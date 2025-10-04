@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Calendar as CalendarIcon, Clock, MapPin } from "lucide-react";
+import { Calendar as CalendarIcon, Clock, MapPin, CheckCircle2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Property, Visit } from "@/types";
 import { toast } from "sonner";
@@ -16,8 +16,6 @@ const Visits = () => {
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     propertyId: "",
-    date: new Date().toISOString().split("T")[0],
-    time: new Date().toTimeString().slice(0, 5),
     price: "",
     notes: "",
   });
@@ -79,8 +77,8 @@ const Visits = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.propertyId || !formData.date || !formData.time) {
-      toast.error("Please fill in all required fields");
+    if (!formData.propertyId) {
+      toast.error("Please select a property");
       return;
     }
 
@@ -92,12 +90,17 @@ const Visits = () => {
 
     try {
       setLoading(true);
+      // Capture current date and time automatically
+      const now = new Date();
+      const currentDate = now.toISOString().split("T")[0];
+      const currentTime = now.toTimeString().slice(0, 5);
+
       const { error } = await supabase
         .from("visits")
         .insert({
           property_id: formData.propertyId,
-          date: formData.date,
-          time: formData.time,
+          date: currentDate,
+          time: currentTime,
           price,
           notes: formData.notes || null,
         });
@@ -106,8 +109,6 @@ const Visits = () => {
 
       setFormData({
         propertyId: "",
-        date: new Date().toISOString().split("T")[0],
-        time: new Date().toTimeString().slice(0, 5),
         price: "",
         notes: "",
       });
@@ -133,91 +134,90 @@ const Visits = () => {
   };
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6 animate-fade-in pb-6">
       <div className="pb-4 border-b border-border/50">
-        <h1 className="text-4xl font-bold bg-gradient-primary bg-clip-text text-transparent">Log Visit</h1>
-        <p className="text-muted-foreground mt-1">Record property visits quickly</p>
+        <h1 className="text-3xl sm:text-4xl font-bold bg-gradient-primary bg-clip-text text-transparent">Log Visit</h1>
+        <p className="text-muted-foreground mt-1 text-sm sm:text-base">Quick entry for property visits</p>
       </div>
 
       <Card className="shadow-card border-border/50">
-        <CardHeader className="bg-gradient-subtle rounded-t-lg">
-          <CardTitle className="text-foreground">New Visit</CardTitle>
-          <CardDescription className="text-muted-foreground">Log a new property visit</CardDescription>
+        <CardHeader className="bg-gradient-subtle rounded-t-lg pb-4">
+          <CardTitle className="text-lg sm:text-xl text-foreground">New Visit Entry</CardTitle>
+          <CardDescription className="text-muted-foreground text-sm">
+            Select property and log your visit instantly
+          </CardDescription>
         </CardHeader>
         <CardContent className="pt-6">
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="property">Property *</Label>
+          <form onSubmit={handleSubmit} className="space-y-5">
+            {/* Property Selection - Large and prominent */}
+            <div className="space-y-3">
+              <Label htmlFor="property" className="text-base font-semibold">Select Property *</Label>
               <Select value={formData.propertyId} onValueChange={handlePropertySelect}>
-                <SelectTrigger id="property" className="text-base">
-                  <SelectValue placeholder="Select a property" />
+                <SelectTrigger id="property" className="h-14 text-lg border-2 focus:border-primary">
+                  <SelectValue placeholder="Choose a property" />
                 </SelectTrigger>
                 <SelectContent>
                   {properties.map((property) => (
-                    <SelectItem key={property.id} value={property.id}>
-                      {property.name} - ${property.visitPrice.toFixed(2)}
+                    <SelectItem key={property.id} value={property.id} className="text-base py-3">
+                      <div className="flex flex-col">
+                        <span className="font-semibold">{property.name}</span>
+                        <span className="text-sm text-muted-foreground">${property.visitPrice.toFixed(2)}</span>
+                      </div>
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="date" className="flex items-center gap-2">
-                  <CalendarIcon className="w-4 h-4" />
-                  Date *
-                </Label>
-                <Input
-                  id="date"
-                  type="date"
-                  value={formData.date}
-                  onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                  className="text-base"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="time" className="flex items-center gap-2">
-                  <Clock className="w-4 h-4" />
-                  Time *
-                </Label>
-                <Input
-                  id="time"
-                  type="time"
-                  value={formData.time}
-                  onChange={(e) => setFormData({ ...formData, time: e.target.value })}
-                  className="text-base"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="price">Visit Price ($) *</Label>
+            {/* Visit Price - Large input */}
+            <div className="space-y-3">
+              <Label htmlFor="price" className="text-base font-semibold">Visit Price ($) *</Label>
               <Input
                 id="price"
                 type="number"
                 step="0.01"
                 value={formData.price}
                 onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                className="text-base"
+                className="h-14 text-lg border-2 focus:border-primary"
                 placeholder="Auto-filled from property"
               />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="notes">Notes (Optional)</Label>
+            {/* Notes - Optional */}
+            <div className="space-y-3">
+              <Label htmlFor="notes" className="text-base font-semibold">Notes (Optional)</Label>
               <Textarea
                 id="notes"
                 value={formData.notes}
                 onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                placeholder="Any additional notes about this visit..."
-                className="text-base min-h-[100px]"
+                placeholder="Any notes about this visit..."
+                className="text-base min-h-[120px] border-2 focus:border-primary"
               />
             </div>
 
-            <Button type="submit" disabled={loading} className="w-full md:w-auto shadow-warm">
-              {loading ? "Logging..." : "Log Visit"}
+            {/* Auto-capture notice */}
+            <div className="bg-primary/5 border border-primary/20 rounded-lg p-4 flex items-start gap-3">
+              <Clock className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" />
+              <div className="text-sm text-muted-foreground">
+                <p className="font-semibold text-foreground mb-1">Auto-tracked</p>
+                <p>Date and time will be recorded automatically when you submit</p>
+              </div>
+            </div>
+
+            {/* Large submit button */}
+            <Button 
+              type="submit" 
+              disabled={loading} 
+              className="w-full h-14 text-lg font-semibold shadow-warm hover:scale-[1.02] transition-transform"
+            >
+              {loading ? (
+                "Logging..."
+              ) : (
+                <>
+                  <CheckCircle2 className="w-5 h-5 mr-2" />
+                  Log Visit Now
+                </>
+              )}
             </Button>
           </form>
         </CardContent>
@@ -225,7 +225,7 @@ const Visits = () => {
 
       <Card className="shadow-card border-border/50">
         <CardHeader className="bg-gradient-subtle rounded-t-lg">
-          <CardTitle className="text-xl">Recent Visits</CardTitle>
+          <CardTitle className="text-lg sm:text-xl">Recent Visits</CardTitle>
         </CardHeader>
         <CardContent className="pt-6">
           {visits.length === 0 ? (
@@ -238,24 +238,25 @@ const Visits = () => {
               {visits.map((visit, index) => (
                 <div 
                   key={visit.id} 
-                  className="p-5 border border-border/50 rounded-xl hover:shadow-card transition-all duration-300 hover:scale-[1.01] bg-gradient-subtle"
+                  className="p-4 sm:p-5 border border-border/50 rounded-xl hover:shadow-card transition-all duration-300 bg-gradient-subtle"
                   style={{ animationDelay: `${index * 0.05}s` }}
                 >
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1 space-y-1.5">
-                      <h3 className="font-semibold text-lg text-foreground">{getPropertyName(visit.propertyId)}</h3>
+                  <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                    <div className="flex-1 space-y-2">
+                      <h3 className="font-semibold text-base sm:text-lg text-foreground">
+                        {getPropertyName(visit.propertyId)}
+                      </h3>
                       <p className="text-sm text-muted-foreground flex items-center gap-1.5">
-                        <MapPin className="w-3.5 h-3.5" />
-                        {getPropertyAddress(visit.propertyId)}
+                        <MapPin className="w-3.5 h-3.5 flex-shrink-0" />
+                        <span className="line-clamp-1">{getPropertyAddress(visit.propertyId)}</span>
                       </p>
-                      <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                      <div className="flex flex-wrap items-center gap-3 text-xs sm:text-sm text-muted-foreground">
                         <span className="flex items-center gap-1.5">
                           <CalendarIcon className="w-3.5 h-3.5" />
                           {new Date(visit.date).toLocaleDateString('en-US', { 
-                            weekday: 'short', 
-                            year: 'numeric', 
                             month: 'short', 
-                            day: 'numeric' 
+                            day: 'numeric',
+                            year: 'numeric'
                           })}
                         </span>
                         <span className="flex items-center gap-1.5">
@@ -269,7 +270,7 @@ const Visits = () => {
                         </p>
                       )}
                     </div>
-                    <div className="text-right">
+                    <div className="text-left sm:text-right">
                       <p className="text-2xl font-bold text-primary">${visit.price.toFixed(2)}</p>
                     </div>
                   </div>
