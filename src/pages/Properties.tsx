@@ -3,14 +3,15 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Trash2, MapPin } from "lucide-react";
-import { storage } from "@/lib/storage";
+import { Plus, Trash2, MapPin, Building2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 import { Property } from "@/types";
 import { toast } from "sonner";
 
 const Properties = () => {
   const [properties, setProperties] = useState<Property[]>([]);
   const [showForm, setShowForm] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     address: "",
@@ -21,11 +22,29 @@ const Properties = () => {
     loadProperties();
   }, []);
 
-  const loadProperties = () => {
-    setProperties(storage.getProperties());
+  const loadProperties = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("properties")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+
+      setProperties((data || []).map(p => ({
+        id: p.id,
+        name: p.name,
+        address: p.address,
+        visitPrice: Number(p.visit_price),
+        createdAt: p.created_at,
+      })));
+    } catch (error) {
+      console.error("Error loading properties:", error);
+      toast.error("Failed to load properties");
+    }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!formData.name || !formData.address || !formData.visitPrice) {
@@ -39,52 +58,77 @@ const Properties = () => {
       return;
     }
 
-    storage.addProperty({
-      name: formData.name,
-      address: formData.address,
-      visitPrice,
-    });
+    try {
+      setLoading(true);
+      const { error } = await supabase
+        .from("properties")
+        .insert({
+          name: formData.name,
+          address: formData.address,
+          visit_price: visitPrice,
+        });
 
-    setFormData({ name: "", address: "", visitPrice: "" });
-    setShowForm(false);
-    loadProperties();
-    toast.success("Property added successfully!");
+      if (error) throw error;
+
+      setFormData({ name: "", address: "", visitPrice: "" });
+      setShowForm(false);
+      await loadProperties();
+      toast.success("Property added successfully!");
+    } catch (error) {
+      console.error("Error adding property:", error);
+      toast.error("Failed to add property");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleDelete = (id: string) => {
-    if (confirm("Are you sure you want to delete this property? All associated visits and expenses will remain but will need reassignment.")) {
-      storage.deleteProperty(id);
-      loadProperties();
+  const handleDelete = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this property? All associated visits and expenses will be deleted.")) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from("properties")
+        .delete()
+        .eq("id", id);
+
+      if (error) throw error;
+
+      await loadProperties();
       toast.success("Property deleted");
+    } catch (error) {
+      console.error("Error deleting property:", error);
+      toast.error("Failed to delete property");
     }
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-6 animate-fade-in">
+      <div className="flex items-center justify-between pb-4 border-b border-border/50">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Properties</h1>
-          <p className="text-muted-foreground">Manage your property portfolio</p>
+          <h1 className="text-4xl font-bold bg-gradient-primary bg-clip-text text-transparent">Properties</h1>
+          <p className="text-muted-foreground mt-1">Manage your property portfolio</p>
         </div>
-        <Button onClick={() => setShowForm(!showForm)} className="gap-2 shadow-warm">
+        <Button onClick={() => setShowForm(!showForm)} className="gap-2 shadow-warm hover:scale-105 transition-transform">
           <Plus className="w-4 h-4" />
           Add Property
         </Button>
       </div>
 
       {showForm && (
-        <Card className="shadow-card">
-          <CardHeader>
+        <Card className="shadow-card border-border/50 animate-scale-in">
+          <CardHeader className="bg-gradient-subtle rounded-t-lg">
             <CardTitle className="text-foreground">Add New Property</CardTitle>
             <CardDescription className="text-muted-foreground">Enter property details below</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-6">
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="name">Property Name</Label>
                 <Input
                   id="name"
-                  placeholder="e.g., Peach Street Duplex"
+                  placeholder="e.g., Villa Ct SE - Unit 14"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   className="text-base"
@@ -106,15 +150,15 @@ const Properties = () => {
                   id="visitPrice"
                   type="number"
                   step="0.01"
-                  placeholder="75.00"
+                  placeholder="150.00"
                   value={formData.visitPrice}
                   onChange={(e) => setFormData({ ...formData, visitPrice: e.target.value })}
                   className="text-base"
                 />
               </div>
               <div className="flex gap-2">
-                <Button type="submit" className="shadow-warm">
-                  Add Property
+                <Button type="submit" disabled={loading} className="shadow-warm">
+                  {loading ? "Adding..." : "Add Property"}
                 </Button>
                 <Button type="button" variant="outline" onClick={() => setShowForm(false)}>
                   Cancel
@@ -127,20 +171,27 @@ const Properties = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {properties.length === 0 ? (
-          <Card className="col-span-full shadow-card">
-            <CardContent className="pt-6 text-center">
+          <Card className="col-span-full shadow-card border-border/50">
+            <CardContent className="pt-12 pb-12 text-center">
+              <Building2 className="h-12 w-12 text-muted-foreground mx-auto mb-4 opacity-50" />
               <p className="text-muted-foreground">No properties yet. Add your first property to get started!</p>
             </CardContent>
           </Card>
         ) : (
-          properties.map((property) => (
-            <Card key={property.id} className="shadow-card hover:shadow-warm transition-shadow">
+          properties.map((property, index) => (
+            <Card 
+              key={property.id} 
+              className="shadow-card hover:shadow-warm transition-all duration-300 border-border/50 hover:scale-105 group"
+              style={{ animationDelay: `${index * 0.1}s` }}
+            >
               <CardHeader>
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
-                    <CardTitle className="text-foreground">{property.name}</CardTitle>
-                    <CardDescription className="flex items-center gap-1 mt-1 text-muted-foreground">
-                      <MapPin className="w-3 h-3" />
+                    <CardTitle className="text-foreground group-hover:text-primary transition-colors">
+                      {property.name}
+                    </CardTitle>
+                    <CardDescription className="flex items-center gap-1.5 mt-2 text-muted-foreground">
+                      <MapPin className="w-3.5 h-3.5" />
                       {property.address}
                     </CardDescription>
                   </div>
@@ -155,7 +206,7 @@ const Properties = () => {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="flex items-baseline gap-2">
+                <div className="flex items-baseline gap-2 bg-gradient-subtle p-4 rounded-lg">
                   <span className="text-sm text-muted-foreground">Visit Price:</span>
                   <span className="text-2xl font-bold text-primary">${property.visitPrice.toFixed(2)}</span>
                 </div>

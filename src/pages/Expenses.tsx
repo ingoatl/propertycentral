@@ -5,14 +5,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { DollarSign, Calendar as CalendarIcon } from "lucide-react";
-import { storage } from "@/lib/storage";
+import { DollarSign, Calendar as CalendarIcon, MapPin, Receipt } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 import { Property, Expense } from "@/types";
 import { toast } from "sonner";
 
 const Expenses = () => {
   const [properties, setProperties] = useState<Property[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     propertyId: "",
     amount: "",
@@ -24,12 +25,46 @@ const Expenses = () => {
     loadData();
   }, []);
 
-  const loadData = () => {
-    setProperties(storage.getProperties());
-    setExpenses(storage.getExpenses());
+  const loadData = async () => {
+    try {
+      const { data: propertiesData, error: propertiesError } = await supabase
+        .from("properties")
+        .select("*")
+        .order("name");
+
+      if (propertiesError) throw propertiesError;
+
+      setProperties((propertiesData || []).map(p => ({
+        id: p.id,
+        name: p.name,
+        address: p.address,
+        visitPrice: Number(p.visit_price),
+        createdAt: p.created_at,
+      })));
+
+      const { data: expensesData, error: expensesError } = await supabase
+        .from("expenses")
+        .select("*")
+        .order("date", { ascending: false })
+        .limit(10);
+
+      if (expensesError) throw expensesError;
+
+      setExpenses((expensesData || []).map(e => ({
+        id: e.id,
+        propertyId: e.property_id,
+        amount: Number(e.amount),
+        date: e.date,
+        purpose: e.purpose,
+        createdAt: e.created_at,
+      })));
+    } catch (error) {
+      console.error("Error loading data:", error);
+      toast.error("Failed to load data");
+    }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!formData.propertyId || !formData.amount || !formData.date) {
@@ -43,22 +78,34 @@ const Expenses = () => {
       return;
     }
 
-    storage.addExpense({
-      propertyId: formData.propertyId,
-      amount,
-      date: formData.date,
-      purpose: formData.purpose,
-    });
+    try {
+      setLoading(true);
+      const { error } = await supabase
+        .from("expenses")
+        .insert({
+          property_id: formData.propertyId,
+          amount,
+          date: formData.date,
+          purpose: formData.purpose || null,
+        });
 
-    setFormData({
-      propertyId: "",
-      amount: "",
-      date: new Date().toISOString().split("T")[0],
-      purpose: "",
-    });
+      if (error) throw error;
 
-    loadData();
-    toast.success("Expense added successfully!");
+      setFormData({
+        propertyId: "",
+        amount: "",
+        date: new Date().toISOString().split("T")[0],
+        purpose: "",
+      });
+
+      await loadData();
+      toast.success("Expense added successfully!");
+    } catch (error) {
+      console.error("Error adding expense:", error);
+      toast.error("Failed to add expense");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const getPropertyName = (propertyId: string) => {
@@ -66,22 +113,27 @@ const Expenses = () => {
     return property?.name || "Unknown";
   };
 
+  const getPropertyAddress = (propertyId: string) => {
+    const property = properties.find((p) => p.id === propertyId);
+    return property?.address || "";
+  };
+
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-foreground">Expenses</h1>
-        <p className="text-muted-foreground">Track property-related expenses</p>
+    <div className="space-y-6 animate-fade-in">
+      <div className="pb-4 border-b border-border/50">
+        <h1 className="text-4xl font-bold bg-gradient-primary bg-clip-text text-transparent">Expenses</h1>
+        <p className="text-muted-foreground mt-1">Track property-related expenses</p>
       </div>
 
-      <Card className="shadow-card">
-        <CardHeader>
+      <Card className="shadow-card border-border/50">
+        <CardHeader className="bg-gradient-subtle rounded-t-lg">
           <CardTitle className="text-foreground">Add Expense</CardTitle>
           <CardDescription className="text-muted-foreground">Record a new expense</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="pt-6">
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="property">Property</Label>
+              <Label htmlFor="property">Property *</Label>
               <Select value={formData.propertyId} onValueChange={(value) => setFormData({ ...formData, propertyId: value })}>
                 <SelectTrigger id="property" className="text-base">
                   <SelectValue placeholder="Select a property" />
@@ -100,7 +152,7 @@ const Expenses = () => {
               <div className="space-y-2">
                 <Label htmlFor="amount" className="flex items-center gap-2">
                   <DollarSign className="w-4 h-4" />
-                  Amount
+                  Amount *
                 </Label>
                 <Input
                   id="amount"
@@ -116,7 +168,7 @@ const Expenses = () => {
               <div className="space-y-2">
                 <Label htmlFor="date" className="flex items-center gap-2">
                   <CalendarIcon className="w-4 h-4" />
-                  Date
+                  Date *
                 </Label>
                 <Input
                   id="date"
@@ -139,47 +191,63 @@ const Expenses = () => {
               />
             </div>
 
-            <Button type="submit" className="w-full md:w-auto shadow-warm">
-              Add Expense
+            <Button type="submit" disabled={loading} className="w-full md:w-auto shadow-warm">
+              {loading ? "Adding..." : "Add Expense"}
             </Button>
           </form>
         </CardContent>
       </Card>
 
-      <div className="space-y-4">
-        <h2 className="text-2xl font-bold text-foreground">Recent Expenses</h2>
-        {expenses.length === 0 ? (
-          <Card className="shadow-card">
-            <CardContent className="pt-6 text-center">
+      <Card className="shadow-card border-border/50">
+        <CardHeader className="bg-gradient-subtle rounded-t-lg">
+          <CardTitle className="text-xl">Recent Expenses</CardTitle>
+        </CardHeader>
+        <CardContent className="pt-6">
+          {expenses.length === 0 ? (
+            <div className="text-center py-12">
+              <Receipt className="h-12 w-12 text-muted-foreground mx-auto mb-4 opacity-50" />
               <p className="text-muted-foreground">No expenses recorded yet</p>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="space-y-2">
-            {expenses
-              .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-              .slice(0, 10)
-              .map((expense) => (
-                <Card key={expense.id} className="shadow-card">
-                  <CardContent className="pt-6">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <h3 className="font-semibold text-foreground">{getPropertyName(expense.propertyId)}</h3>
-                        <p className="text-sm text-muted-foreground mt-1">
-                          {new Date(expense.date).toLocaleDateString()}
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {expenses.map((expense, index) => (
+                <div 
+                  key={expense.id} 
+                  className="p-5 border border-border/50 rounded-xl hover:shadow-card transition-all duration-300 hover:scale-[1.01] bg-gradient-subtle"
+                  style={{ animationDelay: `${index * 0.05}s` }}
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1 space-y-1.5">
+                      <h3 className="font-semibold text-lg text-foreground">{getPropertyName(expense.propertyId)}</h3>
+                      <p className="text-sm text-muted-foreground flex items-center gap-1.5">
+                        <MapPin className="w-3.5 h-3.5" />
+                        {getPropertyAddress(expense.propertyId)}
+                      </p>
+                      <p className="text-sm text-muted-foreground flex items-center gap-1.5">
+                        <CalendarIcon className="w-3.5 h-3.5" />
+                        {new Date(expense.date).toLocaleDateString('en-US', { 
+                          weekday: 'short', 
+                          year: 'numeric', 
+                          month: 'short', 
+                          day: 'numeric' 
+                        })}
+                      </p>
+                      {expense.purpose && (
+                        <p className="text-sm text-muted-foreground mt-2 italic border-l-2 border-primary/30 pl-3">
+                          {expense.purpose}
                         </p>
-                        {expense.purpose && <p className="text-sm text-muted-foreground mt-2">{expense.purpose}</p>}
-                      </div>
-                      <div className="text-right">
-                        <p className="text-xl font-bold text-foreground">${expense.amount.toFixed(2)}</p>
-                      </div>
+                      )}
                     </div>
-                  </CardContent>
-                </Card>
+                    <div className="text-right">
+                      <p className="text-2xl font-bold text-red-600 dark:text-red-500">${expense.amount.toFixed(2)}</p>
+                    </div>
+                  </div>
+                </div>
               ))}
-          </div>
-        )}
-      </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 };
