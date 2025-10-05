@@ -139,10 +139,32 @@ const Dashboard = () => {
           </h1>
           <p className="text-muted-foreground mt-1">Overview of all PeachHaus properties</p>
         </div>
-        <Button onClick={exportToCSV} className="shadow-warm hover:scale-105 transition-transform gap-2">
-          <Download className="w-4 h-4" />
-          Export Report
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            onClick={async () => {
+              try {
+                const { error } = await supabase.functions.invoke("send-monthly-report");
+                if (error) {
+                  console.error("Email error:", error);
+                  toast.error("Failed to send test email");
+                } else {
+                  toast.success("Test email sent to anja@peachhausgroup.com!");
+                }
+              } catch (error) {
+                console.error("Test email error:", error);
+                toast.error("Failed to send test email");
+              }
+            }} 
+            className="shadow-warm hover:scale-105 transition-transform gap-2"
+            variant="outline"
+          >
+            Send Test Email
+          </Button>
+          <Button onClick={exportToCSV} className="shadow-warm hover:scale-105 transition-transform gap-2">
+            <Download className="w-4 h-4" />
+            Export Report
+          </Button>
+        </div>
       </div>
 
       {/* Stats Grid */}

@@ -2,3 +2,6 @@ project_id = "ijsxcaaqphaciaenlegl"
 
 [functions.send-report-email]
 verify_jwt = false
+
+[functions.send-monthly-report]
+verify_jwt = false
