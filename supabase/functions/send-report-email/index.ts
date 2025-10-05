@@ -18,28 +18,50 @@ const handler = async (req: Request): Promise<Response> => {
   try {
     const { csvData, fileName }: EmailRequest = await req.json();
     
-    console.log("Sending report email via FormSubmit");
+    console.log("Sending report email via FormSubmit to anja@peachhausgroup.com");
+    console.log("CSV data length:", csvData.length);
 
-    // Using FormSubmit.co to send email
+    // Using FormSubmit.co to send email with CSV content in body
+    const emailBody = `
+PeachHaus Property Report
+
+Report File: ${fileName}
+Generated: ${new Date().toISOString()}
+
+CSV Data:
+${csvData}
+    `;
+
     const formData = new FormData();
-    formData.append("_subject", "PeachHaus Property Report");
+    formData.append("_subject", "PeachHaus Property Report - " + fileName);
     formData.append("_template", "box");
-    formData.append("report", csvData);
-    formData.append("message", `Please find attached the PeachHaus property report (${fileName}).`);
+    formData.append("_captcha", "false");
+    formData.append("message", emailBody);
 
+    console.log("Calling FormSubmit API...");
+    
     const response = await fetch("https://formsubmit.co/anja@peachhausgroup.com", {
       method: "POST",
       body: formData,
     });
 
+    const responseText = await response.text();
+    console.log("FormSubmit response status:", response.status);
+    console.log("FormSubmit response:", responseText);
+
     if (!response.ok) {
-      throw new Error(`FormSubmit returned ${response.status}`);
+      throw new Error(`FormSubmit returned ${response.status}: ${responseText}`);
     }
 
     console.log("Email sent successfully via FormSubmit");
 
     return new Response(
-      JSON.stringify({ success: true, message: "Email sent successfully" }),
+      JSON.stringify({ 
+        success: true, 
+        message: "Email sent successfully",
+        status: response.status,
+        response: responseText
+      }),
       {
         status: 200,
         headers: {
@@ -51,7 +73,7 @@ const handler = async (req: Request): Promise<Response> => {
   } catch (error: any) {
     console.error("Error sending email:", error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: error.message, stack: error.stack }),
       {
         status: 500,
         headers: { "Content-Type": "application/json", ...corsHeaders },
