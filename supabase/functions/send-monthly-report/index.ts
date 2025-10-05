@@ -68,10 +68,18 @@ const handler = async (req: Request): Promise<Response> => {
     const totalNet = totalRevenue - totalExpenses;
 
     // Generate email body with formatted report
-    const reportDate = new Date().toLocaleDateString('en-US', { 
+    const now = new Date();
+    const reportDate = now.toLocaleDateString('en-US', { 
       year: 'numeric', 
       month: 'long', 
       day: 'numeric' 
+    });
+    
+    // Get previous month for subject line
+    const previousMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const previousMonthName = previousMonth.toLocaleDateString('en-US', { 
+      month: 'long',
+      year: 'numeric'
     });
 
     let emailBody = `<h1>PeachHaus Property Report - ${reportDate}</h1>`;
@@ -119,7 +127,7 @@ const handler = async (req: Request): Promise<Response> => {
     const emailResponse = await resend.emails.send({
       from: "PeachHaus Reports <reports@peachhausgroup.com>",
       to: ["anja@peachhausgroup.com"],
-      subject: `PeachHaus Monthly Report - ${reportDate}`,
+      subject: `Property visits for the month of ${previousMonthName} - Please bill clients`,
       html: emailBody,
     });
 
