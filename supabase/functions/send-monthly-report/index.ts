@@ -113,12 +113,14 @@ const handler = async (req: Request): Promise<Response> => {
     });
     emailBody += `</table>`;
 
-    console.log("Email body generated, sending via Resend to anja@peachhausgroup.com...");
+    console.log("Email body generated, sending via Resend...");
 
     // Send email via Resend
+    // Note: Currently sending to admin@peachhausgroup.com (your verified email)
+    // To send to anja@peachhausgroup.com, verify your domain at resend.com/domains
     const emailResponse = await resend.emails.send({
       from: "PeachHaus Reports <onboarding@resend.dev>",
-      to: ["anja@peachhausgroup.com"],
+      to: ["admin@peachhausgroup.com"], // Sending to verified email
       subject: `PeachHaus Monthly Report - ${reportDate}`,
       html: emailBody,
     });
@@ -129,12 +131,12 @@ const handler = async (req: Request): Promise<Response> => {
       throw emailResponse.error;
     }
 
-    console.log("Monthly report sent successfully to anja@peachhausgroup.com!");
+    console.log("Monthly report sent successfully to admin@peachhausgroup.com!");
 
     return new Response(
       JSON.stringify({ 
         success: true, 
-        message: "Monthly report sent successfully to anja@peachhausgroup.com",
+        message: "Monthly report sent successfully to admin@peachhausgroup.com",
         emailId: emailResponse.data?.id,
         stats: {
           properties: properties?.length || 0,
