@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.58.0";
+import { Resend } from "https://esm.sh/resend@2.0.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -8,6 +9,7 @@ const corsHeaders = {
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
 const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
 
 const handler = async (req: Request): Promise<Response> => {
   if (req.method === "OPTIONS") {
@@ -72,72 +74,68 @@ const handler = async (req: Request): Promise<Response> => {
       day: 'numeric' 
     });
 
-    let emailBody = `PeachHaus Property Report - ${reportDate}\n\n`;
-    emailBody += `SUMMARY\n`;
-    emailBody += `========================================\n`;
-    emailBody += `Total Properties: ${properties?.length || 0}\n`;
-    emailBody += `Total Visits: ${totalVisits}\n`;
-    emailBody += `Total Revenue: $${totalRevenue.toFixed(2)}\n`;
-    emailBody += `Total Expenses: $${totalExpenses.toFixed(2)}\n`;
-    emailBody += `Net Balance: $${totalNet.toFixed(2)}\n\n`;
+    let emailBody = `<h1>PeachHaus Property Report - ${reportDate}</h1>`;
+    emailBody += `<h2>SUMMARY</h2>`;
+    emailBody += `<table style="border-collapse: collapse; width: 100%; margin-bottom: 20px;">`;
+    emailBody += `<tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>Total Properties:</strong></td><td style="padding: 8px; border: 1px solid #ddd;">${properties?.length || 0}</td></tr>`;
+    emailBody += `<tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>Total Visits:</strong></td><td style="padding: 8px; border: 1px solid #ddd;">${totalVisits}</td></tr>`;
+    emailBody += `<tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>Total Revenue:</strong></td><td style="padding: 8px; border: 1px solid #ddd;">$${totalRevenue.toFixed(2)}</td></tr>`;
+    emailBody += `<tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>Total Expenses:</strong></td><td style="padding: 8px; border: 1px solid #ddd;">$${totalExpenses.toFixed(2)}</td></tr>`;
+    emailBody += `<tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>Net Balance:</strong></td><td style="padding: 8px; border: 1px solid #ddd;"><strong>$${totalNet.toFixed(2)}</strong></td></tr>`;
+    emailBody += `</table>`;
 
-    emailBody += `PROPERTY PERFORMANCE\n`;
-    emailBody += `========================================\n\n`;
-
+    emailBody += `<h2>PROPERTY PERFORMANCE</h2>`;
     summaries.forEach(summary => {
-      emailBody += `${summary.name}\n`;
-      emailBody += `Address: ${summary.address}\n`;
-      emailBody += `Visit Rate: $${summary.visitPrice.toFixed(2)}\n`;
-      emailBody += `Visits: ${summary.visitCount}\n`;
-      emailBody += `Revenue: $${summary.visitTotal.toFixed(2)}\n`;
-      emailBody += `Expenses: $${summary.expenseTotal.toFixed(2)}\n`;
-      emailBody += `Net: $${summary.netBalance.toFixed(2)}\n`;
-      emailBody += `----------------------------------------\n\n`;
+      emailBody += `<div style="border: 1px solid #ddd; padding: 15px; margin-bottom: 15px; background-color: #f9f9f9;">`;
+      emailBody += `<h3>${summary.name}</h3>`;
+      emailBody += `<p><strong>Address:</strong> ${summary.address}</p>`;
+      emailBody += `<p><strong>Visit Rate:</strong> $${summary.visitPrice.toFixed(2)}</p>`;
+      emailBody += `<p><strong>Visits:</strong> ${summary.visitCount} | <strong>Revenue:</strong> $${summary.visitTotal.toFixed(2)}</p>`;
+      emailBody += `<p><strong>Expenses:</strong> $${summary.expenseTotal.toFixed(2)} | <strong>Net:</strong> $${summary.netBalance.toFixed(2)}</p>`;
+      emailBody += `</div>`;
     });
 
-    // Add detailed visit and expense logs
-    emailBody += `DETAILED VISITS LOG\n`;
-    emailBody += `========================================\n`;
+    emailBody += `<h2>DETAILED VISITS LOG</h2>`;
+    emailBody += `<table style="border-collapse: collapse; width: 100%; margin-bottom: 20px;">`;
+    emailBody += `<tr><th style="padding: 8px; border: 1px solid #ddd; background-color: #f0f0f0;">Date</th><th style="padding: 8px; border: 1px solid #ddd; background-color: #f0f0f0;">Property</th><th style="padding: 8px; border: 1px solid #ddd; background-color: #f0f0f0;">Amount</th><th style="padding: 8px; border: 1px solid #ddd; background-color: #f0f0f0;">Notes</th></tr>`;
     (visits || []).forEach(visit => {
       const property = properties?.find(p => p.id === visit.property_id);
-      emailBody += `${visit.date} - ${property?.name || 'Unknown'} - $${Number(visit.price).toFixed(2)}${visit.notes ? ' - ' + visit.notes : ''}\n`;
+      emailBody += `<tr><td style="padding: 8px; border: 1px solid #ddd;">${visit.date}</td><td style="padding: 8px; border: 1px solid #ddd;">${property?.name || 'Unknown'}</td><td style="padding: 8px; border: 1px solid #ddd;">$${Number(visit.price).toFixed(2)}</td><td style="padding: 8px; border: 1px solid #ddd;">${visit.notes || '-'}</td></tr>`;
     });
+    emailBody += `</table>`;
 
-    emailBody += `\n\nDETAILED EXPENSES LOG\n`;
-    emailBody += `========================================\n`;
+    emailBody += `<h2>DETAILED EXPENSES LOG</h2>`;
+    emailBody += `<table style="border-collapse: collapse; width: 100%;">`;
+    emailBody += `<tr><th style="padding: 8px; border: 1px solid #ddd; background-color: #f0f0f0;">Date</th><th style="padding: 8px; border: 1px solid #ddd; background-color: #f0f0f0;">Property</th><th style="padding: 8px; border: 1px solid #ddd; background-color: #f0f0f0;">Amount</th><th style="padding: 8px; border: 1px solid #ddd; background-color: #f0f0f0;">Purpose</th></tr>`;
     (expenses || []).forEach(expense => {
       const property = properties?.find(p => p.id === expense.property_id);
-      emailBody += `${expense.date} - ${property?.name || 'Unknown'} - $${Number(expense.amount).toFixed(2)}${expense.purpose ? ' - ' + expense.purpose : ''}\n`;
+      emailBody += `<tr><td style="padding: 8px; border: 1px solid #ddd;">${expense.date}</td><td style="padding: 8px; border: 1px solid #ddd;">${property?.name || 'Unknown'}</td><td style="padding: 8px; border: 1px solid #ddd;">$${Number(expense.amount).toFixed(2)}</td><td style="padding: 8px; border: 1px solid #ddd;">${expense.purpose || '-'}</td></tr>`;
+    });
+    emailBody += `</table>`;
+
+    console.log("Email body generated, sending via Resend to anja@peachhausgroup.com...");
+
+    // Send email via Resend
+    const emailResponse = await resend.emails.send({
+      from: "PeachHaus Reports <onboarding@resend.dev>",
+      to: ["anja@peachhausgroup.com"],
+      subject: `PeachHaus Monthly Report - ${reportDate}`,
+      html: emailBody,
     });
 
-    console.log("Email body generated, sending via FormSubmit...");
+    console.log("Resend response:", emailResponse);
 
-    // Send email via FormSubmit
-    const formData = new FormData();
-    formData.append("_subject", `PeachHaus Monthly Report - ${reportDate}`);
-    formData.append("_template", "box");
-    formData.append("_captcha", "false");
-    formData.append("message", emailBody);
-
-    const response = await fetch("https://formsubmit.co/anja@peachhausgroup.com", {
-      method: "POST",
-      body: formData,
-    });
-
-    const responseText = await response.text();
-    console.log("FormSubmit response status:", response.status);
-    console.log("FormSubmit response:", responseText);
-
-    if (!response.ok) {
-      throw new Error(`FormSubmit returned ${response.status}: ${responseText}`);
+    if (emailResponse.error) {
+      throw emailResponse.error;
     }
 
-    console.log("Monthly report sent successfully!");
+    console.log("Monthly report sent successfully to anja@peachhausgroup.com!");
 
     return new Response(
       JSON.stringify({ 
         success: true, 
-        message: "Monthly report sent successfully",
+        message: "Monthly report sent successfully to anja@peachhausgroup.com",
+        emailId: emailResponse.data?.id,
         stats: {
           properties: properties?.length || 0,
           visits: totalVisits,
