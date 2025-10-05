@@ -85,16 +85,30 @@ const Dashboard = () => {
         csv += `Expense,"${property?.name}","${expense.date}",${expense.amount},"${expense.purpose || ""}"\n`;
       });
 
+      const fileName = `peachhaus-report-${new Date().toISOString().split("T")[0]}.csv`;
+
+      // Download locally
       const blob = new Blob([csv], { type: "text/csv" });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `peachhaus-report-${new Date().toISOString().split("T")[0]}.csv`;
+      a.download = fileName;
       a.click();
       window.URL.revokeObjectURL(url);
 
-      toast.success("Report exported successfully!");
+      // Send via email
+      const { error: emailError } = await supabase.functions.invoke("send-report-email", {
+        body: { csvData: csv, fileName }
+      });
+
+      if (emailError) {
+        console.error("Email error:", emailError);
+        toast.success("Report exported! Email sending failed.");
+      } else {
+        toast.success("Report exported and emailed to anja@peachhausgroup.com!");
+      }
     } catch (error) {
+      console.error("Export error:", error);
       toast.error("Failed to export report");
     }
   };
