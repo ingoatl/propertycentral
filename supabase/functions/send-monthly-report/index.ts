@@ -115,9 +115,9 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log("Email body generated, sending via Resend to anja@peachhausgroup.com...");
 
-    // Send email via Resend
+    // Send email via Resend - using verified domain
     const emailResponse = await resend.emails.send({
-      from: "PeachHaus Reports <onboarding@resend.dev>",
+      from: "PeachHaus Reports <reports@peachhausgroup.com>",
       to: ["anja@peachhausgroup.com"],
       subject: `PeachHaus Monthly Report - ${reportDate}`,
       html: emailBody,
