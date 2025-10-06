@@ -39,6 +39,8 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     console.log('Fetching listings from OwnerRez...');
+    console.log('API Key present:', !!ownerrezApiKey);
+    console.log('API Key length:', ownerrezApiKey?.length);
 
     // Define management fee structure per property
     const managementFeeRates: Record<string, number> = {
@@ -68,7 +70,12 @@ serve(async (req) => {
       },
     });
 
+    console.log('OwnerRez response status:', listingsResponse.status);
+    console.log('OwnerRez response headers:', Object.fromEntries(listingsResponse.headers.entries()));
+    
     if (!listingsResponse.ok) {
+      const errorText = await listingsResponse.text();
+      console.error('OwnerRez API error response:', errorText);
       throw new Error(`OwnerRez API error: ${listingsResponse.statusText}`);
     }
 
