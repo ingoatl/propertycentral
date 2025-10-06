@@ -17,9 +17,10 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    console.log("Starting test monthly statement generation for Villa 14...");
+    console.log("Starting test monthly statement generation for Smoke Hollow...");
     
     const supabase = createClient(supabaseUrl, supabaseKey);
+    const lovableApiKey = Deno.env.get("LOVABLE_API_KEY");
 
     // Get current and previous month dates
     const now = new Date();
@@ -38,26 +39,26 @@ const handler = async (req: Request): Promise<Response> => {
       day: 'numeric' 
     });
 
-    // Fetch Villa 14 property
+    // Fetch Smoke Hollow property
     const { data: properties, error: propertiesError } = await supabase
       .from("properties")
       .select("*, rental_type")
-      .ilike("name", "%villa%14%");
+      .ilike("name", "%smoke%hollow%");
 
     if (propertiesError) throw propertiesError;
     
     if (!properties || properties.length === 0) {
-      throw new Error("Villa 14 not found");
+      throw new Error("Smoke Hollow not found");
     }
 
-    const villa14 = properties[0];
-    console.log("Found Villa 14:", villa14);
+    const property = properties[0];
+    console.log("Found property:", property);
 
     // Fetch visits and expenses for this property (all time for demo)
     const { data: visits, error: visitsError } = await supabase
       .from("visits")
       .select("*")
-      .eq("property_id", villa14.id)
+      .eq("property_id", property.id)
       .order("date", { ascending: false });
 
     if (visitsError) throw visitsError;
@@ -65,7 +66,7 @@ const handler = async (req: Request): Promise<Response> => {
     const { data: expenses, error: expensesError } = await supabase
       .from("expenses")
       .select("*")
-      .eq("property_id", villa14.id)
+      .eq("property_id", property.id)
       .order("date", { ascending: false });
 
     if (expensesError) throw expensesError;
@@ -73,11 +74,24 @@ const handler = async (req: Request): Promise<Response> => {
     const { data: bookings, error: bookingsError } = await supabase
       .from("ownerrez_bookings")
       .select("*")
-      .eq("property_id", villa14.id);
+      .eq("property_id", property.id);
 
     if (bookingsError) throw bookingsError;
 
-    console.log(`Found ${visits?.length || 0} visits, ${expenses?.length || 0} expenses, ${bookings?.length || 0} bookings`);
+    // Check for active mid-term bookings
+    const { data: midTermBookings, error: midTermError } = await supabase
+      .from("mid_term_bookings")
+      .select("*")
+      .eq("property_id", property.id)
+      .eq("status", "active")
+      .gte("end_date", firstDayOfPreviousMonth.toISOString().split('T')[0])
+      .lte("start_date", lastDayOfPreviousMonth.toISOString().split('T')[0]);
+
+    if (midTermError) throw midTermError;
+
+    const hasMidTermBooking = midTermBookings && midTermBookings.length > 0;
+
+    console.log(`Found ${visits?.length || 0} visits, ${expenses?.length || 0} expenses, ${bookings?.length || 0} bookings, ${midTermBookings?.length || 0} mid-term bookings`);
 
     // Generate signed URLs for expense documents
     const expenseDocuments: { [key: string]: string } = {};
@@ -97,12 +111,92 @@ const handler = async (req: Request): Promise<Response> => {
       }
     }
 
-    // Calculate totals
+    // Calculate totals including mid-term revenue
     const visitTotal = (visits || []).reduce((sum, v) => sum + Number(v.price), 0);
     const expenseTotal = (expenses || []).reduce((sum, e) => sum + Number(e.amount), 0);
     const bookingRevenue = (bookings || []).reduce((sum, b) => sum + Number(b.total_amount), 0);
     const managementFees = (bookings || []).reduce((sum, b) => sum + Number(b.management_fee), 0);
-    const netIncome = bookingRevenue - managementFees - expenseTotal;
+    
+    // Calculate mid-term revenue for the month
+    const midTermRevenue = (midTermBookings || []).reduce((sum, b) => sum + Number(b.monthly_rent), 0);
+    const totalRevenue = bookingRevenue + midTermRevenue;
+    
+    const netIncome = totalRevenue - managementFees - expenseTotal;
+
+    // Generate AI insights
+    console.log("Generating AI insights...");
+    let aiInsights = "";
+    
+    try {
+      const propertyContext = `
+Property: ${property.name}
+Location: ${property.address}
+Type: ${property.rental_type === 'hybrid' ? 'Hybrid (Short-term & Mid-term)' : property.rental_type === 'mid_term' ? 'Mid-term' : 'Long-term'}
+Has Active Mid-term Booking: ${hasMidTermBooking ? 'Yes' : 'No'}
+Previous Month: ${previousMonthName}
+Bookings: ${bookings?.length || 0}
+Revenue: $${totalRevenue.toFixed(2)}
+Visits: ${visits?.length || 0}
+Expenses: $${expenseTotal.toFixed(2)}
+      `.trim();
+
+      const aiPrompt = property.rental_type === 'hybrid' && !hasMidTermBooking
+        ? `You are a professional property management expert. Analyze this ${property.rental_type} rental property and provide:
+
+${propertyContext}
+
+Provide a comprehensive, professional analysis in HTML format (use <p>, <strong>, <ul>, <li> tags) covering:
+
+1. **Property Performance Analysis**: Brief analysis of the property's performance this month
+2. **Market Trends**: Current vacation rental and mid-term rental market trends for properties in ${property.address.split(',').pop()?.trim() || 'this area'}
+3. **Local Events & Opportunities**: Upcoming events, seasonal trends, or factors that could drive bookings
+4. **Marketing Strategy**: Mention that we are actively conducting targeted marketing campaigns and corporate outreach to:
+   - Major corporations for corporate housing needs
+   - Insurance companies for temporary housing programs
+   - Healthcare facilities for traveling professionals
+   - Educational institutions for visiting faculty
+
+Keep the tone professional, optimistic, and data-driven. Focus on opportunities and our proactive approach.`
+        : `You are a professional property management expert. Analyze this ${property.rental_type} rental property and provide:
+
+${propertyContext}
+
+Provide a comprehensive, professional analysis in HTML format (use <p>, <strong>, <ul>, <li> tags) covering:
+
+1. **Property Performance Analysis**: Brief analysis of the property's performance this month
+2. **Market Trends**: Current ${property.rental_type === 'hybrid' ? 'vacation and mid-term rental' : property.rental_type === 'mid_term' ? 'mid-term rental' : 'long-term rental'} market trends for properties in ${property.address.split(',').pop()?.trim() || 'this area'}
+3. **Local Events & Opportunities**: Upcoming events, seasonal trends, or factors that could drive bookings
+4. **Recommendations**: Specific actionable recommendations for maximizing revenue
+
+Keep the tone professional, optimistic, and data-driven.`;
+
+      const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${lovableApiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "google/gemini-2.5-flash",
+          messages: [
+            {
+              role: "user",
+              content: aiPrompt
+            }
+          ],
+        }),
+      });
+
+      if (aiResponse.ok) {
+        const aiData = await aiResponse.json();
+        aiInsights = aiData.choices[0].message.content;
+        console.log("AI insights generated successfully");
+      } else {
+        console.error("AI request failed:", await aiResponse.text());
+      }
+    } catch (error) {
+      console.error("Error generating AI insights:", error);
+    }
 
     // Generate beautiful, friendly email
     let emailBody = `
@@ -149,18 +243,22 @@ const handler = async (req: Request): Promise<Response> => {
               <div style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border-radius: 16px; padding: 25px; margin-bottom: 35px; border: 1px solid #dee2e6;">
                 <div style="display: flex; align-items: start; gap: 15px;">
                   <div style="background: linear-gradient(135deg, #FF6B9D, #C86DD7); width: 50px; height: 50px; border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
-                    <span style="font-size: 24px;">${villa14.rental_type === 'short_term' ? '🏖️' : '🏠'}</span>
+                    <span style="font-size: 24px;">${property.rental_type === 'hybrid' ? '🔄' : property.rental_type === 'mid_term' ? '🏠' : '🏢'}</span>
                   </div>
                   <div style="flex: 1;">
                     <h2 style="margin: 0 0 8px 0; font-size: 22px; color: #2c3e50; font-weight: 600;">
-                      ${villa14.name}
+                      ${property.name}
                     </h2>
                     <p style="margin: 0 0 8px 0; color: #6c757d; font-size: 15px; line-height: 1.5;">
-                      📍 ${villa14.address}
+                      📍 ${property.address}
                     </p>
-                    <span style="display: inline-block; background: ${villa14.rental_type === 'short_term' ? 'linear-gradient(135deg, #667eea, #764ba2)' : 'linear-gradient(135deg, #f59e0b, #d97706)'}; color: white; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 600; letter-spacing: 0.5px;">
-                      ${villa14.rental_type === 'short_term' ? 'SHORT-TERM RENTAL' : 'MID-TERM RENTAL'}
+                    <span style="display: inline-block; background: ${property.rental_type === 'hybrid' ? 'linear-gradient(135deg, #667eea, #764ba2)' : property.rental_type === 'mid_term' ? 'linear-gradient(135deg, #f59e0b, #d97706)' : 'linear-gradient(135deg, #10b981, #059669)'}; color: white; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 600; letter-spacing: 0.5px;">
+                      ${property.rental_type === 'hybrid' ? '🔄 HYBRID RENTAL' : property.rental_type === 'mid_term' ? '🏠 MID-TERM RENTAL' : '🏢 LONG-TERM RENTAL'}
                     </span>
+                    ${hasMidTermBooking ? `
+                    <span style="display: inline-block; background: linear-gradient(135deg, #10b981, #059669); color: white; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 600; letter-spacing: 0.5px; margin-left: 8px;">
+                      ✓ ACTIVE MID-TERM TENANT
+                    </span>` : ''}
                   </div>
                 </div>
               </div>
@@ -171,17 +269,29 @@ const handler = async (req: Request): Promise<Response> => {
                   💰 Financial Summary
                 </h2>
                 <p style="text-align: center; color: rgba(255,255,255,0.95); margin: 0 0 25px 0; font-size: 15px;">
-                  ${villa14.rental_type === 'short_term' 
-                    ? 'Your short-term rental generated revenue from guest bookings this month.' 
-                    : 'Your mid-term rental property performance including visits and maintenance.'}
+                  ${property.rental_type === 'hybrid' 
+                    ? (hasMidTermBooking 
+                      ? 'Your hybrid property generated revenue from both short-term bookings and mid-term rental this month.' 
+                      : 'Your hybrid property revenue from short-term bookings. We are actively marketing for mid-term opportunities.')
+                    : property.rental_type === 'mid_term'
+                    ? 'Your mid-term rental property performance including tenant revenue and maintenance.'
+                    : 'Your long-term rental property performance this month.'}
                 </p>
                 <table style="width: 100%; border-collapse: separate; border-spacing: 0 12px;">
+                  ${bookingRevenue > 0 ? `
                   <tr>
                     <td style="background: rgba(255,255,255,0.15); padding: 18px 22px; border-radius: 10px; backdrop-filter: blur(10px);">
-                      <p style="margin: 0 0 8px 0; color: rgba(255,255,255,0.9); font-size: 13px; text-transform: uppercase; letter-spacing: 1.2px; font-weight: 500;">Booking Revenue</p>
-                      <p style="margin: 0; color: white; font-size: 32px; font-weight: 700;">${bookingRevenue > 0 ? '$' + bookingRevenue.toFixed(2) : '$0.00'}</p>
+                      <p style="margin: 0 0 8px 0; color: rgba(255,255,255,0.9); font-size: 13px; text-transform: uppercase; letter-spacing: 1.2px; font-weight: 500;">Short-term Booking Revenue</p>
+                      <p style="margin: 0; color: white; font-size: 32px; font-weight: 700;">$${bookingRevenue.toFixed(2)}</p>
                     </td>
-                  </tr>
+                  </tr>` : ''}
+                  ${midTermRevenue > 0 ? `
+                  <tr>
+                    <td style="background: rgba(255,255,255,0.15); padding: 18px 22px; border-radius: 10px; backdrop-filter: blur(10px);">
+                      <p style="margin: 0 0 8px 0; color: rgba(255,255,255,0.9); font-size: 13px; text-transform: uppercase; letter-spacing: 1.2px; font-weight: 500;">Mid-term Rental Revenue</p>
+                      <p style="margin: 0; color: white; font-size: 32px; font-weight: 700;">$${midTermRevenue.toFixed(2)}</p>
+                    </td>
+                  </tr>` : ''}
                   <tr>
                     <td style="background: rgba(255,255,255,0.15); padding: 18px 22px; border-radius: 10px; backdrop-filter: blur(10px);">
                       <p style="margin: 0 0 8px 0; color: rgba(255,255,255,0.9); font-size: 13px; text-transform: uppercase; letter-spacing: 1.2px; font-weight: 500;">Management Fees</p>
@@ -208,19 +318,36 @@ const handler = async (req: Request): Promise<Response> => {
                 </div>
               </div>`;
 
+    // Add AI Insights Section
+    if (aiInsights) {
+      emailBody += `
+              <div style="margin-bottom: 35px;">
+                <h3 style="color: #2c3e50; margin: 0 0 20px 0; font-size: 22px; font-weight: 600; display: flex; align-items: center; gap: 10px;">
+                  <span style="background: linear-gradient(135deg, #8B5CF6, #7C3AED); width: 38px; height: 38px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 18px;">🎯</span>
+                  Property Insights & Market Analysis
+                </h3>
+                <div style="background: #f8f9fa; border-radius: 12px; padding: 25px; border: 1px solid #e9ecef; color: #34495e; font-size: 15px; line-height: 1.8;">
+                  ${aiInsights}
+                </div>
+              </div>`;
+    }
+
     // Add Visits Section if there are any
     if (visits && visits.length > 0) {
-      const isShortTerm = villa14.rental_type === 'short_term';
+      const isHybrid = property.rental_type === 'hybrid';
+      const isMidTerm = property.rental_type === 'mid_term';
       emailBody += `
               <div style="margin-bottom: 35px;">
                 <h3 style="color: #2c3e50; margin: 0 0 20px 0; font-size: 22px; font-weight: 600; display: flex; align-items: center; gap: 10px;">
                   <span style="background: linear-gradient(135deg, #667eea, #764ba2); width: 38px; height: 38px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 18px;">🏃</span>
-                  ${isShortTerm ? 'Property Visits' : 'Property Inspections & Visits'}
+                  ${isHybrid ? 'Property Visits & Inspections' : isMidTerm ? 'Property Inspections & Visits' : 'Property Visits'}
                 </h3>
                 <p style="color: #6c757d; margin: 0 0 20px 0; font-size: 15px;">
-                  ${isShortTerm 
-                    ? `Our team made ${visits.length} visit${visits.length > 1 ? 's' : ''} to ensure your property is in perfect condition.`
-                    : `We conducted ${visits.length} professional inspection${visits.length > 1 ? 's' : ''} and visit${visits.length > 1 ? 's' : ''} to maintain your property and ensure tenant satisfaction.`
+                  ${isHybrid
+                    ? `Our team made ${visits.length} visit${visits.length > 1 ? 's' : ''} to ensure your property is in perfect condition for both short-term guests and potential mid-term tenants.`
+                    : isMidTerm 
+                    ? `We conducted ${visits.length} professional inspection${visits.length > 1 ? 's' : ''} and visit${visits.length > 1 ? 's' : ''} to maintain your property and ensure tenant satisfaction.`
+                    : `Our team made ${visits.length} visit${visits.length > 1 ? 's' : ''} to ensure your property is in perfect condition.`
                   }
                 </p>
                 <div style="background: #f8f9fa; border-radius: 12px; overflow: hidden; border: 1px solid #e9ecef;">`;
@@ -335,7 +462,7 @@ const handler = async (req: Request): Promise<Response> => {
     const emailResponse = await resend.emails.send({
       from: "PeachHaus Property Management <reports@peachhausgroup.com>",
       to: ["ingo@peachhausgroup.com"],
-      subject: `🏡 Your ${villa14.name} Update for ${previousMonthName}`,
+      subject: `🏡 Your ${property.name} Update for ${previousMonthName}`,
       html: emailBody,
     });
 
@@ -352,12 +479,15 @@ const handler = async (req: Request): Promise<Response> => {
         success: true, 
         message: "Test email sent successfully to ingo@peachhausgroup.com",
         emailId: emailResponse.data?.id,
-        property: villa14.name,
+        property: property.name,
         stats: {
           visits: visits?.length || 0,
           expenses: expenses?.length || 0,
-          revenue: bookingRevenue,
-          netIncome: netIncome
+          bookingRevenue: bookingRevenue,
+          midTermRevenue: midTermRevenue,
+          totalRevenue: totalRevenue,
+          netIncome: netIncome,
+          hasMidTermBooking: hasMidTermBooking
         }
       }),
       {
