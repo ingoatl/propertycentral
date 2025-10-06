@@ -69,57 +69,148 @@ const handler = async (req: Request): Promise<Response> => {
 
     // Generate email body with formatted report
     const now = new Date();
-    const reportDate = now.toLocaleDateString('en-US', { 
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric' 
+    const currentMonth = now.toLocaleDateString('en-US', { 
+      month: 'long',
+      year: 'numeric'
     });
     
-    // Get previous month for subject line
     const previousMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const previousMonthName = previousMonth.toLocaleDateString('en-US', { 
       month: 'long',
       year: 'numeric'
     });
 
-    let emailBody = `<h1>PeachHaus Property Report - ${reportDate}</h1>`;
-    emailBody += `<h2>SUMMARY</h2>`;
-    emailBody += `<table style="border-collapse: collapse; width: 100%; margin-bottom: 20px;">`;
-    emailBody += `<tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>Total Properties:</strong></td><td style="padding: 8px; border: 1px solid #ddd;">${properties?.length || 0}</td></tr>`;
-    emailBody += `<tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>Total Visits:</strong></td><td style="padding: 8px; border: 1px solid #ddd;">${totalVisits}</td></tr>`;
-    emailBody += `<tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>Total Revenue:</strong></td><td style="padding: 8px; border: 1px solid #ddd;">$${totalRevenue.toFixed(2)}</td></tr>`;
-    emailBody += `<tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>Total Expenses:</strong></td><td style="padding: 8px; border: 1px solid #ddd;">$${totalExpenses.toFixed(2)}</td></tr>`;
-    emailBody += `<tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>Net Balance:</strong></td><td style="padding: 8px; border: 1px solid #ddd;"><strong>$${totalNet.toFixed(2)}</strong></td></tr>`;
-    emailBody += `</table>`;
+    const reportDate = now.toLocaleDateString('en-US', { 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    });
 
-    emailBody += `<h2>PROPERTY PERFORMANCE</h2>`;
+    let emailBody = `
+      <div style="font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px;">
+        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 10px 10px 0 0; color: white;">
+          <h1 style="margin: 0 0 10px 0; font-size: 28px;">PeachHaus Property Report</h1>
+          <p style="margin: 0; font-size: 16px; opacity: 0.9;">${previousMonthName} - ${currentMonth}</p>
+        </div>
+        
+        <div style="background: white; padding: 30px; border: 1px solid #e0e0e0; border-top: none;">
+          <p style="font-size: 16px; line-height: 1.6; color: #333; margin-top: 0;">Dear Anja,</p>
+          
+          <p style="font-size: 16px; line-height: 1.6; color: #333;">
+            I hope this email finds you well! Please find below the comprehensive property report for 
+            <strong>${previousMonthName}</strong> through <strong>${currentMonth}</strong>.
+          </p>
+          
+          <p style="font-size: 16px; line-height: 1.6; color: #333; background: #fff3cd; padding: 15px; border-left: 4px solid #ffc107; border-radius: 4px;">
+            <strong>⚠️ Action Required:</strong> Please review the visit logs below and proceed with billing the respective clients accordingly. 
+            All visit details and corresponding properties are listed for your reference.
+          </p>
+
+          <h2 style="color: #667eea; border-bottom: 2px solid #667eea; padding-bottom: 10px; margin-top: 30px;">📊 Executive Summary</h2>
+          <table style="border-collapse: collapse; width: 100%; margin-bottom: 30px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+            <tr style="background: #f8f9fa;">
+              <td style="padding: 15px; border: 1px solid #ddd; font-weight: bold; color: #495057;">Total Properties</td>
+              <td style="padding: 15px; border: 1px solid #ddd; text-align: right; font-size: 18px;">${properties?.length || 0}</td>
+            </tr>
+            <tr>
+              <td style="padding: 15px; border: 1px solid #ddd; font-weight: bold; color: #495057;">Total Visits</td>
+              <td style="padding: 15px; border: 1px solid #ddd; text-align: right; font-size: 18px;">${totalVisits}</td>
+            </tr>
+            <tr style="background: #f8f9fa;">
+              <td style="padding: 15px; border: 1px solid #ddd; font-weight: bold; color: #495057;">Total Revenue</td>
+              <td style="padding: 15px; border: 1px solid #ddd; text-align: right; font-size: 18px; color: #28a745; font-weight: bold;">$${totalRevenue.toFixed(2)}</td>
+            </tr>
+            <tr>
+              <td style="padding: 15px; border: 1px solid #ddd; font-weight: bold; color: #495057;">Total Expenses</td>
+              <td style="padding: 15px; border: 1px solid #ddd; text-align: right; font-size: 18px; color: #dc3545;">$${totalExpenses.toFixed(2)}</td>
+            </tr>
+          </table>
+
+          <h2 style="color: #667eea; border-bottom: 2px solid #667eea; padding-bottom: 10px; margin-top: 30px;">🏠 Property Performance</h2>`;
+    
     summaries.forEach(summary => {
-      emailBody += `<div style="border: 1px solid #ddd; padding: 15px; margin-bottom: 15px; background-color: #f9f9f9;">`;
-      emailBody += `<h3>${summary.name}</h3>`;
-      emailBody += `<p><strong>Address:</strong> ${summary.address}</p>`;
-      emailBody += `<p><strong>Visit Rate:</strong> $${summary.visitPrice.toFixed(2)}</p>`;
-      emailBody += `<p><strong>Visits:</strong> ${summary.visitCount} | <strong>Revenue:</strong> $${summary.visitTotal.toFixed(2)}</p>`;
-      emailBody += `<p><strong>Expenses:</strong> $${summary.expenseTotal.toFixed(2)} | <strong>Net:</strong> $${summary.netBalance.toFixed(2)}</p>`;
-      emailBody += `</div>`;
+      emailBody += `
+        <div style="border: 1px solid #e0e0e0; padding: 20px; margin-bottom: 20px; background: linear-gradient(to right, #f8f9fa, #ffffff); border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+          <h3 style="color: #667eea; margin-top: 0; font-size: 20px;">${summary.name}</h3>
+          <p style="color: #6c757d; margin: 5px 0;"><strong>📍 Address:</strong> ${summary.address}</p>
+          <p style="color: #6c757d; margin: 5px 0;"><strong>💰 Visit Rate:</strong> $${summary.visitPrice.toFixed(2)}</p>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px;">
+            <div style="background: white; padding: 10px; border-radius: 4px; border-left: 3px solid #17a2b8;">
+              <strong>Visits:</strong> ${summary.visitCount} | <strong style="color: #28a745;">Revenue:</strong> $${summary.visitTotal.toFixed(2)}
+            </div>
+            <div style="background: white; padding: 10px; border-radius: 4px; border-left: 3px solid #dc3545;">
+              <strong style="color: #dc3545;">Expenses:</strong> $${summary.expenseTotal.toFixed(2)}
+            </div>
+          </div>
+        </div>`;
     });
 
-    emailBody += `<h2>DETAILED VISITS LOG</h2>`;
-    emailBody += `<table style="border-collapse: collapse; width: 100%; margin-bottom: 20px;">`;
-    emailBody += `<tr><th style="padding: 8px; border: 1px solid #ddd; background-color: #f0f0f0;">Date</th><th style="padding: 8px; border: 1px solid #ddd; background-color: #f0f0f0;">Property</th><th style="padding: 8px; border: 1px solid #ddd; background-color: #f0f0f0;">Amount</th><th style="padding: 8px; border: 1px solid #ddd; background-color: #f0f0f0;">Notes</th></tr>`;
-    (visits || []).forEach(visit => {
+    emailBody += `
+          <h2 style="color: #667eea; border-bottom: 2px solid #667eea; padding-bottom: 10px; margin-top: 40px;">📋 Detailed Visits Log</h2>
+          <p style="color: #6c757d; margin-bottom: 15px;">Please use this information to bill the respective clients.</p>
+          <table style="border-collapse: collapse; width: 100%; margin-bottom: 30px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+            <tr style="background: #667eea; color: white;">
+              <th style="padding: 12px; border: 1px solid #5568d3; text-align: left;">Date</th>
+              <th style="padding: 12px; border: 1px solid #5568d3; text-align: left;">Property</th>
+              <th style="padding: 12px; border: 1px solid #5568d3; text-align: right;">Amount</th>
+              <th style="padding: 12px; border: 1px solid #5568d3; text-align: left;">Notes</th>
+            </tr>`;
+    
+    (visits || []).forEach((visit, index) => {
       const property = properties?.find(p => p.id === visit.property_id);
-      emailBody += `<tr><td style="padding: 8px; border: 1px solid #ddd;">${visit.date}</td><td style="padding: 8px; border: 1px solid #ddd;">${property?.name || 'Unknown'}</td><td style="padding: 8px; border: 1px solid #ddd;">$${Number(visit.price).toFixed(2)}</td><td style="padding: 8px; border: 1px solid #ddd;">${visit.notes || '-'}</td></tr>`;
+      const bgColor = index % 2 === 0 ? '#f8f9fa' : '#ffffff';
+      emailBody += `
+            <tr style="background: ${bgColor};">
+              <td style="padding: 12px; border: 1px solid #ddd;">${new Date(visit.date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</td>
+              <td style="padding: 12px; border: 1px solid #ddd;"><strong>${property?.name || 'Unknown'}</strong></td>
+              <td style="padding: 12px; border: 1px solid #ddd; text-align: right; color: #28a745; font-weight: bold;">$${Number(visit.price).toFixed(2)}</td>
+              <td style="padding: 12px; border: 1px solid #ddd; color: #6c757d;">${visit.notes || '-'}</td>
+            </tr>`;
     });
-    emailBody += `</table>`;
+    
+    emailBody += `
+          </table>
 
-    emailBody += `<h2>DETAILED EXPENSES LOG</h2>`;
-    emailBody += `<table style="border-collapse: collapse; width: 100%;">`;
-    emailBody += `<tr><th style="padding: 8px; border: 1px solid #ddd; background-color: #f0f0f0;">Date</th><th style="padding: 8px; border: 1px solid #ddd; background-color: #f0f0f0;">Property</th><th style="padding: 8px; border: 1px solid #ddd; background-color: #f0f0f0;">Amount</th><th style="padding: 8px; border: 1px solid #ddd; background-color: #f0f0f0;">Purpose</th></tr>`;
-    (expenses || []).forEach(expense => {
+          <h2 style="color: #667eea; border-bottom: 2px solid #667eea; padding-bottom: 10px; margin-top: 40px;">💳 Detailed Expenses Log</h2>
+          <table style="border-collapse: collapse; width: 100%; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+            <tr style="background: #dc3545; color: white;">
+              <th style="padding: 12px; border: 1px solid #c82333; text-align: left;">Date</th>
+              <th style="padding: 12px; border: 1px solid #c82333; text-align: left;">Property</th>
+              <th style="padding: 12px; border: 1px solid #c82333; text-align: right;">Amount</th>
+              <th style="padding: 12px; border: 1px solid #c82333; text-align: left;">Purpose</th>
+            </tr>`;
+    
+    (expenses || []).forEach((expense, index) => {
       const property = properties?.find(p => p.id === expense.property_id);
-      emailBody += `<tr><td style="padding: 8px; border: 1px solid #ddd;">${expense.date}</td><td style="padding: 8px; border: 1px solid #ddd;">${property?.name || 'Unknown'}</td><td style="padding: 8px; border: 1px solid #ddd;">$${Number(expense.amount).toFixed(2)}</td><td style="padding: 8px; border: 1px solid #ddd;">${expense.purpose || '-'}</td></tr>`;
+      const bgColor = index % 2 === 0 ? '#f8f9fa' : '#ffffff';
+      emailBody += `
+            <tr style="background: ${bgColor};">
+              <td style="padding: 12px; border: 1px solid #ddd;">${new Date(expense.date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</td>
+              <td style="padding: 12px; border: 1px solid #ddd;"><strong>${property?.name || 'Unknown'}</strong></td>
+              <td style="padding: 12px; border: 1px solid #ddd; text-align: right; color: #dc3545; font-weight: bold;">$${Number(expense.amount).toFixed(2)}</td>
+              <td style="padding: 12px; border: 1px solid #ddd; color: #6c757d;">${expense.purpose || '-'}</td>
+            </tr>`;
     });
-    emailBody += `</table>`;
+    
+    emailBody += `
+          </table>
+
+          <div style="margin-top: 40px; padding: 20px; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #667eea;">
+            <p style="margin: 0 0 10px 0; color: #333; font-size: 16px;">
+              Please review the above information and proceed with client billing at your earliest convenience. 
+              If you have any questions or need clarification on any of the entries, please don't hesitate to reach out.
+            </p>
+            <p style="margin: 0; color: #333; font-size: 16px;">
+              Best regards,<br>
+              <strong>PeachHaus Property Management System</strong>
+            </p>
+          </div>
+        </div>
+        
+        <div style="background: #f8f9fa; padding: 15px; text-align: center; border-radius: 0 0 10px 10px; color: #6c757d; font-size: 14px;">
+          Report generated on ${reportDate}
+        </div>
+      </div>`;
 
     console.log("Email body generated, sending via Resend to anja@peachhausgroup.com...");
 
@@ -127,7 +218,7 @@ const handler = async (req: Request): Promise<Response> => {
     const emailResponse = await resend.emails.send({
       from: "PeachHaus Reports <reports@peachhausgroup.com>",
       to: ["anja@peachhausgroup.com"],
-      subject: `Property visits for the month of ${previousMonthName} - Please bill clients`,
+      subject: `Property Report ${previousMonthName} - ${currentMonth} | Please Bill Clients`,
       html: emailBody,
     });
 
