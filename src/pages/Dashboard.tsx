@@ -1,14 +1,19 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Download, Building2, Calendar, DollarSign, TrendingUp, MapPin, Activity } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Download, Building2, Calendar, DollarSign, MapPin, Activity } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { PropertySummary } from "@/types";
+import { PropertySummary, Visit, Expense } from "@/types";
 import { toast } from "sonner";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 const Dashboard = () => {
   const [summaries, setSummaries] = useState<PropertySummary[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedProperty, setSelectedProperty] = useState<PropertySummary | null>(null);
+  const [propertyVisits, setPropertyVisits] = useState<Visit[]>([]);
+  const [propertyExpenses, setPropertyExpenses] = useState<Expense[]>([]);
 
   useEffect(() => {
     loadData();
@@ -116,7 +121,42 @@ const Dashboard = () => {
   const totalVisits = summaries.reduce((sum, s) => sum + s.visitCount, 0);
   const totalRevenue = summaries.reduce((sum, s) => sum + s.visitTotal, 0);
   const totalExpenses = summaries.reduce((sum, s) => sum + s.expenseTotal, 0);
-  const totalNet = totalRevenue - totalExpenses;
+
+  const handlePropertyClick = async (summary: PropertySummary) => {
+    setSelectedProperty(summary);
+    
+    const { data: visits } = await supabase
+      .from("visits")
+      .select("*")
+      .eq("property_id", summary.property.id)
+      .order("date", { ascending: false });
+    
+    const { data: expenses } = await supabase
+      .from("expenses")
+      .select("*")
+      .eq("property_id", summary.property.id)
+      .order("date", { ascending: false });
+    
+    setPropertyVisits((visits || []).map(v => ({
+      id: v.id,
+      propertyId: v.property_id,
+      date: v.date,
+      time: v.time,
+      price: Number(v.price),
+      notes: v.notes,
+      createdAt: v.created_at,
+    })));
+    
+    setPropertyExpenses((expenses || []).map(e => ({
+      id: e.id,
+      propertyId: e.property_id,
+      amount: Number(e.amount),
+      date: e.date,
+      purpose: e.purpose,
+      filePath: e.file_path,
+      createdAt: e.created_at,
+    })));
+  };
 
   if (loading) {
     return (
@@ -212,16 +252,16 @@ const Dashboard = () => {
 
         <Card className="shadow-card hover:shadow-warm transition-all duration-300 border-border/50 hover:scale-105">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Net Balance</CardTitle>
-            <div className={`p-2.5 rounded-lg ${totalNet >= 0 ? 'bg-green-500/10' : 'bg-red-500/10'}`}>
-              <TrendingUp className={`h-5 w-5 ${totalNet >= 0 ? 'text-green-600 dark:text-green-500' : 'text-red-600 dark:text-red-500'}`} />
+            <CardTitle className="text-sm font-medium text-muted-foreground">Total Expenses</CardTitle>
+            <div className="p-2.5 bg-red-500/10 rounded-lg">
+              <DollarSign className="h-5 w-5 text-red-600 dark:text-red-500" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className={`text-3xl font-bold ${totalNet >= 0 ? 'text-green-600 dark:text-green-500' : 'text-red-600 dark:text-red-500'}`}>
-              ${totalNet.toFixed(2)}
+            <div className="text-3xl font-bold text-red-600 dark:text-red-500">
+              ${totalExpenses.toFixed(2)}
             </div>
-            <p className="text-xs text-muted-foreground mt-1">Revenue minus expenses</p>
+            <p className="text-xs text-muted-foreground mt-1">All property expenses</p>
           </CardContent>
         </Card>
       </div>
@@ -245,7 +285,8 @@ const Dashboard = () => {
               {summaries.map((summary, index) => (
                 <div 
                   key={summary.property.id} 
-                  className="group p-6 border border-border/50 rounded-xl hover:shadow-card transition-all duration-300 hover:scale-[1.01] bg-gradient-subtle"
+                  onClick={() => handlePropertyClick(summary)}
+                  className="group p-6 border border-border/50 rounded-xl hover:shadow-card transition-all duration-300 hover:scale-[1.01] bg-gradient-subtle cursor-pointer"
                   style={{ animationDelay: `${index * 0.1}s` }}
                 >
                   <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
@@ -261,7 +302,7 @@ const Dashboard = () => {
                         Visit Rate: <span className="font-semibold text-foreground">${summary.property.visitPrice.toFixed(2)}</span>
                       </p>
                     </div>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
+                    <div className="grid grid-cols-3 gap-6">
                       <div className="text-center sm:text-right">
                         <p className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">Visits</p>
                         <p className="font-bold text-lg">{summary.visitCount}</p>
@@ -278,12 +319,6 @@ const Dashboard = () => {
                           ${summary.expenseTotal.toFixed(2)}
                         </p>
                       </div>
-                      <div className="text-center sm:text-right">
-                        <p className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">Net</p>
-                        <p className={`font-bold text-lg ${summary.netBalance >= 0 ? 'text-green-600 dark:text-green-500' : 'text-red-600 dark:text-red-500'}`}>
-                          ${summary.netBalance.toFixed(2)}
-                        </p>
-                      </div>
                     </div>
                   </div>
                 </div>
@@ -292,6 +327,121 @@ const Dashboard = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* Property Details Modal */}
+      <Dialog open={!!selectedProperty} onOpenChange={() => setSelectedProperty(null)}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-2xl">
+              {selectedProperty?.property.name}
+            </DialogTitle>
+            <p className="text-sm text-muted-foreground flex items-center gap-1.5 mt-1">
+              <MapPin className="h-3.5 w-3.5" />
+              {selectedProperty?.property.address}
+            </p>
+          </DialogHeader>
+          
+          <div className="space-y-6 mt-4">
+            {/* Summary Stats */}
+            <div className="grid grid-cols-3 gap-4">
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="text-center">
+                    <p className="text-sm text-muted-foreground mb-1">Visits</p>
+                    <p className="text-2xl font-bold">{selectedProperty?.visitCount}</p>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="text-center">
+                    <p className="text-sm text-muted-foreground mb-1">Revenue</p>
+                    <p className="text-2xl font-bold text-green-600 dark:text-green-500">
+                      ${selectedProperty?.visitTotal.toFixed(2)}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="text-center">
+                    <p className="text-sm text-muted-foreground mb-1">Expenses</p>
+                    <p className="text-2xl font-bold text-red-600 dark:text-red-500">
+                      ${selectedProperty?.expenseTotal.toFixed(2)}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Visits Table */}
+            <div>
+              <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
+                <Calendar className="h-5 w-5 text-primary" />
+                Visits
+              </h3>
+              {propertyVisits.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-8">No visits recorded</p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Time</TableHead>
+                      <TableHead>Notes</TableHead>
+                      <TableHead className="text-right">Amount</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {propertyVisits.map((visit) => (
+                      <TableRow key={visit.id}>
+                        <TableCell>{new Date(visit.date).toLocaleDateString()}</TableCell>
+                        <TableCell>{visit.time}</TableCell>
+                        <TableCell className="text-muted-foreground">{visit.notes || "—"}</TableCell>
+                        <TableCell className="text-right font-semibold text-green-600 dark:text-green-500">
+                          ${Number(visit.price).toFixed(2)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </div>
+
+            {/* Expenses Table */}
+            <div>
+              <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
+                <DollarSign className="h-5 w-5 text-primary" />
+                Expenses
+              </h3>
+              {propertyExpenses.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-8">No expenses recorded</p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Purpose</TableHead>
+                      <TableHead className="text-right">Amount</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {propertyExpenses.map((expense) => (
+                      <TableRow key={expense.id}>
+                        <TableCell>{new Date(expense.date).toLocaleDateString()}</TableCell>
+                        <TableCell className="text-muted-foreground">{expense.purpose || "—"}</TableCell>
+                        <TableCell className="text-right font-semibold text-red-600 dark:text-red-500">
+                          ${Number(expense.amount).toFixed(2)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
