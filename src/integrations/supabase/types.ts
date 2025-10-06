@@ -55,6 +55,65 @@ export type Database = {
           },
         ]
       }
+      mid_term_bookings: {
+        Row: {
+          created_at: string
+          deposit_amount: number | null
+          end_date: string
+          id: string
+          monthly_rent: number
+          notes: string | null
+          property_id: string
+          start_date: string
+          status: string
+          tenant_email: string | null
+          tenant_name: string
+          tenant_phone: string | null
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          deposit_amount?: number | null
+          end_date: string
+          id?: string
+          monthly_rent: number
+          notes?: string | null
+          property_id: string
+          start_date: string
+          status?: string
+          tenant_email?: string | null
+          tenant_name: string
+          tenant_phone?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          deposit_amount?: number | null
+          end_date?: string
+          id?: string
+          monthly_rent?: number
+          notes?: string | null
+          property_id?: string
+          start_date?: string
+          status?: string
+          tenant_email?: string | null
+          tenant_name?: string
+          tenant_phone?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mid_term_bookings_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       monthly_charges: {
         Row: {
           charge_month: string

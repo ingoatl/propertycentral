@@ -3,8 +3,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Trash2, MapPin, Building2 } from "lucide-react";
+import { Plus, Trash2, MapPin, Building2, Edit } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { Property } from "@/types";
 import { toast } from "sonner";
@@ -14,18 +15,26 @@ const propertySchema = z.object({
   name: z.string().trim().min(1, "Name is required").max(200, "Name must be less than 200 characters"),
   address: z.string().trim().min(1, "Address is required").max(500, "Address must be less than 500 characters"),
   visitPrice: z.number().positive("Visit price must be positive").max(10000, "Visit price cannot exceed $10,000"),
-  rentalType: z.enum(["short_term", "mid_term"], { required_error: "Please select a rental type" }),
+  rentalType: z.enum(["short_term", "mid_term", "long_term"], { required_error: "Please select a rental type" }),
 });
 
 const Properties = () => {
   const [properties, setProperties] = useState<Property[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [editingProperty, setEditingProperty] = useState<Property | null>(null);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     address: "",
     visitPrice: "",
-    rentalType: "" as "short_term" | "mid_term" | "",
+    rentalType: "" as "short_term" | "mid_term" | "long_term" | "",
+  });
+  const [editFormData, setEditFormData] = useState({
+    name: "",
+    address: "",
+    visitPrice: "",
+    rentalType: "" as "short_term" | "mid_term" | "long_term" | "",
   });
 
   useEffect(() => {
@@ -46,6 +55,7 @@ const Properties = () => {
         name: p.name,
         address: p.address,
         visitPrice: Number(p.visit_price),
+        rentalType: p.rental_type as "short_term" | "mid_term" | "long_term" | undefined,
         createdAt: p.created_at,
       })));
     } catch (error: any) {
@@ -130,6 +140,64 @@ const Properties = () => {
     }
   };
 
+  const handleEdit = (property: Property) => {
+    setEditingProperty(property);
+    setEditFormData({
+      name: property.name,
+      address: property.address,
+      visitPrice: property.visitPrice.toString(),
+      rentalType: property.rentalType || "",
+    });
+    setEditDialogOpen(true);
+  };
+
+  const handleUpdateProperty = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingProperty) return;
+
+    const visitPrice = parseFloat(editFormData.visitPrice);
+    
+    const validation = propertySchema.safeParse({
+      name: editFormData.name,
+      address: editFormData.address,
+      visitPrice,
+      rentalType: editFormData.rentalType,
+    });
+
+    if (!validation.success) {
+      toast.error(validation.error.errors[0].message);
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      const { error } = await supabase
+        .from("properties")
+        .update({
+          name: editFormData.name.trim(),
+          address: editFormData.address.trim(),
+          visit_price: visitPrice,
+          rental_type: editFormData.rentalType,
+        })
+        .eq("id", editingProperty.id);
+
+      if (error) throw error;
+
+      setEditDialogOpen(false);
+      setEditingProperty(null);
+      await loadProperties();
+      toast.success("Property updated successfully!");
+    } catch (error: any) {
+      if (import.meta.env.DEV) {
+        console.error("Error updating property:", error);
+      }
+      toast.error(error.message || "Failed to update property");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between pb-4 border-b border-border/50">
@@ -204,6 +272,7 @@ const Properties = () => {
                   <SelectContent>
                     <SelectItem value="short_term">Short-term Rental</SelectItem>
                     <SelectItem value="mid_term">Mid-term Rental</SelectItem>
+                    <SelectItem value="long_term">Long-term Rental</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -219,6 +288,83 @@ const Properties = () => {
           </CardContent>
         </Card>
       )}
+
+      {/* Edit Property Dialog */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Property</DialogTitle>
+            <DialogDescription>Update property details below</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleUpdateProperty} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-name">Property Name</Label>
+              <Input
+                id="edit-name"
+                placeholder="e.g., Villa Ct SE - Unit 14"
+                value={editFormData.name}
+                onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
+                className="text-base"
+                maxLength={200}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-address">Address</Label>
+              <Input
+                id="edit-address"
+                placeholder="123 Peach St, Atlanta, GA"
+                value={editFormData.address}
+                onChange={(e) => setEditFormData({ ...editFormData, address: e.target.value })}
+                className="text-base"
+                maxLength={500}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-visitPrice">Visit Price ($)</Label>
+              <Input
+                id="edit-visitPrice"
+                type="number"
+                step="0.01"
+                min="0"
+                max="10000"
+                placeholder="150.00"
+                value={editFormData.visitPrice}
+                onChange={(e) => setEditFormData({ ...editFormData, visitPrice: e.target.value })}
+                className="text-base"
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-rentalType">Rental Type</Label>
+              <Select
+                value={editFormData.rentalType}
+                onValueChange={(value: "short_term" | "mid_term" | "long_term") =>
+                  setEditFormData({ ...editFormData, rentalType: value })
+                }
+              >
+                <SelectTrigger id="edit-rentalType">
+                  <SelectValue placeholder="Select rental type..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="short_term">Short-term Rental</SelectItem>
+                  <SelectItem value="mid_term">Mid-term Rental</SelectItem>
+                  <SelectItem value="long_term">Long-term Rental</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setEditDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={loading} className="shadow-warm">
+                {loading ? "Updating..." : "Update Property"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {properties.length === 0 ? (
@@ -245,15 +391,38 @@ const Properties = () => {
                       <MapPin className="w-3.5 h-3.5" />
                       {property.address}
                     </CardDescription>
+                    {property.rentalType && (
+                      <div className="mt-2">
+                        <span className={`inline-block px-2 py-1 text-xs rounded-full ${
+                          property.rentalType === 'short_term' ? 'bg-blue-100 text-blue-800' :
+                          property.rentalType === 'mid_term' ? 'bg-orange-100 text-orange-800' :
+                          'bg-green-100 text-green-800'
+                        }`}>
+                          {property.rentalType === 'short_term' ? '🏖️ Short-term' :
+                           property.rentalType === 'mid_term' ? '🏠 Mid-term' :
+                           '🏡 Long-term'}
+                        </span>
+                      </div>
+                    )}
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleDelete(property.id)}
-                    className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleEdit(property)}
+                      className="text-primary hover:text-primary hover:bg-primary/10"
+                    >
+                      <Edit className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleDelete(property.id)}
+                      className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent>
