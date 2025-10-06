@@ -100,12 +100,16 @@ serve(async (req) => {
       'Canadian Way',
     ];
 
-    const filteredListings = listings.filter(listing => 
-      targetProperties.some(target => 
-        listing.name.toLowerCase().includes(target.toLowerCase()) ||
-        (listing.address && listing.address.toLowerCase().includes(target.toLowerCase()))
-      )
-    );
+    const filteredListings = listings.filter(listing => {
+      if (!listing.name) return false;
+      return targetProperties.some(target => {
+        const lowerName = listing.name.toLowerCase();
+        const lowerTarget = target.toLowerCase();
+        const lowerAddress = listing.address?.toLowerCase() || '';
+        
+        return lowerName.includes(lowerTarget) || lowerAddress.includes(lowerTarget);
+      });
+    });
 
     console.log(`Filtered to ${filteredListings.length} target properties`);
 
@@ -113,82 +117,95 @@ serve(async (req) => {
     let totalRevenue = 0;
     let totalManagementFees = 0;
 
-    // Sync each listing
-    for (const listing of filteredListings) {
-      console.log(`Syncing listing: ${listing.name}`);
-
-      // Determine management fee rate for this property
-      const managementFeeRate = getManagementFeeRate(listing.name);
-
-      // Try to find matching property in our database
-      const { data: properties } = await supabase
-        .from('properties')
-        .select('id, name, address')
-        .or(`name.ilike.%${listing.name}%,address.ilike.%${listing.address}%`)
-        .limit(1);
-
-      let propertyId = properties?.[0]?.id || null;
-
-      // Fetch bookings for this listing (last 12 months)
-      const startDate = new Date();
-      startDate.setMonth(startDate.getMonth() - 12);
+    // Sync each listing with rate limiting
+    for (let i = 0; i < filteredListings.length; i++) {
+      const listing = filteredListings[i];
       
-      const bookingsResponse = await fetch(
-        `https://api.ownerrez.com/v2/bookings?listing_id=${listing.id}&arrival_from=${startDate.toISOString().split('T')[0]}`,
-        {
-          headers: {
-            'Authorization': authHeader,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
+      try {
+        console.log(`Syncing listing ${i + 1}/${filteredListings.length}: ${listing.name}`);
 
-      if (!bookingsResponse.ok) {
-        console.error(`Failed to fetch bookings for listing ${listing.id}`);
+        // Determine management fee rate for this property
+        const managementFeeRate = getManagementFeeRate(listing.name);
+
+        // Try to find matching property in our database
+        const { data: properties } = await supabase
+          .from('properties')
+          .select('id, name, address')
+          .or(`name.ilike.%${listing.name}%,address.ilike.%${listing.address || ''}%`)
+          .limit(1);
+
+        let propertyId = properties?.[0]?.id || null;
+
+        // Fetch bookings for this listing (last 12 months)
+        const startDate = new Date();
+        startDate.setMonth(startDate.getMonth() - 12);
+        
+        const bookingsResponse = await fetch(
+          `https://api.ownerrez.com/v2/bookings?listing_id=${listing.id}&arrival_from=${startDate.toISOString().split('T')[0]}`,
+          {
+            headers: {
+              'Authorization': authHeader,
+              'Content-Type': 'application/json',
+            },
+          }
+        );
+
+        if (!bookingsResponse.ok) {
+          console.error(`Failed to fetch bookings for listing ${listing.id}`);
+          continue;
+        }
+
+        const bookingsData = await bookingsResponse.json();
+        const bookings: OwnerRezBooking[] = bookingsData.items || [];
+
+        console.log(`Found ${bookings.length} bookings for ${listing.name} (${(managementFeeRate * 100).toFixed(0)}% management fee)`);
+
+        // Calculate total revenue and management fee
+        let listingRevenue = 0;
+        let listingManagementFees = 0;
+        
+        for (const booking of bookings) {
+          const bookingTotal = booking.total || 0;
+          listingRevenue += bookingTotal;
+          
+          const managementFee = bookingTotal * managementFeeRate;
+          listingManagementFees += managementFee;
+
+          // Upsert booking data
+          await supabase
+            .from('ownerrez_bookings')
+            .upsert({
+              property_id: propertyId,
+              ownerrez_listing_id: listing.id.toString(),
+              ownerrez_listing_name: listing.name,
+              booking_id: booking.id.toString(),
+              guest_name: booking.guest_name,
+              check_in: booking.arrival,
+              check_out: booking.departure,
+              total_amount: bookingTotal,
+              management_fee: managementFee,
+              booking_status: booking.status,
+              sync_date: new Date().toISOString(),
+            }, {
+              onConflict: 'booking_id',
+            });
+        }
+
+        totalSyncedBookings += bookings.length;
+        totalRevenue += listingRevenue;
+        totalManagementFees += listingManagementFees;
+
+        console.log(`Synced ${bookings.length} bookings - Revenue: $${listingRevenue.toFixed(2)}, Mgmt Fees (${(managementFeeRate * 100).toFixed(0)}%): $${listingManagementFees.toFixed(2)}`);
+        
+        // Add a small delay between API calls to avoid rate limiting (100ms)
+        if (i < filteredListings.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+      } catch (error) {
+        console.error(`Error syncing listing ${listing.name}:`, error);
+        // Continue with next listing even if one fails
         continue;
       }
-
-      const bookingsData = await bookingsResponse.json();
-      const bookings: OwnerRezBooking[] = bookingsData.items || [];
-
-      console.log(`Found ${bookings.length} bookings for ${listing.name} (${(managementFeeRate * 100).toFixed(0)}% management fee)`);
-
-      // Calculate total revenue and management fee
-      let listingRevenue = 0;
-      let listingManagementFees = 0;
-      
-      for (const booking of bookings) {
-        const bookingTotal = booking.total || 0;
-        listingRevenue += bookingTotal;
-        
-        const managementFee = bookingTotal * managementFeeRate;
-        listingManagementFees += managementFee;
-
-        // Upsert booking data
-        await supabase
-          .from('ownerrez_bookings')
-          .upsert({
-            property_id: propertyId,
-            ownerrez_listing_id: listing.id.toString(),
-            ownerrez_listing_name: listing.name,
-            booking_id: booking.id.toString(),
-            guest_name: booking.guest_name,
-            check_in: booking.arrival,
-            check_out: booking.departure,
-            total_amount: bookingTotal,
-            management_fee: managementFee,
-            booking_status: booking.status,
-            sync_date: new Date().toISOString(),
-          }, {
-            onConflict: 'booking_id',
-          });
-      }
-
-      totalSyncedBookings += bookings.length;
-      totalRevenue += listingRevenue;
-      totalManagementFees += listingManagementFees;
-
-      console.log(`Synced ${bookings.length} bookings - Revenue: $${listingRevenue.toFixed(2)}, Mgmt Fees (${(managementFeeRate * 100).toFixed(0)}%): $${listingManagementFees.toFixed(2)}`);
     }
 
     return new Response(
