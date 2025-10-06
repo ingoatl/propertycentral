@@ -28,13 +28,18 @@ serve(async (req) => {
   }
 
   try {
-    const ownerrezApiKey = Deno.env.get('OWNERREZ_API_KEY');
+    const ownerrezUsername = Deno.env.get('OWNERREZ_USERNAME');
+    const ownerrezPassword = Deno.env.get('OWNERREZ_PASSWORD');
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
-    if (!ownerrezApiKey) {
-      throw new Error('OWNERREZ_API_KEY not configured');
+    if (!ownerrezUsername || !ownerrezPassword) {
+      throw new Error('OWNERREZ_USERNAME and OWNERREZ_PASSWORD not configured');
     }
+
+    // Create Basic Auth header
+    const authString = `${ownerrezUsername}:${ownerrezPassword}`;
+    const base64Auth = btoa(authString);
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
@@ -63,7 +68,7 @@ serve(async (req) => {
     // Fetch all listings from OwnerRez
     const listingsResponse = await fetch('https://api.ownerrez.com/v2/listings', {
       headers: {
-        'Authorization': `Bearer ${ownerrezApiKey}`,
+        'Authorization': `Basic ${base64Auth}`,
         'Content-Type': 'application/json',
       },
     });
@@ -124,7 +129,7 @@ serve(async (req) => {
         `https://api.ownerrez.com/v2/bookings?listing_id=${listing.id}&arrival_from=${startDate.toISOString().split('T')[0]}`,
         {
           headers: {
-            'Authorization': `Bearer ${ownerrezApiKey}`,
+            'Authorization': `Basic ${base64Auth}`,
             'Content-Type': 'application/json',
           },
         }
