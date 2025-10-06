@@ -15,7 +15,7 @@ const propertySchema = z.object({
   name: z.string().trim().min(1, "Name is required").max(200, "Name must be less than 200 characters"),
   address: z.string().trim().min(1, "Address is required").max(500, "Address must be less than 500 characters"),
   visitPrice: z.number().positive("Visit price must be positive").max(10000, "Visit price cannot exceed $10,000"),
-  rentalType: z.enum(["short_term", "mid_term", "long_term"], { required_error: "Please select a rental type" }),
+  rentalType: z.enum(["hybrid", "mid_term", "long_term"], { required_error: "Please select a rental type" }),
 });
 
 const Properties = () => {
@@ -28,13 +28,13 @@ const Properties = () => {
     name: "",
     address: "",
     visitPrice: "",
-    rentalType: "" as "short_term" | "mid_term" | "long_term" | "",
+    rentalType: "" as "hybrid" | "mid_term" | "long_term" | "",
   });
   const [editFormData, setEditFormData] = useState({
     name: "",
     address: "",
     visitPrice: "",
-    rentalType: "" as "short_term" | "mid_term" | "long_term" | "",
+    rentalType: "" as "hybrid" | "mid_term" | "long_term" | "",
   });
 
   useEffect(() => {
@@ -55,7 +55,7 @@ const Properties = () => {
         name: p.name,
         address: p.address,
         visitPrice: Number(p.visit_price),
-        rentalType: p.rental_type as "short_term" | "mid_term" | "long_term" | undefined,
+        rentalType: p.rental_type as "hybrid" | "mid_term" | "long_term" | undefined,
         createdAt: p.created_at,
       })));
     } catch (error: any) {
@@ -260,17 +260,17 @@ const Properties = () => {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="rentalType">Rental Type</Label>
-                <Select
-                  value={formData.rentalType}
-                  onValueChange={(value: "short_term" | "mid_term") =>
-                    setFormData({ ...formData, rentalType: value })
-                  }
+              <Select
+                value={formData.rentalType}
+                onValueChange={(value: "hybrid" | "mid_term" | "long_term") =>
+                  setFormData({ ...formData, rentalType: value })
+                }
                 >
                   <SelectTrigger id="rentalType">
                     <SelectValue placeholder="Select rental type..." />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="short_term">Short-term Rental</SelectItem>
+                    <SelectItem value="hybrid">Hybrid Rental (Short + Mid-term)</SelectItem>
                     <SelectItem value="mid_term">Mid-term Rental</SelectItem>
                     <SelectItem value="long_term">Long-term Rental</SelectItem>
                   </SelectContent>
@@ -340,7 +340,7 @@ const Properties = () => {
               <Label htmlFor="edit-rentalType">Rental Type</Label>
               <Select
                 value={editFormData.rentalType}
-                onValueChange={(value: "short_term" | "mid_term" | "long_term") =>
+                onValueChange={(value: "hybrid" | "mid_term" | "long_term") =>
                   setEditFormData({ ...editFormData, rentalType: value })
                 }
               >
@@ -348,7 +348,7 @@ const Properties = () => {
                   <SelectValue placeholder="Select rental type..." />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="short_term">Short-term Rental</SelectItem>
+                  <SelectItem value="hybrid">Hybrid Rental (Short + Mid-term)</SelectItem>
                   <SelectItem value="mid_term">Mid-term Rental</SelectItem>
                   <SelectItem value="long_term">Long-term Rental</SelectItem>
                 </SelectContent>
@@ -394,11 +394,11 @@ const Properties = () => {
                     {property.rentalType && (
                       <div className="mt-2">
                         <span className={`inline-block px-2 py-1 text-xs rounded-full ${
-                          property.rentalType === 'short_term' ? 'bg-blue-100 text-blue-800' :
+                          property.rentalType === 'hybrid' ? 'bg-blue-100 text-blue-800' :
                           property.rentalType === 'mid_term' ? 'bg-orange-100 text-orange-800' :
                           'bg-green-100 text-green-800'
                         }`}>
-                          {property.rentalType === 'short_term' ? '🏖️ Short-term' :
+                          {property.rentalType === 'hybrid' ? '🔄 Hybrid' :
                            property.rentalType === 'mid_term' ? '🏠 Mid-term' :
                            '🏡 Long-term'}
                         </span>

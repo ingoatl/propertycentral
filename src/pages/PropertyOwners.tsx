@@ -167,10 +167,14 @@ const PropertyOwners = () => {
     }
   };
 
-  const handleAssignProperty = async (propertyId: string, ownerId: string | null) => {
+  const handleAssignProperty = async (propertyId: string, ownerId: string) => {
     try {
-      console.log("Assigning property:", { propertyId, ownerId });
+      console.log("Assigning property - START:", { propertyId, ownerId });
       
+      // Get current user for authentication
+      const { data: { user } } = await supabase.auth.getUser();
+      console.log("Current user:", user?.id);
+
       const { data, error } = await supabase
         .from("properties")
         .update({ owner_id: ownerId })
@@ -178,15 +182,17 @@ const PropertyOwners = () => {
         .select();
 
       if (error) {
-        console.error("Assignment error:", error);
+        console.error("Assignment error details:", error);
         throw error;
       }
 
-      console.log("Assignment successful:", data);
-      toast.success(ownerId ? "Property assigned to owner" : "Property unassigned");
-      loadData();
+      console.log("Assignment successful - data returned:", data);
+      toast.success("Property assigned to owner successfully!");
+      
+      // Reload data to refresh the UI
+      await loadData();
     } catch (error: any) {
-      console.error("Error assigning property:", error);
+      console.error("Error in handleAssignProperty:", error);
       toast.error("Failed to assign property: " + (error.message || "Unknown error"));
     }
   };
@@ -586,7 +592,21 @@ const PropertyOwners = () => {
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => handleAssignProperty(property.id, null)}
+                              onClick={async () => {
+                                try {
+                                  const { error } = await supabase
+                                    .from("properties")
+                                    .update({ owner_id: null })
+                                    .eq("id", property.id);
+                                  
+                                  if (error) throw error;
+                                  toast.success("Property unassigned");
+                                  loadData();
+                                } catch (error: any) {
+                                  console.error("Error unassigning:", error);
+                                  toast.error("Failed to unassign property");
+                                }
+                              }}
                             >
                               Unassign
                             </Button>

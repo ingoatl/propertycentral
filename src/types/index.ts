@@ -3,7 +3,7 @@ export interface Property {
   name: string;
   address: string;
   visitPrice: number;
-  rentalType?: "short_term" | "mid_term" | "long_term";
+  rentalType?: "hybrid" | "mid_term" | "long_term";
   createdAt: string;
 }
 

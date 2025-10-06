@@ -19,7 +19,6 @@ import { Badge } from "@/components/ui/badge";
 const bookingSchema = z.object({
   propertyId: z.string().uuid("Please select a property"),
   tenantName: z.string().min(1, "Tenant name is required").max(255),
-  tenantEmail: z.string().email("Invalid email").optional().or(z.literal("")),
   tenantPhone: z.string().optional(),
   startDate: z.date({ required_error: "Start date is required" }),
   endDate: z.date({ required_error: "End date is required" }),
@@ -58,7 +57,6 @@ const MidTermBookings = () => {
   const [formData, setFormData] = useState({
     propertyId: "",
     tenantName: "",
-    tenantEmail: "",
     tenantPhone: "",
     startDate: undefined as Date | undefined,
     endDate: undefined as Date | undefined,
@@ -82,7 +80,7 @@ const MidTermBookings = () => {
         supabase
           .from("properties")
           .select("id, name, address")
-          .eq("rental_type", "mid_term")
+          .in("rental_type", ["hybrid", "mid_term"])
           .order("name", { ascending: true }),
       ]);
 
@@ -103,7 +101,6 @@ const MidTermBookings = () => {
     setFormData({
       propertyId: "",
       tenantName: "",
-      tenantEmail: "",
       tenantPhone: "",
       startDate: undefined,
       endDate: undefined,
@@ -120,7 +117,6 @@ const MidTermBookings = () => {
     const validation = bookingSchema.safeParse({
       propertyId: formData.propertyId,
       tenantName: formData.tenantName,
-      tenantEmail: formData.tenantEmail,
       tenantPhone: formData.tenantPhone,
       startDate: formData.startDate,
       endDate: formData.endDate,
@@ -147,7 +143,6 @@ const MidTermBookings = () => {
       const bookingData = {
         property_id: formData.propertyId,
         tenant_name: formData.tenantName,
-        tenant_email: formData.tenantEmail || null,
         tenant_phone: formData.tenantPhone || null,
         start_date: format(formData.startDate!, "yyyy-MM-dd"),
         end_date: format(formData.endDate!, "yyyy-MM-dd"),
@@ -190,7 +185,6 @@ const MidTermBookings = () => {
     setFormData({
       propertyId: booking.property_id,
       tenantName: booking.tenant_name,
-      tenantEmail: booking.tenant_email || "",
       tenantPhone: booking.tenant_phone || "",
       startDate: new Date(booking.start_date),
       endDate: new Date(booking.end_date),
@@ -288,26 +282,15 @@ const MidTermBookings = () => {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="tenantEmail">Tenant Email</Label>
+                <Label htmlFor="tenantPhone">Tenant Phone</Label>
                 <Input
-                  id="tenantEmail"
-                  type="email"
-                  value={formData.tenantEmail}
-                  onChange={(e) => setFormData({ ...formData, tenantEmail: e.target.value })}
-                  placeholder="tenant@example.com"
+                  id="tenantPhone"
+                  type="tel"
+                  value={formData.tenantPhone}
+                  onChange={(e) => setFormData({ ...formData, tenantPhone: e.target.value })}
+                  placeholder="+1 (555) 123-4567"
                 />
               </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="tenantPhone">Tenant Phone</Label>
-              <Input
-                id="tenantPhone"
-                type="tel"
-                value={formData.tenantPhone}
-                onChange={(e) => setFormData({ ...formData, tenantPhone: e.target.value })}
-                placeholder="+1 (555) 123-4567"
-              />
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -453,7 +436,6 @@ const MidTermBookings = () => {
                       <div className="font-medium text-foreground">
                         {getPropertyName(booking.property_id)}
                       </div>
-                      {booking.tenant_email && <div>📧 {booking.tenant_email}</div>}
                       {booking.tenant_phone && <div>📞 {booking.tenant_phone}</div>}
                     </CardDescription>
                   </div>
