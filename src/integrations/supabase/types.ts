@@ -55,6 +55,50 @@ export type Database = {
           },
         ]
       }
+      monthly_charges: {
+        Row: {
+          charge_month: string
+          charge_status: string
+          charged_at: string | null
+          created_at: string
+          id: string
+          owner_id: string
+          stripe_invoice_id: string | null
+          stripe_payment_intent_id: string | null
+          total_management_fees: number
+        }
+        Insert: {
+          charge_month: string
+          charge_status?: string
+          charged_at?: string | null
+          created_at?: string
+          id?: string
+          owner_id: string
+          stripe_invoice_id?: string | null
+          stripe_payment_intent_id?: string | null
+          total_management_fees?: number
+        }
+        Update: {
+          charge_month?: string
+          charge_status?: string
+          charged_at?: string | null
+          created_at?: string
+          id?: string
+          owner_id?: string
+          stripe_invoice_id?: string | null
+          stripe_payment_intent_id?: string | null
+          total_management_fees?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "monthly_charges_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "property_owners"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ownerrez_bookings: {
         Row: {
           booking_id: string | null
@@ -147,6 +191,7 @@ export type Database = {
           created_at: string
           id: string
           name: string
+          owner_id: string | null
           user_id: string | null
           visit_price: number
         }
@@ -155,6 +200,7 @@ export type Database = {
           created_at?: string
           id?: string
           name: string
+          owner_id?: string | null
           user_id?: string | null
           visit_price?: number
         }
@@ -163,8 +209,47 @@ export type Database = {
           created_at?: string
           id?: string
           name?: string
+          owner_id?: string | null
           user_id?: string | null
           visit_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "properties_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "property_owners"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      property_owners: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          name: string
+          payment_method: string
+          stripe_customer_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          name: string
+          payment_method: string
+          stripe_customer_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          name?: string
+          payment_method?: string
+          stripe_customer_id?: string | null
+          updated_at?: string
         }
         Relationships: []
       }

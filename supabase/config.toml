@@ -8,3 +8,6 @@ verify_jwt = true
 
 [functions.sync-ownerrez]
 verify_jwt = true
+
+[functions.charge-monthly-fees]
+verify_jwt = true
