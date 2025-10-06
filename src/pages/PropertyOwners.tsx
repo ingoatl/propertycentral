@@ -1,0 +1,408 @@
+import { useState, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { toast } from "sonner";
+import { Building2, CreditCard, DollarSign, ExternalLink, Plus, Trash2 } from "lucide-react";
+import { z } from "zod";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+
+const ownerSchema = z.object({
+  name: z.string().min(1, "Name is required").max(255),
+  email: z.string().email("Invalid email address").max(255),
+  payment_method: z.enum(["card", "ach"]),
+});
+
+interface PropertyOwner {
+  id: string;
+  name: string;
+  email: string;
+  stripe_customer_id: string | null;
+  payment_method: "card" | "ach";
+  created_at: string;
+  updated_at: string;
+}
+
+interface Property {
+  id: string;
+  name: string;
+  address: string;
+  owner_id: string | null;
+}
+
+const PropertyOwners = () => {
+  const [owners, setOwners] = useState<PropertyOwner[]>([]);
+  const [properties, setProperties] = useState<Property[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [newOwner, setNewOwner] = useState({
+    name: "",
+    email: "",
+    payment_method: "card" as "card" | "ach",
+  });
+  const [creating, setCreating] = useState(false);
+
+  useEffect(() => {
+    checkAdminStatus();
+    loadData();
+  }, []);
+
+  const checkAdminStatus = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: roles } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", user.id)
+        .eq("role", "admin")
+        .single();
+
+      setIsAdmin(!!roles);
+    } catch (error) {
+      console.error("Error checking admin status:", error);
+    }
+  };
+
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      
+      const [ownersResult, propertiesResult] = await Promise.all([
+        supabase.from("property_owners").select("*").order("name", { ascending: true }),
+        supabase.from("properties").select("id, name, address, owner_id").order("name", { ascending: true }),
+      ]);
+
+      if (ownersResult.error) throw ownersResult.error;
+      if (propertiesResult.error) throw propertiesResult.error;
+
+      setOwners((ownersResult.data || []) as PropertyOwner[]);
+      setProperties(propertiesResult.data || []);
+    } catch (error: any) {
+      console.error("Error loading data:", error);
+      toast.error("Failed to load property owners");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAddOwner = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    const validation = ownerSchema.safeParse(newOwner);
+    if (!validation.success) {
+      toast.error(validation.error.errors[0].message);
+      return;
+    }
+
+    setCreating(true);
+    try {
+      const { error } = await supabase
+        .from("property_owners")
+        .insert([newOwner]);
+
+      if (error) throw error;
+
+      toast.success("Property owner added successfully");
+      setAddDialogOpen(false);
+      setNewOwner({ name: "", email: "", payment_method: "card" });
+      loadData();
+    } catch (error: any) {
+      console.error("Error adding owner:", error);
+      toast.error(error.message || "Failed to add property owner");
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleAssignProperty = async (propertyId: string, ownerId: string | null) => {
+    try {
+      const { error } = await supabase
+        .from("properties")
+        .update({ owner_id: ownerId })
+        .eq("id", propertyId);
+
+      if (error) throw error;
+
+      toast.success(ownerId ? "Property assigned to owner" : "Property unassigned");
+      loadData();
+    } catch (error: any) {
+      console.error("Error assigning property:", error);
+      toast.error("Failed to assign property");
+    }
+  };
+
+  const handleDeleteOwner = async (ownerId: string) => {
+    if (!confirm("Are you sure you want to delete this owner? This will unassign all their properties.")) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from("property_owners")
+        .delete()
+        .eq("id", ownerId);
+
+      if (error) throw error;
+
+      toast.success("Property owner deleted");
+      loadData();
+    } catch (error: any) {
+      console.error("Error deleting owner:", error);
+      toast.error("Failed to delete property owner");
+    }
+  };
+
+  const getOwnerProperties = (ownerId: string) => {
+    return properties.filter(p => p.owner_id === ownerId);
+  };
+
+  if (!isAdmin) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Card className="max-w-md">
+          <CardHeader>
+            <CardTitle>Access Denied</CardTitle>
+            <CardDescription>You need admin privileges to access this page.</CardDescription>
+          </CardHeader>
+        </Card>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-pulse">Loading...</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6 animate-fade-in">
+      <div className="pb-4 border-b border-border/50 flex justify-between items-center">
+        <div>
+          <h1 className="text-4xl font-bold bg-gradient-primary bg-clip-text text-transparent">
+            Property Owners
+          </h1>
+          <p className="text-muted-foreground mt-1">Manage owners and their payment methods</p>
+        </div>
+        <Dialog open={addDialogOpen} onOpenChange={setAddDialogOpen}>
+          <DialogTrigger asChild>
+            <Button className="gap-2">
+              <Plus className="w-4 h-4" />
+              Add Owner
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Add Property Owner</DialogTitle>
+              <DialogDescription>
+                Add a new property owner. You'll need to set up their payment method in Stripe separately.
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleAddOwner} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="name">Owner Name</Label>
+                <Input
+                  id="name"
+                  value={newOwner.name}
+                  onChange={(e) => setNewOwner({ ...newOwner, name: e.target.value })}
+                  placeholder="John Doe"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={newOwner.email}
+                  onChange={(e) => setNewOwner({ ...newOwner, email: e.target.value })}
+                  placeholder="owner@example.com"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="payment-method">Payment Method Type</Label>
+                <Select
+                  value={newOwner.payment_method}
+                  onValueChange={(value: "card" | "ach") =>
+                    setNewOwner({ ...newOwner, payment_method: value })
+                  }
+                >
+                  <SelectTrigger id="payment-method">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="card">Credit Card</SelectItem>
+                    <SelectItem value="ach">ACH (Bank Account)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <DialogFooter>
+                <Button type="submit" disabled={creating}>
+                  {creating ? "Adding..." : "Add Owner"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      <div className="grid gap-6">
+        {owners.length === 0 ? (
+          <Card>
+            <CardContent className="pt-6">
+              <p className="text-muted-foreground text-center py-8">
+                No property owners yet. Add one to get started.
+              </p>
+            </CardContent>
+          </Card>
+        ) : (
+          owners.map((owner) => {
+            const ownerProperties = getOwnerProperties(owner.id);
+            return (
+              <Card key={owner.id} className="shadow-card border-border/50">
+                <CardHeader className="bg-gradient-subtle rounded-t-lg">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <CardTitle className="flex items-center gap-2">
+                        <Building2 className="w-5 h-5" />
+                        {owner.name}
+                      </CardTitle>
+                      <CardDescription className="mt-1">{owner.email}</CardDescription>
+                    </div>
+                    <div className="flex gap-2 items-center">
+                      <Badge variant={owner.payment_method === "ach" ? "default" : "secondary"}>
+                        <CreditCard className="w-3 h-3 mr-1" />
+                        {owner.payment_method === "ach" ? "ACH" : "Credit Card"}
+                      </Badge>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleDeleteOwner(owner.id)}
+                      >
+                        <Trash2 className="w-4 h-4 text-destructive" />
+                      </Button>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-6 space-y-4">
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label>Stripe Customer</Label>
+                      {owner.stripe_customer_id ? (
+                        <a
+                          href={`https://dashboard.stripe.com/customers/${owner.stripe_customer_id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1 text-sm text-primary hover:underline"
+                        >
+                          View in Stripe
+                          <ExternalLink className="w-3 h-3" />
+                        </a>
+                      ) : (
+                        <Badge variant="outline">Not Set Up</Badge>
+                      )}
+                    </div>
+                    {!owner.stripe_customer_id && (
+                      <p className="text-xs text-muted-foreground">
+                        Customer will be created automatically when first charged
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Assigned Properties ({ownerProperties.length})</Label>
+                    <div className="space-y-2">
+                      {ownerProperties.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">No properties assigned</p>
+                      ) : (
+                        ownerProperties.map((property) => (
+                          <div
+                            key={property.id}
+                            className="flex items-center justify-between p-2 border rounded-lg"
+                          >
+                            <div>
+                              <p className="font-medium text-sm">{property.name}</p>
+                              <p className="text-xs text-muted-foreground">{property.address}</p>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleAssignProperty(property.id, null)}
+                            >
+                              Unassign
+                            </Button>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Assign Property to {owner.name}</Label>
+                    <Select
+                      onValueChange={(propertyId) => handleAssignProperty(propertyId, owner.id)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a property..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {properties
+                          .filter((p) => !p.owner_id || p.owner_id === owner.id)
+                          .map((property) => (
+                            <SelectItem key={property.id} value={property.id}>
+                              {property.name} - {property.address}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })
+        )}
+      </div>
+
+      <Card className="bg-gradient-subtle border-primary/20">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <DollarSign className="w-5 h-5" />
+            Payment Setup Instructions
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-2 text-sm">
+          <p className="font-medium">To set up payment methods for owners in Stripe:</p>
+          <ol className="list-decimal list-inside space-y-2 text-muted-foreground">
+            <li>When you charge an owner for the first time, a Stripe customer will be created automatically</li>
+            <li>For <strong>Credit Card</strong> payments: The owner will receive a payment link via Stripe</li>
+            <li>For <strong>ACH</strong> payments: You'll need to manually add their bank account in Stripe dashboard</li>
+            <li>
+              To manually set up payment methods: Click "View in Stripe" next to a customer and add their
+              payment method from the Stripe dashboard
+            </li>
+          </ol>
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+
+export default PropertyOwners;

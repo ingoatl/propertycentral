@@ -11,6 +11,8 @@ import Expenses from "./pages/Expenses";
 import Admin from "./pages/Admin";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
+import PropertyOwners from "./pages/PropertyOwners";
+import MonthlyCharges from "./pages/MonthlyCharges";
 
 const queryClient = new QueryClient();
 
@@ -30,6 +32,8 @@ const App = () => (
                 <Route path="/visits" element={<Visits />} />
                 <Route path="/expenses" element={<Expenses />} />
                 <Route path="/admin" element={<Admin />} />
+                <Route path="/owners" element={<PropertyOwners />} />
+                <Route path="/charges" element={<MonthlyCharges />} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>
