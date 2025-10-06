@@ -67,19 +67,31 @@ serve(async (req) => {
     // Map by property name patterns
     for (const prop of localProperties || []) {
       const propNameLower = prop.name.toLowerCase();
+      const addressLower = prop.address?.toLowerCase() || '';
       
       // Map Woodland Lane to Mableton Meadows
-      if (propNameLower.includes('woodland')) {
+      if (propNameLower.includes('woodland') || addressLower.includes('woodland')) {
         propertyMapping['mableton meadows'] = prop.id;
       }
       // Map Villa 14 to Boho Lux
-      if (propNameLower.includes('villa') && propNameLower.includes('14')) {
+      if ((propNameLower.includes('villa') && propNameLower.includes('14')) || addressLower.includes('14 villa')) {
         propertyMapping['boho lux'] = prop.id;
+        propertyMapping['boho lux theme'] = prop.id;
       }
       // Map Villa 15 to House of Blues / Blues & Boho Haven
-      if (propNameLower.includes('villa') && propNameLower.includes('15')) {
+      if ((propNameLower.includes('villa') && propNameLower.includes('15')) || addressLower.includes('15 villa')) {
         propertyMapping['house of blues'] = prop.id;
         propertyMapping['blues & boho haven'] = prop.id;
+      }
+      // Map Smoke Hollow
+      if (propNameLower.includes('smoke') || addressLower.includes('smoke hollow') || addressLower.includes('3419')) {
+        propertyMapping['smoke hollow retreat'] = prop.id;
+        propertyMapping['smoke hollow'] = prop.id;
+      }
+      // Map Canadian Way
+      if (propNameLower.includes('canadian') || addressLower.includes('canadian way') || addressLower.includes('3708')) {
+        propertyMapping['canadian way haven'] = prop.id;
+        propertyMapping['canadian way'] = prop.id;
       }
     }
 
@@ -87,10 +99,15 @@ serve(async (req) => {
 
     // Define management fee structure per property
     const managementFeeRates: Record<string, number> = {
-      'mableton meadows': 0.25,  // 25% for Mableton Meadows
+      'mableton meadows': 0.25,  // 25% for Mableton Meadows (Woodland Lane)
       'boho lux': 0.20,  // 20% for Boho Lux Theme (Villa 14)
+      'boho lux theme': 0.20,  // 20% for Boho Lux Theme (Villa 14)
       'house of blues': 0.20,  // 20% for House of Blues Theme (Villa 15)
       'blues & boho haven': 0.20,  // 20% for The Blues & Boho Haven (Villa 15)
+      'smoke hollow retreat': 0.18,  // 18% for Smoke Hollow Retreat
+      'smoke hollow': 0.18,  // 18% for Smoke Hollow Retreat
+      'canadian way haven': 0.20,  // 20% for Canadian Way Haven
+      'canadian way': 0.20,  // 20% for Canadian Way Haven
     };
 
     // Function to determine management fee rate based on property name
