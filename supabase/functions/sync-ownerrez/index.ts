@@ -17,11 +17,14 @@ interface OwnerRezListing {
 interface OwnerRezBooking {
   id: number;
   property_id: number;
-  property_name?: string;  // Property name from booking
+  property?: {
+    id: number;
+    name: string;
+  };
   guest_name: string;
   arrival: string;
   departure: string;
-  total: number;
+  total_amount: number;
   status: string;
 }
 
@@ -160,19 +163,20 @@ serve(async (req) => {
 
         // Try to get property name from listing, bookings, or use property_id as fallback
         const propertyName = listing.name || 
-                            bookings[0]?.property_name || 
+                            bookings[0]?.property?.name || 
                             `Property ${listing.property_id}`;
         
         // Get management fee rate for this specific property
         const managementFeeRate = getManagementFeeRate(listing.property_id, propertyName);
 
         console.log(`Processing ${bookings.length} bookings for ${propertyName} (${(managementFeeRate * 100).toFixed(0)}% management fee)`);
+        console.log(`Sample booking - ID: ${bookings[0]?.id}, Total: $${bookings[0]?.total_amount || 0}`);
 
         let listingRevenue = 0;
         let listingManagementFees = 0;
         
         for (const booking of bookings) {
-          const bookingTotal = booking.total || 0;
+          const bookingTotal = booking.total_amount || 0;
           listingRevenue += bookingTotal;
           
           const managementFee = bookingTotal * managementFeeRate;
