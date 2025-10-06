@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Calendar, DollarSign, RefreshCw, CheckCircle, XCircle, Clock, ExternalLink } from "lucide-react";
+import { Calendar, DollarSign, RefreshCw, CheckCircle, XCircle, Clock, ExternalLink, Mail, ChevronDown, ChevronUp } from "lucide-react";
 import { format } from "date-fns";
 import {
   Table,
@@ -14,6 +14,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 
 interface MonthlyCharge {
   id: string;
@@ -38,11 +43,222 @@ interface ChargeWithOwner extends MonthlyCharge {
   owner: PropertyOwner;
 }
 
+interface ChargeBreakdownProps {
+  charge: ChargeWithOwner;
+}
+
+const ChargeBreakdown = ({ charge }: ChargeBreakdownProps) => {
+  const [properties, setProperties] = useState<any[]>([]);
+  const [visits, setVisits] = useState<any[]>([]);
+  const [expenses, setExpenses] = useState<any[]>([]);
+  const [bookings, setBookings] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadBreakdownData();
+  }, [charge.id]);
+
+  const loadBreakdownData = async () => {
+    try {
+      setLoading(true);
+      
+      // Get the month range
+      const chargeDate = new Date(charge.charge_month);
+      const firstDay = new Date(chargeDate.getFullYear(), chargeDate.getMonth(), 1);
+      const lastDay = new Date(chargeDate.getFullYear(), chargeDate.getMonth() + 1, 0);
+
+      // Fetch properties for this owner
+      const { data: propsData } = await supabase
+        .from("properties")
+        .select("*")
+        .eq("owner_id", charge.owner_id);
+
+      setProperties(propsData || []);
+
+      const propertyIds = (propsData || []).map(p => p.id);
+
+      if (propertyIds.length > 0) {
+        // Fetch visits for this month
+        const { data: visitsData } = await supabase
+          .from("visits")
+          .select("*")
+          .in("property_id", propertyIds)
+          .gte("date", firstDay.toISOString().split('T')[0])
+          .lte("date", lastDay.toISOString().split('T')[0]);
+
+        setVisits(visitsData || []);
+
+        // Fetch expenses for this month
+        const { data: expensesData } = await supabase
+          .from("expenses")
+          .select("*")
+          .in("property_id", propertyIds)
+          .gte("date", firstDay.toISOString().split('T')[0])
+          .lte("date", lastDay.toISOString().split('T')[0]);
+
+        setExpenses(expensesData || []);
+
+        // Fetch bookings
+        const { data: bookingsData } = await supabase
+          .from("ownerrez_bookings")
+          .select("*")
+          .in("property_id", propertyIds);
+
+        setBookings(bookingsData || []);
+      }
+    } catch (error) {
+      console.error("Error loading breakdown:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return <div className="text-center py-4">Loading breakdown...</div>;
+  }
+
+  const totalRevenue = bookings.reduce((sum, b) => sum + Number(b.total_amount || 0), 0);
+  const totalVisits = visits.length;
+  const totalExpenses = expenses.reduce((sum, e) => sum + Number(e.amount || 0), 0);
+  const netIncome = totalRevenue - Number(charge.total_management_fees) - totalExpenses;
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <Card>
+          <CardContent className="pt-4">
+            <p className="text-sm text-muted-foreground">Total Revenue</p>
+            <p className="text-2xl font-bold text-green-600">${totalRevenue.toFixed(2)}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4">
+            <p className="text-sm text-muted-foreground">Management Fees</p>
+            <p className="text-2xl font-bold">${Number(charge.total_management_fees).toFixed(2)}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4">
+            <p className="text-sm text-muted-foreground">Expenses</p>
+            <p className="text-2xl font-bold text-red-600">${totalExpenses.toFixed(2)}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-4">
+            <p className="text-sm text-muted-foreground">Net Income</p>
+            <p className="text-2xl font-bold">${netIncome.toFixed(2)}</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid md:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Properties ({properties.length})</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {properties.map(prop => (
+                <div key={prop.id} className="p-2 border rounded-lg">
+                  <p className="font-medium text-sm">{prop.name}</p>
+                  <p className="text-xs text-muted-foreground">{prop.address}</p>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Visits ({totalVisits})</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2 max-h-48 overflow-y-auto">
+              {visits.map(visit => {
+                const prop = properties.find(p => p.id === visit.property_id);
+                return (
+                  <div key={visit.id} className="p-2 border rounded-lg text-sm">
+                    <div className="flex justify-between">
+                      <span className="font-medium">{prop?.name}</span>
+                      <span className="text-green-600">${Number(visit.price).toFixed(2)}</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {format(new Date(visit.date), "MMM d, yyyy")}
+                    </p>
+                  </div>
+                );
+              })}
+              {visits.length === 0 && (
+                <p className="text-sm text-muted-foreground">No visits this month</p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Expenses ({expenses.length})</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2 max-h-48 overflow-y-auto">
+              {expenses.map(expense => {
+                const prop = properties.find(p => p.id === expense.property_id);
+                return (
+                  <div key={expense.id} className="p-2 border rounded-lg text-sm">
+                    <div className="flex justify-between">
+                      <span className="font-medium">{prop?.name}</span>
+                      <span className="text-red-600">${Number(expense.amount).toFixed(2)}</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">{expense.purpose || 'No description'}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {format(new Date(expense.date), "MMM d, yyyy")}
+                    </p>
+                  </div>
+                );
+              })}
+              {expenses.length === 0 && (
+                <p className="text-sm text-muted-foreground">No expenses this month</p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Bookings ({bookings.length})</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2 max-h-48 overflow-y-auto">
+              {bookings.map(booking => (
+                <div key={booking.id} className="p-2 border rounded-lg text-sm">
+                  <div className="flex justify-between">
+                    <span className="font-medium">{booking.ownerrez_listing_name}</span>
+                    <span className="text-green-600">${Number(booking.total_amount).toFixed(2)}</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Fee: ${Number(booking.management_fee).toFixed(2)}
+                  </p>
+                </div>
+              ))}
+              {bookings.length === 0 && (
+                <p className="text-sm text-muted-foreground">No bookings</p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+};
+
+
 const MonthlyCharges = () => {
   const [charges, setCharges] = useState<ChargeWithOwner[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [charging, setCharging] = useState(false);
+  const [sendingTest, setSendingTest] = useState(false);
+  const [expandedCharge, setExpandedCharge] = useState<string | null>(null);
 
   useEffect(() => {
     checkAdminStatus();
@@ -138,6 +354,26 @@ const MonthlyCharges = () => {
     }
   };
 
+  const handleSendTestEmail = async () => {
+    setSendingTest(true);
+    toast.loading("Sending test monthly statement to ingo@peachhausgroup.com...");
+
+    try {
+      const { data, error } = await supabase.functions.invoke("send-monthly-report");
+
+      if (error) throw error;
+
+      toast.dismiss();
+      toast.success(`Test email sent successfully! ${data.emailsSent?.length || 0} statements sent.`);
+    } catch (error: any) {
+      console.error("Error sending test email:", error);
+      toast.dismiss();
+      toast.error(error.message || "Failed to send test email");
+    } finally {
+      setSendingTest(false);
+    }
+  };
+
   const getStatusIcon = (status: string) => {
     switch (status) {
       case "succeeded":
@@ -194,14 +430,25 @@ const MonthlyCharges = () => {
           </h1>
           <p className="text-muted-foreground mt-1">Manage and track monthly management fee charges</p>
         </div>
-        <Button
-          className="gap-2"
-          onClick={handleChargeMonthlyFees}
-          disabled={charging}
-        >
-          <DollarSign className="w-4 h-4" />
-          {charging ? "Processing..." : "Charge This Month's Fees"}
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            className="gap-2"
+            onClick={handleSendTestEmail}
+            disabled={sendingTest}
+          >
+            <Mail className="w-4 h-4" />
+            {sendingTest ? "Sending..." : "Send Test Email"}
+          </Button>
+          <Button
+            className="gap-2"
+            onClick={handleChargeMonthlyFees}
+            disabled={charging}
+          >
+            <DollarSign className="w-4 h-4" />
+            {charging ? "Processing..." : "Charge This Month's Fees"}
+          </Button>
+        </div>
       </div>
 
       <Card className="bg-gradient-subtle border-primary/20">
@@ -254,51 +501,67 @@ const MonthlyCharges = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {charges.map((charge) => (
-                  <TableRow key={charge.id}>
-                    <TableCell className="font-medium">
-                      {format(new Date(charge.charge_month), "MMMM yyyy")}
-                    </TableCell>
-                    <TableCell>
-                      <div>
-                        <p className="font-medium">{charge.owner.name}</p>
-                        <p className="text-xs text-muted-foreground">{charge.owner.email}</p>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline">
-                        {charge.owner.payment_method === "ach" ? "ACH" : "Card"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="font-mono">
-                      ${Number(charge.total_management_fees).toFixed(2)}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={getStatusVariant(charge.charge_status)} className="gap-1">
-                        {getStatusIcon(charge.charge_status)}
-                        {charge.charge_status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      {charge.charged_at
-                        ? format(new Date(charge.charged_at), "MMM d, yyyy")
-                        : "-"}
-                    </TableCell>
-                    <TableCell>
-                      {charge.stripe_payment_intent_id && (
-                        <a
-                          href={`https://dashboard.stripe.com/payments/${charge.stripe_payment_intent_id}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-1 text-sm text-primary hover:underline"
-                        >
-                          View in Stripe
-                          <ExternalLink className="w-3 h-3" />
-                        </a>
+                {charges.map((charge) => {
+                  const isExpanded = expandedCharge === charge.id;
+                  
+                  return (
+                    <>
+                      <TableRow key={charge.id} className="cursor-pointer hover:bg-muted/50" onClick={() => setExpandedCharge(isExpanded ? null : charge.id)}>
+                        <TableCell className="font-medium">
+                          <div className="flex items-center gap-2">
+                            {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                            {format(new Date(charge.charge_month), "MMMM yyyy")}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div>
+                            <p className="font-medium">{charge.owner.name}</p>
+                            <p className="text-xs text-muted-foreground">{charge.owner.email}</p>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">
+                            {charge.owner.payment_method === "ach" ? "ACH" : "Card"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="font-mono">
+                          ${Number(charge.total_management_fees).toFixed(2)}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={getStatusVariant(charge.charge_status)} className="gap-1">
+                            {getStatusIcon(charge.charge_status)}
+                            {charge.charge_status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {charge.charged_at
+                            ? format(new Date(charge.charged_at), "MMM d, yyyy")
+                            : "-"}
+                        </TableCell>
+                        <TableCell onClick={(e) => e.stopPropagation()}>
+                          {charge.stripe_payment_intent_id && (
+                            <a
+                              href={`https://dashboard.stripe.com/payments/${charge.stripe_payment_intent_id}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-1 text-sm text-primary hover:underline"
+                            >
+                              View in Stripe
+                              <ExternalLink className="w-3 h-3" />
+                            </a>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                      {isExpanded && (
+                        <TableRow>
+                          <TableCell colSpan={7} className="bg-muted/30 p-6">
+                            <ChargeBreakdown charge={charge} />
+                          </TableCell>
+                        </TableRow>
                       )}
-                    </TableCell>
-                  </TableRow>
-                ))}
+                    </>
+                  );
+                })}
               </TableBody>
             </Table>
           )}

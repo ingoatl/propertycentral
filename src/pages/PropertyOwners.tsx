@@ -23,6 +23,7 @@ import {
 const ownerSchema = z.object({
   name: z.string().min(1, "Name is required").max(255),
   email: z.string().email("Invalid email address").max(255),
+  phone: z.string().optional(),
   payment_method: z.enum(["card", "ach"]),
 });
 
@@ -30,6 +31,7 @@ interface PropertyOwner {
   id: string;
   name: string;
   email: string;
+  phone: string | null;
   stripe_customer_id: string | null;
   payment_method: "card" | "ach";
   created_at: string;
@@ -68,6 +70,7 @@ const PropertyOwners = () => {
   const [newOwner, setNewOwner] = useState({
     name: "",
     email: "",
+    phone: "",
     payment_method: "card" as "card" | "ach",
   });
   const [creating, setCreating] = useState(false);
@@ -144,7 +147,7 @@ const PropertyOwners = () => {
 
       toast.success("Property owner added successfully");
       setAddDialogOpen(false);
-      setNewOwner({ name: "", email: "", payment_method: "card" });
+      setNewOwner({ name: "", email: "", phone: "", payment_method: "card" });
       loadData();
     } catch (error: any) {
       console.error("Error adding owner:", error);
@@ -304,6 +307,16 @@ const PropertyOwners = () => {
                 />
               </div>
               <div className="space-y-2">
+                <Label htmlFor="phone">Phone (Optional)</Label>
+                <Input
+                  id="phone"
+                  type="tel"
+                  value={newOwner.phone}
+                  onChange={(e) => setNewOwner({ ...newOwner, phone: e.target.value })}
+                  placeholder="+1 (555) 123-4567"
+                />
+              </div>
+              <div className="space-y-2">
                 <Label htmlFor="payment-method">Payment Method Type</Label>
                 <Select
                   value={newOwner.payment_method}
@@ -351,7 +364,10 @@ const PropertyOwners = () => {
                         <Building2 className="w-5 h-5" />
                         {owner.name}
                       </CardTitle>
-                      <CardDescription className="mt-1">{owner.email}</CardDescription>
+                      <CardDescription className="mt-1 space-y-0.5">
+                        <div>{owner.email}</div>
+                        {owner.phone && <div className="text-xs">{owner.phone}</div>}
+                      </CardDescription>
                     </div>
                     <div className="flex gap-2 items-center">
                       <Badge variant={owner.payment_method === "ach" ? "default" : "secondary"}>
