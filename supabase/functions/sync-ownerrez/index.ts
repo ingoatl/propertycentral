@@ -90,6 +90,11 @@ serve(async (req) => {
 
     console.log(`Found ${listings.length} listings in OwnerRez`);
     
+    // Log first listing structure for debugging
+    if (listings.length > 0) {
+      console.log('First listing structure:', JSON.stringify(listings[0], null, 2));
+    }
+    
     // Log all listing names for debugging
     console.log('All listing names:', listings.map(l => l.name).join(', '));
 
