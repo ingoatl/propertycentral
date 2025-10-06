@@ -1,6 +1,10 @@
 import { ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Home, Building2, DollarSign, Calendar } from "lucide-react";
+import { Home, Building2, DollarSign, Calendar, LogOut } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import { useAuth } from "./ProtectedRoute";
 
 interface LayoutProps {
   children: ReactNode;
@@ -8,6 +12,28 @@ interface LayoutProps {
 
 const Layout = ({ children }: LayoutProps) => {
   const location = useLocation();
+  const { user, loading } = useAuth();
+
+  const handleLogout = async () => {
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      toast.success("Logged out successfully");
+    } catch (error: any) {
+      if (import.meta.env.DEV) {
+        console.error("Logout error:", error);
+      }
+      toast.error("Failed to log out");
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-lg">Loading...</div>
+      </div>
+    );
+  }
 
   const navItems = [
     { path: "/", label: "Dashboard", icon: Home },
@@ -29,6 +55,17 @@ const Layout = ({ children }: LayoutProps) => {
                 <h1 className="text-xl font-bold text-foreground">PeachHaus</h1>
                 <p className="text-xs text-muted-foreground">Property Tracker</p>
               </div>
+            </div>
+            <div className="flex items-center gap-4">
+              {user && (
+                <>
+                  <span className="text-sm text-muted-foreground hidden sm:inline">{user.email}</span>
+                  <Button variant="outline" size="sm" onClick={handleLogout}>
+                    <LogOut className="h-4 w-4 sm:mr-2" />
+                    <span className="hidden sm:inline">Logout</span>
+                  </Button>
+                </>
+              )}
             </div>
           </div>
         </div>

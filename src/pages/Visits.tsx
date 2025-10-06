@@ -9,6 +9,13 @@ import { Calendar as CalendarIcon, Clock, MapPin, CheckCircle2 } from "lucide-re
 import { supabase } from "@/integrations/supabase/client";
 import { Property, Visit } from "@/types";
 import { toast } from "sonner";
+import { z } from "zod";
+
+const visitSchema = z.object({
+  propertyId: z.string().uuid("Please select a property"),
+  price: z.number().positive("Price must be positive").max(10000, "Price cannot exceed $10,000"),
+  notes: z.string().max(2000, "Notes must be less than 2000 characters").optional(),
+});
 
 const Visits = () => {
   const [properties, setProperties] = useState<Property[]>([]);
@@ -59,8 +66,10 @@ const Visits = () => {
         notes: v.notes,
         createdAt: v.created_at,
       })));
-    } catch (error) {
-      console.error("Error loading data:", error);
+    } catch (error: any) {
+      if (import.meta.env.DEV) {
+        console.error("Error loading data:", error);
+      }
       toast.error("Failed to load data");
     }
   };
@@ -77,19 +86,27 @@ const Visits = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.propertyId) {
-      toast.error("Please select a property");
-      return;
-    }
-
     const price = parseFloat(formData.price);
-    if (isNaN(price) || price <= 0) {
-      toast.error("Please enter a valid price");
+    
+    // Validate with zod
+    const validation = visitSchema.safeParse({
+      propertyId: formData.propertyId,
+      price,
+      notes: formData.notes,
+    });
+
+    if (!validation.success) {
+      toast.error(validation.error.errors[0].message);
       return;
     }
 
     try {
       setLoading(true);
+      
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+      
       // Capture current date and time automatically
       const now = new Date();
       const currentDate = now.toISOString().split("T")[0];
@@ -103,6 +120,7 @@ const Visits = () => {
           time: currentTime,
           price,
           notes: formData.notes || null,
+          user_id: user.id,
         });
 
       if (error) throw error;
@@ -115,9 +133,11 @@ const Visits = () => {
 
       await loadData();
       toast.success("Visit logged successfully!");
-    } catch (error) {
-      console.error("Error adding visit:", error);
-      toast.error("Failed to log visit");
+    } catch (error: any) {
+      if (import.meta.env.DEV) {
+        console.error("Error adding visit:", error);
+      }
+      toast.error(error.message || "Failed to log visit");
     } finally {
       setLoading(false);
     }
@@ -173,26 +193,30 @@ const Visits = () => {
             <div className="space-y-3">
               <Label htmlFor="price" className="text-base font-semibold">Visit Price ($) *</Label>
               <Input
-                id="price"
-                type="number"
-                step="0.01"
-                value={formData.price}
-                onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                className="h-14 text-lg border-2 focus:border-primary"
-                placeholder="Auto-filled from property"
-              />
+                  id="price"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  max="10000"
+                  value={formData.price}
+                  onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                  className="h-14 text-lg border-2 focus:border-primary"
+                  placeholder="Auto-filled from property"
+                  required
+                />
             </div>
 
             {/* Notes - Optional */}
             <div className="space-y-3">
               <Label htmlFor="notes" className="text-base font-semibold">Notes (Optional)</Label>
               <Textarea
-                id="notes"
-                value={formData.notes}
-                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                placeholder="Any notes about this visit..."
-                className="text-base min-h-[120px] border-2 focus:border-primary"
-              />
+                  id="notes"
+                  value={formData.notes}
+                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                  placeholder="Any notes about this visit..."
+                  className="text-base min-h-[120px] border-2 focus:border-primary"
+                  maxLength={2000}
+                />
             </div>
 
             {/* Auto-capture notice */}

@@ -7,6 +7,13 @@ import { Plus, Trash2, MapPin, Building2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Property } from "@/types";
 import { toast } from "sonner";
+import { z } from "zod";
+
+const propertySchema = z.object({
+  name: z.string().trim().min(1, "Name is required").max(200, "Name must be less than 200 characters"),
+  address: z.string().trim().min(1, "Address is required").max(500, "Address must be less than 500 characters"),
+  visitPrice: z.number().positive("Visit price must be positive").max(10000, "Visit price cannot exceed $10,000"),
+});
 
 const Properties = () => {
   const [properties, setProperties] = useState<Property[]>([]);
@@ -38,8 +45,10 @@ const Properties = () => {
         visitPrice: Number(p.visit_price),
         createdAt: p.created_at,
       })));
-    } catch (error) {
-      console.error("Error loading properties:", error);
+    } catch (error: any) {
+      if (import.meta.env.DEV) {
+        console.error("Error loading properties:", error);
+      }
       toast.error("Failed to load properties");
     }
   };
@@ -47,25 +56,34 @@ const Properties = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.name || !formData.address || !formData.visitPrice) {
-      toast.error("Please fill in all fields");
-      return;
-    }
-
     const visitPrice = parseFloat(formData.visitPrice);
-    if (isNaN(visitPrice) || visitPrice <= 0) {
-      toast.error("Please enter a valid visit price");
+    
+    // Validate with zod
+    const validation = propertySchema.safeParse({
+      name: formData.name,
+      address: formData.address,
+      visitPrice,
+    });
+
+    if (!validation.success) {
+      toast.error(validation.error.errors[0].message);
       return;
     }
 
     try {
       setLoading(true);
+      
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
       const { error } = await supabase
         .from("properties")
         .insert({
-          name: formData.name,
-          address: formData.address,
+          name: formData.name.trim(),
+          address: formData.address.trim(),
           visit_price: visitPrice,
+          user_id: user.id,
         });
 
       if (error) throw error;
@@ -74,9 +92,11 @@ const Properties = () => {
       setShowForm(false);
       await loadProperties();
       toast.success("Property added successfully!");
-    } catch (error) {
-      console.error("Error adding property:", error);
-      toast.error("Failed to add property");
+    } catch (error: any) {
+      if (import.meta.env.DEV) {
+        console.error("Error adding property:", error);
+      }
+      toast.error(error.message || "Failed to add property");
     } finally {
       setLoading(false);
     }
@@ -97,8 +117,10 @@ const Properties = () => {
 
       await loadProperties();
       toast.success("Property deleted");
-    } catch (error) {
-      console.error("Error deleting property:", error);
+    } catch (error: any) {
+      if (import.meta.env.DEV) {
+        console.error("Error deleting property:", error);
+      }
       toast.error("Failed to delete property");
     }
   };
@@ -132,6 +154,8 @@ const Properties = () => {
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   className="text-base"
+                  maxLength={200}
+                  required
                 />
               </div>
               <div className="space-y-2">
@@ -142,6 +166,8 @@ const Properties = () => {
                   value={formData.address}
                   onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                   className="text-base"
+                  maxLength={500}
+                  required
                 />
               </div>
               <div className="space-y-2">
@@ -150,10 +176,13 @@ const Properties = () => {
                   id="visitPrice"
                   type="number"
                   step="0.01"
+                  min="0"
+                  max="10000"
                   placeholder="150.00"
                   value={formData.visitPrice}
                   onChange={(e) => setFormData({ ...formData, visitPrice: e.target.value })}
                   className="text-base"
+                  required
                 />
               </div>
               <div className="flex gap-2">

@@ -23,6 +23,7 @@ export type Database = {
           id: string
           property_id: string
           purpose: string | null
+          user_id: string | null
         }
         Insert: {
           amount: number
@@ -32,6 +33,7 @@ export type Database = {
           id?: string
           property_id: string
           purpose?: string | null
+          user_id?: string | null
         }
         Update: {
           amount?: number
@@ -41,6 +43,7 @@ export type Database = {
           id?: string
           property_id?: string
           purpose?: string | null
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -58,6 +61,7 @@ export type Database = {
           created_at: string
           id: string
           name: string
+          user_id: string | null
           visit_price: number
         }
         Insert: {
@@ -65,6 +69,7 @@ export type Database = {
           created_at?: string
           id?: string
           name: string
+          user_id?: string | null
           visit_price?: number
         }
         Update: {
@@ -72,6 +77,7 @@ export type Database = {
           created_at?: string
           id?: string
           name?: string
+          user_id?: string | null
           visit_price?: number
         }
         Relationships: []
@@ -85,6 +91,7 @@ export type Database = {
           price: number
           property_id: string
           time: string
+          user_id: string | null
         }
         Insert: {
           created_at?: string
@@ -94,6 +101,7 @@ export type Database = {
           price: number
           property_id: string
           time: string
+          user_id?: string | null
         }
         Update: {
           created_at?: string
@@ -103,6 +111,7 @@ export type Database = {
           price?: number
           property_id?: string
           time?: string
+          user_id?: string | null
         }
         Relationships: [
           {

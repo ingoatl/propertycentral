@@ -5,10 +5,19 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { DollarSign, Calendar as CalendarIcon, MapPin, Receipt, Upload, FileText, Image as ImageIcon } from "lucide-react";
+import { DollarSign, Calendar as CalendarIcon, MapPin, Receipt, Upload } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Property, Expense } from "@/types";
 import { toast } from "sonner";
+import { z } from "zod";
+import { ExpenseDocumentLink } from "@/components/ExpenseDocumentLink";
+
+const expenseSchema = z.object({
+  propertyId: z.string().uuid("Please select a property"),
+  amount: z.number().positive("Amount must be positive").max(1000000, "Amount cannot exceed $1,000,000"),
+  date: z.string().min(1, "Date is required"),
+  purpose: z.string().max(2000, "Purpose must be less than 2000 characters").optional(),
+});
 
 const Expenses = () => {
   const [properties, setProperties] = useState<Property[]>([]);
@@ -60,8 +69,10 @@ const Expenses = () => {
         filePath: e.file_path,
         createdAt: e.created_at,
       })));
-    } catch (error) {
-      console.error("Error loading data:", error);
+    } catch (error: any) {
+      if (import.meta.env.DEV) {
+        console.error("Error loading data:", error);
+      }
       toast.error("Failed to load data");
     }
   };
@@ -85,19 +96,28 @@ const Expenses = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.propertyId || !formData.amount || !formData.date) {
-      toast.error("Please fill in all required fields");
-      return;
-    }
-
     const amount = parseFloat(formData.amount);
-    if (isNaN(amount) || amount <= 0) {
-      toast.error("Please enter a valid amount");
+    
+    // Validate with zod
+    const validation = expenseSchema.safeParse({
+      propertyId: formData.propertyId,
+      amount,
+      date: formData.date,
+      purpose: formData.purpose,
+    });
+
+    if (!validation.success) {
+      toast.error(validation.error.errors[0].message);
       return;
     }
 
     try {
       setLoading(true);
+      
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+      
       let filePath = null;
 
       // Upload file if selected
@@ -122,6 +142,7 @@ const Expenses = () => {
           date: formData.date,
           purpose: formData.purpose || null,
           file_path: filePath,
+          user_id: user.id,
         });
 
       if (error) throw error;
@@ -136,19 +157,14 @@ const Expenses = () => {
 
       await loadData();
       toast.success("Expense added successfully!");
-    } catch (error) {
-      console.error("Error adding expense:", error);
-      toast.error("Failed to add expense");
+    } catch (error: any) {
+      if (import.meta.env.DEV) {
+        console.error("Error adding expense:", error);
+      }
+      toast.error(error.message || "Failed to add expense");
     } finally {
       setLoading(false);
     }
-  };
-
-  const getFileUrl = (filePath: string) => {
-    const { data } = supabase.storage
-      .from('expense-documents')
-      .getPublicUrl(filePath);
-    return data.publicUrl;
   };
 
   const getPropertyName = (propertyId: string) => {
@@ -201,10 +217,13 @@ const Expenses = () => {
                   id="amount"
                   type="number"
                   step="0.01"
+                  min="0"
+                  max="1000000"
                   value={formData.amount}
                   onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
                   placeholder="0.00"
                   className="text-base"
+                  required
                 />
               </div>
 
@@ -219,6 +238,7 @@ const Expenses = () => {
                   value={formData.date}
                   onChange={(e) => setFormData({ ...formData, date: e.target.value })}
                   className="text-base"
+                  required
                 />
               </div>
             </div>
@@ -226,12 +246,13 @@ const Expenses = () => {
             <div className="space-y-2">
               <Label htmlFor="purpose">Purpose (Optional)</Label>
               <Textarea
-                id="purpose"
-                value={formData.purpose}
-                onChange={(e) => setFormData({ ...formData, purpose: e.target.value })}
-                placeholder="e.g., Maintenance, Repairs, Supplies..."
-                className="text-base min-h-[100px]"
-              />
+                  id="purpose"
+                  value={formData.purpose}
+                  onChange={(e) => setFormData({ ...formData, purpose: e.target.value })}
+                  placeholder="e.g., Maintenance, Repairs, Supplies..."
+                  className="text-base min-h-[100px]"
+                  maxLength={2000}
+                />
             </div>
 
             <div className="space-y-2">
@@ -300,19 +321,7 @@ const Expenses = () => {
                         </p>
                       )}
                       {expense.filePath && (
-                        <a
-                          href={getFileUrl(expense.filePath)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-sm text-primary hover:underline flex items-center gap-1.5 mt-2"
-                        >
-                          {expense.filePath.toLowerCase().endsWith('.pdf') ? (
-                            <FileText className="w-3.5 h-3.5" />
-                          ) : (
-                            <ImageIcon className="w-3.5 h-3.5" />
-                          )}
-                          View Document
-                        </a>
+                        <ExpenseDocumentLink filePath={expense.filePath} />
                       )}
                     </div>
                     <div className="text-right">
