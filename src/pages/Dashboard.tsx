@@ -72,6 +72,7 @@ const Dashboard = () => {
       const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
       const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
 
+      // Create summaries for local properties
       const summaryData = (properties || []).map(property => {
         const propertyVisits = (visits || []).filter(v => v.property_id === property.id);
         const propertyExpenses = (expenses || []).filter(e => e.property_id === property.id);
@@ -141,6 +142,82 @@ const Dashboard = () => {
         };
       });
 
+      // Add virtual properties for OwnerRez bookings without local properties
+      const localPropertyIds = (properties || []).map(p => p.id);
+      const unmappedBookings = (bookings || []).filter(b => !b.property_id || !localPropertyIds.includes(b.property_id));
+      
+      // Group unmapped bookings by ownerrez_listing_id
+      const bookingsByListing = unmappedBookings.reduce((acc, booking) => {
+        const key = booking.ownerrez_listing_id;
+        if (!acc[key]) acc[key] = [];
+        acc[key].push(booking);
+        return acc;
+      }, {} as Record<string, typeof bookings>);
+
+      // Create virtual property summaries for unmapped listings
+      const virtualSummaries = Object.entries(bookingsByListing).map(([listingId, listingBookings]) => {
+        const ownerrezRevenue = listingBookings.reduce((sum, b) => sum + Number(b.total_amount), 0);
+        const managementFees = listingBookings.reduce((sum, b) => sum + Number(b.management_fee), 0);
+        const isManaged = listingBookings.some(b => Number(b.management_fee) > 0);
+        
+        // Calculate this month's revenue
+        const thisMonthBookings = listingBookings.filter(b => {
+          if (!b.check_in) return false;
+          const checkIn = new Date(b.check_in);
+          return checkIn >= thisMonthStart;
+        });
+        const thisMonthRevenue = thisMonthBookings.reduce((sum, b) => sum + Number(b.total_amount), 0);
+        
+        // Calculate last month's revenue
+        const lastMonthBookings = listingBookings.filter(b => {
+          if (!b.check_in) return false;
+          const checkIn = new Date(b.check_in);
+          return checkIn >= lastMonthStart && checkIn <= lastMonthEnd;
+        });
+        const lastMonthRevenue = lastMonthBookings.reduce((sum, b) => sum + Number(b.total_amount), 0);
+        
+        // Calculate total nights booked
+        const totalNights = listingBookings.reduce((sum, b) => {
+          if (!b.check_in || !b.check_out) return sum;
+          const checkIn = new Date(b.check_in);
+          const checkOut = new Date(b.check_out);
+          const nights = Math.ceil((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24));
+          return sum + nights;
+        }, 0);
+        
+        const daysInPeriod = 365;
+        const revPAR = ownerrezRevenue / daysInPeriod;
+        const occupancyRate = (totalNights / daysInPeriod) * 100;
+
+        return {
+          property: {
+            id: `ownerrez-${listingId}`,
+            name: listingBookings[0].ownerrez_listing_name,
+            address: "OwnerRez Property",
+            visitPrice: 0,
+            createdAt: listingBookings[0].created_at,
+          },
+          visitCount: 0,
+          visitTotal: 0,
+          expenseTotal: 0,
+          ownerrezRevenue,
+          managementFees,
+          netBalance: managementFees,
+          isManaged,
+          bookingCount: listingBookings.length,
+          thisMonthRevenue,
+          lastMonthRevenue,
+          revPAR,
+          occupancyRate,
+        };
+      });
+
+      // Combine and sort: managed properties first, then unmanaged
+      const allSummaries = [...summaryData, ...virtualSummaries].sort((a, b) => {
+        if (a.isManaged === b.isManaged) return 0;
+        return a.isManaged ? -1 : 1;
+      });
+
       // Store visits grouped by property
       const visitsGrouped = (visits || []).reduce((acc, visit) => {
         if (!acc[visit.property_id]) acc[visit.property_id] = [];
@@ -157,7 +234,7 @@ const Dashboard = () => {
       }, {} as Record<string, Visit[]>);
 
       setAllVisits(visitsGrouped);
-      setSummaries(summaryData);
+      setSummaries(allSummaries);
     } catch (error) {
       console.error("Error loading data:", error);
       toast.error("Failed to load dashboard data");
