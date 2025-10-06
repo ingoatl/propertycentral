@@ -66,6 +66,83 @@ const Dashboard = () => {
         createdAt: b.created_at,
       })));
 
+      
+      // Define managed properties with their addresses and management fees
+      const managedPropertiesInfo: Record<string, { address: string; managementFee: number }> = {
+        // Boho Lux Theme
+        'boho lux': { address: '14 Villa Ct SE #14, Smyrna, GA 30080', managementFee: 0.20 },
+        'boho lux theme': { address: '14 Villa Ct SE #14, Smyrna, GA 30080', managementFee: 0.20 },
+        '14 villa': { address: '14 Villa Ct SE #14, Smyrna, GA 30080', managementFee: 0.20 },
+        
+        // House of Blues Theme
+        'house of blues': { address: '15 Villa Ct SE #15, Smyrna, GA 30080', managementFee: 0.20 },
+        'house of blues theme': { address: '15 Villa Ct SE #15, Smyrna, GA 30080', managementFee: 0.20 },
+        
+        // The Blues & Boho Haven (combined 14 & 15)
+        'blues & boho haven': { address: '14 & 15 Villa Ct SE, Smyrna, GA 30080', managementFee: 0.20 },
+        'the blues & boho haven': { address: '14 & 15 Villa Ct SE, Smyrna, GA 30080', managementFee: 0.20 },
+        '15 villa': { address: '15 Villa Ct SE #15, Smyrna, GA 30080', managementFee: 0.20 },
+        
+        // Mableton Meadows
+        'mableton meadows': { address: '184 Woodland Ln, Mableton, GA 30126', managementFee: 0.25 },
+        'woodland': { address: '184 Woodland Ln, Mableton, GA 30126', managementFee: 0.25 },
+        
+        // Smoke Hollow Retreat
+        'smoke hollow': { address: '3419 Smoke Hollow Pl, Roswell, GA 30075', managementFee: 0.18 },
+        'smoke hollow retreat': { address: '3419 Smoke Hollow Pl, Roswell, GA 30075', managementFee: 0.18 },
+        '3419': { address: '3419 Smoke Hollow Pl, Roswell, GA 30075', managementFee: 0.18 },
+        
+        // Canadian Way Haven
+        'canadian way': { address: '3708 Canadian Way, Tucker, GA 30084', managementFee: 0.20 },
+        'canadian way haven': { address: '3708 Canadian Way, Tucker, GA 30084', managementFee: 0.20 },
+        '3708': { address: '3708 Canadian Way, Tucker, GA 30084', managementFee: 0.20 },
+      };
+
+      // Known unmanaged property addresses
+      const unmanagedAddresses: Record<string, string> = {
+        'family retreat': '5360 Durham Ridge Ct, Lilburn, GA 30047',
+        'lavish living': '3069 Rita Way, Smyrna, GA 30080',
+        'luxurious & spacious apartment': '2580 Old Roswell Rd, Roswell, GA 30076',
+        'modern + cozy townhome': '169 Willow Stream Ct, Woodstock, GA 30188',
+        'scandi chic': '3155 Duvall Pl, Kennesaw, GA 30144',
+        'scandinavian retreat': '5198 Laurel Bridge Dr, Smyrna, GA 30082',
+        'alpine': '4241 Osburn Ct, Duluth, GA 30096',
+      };
+
+      // Helper to check if a property is managed
+      const isPropertyManaged = (name: string, address: string): boolean => {
+        const lowerName = name.toLowerCase();
+        const lowerAddress = address?.toLowerCase() || '';
+        
+        for (const key of Object.keys(managedPropertiesInfo)) {
+          if (lowerName.includes(key) || lowerAddress.includes(key)) {
+            return true;
+          }
+        }
+        return false;
+      };
+
+      // Helper to get proper address for a property
+      const getPropertyAddress = (name: string, currentAddress: string): string => {
+        const lowerName = name.toLowerCase();
+        
+        // Check managed properties
+        for (const [key, info] of Object.entries(managedPropertiesInfo)) {
+          if (lowerName.includes(key)) {
+            return info.address;
+          }
+        }
+        
+        // Check unmanaged properties
+        for (const [key, address] of Object.entries(unmanagedAddresses)) {
+          if (lowerName.includes(key)) {
+            return address;
+          }
+        }
+        
+        return currentAddress || 'Address not available';
+      };
+
       // Calculate date ranges for metrics
       const now = new Date();
       const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -83,8 +160,8 @@ const Dashboard = () => {
         const ownerrezRevenue = propertyBookings.reduce((sum, b) => sum + Number(b.total_amount), 0);
         const managementFees = propertyBookings.reduce((sum, b) => sum + Number(b.management_fee), 0);
 
-        // Check if property is managed (has bookings with management fees > 0)
-        const isManaged = propertyBookings.some(b => Number(b.management_fee) > 0);
+        // Check if property is managed using our mapping
+        const isManaged = isPropertyManaged(property.name, property.address);
         
         // Calculate this month's revenue
         const thisMonthBookings = propertyBookings.filter(b => {
@@ -123,7 +200,7 @@ const Dashboard = () => {
           property: {
             id: property.id,
             name: property.name,
-            address: property.address,
+            address: getPropertyAddress(property.name, property.address),
             visitPrice: Number(property.visit_price),
             createdAt: property.created_at,
           },
@@ -158,7 +235,13 @@ const Dashboard = () => {
       const virtualSummaries = Object.entries(bookingsByListing).map(([listingId, listingBookings]) => {
         const ownerrezRevenue = listingBookings.reduce((sum, b) => sum + Number(b.total_amount), 0);
         const managementFees = listingBookings.reduce((sum, b) => sum + Number(b.management_fee), 0);
-        const isManaged = listingBookings.some(b => Number(b.management_fee) > 0);
+        const propertyName = listingBookings[0].ownerrez_listing_name;
+        
+        // Check if property is managed using our mapping
+        const isManaged = isPropertyManaged(propertyName, '');
+        
+        // Get proper address for this property
+        const propertyAddress = getPropertyAddress(propertyName, '');
         
         // Calculate this month's revenue
         const thisMonthBookings = listingBookings.filter(b => {
@@ -192,8 +275,8 @@ const Dashboard = () => {
         return {
           property: {
             id: `ownerrez-${listingId}`,
-            name: listingBookings[0].ownerrez_listing_name,
-            address: "OwnerRez Property",
+            name: propertyName,
+            address: propertyAddress,
             visitPrice: 0,
             createdAt: listingBookings[0].created_at,
           },
