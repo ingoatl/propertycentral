@@ -49,6 +49,42 @@ serve(async (req) => {
     console.log('Username present:', !!ownerrezUsername);
     console.log('API Key present:', !!ownerrezApiKey);
 
+    // Fetch local properties to map OwnerRez listings
+    const { data: localProperties, error: propertiesError } = await supabase
+      .from('properties')
+      .select('*');
+    
+    if (propertiesError) {
+      console.error('Failed to fetch local properties:', propertiesError);
+      throw propertiesError;
+    }
+
+    console.log('Local properties:', localProperties?.map(p => ({ id: p.id, name: p.name })));
+
+    // Map OwnerRez property names to local property IDs
+    const propertyMapping: Record<string, string> = {};
+    
+    // Map by property name patterns
+    for (const prop of localProperties || []) {
+      const propNameLower = prop.name.toLowerCase();
+      
+      // Map Woodland Lane to Mableton Meadows
+      if (propNameLower.includes('woodland')) {
+        propertyMapping['mableton meadows'] = prop.id;
+      }
+      // Map Villa 14 to Boho Lux
+      if (propNameLower.includes('villa') && propNameLower.includes('14')) {
+        propertyMapping['boho lux'] = prop.id;
+      }
+      // Map Villa 15 to House of Blues / Blues & Boho Haven
+      if (propNameLower.includes('villa') && propNameLower.includes('15')) {
+        propertyMapping['house of blues'] = prop.id;
+        propertyMapping['blues & boho haven'] = prop.id;
+      }
+    }
+
+    console.log('Property mapping:', propertyMapping);
+
     // Define management fee structure per property
     const managementFeeRates: Record<string, number> = {
       'mableton meadows': 0.25,  // 25% for Mableton Meadows
@@ -70,6 +106,21 @@ serve(async (req) => {
       }
       console.log(`No match found - property not under management (0% fee)`);
       return 0.00; // Default 0% if not under management
+    };
+
+    // Function to get local property ID based on OwnerRez property name
+    const getLocalPropertyId = (propertyName: string): string | null => {
+      const lowerName = propertyName.toLowerCase();
+      
+      for (const [key, propertyId] of Object.entries(propertyMapping)) {
+        if (lowerName.includes(key)) {
+          console.log(`Mapped "${propertyName}" to local property ${propertyId}`);
+          return propertyId;
+        }
+      }
+      
+      console.log(`No local property mapping found for "${propertyName}"`);
+      return null;
     };
 
     // Fetch all listings from OwnerRez
@@ -167,6 +218,9 @@ serve(async (req) => {
         
         // Get management fee rate for this specific property
         const managementFeeRate = getManagementFeeRate(listing.property_id, propertyName);
+        
+        // Get local property ID mapping
+        const localPropertyId = getLocalPropertyId(propertyName);
 
         console.log(`Processing ${bookings.length} bookings for ${propertyName} (${(managementFeeRate * 100).toFixed(0)}% management fee)`);
         console.log(`Sample booking - ID: ${bookings[0]?.id}, Total: $${bookings[0]?.total_amount || 0}`);
@@ -181,11 +235,11 @@ serve(async (req) => {
           const managementFee = bookingTotal * managementFeeRate;
           listingManagementFees += managementFee;
 
-          // Upsert booking data
+          // Upsert booking data with local property ID if available
           const { data, error } = await supabase
             .from('ownerrez_bookings')
             .upsert({
-              property_id: null,
+              property_id: localPropertyId,
               ownerrez_listing_id: listing.property_id.toString(),
               ownerrez_listing_name: propertyName,
               booking_id: booking.id.toString(),

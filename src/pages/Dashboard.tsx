@@ -66,6 +66,12 @@ const Dashboard = () => {
         createdAt: b.created_at,
       })));
 
+      // Calculate date ranges for metrics
+      const now = new Date();
+      const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0);
+
       const summaryData = (properties || []).map(property => {
         const propertyVisits = (visits || []).filter(v => v.property_id === property.id);
         const propertyExpenses = (expenses || []).filter(e => e.property_id === property.id);
@@ -75,6 +81,42 @@ const Dashboard = () => {
         const expenseTotal = propertyExpenses.reduce((sum, e) => sum + Number(e.amount), 0);
         const ownerrezRevenue = propertyBookings.reduce((sum, b) => sum + Number(b.total_amount), 0);
         const managementFees = propertyBookings.reduce((sum, b) => sum + Number(b.management_fee), 0);
+
+        // Check if property is managed (has bookings with management fees > 0)
+        const isManaged = propertyBookings.some(b => Number(b.management_fee) > 0);
+        
+        // Calculate this month's revenue
+        const thisMonthBookings = propertyBookings.filter(b => {
+          if (!b.check_in) return false;
+          const checkIn = new Date(b.check_in);
+          return checkIn >= thisMonthStart;
+        });
+        const thisMonthRevenue = thisMonthBookings.reduce((sum, b) => sum + Number(b.total_amount), 0);
+        
+        // Calculate last month's revenue
+        const lastMonthBookings = propertyBookings.filter(b => {
+          if (!b.check_in) return false;
+          const checkIn = new Date(b.check_in);
+          return checkIn >= lastMonthStart && checkIn <= lastMonthEnd;
+        });
+        const lastMonthRevenue = lastMonthBookings.reduce((sum, b) => sum + Number(b.total_amount), 0);
+        
+        // Calculate total nights booked
+        const totalNights = propertyBookings.reduce((sum, b) => {
+          if (!b.check_in || !b.check_out) return sum;
+          const checkIn = new Date(b.check_in);
+          const checkOut = new Date(b.check_out);
+          const nights = Math.ceil((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24));
+          return sum + nights;
+        }, 0);
+        
+        // Calculate RevPAR (Revenue Per Available Room/Night)
+        // Assuming 365 days available per year for simplicity
+        const daysInPeriod = 365;
+        const revPAR = ownerrezRevenue / daysInPeriod;
+        
+        // Calculate occupancy rate (total nights booked / days in period)
+        const occupancyRate = (totalNights / daysInPeriod) * 100;
 
         return {
           property: {
@@ -90,6 +132,12 @@ const Dashboard = () => {
           ownerrezRevenue,
           managementFees,
           netBalance: visitTotal + managementFees - expenseTotal,
+          isManaged,
+          bookingCount: propertyBookings.length,
+          thisMonthRevenue,
+          lastMonthRevenue,
+          revPAR,
+          occupancyRate,
         };
       });
 
@@ -378,69 +426,104 @@ const Dashboard = () => {
       </div>
 
 
-      {/* Properties Overview */}
+      {/* Managed Properties */}
       <Card className="shadow-card border-border/50">
         <CardHeader className="bg-gradient-subtle rounded-t-lg">
           <CardTitle className="flex items-center gap-2 text-xl">
             <MapPin className="h-5 w-5 text-primary" />
-            Property Performance
+            Managed Properties
           </CardTitle>
+          <p className="text-sm text-muted-foreground mt-1">Properties under PeachHaus management</p>
         </CardHeader>
         <CardContent className="pt-6">
-          {summaries.length === 0 ? (
+          {summaries.filter(s => s.isManaged).length === 0 ? (
             <div className="text-center py-12">
               <Building2 className="h-12 w-12 text-muted-foreground mx-auto mb-4 opacity-50" />
-              <p className="text-muted-foreground">No properties yet. Add your first property to get started!</p>
+              <p className="text-muted-foreground">No managed properties yet.</p>
             </div>
           ) : (
             <div className="space-y-4">
-              {summaries.map((summary, index) => {
+              {summaries.filter(s => s.isManaged).map((summary, index) => {
                 const visits = allVisits[summary.property.id] || [];
                 return (
                   <div 
                     key={summary.property.id} 
                     onClick={() => handlePropertyClick(summary)}
-                    className="group p-6 border border-border/50 rounded-xl hover:shadow-card transition-all duration-300 hover:scale-[1.01] bg-gradient-subtle cursor-pointer"
+                    className="group p-6 border-2 border-primary/20 rounded-xl hover:shadow-card transition-all duration-300 hover:scale-[1.01] bg-primary/5 cursor-pointer"
                     style={{ animationDelay: `${index * 0.1}s` }}
                   >
                     <div>
-                      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-                        <div className="space-y-1.5 min-w-0 flex-shrink">
-                          <h3 className="font-semibold text-lg group-hover:text-primary transition-colors">
-                            {summary.property.name}
-                          </h3>
-                          <p className="text-sm text-muted-foreground flex items-center gap-1.5">
-                            <MapPin className="h-3.5 w-3.5 flex-shrink-0" />
-                            {summary.property.address}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            Visit Rate: <span className="font-semibold text-foreground">${summary.property.visitPrice.toFixed(2)}</span>
-                          </p>
-                        </div>
-                        <div className="flex flex-wrap gap-4 sm:gap-6 justify-start sm:justify-end">
-                          <div className="text-left sm:text-right">
-                            <p className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">Visits</p>
-                            <p className="font-bold text-lg">{summary.visitCount}</p>
-                          </div>
-                          <div className="text-left sm:text-right">
-                            <p className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">Visit Rev</p>
-                            <p className="font-bold text-lg text-green-600 dark:text-green-500">
-                              ${summary.visitTotal.toFixed(2)}
+                      <div className="space-y-4">
+                        {/* Property Header */}
+                        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                          <div className="space-y-1.5 min-w-0 flex-shrink">
+                            <h3 className="font-semibold text-lg group-hover:text-primary transition-colors">
+                              {summary.property.name}
+                            </h3>
+                            <p className="text-sm text-muted-foreground flex items-center gap-1.5">
+                              <MapPin className="h-3.5 w-3.5 flex-shrink-0" />
+                              {summary.property.address}
                             </p>
                           </div>
-                          <div className="text-left sm:text-right">
-                            <p className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">OwnerRez</p>
+                        </div>
+
+                        {/* Key Metrics Grid */}
+                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+                          <div className="bg-background/50 p-3 rounded-lg">
+                            <p className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">Bookings</p>
+                            <p className="font-bold text-lg">{summary.bookingCount}</p>
+                          </div>
+                          <div className="bg-background/50 p-3 rounded-lg">
+                            <p className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">Total Rev</p>
                             <p className="font-bold text-lg text-blue-600 dark:text-blue-500">
                               ${summary.ownerrezRevenue.toFixed(2)}
                             </p>
                           </div>
-                          <div className="text-left sm:text-right">
+                          <div className="bg-background/50 p-3 rounded-lg">
                             <p className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">Mgmt Fees</p>
                             <p className="font-bold text-lg text-purple-600 dark:text-purple-500">
                               ${summary.managementFees.toFixed(2)}
                             </p>
                           </div>
-                          <div className="text-left sm:text-right">
+                          <div className="bg-background/50 p-3 rounded-lg">
+                            <p className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">This Month</p>
+                            <p className="font-bold text-lg text-green-600 dark:text-green-500">
+                              ${summary.thisMonthRevenue.toFixed(2)}
+                            </p>
+                          </div>
+                          <div className="bg-background/50 p-3 rounded-lg">
+                            <p className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">Last Month</p>
+                            <p className="font-bold text-lg">
+                              ${summary.lastMonthRevenue.toFixed(2)}
+                            </p>
+                          </div>
+                          <div className="bg-background/50 p-3 rounded-lg">
+                            <p className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">RevPAR</p>
+                            <p className="font-bold text-lg">
+                              ${summary.revPAR.toFixed(2)}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Additional Metrics */}
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                          <div className="bg-background/50 p-3 rounded-lg">
+                            <p className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">Occupancy</p>
+                            <p className="font-bold text-lg">
+                              {summary.occupancyRate.toFixed(1)}%
+                            </p>
+                          </div>
+                          <div className="bg-background/50 p-3 rounded-lg">
+                            <p className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">Visits</p>
+                            <p className="font-bold text-lg">{summary.visitCount}</p>
+                          </div>
+                          <div className="bg-background/50 p-3 rounded-lg">
+                            <p className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">Visit Rev</p>
+                            <p className="font-bold text-lg text-green-600 dark:text-green-500">
+                              ${summary.visitTotal.toFixed(2)}
+                            </p>
+                          </div>
+                          <div className="bg-background/50 p-3 rounded-lg">
                             <p className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">Expenses</p>
                             <p className="font-bold text-lg text-red-600 dark:text-red-500">
                               ${summary.expenseTotal.toFixed(2)}
@@ -452,34 +535,14 @@ const Dashboard = () => {
                       {/* Visits List */}
                       {visits.length > 0 && (
                         <div className="mt-4 pt-4 border-t border-border/50">
-                          <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
-                            <Calendar className="h-4 w-4 text-primary" />
-                            Recent Visits
-                          </h4>
+                          <h4 className="text-sm font-semibold mb-2 text-muted-foreground uppercase tracking-wide">Recent Visits</h4>
                           <div className="space-y-2">
-                            {visits.slice(0, 5).map((visit) => (
-                              <div key={visit.id} className="flex items-center justify-between text-sm p-2 rounded bg-muted/30">
-                                <div className="flex items-center gap-3">
-                                  <span className="text-muted-foreground">
-                                    {new Date(visit.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                                  </span>
-                                  <span className="text-muted-foreground text-xs">{visit.time}</span>
-                                  {visit.notes && (
-                                    <span className="text-xs text-muted-foreground truncate max-w-[200px]">
-                                      {visit.notes}
-                                    </span>
-                                  )}
-                                </div>
-                                <span className="font-semibold text-green-600 dark:text-green-500">
-                                  ${visit.price.toFixed(2)}
-                                </span>
+                            {visits.slice(0, 3).map(visit => (
+                              <div key={visit.id} className="flex justify-between items-center text-sm bg-background/30 p-2 rounded">
+                                <span className="text-muted-foreground">{new Date(visit.date).toLocaleDateString()}</span>
+                                <span className="font-semibold">${Number(visit.price).toFixed(2)}</span>
                               </div>
                             ))}
-                            {visits.length > 5 && (
-                              <p className="text-xs text-muted-foreground text-center pt-1">
-                                +{visits.length - 5} more visits (click to view all)
-                              </p>
-                            )}
                           </div>
                         </div>
                       )}
@@ -491,6 +554,125 @@ const Dashboard = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* Unmanaged Properties */}
+      {summaries.filter(s => !s.isManaged).length > 0 && (
+        <Card className="shadow-card border-border/50">
+          <CardHeader className="bg-muted/30 rounded-t-lg">
+            <CardTitle className="flex items-center gap-2 text-xl">
+              <Building2 className="h-5 w-5 text-muted-foreground" />
+              Other Properties
+            </CardTitle>
+            <p className="text-sm text-muted-foreground mt-1">Properties not under management</p>
+          </CardHeader>
+          <CardContent className="pt-6">
+            <div className="space-y-4">
+              {summaries.filter(s => !s.isManaged).map((summary, index) => {
+                const visits = allVisits[summary.property.id] || [];
+                return (
+                  <div 
+                    key={summary.property.id} 
+                    onClick={() => handlePropertyClick(summary)}
+                    className="group p-6 border border-border/30 rounded-xl hover:shadow-card transition-all duration-300 hover:scale-[1.01] bg-muted/10 cursor-pointer"
+                    style={{ animationDelay: `${index * 0.1}s` }}
+                  >
+                    <div>
+                      <div className="space-y-4">
+                        {/* Property Header */}
+                        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                          <div className="space-y-1.5 min-w-0 flex-shrink">
+                            <h3 className="font-semibold text-lg group-hover:text-primary transition-colors">
+                              {summary.property.name}
+                            </h3>
+                            <p className="text-sm text-muted-foreground flex items-center gap-1.5">
+                              <MapPin className="h-3.5 w-3.5 flex-shrink-0" />
+                              {summary.property.address}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Key Metrics Grid - No Management Fees */}
+                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+                          <div className="bg-background/50 p-3 rounded-lg">
+                            <p className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">Bookings</p>
+                            <p className="font-bold text-lg">{summary.bookingCount}</p>
+                          </div>
+                          <div className="bg-background/50 p-3 rounded-lg">
+                            <p className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">Total Rev</p>
+                            <p className="font-bold text-lg text-blue-600 dark:text-blue-500">
+                              ${summary.ownerrezRevenue.toFixed(2)}
+                            </p>
+                          </div>
+                          <div className="bg-background/50 p-3 rounded-lg">
+                            <p className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">This Month</p>
+                            <p className="font-bold text-lg text-green-600 dark:text-green-500">
+                              ${summary.thisMonthRevenue.toFixed(2)}
+                            </p>
+                          </div>
+                          <div className="bg-background/50 p-3 rounded-lg">
+                            <p className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">Last Month</p>
+                            <p className="font-bold text-lg">
+                              ${summary.lastMonthRevenue.toFixed(2)}
+                            </p>
+                          </div>
+                          <div className="bg-background/50 p-3 rounded-lg">
+                            <p className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">RevPAR</p>
+                            <p className="font-bold text-lg">
+                              ${summary.revPAR.toFixed(2)}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Additional Metrics */}
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                          <div className="bg-background/50 p-3 rounded-lg">
+                            <p className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">Occupancy</p>
+                            <p className="font-bold text-lg">
+                              {summary.occupancyRate.toFixed(1)}%
+                            </p>
+                          </div>
+                          <div className="bg-background/50 p-3 rounded-lg">
+                            <p className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">Visits</p>
+                            <p className="font-bold text-lg">{summary.visitCount}</p>
+                          </div>
+                          <div className="bg-background/50 p-3 rounded-lg">
+                            <p className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">Visit Rev</p>
+                            <p className="font-bold text-lg text-green-600 dark:text-green-500">
+                              ${summary.visitTotal.toFixed(2)}
+                            </p>
+                          </div>
+                          <div className="bg-background/50 p-3 rounded-lg">
+                            <p className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">Expenses</p>
+                            <p className="font-bold text-lg text-red-600 dark:text-red-500">
+                              ${summary.expenseTotal.toFixed(2)}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Visits List */}
+                      {visits.length > 0 && (
+                        <div className="mt-4 pt-4 border-t border-border/50">
+                          <h4 className="text-sm font-semibold mb-2 text-muted-foreground uppercase tracking-wide">Recent Visits</h4>
+                          <div className="space-y-2">
+                            {visits.slice(0, 3).map(visit => (
+                              <div key={visit.id} className="flex justify-between items-center text-sm bg-background/30 p-2 rounded">
+                                <span className="text-muted-foreground">{new Date(visit.date).toLocaleDateString()}</span>
+                                <span className="font-semibold">${Number(visit.price).toFixed(2)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
 
       {/* Property Details Modal */}
       <Dialog open={!!selectedProperty} onOpenChange={() => setSelectedProperty(null)}>

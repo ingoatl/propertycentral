@@ -50,4 +50,10 @@ export interface PropertySummary {
   ownerrezRevenue: number;
   managementFees: number;
   netBalance: number;
+  isManaged: boolean;
+  bookingCount: number;
+  thisMonthRevenue: number;
+  lastMonthRevenue: number;
+  revPAR: number;
+  occupancyRate: number;
 }
