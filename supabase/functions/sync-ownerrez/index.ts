@@ -92,55 +92,61 @@ serve(async (req) => {
     console.log(`Found ${listings.length} listings in OwnerRez`);
     console.log('Property IDs:', listings.map(l => l.property_id).join(', '));
 
+    // Fetch ALL bookings from OwnerRez (without filtering by property)
+    const startDate = new Date();
+    startDate.setMonth(startDate.getMonth() - 12);
+    
+    console.log('Fetching all bookings from OwnerRez...');
+    const allBookingsResponse = await fetch(
+      `https://api.ownerrez.com/v2/bookings?arrival_from=${startDate.toISOString().split('T')[0]}`,
+      {
+        headers: {
+          'Authorization': authHeader,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    if (!allBookingsResponse.ok) {
+      const errorText = await allBookingsResponse.text();
+      console.error('Failed to fetch bookings from OwnerRez');
+      console.error(`Status: ${allBookingsResponse.status}, Response:`, errorText);
+      throw new Error(`Failed to fetch bookings: ${allBookingsResponse.statusText}`);
+    }
+
+    const allBookingsData = await allBookingsResponse.json();
+    const allBookings: OwnerRezBooking[] = allBookingsData.items || [];
+    
+    console.log(`Found ${allBookings.length} total bookings`);
+
     let totalSyncedBookings = 0;
     let totalRevenue = 0;
     let totalManagementFees = 0;
 
-    // Sync all listings (we'll use bookings to get property names)
-    for (let i = 0; i < listings.length; i++) {
-      const listing = listings[i];
-      
+    // Group bookings by property_id
+    const bookingsByProperty = new Map<number, OwnerRezBooking[]>();
+    for (const booking of allBookings) {
+      if (!bookingsByProperty.has(booking.property_id)) {
+        bookingsByProperty.set(booking.property_id, []);
+      }
+      bookingsByProperty.get(booking.property_id)!.push(booking);
+    }
+
+    // Process each listing with its bookings
+    for (const listing of listings) {
       try {
-        console.log(`Syncing property ${i + 1}/${listings.length}: Property ID ${listing.property_id}`);
-
-        // Fetch bookings for this property
-        const startDate = new Date();
-        startDate.setMonth(startDate.getMonth() - 12);
+        const bookings = bookingsByProperty.get(listing.property_id) || [];
         
-        const bookingsResponse = await fetch(
-          `https://api.ownerrez.com/v2/bookings?property_id=${listing.property_id}&arrival_from=${startDate.toISOString().split('T')[0]}`,
-          {
-            headers: {
-              'Authorization': authHeader,
-              'Content-Type': 'application/json',
-            },
-          }
-        );
-
-        if (!bookingsResponse.ok) {
-          const errorText = await bookingsResponse.text();
-          console.error(`Failed to fetch bookings for property ${listing.property_id}`);
-          console.error(`Status: ${bookingsResponse.status}, Response:`, errorText);
-          continue;
-        }
-
-        const bookingsData = await bookingsResponse.json();
-        const bookings: OwnerRezBooking[] = bookingsData.items || [];
-
         if (bookings.length === 0) {
           console.log(`No bookings found for property ${listing.property_id}`);
           continue;
         }
 
-        // Get property name from first booking or use property_id
         const propertyName = `Property ${listing.property_id}`;
-        
-        // Use default 20% management fee for all properties
         const managementFeeRate = 0.20;
 
-        console.log(`Found ${bookings.length} bookings for ${propertyName} (${(managementFeeRate * 100).toFixed(0)}% management fee)`);
+        console.log(`Processing ${bookings.length} bookings for ${propertyName} (${(managementFeeRate * 100).toFixed(0)}% management fee)`);
 
-        // Calculate total revenue and management fee
         let listingRevenue = 0;
         let listingManagementFees = 0;
         
@@ -155,7 +161,7 @@ serve(async (req) => {
           await supabase
             .from('ownerrez_bookings')
             .upsert({
-              property_id: null, // We don't have a match in our properties table
+              property_id: null,
               ownerrez_listing_id: listing.property_id.toString(),
               ownerrez_listing_name: propertyName,
               booking_id: booking.id.toString(),
@@ -176,14 +182,8 @@ serve(async (req) => {
         totalManagementFees += listingManagementFees;
 
         console.log(`Synced ${bookings.length} bookings - Revenue: $${listingRevenue.toFixed(2)}, Mgmt Fees: $${listingManagementFees.toFixed(2)}`);
-        
-        // Add a small delay between API calls to avoid rate limiting (200ms)
-        if (i < listings.length - 1) {
-          await new Promise(resolve => setTimeout(resolve, 200));
-        }
       } catch (error) {
         console.error(`Error syncing property ${listing.property_id}:`, error);
-        // Continue with next property even if one fails
         continue;
       }
     }
