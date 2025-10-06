@@ -619,7 +619,7 @@ const Dashboard = () => {
           <CardHeader className="bg-orange-50 dark:bg-orange-950/30 rounded-t-lg">
             <CardTitle className="flex items-center gap-2 text-xl">
               <span className="text-2xl">❌</span>
-              <span className="font-bold">NOT UNDER MANAGEMENT</span>
+              <span className="font-bold">UNMANAGED PROPERTIES</span>
             </CardTitle>
             <p className="text-sm text-muted-foreground mt-1">{summaries.filter(s => !s.isManaged).length} properties without active management</p>
           </CardHeader>
