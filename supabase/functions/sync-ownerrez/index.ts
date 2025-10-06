@@ -51,11 +51,10 @@ serve(async (req) => {
 
     // Define management fee structure per property
     const managementFeeRates: Record<string, number> = {
-      'woodland': 0.25,  // 25% for Woodland
-      'villa 14': 0.20,  // 20% for Villa 14
-      'villa 15': 0.20,  // 20% for Villa 15
-      'smoke hollow': 0.18,  // 18% for Smoke Hollow
-      'canadian way': 0.20,  // 20% for Canadian Way
+      'mableton meadows': 0.25,  // 25% for Mableton Meadows
+      'boho lux': 0.20,  // 20% for Boho Lux Theme (Villa 14)
+      'house of blues': 0.20,  // 20% for House of Blues Theme (Villa 15)
+      'blues & boho haven': 0.20,  // 20% for The Blues & Boho Haven (Villa 15)
     };
 
     // Function to determine management fee rate based on property name
@@ -69,8 +68,8 @@ serve(async (req) => {
           return rate;
         }
       }
-      console.log(`No match found - using default 20% management fee`);
-      return 0.20; // Default 20% if not found
+      console.log(`No match found - property not under management (0% fee)`);
+      return 0.00; // Default 0% if not under management
     };
 
     // Fetch all listings from OwnerRez
