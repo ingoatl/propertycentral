@@ -504,13 +504,13 @@ const Dashboard = () => {
 
 
       {/* Managed Properties */}
-      <Card className="shadow-card border-border/50">
-        <CardHeader className="bg-gradient-subtle rounded-t-lg">
+      <Card className="shadow-card border-border/50 border-l-4 border-l-green-500">
+        <CardHeader className="bg-green-50 dark:bg-green-950/30 rounded-t-lg">
           <CardTitle className="flex items-center gap-2 text-xl">
-            <MapPin className="h-5 w-5 text-primary" />
-            Managed Properties
+            <span className="text-2xl">✅</span>
+            <span className="font-bold">UNDER MANAGEMENT</span>
           </CardTitle>
-          <p className="text-sm text-muted-foreground mt-1">Properties under PeachHaus management</p>
+          <p className="text-sm text-muted-foreground mt-1">{summaries.filter(s => s.isManaged).length} properties actively managed by PeachHaus</p>
         </CardHeader>
         <CardContent className="pt-6">
           {summaries.filter(s => s.isManaged).length === 0 ? (
@@ -523,106 +523,83 @@ const Dashboard = () => {
               {summaries.filter(s => s.isManaged).map((summary, index) => {
                 const visits = allVisits[summary.property.id] || [];
                 return (
-                  <div 
+                   <div 
                     key={summary.property.id} 
                     onClick={() => handlePropertyClick(summary)}
-                    className="group p-6 border-2 border-primary/20 rounded-xl hover:shadow-card transition-all duration-300 hover:scale-[1.01] bg-primary/5 cursor-pointer"
+                    className="group p-5 border-l-4 border-l-green-500 bg-gradient-to-r from-green-50/50 to-transparent dark:from-green-950/20 rounded-lg hover:shadow-lg transition-all duration-300 hover:scale-[1.01] cursor-pointer"
                     style={{ animationDelay: `${index * 0.1}s` }}
                   >
-                    <div>
-                      <div className="space-y-4">
-                        {/* Property Header */}
-                        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-                          <div className="space-y-1.5 min-w-0 flex-shrink">
-                            <h3 className="font-semibold text-lg group-hover:text-primary transition-colors">
-                              {summary.property.name}
-                            </h3>
-                            <p className="text-sm text-muted-foreground flex items-center gap-1.5">
-                              <MapPin className="h-3.5 w-3.5 flex-shrink-0" />
-                              {summary.property.address}
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* Key Metrics Grid */}
-                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
-                          <div className="bg-background/50 p-3 rounded-lg">
-                            <p className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">Bookings</p>
-                            <p className="font-bold text-lg">{summary.bookingCount}</p>
-                          </div>
-                          <div className="bg-background/50 p-3 rounded-lg">
-                            <p className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">Total Rev</p>
-                            <p className="font-bold text-lg text-blue-600 dark:text-blue-500">
-                              ${summary.ownerrezRevenue.toFixed(2)}
-                            </p>
-                          </div>
-                          <div className="bg-background/50 p-3 rounded-lg">
-                            <p className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">Mgmt Fees</p>
-                            <p className="font-bold text-lg text-purple-600 dark:text-purple-500">
-                              ${summary.managementFees.toFixed(2)}
-                            </p>
-                          </div>
-                          <div className="bg-background/50 p-3 rounded-lg">
-                            <p className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">This Month</p>
-                            <p className="font-bold text-lg text-green-600 dark:text-green-500">
-                              ${summary.thisMonthRevenue.toFixed(2)}
-                            </p>
-                          </div>
-                          <div className="bg-background/50 p-3 rounded-lg">
-                            <p className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">Last Month</p>
-                            <p className="font-bold text-lg">
-                              ${summary.lastMonthRevenue.toFixed(2)}
-                            </p>
-                          </div>
-                          <div className="bg-background/50 p-3 rounded-lg">
-                            <p className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">RevPAR</p>
-                            <p className="font-bold text-lg">
-                              ${summary.revPAR.toFixed(2)}
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* Additional Metrics */}
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                          <div className="bg-background/50 p-3 rounded-lg">
-                            <p className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">Occupancy</p>
-                            <p className="font-bold text-lg">
-                              {summary.occupancyRate.toFixed(1)}%
-                            </p>
-                          </div>
-                          <div className="bg-background/50 p-3 rounded-lg">
-                            <p className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">Visits</p>
-                            <p className="font-bold text-lg">{summary.visitCount}</p>
-                          </div>
-                          <div className="bg-background/50 p-3 rounded-lg">
-                            <p className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">Visit Rev</p>
-                            <p className="font-bold text-lg text-green-600 dark:text-green-500">
-                              ${summary.visitTotal.toFixed(2)}
-                            </p>
-                          </div>
-                          <div className="bg-background/50 p-3 rounded-lg">
-                            <p className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">Expenses</p>
-                            <p className="font-bold text-lg text-red-600 dark:text-red-500">
-                              ${summary.expenseTotal.toFixed(2)}
-                            </p>
-                          </div>
-                        </div>
+                    {/* Property Header */}
+                    <div className="mb-4">
+                      <h3 className="font-bold text-xl group-hover:text-primary transition-colors mb-1">
+                        {summary.property.name}
+                      </h3>
+                      <p className="text-sm text-muted-foreground flex items-center gap-1.5">
+                        <MapPin className="h-3.5 w-3.5 flex-shrink-0" />
+                        {summary.property.address}
+                      </p>
+                      <div className="mt-2 inline-flex items-center gap-2 px-3 py-1 bg-purple-100 dark:bg-purple-900/30 rounded-full">
+                        <span className="text-xs font-semibold text-purple-700 dark:text-purple-300">Management Fee:</span>
+                        <span className="text-sm font-bold text-purple-900 dark:text-purple-100">
+                          {summary.managementFees > 0 ? `${((summary.managementFees / summary.ownerrezRevenue) * 100).toFixed(0)}%` : 'N/A'}
+                        </span>
                       </div>
+                    </div>
 
-                      {/* Visits List */}
-                      {visits.length > 0 && (
-                        <div className="mt-4 pt-4 border-t border-border/50">
-                          <h4 className="text-sm font-semibold mb-2 text-muted-foreground uppercase tracking-wide">Recent Visits</h4>
-                          <div className="space-y-2">
-                            {visits.slice(0, 3).map(visit => (
-                              <div key={visit.id} className="flex justify-between items-center text-sm bg-background/30 p-2 rounded">
-                                <span className="text-muted-foreground">{new Date(visit.date).toLocaleDateString()}</span>
-                                <span className="font-semibold">${Number(visit.price).toFixed(2)}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
+                    {/* Key Metrics - Simplified */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
+                      <div className="bg-white/80 dark:bg-gray-800/80 p-3 rounded-lg border border-border/50">
+                        <p className="text-xs text-muted-foreground mb-0.5">Total Revenue</p>
+                        <p className="font-bold text-lg text-blue-600 dark:text-blue-400">
+                          ${summary.ownerrezRevenue.toLocaleString()}
+                        </p>
+                      </div>
+                      <div className="bg-white/80 dark:bg-gray-800/80 p-3 rounded-lg border border-border/50">
+                        <p className="text-xs text-muted-foreground mb-0.5">Mgmt Fees</p>
+                        <p className="font-bold text-lg text-purple-600 dark:text-purple-400">
+                          ${summary.managementFees.toLocaleString()}
+                        </p>
+                      </div>
+                      <div className="bg-white/80 dark:bg-gray-800/80 p-3 rounded-lg border border-border/50">
+                        <p className="text-xs text-muted-foreground mb-0.5">This Month</p>
+                        <p className="font-bold text-lg text-green-600 dark:text-green-400">
+                          ${summary.thisMonthRevenue.toLocaleString()}
+                        </p>
+                      </div>
+                      <div className="bg-white/80 dark:bg-gray-800/80 p-3 rounded-lg border border-border/50">
+                        <p className="text-xs text-muted-foreground mb-0.5">Last Month</p>
+                        <p className="font-bold text-lg">
+                          ${summary.lastMonthRevenue.toLocaleString()}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Secondary Metrics */}
+                    <div className="grid grid-cols-3 md:grid-cols-6 gap-2 text-center">
+                      <div className="bg-muted/50 p-2 rounded">
+                        <p className="text-xs text-muted-foreground">Bookings</p>
+                        <p className="font-semibold">{summary.bookingCount}</p>
+                      </div>
+                      <div className="bg-muted/50 p-2 rounded">
+                        <p className="text-xs text-muted-foreground">RevPAR</p>
+                        <p className="font-semibold">${summary.revPAR.toFixed(0)}</p>
+                      </div>
+                      <div className="bg-muted/50 p-2 rounded">
+                        <p className="text-xs text-muted-foreground">Occupancy</p>
+                        <p className="font-semibold">{summary.occupancyRate.toFixed(0)}%</p>
+                      </div>
+                      <div className="bg-muted/50 p-2 rounded">
+                        <p className="text-xs text-muted-foreground">Visits</p>
+                        <p className="font-semibold">{summary.visitCount}</p>
+                      </div>
+                      <div className="bg-muted/50 p-2 rounded">
+                        <p className="text-xs text-muted-foreground">Visit Rev</p>
+                        <p className="font-semibold text-green-600 dark:text-green-400">${summary.visitTotal.toFixed(0)}</p>
+                      </div>
+                      <div className="bg-muted/50 p-2 rounded">
+                        <p className="text-xs text-muted-foreground">Expenses</p>
+                        <p className="font-semibold text-red-600 dark:text-red-400">${summary.expenseTotal.toFixed(0)}</p>
+                      </div>
                     </div>
                   </div>
                 );
@@ -634,13 +611,13 @@ const Dashboard = () => {
 
       {/* Unmanaged Properties */}
       {summaries.filter(s => !s.isManaged).length > 0 && (
-        <Card className="shadow-card border-border/50">
-          <CardHeader className="bg-muted/30 rounded-t-lg">
+        <Card className="shadow-card border-border/50 border-l-4 border-l-orange-500">
+          <CardHeader className="bg-orange-50 dark:bg-orange-950/30 rounded-t-lg">
             <CardTitle className="flex items-center gap-2 text-xl">
-              <Building2 className="h-5 w-5 text-muted-foreground" />
-              Other Properties
+              <span className="text-2xl">❌</span>
+              <span className="font-bold">NOT UNDER MANAGEMENT</span>
             </CardTitle>
-            <p className="text-sm text-muted-foreground mt-1">Properties not under management</p>
+            <p className="text-sm text-muted-foreground mt-1">{summaries.filter(s => !s.isManaged).length} properties without active management</p>
           </CardHeader>
           <CardContent className="pt-6">
             <div className="space-y-4">
@@ -650,97 +627,64 @@ const Dashboard = () => {
                   <div 
                     key={summary.property.id} 
                     onClick={() => handlePropertyClick(summary)}
-                    className="group p-6 border border-border/30 rounded-xl hover:shadow-card transition-all duration-300 hover:scale-[1.01] bg-muted/10 cursor-pointer"
+                    className="group p-5 border-l-4 border-l-orange-500 bg-gradient-to-r from-orange-50/30 to-transparent dark:from-orange-950/10 rounded-lg hover:shadow-lg transition-all duration-300 hover:scale-[1.01] cursor-pointer opacity-90"
                     style={{ animationDelay: `${index * 0.1}s` }}
                   >
-                    <div>
-                      <div className="space-y-4">
-                        {/* Property Header */}
-                        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-                          <div className="space-y-1.5 min-w-0 flex-shrink">
-                            <h3 className="font-semibold text-lg group-hover:text-primary transition-colors">
-                              {summary.property.name}
-                            </h3>
-                            <p className="text-sm text-muted-foreground flex items-center gap-1.5">
-                              <MapPin className="h-3.5 w-3.5 flex-shrink-0" />
-                              {summary.property.address}
-                            </p>
-                          </div>
-                        </div>
+                    {/* Property Header */}
+                    <div className="mb-4">
+                      <h3 className="font-bold text-xl group-hover:text-primary transition-colors mb-1">
+                        {summary.property.name}
+                      </h3>
+                      <p className="text-sm text-muted-foreground flex items-center gap-1.5">
+                        <MapPin className="h-3.5 w-3.5 flex-shrink-0" />
+                        {summary.property.address}
+                      </p>
+                    </div>
 
-                        {/* Key Metrics Grid - No Management Fees */}
-                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
-                          <div className="bg-background/50 p-3 rounded-lg">
-                            <p className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">Bookings</p>
-                            <p className="font-bold text-lg">{summary.bookingCount}</p>
-                          </div>
-                          <div className="bg-background/50 p-3 rounded-lg">
-                            <p className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">Total Rev</p>
-                            <p className="font-bold text-lg text-blue-600 dark:text-blue-500">
-                              ${summary.ownerrezRevenue.toFixed(2)}
-                            </p>
-                          </div>
-                          <div className="bg-background/50 p-3 rounded-lg">
-                            <p className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">This Month</p>
-                            <p className="font-bold text-lg text-green-600 dark:text-green-500">
-                              ${summary.thisMonthRevenue.toFixed(2)}
-                            </p>
-                          </div>
-                          <div className="bg-background/50 p-3 rounded-lg">
-                            <p className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">Last Month</p>
-                            <p className="font-bold text-lg">
-                              ${summary.lastMonthRevenue.toFixed(2)}
-                            </p>
-                          </div>
-                          <div className="bg-background/50 p-3 rounded-lg">
-                            <p className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">RevPAR</p>
-                            <p className="font-bold text-lg">
-                              ${summary.revPAR.toFixed(2)}
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* Additional Metrics */}
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                          <div className="bg-background/50 p-3 rounded-lg">
-                            <p className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">Occupancy</p>
-                            <p className="font-bold text-lg">
-                              {summary.occupancyRate.toFixed(1)}%
-                            </p>
-                          </div>
-                          <div className="bg-background/50 p-3 rounded-lg">
-                            <p className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">Visits</p>
-                            <p className="font-bold text-lg">{summary.visitCount}</p>
-                          </div>
-                          <div className="bg-background/50 p-3 rounded-lg">
-                            <p className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">Visit Rev</p>
-                            <p className="font-bold text-lg text-green-600 dark:text-green-500">
-                              ${summary.visitTotal.toFixed(2)}
-                            </p>
-                          </div>
-                          <div className="bg-background/50 p-3 rounded-lg">
-                            <p className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">Expenses</p>
-                            <p className="font-bold text-lg text-red-600 dark:text-red-500">
-                              ${summary.expenseTotal.toFixed(2)}
-                            </p>
-                          </div>
-                        </div>
+                    {/* Key Metrics - No Management Fee */}
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-3">
+                      <div className="bg-white/80 dark:bg-gray-800/80 p-3 rounded-lg border border-border/50">
+                        <p className="text-xs text-muted-foreground mb-0.5">Total Revenue</p>
+                        <p className="font-bold text-lg text-blue-600 dark:text-blue-400">
+                          ${summary.ownerrezRevenue.toLocaleString()}
+                        </p>
                       </div>
+                      <div className="bg-white/80 dark:bg-gray-800/80 p-3 rounded-lg border border-border/50">
+                        <p className="text-xs text-muted-foreground mb-0.5">This Month</p>
+                        <p className="font-bold text-lg text-green-600 dark:text-green-400">
+                          ${summary.thisMonthRevenue.toLocaleString()}
+                        </p>
+                      </div>
+                      <div className="bg-white/80 dark:bg-gray-800/80 p-3 rounded-lg border border-border/50">
+                        <p className="text-xs text-muted-foreground mb-0.5">Last Month</p>
+                        <p className="font-bold text-lg">
+                          ${summary.lastMonthRevenue.toLocaleString()}
+                        </p>
+                      </div>
+                    </div>
 
-                      {/* Visits List */}
-                      {visits.length > 0 && (
-                        <div className="mt-4 pt-4 border-t border-border/50">
-                          <h4 className="text-sm font-semibold mb-2 text-muted-foreground uppercase tracking-wide">Recent Visits</h4>
-                          <div className="space-y-2">
-                            {visits.slice(0, 3).map(visit => (
-                              <div key={visit.id} className="flex justify-between items-center text-sm bg-background/30 p-2 rounded">
-                                <span className="text-muted-foreground">{new Date(visit.date).toLocaleDateString()}</span>
-                                <span className="font-semibold">${Number(visit.price).toFixed(2)}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
+                    {/* Secondary Metrics */}
+                    <div className="grid grid-cols-3 md:grid-cols-5 gap-2 text-center">
+                      <div className="bg-muted/50 p-2 rounded">
+                        <p className="text-xs text-muted-foreground">Bookings</p>
+                        <p className="font-semibold">{summary.bookingCount}</p>
+                      </div>
+                      <div className="bg-muted/50 p-2 rounded">
+                        <p className="text-xs text-muted-foreground">RevPAR</p>
+                        <p className="font-semibold">${summary.revPAR.toFixed(0)}</p>
+                      </div>
+                      <div className="bg-muted/50 p-2 rounded">
+                        <p className="text-xs text-muted-foreground">Occupancy</p>
+                        <p className="font-semibold">{summary.occupancyRate.toFixed(0)}%</p>
+                      </div>
+                      <div className="bg-muted/50 p-2 rounded">
+                        <p className="text-xs text-muted-foreground">Visits</p>
+                        <p className="font-semibold">{summary.visitCount}</p>
+                      </div>
+                      <div className="bg-muted/50 p-2 rounded">
+                        <p className="text-xs text-muted-foreground">Expenses</p>
+                        <p className="font-semibold text-red-600 dark:text-red-400">${summary.expenseTotal.toFixed(0)}</p>
+                      </div>
                     </div>
                   </div>
                 );
