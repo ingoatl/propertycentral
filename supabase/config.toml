@@ -11,3 +11,9 @@ verify_jwt = true
 
 [functions.charge-monthly-fees]
 verify_jwt = true
+
+[functions.create-setup-intent]
+verify_jwt = true
+
+[functions.get-payment-methods]
+verify_jwt = true

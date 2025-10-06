@@ -126,15 +126,49 @@ serve(async (req) => {
         console.log(`Created Stripe customer ${customerId} for ${owner.name}`);
       }
 
-      // Create payment intent with appropriate payment method
-      const paymentMethodTypes = owner.payment_method === "ach" ? ["us_bank_account"] : ["card"];
+      // Get payment methods on file
+      const paymentMethods = await stripe.paymentMethods.list({
+        customer: customerId,
+        type: owner.payment_method === "ach" ? "us_bank_account" : "card",
+        limit: 1,
+      });
+
+      if (paymentMethods.data.length === 0) {
+        console.log(`No payment method on file for ${owner.name}`);
+        
+        // Record failed charge
+        await supabaseClient
+          .from("monthly_charges")
+          .upsert({
+            owner_id: owner.id,
+            charge_month: chargeMonthStr,
+            total_management_fees: totalFees,
+            charge_status: "failed",
+          }, {
+            onConflict: "owner_id,charge_month",
+          });
+
+        results.push({
+          owner: owner.name,
+          status: "failed",
+          amount: totalFees,
+          error: "No payment method on file",
+        });
+        continue;
+      }
+
+      const paymentMethodId = paymentMethods.data[0].id;
+      console.log(`Using payment method ${paymentMethodId} for ${owner.name}`);
       
       try {
+        // Create and confirm payment intent with the payment method on file
         const paymentIntent = await stripe.paymentIntents.create({
           amount: Math.round(totalFees * 100), // Convert to cents
           currency: "usd",
           customer: customerId,
-          payment_method_types: paymentMethodTypes,
+          payment_method: paymentMethodId,
+          off_session: true,
+          confirm: true,
           description: `Management fees for ${chargeMonthStr}`,
           metadata: {
             owner_id: owner.id,
@@ -142,7 +176,7 @@ serve(async (req) => {
           },
         });
 
-        console.log(`Created payment intent ${paymentIntent.id} for ${owner.name}`);
+        console.log(`Payment intent ${paymentIntent.id} status: ${paymentIntent.status}`);
 
         // Record the charge
         const { error: chargeError } = await supabaseClient

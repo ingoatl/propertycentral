@@ -7,8 +7,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Building2, CreditCard, DollarSign, ExternalLink, Plus, Trash2 } from "lucide-react";
+import { Building2, CreditCard, DollarSign, ExternalLink, Plus, Trash2, Wallet } from "lucide-react";
 import { z } from "zod";
+import { AddPaymentMethod } from "@/components/AddPaymentMethod";
 import {
   Dialog,
   DialogContent,
@@ -42,6 +43,22 @@ interface Property {
   owner_id: string | null;
 }
 
+interface PaymentMethodInfo {
+  id: string;
+  type: string;
+  card: {
+    brand: string;
+    last4: string;
+    exp_month: number;
+    exp_year: number;
+  } | null;
+  us_bank_account: {
+    bank_name: string;
+    last4: string;
+    account_type: string;
+  } | null;
+}
+
 const PropertyOwners = () => {
   const [owners, setOwners] = useState<PropertyOwner[]>([]);
   const [properties, setProperties] = useState<Property[]>([]);
@@ -54,11 +71,19 @@ const PropertyOwners = () => {
     payment_method: "card" as "card" | "ach",
   });
   const [creating, setCreating] = useState(false);
+  const [addingPaymentFor, setAddingPaymentFor] = useState<PropertyOwner | null>(null);
+  const [paymentMethods, setPaymentMethods] = useState<Record<string, PaymentMethodInfo[]>>({});
 
   useEffect(() => {
     checkAdminStatus();
     loadData();
   }, []);
+
+  useEffect(() => {
+    if (owners.length > 0) {
+      loadPaymentMethods();
+    }
+  }, [owners]);
 
   const checkAdminStatus = async () => {
     try {
@@ -171,6 +196,33 @@ const PropertyOwners = () => {
     return properties.filter(p => p.owner_id === ownerId);
   };
 
+  const loadPaymentMethods = async () => {
+    const methodsMap: Record<string, PaymentMethodInfo[]> = {};
+    
+    for (const owner of owners) {
+      if (!owner.stripe_customer_id) continue;
+      
+      try {
+        const { data, error } = await supabase.functions.invoke("get-payment-methods", {
+          body: { ownerId: owner.id },
+        });
+
+        if (error) throw error;
+        methodsMap[owner.id] = data.paymentMethods || [];
+      } catch (error) {
+        console.error(`Error loading payment methods for ${owner.name}:`, error);
+      }
+    }
+    
+    setPaymentMethods(methodsMap);
+  };
+
+  const handlePaymentMethodAdded = () => {
+    setAddingPaymentFor(null);
+    loadPaymentMethods();
+    toast.success("Payment method added successfully");
+  };
+
   if (!isAdmin) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -188,6 +240,20 @@ const PropertyOwners = () => {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-pulse">Loading...</div>
+      </div>
+    );
+  }
+
+  if (addingPaymentFor) {
+    return (
+      <div className="space-y-6 animate-fade-in max-w-2xl mx-auto">
+        <AddPaymentMethod
+          ownerId={addingPaymentFor.id}
+          ownerName={addingPaymentFor.name}
+          paymentMethod={addingPaymentFor.payment_method}
+          onSuccess={handlePaymentMethodAdded}
+          onCancel={() => setAddingPaymentFor(null)}
+        />
       </div>
     );
   }
@@ -305,25 +371,46 @@ const PropertyOwners = () => {
                 <CardContent className="pt-6 space-y-4">
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <Label>Stripe Customer</Label>
-                      {owner.stripe_customer_id ? (
-                        <a
-                          href={`https://dashboard.stripe.com/customers/${owner.stripe_customer_id}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-1 text-sm text-primary hover:underline"
-                        >
-                          View in Stripe
-                          <ExternalLink className="w-3 h-3" />
-                        </a>
-                      ) : (
-                        <Badge variant="outline">Not Set Up</Badge>
-                      )}
+                      <Label>Payment Methods on File</Label>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setAddingPaymentFor(owner)}
+                      >
+                        <Wallet className="w-4 h-4 mr-2" />
+                        Add {owner.payment_method === "ach" ? "Bank Account" : "Credit Card"}
+                      </Button>
                     </div>
-                    {!owner.stripe_customer_id && (
-                      <p className="text-xs text-muted-foreground">
-                        Customer will be created automatically when first charged
-                      </p>
+                    {paymentMethods[owner.id]?.length > 0 ? (
+                      <div className="space-y-2">
+                        {paymentMethods[owner.id].map((pm) => (
+                          <div key={pm.id} className="p-3 border rounded-lg flex items-center gap-3">
+                            <CreditCard className="w-4 h-4 text-muted-foreground" />
+                            <div className="flex-1">
+                              {pm.card && (
+                                <p className="text-sm">
+                                  {pm.card.brand.toUpperCase()} •••• {pm.card.last4} (exp {pm.card.exp_month}/{pm.card.exp_year})
+                                </p>
+                              )}
+                              {pm.us_bank_account && (
+                                <div>
+                                  <p className="text-sm font-medium">
+                                    {pm.us_bank_account.bank_name}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground">
+                                    {pm.us_bank_account.account_type} •••• {pm.us_bank_account.last4}
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                            <Badge variant="secondary">On File</Badge>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-sm text-muted-foreground p-3 bg-muted/30 rounded-lg">
+                        No payment method on file yet. Click "Add {owner.payment_method === "ach" ? "Bank Account" : "Credit Card"}" to securely add one.
+                      </div>
                     )}
                   </div>
 
@@ -385,20 +472,21 @@ const PropertyOwners = () => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <DollarSign className="w-5 h-5" />
-            Payment Setup Instructions
+            How It Works
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-2 text-sm">
-          <p className="font-medium">To set up payment methods for owners in Stripe:</p>
+          <p className="font-medium">Adding payment methods:</p>
           <ol className="list-decimal list-inside space-y-2 text-muted-foreground">
-            <li>When you charge an owner for the first time, a Stripe customer will be created automatically</li>
-            <li>For <strong>Credit Card</strong> payments: The owner will receive a payment link via Stripe</li>
-            <li>For <strong>ACH</strong> payments: You'll need to manually add their bank account in Stripe dashboard</li>
-            <li>
-              To manually set up payment methods: Click "View in Stripe" next to a customer and add their
-              payment method from the Stripe dashboard
-            </li>
+            <li>Click "Add Bank Account" or "Add Credit Card" for an owner</li>
+            <li>Enter the payment details securely through Stripe</li>
+            <li>The payment method will be saved on file for future charges</li>
+            <li>When you charge monthly fees, the saved payment method will be automatically charged</li>
           </ol>
+          <p className="text-xs mt-4 p-2 bg-primary/10 rounded">
+            <strong>Note:</strong> All payment information is securely processed and stored by Stripe. 
+            Your app never sees or stores raw payment details.
+          </p>
         </CardContent>
       </Card>
     </div>
