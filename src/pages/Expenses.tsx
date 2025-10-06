@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { DollarSign, Calendar as CalendarIcon, MapPin, Receipt } from "lucide-react";
+import { DollarSign, Calendar as CalendarIcon, MapPin, Receipt, Upload, FileText, Image as ImageIcon } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Property, Expense } from "@/types";
 import { toast } from "sonner";
@@ -14,6 +14,7 @@ const Expenses = () => {
   const [properties, setProperties] = useState<Property[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [formData, setFormData] = useState({
     propertyId: "",
     amount: "",
@@ -56,11 +57,28 @@ const Expenses = () => {
         amount: Number(e.amount),
         date: e.date,
         purpose: e.purpose,
+        filePath: e.file_path,
         createdAt: e.created_at,
       })));
     } catch (error) {
       console.error("Error loading data:", error);
       toast.error("Failed to load data");
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'application/pdf'];
+      if (!validTypes.includes(file.type)) {
+        toast.error("Please upload an image (JPG, PNG, WEBP) or PDF file");
+        return;
+      }
+      if (file.size > 10 * 1024 * 1024) { // 10MB limit
+        toast.error("File size must be less than 10MB");
+        return;
+      }
+      setSelectedFile(file);
     }
   };
 
@@ -80,6 +98,22 @@ const Expenses = () => {
 
     try {
       setLoading(true);
+      let filePath = null;
+
+      // Upload file if selected
+      if (selectedFile) {
+        const fileExt = selectedFile.name.split('.').pop();
+        const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+        const { error: uploadError } = await supabase.storage
+          .from('expense-documents')
+          .upload(fileName, selectedFile);
+
+        if (uploadError) {
+          throw new Error(`File upload failed: ${uploadError.message}`);
+        }
+        filePath = fileName;
+      }
+
       const { error } = await supabase
         .from("expenses")
         .insert({
@@ -87,6 +121,7 @@ const Expenses = () => {
           amount,
           date: formData.date,
           purpose: formData.purpose || null,
+          file_path: filePath,
         });
 
       if (error) throw error;
@@ -97,6 +132,7 @@ const Expenses = () => {
         date: new Date().toISOString().split("T")[0],
         purpose: "",
       });
+      setSelectedFile(null);
 
       await loadData();
       toast.success("Expense added successfully!");
@@ -106,6 +142,13 @@ const Expenses = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const getFileUrl = (filePath: string) => {
+    const { data } = supabase.storage
+      .from('expense-documents')
+      .getPublicUrl(filePath);
+    return data.publicUrl;
   };
 
   const getPropertyName = (propertyId: string) => {
@@ -191,6 +234,25 @@ const Expenses = () => {
               />
             </div>
 
+            <div className="space-y-2">
+              <Label htmlFor="file" className="flex items-center gap-2">
+                <Upload className="w-4 h-4" />
+                Upload Receipt/Document (Optional)
+              </Label>
+              <Input
+                id="file"
+                type="file"
+                accept="image/jpeg,image/jpg,image/png,image/webp,application/pdf"
+                onChange={handleFileChange}
+                className="text-base cursor-pointer"
+              />
+              {selectedFile && (
+                <p className="text-sm text-muted-foreground">
+                  Selected: {selectedFile.name}
+                </p>
+              )}
+            </div>
+
             <Button type="submit" disabled={loading} className="w-full md:w-auto shadow-warm">
               {loading ? "Adding..." : "Add Expense"}
             </Button>
@@ -236,6 +298,21 @@ const Expenses = () => {
                         <p className="text-sm text-muted-foreground mt-2 italic border-l-2 border-primary/30 pl-3">
                           {expense.purpose}
                         </p>
+                      )}
+                      {expense.filePath && (
+                        <a
+                          href={getFileUrl(expense.filePath)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm text-primary hover:underline flex items-center gap-1.5 mt-2"
+                        >
+                          {expense.filePath.toLowerCase().endsWith('.pdf') ? (
+                            <FileText className="w-3.5 h-3.5" />
+                          ) : (
+                            <ImageIcon className="w-3.5 h-3.5" />
+                          )}
+                          View Document
+                        </a>
                       )}
                     </div>
                     <div className="text-right">

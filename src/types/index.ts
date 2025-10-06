@@ -22,6 +22,7 @@ export interface Expense {
   amount: number;
   date: string;
   purpose?: string;
+  filePath?: string;
   createdAt: string;
 }
 

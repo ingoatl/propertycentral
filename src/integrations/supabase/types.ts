@@ -19,6 +19,7 @@ export type Database = {
           amount: number
           created_at: string
           date: string
+          file_path: string | null
           id: string
           property_id: string
           purpose: string | null
@@ -27,6 +28,7 @@ export type Database = {
           amount: number
           created_at?: string
           date: string
+          file_path?: string | null
           id?: string
           property_id: string
           purpose?: string | null
@@ -35,6 +37,7 @@ export type Database = {
           amount?: number
           created_at?: string
           date?: string
+          file_path?: string | null
           id?: string
           property_id?: string
           purpose?: string | null
