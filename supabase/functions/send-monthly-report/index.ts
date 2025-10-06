@@ -41,7 +41,7 @@ const handler = async (req: Request): Promise<Response> => {
     // Fetch Villa 14 property
     const { data: properties, error: propertiesError } = await supabase
       .from("properties")
-      .select("*")
+      .select("*, rental_type")
       .ilike("name", "%villa%14%");
 
     if (propertiesError) throw propertiesError;
@@ -149,24 +149,32 @@ const handler = async (req: Request): Promise<Response> => {
               <div style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border-radius: 16px; padding: 25px; margin-bottom: 35px; border: 1px solid #dee2e6;">
                 <div style="display: flex; align-items: start; gap: 15px;">
                   <div style="background: linear-gradient(135deg, #FF6B9D, #C86DD7); width: 50px; height: 50px; border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
-                    <span style="font-size: 24px;">🏠</span>
+                    <span style="font-size: 24px;">${villa14.rental_type === 'short_term' ? '🏖️' : '🏠'}</span>
                   </div>
                   <div style="flex: 1;">
                     <h2 style="margin: 0 0 8px 0; font-size: 22px; color: #2c3e50; font-weight: 600;">
                       ${villa14.name}
                     </h2>
-                    <p style="margin: 0; color: #6c757d; font-size: 15px; line-height: 1.5;">
+                    <p style="margin: 0 0 8px 0; color: #6c757d; font-size: 15px; line-height: 1.5;">
                       📍 ${villa14.address}
                     </p>
+                    <span style="display: inline-block; background: ${villa14.rental_type === 'short_term' ? 'linear-gradient(135deg, #667eea, #764ba2)' : 'linear-gradient(135deg, #f59e0b, #d97706)'}; color: white; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 600; letter-spacing: 0.5px;">
+                      ${villa14.rental_type === 'short_term' ? 'SHORT-TERM RENTAL' : 'MID-TERM RENTAL'}
+                    </span>
                   </div>
                 </div>
               </div>
 
               <!-- Financial Summary -->
               <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 35px; border-radius: 16px; margin-bottom: 35px; box-shadow: 0 10px 30px rgba(102, 126, 234, 0.25);">
-                <h2 style="color: white; margin: 0 0 25px 0; font-size: 24px; font-weight: 600; text-align: center;">
+                <h2 style="color: white; margin: 0 0 15px 0; font-size: 24px; font-weight: 600; text-align: center;">
                   💰 Financial Summary
                 </h2>
+                <p style="text-align: center; color: rgba(255,255,255,0.95); margin: 0 0 25px 0; font-size: 15px;">
+                  ${villa14.rental_type === 'short_term' 
+                    ? 'Your short-term rental generated revenue from guest bookings this month.' 
+                    : 'Your mid-term rental property performance including visits and maintenance.'}
+                </p>
                 <table style="width: 100%; border-collapse: separate; border-spacing: 0 12px;">
                   <tr>
                     <td style="background: rgba(255,255,255,0.15); padding: 18px 22px; border-radius: 10px; backdrop-filter: blur(10px);">
@@ -202,14 +210,18 @@ const handler = async (req: Request): Promise<Response> => {
 
     // Add Visits Section if there are any
     if (visits && visits.length > 0) {
+      const isShortTerm = villa14.rental_type === 'short_term';
       emailBody += `
               <div style="margin-bottom: 35px;">
                 <h3 style="color: #2c3e50; margin: 0 0 20px 0; font-size: 22px; font-weight: 600; display: flex; align-items: center; gap: 10px;">
                   <span style="background: linear-gradient(135deg, #667eea, #764ba2); width: 38px; height: 38px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 18px;">🏃</span>
-                  Property Visits
+                  ${isShortTerm ? 'Property Visits' : 'Property Inspections & Visits'}
                 </h3>
                 <p style="color: #6c757d; margin: 0 0 20px 0; font-size: 15px;">
-                  Our team made ${visits.length} visit${visits.length > 1 ? 's' : ''} to ensure your property is in perfect condition.
+                  ${isShortTerm 
+                    ? `Our team made ${visits.length} visit${visits.length > 1 ? 's' : ''} to ensure your property is in perfect condition.`
+                    : `We conducted ${visits.length} professional inspection${visits.length > 1 ? 's' : ''} and visit${visits.length > 1 ? 's' : ''} to maintain your property and ensure tenant satisfaction.`
+                  }
                 </p>
                 <div style="background: #f8f9fa; border-radius: 12px; overflow: hidden; border: 1px solid #e9ecef;">`;
       

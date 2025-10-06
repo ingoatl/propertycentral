@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Plus, Trash2, MapPin, Building2 } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { Property } from "@/types";
 import { toast } from "sonner";
@@ -13,6 +14,7 @@ const propertySchema = z.object({
   name: z.string().trim().min(1, "Name is required").max(200, "Name must be less than 200 characters"),
   address: z.string().trim().min(1, "Address is required").max(500, "Address must be less than 500 characters"),
   visitPrice: z.number().positive("Visit price must be positive").max(10000, "Visit price cannot exceed $10,000"),
+  rentalType: z.enum(["short_term", "mid_term"], { required_error: "Please select a rental type" }),
 });
 
 const Properties = () => {
@@ -23,6 +25,7 @@ const Properties = () => {
     name: "",
     address: "",
     visitPrice: "",
+    rentalType: "" as "short_term" | "mid_term" | "",
   });
 
   useEffect(() => {
@@ -63,6 +66,7 @@ const Properties = () => {
       name: formData.name,
       address: formData.address,
       visitPrice,
+      rentalType: formData.rentalType,
     });
 
     if (!validation.success) {
@@ -83,12 +87,13 @@ const Properties = () => {
           name: formData.name.trim(),
           address: formData.address.trim(),
           visit_price: visitPrice,
+          rental_type: formData.rentalType,
           user_id: user.id,
         });
 
       if (error) throw error;
 
-      setFormData({ name: "", address: "", visitPrice: "" });
+      setFormData({ name: "", address: "", visitPrice: "", rentalType: "" });
       setShowForm(false);
       await loadProperties();
       toast.success("Property added successfully!");
@@ -184,6 +189,23 @@ const Properties = () => {
                   className="text-base"
                   required
                 />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="rentalType">Rental Type</Label>
+                <Select
+                  value={formData.rentalType}
+                  onValueChange={(value: "short_term" | "mid_term") =>
+                    setFormData({ ...formData, rentalType: value })
+                  }
+                >
+                  <SelectTrigger id="rentalType">
+                    <SelectValue placeholder="Select rental type..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="short_term">Short-term Rental</SelectItem>
+                    <SelectItem value="mid_term">Mid-term Rental</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div className="flex gap-2">
                 <Button type="submit" disabled={loading} className="shadow-warm">

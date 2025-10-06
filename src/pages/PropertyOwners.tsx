@@ -127,6 +127,9 @@ const PropertyOwners = () => {
 
       setOwners((ownersResult.data || []) as PropertyOwner[]);
       setProperties(propertiesResult.data || []);
+      
+      console.log("Loaded properties:", propertiesResult.data);
+      console.log("Loaded owners:", ownersResult.data);
     } catch (error: any) {
       console.error("Error loading data:", error);
       toast.error("Failed to load property owners");

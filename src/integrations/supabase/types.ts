@@ -192,6 +192,7 @@ export type Database = {
           id: string
           name: string
           owner_id: string | null
+          rental_type: string | null
           user_id: string | null
           visit_price: number
         }
@@ -201,6 +202,7 @@ export type Database = {
           id?: string
           name: string
           owner_id?: string | null
+          rental_type?: string | null
           user_id?: string | null
           visit_price?: number
         }
@@ -210,6 +212,7 @@ export type Database = {
           id?: string
           name?: string
           owner_id?: string | null
+          rental_type?: string | null
           user_id?: string | null
           visit_price?: number
         }
