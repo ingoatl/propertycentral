@@ -140,35 +140,85 @@ Visits: ${visits?.length || 0}
 Expenses: $${expenseTotal.toFixed(2)}
       `.trim();
 
-      const aiPrompt = property.rental_type === 'hybrid' && !hasMidTermBooking
-        ? `You are a professional property management expert. Analyze this ${property.rental_type} rental property and provide:
+      // Customize prompt based on property type and booking status
+      let aiPrompt = "";
+      
+      if (property.rental_type === 'hybrid' && !hasMidTermBooking) {
+        // Hybrid property without mid-term tenant - focus on dual marketing strategy
+        aiPrompt = `You are a professional property management expert for PeachHaus Property Management. Analyze this hybrid rental property and provide insights:
 
 ${propertyContext}
 
-Provide a comprehensive, professional analysis in HTML format (use <p>, <strong>, <ul>, <li> tags) covering:
+Provide a comprehensive, professional analysis in HTML format (use <p>, <strong>, <ul>, <li> tags) with these sections:
 
-1. **Property Performance Analysis**: Brief analysis of the property's performance this month
-2. **Market Trends**: Current vacation rental and mid-term rental market trends for properties in ${property.address.split(',').pop()?.trim() || 'this area'}
-3. **Local Events & Opportunities**: Upcoming events, seasonal trends, or factors that could drive bookings
-4. **Marketing Strategy**: Mention that we are actively conducting targeted marketing campaigns and corporate outreach to:
-   - Major corporations for corporate housing needs
-   - Insurance companies for temporary housing programs
-   - Healthcare facilities for traveling professionals
-   - Educational institutions for visiting faculty
+**1. Property Performance Overview** (2-3 sentences)
+Brief analysis of current performance and revenue trends.
 
-Keep the tone professional, optimistic, and data-driven. Focus on opportunities and our proactive approach.`
-        : `You are a professional property management expert. Analyze this ${property.rental_type} rental property and provide:
+**2. What PeachHaus is Doing to Drive Bookings**
+Explain PeachHaus's comprehensive dual-marketing approach:
+- **Short-term Strategy**: Active listings on Airbnb, VRBO, Booking.com with professional photography, dynamic pricing optimization, and 24/7 guest communication
+- **Mid-term Strategy**: Targeted outreach to corporations for employee relocations, insurance companies for displaced homeowners, healthcare facilities for traveling nurses/doctors, and educational institutions for visiting faculty
+- Professional property inspections and maintenance to ensure property is always guest-ready
+- Regular market analysis and pricing adjustments to maximize occupancy
+
+**3. Upcoming Opportunities** (Maximum 3-4 most significant local events/trends)
+Only mention the 2-3 MOST IMPORTANT upcoming events or seasonal trends in ${property.address.split(',').pop()?.trim() || 'the area'} that could drive short-term bookings. Focus on major events, conferences, or peak seasons. Keep this brief.
+
+**4. Next Steps**
+What PeachHaus is actively doing this month to secure both short-term guests and mid-term contracts.
+
+Keep the tone professional, confident, and action-oriented. Emphasize PeachHaus's proactive approach.`;
+
+      } else if (property.rental_type === 'mid_term' || (property.rental_type === 'hybrid' && hasMidTermBooking)) {
+        // Mid-term property OR hybrid with active tenant - focus on tenant retention and contract acquisition
+        aiPrompt = `You are a professional property management expert for PeachHaus Property Management. Analyze this ${hasMidTermBooking ? 'currently occupied' : ''} mid-term rental property:
 
 ${propertyContext}
 
-Provide a comprehensive, professional analysis in HTML format (use <p>, <strong>, <ul>, <li> tags) covering:
+Provide a comprehensive, professional analysis in HTML format (use <p>, <strong>, <ul> <li> tags) with these sections:
 
-1. **Property Performance Analysis**: Brief analysis of the property's performance this month
-2. **Market Trends**: Current ${property.rental_type === 'hybrid' ? 'vacation and mid-term rental' : property.rental_type === 'mid_term' ? 'mid-term rental' : 'long-term rental'} market trends for properties in ${property.address.split(',').pop()?.trim() || 'this area'}
-3. **Local Events & Opportunities**: Upcoming events, seasonal trends, or factors that could drive bookings
-4. **Recommendations**: Specific actionable recommendations for maximizing revenue
+**1. Property Performance Overview** (2-3 sentences)
+Brief analysis of current ${hasMidTermBooking ? 'tenant relationship and' : ''} property status.
 
-Keep the tone professional, optimistic, and data-driven.`;
+${hasMidTermBooking ? `**2. What PeachHaus is Doing to Ensure Tenant Satisfaction & Retention**
+Explain PeachHaus's tenant-focused approach:
+- **Regular Check-ins**: Proactive communication with current tenant to address any concerns immediately
+- **Maintenance Excellence**: 24-hour response time for maintenance requests, regular property inspections
+- **Renewal Strategy**: Early outreach (60-90 days before lease end) to discuss renewal options and terms
+- **Tenant Comfort**: Ensuring all amenities are functional, addressing feedback promptly
+- **Flexible Terms**: Working with tenants on lease extensions and terms that work for both parties
+
+**3. Contract Extension Planning**
+Our strategy for securing lease renewal or finding the next qualified tenant well before current lease ends.` : 
+`**2. What PeachHaus is Doing to Secure Mid-term Contracts**
+Explain PeachHaus's comprehensive marketing and outreach strategy:
+- **Corporate Partnerships**: Direct outreach to Fortune 500 companies, consulting firms, and tech companies for employee relocations and temporary housing
+- **Insurance Network**: Active partnerships with major insurance providers (State Farm, Allstate, Liberty Mutual) for displaced homeowners
+- **Healthcare Outreach**: Targeted marketing to hospitals, medical centers, and travel nurse agencies for 1-6 month placements
+- **Professional Marketing**: Premium listings on Furnished Finder, Corporate Housing by Owner, and direct corporate channels
+- **Flexible Terms**: Offering 1-12 month leases with corporate-friendly contracts and billing
+
+**3. Market Positioning**
+How we're positioning this property in the ${property.address.split(',').pop()?.trim() || 'local'} mid-term rental market to attract quality tenants.`}
+
+**4. Next Month's Action Plan**
+Specific steps PeachHaus is taking this month to ${hasMidTermBooking ? 'ensure tenant retention and prepare for potential renewal or replacement' : 'secure a qualified mid-term tenant'}.
+
+Keep the tone professional, reassuring, and results-focused. Emphasize PeachHaus's expertise in mid-term tenant acquisition and retention. DO NOT mention local events - that's not relevant for mid-term rentals.`;
+
+      } else {
+        // Long-term or other
+        aiPrompt = `You are a professional property management expert for PeachHaus Property Management. Analyze this property:
+
+${propertyContext}
+
+Provide a brief professional analysis in HTML format (use <p>, <strong>, <ul>, <li> tags) covering:
+1. Property performance overview
+2. What PeachHaus is doing to maintain and optimize the property
+3. Recommendations for maximizing value
+
+Keep the tone professional and concise.`;
+      }
 
       const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
