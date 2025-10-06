@@ -123,14 +123,31 @@ const handler = async (req: Request): Promise<Response> => {
     
     const netIncome = totalRevenue - managementFees - expenseTotal;
 
+    // Parse location from address
+    const addressParts = property.address.split(',').map((p: string) => p.trim());
+    const city = addressParts[1] || '';
+    const stateZip = addressParts[2] || '';
+    const state = stateZip.split(' ')[0] || '';
+    
+    // Determine metro area based on city/state
+    let metroArea = '';
+    if (city.toLowerCase().includes('roswell') || city.toLowerCase().includes('atlanta')) {
+      metroArea = 'Metro Atlanta';
+    } else {
+      metroArea = city;
+    }
+    
+    const locationDescription = `${city}, ${state} (${metroArea})`;
+
     // Generate AI insights
     console.log("Generating AI insights...");
     let aiInsights = "";
     
     try {
+
       const propertyContext = `
 Property: ${property.name}
-Location: ${property.address}
+Location: ${locationDescription}
 Type: ${property.rental_type === 'hybrid' ? 'Hybrid (Short-term & Mid-term)' : property.rental_type === 'mid_term' ? 'Mid-term' : 'Long-term'}
 Has Active Mid-term Booking: ${hasMidTermBooking ? 'Yes' : 'No'}
 Previous Month: ${previousMonthName}
@@ -145,79 +162,64 @@ Expenses: $${expenseTotal.toFixed(2)}
       
       if (property.rental_type === 'hybrid' && !hasMidTermBooking) {
         // Hybrid property without mid-term tenant - focus on dual marketing strategy
-        aiPrompt = `You are a professional property management expert for PeachHaus Property Management. Analyze this hybrid rental property and provide insights:
+        aiPrompt = `You are a professional property management expert for PeachHaus Property Management. Analyze this hybrid rental property:
 
 ${propertyContext}
 
-Provide a comprehensive, professional analysis in HTML format (use <p>, <strong>, <ul>, <li> tags) with these sections:
+Provide a CONCISE professional analysis in HTML format (use <p>, <strong>, <ul>, <li> tags). Keep each section brief and actionable:
 
-**1. Property Performance Overview** (2-3 sentences)
-Brief analysis of current performance and revenue trends.
+**1. Performance Snapshot** (1-2 sentences max)
+Quick assessment of current performance.
 
-**2. What PeachHaus is Doing to Drive Bookings**
-Explain PeachHaus's comprehensive dual-marketing approach:
-- **Short-term Strategy**: Active listings on Airbnb, VRBO, Booking.com with professional photography, dynamic pricing optimization, and 24/7 guest communication
-- **Mid-term Strategy**: Targeted outreach to corporations for employee relocations, insurance companies for displaced homeowners, healthcare facilities for traveling nurses/doctors, and educational institutions for visiting faculty
-- Professional property inspections and maintenance to ensure property is always guest-ready
-- Regular market analysis and pricing adjustments to maximize occupancy
+**2. PeachHaus's Active Marketing Strategy**
+List our key initiatives (use bullet points, keep each to 5-7 words):
+- Short-term: Premium platform listings, dynamic pricing
+- Mid-term: Corporate partnerships, healthcare outreach
+- Property maintenance and optimization
 
-**3. Upcoming Opportunities** (Maximum 3-4 most significant local events/trends)
-Only mention the 2-3 MOST IMPORTANT upcoming events or seasonal trends in ${property.address.split(',').pop()?.trim() || 'the area'} that could drive short-term bookings. Focus on major events, conferences, or peak seasons. Keep this brief.
+**3. Key Local Opportunities** (Maximum 2-3 items)
+Only the most significant upcoming events or trends in ${metroArea} that could drive bookings. Keep very brief.
 
-**4. Next Steps**
-What PeachHaus is actively doing this month to secure both short-term guests and mid-term contracts.
+**4. This Month's Action Plan** (3-4 bullet points max, 5-8 words each)
+Specific actions we're taking now.
 
-Keep the tone professional, confident, and action-oriented. Emphasize PeachHaus's proactive approach.`;
+Keep it CONCISE and SCANNABLE. Each section should be 2-4 lines maximum.`;
 
       } else if (property.rental_type === 'mid_term' || (property.rental_type === 'hybrid' && hasMidTermBooking)) {
-        // Mid-term property OR hybrid with active tenant - focus on tenant retention and contract acquisition
-        aiPrompt = `You are a professional property management expert for PeachHaus Property Management. Analyze this ${hasMidTermBooking ? 'currently occupied' : ''} mid-term rental property:
+        // Mid-term property OR hybrid with active tenant
+        aiPrompt = `You are a professional property management expert for PeachHaus Property Management. Analyze this ${hasMidTermBooking ? 'occupied' : ''} mid-term rental:
 
 ${propertyContext}
 
-Provide a comprehensive, professional analysis in HTML format (use <p>, <strong>, <ul> <li> tags) with these sections:
+Provide a CONCISE professional analysis in HTML format (use <p>, <strong>, <ul>, <li> tags). Keep each section brief:
 
-**1. Property Performance Overview** (2-3 sentences)
-Brief analysis of current ${hasMidTermBooking ? 'tenant relationship and' : ''} property status.
+**1. Performance Snapshot** (1-2 sentences max)
+Quick ${hasMidTermBooking ? 'tenant satisfaction' : 'property status'} overview.
 
-${hasMidTermBooking ? `**2. What PeachHaus is Doing to Ensure Tenant Satisfaction & Retention**
-Explain PeachHaus's tenant-focused approach:
-- **Regular Check-ins**: Proactive communication with current tenant to address any concerns immediately
-- **Maintenance Excellence**: 24-hour response time for maintenance requests, regular property inspections
-- **Renewal Strategy**: Early outreach (60-90 days before lease end) to discuss renewal options and terms
-- **Tenant Comfort**: Ensuring all amenities are functional, addressing feedback promptly
-- **Flexible Terms**: Working with tenants on lease extensions and terms that work for both parties
+${hasMidTermBooking ? `**2. PeachHaus's Tenant Retention Strategy**
+List key initiatives (bullet points, 5-7 words each):
+- Weekly tenant check-ins and support
+- 24-hour maintenance response guarantee
+- Early renewal discussions (60 days out)
+- Amenity optimization based on feedback
 
-**3. Contract Extension Planning**
-Our strategy for securing lease renewal or finding the next qualified tenant well before current lease ends.` : 
-`**2. What PeachHaus is Doing to Secure Mid-term Contracts**
-Explain PeachHaus's comprehensive marketing and outreach strategy:
-- **Corporate Partnerships**: Direct outreach to Fortune 500 companies, consulting firms, and tech companies for employee relocations and temporary housing
-- **Insurance Network**: Active partnerships with major insurance providers (State Farm, Allstate, Liberty Mutual) for displaced homeowners
-- **Healthcare Outreach**: Targeted marketing to hospitals, medical centers, and travel nurse agencies for 1-6 month placements
-- **Professional Marketing**: Premium listings on Furnished Finder, Corporate Housing by Owner, and direct corporate channels
-- **Flexible Terms**: Offering 1-12 month leases with corporate-friendly contracts and billing
+**3. Renewal Action Plan** (3-4 bullet points max, 5-8 words each)
+Specific steps to secure lease extension.` : 
+`**2. PeachHaus's Contract Acquisition Strategy**
+List key initiatives (bullet points, 5-7 words each):
+- Corporate outreach: Fortune 500 relocations
+- Insurance partnerships: Displaced homeowner programs
+- Healthcare network: Travel nurse placements
+- Premium mid-term platform listings
 
-**3. Market Positioning**
-How we're positioning this property in the ${property.address.split(',').pop()?.trim() || 'local'} mid-term rental market to attract quality tenants.`}
+**3. This Month's Action Plan** (3-4 bullet points max, 5-8 words each)
+Specific steps to secure qualified tenant.`}
 
-**4. Next Month's Action Plan**
-Specific steps PeachHaus is taking this month to ${hasMidTermBooking ? 'ensure tenant retention and prepare for potential renewal or replacement' : 'secure a qualified mid-term tenant'}.
-
-Keep the tone professional, reassuring, and results-focused. Emphasize PeachHaus's expertise in mid-term tenant acquisition and retention. DO NOT mention local events - that's not relevant for mid-term rentals.`;
+Keep it CONCISE and SCANNABLE. Each section should be 2-4 lines maximum. DO NOT mention local events for mid-term rentals.`;
 
       } else {
         // Long-term or other
-        aiPrompt = `You are a professional property management expert for PeachHaus Property Management. Analyze this property:
-
-${propertyContext}
-
-Provide a brief professional analysis in HTML format (use <p>, <strong>, <ul>, <li> tags) covering:
-1. Property performance overview
-2. What PeachHaus is doing to maintain and optimize the property
-3. Recommendations for maximizing value
-
-Keep the tone professional and concise.`;
+        aiPrompt = `Provide a brief 3-section analysis: Performance, PeachHaus Actions, Recommendations. Use HTML <p>, <strong>, <ul>, <li> tags. Keep very concise - 2-3 sentences per section max.`;
       }
 
       const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -248,7 +250,7 @@ Keep the tone professional and concise.`;
       console.error("Error generating AI insights:", error);
     }
 
-    // Generate beautiful, friendly email
+    // Generate beautiful, friendly email with visual elements
     let emailBody = `
       <!DOCTYPE html>
       <html>
@@ -263,8 +265,9 @@ Keep the tone professional and concise.`;
         <body style="margin: 0; padding: 0; background: #f8f9fa;">
           <div style="max-width: 680px; margin: 0 auto; background: white;">
             
-            <!-- Hero Header -->
+            <!-- Hero Header with Background Pattern -->
             <div style="background: linear-gradient(135deg, #FF6B9D 0%, #C86DD7 50%, #8B5CF6 100%); padding: 50px 40px; text-align: center; position: relative; overflow: hidden;">
+              <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; opacity: 0.1; background-image: repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(255,255,255,.1) 10px, rgba(255,255,255,.1) 20px);"></div>
               <div style="position: relative; z-index: 2;">
                 <div style="background: white; width: 80px; height: 80px; border-radius: 50%; margin: 0 auto 25px; display: inline-flex; align-items: center; justify-content: center; box-shadow: 0 8px 20px rgba(0,0,0,0.15);">
                   <span style="font-size: 42px;">🏡</span>
@@ -289,10 +292,10 @@ Keep the tone professional and concise.`;
                 Your trust means everything to us, and we're committed to maximizing your investment while keeping you informed every step of the way.
               </p>
 
-              <!-- Property Info Card -->
-              <div style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border-radius: 16px; padding: 25px; margin-bottom: 35px; border: 1px solid #dee2e6;">
+              <!-- Property Info Card with Location -->
+              <div style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border-radius: 16px; padding: 25px; margin-bottom: 35px; border: 1px solid #dee2e6; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
                 <div style="display: flex; align-items: start; gap: 15px;">
-                  <div style="background: linear-gradient(135deg, #FF6B9D, #C86DD7); width: 50px; height: 50px; border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                  <div style="background: linear-gradient(135deg, #FF6B9D, #C86DD7); width: 50px; height: 50px; border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 4px 12px rgba(255, 107, 157, 0.3);">
                     <span style="font-size: 24px;">${property.rental_type === 'hybrid' ? '🔄' : property.rental_type === 'mid_term' ? '🏠' : '🏢'}</span>
                   </div>
                   <div style="flex: 1;">
@@ -300,15 +303,20 @@ Keep the tone professional and concise.`;
                       ${property.name}
                     </h2>
                     <p style="margin: 0 0 8px 0; color: #6c757d; font-size: 15px; line-height: 1.5;">
-                      📍 ${property.address}
+                      📍 ${city}, ${state}
                     </p>
-                    <span style="display: inline-block; background: ${property.rental_type === 'hybrid' ? 'linear-gradient(135deg, #667eea, #764ba2)' : property.rental_type === 'mid_term' ? 'linear-gradient(135deg, #f59e0b, #d97706)' : 'linear-gradient(135deg, #10b981, #059669)'}; color: white; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 600; letter-spacing: 0.5px;">
-                      ${property.rental_type === 'hybrid' ? '🔄 HYBRID RENTAL' : property.rental_type === 'mid_term' ? '🏠 MID-TERM RENTAL' : '🏢 LONG-TERM RENTAL'}
-                    </span>
-                    ${hasMidTermBooking ? `
-                    <span style="display: inline-block; background: linear-gradient(135deg, #10b981, #059669); color: white; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 600; letter-spacing: 0.5px; margin-left: 8px;">
-                      ✓ ACTIVE MID-TERM TENANT
-                    </span>` : ''}
+                    <p style="margin: 0 0 12px 0; color: #8B5CF6; font-size: 14px; font-weight: 500;">
+                      ${metroArea} Area
+                    </p>
+                    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                      <span style="display: inline-block; background: ${property.rental_type === 'hybrid' ? 'linear-gradient(135deg, #667eea, #764ba2)' : property.rental_type === 'mid_term' ? 'linear-gradient(135deg, #f59e0b, #d97706)' : 'linear-gradient(135deg, #10b981, #059669)'}; color: white; padding: 6px 14px; border-radius: 12px; font-size: 12px; font-weight: 600; letter-spacing: 0.5px; box-shadow: 0 2px 8px rgba(0,0,0,0.15);">
+                        ${property.rental_type === 'hybrid' ? '🔄 HYBRID RENTAL' : property.rental_type === 'mid_term' ? '🏠 MID-TERM RENTAL' : '🏢 LONG-TERM RENTAL'}
+                      </span>
+                      ${hasMidTermBooking ? `
+                      <span style="display: inline-block; background: linear-gradient(135deg, #10b981, #059669); color: white; padding: 6px 14px; border-radius: 12px; font-size: 12px; font-weight: 600; letter-spacing: 0.5px; box-shadow: 0 2px 8px rgba(0,0,0,0.15);">
+                        ✓ ACTIVE TENANT
+                      </span>` : ''}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -368,15 +376,20 @@ Keep the tone professional and concise.`;
                 </div>
               </div>`;
 
-    // Add AI Insights Section
+    // Add AI Insights Section with visual enhancements
     if (aiInsights) {
       emailBody += `
+              <!-- Visual Divider -->
+              <div style="text-align: center; margin: 40px 0 35px;">
+                <div style="display: inline-block; width: 60px; height: 3px; background: linear-gradient(90deg, #FF6B9D, #C86DD7, #8B5CF6); border-radius: 2px;"></div>
+              </div>
+
               <div style="margin-bottom: 35px;">
                 <h3 style="color: #2c3e50; margin: 0 0 20px 0; font-size: 22px; font-weight: 600; display: flex; align-items: center; gap: 10px;">
-                  <span style="background: linear-gradient(135deg, #8B5CF6, #7C3AED); width: 38px; height: 38px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 18px;">🎯</span>
-                  Property Insights & Market Analysis
+                  <span style="background: linear-gradient(135deg, #8B5CF6, #7C3AED); width: 38px; height: 38px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 18px; box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);">🎯</span>
+                  Property Insights & PeachHaus Strategy
                 </h3>
-                <div style="background: #f8f9fa; border-radius: 12px; padding: 25px; border: 1px solid #e9ecef; color: #34495e; font-size: 15px; line-height: 1.8;">
+                <div style="background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%); border-radius: 12px; padding: 25px; border-left: 4px solid #8B5CF6; box-shadow: 0 2px 8px rgba(0,0,0,0.05); color: #34495e; font-size: 15px; line-height: 1.8;">
                   ${aiInsights}
                 </div>
               </div>`;
