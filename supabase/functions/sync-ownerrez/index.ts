@@ -40,6 +40,26 @@ serve(async (req) => {
 
     console.log('Fetching listings from OwnerRez...');
 
+    // Define management fee structure per property
+    const managementFeeRates: Record<string, number> = {
+      'woodland': 0.25,  // 25% for Woodland
+      'villa 14': 0.20,  // 20% for Villa 14
+      'villa 15': 0.20,  // 20% for Villa 15
+      'smoke hollow': 0.18,  // 18% for Smoke Hollow
+      'canadian way': 0.20,  // 20% for Canadian Way
+    };
+
+    // Function to determine management fee rate
+    const getManagementFeeRate = (propertyName: string): number => {
+      const lowerName = propertyName.toLowerCase();
+      for (const [key, rate] of Object.entries(managementFeeRates)) {
+        if (lowerName.includes(key)) {
+          return rate;
+        }
+      }
+      return 0.20; // Default 20% if not found
+    };
+
     // Fetch all listings from OwnerRez
     const listingsResponse = await fetch('https://api.ownerrez.com/v2/listings', {
       headers: {
@@ -60,22 +80,32 @@ serve(async (req) => {
     // Filter for specific properties
     const targetProperties = [
       '184 Woodland Ln, Mableton, GA 30126',
+      'Woodland',
       'Villa 14',
       'Villa 15',
+      'Smoke Hollow',
+      'Canadian Way',
     ];
 
     const filteredListings = listings.filter(listing => 
       targetProperties.some(target => 
         listing.name.toLowerCase().includes(target.toLowerCase()) ||
-        listing.address.toLowerCase().includes(target.toLowerCase())
+        (listing.address && listing.address.toLowerCase().includes(target.toLowerCase()))
       )
     );
 
     console.log(`Filtered to ${filteredListings.length} target properties`);
 
+    let totalSyncedBookings = 0;
+    let totalRevenue = 0;
+    let totalManagementFees = 0;
+
     // Sync each listing
     for (const listing of filteredListings) {
       console.log(`Syncing listing: ${listing.name}`);
+
+      // Determine management fee rate for this property
+      const managementFeeRate = getManagementFeeRate(listing.name);
 
       // Try to find matching property in our database
       const { data: properties } = await supabase
@@ -108,15 +138,18 @@ serve(async (req) => {
       const bookingsData = await bookingsResponse.json();
       const bookings: OwnerRezBooking[] = bookingsData.items || [];
 
-      console.log(`Found ${bookings.length} bookings for ${listing.name}`);
+      console.log(`Found ${bookings.length} bookings for ${listing.name} (${(managementFeeRate * 100).toFixed(0)}% management fee)`);
 
-      // Calculate total revenue and management fee (assuming 10% fee)
-      let totalRevenue = 0;
+      // Calculate total revenue and management fee
+      let listingRevenue = 0;
+      let listingManagementFees = 0;
       
       for (const booking of bookings) {
-        totalRevenue += booking.total || 0;
+        const bookingTotal = booking.total || 0;
+        listingRevenue += bookingTotal;
         
-        const managementFee = (booking.total || 0) * 0.10;
+        const managementFee = bookingTotal * managementFeeRate;
+        listingManagementFees += managementFee;
 
         // Upsert booking data
         await supabase
@@ -129,7 +162,7 @@ serve(async (req) => {
             guest_name: booking.guest_name,
             check_in: booking.arrival,
             check_out: booking.departure,
-            total_amount: booking.total || 0,
+            total_amount: bookingTotal,
             management_fee: managementFee,
             booking_status: booking.status,
             sync_date: new Date().toISOString(),
@@ -138,7 +171,11 @@ serve(async (req) => {
           });
       }
 
-      console.log(`Synced ${bookings.length} bookings with total revenue: $${totalRevenue}`);
+      totalSyncedBookings += bookings.length;
+      totalRevenue += listingRevenue;
+      totalManagementFees += listingManagementFees;
+
+      console.log(`Synced ${bookings.length} bookings - Revenue: $${listingRevenue.toFixed(2)}, Mgmt Fees (${(managementFeeRate * 100).toFixed(0)}%): $${listingManagementFees.toFixed(2)}`);
     }
 
     return new Response(
@@ -146,6 +183,11 @@ serve(async (req) => {
         success: true, 
         message: `Synced ${filteredListings.length} properties from OwnerRez`,
         listings: filteredListings.map(l => l.name),
+        summary: {
+          totalBookings: totalSyncedBookings,
+          totalRevenue: totalRevenue.toFixed(2),
+          totalManagementFees: totalManagementFees.toFixed(2),
+        },
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
