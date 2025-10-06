@@ -370,7 +370,7 @@ const Dashboard = () => {
             <div className="text-3xl font-bold text-purple-600 dark:text-purple-500">
               ${totalManagementFees.toFixed(2)}
             </div>
-            <p className="text-xs text-muted-foreground mt-1">10% of OwnerRez bookings</p>
+            <p className="text-xs text-muted-foreground mt-1">From OwnerRez bookings</p>
           </CardContent>
         </Card>
       </div>
@@ -401,44 +401,44 @@ const Dashboard = () => {
                     className="group p-6 border border-border/50 rounded-xl hover:shadow-card transition-all duration-300 hover:scale-[1.01] bg-gradient-subtle cursor-pointer"
                     style={{ animationDelay: `${index * 0.1}s` }}
                   >
-                    <div className="flex flex-col gap-4">
-                      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                        <div className="space-y-1.5">
+                    <div>
+                      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                        <div className="space-y-1.5 min-w-0 flex-shrink">
                           <h3 className="font-semibold text-lg group-hover:text-primary transition-colors">
                             {summary.property.name}
                           </h3>
                           <p className="text-sm text-muted-foreground flex items-center gap-1.5">
-                            <MapPin className="h-3.5 w-3.5" />
+                            <MapPin className="h-3.5 w-3.5 flex-shrink-0" />
                             {summary.property.address}
                           </p>
                           <p className="text-xs text-muted-foreground">
                             Visit Rate: <span className="font-semibold text-foreground">${summary.property.visitPrice.toFixed(2)}</span>
                           </p>
                         </div>
-                        <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
-                          <div className="text-center sm:text-right">
+                        <div className="flex flex-wrap gap-4 sm:gap-6 justify-start sm:justify-end">
+                          <div className="text-left sm:text-right">
                             <p className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">Visits</p>
                             <p className="font-bold text-lg">{summary.visitCount}</p>
                           </div>
-                          <div className="text-center sm:text-right">
+                          <div className="text-left sm:text-right">
                             <p className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">Visit Rev</p>
                             <p className="font-bold text-lg text-green-600 dark:text-green-500">
                               ${summary.visitTotal.toFixed(2)}
                             </p>
                           </div>
-                          <div className="text-center sm:text-right">
+                          <div className="text-left sm:text-right">
                             <p className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">OwnerRez</p>
                             <p className="font-bold text-lg text-blue-600 dark:text-blue-500">
                               ${summary.ownerrezRevenue.toFixed(2)}
                             </p>
                           </div>
-                          <div className="text-center sm:text-right">
+                          <div className="text-left sm:text-right">
                             <p className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">Mgmt Fees</p>
                             <p className="font-bold text-lg text-purple-600 dark:text-purple-500">
                               ${summary.managementFees.toFixed(2)}
                             </p>
                           </div>
-                          <div className="text-center sm:text-right">
+                          <div className="text-left sm:text-right">
                             <p className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">Expenses</p>
                             <p className="font-bold text-lg text-red-600 dark:text-red-500">
                               ${summary.expenseTotal.toFixed(2)}

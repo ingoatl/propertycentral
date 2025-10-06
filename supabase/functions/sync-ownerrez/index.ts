@@ -109,7 +109,7 @@ serve(async (req) => {
     
     console.log('Fetching all bookings from OwnerRez...');
     const allBookingsResponse = await fetch(
-      `https://api.ownerrez.com/v2/bookings?arrival_from=${startDate.toISOString().split('T')[0]}`,
+      `https://api.ownerrez.com/v2/bookings?since_utc=${startDate.toISOString()}`,
       {
         headers: {
           'Authorization': authHeader,
