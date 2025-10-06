@@ -8,6 +8,7 @@ const corsHeaders = {
 
 interface OwnerRezListing {
   property_id: number;
+  name?: string;  // Property name if available
   bedroom_count?: number;
   bathroom_count?: number;
   occupancy_max?: number;
@@ -16,6 +17,7 @@ interface OwnerRezListing {
 interface OwnerRezBooking {
   id: number;
   property_id: number;
+  property_name?: string;  // Property name from booking
   guest_name: string;
   arrival: string;
   departure: string;
@@ -53,14 +55,18 @@ serve(async (req) => {
       'canadian way': 0.20,  // 20% for Canadian Way
     };
 
-    // Function to determine management fee rate
-    const getManagementFeeRate = (propertyName: string): number => {
+    // Function to determine management fee rate based on property name
+    const getManagementFeeRate = (propertyId: number, propertyName: string): number => {
       const lowerName = propertyName.toLowerCase();
+      console.log(`Checking management fee for property: "${propertyName}" (ID: ${propertyId})`);
+      
       for (const [key, rate] of Object.entries(managementFeeRates)) {
         if (lowerName.includes(key)) {
+          console.log(`Matched "${key}" - using ${(rate * 100).toFixed(0)}% management fee`);
           return rate;
         }
       }
+      console.log(`No match found - using default 20% management fee`);
       return 0.20; // Default 20% if not found
     };
 
@@ -91,6 +97,11 @@ serve(async (req) => {
 
     console.log(`Found ${listings.length} listings in OwnerRez`);
     console.log('Property IDs:', listings.map(l => l.property_id).join(', '));
+    
+    // Log the full structure of the first listing to see what fields are available
+    if (listings.length > 0) {
+      console.log('First listing structure:', JSON.stringify(listings[0], null, 2));
+    }
 
     // Fetch ALL bookings from OwnerRez (without filtering by property)
     const startDate = new Date();
@@ -118,6 +129,11 @@ serve(async (req) => {
     const allBookings: OwnerRezBooking[] = allBookingsData.items || [];
     
     console.log(`Found ${allBookings.length} total bookings`);
+    
+    // Log the first booking structure to see what fields are available
+    if (allBookings.length > 0) {
+      console.log('First booking structure:', JSON.stringify(allBookings[0], null, 2));
+    }
 
     let totalSyncedBookings = 0;
     let totalRevenue = 0;
@@ -142,8 +158,13 @@ serve(async (req) => {
           continue;
         }
 
-        const propertyName = `Property ${listing.property_id}`;
-        const managementFeeRate = 0.20;
+        // Try to get property name from listing, bookings, or use property_id as fallback
+        const propertyName = listing.name || 
+                            bookings[0]?.property_name || 
+                            `Property ${listing.property_id}`;
+        
+        // Get management fee rate for this specific property
+        const managementFeeRate = getManagementFeeRate(listing.property_id, propertyName);
 
         console.log(`Processing ${bookings.length} bookings for ${propertyName} (${(managementFeeRate * 100).toFixed(0)}% management fee)`);
 
