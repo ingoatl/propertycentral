@@ -63,9 +63,13 @@ serve(async (req) => {
     };
 
     // Fetch all listings from OwnerRez
+    // Try username:token format in Authorization
+    const authHeader = `Token ${ownerrezApiKey}`;
+    console.log('Using auth header format: Token {token}');
+    
     const listingsResponse = await fetch('https://api.ownerrez.com/v2/listings', {
       headers: {
-        'Authorization': `Bearer ${ownerrezApiKey}`,
+        'Authorization': authHeader,
         'Content-Type': 'application/json',
       },
     });
@@ -131,7 +135,7 @@ serve(async (req) => {
         `https://api.ownerrez.com/v2/bookings?listing_id=${listing.id}&arrival_from=${startDate.toISOString().split('T')[0]}`,
         {
           headers: {
-            'Authorization': `Bearer ${ownerrezApiKey}`,
+            'Authorization': authHeader,
             'Content-Type': 'application/json',
           },
         }
