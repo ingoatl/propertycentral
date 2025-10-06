@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Building2, CreditCard, DollarSign, ExternalLink, Plus, Trash2, Wallet } from "lucide-react";
+import { Building2, CreditCard, DollarSign, ExternalLink, Plus, Trash2, Wallet, Edit, Phone, Mail } from "lucide-react";
 import { z } from "zod";
 import { AddPaymentMethod } from "@/components/AddPaymentMethod";
 import {
@@ -76,6 +76,13 @@ const PropertyOwners = () => {
   const [creating, setCreating] = useState(false);
   const [addingPaymentFor, setAddingPaymentFor] = useState<PropertyOwner | null>(null);
   const [paymentMethods, setPaymentMethods] = useState<Record<string, PaymentMethodInfo[]>>({});
+  const [editingOwner, setEditingOwner] = useState<PropertyOwner | null>(null);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editForm, setEditForm] = useState({
+    name: "",
+    email: "",
+    phone: "",
+  });
 
   useEffect(() => {
     checkAdminStatus();
@@ -226,6 +233,57 @@ const PropertyOwners = () => {
     toast.success("Payment method added successfully");
   };
 
+  const handleEditOwner = (owner: PropertyOwner) => {
+    setEditingOwner(owner);
+    setEditForm({
+      name: owner.name,
+      email: owner.email,
+      phone: owner.phone || "",
+    });
+    setEditDialogOpen(true);
+  };
+
+  const handleUpdateOwner = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!editingOwner) return;
+
+    const validation = z.object({
+      name: z.string().min(1, "Name is required").max(255),
+      email: z.string().email("Invalid email address").max(255),
+      phone: z.string().optional(),
+    }).safeParse(editForm);
+
+    if (!validation.success) {
+      toast.error(validation.error.errors[0].message);
+      return;
+    }
+
+    setCreating(true);
+    try {
+      const { error } = await supabase
+        .from("property_owners")
+        .update({
+          name: editForm.name,
+          email: editForm.email,
+          phone: editForm.phone || null,
+        })
+        .eq("id", editingOwner.id);
+
+      if (error) throw error;
+
+      toast.success("Property owner updated successfully");
+      setEditDialogOpen(false);
+      setEditingOwner(null);
+      loadData();
+    } catch (error: any) {
+      console.error("Error updating owner:", error);
+      toast.error(error.message || "Failed to update property owner");
+    } finally {
+      setCreating(false);
+    }
+  };
+
   if (!isAdmin) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -343,6 +401,59 @@ const PropertyOwners = () => {
         </Dialog>
       </div>
 
+      {/* Edit Owner Dialog */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Property Owner</DialogTitle>
+            <DialogDescription>
+              Update owner contact information
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleUpdateOwner} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-name">Owner Name</Label>
+              <Input
+                id="edit-name"
+                value={editForm.name}
+                onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                placeholder="John Doe"
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-email">Email</Label>
+              <Input
+                id="edit-email"
+                type="email"
+                value={editForm.email}
+                onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                placeholder="owner@example.com"
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-phone">Phone</Label>
+              <Input
+                id="edit-phone"
+                type="tel"
+                value={editForm.phone}
+                onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                placeholder="+1 (555) 123-4567"
+              />
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setEditDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={creating}>
+                {creating ? "Saving..." : "Save Changes"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
       <div className="grid gap-6">
         {owners.length === 0 ? (
           <Card>
@@ -359,17 +470,33 @@ const PropertyOwners = () => {
               <Card key={owner.id} className="shadow-card border-border/50">
                 <CardHeader className="bg-gradient-subtle rounded-t-lg">
                   <div className="flex justify-between items-start">
-                    <div>
+                    <div className="flex-1">
                       <CardTitle className="flex items-center gap-2">
                         <Building2 className="w-5 h-5" />
                         {owner.name}
                       </CardTitle>
-                      <CardDescription className="mt-1 space-y-0.5">
-                        <div>{owner.email}</div>
-                        {owner.phone && <div className="text-xs">{owner.phone}</div>}
+                      <CardDescription className="mt-2 space-y-1">
+                        <div className="flex items-center gap-2">
+                          <Mail className="w-3.5 h-3.5" />
+                          {owner.email}
+                        </div>
+                        {owner.phone && (
+                          <div className="flex items-center gap-2">
+                            <Phone className="w-3.5 h-3.5" />
+                            {owner.phone}
+                          </div>
+                        )}
                       </CardDescription>
                     </div>
                     <div className="flex gap-2 items-center">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleEditOwner(owner)}
+                        title="Edit owner details"
+                      >
+                        <Edit className="w-4 h-4" />
+                      </Button>
                       <Badge variant={owner.payment_method === "ach" ? "default" : "secondary"}>
                         <CreditCard className="w-3 h-3 mr-1" />
                         {owner.payment_method === "ach" ? "ACH" : "Credit Card"}
@@ -378,6 +505,7 @@ const PropertyOwners = () => {
                         variant="ghost"
                         size="icon"
                         onClick={() => handleDeleteOwner(owner.id)}
+                        title="Delete owner"
                       >
                         <Trash2 className="w-4 h-4 text-destructive" />
                       </Button>
@@ -460,20 +588,23 @@ const PropertyOwners = () => {
 
                   <div className="space-y-2">
                     <Label>Assign Property to {owner.name}</Label>
-                    <Select
-                      onValueChange={(propertyId) => handleAssignProperty(propertyId, owner.id)}
-                    >
+                    <Select onValueChange={(propertyId) => handleAssignProperty(propertyId, owner.id)}>
                       <SelectTrigger>
-                        <SelectValue placeholder="Select a property..." />
+                        <SelectValue placeholder="Select a property to assign..." />
                       </SelectTrigger>
                       <SelectContent>
                         {properties
-                          .filter((p) => !p.owner_id || p.owner_id === owner.id)
+                          .filter((p) => !p.owner_id)
                           .map((property) => (
                             <SelectItem key={property.id} value={property.id}>
                               {property.name} - {property.address}
                             </SelectItem>
                           ))}
+                        {properties.filter((p) => !p.owner_id).length === 0 && (
+                          <div className="p-2 text-sm text-muted-foreground text-center">
+                            No unassigned properties available
+                          </div>
+                        )}
                       </SelectContent>
                     </Select>
                   </div>
