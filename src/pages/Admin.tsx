@@ -3,8 +3,21 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-import { CheckCircle, XCircle, Clock, Shield } from "lucide-react";
+import { CheckCircle, XCircle, Clock, Shield, UserPlus, Key } from "lucide-react";
+import { z } from "zod";
+
+const createUserSchema = z.object({
+  email: z.string().email("Invalid email address").max(255),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+});
+
+const changePasswordSchema = z.object({
+  newPassword: z.string().min(6, "Password must be at least 6 characters"),
+});
 
 interface Profile {
   id: string;
@@ -18,6 +31,12 @@ const Admin = () => {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [newUserEmail, setNewUserEmail] = useState("");
+  const [newUserPassword, setNewUserPassword] = useState("");
+  const [autoApprove, setAutoApprove] = useState(true);
+  const [creatingUser, setCreatingUser] = useState(false);
+  const [newPassword, setNewPassword] = useState("");
+  const [changingPassword, setChangingPassword] = useState(false);
 
   useEffect(() => {
     checkAdminStatus();
@@ -96,6 +115,89 @@ const Admin = () => {
     }
   };
 
+  const handleCreateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    const validation = createUserSchema.safeParse({ 
+      email: newUserEmail, 
+      password: newUserPassword 
+    });
+    
+    if (!validation.success) {
+      toast.error(validation.error.errors[0].message);
+      return;
+    }
+
+    setCreatingUser(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error("Not authenticated");
+        return;
+      }
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-user`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            email: newUserEmail,
+            password: newUserPassword,
+            autoApprove,
+          }),
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to create user");
+      }
+
+      toast.success(`User ${newUserEmail} created successfully!`);
+      setNewUserEmail("");
+      setNewUserPassword("");
+      loadProfiles();
+    } catch (error: any) {
+      console.error("Error creating user:", error);
+      toast.error(error.message || "Failed to create user");
+    } finally {
+      setCreatingUser(false);
+    }
+  };
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    const validation = changePasswordSchema.safeParse({ newPassword });
+    
+    if (!validation.success) {
+      toast.error(validation.error.errors[0].message);
+      return;
+    }
+
+    setChangingPassword(true);
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+
+      if (error) throw error;
+
+      toast.success("Password changed successfully!");
+      setNewPassword("");
+    } catch (error: any) {
+      console.error("Error changing password:", error);
+      toast.error(error.message || "Failed to change password");
+    } finally {
+      setChangingPassword(false);
+    }
+  };
+
   const toggleAdminStatus = async (userId: string, currentStatus: boolean) => {
     try {
       if (currentStatus) {
@@ -149,6 +251,97 @@ const Admin = () => {
         <h1 className="text-4xl font-bold bg-gradient-primary bg-clip-text text-transparent">Admin Panel</h1>
         <p className="text-muted-foreground mt-1">Manage user access and permissions</p>
       </div>
+
+      {/* Admin Actions */}
+      <div className="grid gap-6 md:grid-cols-2">
+        <Card className="shadow-card border-border/50">
+          <CardHeader className="bg-gradient-subtle rounded-t-lg">
+            <CardTitle className="flex items-center gap-2">
+              <UserPlus className="w-5 h-5" />
+              Create New User
+            </CardTitle>
+            <CardDescription>
+              Add a new user account with email and password
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="pt-6">
+            <form onSubmit={handleCreateUser} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="new-email">Email</Label>
+                <Input
+                  id="new-email"
+                  type="email"
+                  placeholder="user@example.com"
+                  value={newUserEmail}
+                  onChange={(e) => setNewUserEmail(e.target.value)}
+                  required
+                  maxLength={255}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="new-password">Password</Label>
+                <Input
+                  id="new-password"
+                  type="password"
+                  placeholder="••••••••"
+                  value={newUserPassword}
+                  onChange={(e) => setNewUserPassword(e.target.value)}
+                  required
+                  minLength={6}
+                />
+              </div>
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="auto-approve"
+                  checked={autoApprove}
+                  onChange={(e) => setAutoApprove(e.target.checked)}
+                  className="h-4 w-4 rounded border-gray-300"
+                />
+                <Label htmlFor="auto-approve" className="cursor-pointer text-sm">
+                  Auto-approve user
+                </Label>
+              </div>
+              <Button type="submit" disabled={creatingUser} className="w-full">
+                {creatingUser ? "Creating..." : "Create User"}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-card border-border/50">
+          <CardHeader className="bg-gradient-subtle rounded-t-lg">
+            <CardTitle className="flex items-center gap-2">
+              <Key className="w-5 h-5" />
+              Change Your Password
+            </CardTitle>
+            <CardDescription>
+              Update your admin account password
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="pt-6">
+            <form onSubmit={handleChangePassword} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="password">New Password</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  placeholder="••••••••"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  required
+                  minLength={6}
+                />
+              </div>
+              <Button type="submit" disabled={changingPassword} className="w-full">
+                {changingPassword ? "Changing..." : "Change Password"}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Separator />
 
       {/* Pending Approvals */}
       <Card className="shadow-card border-border/50">
