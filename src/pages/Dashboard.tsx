@@ -299,7 +299,7 @@ const Dashboard = () => {
       if (error) throw error;
       
       toast.dismiss();
-      toast.success(`Synced ${data.listings?.length || 0} properties from OwnerRez`);
+      toast.success(`Synced ${data.properties || 0} properties: ${data.summary?.totalBookings || 0} bookings, $${data.summary?.totalRevenue || 0} revenue, $${data.summary?.totalManagementFees || 0} management fees`);
       
       // Reload data to show updated bookings
       await loadData();
