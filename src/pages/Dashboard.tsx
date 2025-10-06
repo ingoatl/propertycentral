@@ -190,8 +190,10 @@ const Dashboard = () => {
   const totalVisits = summaries.reduce((sum, s) => sum + s.visitCount, 0);
   const totalRevenue = summaries.reduce((sum, s) => sum + s.visitTotal, 0);
   const totalExpenses = summaries.reduce((sum, s) => sum + s.expenseTotal, 0);
-  const totalOwnerRezRevenue = summaries.reduce((sum, s) => sum + s.ownerrezRevenue, 0);
-  const totalManagementFees = summaries.reduce((sum, s) => sum + s.managementFees, 0);
+  
+  // Calculate OwnerRez totals directly from bookings since they may not be linked to properties
+  const totalOwnerRezRevenue = ownerrezBookings.reduce((sum, b) => sum + b.totalAmount, 0);
+  const totalManagementFees = ownerrezBookings.reduce((sum, b) => sum + b.managementFee, 0);
 
   const handlePropertyClick = async (summary: PropertySummary) => {
     setSelectedProperty(summary);
