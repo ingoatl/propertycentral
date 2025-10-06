@@ -166,18 +166,25 @@ const PropertyOwners = () => {
 
   const handleAssignProperty = async (propertyId: string, ownerId: string | null) => {
     try {
-      const { error } = await supabase
+      console.log("Assigning property:", { propertyId, ownerId });
+      
+      const { data, error } = await supabase
         .from("properties")
         .update({ owner_id: ownerId })
-        .eq("id", propertyId);
+        .eq("id", propertyId)
+        .select();
 
-      if (error) throw error;
+      if (error) {
+        console.error("Assignment error:", error);
+        throw error;
+      }
 
+      console.log("Assignment successful:", data);
       toast.success(ownerId ? "Property assigned to owner" : "Property unassigned");
       loadData();
     } catch (error: any) {
       console.error("Error assigning property:", error);
-      toast.error("Failed to assign property");
+      toast.error("Failed to assign property: " + (error.message || "Unknown error"));
     }
   };
 
