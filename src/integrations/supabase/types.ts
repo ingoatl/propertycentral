@@ -55,6 +55,65 @@ export type Database = {
           },
         ]
       }
+      ownerrez_bookings: {
+        Row: {
+          booking_id: string | null
+          booking_status: string | null
+          check_in: string | null
+          check_out: string | null
+          created_at: string
+          guest_name: string | null
+          id: string
+          management_fee: number
+          ownerrez_listing_id: string
+          ownerrez_listing_name: string
+          property_id: string | null
+          sync_date: string
+          total_amount: number
+          updated_at: string
+        }
+        Insert: {
+          booking_id?: string | null
+          booking_status?: string | null
+          check_in?: string | null
+          check_out?: string | null
+          created_at?: string
+          guest_name?: string | null
+          id?: string
+          management_fee?: number
+          ownerrez_listing_id: string
+          ownerrez_listing_name: string
+          property_id?: string | null
+          sync_date?: string
+          total_amount?: number
+          updated_at?: string
+        }
+        Update: {
+          booking_id?: string | null
+          booking_status?: string | null
+          check_in?: string | null
+          check_out?: string | null
+          created_at?: string
+          guest_name?: string | null
+          id?: string
+          management_fee?: number
+          ownerrez_listing_id?: string
+          ownerrez_listing_name?: string
+          property_id?: string | null
+          sync_date?: string
+          total_amount?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ownerrez_bookings_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string

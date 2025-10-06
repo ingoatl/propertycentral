@@ -5,3 +5,6 @@ verify_jwt = true
 
 [functions.send-monthly-report]
 verify_jwt = true
+
+[functions.sync-ownerrez]
+verify_jwt = true

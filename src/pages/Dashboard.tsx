@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Download, Building2, Calendar, DollarSign, MapPin, Activity } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { PropertySummary, Visit, Expense } from "@/types";
+import { PropertySummary, Visit, Expense, OwnerRezBooking } from "@/types";
 import { toast } from "sonner";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
@@ -15,6 +15,8 @@ const Dashboard = () => {
   const [propertyVisits, setPropertyVisits] = useState<Visit[]>([]);
   const [propertyExpenses, setPropertyExpenses] = useState<Expense[]>([]);
   const [allVisits, setAllVisits] = useState<Record<string, Visit[]>>({});
+  const [ownerrezBookings, setOwnerrezBookings] = useState<OwnerRezBooking[]>([]);
+  const [syncing, setSyncing] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -42,12 +44,37 @@ const Dashboard = () => {
 
       if (expensesError) throw expensesError;
 
+      const { data: bookings, error: bookingsError } = await supabase
+        .from("ownerrez_bookings")
+        .select("*");
+
+      if (bookingsError) throw bookingsError;
+
+      setOwnerrezBookings((bookings || []).map(b => ({
+        id: b.id,
+        propertyId: b.property_id,
+        ownerrezListingId: b.ownerrez_listing_id,
+        ownerrezListingName: b.ownerrez_listing_name,
+        bookingId: b.booking_id,
+        guestName: b.guest_name,
+        checkIn: b.check_in,
+        checkOut: b.check_out,
+        totalAmount: Number(b.total_amount),
+        managementFee: Number(b.management_fee),
+        bookingStatus: b.booking_status,
+        syncDate: b.sync_date,
+        createdAt: b.created_at,
+      })));
+
       const summaryData = (properties || []).map(property => {
         const propertyVisits = (visits || []).filter(v => v.property_id === property.id);
         const propertyExpenses = (expenses || []).filter(e => e.property_id === property.id);
+        const propertyBookings = (bookings || []).filter(b => b.property_id === property.id);
         
         const visitTotal = propertyVisits.reduce((sum, v) => sum + Number(v.price), 0);
         const expenseTotal = propertyExpenses.reduce((sum, e) => sum + Number(e.amount), 0);
+        const ownerrezRevenue = propertyBookings.reduce((sum, b) => sum + Number(b.total_amount), 0);
+        const managementFees = propertyBookings.reduce((sum, b) => sum + Number(b.management_fee), 0);
 
         return {
           property: {
@@ -60,7 +87,9 @@ const Dashboard = () => {
           visitCount: propertyVisits.length,
           visitTotal,
           expenseTotal,
-          netBalance: visitTotal - expenseTotal,
+          ownerrezRevenue,
+          managementFees,
+          netBalance: visitTotal + managementFees - expenseTotal,
         };
       });
 
@@ -135,9 +164,34 @@ const Dashboard = () => {
     }
   };
 
+  const syncOwnerRez = async () => {
+    try {
+      setSyncing(true);
+      toast.loading("Syncing OwnerRez data...");
+      
+      const { data, error } = await supabase.functions.invoke("sync-ownerrez");
+      
+      if (error) throw error;
+      
+      toast.dismiss();
+      toast.success(`Synced ${data.listings?.length || 0} properties from OwnerRez`);
+      
+      // Reload data to show updated bookings
+      await loadData();
+    } catch (error: any) {
+      console.error("OwnerRez sync error:", error);
+      toast.dismiss();
+      toast.error("Failed to sync OwnerRez data");
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   const totalVisits = summaries.reduce((sum, s) => sum + s.visitCount, 0);
   const totalRevenue = summaries.reduce((sum, s) => sum + s.visitTotal, 0);
   const totalExpenses = summaries.reduce((sum, s) => sum + s.expenseTotal, 0);
+  const totalOwnerRezRevenue = summaries.reduce((sum, s) => sum + s.ownerrezRevenue, 0);
+  const totalManagementFees = summaries.reduce((sum, s) => sum + s.managementFees, 0);
 
   const handlePropertyClick = async (summary: PropertySummary) => {
     setSelectedProperty(summary);
@@ -197,6 +251,14 @@ const Dashboard = () => {
           <p className="text-muted-foreground mt-1">Overview of all PeachHaus properties</p>
         </div>
         <div className="flex gap-2">
+          <Button 
+            onClick={syncOwnerRez}
+            disabled={syncing}
+            className="shadow-warm hover:scale-105 transition-transform gap-2"
+            variant="outline"
+          >
+            {syncing ? "Syncing..." : "Sync OwnerRez"}
+          </Button>
           <Button 
             onClick={async () => {
               try {
@@ -281,6 +343,36 @@ const Dashboard = () => {
             <p className="text-xs text-muted-foreground mt-1">All property expenses</p>
           </CardContent>
         </Card>
+
+        <Card className="shadow-card hover:shadow-warm transition-all duration-300 border-border/50 hover:scale-105">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">OwnerRez Revenue</CardTitle>
+            <div className="p-2.5 bg-blue-500/10 rounded-lg">
+              <DollarSign className="h-5 w-5 text-blue-600 dark:text-blue-500" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-blue-600 dark:text-blue-500">
+              ${totalOwnerRezRevenue.toFixed(2)}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">From booking platforms</p>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-card hover:shadow-warm transition-all duration-300 border-border/50 hover:scale-105">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Management Fees</CardTitle>
+            <div className="p-2.5 bg-purple-500/10 rounded-lg">
+              <DollarSign className="h-5 w-5 text-purple-600 dark:text-purple-500" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-purple-600 dark:text-purple-500">
+              ${totalManagementFees.toFixed(2)}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">10% of OwnerRez bookings</p>
+          </CardContent>
+        </Card>
       </div>
 
 
@@ -323,15 +415,27 @@ const Dashboard = () => {
                             Visit Rate: <span className="font-semibold text-foreground">${summary.property.visitPrice.toFixed(2)}</span>
                           </p>
                         </div>
-                        <div className="grid grid-cols-3 gap-6">
+                        <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
                           <div className="text-center sm:text-right">
                             <p className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">Visits</p>
                             <p className="font-bold text-lg">{summary.visitCount}</p>
                           </div>
                           <div className="text-center sm:text-right">
-                            <p className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">Revenue</p>
+                            <p className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">Visit Rev</p>
                             <p className="font-bold text-lg text-green-600 dark:text-green-500">
                               ${summary.visitTotal.toFixed(2)}
+                            </p>
+                          </div>
+                          <div className="text-center sm:text-right">
+                            <p className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">OwnerRez</p>
+                            <p className="font-bold text-lg text-blue-600 dark:text-blue-500">
+                              ${summary.ownerrezRevenue.toFixed(2)}
+                            </p>
+                          </div>
+                          <div className="text-center sm:text-right">
+                            <p className="text-xs text-muted-foreground mb-1 uppercase tracking-wide">Mgmt Fees</p>
+                            <p className="font-bold text-lg text-purple-600 dark:text-purple-500">
+                              ${summary.managementFees.toFixed(2)}
                             </p>
                           </div>
                           <div className="text-center sm:text-right">
