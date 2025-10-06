@@ -29,13 +29,14 @@ const Admin = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("is_admin")
-        .eq("id", user.id)
+      const { data: roles } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", user.id)
+        .eq("role", "admin")
         .single();
 
-      setIsAdmin(profile?.is_admin || false);
+      setIsAdmin(!!roles);
     } catch (error: any) {
       if (import.meta.env.DEV) {
         console.error("Error checking admin status:", error);
@@ -45,13 +46,27 @@ const Admin = () => {
 
   const loadProfiles = async () => {
     try {
-      const { data, error } = await supabase
+      const { data: profilesData, error: profilesError } = await supabase
         .from("profiles")
         .select("*")
         .order("created_at", { ascending: false });
 
-      if (error) throw error;
-      setProfiles(data || []);
+      if (profilesError) throw profilesError;
+
+      // Get admin roles for all users
+      const { data: rolesData } = await supabase
+        .from("user_roles")
+        .select("user_id, role")
+        .eq("role", "admin");
+
+      // Merge the data
+      const adminUserIds = new Set(rolesData?.map(r => r.user_id) || []);
+      const profilesWithRoles = profilesData?.map(profile => ({
+        ...profile,
+        is_admin: adminUserIds.has(profile.id)
+      })) || [];
+
+      setProfiles(profilesWithRoles);
     } catch (error: any) {
       if (import.meta.env.DEV) {
         console.error("Error loading profiles:", error);
@@ -83,12 +98,23 @@ const Admin = () => {
 
   const toggleAdminStatus = async (userId: string, currentStatus: boolean) => {
     try {
-      const { error } = await supabase
-        .from("profiles")
-        .update({ is_admin: !currentStatus })
-        .eq("id", userId);
+      if (currentStatus) {
+        // Remove admin role
+        const { error } = await supabase
+          .from("user_roles")
+          .delete()
+          .eq("user_id", userId)
+          .eq("role", "admin");
 
-      if (error) throw error;
+        if (error) throw error;
+      } else {
+        // Add admin role
+        const { error } = await supabase
+          .from("user_roles")
+          .insert({ user_id: userId, role: "admin" });
+
+        if (error) throw error;
+      }
 
       await loadProfiles();
       toast.success(`Admin status ${!currentStatus ? "granted" : "revoked"}`);

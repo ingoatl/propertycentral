@@ -20,13 +20,14 @@ const Layout = ({ children }: LayoutProps) => {
     const checkAdminStatus = async () => {
       if (!user) return;
       
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("is_admin")
-        .eq("id", user.id)
+      const { data: roles } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", user.id)
+        .eq("role", "admin")
         .maybeSingle();
       
-      setIsAdmin(profile?.is_admin || false);
+      setIsAdmin(!!roles);
     };
 
     checkAdminStatus();

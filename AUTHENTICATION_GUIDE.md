@@ -1,173 +1,151 @@
-# PeachHaus Property Manager - Authentication Guide
+# Authentication Guide
 
-## 🔐 How to Login
+## Admin Accounts
 
-### For New Users:
-1. Go to the application URL
-2. Click **"Don't have an account? Sign up"**
+The following accounts are automatically configured as administrators:
+- **ingo@peachhausgroup.com**
+- **anja@peachhausgroup.com**
+
+**Password for both accounts:** `Z^kHcvYv2Zc%dUJ7`
+
+These accounts are automatically approved and granted admin privileges when created.
+
+## How to Log In
+
+### For New Users
+1. Navigate to the login page
+2. Click "Don't have an account? Sign up"
 3. Enter your email and password (minimum 6 characters)
-4. Click **"Sign Up"**
-5. **IMPORTANT:** Your account will be in "pending" status
-6. Wait for an administrator to approve your account
-7. Once approved, you can log in normally
+4. Click "Sign Up"
+5. **Wait for admin approval** - You'll see a message that your account is pending
+6. Once an admin approves your account, you can log in
 
-### For Existing Users:
-1. Go to the application URL
+### For Admin Users (ingo@peachhausgroup.com or anja@peachhausgroup.com)
+1. Navigate to the login page
+2. If this is your first time:
+   - Click "Don't have an account? Sign up"
+   - Enter your email and the password above
+   - You'll be automatically approved and can log in immediately
+3. For subsequent logins:
+   - Enter your email and password
+   - Click "Sign In"
+
+### For Approved Users
+1. Navigate to the login page
 2. Enter your email and password
-3. Click **"Sign In"**
-4. You'll stay logged in for up to **1 year** (automatic session refresh)
+3. Click "Sign In"
+4. You'll be logged in and redirected to the dashboard
 
-### If You Forgot Your Password:
-1. Click **"Forgot password?"** on the login page
+### Forgot Password?
+1. Click "Forgot password?" on the login page
 2. Enter your email address
-3. Click **"Send Reset Link"**
+3. Click "Send Reset Link"
 4. Check your email for the password reset link
-5. Click the link and set your new password
-6. Return to the login page and sign in with your new password
+5. Click the link and you'll be logged in automatically
+6. **Note:** If your account is not approved, you'll see a pending approval message after resetting your password
 
----
+## Admin Functions
 
-## 👑 Admin Functions
+### Making Someone an Admin
+Only existing admins can grant admin privileges to other users.
 
-### Making Someone an Admin:
-To create the first admin (must be done via database):
+1. Log in as an admin (ingo@peachhausgroup.com or anja@peachhausgroup.com)
+2. Click the "Admin" link in the navigation bar
+3. Find the user in the "Approved Users" section
+4. Click "Make Admin" button next to their name
+5. The user will immediately receive admin privileges
 
-1. Open Lovable Cloud backend dashboard
-2. Go to the **profiles** table
-3. Find the user you want to make admin
-4. Set `is_admin` to `true` for that user
-5. Save the changes
+### Admin Panel Features
+The admin panel allows you to:
+- **View Pending Approvals:** See all users waiting for approval
+- **Approve Users:** Click "Approve" to grant access to pending users
+- **Reject Users:** Click "Reject" to deny access
+- **Manage Admin Roles:** Grant or revoke admin privileges for approved users
+- **Revoke Access:** Remove access from approved users (changes status to rejected)
+- **Re-approve Rejected Users:** Approve previously rejected users
 
-Once you have at least one admin, they can:
-- Approve/reject new user signups
-- Grant admin privileges to other users
-- Revoke user access
+## Session Duration
 
-### Admin Panel Features:
-Access the admin panel at `/admin` (only visible to admins in the navigation)
+Users stay logged in for up to **1 year** with automatic token refresh. This means:
+- You won't need to log in again for a year (unless you log out manually)
+- Your session will automatically refresh in the background
+- If you close and reopen your browser, you'll still be logged in
 
-**Pending Approvals:**
-- View all users waiting for approval
-- Click **"Approve"** to grant access
-- Click **"Reject"** to deny access
+### Logging Out
+To manually log out:
+1. Click the "Logout" button in the top navigation bar
+2. You'll be redirected to the login page
 
-**Approved Users:**
-- See all active users
-- Grant/revoke admin privileges
-- Revoke access if needed
+## Security Features
 
-**Rejected Users:**
-- View previously rejected users
-- Re-approve if circumstances change
+### Account Approval System
+- All new signups (except admin emails) require admin approval
+- Users with pending accounts cannot access the application
+- Rejected users cannot log in
+- Only approved users can access the system
 
----
+### Password Security
+- Passwords must be at least 6 characters
+- Passwords are securely hashed and cannot be retrieved
+- Use the "Forgot password?" feature to reset if needed
 
-## ⏰ Session Duration
+### Role-Based Access Control
+- Admin roles are stored in a separate secure table
+- Only admins can:
+  - Approve/reject user accounts
+  - Grant/revoke admin privileges
+  - View the admin panel
+- Regular users can only access their own data
 
-**Users stay logged in for up to 1 YEAR** with these features:
-- Sessions persist in browser localStorage
-- Automatic token refresh before expiration
-- No need to log in repeatedly
-- Only signed out when:
-  - User clicks "Logout"
-  - User clears browser data
-  - Token is manually revoked
+## Email Configuration
 
-To configure the exact session duration:
-1. Open your Lovable Cloud backend dashboard
-2. Go to **Authentication** → **Settings**
-3. Under **Security and Protection**:
-   - Set **JWT Expiry** to `31536000` (1 year in seconds)
-   - Enable **Auto Refresh Token**
-4. Save changes
+### Auto-Confirm Email
+Email confirmation is enabled for faster testing and development. Users can sign up and log in immediately without confirming their email (after admin approval).
 
----
+### Password Reset Emails
+When a user requests a password reset:
+1. An email is sent to their registered email address
+2. The email contains a secure link that expires
+3. Clicking the link automatically logs them in
+4. If their account is not approved, they'll see the pending approval message
 
-## 🔒 Security Features
+## Troubleshooting
 
-### Account Approval System:
-- New signups are automatically set to "pending"
-- Users cannot access the app until approved by an admin
-- Prevents unauthorized access
-- Admins have full control over who can use the system
+### "Account Pending Approval" Message
+- Your account is waiting for an admin to approve it
+- Contact an administrator (ingo@peachhausgroup.com or anja@peachhausgroup.com)
+- Once approved, you can log in normally
 
-### Password Security:
-- Minimum 6 characters required
-- Passwords are encrypted (hashed) in database
-- No one (including admins) can see user passwords
-- Password reset available if forgotten
-
-### Role-Based Access:
-- Regular users can manage properties, visits, and expenses
-- Admins can additionally manage user accounts
-- All data requires authentication to access
-
----
-
-## 📧 Email Configuration
-
-### Current Setup:
-- **Auto-confirm emails:** ENABLED (users don't need to verify email)
-- **Password reset emails:** Sent automatically via Supabase
-- **Edge function emails:** Require JWT authentication
-
-### For Production Use:
-Consider disabling auto-confirm and requiring email verification:
-1. Go to Lovable Cloud backend → Authentication → Email Auth
-2. Disable "Enable email confirmations"
-3. Users will need to verify their email before logging in
-
----
-
-## 🆘 Troubleshooting
-
-### "Account Pending Approval" Message:
-- Your account has been created but needs admin approval
-- Contact an administrator to approve your account
-- You cannot access the app until approved
-
-### "Account Rejected" Message:
-- Your account was rejected by an administrator
+### "Account Has Been Rejected"
+- Your access has been denied by an administrator
 - Contact an administrator if you believe this is an error
 
-### Can't Remember Password:
-- Use the "Forgot password?" link on login page
-- Check your email spam folder if you don't receive the reset email
+### Can't See Admin Panel
+- You must be logged in as an admin user
+- Check with ingo@peachhausgroup.com or anja@peachhausgroup.com to get admin privileges
+- Only users with admin role can access the Admin panel
 
-### Need to Reset Someone's Password:
-- Users must use the password reset feature themselves
-- Admins cannot see or reset passwords directly
-- This is a security feature to protect user data
+### Password Reset Not Working
+- Make sure you're using the correct email address
+- Check your spam folder for the reset email
+- The reset link expires after some time - request a new one if needed
+- If your account is not approved, you'll see a pending message after reset
 
----
+## First-Time Setup
 
-## 🎯 First-Time Setup
+If you're setting up the system for the first time:
 
-1. **Create First Admin Account:**
-   - Sign up normally through the app
-   - Manually set `is_admin = true` in the database
-   - Log in with admin privileges
+1. **Sign up both admin accounts:**
+   - Go to the signup page
+   - Create account for ingo@peachhausgroup.com with password `Z^kHcvYv2Zc%dUJ7`
+   - Create account for anja@peachhausgroup.com with password `Z^kHcvYv2Zc%dUJ7`
+   - Both will be automatically approved and granted admin privileges
 
-2. **Approve Waiting Users:**
-   - Go to Admin panel
-   - Review and approve pending accounts
+2. **Log in and test:**
+   - Log in with either admin account
+   - You should see the "Admin" link in the navigation
+   - Click it to access the admin panel
 
-3. **Configure Session Duration:**
-   - Set JWT expiry in backend settings
-   - Enable auto-refresh tokens
-
-4. **Test the System:**
-   - Create a test account
-   - Approve it
-   - Test password reset
-   - Verify session persistence
-
----
-
-## 📝 Notes
-
-- The system requires authentication for ALL features
-- Storage files use 1-hour signed URLs for security
-- Edge functions require JWT tokens
-- All form inputs are validated on both client and server
-- Sessions automatically refresh before expiration
+3. **Approve new users:**
+   - As users sign up, they'll appear in the "Pending Approvals" section
+   - Review and approve/reject as needed
