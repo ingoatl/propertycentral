@@ -89,6 +89,9 @@ serve(async (req) => {
     const listings: OwnerRezListing[] = listingsData.items || [];
 
     console.log(`Found ${listings.length} listings in OwnerRez`);
+    
+    // Log all listing names for debugging
+    console.log('All listing names:', listings.map(l => l.name).join(', '));
 
     // Filter for specific properties
     const targetProperties = [
