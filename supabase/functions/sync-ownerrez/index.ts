@@ -182,7 +182,7 @@ serve(async (req) => {
           listingManagementFees += managementFee;
 
           // Upsert booking data
-          await supabase
+          const { data, error } = await supabase
             .from('ownerrez_bookings')
             .upsert({
               property_id: null,
@@ -199,6 +199,11 @@ serve(async (req) => {
             }, {
               onConflict: 'booking_id',
             });
+          
+          if (error) {
+            console.error(`Failed to upsert booking ${booking.id}:`, error);
+            throw error;
+          }
         }
 
         totalSyncedBookings += bookings.length;
