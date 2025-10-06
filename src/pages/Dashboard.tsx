@@ -2,11 +2,14 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Download, Building2, Calendar, DollarSign, MapPin, Activity } from "lucide-react";
+import { Download, Building2, Calendar, DollarSign, MapPin, Activity, TrendingUp } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { PropertySummary, Visit, Expense } from "@/types";
 import { toast } from "sonner";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { format, parseISO, startOfMonth } from "date-fns";
+import { Bar, BarChart, CartesianGrid, XAxis, YAxis, ResponsiveContainer } from "recharts";
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 
 const Dashboard = () => {
   const [summaries, setSummaries] = useState<PropertySummary[]>([]);
@@ -14,6 +17,7 @@ const Dashboard = () => {
   const [selectedProperty, setSelectedProperty] = useState<PropertySummary | null>(null);
   const [propertyVisits, setPropertyVisits] = useState<Visit[]>([]);
   const [propertyExpenses, setPropertyExpenses] = useState<Expense[]>([]);
+  const [monthlyVisits, setMonthlyVisits] = useState<{ month: string; visits: number }[]>([]);
 
   useEffect(() => {
     loadData();
@@ -63,6 +67,23 @@ const Dashboard = () => {
         };
       });
 
+      // Group visits by month
+      const visitsGrouped = (visits || []).reduce((acc, visit) => {
+        const monthKey = format(startOfMonth(parseISO(visit.date)), 'MMM yyyy');
+        acc[monthKey] = (acc[monthKey] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+
+      const monthlyData = Object.entries(visitsGrouped)
+        .map(([month, count]) => ({ month, visits: count }))
+        .sort((a, b) => {
+          const dateA = parseISO(`01 ${a.month}`);
+          const dateB = parseISO(`01 ${b.month}`);
+          return dateA.getTime() - dateB.getTime();
+        })
+        .slice(-6); // Last 6 months
+
+      setMonthlyVisits(monthlyData);
       setSummaries(summaryData);
     } catch (error) {
       console.error("Error loading data:", error);
@@ -266,7 +287,55 @@ const Dashboard = () => {
         </Card>
       </div>
 
-      {/* Properties Overview */}
+      {/* Monthly Visits Chart */}
+      <Card className="shadow-card border-border/50">
+        <CardHeader className="bg-gradient-subtle rounded-t-lg">
+          <CardTitle className="flex items-center gap-2 text-xl">
+            <TrendingUp className="h-5 w-5 text-primary" />
+            Visits Per Month
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="pt-6">
+          {monthlyVisits.length === 0 ? (
+            <div className="text-center py-12">
+              <Calendar className="h-12 w-12 text-muted-foreground mx-auto mb-4 opacity-50" />
+              <p className="text-muted-foreground">No visits recorded yet</p>
+            </div>
+          ) : (
+            <ChartContainer
+              config={{
+                visits: {
+                  label: "Visits",
+                  color: "hsl(var(--primary))",
+                },
+              }}
+              className="h-[300px]"
+            >
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={monthlyVisits}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                  <XAxis 
+                    dataKey="month" 
+                    className="text-xs"
+                    tick={{ fill: 'hsl(var(--muted-foreground))' }}
+                  />
+                  <YAxis 
+                    className="text-xs"
+                    tick={{ fill: 'hsl(var(--muted-foreground))' }}
+                  />
+                  <ChartTooltip content={<ChartTooltipContent />} />
+                  <Bar 
+                    dataKey="visits" 
+                    fill="hsl(var(--primary))" 
+                    radius={[8, 8, 0, 0]}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            </ChartContainer>
+          )}
+        </CardContent>
+      </Card>
+
       <Card className="shadow-card border-border/50">
         <CardHeader className="bg-gradient-subtle rounded-t-lg">
           <CardTitle className="flex items-center gap-2 text-xl">
