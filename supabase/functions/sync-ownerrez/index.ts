@@ -28,19 +28,20 @@ serve(async (req) => {
   }
 
   try {
+    const ownerrezUsername = Deno.env.get('OWNERREZ_USERNAME');
     const ownerrezApiKey = Deno.env.get('OWNERREZ_API_KEY');
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
-    if (!ownerrezApiKey) {
-      throw new Error('OWNERREZ_API_KEY not configured');
+    if (!ownerrezUsername || !ownerrezApiKey) {
+      throw new Error('OWNERREZ_USERNAME and OWNERREZ_API_KEY must be configured');
     }
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     console.log('Fetching listings from OwnerRez...');
+    console.log('Username present:', !!ownerrezUsername);
     console.log('API Key present:', !!ownerrezApiKey);
-    console.log('API Key length:', ownerrezApiKey?.length);
 
     // Define management fee structure per property
     const managementFeeRates: Record<string, number> = {
@@ -63,9 +64,10 @@ serve(async (req) => {
     };
 
     // Fetch all listings from OwnerRez
-    // Try username:token format in Authorization
-    const authHeader = `Token ${ownerrezApiKey}`;
-    console.log('Using auth header format: Token {token}');
+    // Use HTTP Basic Authentication with username:token
+    const credentials = btoa(`${ownerrezUsername}:${ownerrezApiKey}`);
+    const authHeader = `Basic ${credentials}`;
+    console.log('Using HTTP Basic Authentication');
     
     const listingsResponse = await fetch('https://api.ownerrez.com/v2/listings', {
       headers: {
