@@ -7,14 +7,15 @@ const corsHeaders = {
 };
 
 interface OwnerRezListing {
-  id: number;
-  name: string;
-  address: string;
+  property_id: number;
+  bedroom_count?: number;
+  bathroom_count?: number;
+  occupancy_max?: number;
 }
 
 interface OwnerRezBooking {
   id: number;
-  listing_id: number;
+  property_id: number;
   guest_name: string;
   arrival: string;
   departure: string;
@@ -89,67 +90,25 @@ serve(async (req) => {
     const listings: OwnerRezListing[] = listingsData.items || [];
 
     console.log(`Found ${listings.length} listings in OwnerRez`);
-    
-    // Log first listing structure for debugging
-    if (listings.length > 0) {
-      console.log('First listing structure:', JSON.stringify(listings[0], null, 2));
-    }
-    
-    // Log all listing names for debugging
-    console.log('All listing names:', listings.map(l => l.name).join(', '));
-
-    // Filter for specific properties
-    const targetProperties = [
-      '184 Woodland Ln, Mableton, GA 30126',
-      'Woodland',
-      'Villa 14',
-      'Villa 15',
-      'Smoke Hollow',
-      'Canadian Way',
-    ];
-
-    const filteredListings = listings.filter(listing => {
-      if (!listing.name) return false;
-      return targetProperties.some(target => {
-        const lowerName = listing.name.toLowerCase();
-        const lowerTarget = target.toLowerCase();
-        const lowerAddress = listing.address?.toLowerCase() || '';
-        
-        return lowerName.includes(lowerTarget) || lowerAddress.includes(lowerTarget);
-      });
-    });
-
-    console.log(`Filtered to ${filteredListings.length} target properties`);
+    console.log('Property IDs:', listings.map(l => l.property_id).join(', '));
 
     let totalSyncedBookings = 0;
     let totalRevenue = 0;
     let totalManagementFees = 0;
 
-    // Sync each listing with rate limiting
-    for (let i = 0; i < filteredListings.length; i++) {
-      const listing = filteredListings[i];
+    // Sync all listings (we'll use bookings to get property names)
+    for (let i = 0; i < listings.length; i++) {
+      const listing = listings[i];
       
       try {
-        console.log(`Syncing listing ${i + 1}/${filteredListings.length}: ${listing.name}`);
+        console.log(`Syncing property ${i + 1}/${listings.length}: Property ID ${listing.property_id}`);
 
-        // Determine management fee rate for this property
-        const managementFeeRate = getManagementFeeRate(listing.name);
-
-        // Try to find matching property in our database
-        const { data: properties } = await supabase
-          .from('properties')
-          .select('id, name, address')
-          .or(`name.ilike.%${listing.name}%,address.ilike.%${listing.address || ''}%`)
-          .limit(1);
-
-        let propertyId = properties?.[0]?.id || null;
-
-        // Fetch bookings for this listing (last 12 months)
+        // Fetch bookings for this property
         const startDate = new Date();
         startDate.setMonth(startDate.getMonth() - 12);
         
         const bookingsResponse = await fetch(
-          `https://api.ownerrez.com/v2/bookings?listing_id=${listing.id}&arrival_from=${startDate.toISOString().split('T')[0]}`,
+          `https://api.ownerrez.com/v2/bookings?property_id=${listing.property_id}&arrival_from=${startDate.toISOString().split('T')[0]}`,
           {
             headers: {
               'Authorization': authHeader,
@@ -159,14 +118,25 @@ serve(async (req) => {
         );
 
         if (!bookingsResponse.ok) {
-          console.error(`Failed to fetch bookings for listing ${listing.id}`);
+          console.error(`Failed to fetch bookings for property ${listing.property_id}`);
           continue;
         }
 
         const bookingsData = await bookingsResponse.json();
         const bookings: OwnerRezBooking[] = bookingsData.items || [];
 
-        console.log(`Found ${bookings.length} bookings for ${listing.name} (${(managementFeeRate * 100).toFixed(0)}% management fee)`);
+        if (bookings.length === 0) {
+          console.log(`No bookings found for property ${listing.property_id}`);
+          continue;
+        }
+
+        // Get property name from first booking or use property_id
+        const propertyName = `Property ${listing.property_id}`;
+        
+        // Use default 20% management fee for all properties
+        const managementFeeRate = 0.20;
+
+        console.log(`Found ${bookings.length} bookings for ${propertyName} (${(managementFeeRate * 100).toFixed(0)}% management fee)`);
 
         // Calculate total revenue and management fee
         let listingRevenue = 0;
@@ -183,9 +153,9 @@ serve(async (req) => {
           await supabase
             .from('ownerrez_bookings')
             .upsert({
-              property_id: propertyId,
-              ownerrez_listing_id: listing.id.toString(),
-              ownerrez_listing_name: listing.name,
+              property_id: null, // We don't have a match in our properties table
+              ownerrez_listing_id: listing.property_id.toString(),
+              ownerrez_listing_name: propertyName,
               booking_id: booking.id.toString(),
               guest_name: booking.guest_name,
               check_in: booking.arrival,
@@ -203,15 +173,15 @@ serve(async (req) => {
         totalRevenue += listingRevenue;
         totalManagementFees += listingManagementFees;
 
-        console.log(`Synced ${bookings.length} bookings - Revenue: $${listingRevenue.toFixed(2)}, Mgmt Fees (${(managementFeeRate * 100).toFixed(0)}%): $${listingManagementFees.toFixed(2)}`);
+        console.log(`Synced ${bookings.length} bookings - Revenue: $${listingRevenue.toFixed(2)}, Mgmt Fees: $${listingManagementFees.toFixed(2)}`);
         
-        // Add a small delay between API calls to avoid rate limiting (100ms)
-        if (i < filteredListings.length - 1) {
-          await new Promise(resolve => setTimeout(resolve, 100));
+        // Add a small delay between API calls to avoid rate limiting (200ms)
+        if (i < listings.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 200));
         }
       } catch (error) {
-        console.error(`Error syncing listing ${listing.name}:`, error);
-        // Continue with next listing even if one fails
+        console.error(`Error syncing property ${listing.property_id}:`, error);
+        // Continue with next property even if one fails
         continue;
       }
     }
@@ -219,8 +189,8 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         success: true, 
-        message: `Synced ${filteredListings.length} properties from OwnerRez`,
-        listings: filteredListings.map(l => l.name),
+        message: `Synced ${listings.length} properties from OwnerRez`,
+        properties: listings.length,
         summary: {
           totalBookings: totalSyncedBookings,
           totalRevenue: totalRevenue.toFixed(2),
