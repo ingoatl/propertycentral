@@ -118,7 +118,9 @@ serve(async (req) => {
         );
 
         if (!bookingsResponse.ok) {
+          const errorText = await bookingsResponse.text();
           console.error(`Failed to fetch bookings for property ${listing.property_id}`);
+          console.error(`Status: ${bookingsResponse.status}, Response:`, errorText);
           continue;
         }
 
