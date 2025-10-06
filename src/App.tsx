@@ -8,6 +8,7 @@ import Dashboard from "./pages/Dashboard";
 import Properties from "./pages/Properties";
 import Visits from "./pages/Visits";
 import Expenses from "./pages/Expenses";
+import Admin from "./pages/Admin";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 
@@ -28,6 +29,7 @@ const App = () => (
                 <Route path="/properties" element={<Properties />} />
                 <Route path="/visits" element={<Visits />} />
                 <Route path="/expenses" element={<Expenses />} />
+                <Route path="/admin" element={<Admin />} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>

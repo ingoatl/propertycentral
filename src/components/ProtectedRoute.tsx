@@ -2,29 +2,37 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import type { User } from "@supabase/supabase-js";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export const useAuth = () => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isApproved, setIsApproved] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
     // Set up auth state listener first
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setUser(session?.user ?? null);
-      setLoading(false);
       
-      if (!session?.user && event === 'SIGNED_OUT') {
-        navigate("/auth");
+      if (session?.user) {
+        checkApprovalStatus(session.user.id);
+      } else {
+        setLoading(false);
+        if (event === 'SIGNED_OUT') {
+          navigate("/auth");
+        }
       }
     });
 
     // Then check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
-      setLoading(false);
       
-      if (!session?.user) {
+      if (session?.user) {
+        checkApprovalStatus(session.user.id);
+      } else {
+        setLoading(false);
         navigate("/auth");
       }
     });
@@ -32,5 +40,37 @@ export const useAuth = () => {
     return () => subscription.unsubscribe();
   }, [navigate]);
 
-  return { user, loading };
+  const checkApprovalStatus = async (userId: string) => {
+    try {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("status")
+        .eq("id", userId)
+        .single();
+
+      if (profile?.status === "approved") {
+        setIsApproved(true);
+      } else {
+        setIsApproved(false);
+      }
+    } catch (error: any) {
+      if (import.meta.env.DEV) {
+        console.error("Error checking approval status:", error);
+      }
+      setIsApproved(false);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Show pending approval message if logged in but not approved
+  if (user && !loading && !isApproved) {
+    return {
+      user,
+      loading: false,
+      pendingApproval: true,
+    };
+  }
+
+  return { user, loading, isApproved };
 };
