@@ -248,35 +248,49 @@ serve(async (req) => {
       }
     }
 
-    // Fetch all guests to map guest names (using a very old date to get all historical records)
-    console.log('Fetching all guests from OwnerRez...');
-    const guestStartDate = new Date();
-    guestStartDate.setFullYear(guestStartDate.getFullYear() - 50); // Use 50 years to ensure we get ALL guests
-    
-    const guestsResponse = await fetch(
-      `https://api.ownerrez.com/v2/guests?created_since_utc=${guestStartDate.toISOString()}`,
-      {
-        headers: {
-          'Authorization': authHeader,
-          'Content-Type': 'application/json',
-        },
-      }
-    );
-
+    // Fetch all guests to map guest names with pagination
+    console.log('Fetching all guests from OwnerRez with pagination...');
     const guestsMap = new Map<number, OwnerRezGuest>();
-    if (guestsResponse.ok) {
-      const guestsData = await guestsResponse.json();
-      const guests: OwnerRezGuest[] = guestsData.items || [];
-      console.log(`Fetched ${guests.length} guests from OwnerRez`);
-      
-      // Build guest map
-      for (const guest of guests) {
-        guestsMap.set(guest.id, guest);
+    
+    let offset = 0;
+    const limit = 100; // Fetch 100 guests per page
+    let hasMoreGuests = true;
+    
+    while (hasMoreGuests) {
+      const guestsResponse = await fetch(
+        `https://api.ownerrez.com/v2/guests?limit=${limit}&offset=${offset}`,
+        {
+          headers: {
+            'Authorization': authHeader,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (guestsResponse.ok) {
+        const guestsData = await guestsResponse.json();
+        const guests: OwnerRezGuest[] = guestsData.items || [];
+        
+        console.log(`Fetched ${guests.length} guests at offset ${offset}`);
+        
+        // Add guests to map
+        for (const guest of guests) {
+          guestsMap.set(guest.id, guest);
+        }
+        
+        // Check if we got a full page - if not, we're done
+        if (guests.length < limit) {
+          hasMoreGuests = false;
+        } else {
+          offset += limit;
+        }
+      } else {
+        console.error('Failed to fetch guests:', guestsResponse.status, await guestsResponse.text());
+        hasMoreGuests = false;
       }
-      console.log(`Built guest map with ${guestsMap.size} entries`);
-    } else {
-      console.error('Failed to fetch guests:', guestsResponse.status, await guestsResponse.text());
     }
+    
+    console.log(`Total guests fetched: ${guestsMap.size}`);
 
     let totalSyncedBookings = 0;
     let totalRevenue = 0;
