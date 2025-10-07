@@ -127,7 +127,19 @@ const Bookings = () => {
 
       const allProperties = [...processedProperties, ...Array.from(virtualPropertiesMap.values())];
       
-      setProperties(allProperties);
+      // Separate managed and unmanaged properties
+      const managedAddresses = processedProperties.map(p => p.address.toLowerCase());
+      const sortedProperties = allProperties.sort((a, b) => {
+        const aIsManaged = managedAddresses.some(addr => a.id.includes('ownerrez-') ? false : true);
+        const bIsManaged = managedAddresses.some(addr => b.id.includes('ownerrez-') ? false : true);
+        
+        if (aIsManaged === bIsManaged) {
+          return a.address.localeCompare(b.address);
+        }
+        return aIsManaged ? -1 : 1;
+      });
+      
+      setProperties(sortedProperties);
       setBookings((bookingsData || []).map(b => ({
         id: b.id,
         guestName: b.guest_name,
@@ -283,11 +295,23 @@ const Bookings = () => {
 
             {/* Property Rows */}
             <div className="divide-y divide-border">
-              {filteredProperties.map((property) => {
+              {filteredProperties.map((property, idx) => {
                 const propertyBookings = getBookingsForProperty(property.id);
+                const isManaged = !property.id.startsWith('ownerrez-');
+                const prevProperty = idx > 0 ? filteredProperties[idx - 1] : null;
+                const prevIsManaged = prevProperty && !prevProperty.id.startsWith('ownerrez-');
+                const showSeparator = idx > 0 && isManaged !== prevIsManaged;
                 
                 return (
-                  <div key={property.id} className="flex hover:bg-muted/30 transition-colors">
+                  <div key={property.id}>
+                    {showSeparator && (
+                      <div className="bg-muted/30 py-2 px-3 border-t-2 border-border">
+                        <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                          Unmanaged Properties
+                        </div>
+                      </div>
+                    )}
+                    <div className="flex hover:bg-muted/30 transition-colors">{property.id}
                     <div className="w-64 flex-shrink-0 border-r border-border p-3">
                       <div className="text-sm font-semibold text-foreground line-clamp-1">
                         {property.address}
@@ -315,8 +339,7 @@ const Bookings = () => {
                           const left = position.startIndex * dayWidth;
                           const width = position.width * dayWidth;
 
-                          // Show "Block" only if there's no guest name and it's not canceled
-                          const isBlock = !booking.guestName && booking.bookingStatus?.toLowerCase() !== 'canceled';
+                          // Only show if there's an actual booking, not just empty property
                           const isCanceled = booking.bookingStatus?.toLowerCase() === 'canceled';
                           const displayName = booking.guestName || (isCanceled ? 'Canceled' : 'Block');
                           
@@ -339,6 +362,7 @@ const Bookings = () => {
                       </div>
                     </div>
                   </div>
+                </div>
                 );
               })}
             </div>
