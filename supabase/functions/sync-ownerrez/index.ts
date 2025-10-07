@@ -21,11 +21,24 @@ interface OwnerRezBooking {
     id: number;
     name: string;
   };
-  guest_name: string;
+  guest_id?: number;
+  guest?: {
+    first_name?: string;
+    last_name?: string;
+    name?: string;
+  };
   arrival: string;
   departure: string;
   total_amount: number;
   status: string;
+  type?: string;
+}
+
+interface OwnerRezGuest {
+  id: number;
+  first_name: string;
+  last_name: string;
+  name?: string;
 }
 
 serve(async (req) => {
@@ -279,6 +292,45 @@ serve(async (req) => {
           const managementFee = bookingTotal * managementFeeRate;
           listingManagementFees += managementFee;
 
+          // Determine guest name
+          let guestName: string | null = null;
+          
+          // Check if booking has guest information
+          if (booking.guest?.name) {
+            guestName = booking.guest.name;
+          } else if (booking.guest?.first_name || booking.guest?.last_name) {
+            guestName = `${booking.guest.first_name || ''} ${booking.guest.last_name || ''}`.trim();
+          } else if (booking.guest_id) {
+            // Fetch guest details if we have a guest_id but no guest info
+            try {
+              const guestResponse = await fetch(
+                `https://api.ownerrez.com/v2/guests/${booking.guest_id}`,
+                {
+                  headers: {
+                    'Authorization': authHeader,
+                    'Content-Type': 'application/json',
+                  },
+                }
+              );
+              
+              if (guestResponse.ok) {
+                const guestData = await guestResponse.json();
+                if (guestData.name) {
+                  guestName = guestData.name;
+                } else if (guestData.first_name || guestData.last_name) {
+                  guestName = `${guestData.first_name || ''} ${guestData.last_name || ''}`.trim();
+                }
+              }
+            } catch (error) {
+              console.error(`Failed to fetch guest ${booking.guest_id}:`, error);
+            }
+          }
+          
+          // If it's a block (no guest), set guest_name to null
+          if (booking.type === 'block' || booking.status === 'block') {
+            guestName = null;
+          }
+
           // Upsert booking data with local property ID if available
           const { data, error } = await supabase
             .from('ownerrez_bookings')
@@ -287,7 +339,7 @@ serve(async (req) => {
               ownerrez_listing_id: listing.property_id.toString(),
               ownerrez_listing_name: propertyName,
               booking_id: booking.id.toString(),
-              guest_name: booking.guest_name,
+              guest_name: guestName,
               check_in: booking.arrival,
               check_out: booking.departure,
               total_amount: bookingTotal,

@@ -314,7 +314,10 @@ const Bookings = () => {
                           const left = position.startIndex * dayWidth;
                           const width = position.width * dayWidth;
 
-                          const displayName = booking.guestName || (booking.bookingStatus?.toLowerCase() === 'canceled' ? 'Canceled' : 'Block');
+                          // Show "Block" only if there's no guest name and it's not canceled
+                          const isBlock = !booking.guestName && booking.bookingStatus?.toLowerCase() !== 'canceled';
+                          const isCanceled = booking.bookingStatus?.toLowerCase() === 'canceled';
+                          const displayName = booking.guestName || (isCanceled ? 'Canceled' : 'Block');
                           
                           return (
                             <div
