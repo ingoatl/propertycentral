@@ -251,7 +251,7 @@ serve(async (req) => {
     // Fetch all guests to map guest names (need to provide a date filter)
     console.log('Fetching all guests from OwnerRez...');
     const guestStartDate = new Date();
-    guestStartDate.setFullYear(guestStartDate.getFullYear() - 2); // Get guests from last 2 years
+    guestStartDate.setFullYear(guestStartDate.getFullYear() - 5); // Get guests from last 5 years to ensure we get all
     
     const guestsResponse = await fetch(
       `https://api.ownerrez.com/v2/guests?created_since_utc=${guestStartDate.toISOString()}`,
