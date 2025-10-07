@@ -252,13 +252,17 @@ serve(async (req) => {
     console.log('Fetching all guests from OwnerRez with pagination...');
     const guestsMap = new Map<number, OwnerRezGuest>();
     
+    // Use a very old date to ensure we get all guests
+    const guestStartDate = new Date();
+    guestStartDate.setFullYear(1970); // Use 1970 to get ALL guests ever
+    
     let offset = 0;
     const limit = 100; // Fetch 100 guests per page
     let hasMoreGuests = true;
     
     while (hasMoreGuests) {
       const guestsResponse = await fetch(
-        `https://api.ownerrez.com/v2/guests?limit=${limit}&offset=${offset}`,
+        `https://api.ownerrez.com/v2/guests?created_since_utc=${guestStartDate.toISOString()}&limit=${limit}&offset=${offset}`,
         {
           headers: {
             'Authorization': authHeader,
