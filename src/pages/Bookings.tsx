@@ -125,6 +125,18 @@ const Bookings = () => {
         }
       });
 
+      // Ensure "The Alpine" always shows up even without bookings
+      const alpineExists = [...processedProperties, ...Array.from(virtualPropertiesMap.values())]
+        .some(p => p.address.toLowerCase().includes('4241 osburn'));
+      
+      if (!alpineExists) {
+        virtualPropertiesMap.set('alpine-fallback', {
+          id: 'ownerrez-alpine-fallback',
+          name: 'The Alpine',
+          address: '4241 Osburn Ct, Duluth, GA 30096'
+        });
+      }
+
       const allProperties = [...processedProperties, ...Array.from(virtualPropertiesMap.values())];
       
       // Separate managed and unmanaged properties
