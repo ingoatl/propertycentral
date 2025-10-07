@@ -248,6 +248,33 @@ serve(async (req) => {
       }
     }
 
+    // Fetch all guests to map guest names
+    console.log('Fetching all guests from OwnerRez...');
+    const guestsResponse = await fetch(
+      'https://api.ownerrez.com/v2/guests',
+      {
+        headers: {
+          'Authorization': authHeader,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    const guestsMap = new Map<number, OwnerRezGuest>();
+    if (guestsResponse.ok) {
+      const guestsData = await guestsResponse.json();
+      const guests: OwnerRezGuest[] = guestsData.items || [];
+      console.log(`Fetched ${guests.length} guests from OwnerRez`);
+      
+      // Build guest map
+      for (const guest of guests) {
+        guestsMap.set(guest.id, guest);
+      }
+      console.log(`Built guest map with ${guestsMap.size} entries`);
+    } else {
+      console.error('Failed to fetch guests:', guestsResponse.status, await guestsResponse.text());
+    }
+
     let totalSyncedBookings = 0;
     let totalRevenue = 0;
     let totalManagementFees = 0;
@@ -295,19 +322,25 @@ serve(async (req) => {
           const managementFee = bookingTotal * managementFeeRate;
           listingManagementFees += managementFee;
 
-          // Determine guest name from expanded guest data in booking
+          // Determine guest name from guest_id lookup
           let guestName: string | null = null;
           
-          // Use guest data that's embedded in the booking (from expand=guest)
-          if (booking.type !== 'block' && booking.guest) {
-            if (booking.guest.name) {
-              guestName = booking.guest.name;
-            } else if (booking.guest.first_name || booking.guest.last_name) {
-              guestName = `${booking.guest.first_name || ''} ${booking.guest.last_name || ''}`.trim();
+          // Only look up guest name for actual bookings (not blocks)
+          if (booking.type !== 'block' && booking.guest_id) {
+            const guest = guestsMap.get(booking.guest_id);
+            if (guest) {
+              if (guest.name) {
+                guestName = guest.name;
+              } else if (guest.first_name || guest.last_name) {
+                guestName = `${guest.first_name || ''} ${guest.last_name || ''}`.trim();
+              }
+              console.log(`Booking ${booking.id}: Found guest "${guestName}" for guest_id ${booking.guest_id}`);
+            } else {
+              console.log(`Booking ${booking.id}: No guest found in map for guest_id ${booking.guest_id}`);
             }
           }
           
-          console.log(`Booking ${booking.id}: guest_name="${guestName}", type="${booking.type}", status="${booking.status}", has_guest_data=${!!booking.guest}`);
+          console.log(`Booking ${booking.id}: guest_id=${booking.guest_id}, guest_name="${guestName}", type="${booking.type}", status="${booking.status}", has_guest_data=${!!booking.guest}`);
 
           // Upsert booking data with local property ID if available
           const { data, error } = await supabase
