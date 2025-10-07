@@ -331,11 +331,7 @@ const Bookings = () => {
                       </div>
                       {/* Bookings overlay */}
                       <div className="absolute inset-0 pointer-events-none">
-                        {propertyBookings.filter(booking => {
-                          // Only show bookings with guest names or canceled status
-                          // Don't show blocks for empty properties
-                          return booking.guestName || booking.bookingStatus?.toLowerCase() === 'canceled';
-                        }).map((booking) => {
+                        {propertyBookings.map((booking) => {
                           const position = getBookingPosition(booking);
                           if (!position) return null;
 
@@ -344,7 +340,8 @@ const Bookings = () => {
                           const width = position.width * dayWidth;
 
                           const isCanceled = booking.bookingStatus?.toLowerCase() === 'canceled';
-                          const displayName = booking.guestName || 'Canceled';
+                          const isBlock = !booking.guestName && !isCanceled;
+                          const displayName = booking.guestName || (isCanceled ? 'Canceled' : 'Block');
                           
                           return (
                             <div
