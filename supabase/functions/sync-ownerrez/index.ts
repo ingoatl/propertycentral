@@ -248,10 +248,13 @@ serve(async (req) => {
       }
     }
 
-    // Fetch all guests to map guest names
+    // Fetch all guests to map guest names (need to provide a date filter)
     console.log('Fetching all guests from OwnerRez...');
+    const guestStartDate = new Date();
+    guestStartDate.setFullYear(guestStartDate.getFullYear() - 2); // Get guests from last 2 years
+    
     const guestsResponse = await fetch(
-      'https://api.ownerrez.com/v2/guests',
+      `https://api.ownerrez.com/v2/guests?created_since_utc=${guestStartDate.toISOString()}`,
       {
         headers: {
           'Authorization': authHeader,
