@@ -14,6 +14,7 @@ import NotFound from "./pages/NotFound";
 import PropertyOwners from "./pages/PropertyOwners";
 import MonthlyCharges from "./pages/MonthlyCharges";
 import MidTermBookings from "./pages/MidTermBookings";
+import Bookings from "./pages/Bookings";
 
 const queryClient = new QueryClient();
 
@@ -36,6 +37,7 @@ const App = () => (
                 <Route path="/owners" element={<PropertyOwners />} />
                 <Route path="/charges" element={<MonthlyCharges />} />
                 <Route path="/mid-term-bookings" element={<MidTermBookings />} />
+                <Route path="/bookings" element={<Bookings />} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>
