@@ -272,20 +272,20 @@ const Bookings = () => {
           {/* Calendar Grid */}
           <div className="border border-border rounded-lg overflow-hidden">
             {/* Header Row */}
-            <div className="flex bg-muted/50">
-              <div className="w-64 flex-shrink-0 border-r border-border p-3 font-semibold text-sm">
+            <div className="flex bg-muted/50 sticky top-0 z-10">
+              <div className="w-64 flex-shrink-0 border-r border-border p-2 font-semibold text-xs">
                 Property Address
               </div>
               <div className="flex-1 flex overflow-x-auto">
                 {daysInMonth.map((day, idx) => (
                   <div
                     key={idx}
-                    className="flex-1 min-w-[40px] border-r border-border p-2 text-center"
+                    className="flex-1 min-w-[40px] border-r border-border p-1 text-center"
                   >
-                    <div className="text-xs text-muted-foreground">
+                    <div className="text-[10px] text-muted-foreground">
                       {format(day, 'EEE')}
                     </div>
-                    <div className="text-sm font-medium">
+                    <div className="text-xs font-medium">
                       {format(day, 'd')}
                     </div>
                   </div>
@@ -311,16 +311,16 @@ const Bookings = () => {
                         </div>
                       </div>
                     )}
-                    <div className="flex hover:bg-muted/30 transition-colors">{property.id}
-                    <div className="w-64 flex-shrink-0 border-r border-border p-3">
-                      <div className="text-sm font-semibold text-foreground line-clamp-1">
+                    <div className="flex hover:bg-muted/30 transition-colors">
+                    <div className="w-64 flex-shrink-0 border-r border-border p-2">
+                      <div className="text-xs font-semibold text-foreground line-clamp-1">
                         {property.address}
                       </div>
-                      <div className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                      <div className="text-[10px] text-muted-foreground mt-0.5 line-clamp-1">
                         {property.name}
                       </div>
                     </div>
-                    <div className="flex-1 relative min-h-[60px]">
+                    <div className="flex-1 relative min-h-[44px]">
                       <div className="flex h-full">
                         {daysInMonth.map((_, idx) => (
                           <div
@@ -331,7 +331,11 @@ const Bookings = () => {
                       </div>
                       {/* Bookings overlay */}
                       <div className="absolute inset-0 pointer-events-none">
-                        {propertyBookings.map((booking) => {
+                        {propertyBookings.filter(booking => {
+                          // Only show bookings with guest names or canceled status
+                          // Don't show blocks for empty properties
+                          return booking.guestName || booking.bookingStatus?.toLowerCase() === 'canceled';
+                        }).map((booking) => {
                           const position = getBookingPosition(booking);
                           if (!position) return null;
 
@@ -339,21 +343,20 @@ const Bookings = () => {
                           const left = position.startIndex * dayWidth;
                           const width = position.width * dayWidth;
 
-                          // Only show if there's an actual booking, not just empty property
                           const isCanceled = booking.bookingStatus?.toLowerCase() === 'canceled';
-                          const displayName = booking.guestName || (isCanceled ? 'Canceled' : 'Block');
+                          const displayName = booking.guestName || 'Canceled';
                           
                           return (
                             <div
                               key={booking.id}
-                              className={`absolute top-2 bottom-2 ${getBookingColor(booking.bookingStatus, booking.guestName)} rounded text-white text-xs p-1 flex items-center justify-center shadow-lg pointer-events-auto cursor-default transition-transform hover:scale-105`}
+                              className={`absolute top-1 bottom-1 ${getBookingColor(booking.bookingStatus, booking.guestName)} rounded text-white text-[10px] px-1 flex items-center justify-center shadow-md pointer-events-auto cursor-default transition-transform hover:scale-105`}
                               style={{
                                 left: `${left}%`,
                                 width: `${width}%`,
                               }}
                               title={`${displayName}\n${booking.checkIn} to ${booking.checkOut}\nStatus: ${booking.bookingStatus || 'Unknown'}`}
                             >
-                              <span className="truncate px-1 font-medium">
+                              <span className="truncate font-medium">
                                 {displayName}
                               </span>
                             </div>
