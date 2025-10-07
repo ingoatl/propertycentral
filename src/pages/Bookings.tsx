@@ -80,6 +80,17 @@ const Bookings = () => {
 
       if (bookingsError) throw bookingsError;
 
+      // Address mappings for unmanaged properties
+      const unmanagedAddresses: Record<string, string> = {
+        'family retreat': '5360 Durham Ridge Ct, Lilburn, GA 30047',
+        'lavish living': '3069 Rita Way, Smyrna, GA 30080',
+        'luxurious & spacious apartment': '2580 Old Roswell Rd, Roswell, GA 30076',
+        'modern + cozy townhome': '169 Willow Stream Ct, Woodstock, GA 30188',
+        'scandi chic': '3155 Duvall Pl, Kennesaw, GA 30144',
+        'scandinavian retreat': '5198 Laurel Bridge Dr, Smyrna, GA 30082',
+        'alpine': '4241 Osburn Ct, Duluth, GA 30096',
+      };
+
       // Process properties with addresses
       const processedProperties: Property[] = (propertiesData || []).map(p => ({
         id: p.id,
@@ -94,10 +105,21 @@ const Bookings = () => {
       const virtualPropertiesMap = new Map<string, Property>();
       unmappedBookings.forEach(booking => {
         if (!virtualPropertiesMap.has(booking.ownerrez_listing_id)) {
+          // Get address for this property
+          const listingNameLower = booking.ownerrez_listing_name.toLowerCase();
+          let propertyAddress = "Address not available";
+          
+          for (const [key, address] of Object.entries(unmanagedAddresses)) {
+            if (listingNameLower.includes(key)) {
+              propertyAddress = address;
+              break;
+            }
+          }
+          
           virtualPropertiesMap.set(booking.ownerrez_listing_id, {
             id: `ownerrez-${booking.ownerrez_listing_id}`,
             name: booking.ownerrez_listing_name,
-            address: "Address from OwnerRez listing"
+            address: propertyAddress
           });
         }
       });
@@ -160,13 +182,20 @@ const Bookings = () => {
     return { startIndex, width: visibleDays };
   };
 
-  const getBookingColor = (status: string | null) => {
+  const getBookingColor = (status: string | null, guestName: string | null) => {
+    // If no guest name and status is active/confirmed, it's likely a block
+    if (!guestName && (status?.toLowerCase() === 'active' || status?.toLowerCase() === 'confirmed')) {
+      return 'bg-gray-500/90';
+    }
+    
     switch (status?.toLowerCase()) {
       case 'confirmed':
+      case 'active':
         return 'bg-emerald-500/90';
       case 'pending':
         return 'bg-amber-500/90';
       case 'cancelled':
+      case 'canceled':
         return 'bg-red-500/90';
       default:
         return 'bg-blue-500/90';
@@ -259,10 +288,10 @@ const Bookings = () => {
                 return (
                   <div key={property.id} className="flex hover:bg-muted/30 transition-colors">
                     <div className="w-64 flex-shrink-0 border-r border-border p-3">
-                      <div className="text-sm font-medium text-foreground line-clamp-2">
+                      <div className="text-sm font-semibold text-foreground line-clamp-1">
                         {property.address}
                       </div>
-                      <div className="text-xs text-muted-foreground mt-1 truncate">
+                      <div className="text-xs text-muted-foreground mt-1 line-clamp-2">
                         {property.name}
                       </div>
                     </div>
@@ -285,18 +314,20 @@ const Bookings = () => {
                           const left = position.startIndex * dayWidth;
                           const width = position.width * dayWidth;
 
+                          const displayName = booking.guestName || (booking.bookingStatus?.toLowerCase() === 'canceled' ? 'Canceled' : 'Block');
+                          
                           return (
                             <div
                               key={booking.id}
-                              className={`absolute top-2 bottom-2 ${getBookingColor(booking.bookingStatus)} rounded text-white text-xs p-1 flex items-center justify-center shadow-lg pointer-events-auto cursor-default transition-transform hover:scale-105`}
+                              className={`absolute top-2 bottom-2 ${getBookingColor(booking.bookingStatus, booking.guestName)} rounded text-white text-xs p-1 flex items-center justify-center shadow-lg pointer-events-auto cursor-default transition-transform hover:scale-105`}
                               style={{
                                 left: `${left}%`,
                                 width: `${width}%`,
                               }}
-                              title={`${booking.guestName || 'Guest'}\n${booking.checkIn} to ${booking.checkOut}\nStatus: ${booking.bookingStatus || 'Unknown'}`}
+                              title={`${displayName}\n${booking.checkIn} to ${booking.checkOut}\nStatus: ${booking.bookingStatus || 'Unknown'}`}
                             >
                               <span className="truncate px-1 font-medium">
-                                {booking.guestName || 'Guest'}
+                                {displayName}
                               </span>
                             </div>
                           );
