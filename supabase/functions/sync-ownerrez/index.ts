@@ -217,9 +217,9 @@ serve(async (req) => {
     const startDate = new Date();
     startDate.setMonth(startDate.getMonth() - 12);
     
-    console.log('Fetching all bookings from OwnerRez...');
+    console.log('Fetching all bookings with guest details from OwnerRez...');
     const allBookingsResponse = await fetch(
-      `https://api.ownerrez.com/v2/bookings?since_utc=${startDate.toISOString()}`,
+      `https://api.ownerrez.com/v2/bookings?since_utc=${startDate.toISOString()}&expand=guest`,
       {
         headers: {
           'Authorization': authHeader,
@@ -243,6 +243,7 @@ serve(async (req) => {
     // Log the first booking structure to see what fields are available
     if (allBookings.length > 0) {
       console.log('First booking structure:', JSON.stringify(allBookings[0], null, 2));
+      console.log('First booking guest info:', JSON.stringify(allBookings[0].guest, null, 2));
     }
 
     let totalSyncedBookings = 0;
@@ -292,44 +293,24 @@ serve(async (req) => {
           const managementFee = bookingTotal * managementFeeRate;
           listingManagementFees += managementFee;
 
-          // Determine guest name
+          // Determine guest name from expanded guest data
           let guestName: string | null = null;
           
-          // Check if booking has guest information
-          if (booking.guest?.name) {
-            guestName = booking.guest.name;
-          } else if (booking.guest?.first_name || booking.guest?.last_name) {
-            guestName = `${booking.guest.first_name || ''} ${booking.guest.last_name || ''}`.trim();
-          } else if (booking.guest_id) {
-            // Fetch guest details if we have a guest_id but no guest info
-            try {
-              const guestResponse = await fetch(
-                `https://api.ownerrez.com/v2/guests/${booking.guest_id}`,
-                {
-                  headers: {
-                    'Authorization': authHeader,
-                    'Content-Type': 'application/json',
-                  },
-                }
-              );
-              
-              if (guestResponse.ok) {
-                const guestData = await guestResponse.json();
-                if (guestData.name) {
-                  guestName = guestData.name;
-                } else if (guestData.first_name || guestData.last_name) {
-                  guestName = `${guestData.first_name || ''} ${guestData.last_name || ''}`.trim();
-                }
-              }
-            } catch (error) {
-              console.error(`Failed to fetch guest ${booking.guest_id}:`, error);
+          // Check if booking has guest information (from expand=guest parameter)
+          if (booking.guest) {
+            if (booking.guest.name) {
+              guestName = booking.guest.name;
+            } else if (booking.guest.first_name || booking.guest.last_name) {
+              guestName = `${booking.guest.first_name || ''} ${booking.guest.last_name || ''}`.trim();
             }
           }
           
-          // If it's a block (no guest), set guest_name to null
-          if (booking.type === 'block' || booking.status === 'block') {
+          // If it's a block or has no guest, set guest_name to null
+          if (booking.type === 'block' || !guestName) {
             guestName = null;
           }
+          
+          console.log(`Booking ${booking.id}: guest_name="${guestName}", type="${booking.type}", status="${booking.status}"`);
 
           // Upsert booking data with local property ID if available
           const { data, error } = await supabase

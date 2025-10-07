@@ -89,6 +89,7 @@ const Bookings = () => {
         'scandi chic': '3155 Duvall Pl, Kennesaw, GA 30144',
         'scandinavian retreat': '5198 Laurel Bridge Dr, Smyrna, GA 30082',
         'alpine': '4241 Osburn Ct, Duluth, GA 30096',
+        'the alpine': '4241 Osburn Ct, Duluth, GA 30096',
       };
 
       // Process properties with addresses
