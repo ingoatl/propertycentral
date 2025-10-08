@@ -40,13 +40,19 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
         .eq("id", task.id);
 
       if (error) throw error;
-      onUpdate();
+      // Update parent without triggering re-renders that might close modal
+      setTimeout(() => onUpdate(), 50);
     } catch (error) {
       console.error("Failed to update task:", error);
     }
   };
 
-  const handleSave = async () => {
+  const handleSave = async (e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    
     try {
       setSaving(true);
       const updateData: any = {
@@ -66,7 +72,8 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
         .eq("id", task.id);
 
       if (error) throw error;
-      onUpdate();
+      // Update parent without triggering re-renders that might close modal
+      setTimeout(() => onUpdate(), 50);
     } catch (error) {
       console.error("Failed to save task:", error);
     } finally {

@@ -30,13 +30,13 @@ export const OnboardingTab = ({ propertyId, propertyName, propertyAddress }: Onb
         .from("onboarding_projects")
         .select("*")
         .eq("property_id", propertyId)
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .limit(1);
 
       if (error) throw error;
       setProjects((data || []) as OnboardingProject[]);
     } catch (error: any) {
-      toast.error("Failed to load onboarding projects");
-      console.error(error);
+      console.error("Failed to load onboarding projects:", error);
     } finally {
       setLoading(false);
     }
