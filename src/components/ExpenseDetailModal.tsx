@@ -119,6 +119,22 @@ export const ExpenseDetailModal = ({
             </>
           )}
 
+          {/* Delivery Address */}
+          {expense.deliveryAddress && (
+            <>
+              <div className="space-y-2">
+                <h3 className="font-semibold flex items-center gap-2">
+                  <MapPin className="w-4 h-4" />
+                  Delivery Address
+                </h3>
+                <p className="pl-6 text-sm leading-relaxed bg-muted/50 p-3 rounded-lg">
+                  {expense.deliveryAddress}
+                </p>
+              </div>
+              <Separator />
+            </>
+          )}
+
           {/* Items Detail */}
           {expense.itemsDetail && (
             <>
@@ -128,20 +144,6 @@ export const ExpenseDetailModal = ({
                   Items Purchased
                 </h3>
                 <p className="pl-6 text-sm leading-relaxed">{expense.itemsDetail}</p>
-              </div>
-              <Separator />
-            </>
-          )}
-
-          {/* Delivery Address */}
-          {expense.deliveryAddress && (
-            <>
-              <div className="space-y-2">
-                <h3 className="font-semibold flex items-center gap-2">
-                  <MapPin className="w-4 h-4" />
-                  Delivery Address
-                </h3>
-                <p className="pl-6 text-sm leading-relaxed">{expense.deliveryAddress}</p>
               </div>
               <Separator />
             </>

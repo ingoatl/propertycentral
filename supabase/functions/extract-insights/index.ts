@@ -81,9 +81,12 @@ Analyze the email comprehensively and extract:
    - Sum ALL prices across ALL orders in the email
    - List ALL items purchased
    
-   Step 4: Find dates
-   - Look for "Delivery estimate:" or "arriving:"
-   - Convert to YYYY-MM-DD format (e.g., "Tuesday, October 1" → "2024-10-01")
+   Step 4: Find dates - CRITICAL YEAR DETECTION
+   - Look for "Delivery estimate:" or "arriving:" or "Guaranteed delivery:"
+   - IMPORTANT: The current year is 2025, NOT 2024
+   - When you see dates like "Tuesday, October 1" or "October 7", assume year 2025 unless explicitly stated otherwise
+   - If the email date is in 2025 and delivery date has no year, use 2025
+   - Convert to YYYY-MM-DD format (e.g., "Tuesday, October 1" → "2025-10-01", "October 7" → "2025-10-07")
    - Use the EARLIEST date if multiple orders
    
    **FOR NON-AMAZON EXPENSES:**
