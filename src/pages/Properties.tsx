@@ -3,7 +3,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Trash2, MapPin, Building2, Edit } from "lucide-react";
+import { Plus, Trash2, MapPin, Building2, Edit, Mail, ClipboardList } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { OnboardingTab } from "@/components/onboarding/OnboardingTab";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -445,21 +447,49 @@ const Properties = () => {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="flex items-baseline gap-2 bg-gradient-subtle p-4 rounded-lg">
-                    <span className="text-sm text-muted-foreground">Visit Price:</span>
-                    <span className="text-2xl font-bold text-primary">${property.visitPrice.toFixed(2)}</span>
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setSelectedPropertyForInsights(property);
-                      setEmailInsightsDialogOpen(true);
-                    }}
-                    className="w-full mt-4"
-                  >
-                    View Email Insights
-                  </Button>
+                  <Tabs defaultValue="details" className="w-full">
+                    <TabsList className="grid w-full grid-cols-3">
+                      <TabsTrigger value="details">Details</TabsTrigger>
+                      <TabsTrigger value="insights">
+                        <Mail className="w-4 h-4 mr-1" />
+                        Insights
+                      </TabsTrigger>
+                      <TabsTrigger value="onboarding">
+                        <ClipboardList className="w-4 h-4 mr-1" />
+                        Onboarding
+                      </TabsTrigger>
+                    </TabsList>
+
+                    <TabsContent value="details" className="mt-4">
+                      <div className="flex items-baseline gap-2 bg-gradient-subtle p-4 rounded-lg">
+                        <span className="text-sm text-muted-foreground">Visit Price:</span>
+                        <span className="text-2xl font-bold text-primary">${property.visitPrice.toFixed(2)}</span>
+                      </div>
+                    </TabsContent>
+
+                    <TabsContent value="insights" className="mt-4">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedPropertyForInsights(property);
+                          setEmailInsightsDialogOpen(true);
+                        }}
+                        className="w-full"
+                      >
+                        <Mail className="w-4 h-4 mr-2" />
+                        View Email Insights
+                      </Button>
+                    </TabsContent>
+
+                    <TabsContent value="onboarding" className="mt-4">
+                      <OnboardingTab
+                        propertyId={property.id}
+                        propertyName={property.name}
+                        propertyAddress={property.address}
+                      />
+                    </TabsContent>
+                  </Tabs>
                 </CardContent>
               </Card>
             </div>

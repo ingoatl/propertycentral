@@ -332,6 +332,150 @@ export type Database = {
           },
         ]
       }
+      onboarding_comments: {
+        Row: {
+          comment: string
+          created_at: string
+          id: string
+          task_id: string
+          user_id: string | null
+          user_name: string
+        }
+        Insert: {
+          comment: string
+          created_at?: string
+          id?: string
+          task_id: string
+          user_id?: string | null
+          user_name: string
+        }
+        Update: {
+          comment?: string
+          created_at?: string
+          id?: string
+          task_id?: string
+          user_id?: string | null
+          user_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "onboarding_comments_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      onboarding_projects: {
+        Row: {
+          created_at: string
+          id: string
+          owner_name: string
+          progress: number | null
+          property_address: string
+          property_id: string | null
+          status: string
+          updated_at: string
+          webhook_url: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          owner_name: string
+          progress?: number | null
+          property_address: string
+          property_id?: string | null
+          status?: string
+          updated_at?: string
+          webhook_url?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          owner_name?: string
+          progress?: number | null
+          property_address?: string
+          property_id?: string | null
+          status?: string
+          updated_at?: string
+          webhook_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "onboarding_projects_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      onboarding_tasks: {
+        Row: {
+          assigned_to: string | null
+          completed_date: string | null
+          created_at: string
+          description: string | null
+          due_date: string | null
+          field_type: string
+          field_value: string | null
+          file_path: string | null
+          id: string
+          notes: string | null
+          phase_number: number
+          phase_title: string
+          project_id: string
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          completed_date?: string | null
+          created_at?: string
+          description?: string | null
+          due_date?: string | null
+          field_type?: string
+          field_value?: string | null
+          file_path?: string | null
+          id?: string
+          notes?: string | null
+          phase_number: number
+          phase_title: string
+          project_id: string
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          assigned_to?: string | null
+          completed_date?: string | null
+          created_at?: string
+          description?: string | null
+          due_date?: string | null
+          field_type?: string
+          field_value?: string | null
+          file_path?: string | null
+          id?: string
+          notes?: string | null
+          phase_number?: number
+          phase_title?: string
+          project_id?: string
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "onboarding_tasks_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ownerrez_bookings: {
         Row: {
           booking_id: string | null

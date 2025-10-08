@@ -1,0 +1,94 @@
+import { PhaseDefinition, OnboardingTask } from "@/types/onboarding";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Badge } from "@/components/ui/badge";
+import { ChevronDown, Lock, CheckCircle2 } from "lucide-react";
+import { TaskItem } from "./TaskItem";
+import { cn } from "@/lib/utils";
+
+interface PhaseCardProps {
+  phase: PhaseDefinition;
+  tasks: OnboardingTask[];
+  completion: number;
+  unlocked: boolean;
+  expanded: boolean;
+  onToggle: () => void;
+  onTaskUpdate: () => void;
+}
+
+export const PhaseCard = ({
+  phase,
+  tasks,
+  completion,
+  unlocked,
+  expanded,
+  onToggle,
+  onTaskUpdate,
+}: PhaseCardProps) => {
+  const isComplete = completion === 100;
+
+  return (
+    <Card className={cn(
+      "transition-all",
+      !unlocked && "opacity-60 bg-muted/30",
+      isComplete && "border-green-500/50"
+    )}>
+      <Collapsible open={expanded && unlocked} onOpenChange={unlocked ? onToggle : undefined}>
+        <CollapsibleTrigger className="w-full" disabled={!unlocked}>
+          <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
+            <div className="flex items-start justify-between">
+              <div className="flex-1 text-left">
+                <div className="flex items-center gap-3">
+                  <Badge variant="outline" className="font-mono">
+                    Phase {phase.id}
+                  </Badge>
+                  {!unlocked && <Lock className="w-4 h-4 text-muted-foreground" />}
+                  {isComplete && <CheckCircle2 className="w-5 h-5 text-green-600" />}
+                  <CardTitle className="text-lg">{phase.title}</CardTitle>
+                </div>
+                <CardDescription className="mt-2">{phase.description}</CardDescription>
+              </div>
+              <div className="flex items-center gap-4">
+                <div className="text-right">
+                  <div className="text-sm font-medium">{Math.round(completion)}%</div>
+                  <div className="text-xs text-muted-foreground">
+                    {tasks.filter(t => t.status === "completed").length} / {tasks.length}
+                  </div>
+                </div>
+                {unlocked && (
+                  <ChevronDown className={cn(
+                    "w-5 h-5 transition-transform",
+                    expanded && "transform rotate-180"
+                  )} />
+                )}
+              </div>
+            </div>
+
+            {/* Progress Bar */}
+            <div className="w-full bg-muted rounded-full h-2 mt-4">
+              <div
+                className={cn(
+                  "h-2 rounded-full transition-all duration-300",
+                  isComplete ? "bg-green-600" : "bg-primary"
+                )}
+                style={{ width: `${completion}%` }}
+              />
+            </div>
+          </CardHeader>
+        </CollapsibleTrigger>
+
+        <CollapsibleContent>
+          <CardContent className="space-y-2 pt-0">
+            {tasks.map((task) => (
+              <TaskItem
+                key={task.id}
+                task={task}
+                onUpdate={onTaskUpdate}
+              />
+            ))}
+          </CardContent>
+        </CollapsibleContent>
+      </Collapsible>
+    </Card>
+  );
+};
