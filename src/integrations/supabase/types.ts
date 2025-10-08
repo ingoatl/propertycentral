@@ -14,6 +14,99 @@ export type Database = {
   }
   public: {
     Tables: {
+      email_insights: {
+        Row: {
+          action_required: boolean | null
+          category: string
+          created_at: string
+          due_date: string | null
+          email_date: string
+          gmail_message_id: string | null
+          id: string
+          owner_id: string | null
+          priority: string | null
+          property_id: string | null
+          sender_email: string
+          status: string | null
+          subject: string
+          summary: string
+        }
+        Insert: {
+          action_required?: boolean | null
+          category: string
+          created_at?: string
+          due_date?: string | null
+          email_date: string
+          gmail_message_id?: string | null
+          id?: string
+          owner_id?: string | null
+          priority?: string | null
+          property_id?: string | null
+          sender_email: string
+          status?: string | null
+          subject: string
+          summary: string
+        }
+        Update: {
+          action_required?: boolean | null
+          category?: string
+          created_at?: string
+          due_date?: string | null
+          email_date?: string
+          gmail_message_id?: string | null
+          id?: string
+          owner_id?: string | null
+          priority?: string | null
+          property_id?: string | null
+          sender_email?: string
+          status?: string | null
+          subject?: string
+          summary?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_insights_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "property_owners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_insights_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      email_scan_log: {
+        Row: {
+          emails_processed: number | null
+          error_message: string | null
+          id: string
+          insights_generated: number | null
+          scan_date: string
+          scan_status: string | null
+        }
+        Insert: {
+          emails_processed?: number | null
+          error_message?: string | null
+          id?: string
+          insights_generated?: number | null
+          scan_date?: string
+          scan_status?: string | null
+        }
+        Update: {
+          emails_processed?: number | null
+          error_message?: string | null
+          id?: string
+          insights_generated?: number | null
+          scan_date?: string
+          scan_status?: string | null
+        }
+        Relationships: []
+      }
       expenses: {
         Row: {
           amount: number
@@ -60,6 +153,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      gmail_oauth_tokens: {
+        Row: {
+          access_token: string
+          created_at: string
+          expires_at: string
+          id: string
+          refresh_token: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          access_token: string
+          created_at?: string
+          expires_at: string
+          id?: string
+          refresh_token: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          access_token?: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          refresh_token?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       mid_term_bookings: {
         Row: {
