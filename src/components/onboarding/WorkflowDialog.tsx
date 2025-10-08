@@ -44,8 +44,7 @@ export const WorkflowDialog = ({ open, onOpenChange, project, onUpdate }: Workfl
   };
 
   const handleTaskUpdate = async () => {
-    await loadTasks();
-    await updateProjectProgress();
+    await Promise.all([loadTasks(), updateProjectProgress()]);
     onUpdate();
   };
 

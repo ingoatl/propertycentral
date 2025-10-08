@@ -10,7 +10,7 @@ interface WorkflowPhasesProps {
 }
 
 export const WorkflowPhases = ({ projectId, tasks, onTaskUpdate }: WorkflowPhasesProps) => {
-  const [expandedPhase, setExpandedPhase] = useState<number | null>(1);
+  const [expandedPhases, setExpandedPhases] = useState<Set<number>>(new Set([1]));
 
   const getPhaseCompletion = (phaseNumber: number) => {
     const phaseTasks = tasks.filter(t => t.phase_number === phaseNumber);
@@ -19,8 +19,16 @@ export const WorkflowPhases = ({ projectId, tasks, onTaskUpdate }: WorkflowPhase
     return (completed / phaseTasks.length) * 100;
   };
 
-  const isPhaseUnlocked = (phaseNumber: number) => {
-    return true; // All phases are always unlocked
+  const togglePhase = (phaseNumber: number) => {
+    setExpandedPhases(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(phaseNumber)) {
+        newSet.delete(phaseNumber);
+      } else {
+        newSet.add(phaseNumber);
+      }
+      return newSet;
+    });
   };
 
   return (
@@ -28,7 +36,6 @@ export const WorkflowPhases = ({ projectId, tasks, onTaskUpdate }: WorkflowPhase
       {ONBOARDING_PHASES.map((phase) => {
         const phaseTasks = tasks.filter(t => t.phase_number === phase.id);
         const completion = getPhaseCompletion(phase.id);
-        const unlocked = isPhaseUnlocked(phase.id);
 
         return (
           <PhaseCard
@@ -36,9 +43,9 @@ export const WorkflowPhases = ({ projectId, tasks, onTaskUpdate }: WorkflowPhase
             phase={phase}
             tasks={phaseTasks}
             completion={completion}
-            unlocked={unlocked}
-            expanded={expandedPhase === phase.id}
-            onToggle={() => setExpandedPhase(expandedPhase === phase.id ? null : phase.id)}
+            unlocked={true}
+            expanded={expandedPhases.has(phase.id)}
+            onToggle={() => togglePhase(phase.id)}
             onTaskUpdate={onTaskUpdate}
           />
         );
