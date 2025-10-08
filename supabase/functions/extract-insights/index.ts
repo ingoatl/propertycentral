@@ -37,52 +37,68 @@ serve(async (req) => {
 Properties: ${propertyList}
 Owners: ${ownerList}
 
+CRITICAL INSTRUCTIONS FOR EXPENSE EXTRACTION:
+You MUST extract ALL details accurately. Missing fields cause problems.
+
 Analyze the email comprehensively and extract:
 
 1. **Relevance**: Is this email relevant to any property or owner? (yes/no)
-2. **Property Match**: Which property is it related to? (match by name or address in email)
+2. **Property Match**: Which property is it related to? (match by name or address in email body - look carefully!)
 3. **Owner Match**: Which owner is it related to? (match by email or name)
 4. **Category**: maintenance, payment, booking, tenant_communication, legal, insurance, utilities, expense, order, or other
 5. **Summary**: 2-3 sentence summary of the email content
 6. **Sentiment**: Analyze the overall tone - positive, negative, neutral, urgent, or concerning
 7. **Action Required**: Does this need follow-up? (yes/no)
-8. **Suggested Actions**: List 1-3 specific actionable next steps (e.g., "Schedule repair appointment", "Reply to tenant by Friday", "Review invoice details")
+8. **Suggested Actions**: List 1-3 specific actionable next steps
 9. **Priority**: low, normal, high, urgent
 10. **Due Date**: If action required, when is it due? (YYYY-MM-DD or null)
 
-11. **Expense Detection** (CRITICAL - Analyze entire email thoroughly): 
-   - Is this an expense/order/purchase? (yes/no)
+11. **EXPENSE DETECTION - READ EVERY WORD CAREFULLY**: 
    
-   **FOR AMAZON ORDERS - READ CAREFULLY:**
-   - Amazon often sends ONE EMAIL containing MULTIPLE SEPARATE ORDERS
-   - Look for phrases like "Order Confirmation" appearing multiple times
-   - Each order has its own:
-     * Order number (e.g., in "View or manage order" links)
-     * Delivery date
-     * Set of items with individual prices
-   - YOU MUST:
-     * Identify ALL separate orders in the email
-     * Extract the FIRST/EARLIEST order number as the main order number
-     * Use the EARLIEST delivery/order date
-     * Calculate TOTAL: SUM of ALL item prices across ALL orders
-     * List ALL items from ALL orders
-     * Extract delivery address (shipping address)
+   **CRITICAL - FOR AMAZON EMAILS:**
+   - Amazon emails have VERY specific patterns you MUST recognize
+   - Look for "Order Confirmation" headers (can appear multiple times)
+   - Each order has:
+     * Order number in format: ###-#######-####### (EXTRACT THIS!)
+     * Delivery estimate like "Tuesday, October 1" (CONVERT TO YYYY-MM-DD!)
+     * Item list with individual prices
+     * Delivery address (EXTRACT FULL ADDRESS!)
    
-   **Example**: If email shows:
-     - Order 1: Item A ($50), Item B ($30) - delivers Oct 1
-     - Order 2: Item C ($20) - delivers Oct 2
-   Then: orderNumber = Order 1 number, orderDate = Oct 1, expenseAmount = 100, items = "Item A, Item B, Item C"
+   **STEP BY STEP EXTRACTION PROCESS:**
    
-   Extract:
-   - Order number: First order ID found (look in links like "View or manage order #123-456789-0123456")
-   - Order date: EARLIEST order/delivery date (YYYY-MM-DD format)
-   - Total amount: SUM of ALL item prices from ALL orders combined
-   - Vendor: "Amazon.com" or actual vendor name
-   - Items: Comma-separated list of ALL items from ALL orders
-   - Tracking: First tracking number if available
-   - Delivery address: Full shipping address
+   Step 1: Find ALL order numbers
+   - Search for patterns like "order #113-4868842-1944206"
+   - Or in links: "amazon.com/your-orders/order-details?orderID=113-4868842-1944206"
+   - Save the FIRST order number you find
+   
+   Step 2: Find delivery address
+   - Look for "Shipping address:" or "Deliver to:"
+   - Extract the COMPLETE address including street, city, state, ZIP
+   - Format: "123 Main St, City, State 12345"
+   
+   Step 3: Find ALL items and prices
+   - Look for item names followed by prices like "$339.99"
+   - Sum ALL prices across ALL orders in the email
+   - List ALL items purchased
+   
+   Step 4: Find dates
+   - Look for "Delivery estimate:" or "arriving:"
+   - Convert to YYYY-MM-DD format (e.g., "Tuesday, October 1" → "2024-10-01")
+   - Use the EARLIEST date if multiple orders
+   
+   **FOR NON-AMAZON EXPENSES:**
+   - Extract vendor name from sender or email body
+   - Look for invoice numbers, PO numbers as order numbers
+   - Extract total amount clearly stated
+   - Find any address mentioned
+   
+   **VALIDATION:**
+   - orderNumber MUST be extracted if this is an Amazon order
+   - deliveryAddress MUST be extracted if shipping address is mentioned
+   - expenseAmount MUST be the SUM of all items
+   - orderDate MUST be in YYYY-MM-DD format
 
-Return ONLY a JSON object with these exact fields:
+Return ONLY a JSON object:
 {
   "isRelevant": boolean,
   "propertyName": string or null,
@@ -91,24 +107,24 @@ Return ONLY a JSON object with these exact fields:
   "summary": string,
   "sentiment": string,
   "actionRequired": boolean,
-  "suggestedActions": string (comma-separated actions),
+  "suggestedActions": string,
   "priority": string,
   "dueDate": string or null,
   "expenseDetected": boolean,
-  "expenseAmount": number or null (TOTAL SUM),
-  "expenseDescription": string or null (ALL items),
-  "orderNumber": string or null (FIRST order),
-  "orderDate": string or null (EARLIEST date YYYY-MM-DD),
+  "expenseAmount": number or null,
+  "expenseDescription": string or null,
+  "orderNumber": string or null (REQUIRED for Amazon),
+  "orderDate": string or null (YYYY-MM-DD),
   "trackingNumber": string or null,
   "vendor": string or null,
-  "deliveryAddress": string or null
+  "deliveryAddress": string or null (REQUIRED if address in email)
 }`;
 
     const userPrompt = `Email from: ${senderEmail}
 Subject: ${subject}
 Body: ${body}
 
-Analyze this email.`;
+ANALYZE CAREFULLY - Extract ALL order details including order number and delivery address.`;
 
     console.log('Calling Lovable AI for email analysis...');
 
@@ -124,7 +140,7 @@ Analyze this email.`;
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt },
         ],
-        temperature: 0.3,
+        temperature: 0.1,
       }),
     });
 
@@ -142,7 +158,6 @@ Analyze this email.`;
     // Parse AI response
     let analysis;
     try {
-      // Extract JSON from response (AI might wrap it in markdown)
       const jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         analysis = JSON.parse(jsonMatch[0]);
@@ -180,12 +195,12 @@ Analyze this email.`;
       );
     }
 
-    // Check if already processed
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
+    // Check if already processed
     const { data: existing } = await supabase
       .from('email_insights')
       .select('id')
@@ -232,42 +247,63 @@ Analyze this email.`;
 
     console.log('Insight saved successfully');
 
-    // If expense detected and we have a property, create an expense record with full details
+    // If expense detected and we have a property, check for duplicates before creating
     if (analysis.expenseDetected && analysis.expenseAmount && property?.id) {
-      console.log('Creating expense record from email with order details...');
+      console.log('Checking for duplicate expenses...');
       
-      const { data: userData } = await supabase
-        .from('gmail_oauth_tokens')
-        .select('user_id')
-        .maybeSingle();
+      // Check if duplicate using the database function
+      const { data: isDuplicate } = await supabase.rpc('is_duplicate_expense', {
+        p_property_id: property.id,
+        p_amount: analysis.expenseAmount,
+        p_date: analysis.orderDate || new Date(emailDate).toISOString().split('T')[0],
+        p_purpose: analysis.expenseDescription || subject,
+        p_order_number: analysis.orderNumber
+      });
 
-      const { error: expenseError } = await supabase
-        .from('expenses')
-        .insert({
-          property_id: property.id,
-          amount: analysis.expenseAmount,
-          date: analysis.orderDate || new Date(emailDate).toISOString().split('T')[0],
-          purpose: analysis.expenseDescription || `Email expense: ${subject}`,
-          category: analysis.category || 'order',
-          order_number: analysis.orderNumber || null,
-          order_date: analysis.orderDate || null,
-          tracking_number: analysis.trackingNumber || null,
-          vendor: analysis.vendor || null,
-          items_detail: analysis.expenseDescription || null,
-          delivery_address: analysis.deliveryAddress || null,
-          user_id: userData?.user_id || null,
-        });
-
-      if (expenseError) {
-        console.error('Failed to create expense:', expenseError);
-      } else {
-        // Mark expense as created
+      if (isDuplicate) {
+        console.log('Duplicate expense detected, skipping creation...');
         await supabase
           .from('email_insights')
-          .update({ expense_created: true })
+          .update({ 
+            expense_created: false,
+            suggested_actions: (analysis.suggestedActions || '') + ' (Duplicate expense detected - not created)'
+          })
           .eq('id', insertedInsight.id);
+      } else {
+        console.log('Creating expense record with full details...');
         
-        console.log('Expense record created successfully with order details');
+        const { data: userData } = await supabase
+          .from('gmail_oauth_tokens')
+          .select('user_id')
+          .maybeSingle();
+
+        const { error: expenseError } = await supabase
+          .from('expenses')
+          .insert({
+            property_id: property.id,
+            amount: analysis.expenseAmount,
+            date: analysis.orderDate || new Date(emailDate).toISOString().split('T')[0],
+            purpose: analysis.expenseDescription || `Email expense: ${subject}`,
+            category: analysis.category || 'order',
+            order_number: analysis.orderNumber || null,
+            order_date: analysis.orderDate || null,
+            tracking_number: analysis.trackingNumber || null,
+            vendor: analysis.vendor || null,
+            items_detail: analysis.expenseDescription || null,
+            delivery_address: analysis.deliveryAddress || null,
+            user_id: userData?.user_id || null,
+          });
+
+        if (expenseError) {
+          console.error('Failed to create expense:', expenseError);
+        } else {
+          await supabase
+            .from('email_insights')
+            .update({ expense_created: true })
+            .eq('id', insertedInsight.id);
+          
+          console.log('Expense record created successfully with order details');
+        }
       }
     }
 

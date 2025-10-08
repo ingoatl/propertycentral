@@ -566,6 +566,16 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_duplicate_expense: {
+        Args: {
+          p_amount: number
+          p_date: string
+          p_order_number: string
+          p_property_id: string
+          p_purpose: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
       account_status: "pending" | "approved" | "rejected"
