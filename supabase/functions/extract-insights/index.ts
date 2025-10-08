@@ -32,20 +32,29 @@ serve(async (req) => {
       .map((o: any) => `${o.name} (${o.email})`)
       .join(', ');
 
-    const systemPrompt = `You are an AI assistant analyzing property management emails. Extract key information and determine if this email is relevant to properties or owners.
+    const systemPrompt = `You are an AI assistant analyzing property management emails with advanced sentiment analysis and expense detection capabilities.
 
 Properties: ${propertyList}
 Owners: ${ownerList}
 
-Analyze the email and extract:
-1. Is this email relevant to any property or owner? (yes/no)
-2. Which property is it related to? (match by name or address)
-3. Which owner is it related to? (match by email or name)
-4. Category: maintenance, payment, booking, tenant_communication, legal, insurance, utilities, or other
-5. Summary: 2-3 sentence summary of the email
-6. Action required: Does this need follow-up? (yes/no)
-7. Priority: low, normal, high, urgent
-8. Due date: If action required, when is it due? (YYYY-MM-DD or null)
+Analyze the email comprehensively and extract:
+
+1. **Relevance**: Is this email relevant to any property or owner? (yes/no)
+2. **Property Match**: Which property is it related to? (match by name or address)
+3. **Owner Match**: Which owner is it related to? (match by email or name)
+4. **Category**: maintenance, payment, booking, tenant_communication, legal, insurance, utilities, expense, order, or other
+5. **Summary**: 2-3 sentence summary of the email content
+6. **Sentiment**: Analyze the overall tone - positive, negative, neutral, urgent, or concerning
+7. **Action Required**: Does this need follow-up? (yes/no)
+8. **Suggested Actions**: List 1-3 specific actionable next steps (e.g., "Schedule repair appointment", "Reply to tenant by Friday", "Review invoice details")
+9. **Priority**: low, normal, high, urgent
+10. **Due Date**: If action required, when is it due? (YYYY-MM-DD or null)
+
+11. **Expense Detection**: 
+   - Is this an expense/order/purchase? (yes/no)
+   - Look for: Amazon orders, receipts, invoices, purchase confirmations, subscriptions, utility bills
+   - Extract amount if present (as number, no currency symbols)
+   - Extract what the expense is for (brief description)
 
 Return ONLY a JSON object with these exact fields:
 {
@@ -54,9 +63,14 @@ Return ONLY a JSON object with these exact fields:
   "ownerEmail": string or null,
   "category": string,
   "summary": string,
+  "sentiment": string,
   "actionRequired": boolean,
+  "suggestedActions": string (comma-separated actions),
   "priority": string,
-  "dueDate": string or null
+  "dueDate": string or null,
+  "expenseDetected": boolean,
+  "expenseAmount": number or null,
+  "expenseDescription": string or null
 }`;
 
     const userPrompt = `Email from: ${senderEmail}
@@ -156,20 +170,29 @@ Analyze this email.`;
     }
 
     // Save insight
-    const { error: insertError } = await supabase.from('email_insights').insert({
-      property_id: property?.id || null,
-      owner_id: owner?.id || null,
-      email_date: emailDate,
-      sender_email: senderEmail,
-      subject,
-      summary: analysis.summary,
-      category: analysis.category,
-      action_required: analysis.actionRequired,
-      priority: analysis.priority,
-      due_date: analysis.dueDate,
-      status: 'new',
-      gmail_message_id: gmailMessageId,
-    });
+    const { data: insertedInsight, error: insertError } = await supabase
+      .from('email_insights')
+      .insert({
+        property_id: property?.id || null,
+        owner_id: owner?.id || null,
+        email_date: emailDate,
+        sender_email: senderEmail,
+        subject,
+        summary: analysis.summary,
+        category: analysis.category,
+        sentiment: analysis.sentiment,
+        action_required: analysis.actionRequired,
+        suggested_actions: analysis.suggestedActions,
+        priority: analysis.priority,
+        due_date: analysis.dueDate,
+        expense_detected: analysis.expenseDetected || false,
+        expense_amount: analysis.expenseAmount || null,
+        expense_description: analysis.expenseDescription || null,
+        status: 'new',
+        gmail_message_id: gmailMessageId,
+      })
+      .select()
+      .single();
 
     if (insertError) {
       console.error('Failed to save insight:', insertError);
@@ -177,6 +200,39 @@ Analyze this email.`;
     }
 
     console.log('Insight saved successfully');
+
+    // If expense detected and we have a property, create an expense record
+    if (analysis.expenseDetected && analysis.expenseAmount && property?.id) {
+      console.log('Creating expense record from email...');
+      
+      const { data: userData } = await supabase
+        .from('gmail_oauth_tokens')
+        .select('user_id')
+        .single();
+
+      const { error: expenseError } = await supabase
+        .from('expenses')
+        .insert({
+          property_id: property.id,
+          amount: analysis.expenseAmount,
+          date: new Date(emailDate).toISOString().split('T')[0],
+          purpose: analysis.expenseDescription || `Email expense: ${subject}`,
+          category: 'Email Import',
+          user_id: userData?.user_id || null,
+        });
+
+      if (expenseError) {
+        console.error('Failed to create expense:', expenseError);
+      } else {
+        // Mark expense as created
+        await supabase
+          .from('email_insights')
+          .update({ expense_created: true })
+          .eq('id', insertedInsight.id);
+        
+        console.log('Expense record created successfully');
+      }
+    }
 
     return new Response(
       JSON.stringify({ shouldSave: true, analysis }),

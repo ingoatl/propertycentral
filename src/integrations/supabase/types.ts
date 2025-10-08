@@ -21,14 +21,20 @@ export type Database = {
           created_at: string
           due_date: string | null
           email_date: string
+          expense_amount: number | null
+          expense_created: boolean | null
+          expense_description: string | null
+          expense_detected: boolean | null
           gmail_message_id: string | null
           id: string
           owner_id: string | null
           priority: string | null
           property_id: string | null
           sender_email: string
+          sentiment: string | null
           status: string | null
           subject: string
+          suggested_actions: string | null
           summary: string
         }
         Insert: {
@@ -37,14 +43,20 @@ export type Database = {
           created_at?: string
           due_date?: string | null
           email_date: string
+          expense_amount?: number | null
+          expense_created?: boolean | null
+          expense_description?: string | null
+          expense_detected?: boolean | null
           gmail_message_id?: string | null
           id?: string
           owner_id?: string | null
           priority?: string | null
           property_id?: string | null
           sender_email: string
+          sentiment?: string | null
           status?: string | null
           subject: string
+          suggested_actions?: string | null
           summary: string
         }
         Update: {
@@ -53,14 +65,20 @@ export type Database = {
           created_at?: string
           due_date?: string | null
           email_date?: string
+          expense_amount?: number | null
+          expense_created?: boolean | null
+          expense_description?: string | null
+          expense_detected?: boolean | null
           gmail_message_id?: string | null
           id?: string
           owner_id?: string | null
           priority?: string | null
           property_id?: string | null
           sender_email?: string
+          sentiment?: string | null
           status?: string | null
           subject?: string
+          suggested_actions?: string | null
           summary?: string
         }
         Relationships: [

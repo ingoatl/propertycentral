@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Mail, ChevronDown, AlertCircle, CheckCircle, Clock, TrendingUp } from "lucide-react";
+import { Mail, ChevronDown, AlertCircle, CheckCircle, Clock, TrendingUp, Trash2, DollarSign, Lightbulb, Heart, Frown, Meh, Zap } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -16,10 +16,16 @@ interface EmailInsight {
   subject: string;
   summary: string;
   category: string;
+  sentiment: string | null;
   actionRequired: boolean;
+  suggestedActions: string | null;
   dueDate: string | null;
   priority: string;
   status: string;
+  expenseDetected: boolean;
+  expenseAmount: number | null;
+  expenseDescription: string | null;
+  expenseCreated: boolean;
   createdAt: string;
 }
 
@@ -87,10 +93,16 @@ export function EmailInsightsCard({ propertyId, showHeader = true }: EmailInsigh
         subject: d.subject,
         summary: d.summary,
         category: d.category,
+        sentiment: d.sentiment,
         actionRequired: d.action_required,
+        suggestedActions: d.suggested_actions,
         dueDate: d.due_date,
         priority: d.priority,
         status: d.status,
+        expenseDetected: d.expense_detected,
+        expenseAmount: d.expense_amount,
+        expenseDescription: d.expense_description,
+        expenseCreated: d.expense_created,
         createdAt: d.created_at,
       })));
     } catch (error: any) {
@@ -181,7 +193,47 @@ export function EmailInsightsCard({ propertyId, showHeader = true }: EmailInsigh
       case 'legal': return '⚖️';
       case 'insurance': return '🛡️';
       case 'utilities': return '⚡';
+      case 'expense': return '💰';
+      case 'order': return '📦';
       default: return '📧';
+    }
+  };
+
+  const getSentimentIcon = (sentiment: string | null) => {
+    if (!sentiment) return null;
+    switch (sentiment.toLowerCase()) {
+      case 'positive':
+        return <Heart className="w-4 h-4 text-green-600" />;
+      case 'negative':
+      case 'concerning':
+        return <Frown className="w-4 h-4 text-red-600" />;
+      case 'urgent':
+        return <Zap className="w-4 h-4 text-orange-600" />;
+      case 'neutral':
+        return <Meh className="w-4 h-4 text-gray-600" />;
+      default:
+        return null;
+    }
+  };
+
+  const handleDeleteInsight = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this email insight?")) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('email_insights')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      await loadInsights();
+      toast.success("Email insight deleted");
+    } catch (error: any) {
+      console.error("Error deleting insight:", error);
+      toast.error("Failed to delete insight");
     }
   };
 
@@ -280,6 +332,55 @@ export function EmailInsightsCard({ propertyId, showHeader = true }: EmailInsigh
                         <p className="font-medium text-foreground line-clamp-1">{insight.subject}</p>
                         <p className="text-sm text-muted-foreground line-clamp-2">{insight.summary}</p>
                         
+                        {/* Sentiment Badge */}
+                        {insight.sentiment && (
+                          <div className="flex items-center gap-2">
+                            {getSentimentIcon(insight.sentiment)}
+                            <Badge variant="outline" className="capitalize text-xs">
+                              {insight.sentiment}
+                            </Badge>
+                          </div>
+                        )}
+
+                        {/* Suggested Actions */}
+                        {insight.suggestedActions && (
+                          <div className="bg-blue-50 dark:bg-blue-950/30 p-3 rounded-lg border border-blue-200 dark:border-blue-800">
+                            <div className="flex items-start gap-2">
+                              <Lightbulb className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                              <div className="space-y-1">
+                                <p className="text-xs font-medium text-blue-900 dark:text-blue-100">Suggested Actions:</p>
+                                <ul className="text-xs text-blue-800 dark:text-blue-200 space-y-0.5">
+                                  {insight.suggestedActions.split(',').map((action, idx) => (
+                                    <li key={idx}>• {action.trim()}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Expense Information */}
+                        {insight.expenseDetected && (
+                          <div className="bg-green-50 dark:bg-green-950/30 p-3 rounded-lg border border-green-200 dark:border-green-800">
+                            <div className="flex items-start gap-2">
+                              <DollarSign className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                              <div className="flex-1">
+                                <p className="text-xs font-medium text-green-900 dark:text-green-100">
+                                  Expense Detected: ${insight.expenseAmount?.toFixed(2)}
+                                </p>
+                                {insight.expenseDescription && (
+                                  <p className="text-xs text-green-800 dark:text-green-200">{insight.expenseDescription}</p>
+                                )}
+                                {insight.expenseCreated && (
+                                  <Badge variant="outline" className="mt-1 text-xs bg-green-100 text-green-800 border-green-300">
+                                    ✓ Expense Record Created
+                                  </Badge>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                        
                         <div className="flex items-center gap-4 text-xs text-muted-foreground">
                           <span className="flex items-center gap-1">
                             <Mail className="w-3 h-3" />
@@ -298,9 +399,19 @@ export function EmailInsightsCard({ propertyId, showHeader = true }: EmailInsigh
                         </div>
                       </div>
                       
-                      {insight.status === 'completed' && (
-                        <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0" />
-                      )}
+                      <div className="flex gap-1">
+                        {insight.status === 'completed' && (
+                          <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0" />
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDeleteInsight(insight.id)}
+                          className="text-destructive hover:text-destructive hover:bg-destructive/10 flex-shrink-0"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 ))}
