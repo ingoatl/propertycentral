@@ -14,6 +14,11 @@ interface OnboardingProjectCardProps {
 
 export const OnboardingProjectCard = ({ project, onUpdate }: OnboardingProjectCardProps) => {
   const [showWorkflow, setShowWorkflow] = useState(false);
+  
+  const handleUpdate = () => {
+    // Don't close the modal when updating
+    onUpdate();
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -75,7 +80,7 @@ export const OnboardingProjectCard = ({ project, onUpdate }: OnboardingProjectCa
         open={showWorkflow}
         onOpenChange={setShowWorkflow}
         project={project}
-        onUpdate={onUpdate}
+        onUpdate={handleUpdate}
       />
     </>
   );

@@ -41,7 +41,10 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
         .update(updateData)
         .eq("id", task.id);
 
-      onUpdate();
+      // Delay update to prevent modal from closing
+      requestAnimationFrame(() => {
+        onUpdate();
+      });
     } catch (error) {
       console.error("Failed to auto-save task:", error);
     }
