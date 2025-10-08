@@ -21,13 +21,11 @@ export const OnboardingTab = ({ propertyId, propertyName, propertyAddress }: Onb
 
   useEffect(() => {
     loadProjects();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [propertyId]);
 
   const loadProjects = async () => {
     try {
-      setLoading(true);
-      console.log("Loading onboarding projects for property:", propertyId);
-      
       const { data, error } = await supabase
         .from("onboarding_projects")
         .select("*")
@@ -39,7 +37,6 @@ export const OnboardingTab = ({ propertyId, propertyName, propertyAddress }: Onb
         toast.error("Failed to load onboarding projects: " + error.message);
         setProjects([]);
       } else {
-        console.log("Loaded projects:", data);
         setProjects((data || []) as OnboardingProject[]);
       }
     } catch (error: any) {
