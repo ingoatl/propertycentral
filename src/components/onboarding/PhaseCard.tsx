@@ -14,6 +14,7 @@ interface PhaseCardProps {
   expanded: boolean;
   onToggle: () => void;
   onTaskUpdate: () => void;
+  highlighted?: boolean;
 }
 
 export const PhaseCard = ({
@@ -24,13 +25,15 @@ export const PhaseCard = ({
   expanded,
   onToggle,
   onTaskUpdate,
+  highlighted = false,
 }: PhaseCardProps) => {
   const isComplete = completion === 100;
 
   return (
     <Card className={cn(
       "transition-all",
-      isComplete && "border-green-500/50"
+      isComplete && "border-green-500/50",
+      highlighted && "ring-2 ring-blue-500 shadow-lg"
     )}>
       <Collapsible open={expanded} onOpenChange={onToggle}>
         <CollapsibleTrigger className="w-full">

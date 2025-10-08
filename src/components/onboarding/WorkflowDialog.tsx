@@ -179,6 +179,7 @@ export const WorkflowDialog = ({ open, onOpenChange, project, onUpdate }: Workfl
                 projectId={project.id}
                 tasks={searchQuery ? filteredTasks : tasks}
                 onTaskUpdate={handleTaskUpdate}
+                searchQuery={searchQuery}
               />
 
               {searchQuery && filteredTasks.length === 0 && (

@@ -59,9 +59,8 @@ export const InspectionCard = ({ projectId }: InspectionCardProps) => {
 
   const photoLink = inspectionLink || "https://peachhaus-str-inspect.lovable.app/property/04c0c98d-443f-4d53-9f2a-8234f8bc1b34#photos";
 
-  if (!inspectionLink) {
-    return null; // Don't show card if no inspection link is set
-  }
+  // Show a placeholder message if no link is set
+  const showPlaceholder = !inspectionLink;
 
   return (
     <Card className="border-blue-200 bg-blue-50/50">
@@ -84,7 +83,14 @@ export const InspectionCard = ({ projectId }: InspectionCardProps) => {
         </CardHeader>
 
         <CollapsibleContent>
-          <CardContent className="space-y-4">
+          {showPlaceholder ? (
+            <CardContent className="py-6">
+              <div className="text-center text-muted-foreground text-sm">
+                Add the inspection report link in the "Inspection report link" field to view inspection details here.
+              </div>
+            </CardContent>
+          ) : (
+            <CardContent className="space-y-4">
             {/* Inspection Summary */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               <div className="flex items-center gap-2 text-sm">
@@ -223,6 +229,7 @@ export const InspectionCard = ({ projectId }: InspectionCardProps) => {
               </a>
             </div>
           </CardContent>
+          )}
         </CollapsibleContent>
       </Collapsible>
     </Card>

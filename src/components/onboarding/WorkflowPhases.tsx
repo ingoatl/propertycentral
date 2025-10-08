@@ -7,9 +7,10 @@ interface WorkflowPhasesProps {
   projectId: string;
   tasks: OnboardingTask[];
   onTaskUpdate: () => void;
+  searchQuery?: string;
 }
 
-export const WorkflowPhases = ({ projectId, tasks, onTaskUpdate }: WorkflowPhasesProps) => {
+export const WorkflowPhases = ({ projectId, tasks, onTaskUpdate, searchQuery = "" }: WorkflowPhasesProps) => {
   const [expandedPhases, setExpandedPhases] = useState<Set<number>>(new Set([1]));
 
   const getPhaseCompletion = (phaseNumber: number) => {
@@ -31,11 +32,30 @@ export const WorkflowPhases = ({ projectId, tasks, onTaskUpdate }: WorkflowPhase
     });
   };
 
+  // Auto-expand phases with matching tasks when searching
+  const getHighlightedPhases = () => {
+    if (!searchQuery) return new Set<number>();
+    const phases = new Set<number>();
+    tasks.forEach(task => {
+      phases.add(task.phase_number);
+    });
+    return phases;
+  };
+
+  const highlightedPhases = getHighlightedPhases();
+
   return (
     <div className="space-y-4">
       {ONBOARDING_PHASES.map((phase) => {
         const phaseTasks = tasks.filter(t => t.phase_number === phase.id);
         const completion = getPhaseCompletion(phase.id);
+        const isHighlighted = highlightedPhases.has(phase.id);
+        const shouldExpand = isHighlighted || expandedPhases.has(phase.id);
+
+        // Skip phases with no tasks when searching
+        if (searchQuery && phaseTasks.length === 0) {
+          return null;
+        }
 
         return (
           <PhaseCard
@@ -44,9 +64,10 @@ export const WorkflowPhases = ({ projectId, tasks, onTaskUpdate }: WorkflowPhase
             tasks={phaseTasks}
             completion={completion}
             unlocked={true}
-            expanded={expandedPhases.has(phase.id)}
+            expanded={shouldExpand}
             onToggle={() => togglePhase(phase.id)}
             onTaskUpdate={onTaskUpdate}
+            highlighted={isHighlighted}
           />
         );
       })}

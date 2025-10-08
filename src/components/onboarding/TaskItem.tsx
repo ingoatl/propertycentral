@@ -9,7 +9,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
-import { CalendarIcon, Upload, FileText, CheckCircle2, Edit2 } from "lucide-react";
+import { CalendarIcon, Upload, FileText, CheckCircle2, Edit2, Copy, Check } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -31,9 +31,19 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
   const [naReason, setNAReason] = useState(task.notes || "");
   const [taskStatus, setTaskStatus] = useState(task.status);
   const [isEditing, setIsEditing] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   const hasValue = task.field_value && task.field_value.trim() !== "";
   const isReadOnly = hasValue && !isEditing;
+
+  const handleCopy = async () => {
+    if (fieldValue) {
+      await navigator.clipboard.writeText(fieldValue);
+      setCopied(true);
+      toast.success("Copied to clipboard");
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
 
   const autoSave = async (value: string, isCompleted: boolean = true, notesValue?: string) => {
     try {
@@ -170,16 +180,27 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
             <div className="flex items-center justify-between">
               <Label>{task.title}</Label>
               {hasValue && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setIsEditing(!isEditing)}
-                  className="h-6 px-2 text-xs"
-                >
-                  <Edit2 className="w-3 h-3 mr-1" />
-                  {isEditing ? "Cancel" : "Edit"}
-                </Button>
+                <div className="flex gap-1">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleCopy}
+                    className="h-6 px-2 text-xs"
+                  >
+                    {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setIsEditing(!isEditing)}
+                    className="h-6 px-2 text-xs"
+                  >
+                    <Edit2 className="w-3 h-3 mr-1" />
+                    {isEditing ? "Cancel" : "Edit"}
+                  </Button>
+                </div>
               )}
             </div>
             <Textarea
@@ -187,9 +208,12 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
               onChange={(e) => handleInputChange(e.target.value)}
               onBlur={handleInputBlur}
               placeholder={task.description || "Enter details..."}
-              rows={3}
+              rows={2}
               disabled={isReadOnly}
-              className={cn(isReadOnly && "border-2 border-green-200 bg-green-50/30")}
+              className={cn(
+                "text-sm",
+                isReadOnly && "border-2 border-green-200 bg-green-50/30 text-foreground font-medium resize-none"
+              )}
             />
           </div>
         );
@@ -218,12 +242,12 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
                   variant="outline"
                   disabled={isReadOnly}
                   className={cn(
-                    "w-full justify-start text-left font-normal",
+                    "w-full justify-start text-left font-normal text-sm h-9",
                     !date && "text-muted-foreground",
-                    isReadOnly && "border-2 border-green-200 bg-green-50/30"
+                    isReadOnly && "border-2 border-green-200 bg-green-50/30 text-foreground font-medium"
                   )}
                 >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  <CalendarIcon className="mr-2 h-3.5 w-3.5" />
                   {date ? format(date, "PPP") : <span>Pick a date</span>}
                 </Button>
               </PopoverTrigger>
@@ -337,27 +361,41 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
             <div className="flex items-center justify-between">
               <Label>{task.title}</Label>
               {hasValue && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setIsEditing(!isEditing)}
-                  className="h-6 px-2 text-xs"
-                >
-                  <Edit2 className="w-3 h-3 mr-1" />
-                  {isEditing ? "Cancel" : "Edit"}
-                </Button>
+                <div className="flex gap-1">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleCopy}
+                    className="h-6 px-2 text-xs"
+                  >
+                    {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setIsEditing(!isEditing)}
+                    className="h-6 px-2 text-xs"
+                  >
+                    <Edit2 className="w-3 h-3 mr-1" />
+                    {isEditing ? "Cancel" : "Edit"}
+                  </Button>
+                </div>
               )}
             </div>
             <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
               <Input
                 type="number"
                 step="0.01"
                 value={fieldValue}
                 onChange={(e) => handleInputChange(e.target.value)}
                 onBlur={handleInputBlur}
-                className={cn("pl-7", isReadOnly && "border-2 border-green-200 bg-green-50/30")}
+                className={cn(
+                  "pl-7 h-9 text-sm",
+                  isReadOnly && "border-2 border-green-200 bg-green-50/30 text-foreground font-medium"
+                )}
                 placeholder="0.00"
                 disabled={isReadOnly}
               />
@@ -371,16 +409,27 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
             <div className="flex items-center justify-between">
               <Label>{task.title}</Label>
               {hasValue && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setIsEditing(!isEditing)}
-                  className="h-6 px-2 text-xs"
-                >
-                  <Edit2 className="w-3 h-3 mr-1" />
-                  {isEditing ? "Cancel" : "Edit"}
-                </Button>
+                <div className="flex gap-1">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleCopy}
+                    className="h-6 px-2 text-xs"
+                  >
+                    {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setIsEditing(!isEditing)}
+                    className="h-6 px-2 text-xs"
+                  >
+                    <Edit2 className="w-3 h-3 mr-1" />
+                    {isEditing ? "Cancel" : "Edit"}
+                  </Button>
+                </div>
               )}
             </div>
             <Input
@@ -390,7 +439,10 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
               onBlur={handleInputBlur}
               placeholder="(555) 123-4567"
               disabled={isReadOnly}
-              className={cn(isReadOnly && "border-2 border-green-200 bg-green-50/30")}
+              className={cn(
+                "h-9 text-sm",
+                isReadOnly && "border-2 border-green-200 bg-green-50/30 text-foreground font-medium"
+              )}
             />
           </div>
         );
@@ -416,16 +468,27 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
             <div className="flex items-center justify-between">
               <Label>{task.title}</Label>
               {hasValue && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setIsEditing(!isEditing)}
-                  className="h-6 px-2 text-xs"
-                >
-                  <Edit2 className="w-3 h-3 mr-1" />
-                  {isEditing ? "Cancel" : "Edit"}
-                </Button>
+                <div className="flex gap-1">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleCopy}
+                    className="h-6 px-2 text-xs"
+                  >
+                    {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setIsEditing(!isEditing)}
+                    className="h-6 px-2 text-xs"
+                  >
+                    <Edit2 className="w-3 h-3 mr-1" />
+                    {isEditing ? "Cancel" : "Edit"}
+                  </Button>
+                </div>
               )}
             </div>
             <Input
@@ -434,7 +497,10 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
               onBlur={handleInputBlur}
               placeholder={task.description || "Enter value..."}
               disabled={isReadOnly}
-              className={cn(isReadOnly && "border-2 border-green-200 bg-green-50/30")}
+              className={cn(
+                "h-9 text-sm",
+                isReadOnly && "border-2 border-green-200 bg-green-50/30 text-foreground font-medium"
+              )}
             />
           </div>
         );
