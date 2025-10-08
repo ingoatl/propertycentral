@@ -26,59 +26,51 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
   const [date, setDate] = useState<Date | undefined>(
     task.field_value && task.field_type === "date" ? new Date(task.field_value) : undefined
   );
-  const [saving, setSaving] = useState(false);
 
-  const handleCheckboxChange = async (checked: boolean) => {
+  const autoSave = async (value: string, isCompleted: boolean = true) => {
     try {
-      const { error } = await supabase
-        .from("onboarding_tasks")
-        .update({
-          status: checked ? "completed" : "pending",
-          completed_date: checked ? new Date().toISOString() : null,
-          field_value: checked ? "true" : "false",
-        })
-        .eq("id", task.id);
-
-      if (error) throw error;
-      // Update parent without triggering re-renders that might close modal
-      setTimeout(() => onUpdate(), 50);
-    } catch (error) {
-      console.error("Failed to update task:", error);
-    }
-  };
-
-  const handleSave = async (e?: React.MouseEvent) => {
-    if (e) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
-    
-    try {
-      setSaving(true);
       const updateData: any = {
-        field_value: fieldValue,
+        field_value: value,
         notes,
-        status: fieldValue ? "completed" : "pending",
-        completed_date: fieldValue ? new Date().toISOString() : null,
+        status: isCompleted && value ? "completed" : "pending",
+        completed_date: isCompleted && value ? new Date().toISOString() : null,
       };
 
-      if (task.field_type === "date" && date) {
-        updateData.field_value = format(date, "yyyy-MM-dd");
-      }
-
-      const { error } = await supabase
+      await supabase
         .from("onboarding_tasks")
         .update(updateData)
         .eq("id", task.id);
 
-      if (error) throw error;
-      // Update parent without triggering re-renders that might close modal
-      setTimeout(() => onUpdate(), 50);
+      onUpdate();
     } catch (error) {
-      console.error("Failed to save task:", error);
-    } finally {
-      setSaving(false);
+      console.error("Failed to auto-save task:", error);
     }
+  };
+
+  const handleCheckboxChange = async (checked: boolean) => {
+    await autoSave(checked ? "true" : "false", checked);
+  };
+
+  const handleInputChange = (value: string) => {
+    setFieldValue(value);
+  };
+
+  const handleInputBlur = () => {
+    if (fieldValue !== task.field_value) {
+      autoSave(fieldValue);
+    }
+  };
+
+  const handleDateChange = (newDate: Date | undefined) => {
+    setDate(newDate);
+    if (newDate) {
+      autoSave(format(newDate, "yyyy-MM-dd"));
+    }
+  };
+
+  const handleRadioChange = (value: string) => {
+    setFieldValue(value);
+    autoSave(value);
   };
 
   const renderField = () => {
@@ -103,7 +95,8 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
             <Label>{task.title}</Label>
             <Textarea
               value={fieldValue}
-              onChange={(e) => setFieldValue(e.target.value)}
+              onChange={(e) => handleInputChange(e.target.value)}
+              onBlur={handleInputBlur}
               placeholder={task.description || "Enter details..."}
               rows={3}
             />
@@ -131,7 +124,7 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
                 <Calendar
                   mode="single"
                   selected={date}
-                  onSelect={setDate}
+                  onSelect={handleDateChange}
                   initialFocus
                 />
               </PopoverContent>
@@ -165,7 +158,8 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
                 type="number"
                 step="0.01"
                 value={fieldValue}
-                onChange={(e) => setFieldValue(e.target.value)}
+                onChange={(e) => handleInputChange(e.target.value)}
+                onBlur={handleInputBlur}
                 className="pl-7"
                 placeholder="0.00"
               />
@@ -180,7 +174,8 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
             <Input
               type="tel"
               value={fieldValue}
-              onChange={(e) => setFieldValue(e.target.value)}
+              onChange={(e) => handleInputChange(e.target.value)}
+              onBlur={handleInputBlur}
               placeholder="(555) 123-4567"
             />
           </div>
@@ -190,7 +185,7 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
         return (
           <div className="space-y-2">
             <Label>{task.title}</Label>
-            <RadioGroup value={fieldValue} onValueChange={setFieldValue}>
+            <RadioGroup value={fieldValue} onValueChange={handleRadioChange}>
               {["Yes", "No", "N/A"].map((option) => (
                 <div key={option} className="flex items-center space-x-2">
                   <RadioGroupItem value={option} id={`${task.id}-${option}`} />
@@ -207,7 +202,8 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
             <Label>{task.title}</Label>
             <Input
               value={fieldValue}
-              onChange={(e) => setFieldValue(e.target.value)}
+              onChange={(e) => handleInputChange(e.target.value)}
+              onBlur={handleInputBlur}
               placeholder={task.description || "Enter value..."}
             />
           </div>
@@ -221,35 +217,7 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
       task.status === "completed" && "bg-green-50 border-green-200"
     )}>
       <CardContent className="pt-4">
-        <div className="space-y-3">
-          {renderField()}
-
-          {task.field_type !== "checkbox" && (
-            <>
-              <div className="space-y-2">
-                <Label className="text-xs text-muted-foreground">Notes (optional)</Label>
-                <Textarea
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Add notes..."
-                  rows={2}
-                  className="text-sm"
-                />
-              </div>
-
-              <div className="flex gap-2">
-                <Button onClick={handleSave} disabled={saving} size="sm">
-                  <Save className="w-4 h-4 mr-2" />
-                  {saving ? "Saving..." : "Save"}
-                </Button>
-                <Button variant="outline" size="sm">
-                  <MessageSquare className="w-4 h-4 mr-2" />
-                  Comments
-                </Button>
-              </div>
-            </>
-          )}
-        </div>
+        {renderField()}
       </CardContent>
     </Card>
   );
