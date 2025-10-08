@@ -227,10 +227,15 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
                 )}
                 
                 {task.file_path && !uploading && (
-                  <div className="flex items-center gap-2 text-xs text-green-600">
+                  <a
+                    href={`${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/onboarding-documents/${task.file_path}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 text-xs text-green-600 hover:text-green-700 hover:underline"
+                  >
                     <FileText className="w-4 h-4" />
                     <span>{task.field_value}</span>
-                  </div>
+                  </a>
                 )}
                 
                 {!task.file_path && task.field_value !== "N/A" && (
