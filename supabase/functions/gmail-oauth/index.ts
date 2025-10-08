@@ -12,7 +12,25 @@ serve(async (req) => {
   }
 
   try {
-    const { code, userId } = await req.json();
+    const url = new URL(req.url);
+    const code = url.searchParams.get('code');
+    const userId = url.searchParams.get('state'); // userId passed as state
+    const error = url.searchParams.get('error');
+
+    console.log('OAuth callback received', { hasCode: !!code, userId, error });
+
+    // Handle OAuth errors
+    if (error) {
+      console.error('OAuth error:', error);
+      return new Response(
+        `<html><body><script>window.close(); alert('Authorization failed: ${error}');</script></body></html>`,
+        { headers: { 'Content-Type': 'text/html' } }
+      );
+    }
+
+    if (!code || !userId) {
+      throw new Error('Missing authorization code or user ID');
+    }
     
     const GOOGLE_CLIENT_ID = Deno.env.get('GOOGLE_CLIENT_ID');
     const GOOGLE_CLIENT_SECRET = Deno.env.get('GOOGLE_CLIENT_SECRET');
@@ -71,16 +89,33 @@ serve(async (req) => {
 
     console.log('Tokens stored successfully');
 
+    // Return success page that closes the window
     return new Response(
-      JSON.stringify({ success: true, message: 'Gmail connected successfully' }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      `<html>
+        <body>
+          <h1>Gmail Connected Successfully!</h1>
+          <p>You can close this window and return to the app.</p>
+          <script>
+            setTimeout(() => {
+              window.close();
+            }, 2000);
+          </script>
+        </body>
+      </html>`,
+      { headers: { 'Content-Type': 'text/html' } }
     );
   } catch (error) {
     console.error('Error in gmail-oauth:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return new Response(
-      JSON.stringify({ error: errorMessage }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      `<html>
+        <body>
+          <h1>Error Connecting Gmail</h1>
+          <p>${errorMessage}</p>
+          <p>You can close this window.</p>
+        </body>
+      </html>`,
+      { headers: { 'Content-Type': 'text/html' } }
     );
   }
 });

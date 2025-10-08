@@ -94,32 +94,46 @@ export function EmailInsightsCard({ propertyId, showHeader = true }: EmailInsigh
     }
   };
 
-  const connectGmail = async () => {
+  const connectGmail = () => {
     try {
-      setConnecting(true);
-      const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+      // Your Google Client ID from the screenshot
+      const GOOGLE_CLIENT_ID = '599562846826-47Dvh7o74po3ffvg95e1a4592rn3ill.apps.googleusercontent.com';
       const REDIRECT_URI = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/gmail-oauth`;
       
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
+      supabase.auth.getUser().then(({ data: { user } }) => {
+        if (!user) {
+          toast.error('Not authenticated');
+          return;
+        }
 
-      const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?${new URLSearchParams({
-        client_id: GOOGLE_CLIENT_ID,
-        redirect_uri: REDIRECT_URI,
-        response_type: 'code',
-        scope: 'https://www.googleapis.com/auth/gmail.readonly',
-        access_type: 'offline',
-        prompt: 'consent',
-        state: user.id,
-      })}`;
+        const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?${new URLSearchParams({
+          client_id: GOOGLE_CLIENT_ID,
+          redirect_uri: REDIRECT_URI,
+          response_type: 'code',
+          scope: 'https://www.googleapis.com/auth/gmail.readonly',
+          access_type: 'offline',
+          prompt: 'consent',
+          state: user.id,
+        })}`;
 
-      window.open(authUrl, '_blank');
-      toast.info('Complete authorization in the new window');
+        // Use window.open instead of location.href so user stays on the page
+        const authWindow = window.open(authUrl, 'gmail-auth', 'width=600,height=700');
+        
+        // Poll for window close
+        const pollTimer = setInterval(() => {
+          if (authWindow?.closed) {
+            clearInterval(pollTimer);
+            // Reload data after auth window closes
+            setTimeout(() => {
+              checkGmailConnection();
+              loadInsights();
+            }, 1000);
+          }
+        }, 500);
+      });
     } catch (error: any) {
       console.error('Error connecting Gmail:', error);
       toast.error('Failed to connect Gmail');
-    } finally {
-      setConnecting(false);
     }
   };
 
