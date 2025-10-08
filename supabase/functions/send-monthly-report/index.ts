@@ -265,20 +265,14 @@ Keep it CONCISE and SCANNABLE. Each section should be 2-4 lines maximum. DO NOT 
         <body style="margin: 0; padding: 0; background: #f8f9fa;">
           <div style="max-width: 680px; margin: 0 auto; background: white;">
             
-            <!-- Hero Header with Background Pattern -->
-            <div style="background: linear-gradient(135deg, #FF6B9D 0%, #C86DD7 50%, #8B5CF6 100%); padding: 50px 40px; text-align: center; position: relative; overflow: hidden;">
-              <div style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; opacity: 0.1; background-image: repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(255,255,255,.1) 10px, rgba(255,255,255,.1) 20px);"></div>
-              <div style="position: relative; z-index: 2;">
-                <div style="background: white; width: 80px; height: 80px; border-radius: 50%; margin: 0 auto 25px; display: inline-flex; align-items: center; justify-content: center; box-shadow: 0 8px 20px rgba(0,0,0,0.15);">
-                  <span style="font-size: 42px;">🏡</span>
-                </div>
-                <h1 style="margin: 0 0 12px 0; font-size: 36px; color: white; font-weight: 700; letter-spacing: -0.5px; text-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                  Your Property Update
-                </h1>
-                <p style="margin: 0; font-size: 20px; color: rgba(255,255,255,0.95); font-weight: 300;">
-                  ${previousMonthName}
-                </p>
-              </div>
+            <!-- Hero Header -->
+            <div style="background: linear-gradient(135deg, #FF6B9D 0%, #C86DD7 50%, #8B5CF6 100%); padding: 50px 40px; text-align: center;">
+              <h1 style="margin: 0 0 12px 0; font-size: 36px; color: white; font-weight: 700; letter-spacing: -0.5px;">
+                Your Property Update
+              </h1>
+              <p style="margin: 0; font-size: 20px; color: rgba(255,255,255,0.95); font-weight: 300;">
+                ${previousMonthName}
+              </p>
             </div>
 
             <!-- Welcome Message -->

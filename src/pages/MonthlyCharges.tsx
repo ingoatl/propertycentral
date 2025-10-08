@@ -3,8 +3,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Calendar, DollarSign, RefreshCw, CheckCircle, XCircle, Clock, ExternalLink, Mail, ChevronDown, ChevronUp } from "lucide-react";
+import { Calendar, DollarSign, RefreshCw, CheckCircle, XCircle, Clock, ExternalLink, Mail, ChevronDown, ChevronUp, Upload, FileText } from "lucide-react";
 import { format } from "date-fns";
 import {
   Table,
@@ -19,6 +22,15 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 
 interface MonthlyCharge {
   id: string;
@@ -30,6 +42,7 @@ interface MonthlyCharge {
   charge_status: "pending" | "processing" | "succeeded" | "failed" | "refunded";
   charged_at: string | null;
   created_at: string;
+  receipt_path: string | null;
 }
 
 interface PropertyOwner {
@@ -254,15 +267,23 @@ const ChargeBreakdown = ({ charge }: ChargeBreakdownProps) => {
 
 const MonthlyCharges = () => {
   const [charges, setCharges] = useState<ChargeWithOwner[]>([]);
+  const [owners, setOwners] = useState<PropertyOwner[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   const [charging, setCharging] = useState(false);
   const [sendingTest, setSendingTest] = useState(false);
   const [expandedCharge, setExpandedCharge] = useState<string | null>(null);
+  const [chargeDialogOpen, setChargeDialogOpen] = useState(false);
+  const [selectedOwner, setSelectedOwner] = useState<string>("");
+  const [chargeAmount, setChargeAmount] = useState("");
+  const [chargeMonth, setChargeMonth] = useState(new Date().toISOString().slice(0, 7));
+  const [chargeDescription, setChargeDescription] = useState("");
+  const [uploadingReceipt, setUploadingReceipt] = useState(false);
 
   useEffect(() => {
     checkAdminStatus();
     loadCharges();
+    loadOwners();
   }, []);
 
   const checkAdminStatus = async () => {
@@ -280,6 +301,21 @@ const MonthlyCharges = () => {
       setIsAdmin(!!roles);
     } catch (error) {
       console.error("Error checking admin status:", error);
+    }
+  };
+
+  const loadOwners = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("property_owners")
+        .select("*")
+        .order("name");
+
+      if (error) throw error;
+      setOwners((data || []) as PropertyOwner[]);
+    } catch (error: any) {
+      console.error("Error loading owners:", error);
+      toast.error("Failed to load property owners");
     }
   };
 
@@ -315,6 +351,79 @@ const MonthlyCharges = () => {
       toast.error("Failed to load charges");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleChargeIndividual = async () => {
+    if (!selectedOwner || !chargeAmount || !chargeMonth) {
+      toast.error("Please fill in all required fields");
+      return;
+    }
+
+    setCharging(true);
+    toast.loading("Processing charge...");
+
+    try {
+      const { data, error } = await supabase.functions.invoke("charge-individual-owner", {
+        body: {
+          ownerId: selectedOwner,
+          chargeMonth: chargeMonth + "-01",
+          amount: parseFloat(chargeAmount),
+          description: chargeDescription,
+        },
+      });
+
+      if (error) throw error;
+
+      toast.dismiss();
+      toast.success("Charge processed and email sent to owner!");
+      
+      setChargeDialogOpen(false);
+      setSelectedOwner("");
+      setChargeAmount("");
+      setChargeDescription("");
+      loadCharges();
+    } catch (error: any) {
+      console.error("Error charging owner:", error);
+      toast.dismiss();
+      toast.error(error.message || "Failed to process charge");
+    } finally {
+      setCharging(false);
+    }
+  };
+
+  const handleUploadReceipt = async (chargeId: string, file: File) => {
+    if (!file) return;
+
+    setUploadingReceipt(true);
+    toast.loading("Uploading receipt...");
+
+    try {
+      const fileExt = file.name.split('.').pop();
+      const filePath = `${chargeId}/${Date.now()}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("expense-documents")
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { error: updateError } = await supabase
+        .from("monthly_charges")
+        .update({ receipt_path: filePath })
+        .eq("id", chargeId);
+
+      if (updateError) throw updateError;
+
+      toast.dismiss();
+      toast.success("Receipt uploaded successfully!");
+      loadCharges();
+    } catch (error: any) {
+      console.error("Error uploading receipt:", error);
+      toast.dismiss();
+      toast.error(error.message || "Failed to upload receipt");
+    } finally {
+      setUploadingReceipt(false);
     }
   };
 
@@ -440,14 +549,77 @@ const MonthlyCharges = () => {
             <Mail className="w-4 h-4" />
             {sendingTest ? "Sending..." : "Send Test Email"}
           </Button>
-          <Button
-            className="gap-2"
-            onClick={handleChargeMonthlyFees}
-            disabled={charging}
-          >
-            <DollarSign className="w-4 h-4" />
-            {charging ? "Processing..." : "Charge This Month's Fees"}
-          </Button>
+          <Dialog open={chargeDialogOpen} onOpenChange={setChargeDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="gap-2">
+                <DollarSign className="w-4 h-4" />
+                Charge Individual Owner
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[500px]">
+              <DialogHeader>
+                <DialogTitle>Charge Individual Owner</DialogTitle>
+                <DialogDescription>
+                  Process a charge for a specific property owner and send them an email receipt.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="owner">Property Owner *</Label>
+                  <select
+                    id="owner"
+                    value={selectedOwner}
+                    onChange={(e) => setSelectedOwner(e.target.value)}
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  >
+                    <option value="">Select owner...</option>
+                    {owners.map(owner => (
+                      <option key={owner.id} value={owner.id}>
+                        {owner.name} ({owner.email})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="month">Charge Month *</Label>
+                  <Input
+                    id="month"
+                    type="month"
+                    value={chargeMonth}
+                    onChange={(e) => setChargeMonth(e.target.value)}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="amount">Amount *</Label>
+                  <Input
+                    id="amount"
+                    type="number"
+                    step="0.01"
+                    placeholder="0.00"
+                    value={chargeAmount}
+                    onChange={(e) => setChargeAmount(e.target.value)}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="description">Description (optional)</Label>
+                  <Textarea
+                    id="description"
+                    placeholder="e.g., Management fees, maintenance costs..."
+                    value={chargeDescription}
+                    onChange={(e) => setChargeDescription(e.target.value)}
+                  />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setChargeDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={handleChargeIndividual} disabled={charging}>
+                  {charging ? "Processing..." : "Charge Owner"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 
@@ -460,18 +632,14 @@ const MonthlyCharges = () => {
         </CardHeader>
         <CardContent className="space-y-2 text-sm text-muted-foreground">
           <p>
-            When you click "Charge This Month's Fees", the system will:
+            You can now charge individual owners with custom amounts and descriptions:
           </p>
-          <ol className="list-decimal list-inside space-y-1 ml-2">
-            <li>Calculate management fees from all OwnerRez bookings for the <strong>previous month</strong></li>
-            <li>Group fees by property owner</li>
-            <li>Create Stripe payment intents using each owner's preferred payment method (Card or ACH)</li>
-            <li>Record the charge status in this table</li>
-          </ol>
-          <p className="mt-4">
-            <strong>Note:</strong> For ACH payments, make sure the bank account is set up in Stripe first.
-            For credit card payments, the owner will receive a payment link if not set up.
-          </p>
+          <ul className="list-disc list-inside space-y-1 ml-2">
+            <li>Click "Charge Individual Owner" to process a specific charge</li>
+            <li>Owner receives a professional email confirmation immediately</li>
+            <li>Upload receipts to document each charge</li>
+            <li>View payment history and Stripe transaction details</li>
+          </ul>
         </CardContent>
       </Card>
 
@@ -539,17 +707,48 @@ const MonthlyCharges = () => {
                             : "-"}
                         </TableCell>
                         <TableCell onClick={(e) => e.stopPropagation()}>
-                          {charge.stripe_payment_intent_id && (
-                            <a
-                              href={`https://dashboard.stripe.com/payments/${charge.stripe_payment_intent_id}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="flex items-center gap-1 text-sm text-primary hover:underline"
-                            >
-                              View in Stripe
-                              <ExternalLink className="w-3 h-3" />
-                            </a>
-                          )}
+                          <div className="flex items-center gap-2">
+                            {charge.receipt_path ? (
+                              <a
+                                href={`${supabase.storage.from('expense-documents').getPublicUrl(charge.receipt_path).data.publicUrl}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-1 text-sm text-primary hover:underline"
+                              >
+                                <FileText className="w-3 h-3" />
+                                Receipt
+                              </a>
+                            ) : (
+                              <label className="cursor-pointer">
+                                <input
+                                  type="file"
+                                  className="hidden"
+                                  accept=".pdf,.jpg,.jpeg,.png"
+                                  onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (file) handleUploadReceipt(charge.id, file);
+                                  }}
+                                  disabled={uploadingReceipt}
+                                />
+                                <Button size="sm" variant="outline" className="gap-1" disabled={uploadingReceipt} asChild>
+                                  <span>
+                                    <Upload className="w-3 h-3" />
+                                    Upload
+                                  </span>
+                                </Button>
+                              </label>
+                            )}
+                            {charge.stripe_payment_intent_id && (
+                              <a
+                                href={`https://dashboard.stripe.com/payments/${charge.stripe_payment_intent_id}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-1 text-sm text-muted-foreground hover:text-primary"
+                              >
+                                <ExternalLink className="w-3 h-3" />
+                              </a>
+                            )}
+                          </div>
                         </TableCell>
                       </TableRow>
                       {isExpanded && (

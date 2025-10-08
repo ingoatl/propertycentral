@@ -122,6 +122,7 @@ export type Database = {
           created_at: string
           id: string
           owner_id: string
+          receipt_path: string | null
           stripe_invoice_id: string | null
           stripe_payment_intent_id: string | null
           total_management_fees: number
@@ -133,6 +134,7 @@ export type Database = {
           created_at?: string
           id?: string
           owner_id: string
+          receipt_path?: string | null
           stripe_invoice_id?: string | null
           stripe_payment_intent_id?: string | null
           total_management_fees?: number
@@ -144,6 +146,7 @@ export type Database = {
           created_at?: string
           id?: string
           owner_id?: string
+          receipt_path?: string | null
           stripe_invoice_id?: string | null
           stripe_payment_intent_id?: string | null
           total_management_fees?: number
