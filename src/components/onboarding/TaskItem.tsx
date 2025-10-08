@@ -40,11 +40,9 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
         .eq("id", task.id);
 
       if (error) throw error;
-      toast.success(checked ? "Task completed!" : "Task marked incomplete");
       onUpdate();
     } catch (error) {
-      toast.error("Failed to update task");
-      console.error(error);
+      console.error("Failed to update task:", error);
     }
   };
 
@@ -68,11 +66,9 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
         .eq("id", task.id);
 
       if (error) throw error;
-      toast.success("Task updated!");
       onUpdate();
     } catch (error) {
-      toast.error("Failed to save task");
-      console.error(error);
+      console.error("Failed to save task:", error);
     } finally {
       setSaving(false);
     }
