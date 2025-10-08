@@ -1,290 +1,102 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Calendar, DollarSign, RefreshCw, CheckCircle, XCircle, Clock, ExternalLink, Mail, ChevronDown, ChevronUp, Upload, FileText } from "lucide-react";
+import { Loader2, Download, FileText, ExternalLink, DollarSign, Receipt } from "lucide-react";
 import { format } from "date-fns";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 
-interface MonthlyCharge {
+interface Transaction {
   id: string;
-  owner_id: string;
-  charge_month: string;
-  total_management_fees: number;
-  stripe_payment_intent_id: string | null;
-  stripe_invoice_id: string | null;
-  charge_status: "pending" | "processing" | "succeeded" | "failed" | "refunded";
-  charged_at: string | null;
-  created_at: string;
-  receipt_path: string | null;
+  date: string;
+  type: 'charge' | 'expense';
+  property_name?: string;
+  owner_name?: string;
+  category: string;
+  description: string;
+  amount: number;
+  receipt_path?: string;
+  status?: string;
+  stripe_payment_intent_id?: string;
+  exported: boolean;
 }
 
 interface PropertyOwner {
   id: string;
   name: string;
   email: string;
-  payment_method: "card" | "ach";
 }
 
-interface ChargeWithOwner extends MonthlyCharge {
-  owner: PropertyOwner;
+interface Property {
+  id: string;
+  name: string;
 }
 
-interface ChargeBreakdownProps {
-  charge: ChargeWithOwner;
-}
+const EXPENSE_CATEGORIES = [
+  "Maintenance",
+  "Utilities",
+  "Repairs",
+  "Supplies",
+  "Insurance",
+  "Property Tax",
+  "Marketing",
+  "Legal & Professional",
+  "Other"
+];
 
-const ChargeBreakdown = ({ charge }: ChargeBreakdownProps) => {
-  const [properties, setProperties] = useState<any[]>([]);
-  const [visits, setVisits] = useState<any[]>([]);
-  const [expenses, setExpenses] = useState<any[]>([]);
-  const [bookings, setBookings] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+const CHARGE_CATEGORIES = [
+  "Management Fee",
+  "Late Fee",
+  "Service Fee",
+  "Other"
+];
 
-  useEffect(() => {
-    loadBreakdownData();
-  }, [charge.id]);
-
-  const loadBreakdownData = async () => {
-    try {
-      setLoading(true);
-      
-      // Get the month range
-      const chargeDate = new Date(charge.charge_month);
-      const firstDay = new Date(chargeDate.getFullYear(), chargeDate.getMonth(), 1);
-      const lastDay = new Date(chargeDate.getFullYear(), chargeDate.getMonth() + 1, 0);
-
-      // Fetch properties for this owner
-      const { data: propsData } = await supabase
-        .from("properties")
-        .select("*")
-        .eq("owner_id", charge.owner_id);
-
-      setProperties(propsData || []);
-
-      const propertyIds = (propsData || []).map(p => p.id);
-
-      if (propertyIds.length > 0) {
-        // Fetch visits for this month
-        const { data: visitsData } = await supabase
-          .from("visits")
-          .select("*")
-          .in("property_id", propertyIds)
-          .gte("date", firstDay.toISOString().split('T')[0])
-          .lte("date", lastDay.toISOString().split('T')[0]);
-
-        setVisits(visitsData || []);
-
-        // Fetch expenses for this month
-        const { data: expensesData } = await supabase
-          .from("expenses")
-          .select("*")
-          .in("property_id", propertyIds)
-          .gte("date", firstDay.toISOString().split('T')[0])
-          .lte("date", lastDay.toISOString().split('T')[0]);
-
-        setExpenses(expensesData || []);
-
-        // Fetch bookings
-        const { data: bookingsData } = await supabase
-          .from("ownerrez_bookings")
-          .select("*")
-          .in("property_id", propertyIds);
-
-        setBookings(bookingsData || []);
-      }
-    } catch (error) {
-      console.error("Error loading breakdown:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (loading) {
-    return <div className="text-center py-4">Loading breakdown...</div>;
-  }
-
-  const totalRevenue = bookings.reduce((sum, b) => sum + Number(b.total_amount || 0), 0);
-  const totalVisits = visits.length;
-  const totalExpenses = expenses.reduce((sum, e) => sum + Number(e.amount || 0), 0);
-  const netIncome = totalRevenue - Number(charge.total_management_fees) - totalExpenses;
-
-  return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="pt-4">
-            <p className="text-sm text-muted-foreground">Total Revenue</p>
-            <p className="text-2xl font-bold text-green-600">${totalRevenue.toFixed(2)}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-4">
-            <p className="text-sm text-muted-foreground">Management Fees</p>
-            <p className="text-2xl font-bold">${Number(charge.total_management_fees).toFixed(2)}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-4">
-            <p className="text-sm text-muted-foreground">Expenses</p>
-            <p className="text-2xl font-bold text-red-600">${totalExpenses.toFixed(2)}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-4">
-            <p className="text-sm text-muted-foreground">Net Income</p>
-            <p className="text-2xl font-bold">${netIncome.toFixed(2)}</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid md:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Properties ({properties.length})</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              {properties.map(prop => (
-                <div key={prop.id} className="p-2 border rounded-lg">
-                  <p className="font-medium text-sm">{prop.name}</p>
-                  <p className="text-xs text-muted-foreground">{prop.address}</p>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Visits ({totalVisits})</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2 max-h-48 overflow-y-auto">
-              {visits.map(visit => {
-                const prop = properties.find(p => p.id === visit.property_id);
-                return (
-                  <div key={visit.id} className="p-2 border rounded-lg text-sm">
-                    <div className="flex justify-between">
-                      <span className="font-medium">{prop?.name}</span>
-                      <span className="text-green-600">${Number(visit.price).toFixed(2)}</span>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      {format(new Date(visit.date), "MMM d, yyyy")}
-                    </p>
-                  </div>
-                );
-              })}
-              {visits.length === 0 && (
-                <p className="text-sm text-muted-foreground">No visits this month</p>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Expenses ({expenses.length})</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2 max-h-48 overflow-y-auto">
-              {expenses.map(expense => {
-                const prop = properties.find(p => p.id === expense.property_id);
-                return (
-                  <div key={expense.id} className="p-2 border rounded-lg text-sm">
-                    <div className="flex justify-between">
-                      <span className="font-medium">{prop?.name}</span>
-                      <span className="text-red-600">${Number(expense.amount).toFixed(2)}</span>
-                    </div>
-                    <p className="text-xs text-muted-foreground">{expense.purpose || 'No description'}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {format(new Date(expense.date), "MMM d, yyyy")}
-                    </p>
-                  </div>
-                );
-              })}
-              {expenses.length === 0 && (
-                <p className="text-sm text-muted-foreground">No expenses this month</p>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Bookings ({bookings.length})</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2 max-h-48 overflow-y-auto">
-              {bookings.map(booking => (
-                <div key={booking.id} className="p-2 border rounded-lg text-sm">
-                  <div className="flex justify-between">
-                    <span className="font-medium">{booking.ownerrez_listing_name}</span>
-                    <span className="text-green-600">${Number(booking.total_amount).toFixed(2)}</span>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Fee: ${Number(booking.management_fee).toFixed(2)}
-                  </p>
-                </div>
-              ))}
-              {bookings.length === 0 && (
-                <p className="text-sm text-muted-foreground">No bookings</p>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    </div>
-  );
-};
-
-
-const MonthlyCharges = () => {
-  const [charges, setCharges] = useState<ChargeWithOwner[]>([]);
-  const [owners, setOwners] = useState<PropertyOwner[]>([]);
+export default function MonthlyCharges() {
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [charging, setCharging] = useState(false);
-  const [sendingTest, setSendingTest] = useState(false);
-  const [expandedCharge, setExpandedCharge] = useState<string | null>(null);
-  const [chargeDialogOpen, setChargeDialogOpen] = useState(false);
+  
+  // Charge Owner Form State
+  const [owners, setOwners] = useState<PropertyOwner[]>([]);
   const [selectedOwner, setSelectedOwner] = useState<string>("");
-  const [chargeAmount, setChargeAmount] = useState("");
-  const [chargeMonth, setChargeMonth] = useState(new Date().toISOString().slice(0, 7));
-  const [chargeDescription, setChargeDescription] = useState("");
-  const [uploadingReceipt, setUploadingReceipt] = useState(false);
+  const [chargeAmount, setChargeAmount] = useState<string>("");
+  const [chargeMonth, setChargeMonth] = useState<string>(format(new Date(), 'yyyy-MM'));
+  const [chargeDescription, setChargeDescription] = useState<string>("");
+  const [chargeCategory, setChargeCategory] = useState<string>("Management Fee");
+  const [chargingOwner, setChargingOwner] = useState(false);
+  
+  // Record Expense Form State
+  const [properties, setProperties] = useState<Property[]>([]);
+  const [selectedProperty, setSelectedProperty] = useState<string>("");
+  const [expenseAmount, setExpenseAmount] = useState<string>("");
+  const [expenseDate, setExpenseDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
+  const [expenseCategory, setExpenseCategory] = useState<string>("Maintenance");
+  const [expenseDescription, setExpenseDescription] = useState<string>("");
+  const [expenseFile, setExpenseFile] = useState<File | null>(null);
+  const [savingExpense, setSavingExpense] = useState(false);
+  
+  // Filter State
+  const [filterType, setFilterType] = useState<string>("all");
+  const [filterDateFrom, setFilterDateFrom] = useState<string>("");
+  const [filterDateTo, setFilterDateTo] = useState<string>("");
 
   useEffect(() => {
     checkAdminStatus();
-    loadCharges();
     loadOwners();
+    loadProperties();
   }, []);
+
+  useEffect(() => {
+    if (isAdmin) {
+      loadTransactions();
+    }
+  }, [isAdmin]);
 
   const checkAdminStatus = async () => {
     try {
@@ -301,222 +113,295 @@ const MonthlyCharges = () => {
       setIsAdmin(!!roles);
     } catch (error) {
       console.error("Error checking admin status:", error);
+    } finally {
+      setLoading(false);
     }
   };
 
   const loadOwners = async () => {
     try {
       const { data, error } = await supabase
-        .from("property_owners")
-        .select("*")
-        .order("name");
+        .from('property_owners')
+        .select('id, name, email')
+        .order('name');
 
       if (error) throw error;
-      setOwners((data || []) as PropertyOwner[]);
+      setOwners(data || []);
     } catch (error: any) {
-      console.error("Error loading owners:", error);
-      toast.error("Failed to load property owners");
+      console.error('Error loading owners:', error);
     }
   };
 
-  const loadCharges = async () => {
+  const loadProperties = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('properties')
+        .select('id, name')
+        .order('name');
+
+      if (error) throw error;
+      setProperties(data || []);
+    } catch (error: any) {
+      console.error('Error loading properties:', error);
+    }
+  };
+
+  const loadTransactions = async () => {
     try {
       setLoading(true);
-
+      
+      // Load charges
       const { data: chargesData, error: chargesError } = await supabase
-        .from("monthly_charges")
-        .select("*")
-        .order("charge_month", { ascending: false });
+        .from('monthly_charges')
+        .select(`
+          *,
+          property_owners (
+            id,
+            name
+          )
+        `)
+        .order('charge_month', { ascending: false });
 
       if (chargesError) throw chargesError;
 
-      const { data: ownersData, error: ownersError } = await supabase
-        .from("property_owners")
-        .select("*");
+      // Load expenses
+      const { data: expensesData, error: expensesError } = await supabase
+        .from('expenses')
+        .select(`
+          *,
+          properties (
+            id,
+            name
+          )
+        `)
+        .order('date', { ascending: false });
 
-      if (ownersError) throw ownersError;
+      if (expensesError) throw expensesError;
 
-      const ownersMap = new Map(ownersData.map(owner => [owner.id, owner]));
+      // Combine into transactions array
+      const chargeTransactions: Transaction[] = (chargesData || []).map(charge => ({
+        id: charge.id,
+        date: charge.charge_month,
+        type: 'charge' as const,
+        owner_name: charge.property_owners?.name || 'Unknown Owner',
+        category: charge.category || 'Management Fee',
+        description: `Charge for ${format(new Date(charge.charge_month), 'MMMM yyyy')}`,
+        amount: Number(charge.total_management_fees),
+        receipt_path: charge.receipt_path,
+        status: charge.charge_status,
+        stripe_payment_intent_id: charge.stripe_payment_intent_id,
+        exported: charge.exported || false
+      }));
 
-      const chargesWithOwners = (chargesData || [])
-        .map(charge => ({
-          ...charge,
-          owner: ownersMap.get(charge.owner_id),
-        }))
-        .filter(charge => charge.owner) as ChargeWithOwner[];
+      const expenseTransactions: Transaction[] = (expensesData || []).map(expense => ({
+        id: expense.id,
+        date: expense.date,
+        type: 'expense' as const,
+        property_name: expense.properties?.name || 'Unknown Property',
+        category: expense.category || 'Uncategorized',
+        description: expense.purpose || '',
+        amount: Number(expense.amount),
+        receipt_path: expense.file_path,
+        exported: expense.exported || false
+      }));
 
-      setCharges(chargesWithOwners);
+      // Combine and sort by date
+      const allTransactions = [...chargeTransactions, ...expenseTransactions].sort((a, b) => 
+        new Date(b.date).getTime() - new Date(a.date).getTime()
+      );
+
+      setTransactions(allTransactions);
     } catch (error: any) {
-      console.error("Error loading charges:", error);
-      toast.error("Failed to load charges");
+      console.error('Error loading transactions:', error);
+      toast.error("Failed to load transactions");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleChargeIndividual = async () => {
+  const handleChargeOwner = async (viaPending: boolean = false) => {
     if (!selectedOwner || !chargeAmount || !chargeMonth) {
       toast.error("Please fill in all required fields");
       return;
     }
 
-    setCharging(true);
-    toast.loading("Processing charge...");
-
     try {
-      const { data, error } = await supabase.functions.invoke("charge-individual-owner", {
-        body: {
-          ownerId: selectedOwner,
-          chargeMonth: chargeMonth + "-01",
-          amount: parseFloat(chargeAmount),
-          description: chargeDescription,
-        },
-      });
+      setChargingOwner(true);
 
-      if (error) throw error;
+      if (viaPending) {
+        // Save as pending charge without Stripe
+        const { error } = await supabase
+          .from('monthly_charges')
+          .insert({
+            owner_id: selectedOwner,
+            charge_month: `${chargeMonth}-01`,
+            total_management_fees: parseFloat(chargeAmount),
+            category: chargeCategory,
+            charge_status: 'pending'
+          });
 
-      toast.dismiss();
-      toast.success("Charge processed and email sent to owner!");
-      
-      setChargeDialogOpen(false);
+        if (error) throw error;
+
+        toast.success("Charge saved as pending");
+      } else {
+        // Process via Stripe
+        const { data, error } = await supabase.functions.invoke('charge-individual-owner', {
+          body: {
+            ownerId: selectedOwner,
+            chargeMonth: `${chargeMonth}-01`,
+            amount: parseFloat(chargeAmount),
+            description: chargeDescription || `${chargeCategory} for ${format(new Date(chargeMonth), 'MMMM yyyy')}`
+          }
+        });
+
+        if (error) throw error;
+
+        toast.success(data.message || "Owner charged successfully");
+      }
+
+      // Reset form
       setSelectedOwner("");
       setChargeAmount("");
       setChargeDescription("");
-      loadCharges();
+      setChargeCategory("Management Fee");
+      loadTransactions();
     } catch (error: any) {
-      console.error("Error charging owner:", error);
-      toast.dismiss();
-      toast.error(error.message || "Failed to process charge");
+      console.error('Error charging owner:', error);
+      toast.error(error.message || "Failed to charge owner");
     } finally {
-      setCharging(false);
+      setChargingOwner(false);
     }
   };
 
-  const handleUploadReceipt = async (chargeId: string, file: File) => {
-    if (!file) return;
-
-    setUploadingReceipt(true);
-    toast.loading("Uploading receipt...");
-
-    try {
-      const fileExt = file.name.split('.').pop();
-      const filePath = `${chargeId}/${Date.now()}.${fileExt}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from("expense-documents")
-        .upload(filePath, file);
-
-      if (uploadError) throw uploadError;
-
-      const { error: updateError } = await supabase
-        .from("monthly_charges")
-        .update({ receipt_path: filePath })
-        .eq("id", chargeId);
-
-      if (updateError) throw updateError;
-
-      toast.dismiss();
-      toast.success("Receipt uploaded successfully!");
-      loadCharges();
-    } catch (error: any) {
-      console.error("Error uploading receipt:", error);
-      toast.dismiss();
-      toast.error(error.message || "Failed to upload receipt");
-    } finally {
-      setUploadingReceipt(false);
-    }
-  };
-
-  const handleChargeMonthlyFees = async () => {
-    if (!confirm("This will charge all property owners for the previous month's management fees. Continue?")) {
+  const handleSaveExpense = async () => {
+    if (!selectedProperty || !expenseAmount || !expenseDate) {
+      toast.error("Please fill in all required fields");
       return;
     }
 
-    setCharging(true);
-    toast.loading("Processing monthly charges...");
-
     try {
-      const { data, error } = await supabase.functions.invoke("charge-monthly-fees");
+      setSavingExpense(true);
+
+      let filePath = null;
+
+      // Upload receipt if provided
+      if (expenseFile) {
+        const fileExt = expenseFile.name.split('.').pop();
+        const fileName = `${Date.now()}.${fileExt}`;
+        const { error: uploadError } = await supabase.storage
+          .from('expense-documents')
+          .upload(fileName, expenseFile);
+
+        if (uploadError) throw uploadError;
+        filePath = fileName;
+      }
+
+      // Save expense
+      const { data: userData } = await supabase.auth.getUser();
+      const { error } = await supabase
+        .from('expenses')
+        .insert({
+          property_id: selectedProperty,
+          date: expenseDate,
+          amount: parseFloat(expenseAmount),
+          category: expenseCategory,
+          purpose: expenseDescription,
+          file_path: filePath,
+          user_id: userData.user?.id
+        });
 
       if (error) throw error;
 
-      console.log("Charge results:", data);
+      toast.success("Expense recorded successfully");
 
-      toast.dismiss();
-      
-      const results = data.results || [];
-      const succeeded = results.filter((r: any) => r.status === "charged").length;
-      const failed = results.filter((r: any) => r.status === "failed").length;
-      const skipped = results.filter((r: any) => r.status === "skipped").length;
-
-      toast.success(
-        `Monthly charges processed! ${succeeded} charged, ${failed} failed, ${skipped} skipped`
-      );
-
-      loadCharges();
+      // Reset form
+      setSelectedProperty("");
+      setExpenseAmount("");
+      setExpenseDate(format(new Date(), 'yyyy-MM-dd'));
+      setExpenseCategory("Maintenance");
+      setExpenseDescription("");
+      setExpenseFile(null);
+      loadTransactions();
     } catch (error: any) {
-      console.error("Error charging fees:", error);
-      toast.dismiss();
-      toast.error(error.message || "Failed to process monthly charges");
+      console.error('Error saving expense:', error);
+      toast.error(error.message || "Failed to save expense");
     } finally {
-      setCharging(false);
+      setSavingExpense(false);
     }
   };
 
-  const handleSendTestEmail = async () => {
-    setSendingTest(true);
-    toast.loading("Sending test monthly statement to ingo@peachhausgroup.com...");
+  const exportToCSV = () => {
+    const csvRows = [];
+    
+    // QuickBooks CSV headers
+    csvRows.push([
+      'Date',
+      'Transaction Type',
+      'Account',
+      'Customer/Vendor',
+      'Category',
+      'Description',
+      'Amount',
+      'Payment Method',
+      'Reference #'
+    ].join(','));
 
-    try {
-      const { data, error } = await supabase.functions.invoke("send-monthly-report");
+    // Add transaction rows
+    const filteredTransactions = getFilteredTransactions();
+    filteredTransactions.forEach(transaction => {
+      csvRows.push([
+        transaction.date,
+        transaction.type === 'charge' ? 'Income' : 'Expense',
+        transaction.type === 'charge' ? 'Management Fees' : 'Property Expenses',
+        transaction.type === 'charge' ? transaction.owner_name : transaction.property_name,
+        transaction.category,
+        `"${transaction.description.replace(/"/g, '""')}"`,
+        transaction.amount.toFixed(2),
+        transaction.stripe_payment_intent_id ? 'Stripe' : 'Other',
+        transaction.stripe_payment_intent_id || ''
+      ].join(','));
+    });
 
-      if (error) throw error;
+    const csvContent = csvRows.join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `quickbooks_export_${format(new Date(), 'yyyy-MM-dd')}.csv`;
+    a.click();
 
-      toast.dismiss();
-      toast.success(`Test email sent successfully! ${data.emailsSent?.length || 0} statements sent.`);
-    } catch (error: any) {
-      console.error("Error sending test email:", error);
-      toast.dismiss();
-      toast.error(error.message || "Failed to send test email");
-    } finally {
-      setSendingTest(false);
-    }
+    toast.success("Exported to QuickBooks CSV format");
   };
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "succeeded":
-        return <CheckCircle className="w-4 h-4 text-green-500" />;
-      case "failed":
-        return <XCircle className="w-4 h-4 text-red-500" />;
-      case "processing":
-        return <Clock className="w-4 h-4 text-blue-500" />;
-      default:
-        return <Clock className="w-4 h-4 text-amber-500" />;
-    }
+  const getFilteredTransactions = () => {
+    return transactions.filter(transaction => {
+      if (filterType !== 'all' && transaction.type !== filterType) return false;
+      if (filterDateFrom && transaction.date < filterDateFrom) return false;
+      if (filterDateTo && transaction.date > filterDateTo) return false;
+      return true;
+    });
   };
 
-  const getStatusVariant = (status: string): "default" | "secondary" | "destructive" | "outline" => {
-    switch (status) {
-      case "succeeded":
-        return "default";
-      case "failed":
-        return "destructive";
-      case "processing":
-        return "secondary";
-      default:
-        return "outline";
+  const viewReceipt = async (receiptPath: string) => {
+    const { data } = await supabase.storage
+      .from('expense-documents')
+      .createSignedUrl(receiptPath, 60);
+    
+    if (data?.signedUrl) {
+      window.open(data.signedUrl, '_blank');
     }
   };
 
   if (!isAdmin) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Card className="max-w-md">
+      <div className="flex items-center justify-center min-h-screen">
+        <Card>
           <CardHeader>
             <CardTitle>Access Denied</CardTitle>
-            <CardDescription>You need admin privileges to access this page.</CardDescription>
           </CardHeader>
+          <CardContent>
+            <p className="text-muted-foreground">You need admin privileges to access this page.</p>
+          </CardContent>
         </Card>
       </div>
     );
@@ -524,250 +409,331 @@ const MonthlyCharges = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-pulse">Loading...</div>
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin" />
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      <div className="pb-4 border-b border-border/50 flex justify-between items-center">
+    <div className="container mx-auto p-6 space-y-6">
+      <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-4xl font-bold bg-gradient-primary bg-clip-text text-transparent">
-            Monthly Charges
-          </h1>
-          <p className="text-muted-foreground mt-1">Manage and track monthly management fee charges</p>
+          <h1 className="text-3xl font-bold">Monthly Charges</h1>
+          <p className="text-muted-foreground">Manage charges, expenses, and export to QuickBooks</p>
         </div>
         <div className="flex gap-2">
-          <Button
-            variant="outline"
-            className="gap-2"
-            onClick={handleSendTestEmail}
-            disabled={sendingTest}
-          >
-            <Mail className="w-4 h-4" />
-            {sendingTest ? "Sending..." : "Send Test Email"}
+          <Button onClick={exportToCSV} variant="outline" className="gap-2">
+            <Download className="w-4 h-4" />
+            Export to QuickBooks
           </Button>
-          <Dialog open={chargeDialogOpen} onOpenChange={setChargeDialogOpen}>
-            <DialogTrigger asChild>
-              <Button className="gap-2">
-                <DollarSign className="w-4 h-4" />
-                Charge Individual Owner
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[500px]">
-              <DialogHeader>
-                <DialogTitle>Charge Individual Owner</DialogTitle>
-                <DialogDescription>
-                  Process a charge for a specific property owner and send them an email receipt.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="owner">Property Owner *</Label>
-                  <select
-                    id="owner"
-                    value={selectedOwner}
-                    onChange={(e) => setSelectedOwner(e.target.value)}
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                  >
-                    <option value="">Select owner...</option>
-                    {owners.map(owner => (
-                      <option key={owner.id} value={owner.id}>
-                        {owner.name} ({owner.email})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="month">Charge Month *</Label>
-                  <Input
-                    id="month"
-                    type="month"
-                    value={chargeMonth}
-                    onChange={(e) => setChargeMonth(e.target.value)}
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="amount">Amount *</Label>
-                  <Input
-                    id="amount"
-                    type="number"
-                    step="0.01"
-                    placeholder="0.00"
-                    value={chargeAmount}
-                    onChange={(e) => setChargeAmount(e.target.value)}
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="description">Description (optional)</Label>
-                  <Textarea
-                    id="description"
-                    placeholder="e.g., Management fees, maintenance costs..."
-                    value={chargeDescription}
-                    onChange={(e) => setChargeDescription(e.target.value)}
-                  />
-                </div>
-              </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setChargeDialogOpen(false)}>
-                  Cancel
-                </Button>
-                <Button onClick={handleChargeIndividual} disabled={charging}>
-                  {charging ? "Processing..." : "Charge Owner"}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
         </div>
       </div>
 
-      <Card className="bg-gradient-subtle border-primary/20">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Calendar className="w-5 h-5" />
-            How Monthly Charging Works
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2 text-sm text-muted-foreground">
-          <p>
-            You can now charge individual owners with custom amounts and descriptions:
-          </p>
-          <ul className="list-disc list-inside space-y-1 ml-2">
-            <li>Click "Charge Individual Owner" to process a specific charge</li>
-            <li>Owner receives a professional email confirmation immediately</li>
-            <li>Upload receipts to document each charge</li>
-            <li>View payment history and Stripe transaction details</li>
-          </ul>
-        </CardContent>
-      </Card>
+      {/* Two Forms Side by Side */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Charge Owner Form */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <DollarSign className="w-5 h-5" />
+              Charge Owner
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="owner">Owner *</Label>
+              <Select value={selectedOwner} onValueChange={setSelectedOwner}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select owner..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {owners.map(owner => (
+                    <SelectItem key={owner.id} value={owner.id}>
+                      {owner.name} ({owner.email})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-      <Card className="shadow-card border-border/50">
-        <CardHeader className="bg-gradient-subtle rounded-t-lg">
-          <CardTitle>Charge History</CardTitle>
-          <CardDescription>
-            All monthly charges and their status
-          </CardDescription>
+            <div className="space-y-2">
+              <Label htmlFor="charge-month">Month *</Label>
+              <Input
+                id="charge-month"
+                type="month"
+                value={chargeMonth}
+                onChange={(e) => setChargeMonth(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="charge-amount">Amount *</Label>
+              <Input
+                id="charge-amount"
+                type="number"
+                step="0.01"
+                placeholder="0.00"
+                value={chargeAmount}
+                onChange={(e) => setChargeAmount(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="charge-category">Category</Label>
+              <Select value={chargeCategory} onValueChange={setChargeCategory}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {CHARGE_CATEGORIES.map(cat => (
+                    <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="charge-description">Description</Label>
+              <Textarea
+                id="charge-description"
+                placeholder="Optional notes..."
+                value={chargeDescription}
+                onChange={(e) => setChargeDescription(e.target.value)}
+              />
+            </div>
+
+            <div className="flex gap-2">
+              <Button 
+                onClick={() => handleChargeOwner(false)} 
+                disabled={chargingOwner}
+                className="flex-1"
+              >
+                {chargingOwner ? <Loader2 className="w-4 h-4 animate-spin" /> : "Charge via Stripe"}
+              </Button>
+              <Button 
+                onClick={() => handleChargeOwner(true)} 
+                disabled={chargingOwner}
+                variant="outline"
+                className="flex-1"
+              >
+                Save as Pending
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Record Expense Form */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Receipt className="w-5 h-5" />
+              Record Expense
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="property">Property *</Label>
+              <Select value={selectedProperty} onValueChange={setSelectedProperty}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select property..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {properties.map(prop => (
+                    <SelectItem key={prop.id} value={prop.id}>
+                      {prop.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="expense-date">Date *</Label>
+              <Input
+                id="expense-date"
+                type="date"
+                value={expenseDate}
+                onChange={(e) => setExpenseDate(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="expense-amount">Amount *</Label>
+              <Input
+                id="expense-amount"
+                type="number"
+                step="0.01"
+                placeholder="0.00"
+                value={expenseAmount}
+                onChange={(e) => setExpenseAmount(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="expense-category">Category</Label>
+              <Select value={expenseCategory} onValueChange={setExpenseCategory}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {EXPENSE_CATEGORIES.map(cat => (
+                    <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="expense-description">Description</Label>
+              <Textarea
+                id="expense-description"
+                placeholder="Purpose of expense..."
+                value={expenseDescription}
+                onChange={(e) => setExpenseDescription(e.target.value)}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="receipt-upload">Receipt</Label>
+              <Input
+                id="receipt-upload"
+                type="file"
+                accept=".pdf,.jpg,.jpeg,.png"
+                onChange={(e) => setExpenseFile(e.target.files?.[0] || null)}
+              />
+            </div>
+
+            <Button 
+              onClick={handleSaveExpense} 
+              disabled={savingExpense}
+              className="w-full"
+            >
+              {savingExpense ? <Loader2 className="w-4 h-4 animate-spin" /> : "Save Expense"}
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Transaction History */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Transaction History</CardTitle>
+          <div className="flex gap-4 mt-4">
+            <div className="flex-1">
+              <Label>Filter by Type</Label>
+              <Select value={filterType} onValueChange={setFilterType}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="charge">Charges Only</SelectItem>
+                  <SelectItem value="expense">Expenses Only</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex-1">
+              <Label>From Date</Label>
+              <Input
+                type="date"
+                value={filterDateFrom}
+                onChange={(e) => setFilterDateFrom(e.target.value)}
+              />
+            </div>
+            <div className="flex-1">
+              <Label>To Date</Label>
+              <Input
+                type="date"
+                value={filterDateTo}
+                onChange={(e) => setFilterDateTo(e.target.value)}
+              />
+            </div>
+          </div>
         </CardHeader>
-        <CardContent className="pt-6">
-          {charges.length === 0 ? (
-            <p className="text-muted-foreground text-center py-8">
-              No charges yet. Click "Charge This Month's Fees" to create the first batch.
-            </p>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Month</TableHead>
-                  <TableHead>Owner</TableHead>
-                  <TableHead>Payment Method</TableHead>
-                  <TableHead>Amount</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Charged Date</TableHead>
-                  <TableHead>Actions</TableHead>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Date</TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead>Property/Owner</TableHead>
+                <TableHead>Category</TableHead>
+                <TableHead>Description</TableHead>
+                <TableHead>Amount</TableHead>
+                <TableHead>Receipt</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {getFilteredTransactions().map((transaction) => (
+                <TableRow key={transaction.id}>
+                  <TableCell>{format(new Date(transaction.date), 'MMM d, yyyy')}</TableCell>
+                  <TableCell>
+                    <Badge variant={transaction.type === 'charge' ? 'default' : 'secondary'}>
+                      {transaction.type === 'charge' ? 'Income' : 'Expense'}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    {transaction.type === 'charge' ? transaction.owner_name : transaction.property_name}
+                  </TableCell>
+                  <TableCell>{transaction.category}</TableCell>
+                  <TableCell className="max-w-xs truncate">{transaction.description}</TableCell>
+                  <TableCell className="font-mono">
+                    ${transaction.amount.toFixed(2)}
+                  </TableCell>
+                  <TableCell>
+                    {transaction.receipt_path ? (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => viewReceipt(transaction.receipt_path!)}
+                      >
+                        <FileText className="w-4 h-4" />
+                      </Button>
+                    ) : (
+                      <span className="text-muted-foreground text-sm">-</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {transaction.status ? (
+                      <Badge variant={transaction.status === 'succeeded' ? 'default' : 'outline'}>
+                        {transaction.status}
+                      </Badge>
+                    ) : (
+                      <span className="text-muted-foreground text-sm">-</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {transaction.stripe_payment_intent_id && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        asChild
+                      >
+                        <a
+                          href={`https://dashboard.stripe.com/payments/${transaction.stripe_payment_intent_id}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          <ExternalLink className="w-4 h-4" />
+                        </a>
+                      </Button>
+                    )}
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {charges.map((charge) => {
-                  const isExpanded = expandedCharge === charge.id;
-                  
-                  return (
-                    <>
-                      <TableRow key={charge.id} className="cursor-pointer hover:bg-muted/50" onClick={() => setExpandedCharge(isExpanded ? null : charge.id)}>
-                        <TableCell className="font-medium">
-                          <div className="flex items-center gap-2">
-                            {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                            {format(new Date(charge.charge_month), "MMMM yyyy")}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div>
-                            <p className="font-medium">{charge.owner.name}</p>
-                            <p className="text-xs text-muted-foreground">{charge.owner.email}</p>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline">
-                            {charge.owner.payment_method === "ach" ? "ACH" : "Card"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="font-mono">
-                          ${Number(charge.total_management_fees).toFixed(2)}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={getStatusVariant(charge.charge_status)} className="gap-1">
-                            {getStatusIcon(charge.charge_status)}
-                            {charge.charge_status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          {charge.charged_at
-                            ? format(new Date(charge.charged_at), "MMM d, yyyy")
-                            : "-"}
-                        </TableCell>
-                        <TableCell onClick={(e) => e.stopPropagation()}>
-                          <div className="flex items-center gap-2">
-                            {charge.receipt_path ? (
-                              <a
-                                href={`${supabase.storage.from('expense-documents').getPublicUrl(charge.receipt_path).data.publicUrl}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex items-center gap-1 text-sm text-primary hover:underline"
-                              >
-                                <FileText className="w-3 h-3" />
-                                Receipt
-                              </a>
-                            ) : (
-                              <label className="cursor-pointer">
-                                <input
-                                  type="file"
-                                  className="hidden"
-                                  accept=".pdf,.jpg,.jpeg,.png"
-                                  onChange={(e) => {
-                                    const file = e.target.files?.[0];
-                                    if (file) handleUploadReceipt(charge.id, file);
-                                  }}
-                                  disabled={uploadingReceipt}
-                                />
-                                <Button size="sm" variant="outline" className="gap-1" disabled={uploadingReceipt} asChild>
-                                  <span>
-                                    <Upload className="w-3 h-3" />
-                                    Upload
-                                  </span>
-                                </Button>
-                              </label>
-                            )}
-                            {charge.stripe_payment_intent_id && (
-                              <a
-                                href={`https://dashboard.stripe.com/payments/${charge.stripe_payment_intent_id}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex items-center gap-1 text-sm text-muted-foreground hover:text-primary"
-                              >
-                                <ExternalLink className="w-3 h-3" />
-                              </a>
-                            )}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                      {isExpanded && (
-                        <TableRow>
-                          <TableCell colSpan={7} className="bg-muted/30 p-6">
-                            <ChargeBreakdown charge={charge} />
-                          </TableCell>
-                        </TableRow>
-                      )}
-                    </>
-                  );
-                })}
-              </TableBody>
-            </Table>
+              ))}
+            </TableBody>
+          </Table>
+
+          {getFilteredTransactions().length === 0 && (
+            <div className="text-center py-8 text-muted-foreground">
+              No transactions found. Start by charging an owner or recording an expense.
+            </div>
           )}
         </CardContent>
       </Card>
     </div>
   );
-};
-
-export default MonthlyCharges;
+}

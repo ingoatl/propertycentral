@@ -17,8 +17,10 @@ export type Database = {
       expenses: {
         Row: {
           amount: number
+          category: string | null
           created_at: string
           date: string
+          exported: boolean | null
           file_path: string | null
           id: string
           property_id: string
@@ -27,8 +29,10 @@ export type Database = {
         }
         Insert: {
           amount: number
+          category?: string | null
           created_at?: string
           date: string
+          exported?: boolean | null
           file_path?: string | null
           id?: string
           property_id: string
@@ -37,8 +41,10 @@ export type Database = {
         }
         Update: {
           amount?: number
+          category?: string | null
           created_at?: string
           date?: string
+          exported?: boolean | null
           file_path?: string | null
           id?: string
           property_id?: string
@@ -116,10 +122,12 @@ export type Database = {
       }
       monthly_charges: {
         Row: {
+          category: string | null
           charge_month: string
           charge_status: string
           charged_at: string | null
           created_at: string
+          exported: boolean | null
           id: string
           owner_id: string
           receipt_path: string | null
@@ -128,10 +136,12 @@ export type Database = {
           total_management_fees: number
         }
         Insert: {
+          category?: string | null
           charge_month: string
           charge_status?: string
           charged_at?: string | null
           created_at?: string
+          exported?: boolean | null
           id?: string
           owner_id: string
           receipt_path?: string | null
@@ -140,10 +150,12 @@ export type Database = {
           total_management_fees?: number
         }
         Update: {
+          category?: string | null
           charge_month?: string
           charge_status?: string
           charged_at?: string | null
           created_at?: string
+          exported?: boolean | null
           id?: string
           owner_id?: string
           receipt_path?: string | null
