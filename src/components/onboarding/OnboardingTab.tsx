@@ -26,22 +26,25 @@ export const OnboardingTab = ({ propertyId, propertyName, propertyAddress }: Onb
   const loadProjects = async () => {
     try {
       setLoading(true);
+      console.log("Loading onboarding projects for property:", propertyId);
+      
       const { data, error } = await supabase
         .from("onboarding_projects")
         .select("*")
         .eq("property_id", propertyId)
-        .order("created_at", { ascending: false })
-        .limit(1);
+        .order("created_at", { ascending: false });
 
       if (error) {
         console.error("Failed to load onboarding projects:", error);
-        toast.error("Failed to load onboarding projects");
-        throw error;
+        toast.error("Failed to load onboarding projects: " + error.message);
+        setProjects([]);
+      } else {
+        console.log("Loaded projects:", data);
+        setProjects((data || []) as OnboardingProject[]);
       }
-      
-      setProjects((data || []) as OnboardingProject[]);
     } catch (error: any) {
-      console.error("Failed to load onboarding projects:", error);
+      console.error("Exception loading projects:", error);
+      setProjects([]);
     } finally {
       setLoading(false);
     }
@@ -54,7 +57,7 @@ export const OnboardingTab = ({ propertyId, propertyName, propertyAddress }: Onb
           <h2 className="text-2xl font-bold">Onboarding Workflow</h2>
           <p className="text-sm text-muted-foreground">9-phase STR property onboarding system</p>
         </div>
-        <Button onClick={() => setShowCreateDialog(true)} className="gap-2">
+        <Button onClick={() => setShowCreateDialog(true)} size="sm" className="gap-2">
           <Plus className="w-4 h-4" />
           New Onboarding Project
         </Button>
