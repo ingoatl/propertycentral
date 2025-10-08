@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Trash2, MapPin, Building2, Edit, Mail } from "lucide-react";
+import { Plus, Trash2, MapPin, Building2, Edit } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -26,7 +26,8 @@ const Properties = () => {
   const [loading, setLoading] = useState(false);
   const [editingProperty, setEditingProperty] = useState<Property | null>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [expandedPropertyId, setExpandedPropertyId] = useState<string | null>(null);
+  const [emailInsightsDialogOpen, setEmailInsightsDialogOpen] = useState(false);
+  const [selectedPropertyForInsights, setSelectedPropertyForInsights] = useState<Property | null>(null);
   const [formData, setFormData] = useState({
     name: "",
     address: "",
@@ -292,6 +293,21 @@ const Properties = () => {
         </Card>
       )}
 
+      {/* Email Insights Dialog */}
+      <Dialog open={emailInsightsDialogOpen} onOpenChange={setEmailInsightsDialogOpen}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Email Insights - {selectedPropertyForInsights?.name}</DialogTitle>
+            <DialogDescription>
+              AI-generated insights from emails related to this property
+            </DialogDescription>
+          </DialogHeader>
+          {selectedPropertyForInsights && (
+            <PropertyEmailInsights propertyId={selectedPropertyForInsights.id} />
+          )}
+        </DialogContent>
+      </Dialog>
+
       {/* Edit Property Dialog */}
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
         <DialogContent>
@@ -412,15 +428,6 @@ const Properties = () => {
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => setExpandedPropertyId(expandedPropertyId === property.id ? null : property.id)}
-                        className="text-primary hover:text-primary hover:bg-primary/10"
-                        title="View email insights"
-                      >
-                        <Mail className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
                         onClick={() => handleEdit(property)}
                         className="text-primary hover:text-primary hover:bg-primary/10"
                       >
@@ -442,15 +449,19 @@ const Properties = () => {
                     <span className="text-sm text-muted-foreground">Visit Price:</span>
                     <span className="text-2xl font-bold text-primary">${property.visitPrice.toFixed(2)}</span>
                   </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setSelectedPropertyForInsights(property);
+                      setEmailInsightsDialogOpen(true);
+                    }}
+                    className="w-full mt-4"
+                  >
+                    View Email Insights
+                  </Button>
                 </CardContent>
               </Card>
-
-              {/* Email Insights - Collapsible */}
-              {expandedPropertyId === property.id && (
-                <div className="animate-scale-in">
-                  <PropertyEmailInsights propertyId={property.id} />
-                </div>
-              )}
             </div>
           ))
         )}

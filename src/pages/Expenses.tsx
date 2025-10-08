@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { DollarSign, Calendar as CalendarIcon, MapPin, Receipt, Upload } from "lucide-react";
+import { DollarSign, Calendar as CalendarIcon, MapPin, Receipt, Upload, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Property, Expense } from "@/types";
 import { toast } from "sonner";
@@ -177,6 +177,29 @@ const Expenses = () => {
     return property?.address || "";
   };
 
+  const handleDelete = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this expense?")) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from("expenses")
+        .delete()
+        .eq("id", id);
+
+      if (error) throw error;
+
+      await loadData();
+      toast.success("Expense deleted");
+    } catch (error: any) {
+      if (import.meta.env.DEV) {
+        console.error("Error deleting expense:", error);
+      }
+      toast.error("Failed to delete expense");
+    }
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="pb-4 border-b border-border/50">
@@ -324,8 +347,16 @@ const Expenses = () => {
                         <ExpenseDocumentLink filePath={expense.filePath} />
                       )}
                     </div>
-                    <div className="text-right">
+                    <div className="flex flex-col items-end gap-3">
                       <p className="text-2xl font-bold text-red-600 dark:text-red-500">${expense.amount.toFixed(2)}</p>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleDelete(expense.id)}
+                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
                     </div>
                   </div>
                 </div>
