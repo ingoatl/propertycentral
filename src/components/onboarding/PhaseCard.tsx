@@ -30,11 +30,10 @@ export const PhaseCard = ({
   return (
     <Card className={cn(
       "transition-all",
-      !unlocked && "opacity-60 bg-muted/30",
       isComplete && "border-green-500/50"
     )}>
-      <Collapsible open={expanded && unlocked} onOpenChange={unlocked ? onToggle : undefined}>
-        <CollapsibleTrigger className="w-full" disabled={!unlocked}>
+      <Collapsible open={expanded} onOpenChange={onToggle}>
+        <CollapsibleTrigger className="w-full">
           <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
             <div className="flex items-start justify-between">
               <div className="flex-1 text-left">
@@ -42,7 +41,6 @@ export const PhaseCard = ({
                   <Badge variant="outline" className="font-mono">
                     Phase {phase.id}
                   </Badge>
-                  {!unlocked && <Lock className="w-4 h-4 text-muted-foreground" />}
                   {isComplete && <CheckCircle2 className="w-5 h-5 text-green-600" />}
                   <CardTitle className="text-lg">{phase.title}</CardTitle>
                 </div>
@@ -55,12 +53,10 @@ export const PhaseCard = ({
                     {tasks.filter(t => t.status === "completed").length} / {tasks.length}
                   </div>
                 </div>
-                {unlocked && (
-                  <ChevronDown className={cn(
-                    "w-5 h-5 transition-transform",
-                    expanded && "transform rotate-180"
-                  )} />
-                )}
+                <ChevronDown className={cn(
+                  "w-5 h-5 transition-transform",
+                  expanded && "transform rotate-180"
+                )} />
               </div>
             </div>
 

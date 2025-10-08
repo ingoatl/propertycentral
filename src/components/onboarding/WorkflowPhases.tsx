@@ -20,9 +20,7 @@ export const WorkflowPhases = ({ projectId, tasks, onTaskUpdate }: WorkflowPhase
   };
 
   const isPhaseUnlocked = (phaseNumber: number) => {
-    if (phaseNumber === 1) return true;
-    const previousPhaseCompletion = getPhaseCompletion(phaseNumber - 1);
-    return previousPhaseCompletion === 100;
+    return true; // All phases are always unlocked
   };
 
   return (
