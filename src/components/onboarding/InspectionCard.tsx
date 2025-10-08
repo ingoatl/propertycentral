@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ClipboardCheck, Calendar, User, Image, Wrench } from "lucide-react";
+import { ClipboardCheck, Calendar, User, Image, Wrench, ExternalLink } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Button } from "@/components/ui/button";
 import { ChevronDown } from "lucide-react";
@@ -97,23 +97,63 @@ export const InspectionCard = ({ projectId }: InspectionCardProps) => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
                 <div className="p-2 bg-white rounded border">
                   <span className="text-muted-foreground">HVAC: </span>
-                  <span className="font-medium">{inspectionData.serialNumbers.hvac}</span>
+                  <a 
+                    href="https://peachhaus-str-inspect.lovable.app/property/04c0c98d-443f-4d53-9f2a-8234f8bc1b34#photos"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-medium text-blue-600 hover:text-blue-700 hover:underline inline-flex items-center gap-1"
+                  >
+                    {inspectionData.serialNumbers.hvac}
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
                 </div>
                 <div className="p-2 bg-white rounded border">
                   <span className="text-muted-foreground">Refrigerator: </span>
-                  <span className="font-medium">{inspectionData.serialNumbers.refrigerator}</span>
+                  <a 
+                    href="https://peachhaus-str-inspect.lovable.app/property/04c0c98d-443f-4d53-9f2a-8234f8bc1b34#photos"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-medium text-blue-600 hover:text-blue-700 hover:underline inline-flex items-center gap-1"
+                  >
+                    {inspectionData.serialNumbers.refrigerator}
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
                 </div>
                 <div className="p-2 bg-white rounded border">
                   <span className="text-muted-foreground">Dishwasher: </span>
-                  <span className="font-medium">{inspectionData.serialNumbers.dishwasher}</span>
+                  <a 
+                    href="https://peachhaus-str-inspect.lovable.app/property/04c0c98d-443f-4d53-9f2a-8234f8bc1b34#photos"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-medium text-blue-600 hover:text-blue-700 hover:underline inline-flex items-center gap-1"
+                  >
+                    {inspectionData.serialNumbers.dishwasher}
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
                 </div>
                 <div className="p-2 bg-white rounded border">
                   <span className="text-muted-foreground">Washer: </span>
-                  <span className="font-medium">{inspectionData.serialNumbers.washer}</span>
+                  <a 
+                    href="https://peachhaus-str-inspect.lovable.app/property/04c0c98d-443f-4d53-9f2a-8234f8bc1b34#photos"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-medium text-blue-600 hover:text-blue-700 hover:underline inline-flex items-center gap-1"
+                  >
+                    {inspectionData.serialNumbers.washer}
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
                 </div>
                 <div className="p-2 bg-white rounded border">
                   <span className="text-muted-foreground">Dryer: </span>
-                  <span className="font-medium">{inspectionData.serialNumbers.dryer}</span>
+                  <a 
+                    href="https://peachhaus-str-inspect.lovable.app/property/04c0c98d-443f-4d53-9f2a-8234f8bc1b34#photos"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-medium text-blue-600 hover:text-blue-700 hover:underline inline-flex items-center gap-1"
+                  >
+                    {inspectionData.serialNumbers.dryer}
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
                 </div>
               </div>
             </div>

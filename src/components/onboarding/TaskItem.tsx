@@ -189,7 +189,7 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
               placeholder={task.description || "Enter details..."}
               rows={3}
               disabled={isReadOnly}
-              className={cn(isReadOnly && "bg-muted cursor-default")}
+              className={cn(isReadOnly && "border-2 border-green-200 bg-green-50/30")}
             />
           </div>
         );
@@ -220,7 +220,7 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
                   className={cn(
                     "w-full justify-start text-left font-normal",
                     !date && "text-muted-foreground",
-                    isReadOnly && "bg-muted cursor-default"
+                    isReadOnly && "border-2 border-green-200 bg-green-50/30"
                   )}
                 >
                   <CalendarIcon className="mr-2 h-4 w-4" />
@@ -357,7 +357,7 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
                 value={fieldValue}
                 onChange={(e) => handleInputChange(e.target.value)}
                 onBlur={handleInputBlur}
-                className={cn("pl-7", isReadOnly && "bg-muted cursor-default")}
+                className={cn("pl-7", isReadOnly && "border-2 border-green-200 bg-green-50/30")}
                 placeholder="0.00"
                 disabled={isReadOnly}
               />
@@ -390,7 +390,7 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
               onBlur={handleInputBlur}
               placeholder="(555) 123-4567"
               disabled={isReadOnly}
-              className={cn(isReadOnly && "bg-muted cursor-default")}
+              className={cn(isReadOnly && "border-2 border-green-200 bg-green-50/30")}
             />
           </div>
         );
@@ -434,7 +434,7 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
               onBlur={handleInputBlur}
               placeholder={task.description || "Enter value..."}
               disabled={isReadOnly}
-              className={cn(isReadOnly && "bg-muted cursor-default")}
+              className={cn(isReadOnly && "border-2 border-green-200 bg-green-50/30")}
             />
           </div>
         );
