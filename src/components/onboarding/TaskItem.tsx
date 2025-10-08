@@ -41,10 +41,7 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
         .update(updateData)
         .eq("id", task.id);
 
-      // Delay update to prevent modal from closing
-      requestAnimationFrame(() => {
-        onUpdate();
-      });
+      // Don't call onUpdate - let WorkflowDialog handle it on close
     } catch (error) {
       console.error("Failed to auto-save task:", error);
     }
