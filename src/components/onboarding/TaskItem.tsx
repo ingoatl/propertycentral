@@ -9,7 +9,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
-import { CalendarIcon, Upload, FileText, CheckCircle2 } from "lucide-react";
+import { CalendarIcon, Upload, FileText, CheckCircle2, Edit2 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -30,6 +30,10 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
   const [showNAField, setShowNAField] = useState(task.field_value === "N/A");
   const [naReason, setNAReason] = useState(task.notes || "");
   const [taskStatus, setTaskStatus] = useState(task.status);
+  const [isEditing, setIsEditing] = useState(false);
+
+  const hasValue = task.field_value && task.field_value.trim() !== "";
+  const isReadOnly = hasValue && !isEditing;
 
   const autoSave = async (value: string, isCompleted: boolean = true, notesValue?: string) => {
     try {
@@ -163,13 +167,29 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
       case "textarea":
         return (
           <div className="space-y-2">
-            <Label>{task.title}</Label>
+            <div className="flex items-center justify-between">
+              <Label>{task.title}</Label>
+              {hasValue && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsEditing(!isEditing)}
+                  className="h-6 px-2 text-xs"
+                >
+                  <Edit2 className="w-3 h-3 mr-1" />
+                  {isEditing ? "Cancel" : "Edit"}
+                </Button>
+              )}
+            </div>
             <Textarea
               value={fieldValue}
               onChange={(e) => handleInputChange(e.target.value)}
               onBlur={handleInputBlur}
               placeholder={task.description || "Enter details..."}
               rows={3}
+              disabled={isReadOnly}
+              className={cn(isReadOnly && "bg-muted cursor-default")}
             />
           </div>
         );
@@ -177,14 +197,30 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
       case "date":
         return (
           <div className="space-y-2">
-            <Label>{task.title}</Label>
+            <div className="flex items-center justify-between">
+              <Label>{task.title}</Label>
+              {hasValue && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsEditing(!isEditing)}
+                  className="h-6 px-2 text-xs"
+                >
+                  <Edit2 className="w-3 h-3 mr-1" />
+                  {isEditing ? "Cancel" : "Edit"}
+                </Button>
+              )}
+            </div>
             <Popover>
               <PopoverTrigger asChild>
                 <Button
                   variant="outline"
+                  disabled={isReadOnly}
                   className={cn(
                     "w-full justify-start text-left font-normal",
-                    !date && "text-muted-foreground"
+                    !date && "text-muted-foreground",
+                    isReadOnly && "bg-muted cursor-default"
                   )}
                 >
                   <CalendarIcon className="mr-2 h-4 w-4" />
@@ -298,7 +334,21 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
       case "currency":
         return (
           <div className="space-y-2">
-            <Label>{task.title}</Label>
+            <div className="flex items-center justify-between">
+              <Label>{task.title}</Label>
+              {hasValue && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsEditing(!isEditing)}
+                  className="h-6 px-2 text-xs"
+                >
+                  <Edit2 className="w-3 h-3 mr-1" />
+                  {isEditing ? "Cancel" : "Edit"}
+                </Button>
+              )}
+            </div>
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
               <Input
@@ -307,8 +357,9 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
                 value={fieldValue}
                 onChange={(e) => handleInputChange(e.target.value)}
                 onBlur={handleInputBlur}
-                className="pl-7"
+                className={cn("pl-7", isReadOnly && "bg-muted cursor-default")}
                 placeholder="0.00"
+                disabled={isReadOnly}
               />
             </div>
           </div>
@@ -317,13 +368,29 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
       case "phone":
         return (
           <div className="space-y-2">
-            <Label>{task.title}</Label>
+            <div className="flex items-center justify-between">
+              <Label>{task.title}</Label>
+              {hasValue && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsEditing(!isEditing)}
+                  className="h-6 px-2 text-xs"
+                >
+                  <Edit2 className="w-3 h-3 mr-1" />
+                  {isEditing ? "Cancel" : "Edit"}
+                </Button>
+              )}
+            </div>
             <Input
               type="tel"
               value={fieldValue}
               onChange={(e) => handleInputChange(e.target.value)}
               onBlur={handleInputBlur}
               placeholder="(555) 123-4567"
+              disabled={isReadOnly}
+              className={cn(isReadOnly && "bg-muted cursor-default")}
             />
           </div>
         );
@@ -346,12 +413,28 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
       default:
         return (
           <div className="space-y-2">
-            <Label>{task.title}</Label>
+            <div className="flex items-center justify-between">
+              <Label>{task.title}</Label>
+              {hasValue && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsEditing(!isEditing)}
+                  className="h-6 px-2 text-xs"
+                >
+                  <Edit2 className="w-3 h-3 mr-1" />
+                  {isEditing ? "Cancel" : "Edit"}
+                </Button>
+              )}
+            </div>
             <Input
               value={fieldValue}
               onChange={(e) => handleInputChange(e.target.value)}
               onBlur={handleInputBlur}
               placeholder={task.description || "Enter value..."}
+              disabled={isReadOnly}
+              className={cn(isReadOnly && "bg-muted cursor-default")}
             />
           </div>
         );
