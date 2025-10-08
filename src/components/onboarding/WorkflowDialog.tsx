@@ -6,6 +6,9 @@ import { toast } from "sonner";
 import { WorkflowPhases } from "./WorkflowPhases";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ONBOARDING_PHASES } from "@/context/onboardingPhases";
+import { InspectionCard } from "./InspectionCard";
+import { Input } from "@/components/ui/input";
+import { Search } from "lucide-react";
 
 interface WorkflowDialogProps {
   open: boolean;
@@ -17,12 +20,32 @@ interface WorkflowDialogProps {
 export const WorkflowDialog = ({ open, onOpenChange, project, onUpdate }: WorkflowDialogProps) => {
   const [tasks, setTasks] = useState<OnboardingTask[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filteredTasks, setFilteredTasks] = useState<OnboardingTask[]>([]);
 
   useEffect(() => {
     if (open) {
       loadTasks();
     }
   }, [open, project.id]);
+
+  useEffect(() => {
+    // Filter tasks based on search query
+    if (searchQuery.trim() === "") {
+      setFilteredTasks(tasks);
+    } else {
+      const query = searchQuery.toLowerCase();
+      const filtered = tasks.filter(
+        (task) =>
+          task.title.toLowerCase().includes(query) ||
+          task.phase_title.toLowerCase().includes(query) ||
+          task.description?.toLowerCase().includes(query) ||
+          task.field_value?.toLowerCase().includes(query) ||
+          task.notes?.toLowerCase().includes(query)
+      );
+      setFilteredTasks(filtered);
+    }
+  }, [searchQuery, tasks]);
 
   useEffect(() => {
     // When dialog closes, update parent to refresh progress
@@ -132,15 +155,38 @@ export const WorkflowDialog = ({ open, onOpenChange, project, onUpdate }: Workfl
           <p className="text-sm text-muted-foreground">{project.property_address}</p>
         </DialogHeader>
 
-        <ScrollArea className="h-[calc(90vh-120px)] pr-4">
+        {/* Search Field */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            placeholder="Search tasks, phases, values, notes..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+
+        <ScrollArea className="h-[calc(90vh-200px)] pr-4">
           {loading ? (
             <div className="py-12 text-center text-muted-foreground">Loading workflow...</div>
           ) : (
-            <WorkflowPhases
-              projectId={project.id}
-              tasks={tasks}
-              onTaskUpdate={handleTaskUpdate}
-            />
+            <div className="space-y-4">
+              {/* Inspection Card */}
+              <InspectionCard projectId={project.id} />
+
+              {/* Workflow Phases */}
+              <WorkflowPhases
+                projectId={project.id}
+                tasks={searchQuery ? filteredTasks : tasks}
+                onTaskUpdate={handleTaskUpdate}
+              />
+
+              {searchQuery && filteredTasks.length === 0 && (
+                <div className="py-12 text-center text-muted-foreground">
+                  No results found for "{searchQuery}"
+                </div>
+              )}
+            </div>
           )}
         </ScrollArea>
       </DialogContent>

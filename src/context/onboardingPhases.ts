@@ -145,36 +145,5 @@ export const ONBOARDING_PHASES: PhaseDefinition[] = [
       { title: "First Aid Kit Location", field_type: "text" },
       { title: "Water Main Shutoff Location", field_type: "text" },
     ]
-  },
-  {
-    id: 10,
-    title: "Property Inspection & Equipment",
-    description: "Complete inspection report with appliance serial numbers and photos",
-    tasks: [
-      { title: "Inspection Date", field_type: "date" },
-      { title: "Inspector Name", field_type: "text" },
-      { title: "Upload Inspection Report", field_type: "file" },
-      { title: "Upload Exterior Property Photos", field_type: "file" },
-      { title: "HVAC Serial Numbers", field_type: "textarea", description: "All units with model and serial" },
-      { title: "Upload HVAC Serial Number Photos", field_type: "file" },
-      { title: "Refrigerator Serial Number", field_type: "text" },
-      { title: "Dishwasher Serial Number", field_type: "text" },
-      { title: "Washer Serial Number", field_type: "text" },
-      { title: "Dryer Serial Number", field_type: "text" },
-      { title: "Upload Kitchen Appliance Photos", field_type: "file" },
-      { title: "Upload Laundry Appliance Photos", field_type: "file" },
-      { title: "Smoke/CO Detector Brand & Model", field_type: "text" },
-      { title: "Number of Bedrooms", field_type: "text" },
-      { title: "Number of Bathrooms", field_type: "text" },
-      { title: "Thermostat Locations", field_type: "textarea" },
-      { title: "Upload Bedroom Photos", field_type: "file" },
-      { title: "Upload Bathroom Photos", field_type: "file" },
-      { title: "Upload Living Area Photos", field_type: "file" },
-      { title: "TV Remote Battery Types", field_type: "textarea", description: "List battery type for each TV" },
-      { title: "Internet Speed Test Result", field_type: "text", description: "Download/Upload Mbps" },
-      { title: "Upload Speed Test Screenshot", field_type: "file" },
-      { title: "Inspection Issues Found", field_type: "textarea" },
-      { title: "Inspection Notes", field_type: "textarea" },
-    ]
   }
 ];
