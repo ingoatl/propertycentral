@@ -24,6 +24,7 @@ const Expenses = () => {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [filterPropertyId, setFilterPropertyId] = useState<string>("all");
   const [formData, setFormData] = useState({
     propertyId: "",
     amount: "",
@@ -306,18 +307,33 @@ const Expenses = () => {
 
       <Card className="shadow-card border-border/50">
         <CardHeader className="bg-gradient-subtle rounded-t-lg">
-          <CardTitle className="text-xl">Recent Expenses</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-xl">Recent Expenses</CardTitle>
+            <Select value={filterPropertyId} onValueChange={setFilterPropertyId}>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="Filter by property" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Properties</SelectItem>
+                {properties.map((property) => (
+                  <SelectItem key={property.id} value={property.id}>
+                    {property.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </CardHeader>
         <CardContent className="pt-6">
-          {expenses.length === 0 ? (
+          {(filterPropertyId === "all" ? expenses : expenses.filter(e => e.propertyId === filterPropertyId)).length === 0 ? (
             <div className="text-center py-12">
               <Receipt className="h-12 w-12 text-muted-foreground mx-auto mb-4 opacity-50" />
               <p className="text-muted-foreground">No expenses recorded yet</p>
             </div>
           ) : (
             <div className="space-y-3">
-              {expenses.map((expense, index) => (
-                <div 
+              {(filterPropertyId === "all" ? expenses : expenses.filter(e => e.propertyId === filterPropertyId)).map((expense, index) => (
+                <div
                   key={expense.id} 
                   className="p-5 border border-border/50 rounded-xl hover:shadow-card transition-all duration-300 hover:scale-[1.01] bg-gradient-subtle"
                   style={{ animationDelay: `${index * 0.05}s` }}

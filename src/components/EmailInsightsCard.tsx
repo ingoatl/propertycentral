@@ -6,6 +6,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Mail, ChevronDown, AlertCircle, CheckCircle, Clock, TrendingUp, Trash2, DollarSign, Lightbulb, Heart, Frown, Meh, Zap } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { RescanEmailsButton } from "./RescanEmailsButton";
 
 interface EmailInsight {
   id: string;
@@ -276,6 +277,7 @@ export function EmailInsightsCard({ propertyId, showHeader = true }: EmailInsigh
                 )}
               </div>
               <div className="flex items-center gap-2">
+                <RescanEmailsButton />
                 <Button 
                   size="sm" 
                   variant="outline" 
@@ -285,7 +287,7 @@ export function EmailInsightsCard({ propertyId, showHeader = true }: EmailInsigh
                   }}
                   disabled={scanning}
                 >
-                  {scanning ? 'Scanning...' : 'Scan Now'}
+                  {scanning ? 'Scanning...' : 'Scan New'}
                 </Button>
                 <ChevronDown className={`w-5 h-5 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
               </div>
