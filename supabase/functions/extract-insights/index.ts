@@ -40,7 +40,7 @@ Owners: ${ownerList}
 Analyze the email comprehensively and extract:
 
 1. **Relevance**: Is this email relevant to any property or owner? (yes/no)
-2. **Property Match**: Which property is it related to? (match by name or address)
+2. **Property Match**: Which property is it related to? (match by name or address in email)
 3. **Owner Match**: Which owner is it related to? (match by email or name)
 4. **Category**: maintenance, payment, booking, tenant_communication, legal, insurance, utilities, expense, order, or other
 5. **Summary**: 2-3 sentence summary of the email content
@@ -50,11 +50,19 @@ Analyze the email comprehensively and extract:
 9. **Priority**: low, normal, high, urgent
 10. **Due Date**: If action required, when is it due? (YYYY-MM-DD or null)
 
-11. **Expense Detection**: 
+11. **Expense Detection** (CRITICAL - read carefully for Amazon orders): 
    - Is this an expense/order/purchase? (yes/no)
-   - Look for: Amazon orders, receipts, invoices, purchase confirmations, subscriptions, utility bills
-   - Extract amount if present (as number, no currency symbols)
-   - Extract what the expense is for (brief description)
+   - For Amazon emails: These often contain MULTIPLE orders in ONE email. Look for:
+     * Multiple "Order Confirmation" sections
+     * Multiple delivery dates (e.g., "Tuesday, October 1", "Wednesday, October 2")
+     * Each order section has items with prices
+     * Sum ALL item prices across ALL orders in the email
+   - Extract order number (look for order IDs in links like "View or manage order" buttons)
+   - Extract order date (the earliest delivery/order date mentioned)
+   - Calculate TOTAL amount: Add up ALL item prices from ALL orders in the email
+   - Extract vendor name (e.g., "Amazon", "Home Depot")
+   - List ALL items purchased (e.g., "7 items across 3 orders: Ekar 15-Meter HDMI Cable, Roku Streaming Stick, GDORUN Flags, etc.")
+   - Extract tracking number if available
 
 Return ONLY a JSON object with these exact fields:
 {
@@ -69,8 +77,12 @@ Return ONLY a JSON object with these exact fields:
   "priority": string,
   "dueDate": string or null,
   "expenseDetected": boolean,
-  "expenseAmount": number or null,
-  "expenseDescription": string or null
+  "expenseAmount": number or null (SUM of ALL items),
+  "expenseDescription": string or null (list ALL items),
+  "orderNumber": string or null,
+  "orderDate": string or null (YYYY-MM-DD),
+  "trackingNumber": string or null,
+  "vendor": string or null
 }`;
 
     const userPrompt = `Email from: ${senderEmail}
@@ -201,9 +213,9 @@ Analyze this email.`;
 
     console.log('Insight saved successfully');
 
-    // If expense detected and we have a property, create an expense record
+    // If expense detected and we have a property, create an expense record with full details
     if (analysis.expenseDetected && analysis.expenseAmount && property?.id) {
-      console.log('Creating expense record from email...');
+      console.log('Creating expense record from email with order details...');
       
       const { data: userData } = await supabase
         .from('gmail_oauth_tokens')
@@ -215,9 +227,14 @@ Analyze this email.`;
         .insert({
           property_id: property.id,
           amount: analysis.expenseAmount,
-          date: new Date(emailDate).toISOString().split('T')[0],
+          date: analysis.orderDate || new Date(emailDate).toISOString().split('T')[0],
           purpose: analysis.expenseDescription || `Email expense: ${subject}`,
-          category: 'Email Import',
+          category: analysis.category || 'order',
+          order_number: analysis.orderNumber || null,
+          order_date: analysis.orderDate || null,
+          tracking_number: analysis.trackingNumber || null,
+          vendor: analysis.vendor || null,
+          items_detail: analysis.expenseDescription || null,
           user_id: userData?.user_id || null,
         });
 
@@ -230,7 +247,7 @@ Analyze this email.`;
           .update({ expense_created: true })
           .eq('id', insertedInsight.id);
         
-        console.log('Expense record created successfully');
+        console.log('Expense record created successfully with order details');
       }
     }
 

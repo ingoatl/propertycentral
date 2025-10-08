@@ -5,12 +5,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { DollarSign, Calendar as CalendarIcon, MapPin, Receipt, Upload, Trash2 } from "lucide-react";
+import { DollarSign, Calendar as CalendarIcon, MapPin, Receipt, Upload, Trash2, Eye } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Property, Expense } from "@/types";
 import { toast } from "sonner";
 import { z } from "zod";
 import { ExpenseDocumentLink } from "@/components/ExpenseDocumentLink";
+import { ExpenseDetailModal } from "@/components/ExpenseDetailModal";
 
 const expenseSchema = z.object({
   propertyId: z.string().uuid("Please select a property"),
@@ -25,6 +26,8 @@ const Expenses = () => {
   const [loading, setLoading] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [filterPropertyId, setFilterPropertyId] = useState<string>("all");
+  const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [formData, setFormData] = useState({
     propertyId: "",
     amount: "",
@@ -69,6 +72,12 @@ const Expenses = () => {
         purpose: e.purpose,
         filePath: e.file_path,
         createdAt: e.created_at,
+        category: e.category,
+        orderNumber: e.order_number,
+        orderDate: e.order_date,
+        trackingNumber: e.tracking_number,
+        vendor: e.vendor,
+        itemsDetail: e.items_detail,
       })));
     } catch (error: any) {
       if (import.meta.env.DEV) {
@@ -365,14 +374,27 @@ const Expenses = () => {
                     </div>
                     <div className="flex flex-col items-end gap-3">
                       <p className="text-2xl font-bold text-red-600 dark:text-red-500">${expense.amount.toFixed(2)}</p>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleDelete(expense.id)}
-                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => {
+                            setSelectedExpense(expense);
+                            setIsDetailModalOpen(true);
+                          }}
+                          className="hover:bg-primary/10"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDelete(expense.id)}
+                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -381,6 +403,14 @@ const Expenses = () => {
           )}
         </CardContent>
       </Card>
+
+      <ExpenseDetailModal
+        expense={selectedExpense}
+        propertyName={selectedExpense ? getPropertyName(selectedExpense.propertyId) : ""}
+        propertyAddress={selectedExpense ? getPropertyAddress(selectedExpense.propertyId) : ""}
+        open={isDetailModalOpen}
+        onOpenChange={setIsDetailModalOpen}
+      />
     </div>
   );
 };

@@ -25,6 +25,12 @@ export interface Expense {
   purpose?: string;
   filePath?: string;
   createdAt: string;
+  category?: string;
+  orderNumber?: string;
+  orderDate?: string;
+  trackingNumber?: string;
+  vendor?: string;
+  itemsDetail?: string;
 }
 
 export interface OwnerRezBooking {

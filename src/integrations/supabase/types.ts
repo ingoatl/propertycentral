@@ -134,9 +134,14 @@ export type Database = {
           exported: boolean | null
           file_path: string | null
           id: string
+          items_detail: string | null
+          order_date: string | null
+          order_number: string | null
           property_id: string
           purpose: string | null
+          tracking_number: string | null
           user_id: string | null
+          vendor: string | null
         }
         Insert: {
           amount: number
@@ -146,9 +151,14 @@ export type Database = {
           exported?: boolean | null
           file_path?: string | null
           id?: string
+          items_detail?: string | null
+          order_date?: string | null
+          order_number?: string | null
           property_id: string
           purpose?: string | null
+          tracking_number?: string | null
           user_id?: string | null
+          vendor?: string | null
         }
         Update: {
           amount?: number
@@ -158,9 +168,14 @@ export type Database = {
           exported?: boolean | null
           file_path?: string | null
           id?: string
+          items_detail?: string | null
+          order_date?: string | null
+          order_number?: string | null
           property_id?: string
           purpose?: string | null
+          tracking_number?: string | null
           user_id?: string | null
+          vendor?: string | null
         }
         Relationships: [
           {
