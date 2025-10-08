@@ -74,6 +74,7 @@ const Expenses = () => {
         trackingNumber: e.tracking_number,
         vendor: e.vendor,
         itemsDetail: e.items_detail,
+        deliveryAddress: e.delivery_address,
       })));
     } catch (error: any) {
       if (import.meta.env.DEV) {

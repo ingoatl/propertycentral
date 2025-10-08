@@ -31,6 +31,7 @@ export interface Expense {
   trackingNumber?: string;
   vendor?: string;
   itemsDetail?: string;
+  deliveryAddress?: string;
 }
 
 export interface OwnerRezBooking {

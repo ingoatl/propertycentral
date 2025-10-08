@@ -50,19 +50,37 @@ Analyze the email comprehensively and extract:
 9. **Priority**: low, normal, high, urgent
 10. **Due Date**: If action required, when is it due? (YYYY-MM-DD or null)
 
-11. **Expense Detection** (CRITICAL - read carefully for Amazon orders): 
+11. **Expense Detection** (CRITICAL - Analyze entire email thoroughly): 
    - Is this an expense/order/purchase? (yes/no)
-   - For Amazon emails: These often contain MULTIPLE orders in ONE email. Look for:
-     * Multiple "Order Confirmation" sections
-     * Multiple delivery dates (e.g., "Tuesday, October 1", "Wednesday, October 2")
-     * Each order section has items with prices
-     * Sum ALL item prices across ALL orders in the email
-   - Extract order number (look for order IDs in links like "View or manage order" buttons)
-   - Extract order date (the earliest delivery/order date mentioned)
-   - Calculate TOTAL amount: Add up ALL item prices from ALL orders in the email
-   - Extract vendor name (e.g., "Amazon", "Home Depot")
-   - List ALL items purchased (e.g., "7 items across 3 orders: Ekar 15-Meter HDMI Cable, Roku Streaming Stick, GDORUN Flags, etc.")
-   - Extract tracking number if available
+   
+   **FOR AMAZON ORDERS - READ CAREFULLY:**
+   - Amazon often sends ONE EMAIL containing MULTIPLE SEPARATE ORDERS
+   - Look for phrases like "Order Confirmation" appearing multiple times
+   - Each order has its own:
+     * Order number (e.g., in "View or manage order" links)
+     * Delivery date
+     * Set of items with individual prices
+   - YOU MUST:
+     * Identify ALL separate orders in the email
+     * Extract the FIRST/EARLIEST order number as the main order number
+     * Use the EARLIEST delivery/order date
+     * Calculate TOTAL: SUM of ALL item prices across ALL orders
+     * List ALL items from ALL orders
+     * Extract delivery address (shipping address)
+   
+   **Example**: If email shows:
+     - Order 1: Item A ($50), Item B ($30) - delivers Oct 1
+     - Order 2: Item C ($20) - delivers Oct 2
+   Then: orderNumber = Order 1 number, orderDate = Oct 1, expenseAmount = 100, items = "Item A, Item B, Item C"
+   
+   Extract:
+   - Order number: First order ID found (look in links like "View or manage order #123-456789-0123456")
+   - Order date: EARLIEST order/delivery date (YYYY-MM-DD format)
+   - Total amount: SUM of ALL item prices from ALL orders combined
+   - Vendor: "Amazon.com" or actual vendor name
+   - Items: Comma-separated list of ALL items from ALL orders
+   - Tracking: First tracking number if available
+   - Delivery address: Full shipping address
 
 Return ONLY a JSON object with these exact fields:
 {
@@ -77,12 +95,13 @@ Return ONLY a JSON object with these exact fields:
   "priority": string,
   "dueDate": string or null,
   "expenseDetected": boolean,
-  "expenseAmount": number or null (SUM of ALL items),
-  "expenseDescription": string or null (list ALL items),
-  "orderNumber": string or null,
-  "orderDate": string or null (YYYY-MM-DD),
+  "expenseAmount": number or null (TOTAL SUM),
+  "expenseDescription": string or null (ALL items),
+  "orderNumber": string or null (FIRST order),
+  "orderDate": string or null (EARLIEST date YYYY-MM-DD),
   "trackingNumber": string or null,
-  "vendor": string or null
+  "vendor": string or null,
+  "deliveryAddress": string or null
 }`;
 
     const userPrompt = `Email from: ${senderEmail}
@@ -171,7 +190,7 @@ Analyze this email.`;
       .from('email_insights')
       .select('id')
       .eq('gmail_message_id', gmailMessageId)
-      .single();
+      .maybeSingle();
 
     if (existing) {
       console.log('Email already processed, skipping...');
@@ -220,7 +239,7 @@ Analyze this email.`;
       const { data: userData } = await supabase
         .from('gmail_oauth_tokens')
         .select('user_id')
-        .single();
+        .maybeSingle();
 
       const { error: expenseError } = await supabase
         .from('expenses')
@@ -235,6 +254,7 @@ Analyze this email.`;
           tracking_number: analysis.trackingNumber || null,
           vendor: analysis.vendor || null,
           items_detail: analysis.expenseDescription || null,
+          delivery_address: analysis.deliveryAddress || null,
           user_id: userData?.user_id || null,
         });
 

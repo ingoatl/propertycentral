@@ -106,7 +106,11 @@ export const PropertyExpenseView = ({
               {expensesByMonth[monthKey].map((expense, index) => (
                 <div
                   key={expense.id}
-                  className="p-5 border border-border/50 rounded-xl hover:shadow-card transition-all duration-300 hover:scale-[1.01] bg-gradient-subtle"
+                  onClick={() => {
+                    setSelectedExpense(expense);
+                    setIsDetailModalOpen(true);
+                  }}
+                  className="p-5 border border-border/50 rounded-xl hover:shadow-card transition-all duration-300 hover:scale-[1.01] bg-gradient-subtle cursor-pointer group"
                   style={{ animationDelay: `${index * 0.05}s` }}
                 >
                   <div className="flex items-start justify-between gap-4">
@@ -120,14 +124,14 @@ export const PropertyExpenseView = ({
                           day: 'numeric'
                         })}
                       </p>
-                      {expense.purpose && (
-                        <p className="text-sm text-muted-foreground mt-2 italic border-l-2 border-primary/30 pl-3">
-                          {expense.purpose}
-                        </p>
-                      )}
                       {expense.vendor && (
                         <p className="text-sm font-semibold text-foreground">
-                          Vendor: {expense.vendor}
+                          {expense.vendor}
+                        </p>
+                      )}
+                      {expense.purpose && (
+                        <p className="text-sm text-muted-foreground line-clamp-2">
+                          {expense.purpose}
                         </p>
                       )}
                       {expense.filePath && (
@@ -142,7 +146,8 @@ export const PropertyExpenseView = ({
                         <Button
                           variant="outline"
                           size="icon"
-                          onClick={() => {
+                          onClick={(e) => {
+                            e.stopPropagation();
                             setSelectedExpense(expense);
                             setIsDetailModalOpen(true);
                           }}
@@ -153,7 +158,10 @@ export const PropertyExpenseView = ({
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => handleDelete(expense.id)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDelete(expense.id);
+                          }}
                           className="text-destructive hover:text-destructive hover:bg-destructive/10"
                         >
                           <Trash2 className="w-4 h-4" />

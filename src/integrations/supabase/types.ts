@@ -131,6 +131,7 @@ export type Database = {
           category: string | null
           created_at: string
           date: string
+          delivery_address: string | null
           exported: boolean | null
           file_path: string | null
           id: string
@@ -148,6 +149,7 @@ export type Database = {
           category?: string | null
           created_at?: string
           date: string
+          delivery_address?: string | null
           exported?: boolean | null
           file_path?: string | null
           id?: string
@@ -165,6 +167,7 @@ export type Database = {
           category?: string | null
           created_at?: string
           date?: string
+          delivery_address?: string | null
           exported?: boolean | null
           file_path?: string | null
           id?: string
