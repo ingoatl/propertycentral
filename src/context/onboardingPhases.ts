@@ -26,7 +26,7 @@ export const ONBOARDING_PHASES: PhaseDefinition[] = [
       { title: "WiFi network name (SSID)", field_type: "text" },
       { title: "WiFi password", field_type: "text" },
       { title: "Smart lock brand", field_type: "text" },
-      { title: "Smart lock master code", field_type: "text" },
+      { title: "Smart lock master PIN code", field_type: "text" },
       { title: "Emergency guest PIN", field_type: "text" },
       { title: "Lockbox code", field_type: "text" },
       { title: "Backup key location", field_type: "text" },

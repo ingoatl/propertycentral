@@ -104,6 +104,8 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
         .eq("id", task.id);
 
       setFieldValue("N/A");
+      setShowNAField(false);
+      toast.success("Marked as not applicable");
     } catch (error) {
       console.error("Failed to mark as N/A:", error);
       toast.error("Failed to save");
@@ -197,7 +199,7 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
 
       case "file":
         return (
-          <div className="space-y-3">
+          <div className="space-y-2">
             <Label>{task.title}</Label>
             
             {!showNAField ? (
@@ -228,10 +230,10 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
                 {!task.file_path && task.field_value !== "N/A" && (
                   <Button 
                     type="button"
-                    variant="outline" 
+                    variant="ghost" 
                     size="sm"
                     onClick={() => setShowNAField(true)}
-                    className="w-full"
+                    className="h-7 text-xs"
                   >
                     Mark as Not Applicable
                   </Button>
@@ -242,22 +244,25 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
                 <Textarea
                   value={naReason}
                   onChange={(e) => setNAReason(e.target.value)}
-                  placeholder="Explain why this document is not available (e.g., owner opted out, not required, etc.)"
-                  rows={3}
+                  placeholder="Why is this not available?"
+                  rows={2}
+                  className="text-sm"
                 />
                 <div className="flex gap-2">
                   <Button 
                     type="button"
                     size="sm" 
                     onClick={handleMarkAsNA}
+                    className="h-7 text-xs"
                   >
-                    Save as N/A
+                    Save
                   </Button>
                   <Button 
                     type="button"
                     size="sm" 
                     variant="outline"
                     onClick={() => setShowNAField(false)}
+                    className="h-7 text-xs"
                   >
                     Cancel
                   </Button>
@@ -266,12 +271,12 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
             )}
             
             {task.field_value === "N/A" && (
-              <div className="p-3 bg-amber-50 border border-amber-200 rounded-md">
+              <div className="p-2 bg-amber-50 border border-amber-200 rounded-md">
                 <div className="flex items-start gap-2">
-                  <CheckCircle2 className="w-5 h-5 text-amber-600 mt-0.5" />
+                  <CheckCircle2 className="w-4 h-4 text-amber-600 mt-0.5" />
                   <div className="flex-1">
-                    <p className="text-sm font-medium text-amber-900">Marked as Not Applicable</p>
-                    <p className="text-xs text-amber-700 mt-1">{task.notes}</p>
+                    <p className="text-xs font-medium text-amber-900">Not Applicable</p>
+                    <p className="text-xs text-amber-700 mt-0.5">{task.notes}</p>
                   </div>
                 </div>
               </div>
