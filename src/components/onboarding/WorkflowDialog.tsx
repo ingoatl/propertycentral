@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { WorkflowPhases } from "./WorkflowPhases";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { ONBOARDING_PHASES } from "@/context/onboardingPhases";
 
 interface WorkflowDialogProps {
   open: boolean;
@@ -41,7 +42,53 @@ export const WorkflowDialog = ({ open, onOpenChange, project, onUpdate }: Workfl
         .order("created_at");
 
       if (error) throw error;
-      setTasks((data || []) as OnboardingTask[]);
+      
+      const existingTasks = (data || []) as OnboardingTask[];
+      
+      // Check if we need to add tasks for new phases
+      const existingPhases = new Set(existingTasks.map(t => t.phase_number));
+      const missingPhaseTasks = [];
+      
+      for (const phase of ONBOARDING_PHASES) {
+        if (!existingPhases.has(phase.id)) {
+          // This phase has no tasks - create them
+          for (const task of phase.tasks) {
+            missingPhaseTasks.push({
+              project_id: project.id,
+              phase_number: phase.id,
+              phase_title: phase.title,
+              title: task.title,
+              description: task.description,
+              field_type: task.field_type,
+              status: "pending" as const,
+            });
+          }
+        }
+      }
+      
+      // Insert missing tasks if any
+      if (missingPhaseTasks.length > 0) {
+        const { error: insertError } = await supabase
+          .from("onboarding_tasks")
+          .insert(missingPhaseTasks);
+          
+        if (insertError) {
+          console.error("Failed to add missing tasks:", insertError);
+        } else {
+          // Reload tasks to include the newly added ones
+          const { data: updatedData } = await supabase
+            .from("onboarding_tasks")
+            .select("*")
+            .eq("project_id", project.id)
+            .order("phase_number")
+            .order("created_at");
+            
+          setTasks((updatedData || []) as OnboardingTask[]);
+          return;
+        }
+      }
+      
+      setTasks(existingTasks);
     } catch (error: any) {
       toast.error("Failed to load tasks");
       console.error(error);
