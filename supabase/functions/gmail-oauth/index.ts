@@ -21,15 +21,32 @@ serve(async (req) => {
 
     // Handle OAuth errors
     if (error) {
-      console.error('OAuth error:', error);
+      const errorDescription = url.searchParams.get('error_description') || '';
+      console.error('OAuth error:', error, errorDescription);
       return new Response(
-        `<html><body><script>window.close(); alert('Authorization failed: ${error}');</script></body></html>`,
-        { headers: { 'Content-Type': 'text/html' } }
+        `<html>
+          <body>
+            <h1>Authorization Failed</h1>
+            <p>Error: ${error}</p>
+            <p>${errorDescription}</p>
+            <p>You can close this window.</p>
+          </body>
+        </html>`,
+        { headers: { 'Content-Type': 'text/html' }, status: 400 }
       );
     }
 
     if (!code || !userId) {
-      throw new Error('Missing authorization code or user ID');
+      return new Response(
+        `<html>
+          <body>
+            <h1>Missing Parameters</h1>
+            <p>Missing authorization code or user ID</p>
+            <p>You can close this window.</p>
+          </body>
+        </html>`,
+        { headers: { 'Content-Type': 'text/html' }, status: 400 }
+      );
     }
     
     const GOOGLE_CLIENT_ID = Deno.env.get('GOOGLE_CLIENT_ID');
@@ -54,9 +71,18 @@ serve(async (req) => {
     });
 
     if (!tokenResponse.ok) {
-      const error = await tokenResponse.text();
-      console.error('Token exchange failed:', error);
-      throw new Error('Failed to exchange authorization code');
+      const errorText = await tokenResponse.text();
+      console.error('Token exchange failed:', errorText);
+      return new Response(
+        `<html>
+          <body>
+            <h1>Token Exchange Failed</h1>
+            <pre>${errorText}</pre>
+            <p>You can close this window.</p>
+          </body>
+        </html>`,
+        { headers: { 'Content-Type': 'text/html' }, status: 500 }
+      );
     }
 
     const tokens = await tokenResponse.json();
@@ -84,7 +110,16 @@ serve(async (req) => {
 
     if (dbError) {
       console.error('Database error:', dbError);
-      throw dbError;
+      return new Response(
+        `<html>
+          <body>
+            <h1>Database Error</h1>
+            <pre>${JSON.stringify(dbError, null, 2)}</pre>
+            <p>You can close this window.</p>
+          </body>
+        </html>`,
+        { headers: { 'Content-Type': 'text/html' }, status: 500 }
+      );
     }
 
     console.log('Tokens stored successfully');

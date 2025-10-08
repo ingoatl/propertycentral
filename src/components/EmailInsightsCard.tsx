@@ -43,12 +43,19 @@ export function EmailInsightsCard({ propertyId, showHeader = true }: EmailInsigh
 
   const checkGmailConnection = async () => {
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setGmailConnected(false);
+        return;
+      }
+
       const { data } = await supabase
         .from('gmail_oauth_tokens')
         .select('id')
-        .single();
+        .eq('user_id', user.id)
+        .limit(1);
       
-      setGmailConnected(!!data);
+      setGmailConnected(!!(data && data.length > 0));
     } catch (error) {
       setGmailConnected(false);
     }
@@ -110,9 +117,9 @@ export function EmailInsightsCard({ propertyId, showHeader = true }: EmailInsigh
           client_id: GOOGLE_CLIENT_ID,
           redirect_uri: REDIRECT_URI,
           response_type: 'code',
-          scope: 'https://www.googleapis.com/auth/gmail.readonly',
+          scope: 'https://www.googleapis.com/auth/gmail.readonly openid https://www.googleapis.com/auth/userinfo.email',
           access_type: 'offline',
-          prompt: 'consent',
+          prompt: 'consent select_account',
           state: user.id,
         })}`;
 
