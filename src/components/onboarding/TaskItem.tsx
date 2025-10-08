@@ -9,7 +9,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
-import { CalendarIcon, Upload, Save, MessageSquare } from "lucide-react";
+import { CalendarIcon, Upload, FileText, CheckCircle2 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -26,6 +26,7 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
   const [date, setDate] = useState<Date | undefined>(
     task.field_value && task.field_type === "date" ? new Date(task.field_value) : undefined
   );
+  const [uploading, setUploading] = useState(false);
 
   const autoSave = async (value: string, isCompleted: boolean = true) => {
     try {
@@ -41,9 +42,46 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
         .update(updateData)
         .eq("id", task.id);
 
-      // Don't call onUpdate - let WorkflowDialog handle it on close
+      // Update the UI after save
+      onUpdate();
     } catch (error) {
       console.error("Failed to auto-save task:", error);
+    }
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setUploading(true);
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${task.project_id}/${task.id}_${Date.now()}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('onboarding-documents')
+        .upload(fileName, file);
+
+      if (uploadError) throw uploadError;
+
+      // Update task with file path
+      await supabase
+        .from("onboarding_tasks")
+        .update({
+          file_path: fileName,
+          field_value: file.name,
+          status: "completed",
+          completed_date: new Date().toISOString(),
+        })
+        .eq("id", task.id);
+
+      setFieldValue(file.name);
+      onUpdate();
+    } catch (error: any) {
+      console.error("Failed to upload file:", error);
+      toast.error("Failed to upload file");
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -137,13 +175,24 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
           <div className="space-y-2">
             <Label>{task.title}</Label>
             <div className="flex items-center gap-2">
-              <Input type="file" />
-              <Button size="sm" variant="outline">
-                <Upload className="w-4 h-4" />
-              </Button>
+              <Input 
+                type="file" 
+                onChange={handleFileUpload}
+                disabled={uploading}
+                className="flex-1"
+              />
+              {task.file_path && (
+                <CheckCircle2 className="w-5 h-5 text-green-600" />
+              )}
             </div>
-            {task.file_path && (
-              <p className="text-xs text-muted-foreground">File uploaded</p>
+            {uploading && (
+              <p className="text-xs text-muted-foreground">Uploading...</p>
+            )}
+            {task.file_path && !uploading && (
+              <div className="flex items-center gap-2 text-xs text-green-600">
+                <FileText className="w-4 h-4" />
+                <span>{task.field_value || "File uploaded"}</span>
+              </div>
             )}
           </div>
         );
