@@ -29,13 +29,15 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
   const [uploading, setUploading] = useState(false);
   const [showNAField, setShowNAField] = useState(task.field_value === "N/A");
   const [naReason, setNAReason] = useState(task.notes || "");
+  const [taskStatus, setTaskStatus] = useState(task.status);
 
   const autoSave = async (value: string, isCompleted: boolean = true, notesValue?: string) => {
     try {
+      const newStatus = isCompleted && value ? "completed" : "pending";
       const updateData: any = {
         field_value: value,
         notes: notesValue ?? notes,
-        status: isCompleted && value ? "completed" : "pending",
+        status: newStatus,
         completed_date: isCompleted && value ? new Date().toISOString() : null,
       };
 
@@ -44,7 +46,8 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
         .update(updateData)
         .eq("id", task.id);
 
-      // Silently update - parent will refresh when dialog closes
+      // Update local status immediately for visual feedback
+      setTaskStatus(newStatus);
     } catch (error) {
       console.error("Failed to auto-save task:", error);
     }
@@ -78,6 +81,8 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
 
       setFieldValue(file.name);
       setShowNAField(false);
+      setTaskStatus("completed");
+      toast.success("File uploaded successfully");
     } catch (error: any) {
       console.error("Failed to upload file:", error);
       toast.error("Failed to upload file");
@@ -105,6 +110,7 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
 
       setFieldValue("N/A");
       setShowNAField(false);
+      setTaskStatus("completed");
       toast.success("Marked as not applicable");
     } catch (error) {
       console.error("Failed to mark as N/A:", error);
@@ -145,7 +151,7 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
           <div className="flex items-center gap-2">
             <Checkbox
               id={task.id}
-              checked={task.status === "completed"}
+              checked={taskStatus === "completed"}
               onCheckedChange={handleCheckboxChange}
             />
             <Label htmlFor={task.id} className="cursor-pointer">
@@ -350,7 +356,7 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
   return (
     <Card className={cn(
       "transition-colors",
-      task.status === "completed" && "bg-green-50 border-green-200"
+      taskStatus === "completed" && "bg-green-50 border-green-200"
     )}>
       <CardContent className="pt-4">
         {renderField()}
