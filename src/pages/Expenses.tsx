@@ -5,13 +5,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { DollarSign, Calendar as CalendarIcon, MapPin, Receipt, Upload, Trash2, Eye } from "lucide-react";
+import { DollarSign, Calendar as CalendarIcon, Receipt, Upload, ChevronRight } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Property, Expense } from "@/types";
 import { toast } from "sonner";
 import { z } from "zod";
-import { ExpenseDocumentLink } from "@/components/ExpenseDocumentLink";
-import { ExpenseDetailModal } from "@/components/ExpenseDetailModal";
+import { PropertyExpenseView } from "@/components/PropertyExpenseView";
 
 const expenseSchema = z.object({
   propertyId: z.string().uuid("Please select a property"),
@@ -25,9 +24,7 @@ const Expenses = () => {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [filterPropertyId, setFilterPropertyId] = useState<string>("all");
-  const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
-  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [selectedPropertyId, setSelectedPropertyId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     propertyId: "",
     amount: "",
@@ -59,8 +56,7 @@ const Expenses = () => {
       const { data: expensesData, error: expensesError } = await supabase
         .from("expenses")
         .select("*")
-        .order("date", { ascending: false })
-        .limit(10);
+        .order("date", { ascending: false });
 
       if (expensesError) throw expensesError;
 
@@ -187,28 +183,34 @@ const Expenses = () => {
     return property?.address || "";
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this expense?")) {
-      return;
+  // Group expenses by property
+  const expensesByProperty = expenses.reduce((acc, expense) => {
+    if (!acc[expense.propertyId]) {
+      acc[expense.propertyId] = [];
     }
+    acc[expense.propertyId].push(expense);
+    return acc;
+  }, {} as Record<string, Expense[]>);
 
-    try {
-      const { error } = await supabase
-        .from("expenses")
-        .delete()
-        .eq("id", id);
-
-      if (error) throw error;
-
-      await loadData();
-      toast.success("Expense deleted");
-    } catch (error: any) {
-      if (import.meta.env.DEV) {
-        console.error("Error deleting expense:", error);
-      }
-      toast.error("Failed to delete expense");
-    }
+  const getPropertyTotal = (propertyId: string) => {
+    return expensesByProperty[propertyId]?.reduce((sum, exp) => sum + exp.amount, 0) || 0;
   };
+
+  if (selectedPropertyId) {
+    const property = properties.find(p => p.id === selectedPropertyId);
+    const propertyExpenses = expensesByProperty[selectedPropertyId] || [];
+    
+    return (
+      <PropertyExpenseView
+        propertyId={selectedPropertyId}
+        propertyName={property?.name || "Unknown"}
+        propertyAddress={property?.address || ""}
+        expenses={propertyExpenses}
+        onBack={() => setSelectedPropertyId(null)}
+        onExpenseDeleted={loadData}
+      />
+    );
+  }
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -316,101 +318,52 @@ const Expenses = () => {
 
       <Card className="shadow-card border-border/50">
         <CardHeader className="bg-gradient-subtle rounded-t-lg">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-xl">Recent Expenses</CardTitle>
-            <Select value={filterPropertyId} onValueChange={setFilterPropertyId}>
-              <SelectTrigger className="w-[200px]">
-                <SelectValue placeholder="Filter by property" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Properties</SelectItem>
-                {properties.map((property) => (
-                  <SelectItem key={property.id} value={property.id}>
-                    {property.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          <CardTitle className="text-xl">Properties with Expenses</CardTitle>
         </CardHeader>
         <CardContent className="pt-6">
-          {(filterPropertyId === "all" ? expenses : expenses.filter(e => e.propertyId === filterPropertyId)).length === 0 ? (
+          {Object.keys(expensesByProperty).length === 0 ? (
             <div className="text-center py-12">
               <Receipt className="h-12 w-12 text-muted-foreground mx-auto mb-4 opacity-50" />
               <p className="text-muted-foreground">No expenses recorded yet</p>
             </div>
           ) : (
-            <div className="space-y-3">
-              {(filterPropertyId === "all" ? expenses : expenses.filter(e => e.propertyId === filterPropertyId)).map((expense, index) => (
-                <div
-                  key={expense.id} 
-                  className="p-5 border border-border/50 rounded-xl hover:shadow-card transition-all duration-300 hover:scale-[1.01] bg-gradient-subtle"
-                  style={{ animationDelay: `${index * 0.05}s` }}
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1 space-y-1.5">
-                      <h3 className="font-semibold text-lg text-foreground">{getPropertyName(expense.propertyId)}</h3>
-                      <p className="text-sm text-muted-foreground flex items-center gap-1.5">
-                        <MapPin className="w-3.5 h-3.5" />
-                        {getPropertyAddress(expense.propertyId)}
-                      </p>
-                      <p className="text-sm text-muted-foreground flex items-center gap-1.5">
-                        <CalendarIcon className="w-3.5 h-3.5" />
-                        {new Date(expense.date).toLocaleDateString('en-US', { 
-                          weekday: 'short', 
-                          year: 'numeric', 
-                          month: 'short', 
-                          day: 'numeric' 
-                        })}
-                      </p>
-                      {expense.purpose && (
-                        <p className="text-sm text-muted-foreground mt-2 italic border-l-2 border-primary/30 pl-3">
-                          {expense.purpose}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {Object.keys(expensesByProperty).map((propertyId) => {
+                const expenseCount = expensesByProperty[propertyId].length;
+                const total = getPropertyTotal(propertyId);
+                
+                return (
+                  <div
+                    key={propertyId}
+                    onClick={() => setSelectedPropertyId(propertyId)}
+                    className="p-6 border border-border/50 rounded-xl hover:shadow-card transition-all duration-300 hover:scale-[1.02] bg-gradient-subtle cursor-pointer group"
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1 space-y-2">
+                        <h3 className="font-semibold text-lg text-foreground group-hover:text-primary transition-colors">
+                          {getPropertyName(propertyId)}
+                        </h3>
+                        <p className="text-sm text-muted-foreground">
+                          {getPropertyAddress(propertyId)}
                         </p>
-                      )}
-                      {expense.filePath && (
-                        <ExpenseDocumentLink filePath={expense.filePath} />
-                      )}
-                    </div>
-                    <div className="flex flex-col items-end gap-3">
-                      <p className="text-2xl font-bold text-red-600 dark:text-red-500">${expense.amount.toFixed(2)}</p>
-                      <div className="flex gap-2">
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          onClick={() => {
-                            setSelectedExpense(expense);
-                            setIsDetailModalOpen(true);
-                          }}
-                          className="hover:bg-primary/10"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDelete(expense.id)}
-                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
+                        <p className="text-sm text-muted-foreground">
+                          {expenseCount} {expenseCount === 1 ? 'expense' : 'expenses'}
+                        </p>
+                      </div>
+                      <div className="flex flex-col items-end gap-2">
+                        <p className="text-2xl font-bold text-red-600 dark:text-red-500">
+                          ${total.toFixed(2)}
+                        </p>
+                        <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" />
                       </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </CardContent>
       </Card>
-
-      <ExpenseDetailModal
-        expense={selectedExpense}
-        propertyName={selectedExpense ? getPropertyName(selectedExpense.propertyId) : ""}
-        propertyAddress={selectedExpense ? getPropertyAddress(selectedExpense.propertyId) : ""}
-        open={isDetailModalOpen}
-        onOpenChange={setIsDetailModalOpen}
-      />
     </div>
   );
 };
