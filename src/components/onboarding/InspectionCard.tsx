@@ -4,7 +4,9 @@ import { ClipboardCheck, Calendar, User, Image, Wrench, ExternalLink } from "luc
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Button } from "@/components/ui/button";
 import { ChevronDown } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { OnboardingTask } from "@/types/onboarding";
 
 interface InspectionCardProps {
   projectId: string;
@@ -12,6 +14,24 @@ interface InspectionCardProps {
 
 export const InspectionCard = ({ projectId }: InspectionCardProps) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [inspectionLink, setInspectionLink] = useState<string>("");
+
+  useEffect(() => {
+    const loadInspectionLink = async () => {
+      const { data } = await supabase
+        .from("onboarding_tasks")
+        .select("field_value")
+        .eq("project_id", projectId)
+        .eq("title", "Inspection report link")
+        .maybeSingle();
+
+      if (data?.field_value) {
+        setInspectionLink(data.field_value);
+      }
+    };
+
+    loadInspectionLink();
+  }, [projectId]);
 
   // Mock inspection data - in a real app, this would come from the database
   const inspectionData = {
@@ -36,6 +56,12 @@ export const InspectionCard = ({ projectId }: InspectionCardProps) => {
     },
     notes: "Inspection completed with minor issues. First aid kit missing in kitchen.",
   };
+
+  const photoLink = inspectionLink || "https://peachhaus-str-inspect.lovable.app/property/04c0c98d-443f-4d53-9f2a-8234f8bc1b34#photos";
+
+  if (!inspectionLink) {
+    return null; // Don't show card if no inspection link is set
+  }
 
   return (
     <Card className="border-blue-200 bg-blue-50/50">
@@ -98,7 +124,7 @@ export const InspectionCard = ({ projectId }: InspectionCardProps) => {
                 <div className="p-2 bg-white rounded border">
                   <span className="text-muted-foreground">HVAC: </span>
                   <a 
-                    href="https://peachhaus-str-inspect.lovable.app/property/04c0c98d-443f-4d53-9f2a-8234f8bc1b34#photos"
+                    href={photoLink}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="font-medium text-blue-600 hover:text-blue-700 hover:underline inline-flex items-center gap-1"
@@ -110,7 +136,7 @@ export const InspectionCard = ({ projectId }: InspectionCardProps) => {
                 <div className="p-2 bg-white rounded border">
                   <span className="text-muted-foreground">Refrigerator: </span>
                   <a 
-                    href="https://peachhaus-str-inspect.lovable.app/property/04c0c98d-443f-4d53-9f2a-8234f8bc1b34#photos"
+                    href={photoLink}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="font-medium text-blue-600 hover:text-blue-700 hover:underline inline-flex items-center gap-1"
@@ -122,7 +148,7 @@ export const InspectionCard = ({ projectId }: InspectionCardProps) => {
                 <div className="p-2 bg-white rounded border">
                   <span className="text-muted-foreground">Dishwasher: </span>
                   <a 
-                    href="https://peachhaus-str-inspect.lovable.app/property/04c0c98d-443f-4d53-9f2a-8234f8bc1b34#photos"
+                    href={photoLink}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="font-medium text-blue-600 hover:text-blue-700 hover:underline inline-flex items-center gap-1"
@@ -134,7 +160,7 @@ export const InspectionCard = ({ projectId }: InspectionCardProps) => {
                 <div className="p-2 bg-white rounded border">
                   <span className="text-muted-foreground">Washer: </span>
                   <a 
-                    href="https://peachhaus-str-inspect.lovable.app/property/04c0c98d-443f-4d53-9f2a-8234f8bc1b34#photos"
+                    href={photoLink}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="font-medium text-blue-600 hover:text-blue-700 hover:underline inline-flex items-center gap-1"
@@ -146,7 +172,7 @@ export const InspectionCard = ({ projectId }: InspectionCardProps) => {
                 <div className="p-2 bg-white rounded border">
                   <span className="text-muted-foreground">Dryer: </span>
                   <a 
-                    href="https://peachhaus-str-inspect.lovable.app/property/04c0c98d-443f-4d53-9f2a-8234f8bc1b34#photos"
+                    href={photoLink}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="font-medium text-blue-600 hover:text-blue-700 hover:underline inline-flex items-center gap-1"
@@ -188,7 +214,7 @@ export const InspectionCard = ({ projectId }: InspectionCardProps) => {
             {/* Link to Full Report */}
             <div className="pt-2">
               <a
-                href="https://peachhaus-str-inspect.lovable.app/property/04c0c98d-443f-4d53-9f2a-8234f8bc1b34#photos"
+                href={photoLink}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-sm text-blue-600 hover:text-blue-700 hover:underline flex items-center gap-1"
