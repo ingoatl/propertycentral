@@ -3,13 +3,15 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Trash2, MapPin, Building2, Edit } from "lucide-react";
+import { Plus, Trash2, MapPin, Building2, Edit, Mail } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { supabase } from "@/integrations/supabase/client";
 import { Property } from "@/types";
 import { toast } from "sonner";
 import { z } from "zod";
+import { PropertyEmailInsights } from "@/components/PropertyEmailInsights";
 
 const propertySchema = z.object({
   name: z.string().trim().min(1, "Name is required").max(200, "Name must be less than 200 characters"),
@@ -24,6 +26,7 @@ const Properties = () => {
   const [loading, setLoading] = useState(false);
   const [editingProperty, setEditingProperty] = useState<Property | null>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [expandedPropertyId, setExpandedPropertyId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: "",
     address: "",
@@ -376,62 +379,79 @@ const Properties = () => {
           </Card>
         ) : (
           properties.map((property, index) => (
-            <Card 
-              key={property.id} 
-              className="shadow-card hover:shadow-warm transition-all duration-300 border-border/50 hover:scale-105 group"
-              style={{ animationDelay: `${index * 0.1}s` }}
-            >
-              <CardHeader>
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <CardTitle className="text-foreground group-hover:text-primary transition-colors">
-                      {property.name}
-                    </CardTitle>
-                    <CardDescription className="flex items-center gap-1.5 mt-2 text-muted-foreground">
-                      <MapPin className="w-3.5 h-3.5" />
-                      {property.address}
-                    </CardDescription>
-                    {property.rentalType && (
-                      <div className="mt-2">
-                        <span className={`inline-block px-2 py-1 text-xs rounded-full ${
-                          property.rentalType === 'hybrid' ? 'bg-blue-100 text-blue-800' :
-                          property.rentalType === 'mid_term' ? 'bg-orange-100 text-orange-800' :
-                          'bg-green-100 text-green-800'
-                        }`}>
-                          {property.rentalType === 'hybrid' ? '🔄 Hybrid' :
-                           property.rentalType === 'mid_term' ? '🏠 Mid-term' :
-                           '🏡 Long-term'}
-                        </span>
-                      </div>
-                    )}
+            <div key={property.id} className="space-y-4">
+              <Card 
+                className="shadow-card hover:shadow-warm transition-all duration-300 border-border/50 hover:scale-105 group"
+                style={{ animationDelay: `${index * 0.1}s` }}
+              >
+                <CardHeader>
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <CardTitle className="text-foreground group-hover:text-primary transition-colors">
+                        {property.name}
+                      </CardTitle>
+                      <CardDescription className="flex items-center gap-1.5 mt-2 text-muted-foreground">
+                        <MapPin className="w-3.5 h-3.5" />
+                        {property.address}
+                      </CardDescription>
+                      {property.rentalType && (
+                        <div className="mt-2">
+                          <span className={`inline-block px-2 py-1 text-xs rounded-full ${
+                            property.rentalType === 'hybrid' ? 'bg-blue-100 text-blue-800' :
+                            property.rentalType === 'mid_term' ? 'bg-orange-100 text-orange-800' :
+                            'bg-green-100 text-green-800'
+                          }`}>
+                            {property.rentalType === 'hybrid' ? '🔄 Hybrid' :
+                             property.rentalType === 'mid_term' ? '🏠 Mid-term' :
+                             '🏡 Long-term'}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setExpandedPropertyId(expandedPropertyId === property.id ? null : property.id)}
+                        className="text-primary hover:text-primary hover:bg-primary/10"
+                        title="View email insights"
+                      >
+                        <Mail className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleEdit(property)}
+                        className="text-primary hover:text-primary hover:bg-primary/10"
+                      >
+                        <Edit className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleDelete(property.id)}
+                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
                   </div>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleEdit(property)}
-                      className="text-primary hover:text-primary hover:bg-primary/10"
-                    >
-                      <Edit className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleDelete(property.id)}
-                      className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-baseline gap-2 bg-gradient-subtle p-4 rounded-lg">
+                    <span className="text-sm text-muted-foreground">Visit Price:</span>
+                    <span className="text-2xl font-bold text-primary">${property.visitPrice.toFixed(2)}</span>
                   </div>
+                </CardContent>
+              </Card>
+
+              {/* Email Insights - Collapsible */}
+              {expandedPropertyId === property.id && (
+                <div className="animate-scale-in">
+                  <PropertyEmailInsights propertyId={property.id} />
                 </div>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-baseline gap-2 bg-gradient-subtle p-4 rounded-lg">
-                  <span className="text-sm text-muted-foreground">Visit Price:</span>
-                  <span className="text-2xl font-bold text-primary">${property.visitPrice.toFixed(2)}</span>
-                </div>
-              </CardContent>
-            </Card>
+              )}
+            </div>
           ))
         )}
       </div>

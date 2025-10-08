@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { PropertySummary, Visit, Expense, OwnerRezBooking } from "@/types";
 import { toast } from "sonner";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { EmailInsightsCard } from "@/components/EmailInsightsCard";
 
 const Dashboard = () => {
   const [summaries, setSummaries] = useState<PropertySummary[]>([]);
@@ -495,6 +496,9 @@ const Dashboard = () => {
           </Button>
         </div>
       </div>
+
+      {/* Email Insights Card */}
+      <EmailInsightsCard showHeader={true} />
 
       {/* Stats Grid */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">

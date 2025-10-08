@@ -17,3 +17,21 @@ verify_jwt = true
 
 [functions.get-payment-methods]
 verify_jwt = true
+
+[functions.gmail-oauth]
+verify_jwt = true
+
+[functions.scan-gmail]
+verify_jwt = true
+
+[functions.extract-insights]
+verify_jwt = true
+
+[functions.charge-individual-owner]
+verify_jwt = true
+
+[functions.create-user]
+verify_jwt = true
+
+[functions.schedule-daily-scan]
+verify_jwt = false
