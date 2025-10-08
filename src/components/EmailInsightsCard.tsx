@@ -103,8 +103,7 @@ export function EmailInsightsCard({ propertyId, showHeader = true }: EmailInsigh
 
   const connectGmail = () => {
     try {
-      // Your Google Client ID from the screenshot
-      const GOOGLE_CLIENT_ID = '599562846826-47Dvh7o74po3ffvg95e1a4592rn3ill.apps.googleusercontent.com';
+      const GOOGLE_CLIENT_ID = '599562846826-47dvh7o74po3ffvg95e1a4592rn3ill.apps.googleusercontent.com';
       const REDIRECT_URI = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/gmail-oauth`;
       
       supabase.auth.getUser().then(({ data: { user } }) => {
@@ -113,24 +112,22 @@ export function EmailInsightsCard({ propertyId, showHeader = true }: EmailInsigh
           return;
         }
 
-        const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?${new URLSearchParams({
-          client_id: GOOGLE_CLIENT_ID,
-          redirect_uri: REDIRECT_URI,
-          response_type: 'code',
-          scope: 'https://www.googleapis.com/auth/gmail.readonly openid https://www.googleapis.com/auth/userinfo.email',
-          access_type: 'offline',
-          prompt: 'consent select_account',
-          state: user.id,
-        })}`;
+        const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
+          `client_id=${encodeURIComponent(GOOGLE_CLIENT_ID)}` +
+          `&redirect_uri=${encodeURIComponent(REDIRECT_URI)}` +
+          `&response_type=code` +
+          `&scope=${encodeURIComponent('https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/userinfo.email openid')}` +
+          `&access_type=offline` +
+          `&prompt=consent` +
+          `&state=${encodeURIComponent(user.id)}`;
 
-        // Use window.open instead of location.href so user stays on the page
+        console.log('OAuth URL:', authUrl);
+        
         const authWindow = window.open(authUrl, 'gmail-auth', 'width=600,height=700');
         
-        // Poll for window close
         const pollTimer = setInterval(() => {
           if (authWindow?.closed) {
             clearInterval(pollTimer);
-            // Reload data after auth window closes
             setTimeout(() => {
               checkGmailConnection();
               loadInsights();
