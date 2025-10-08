@@ -24,7 +24,7 @@ export const WorkflowDialog = ({ open, onOpenChange, project, onUpdate }: Workfl
   }, [open, project.id]);
 
   useEffect(() => {
-    // When dialog closes, update parent
+    // When dialog closes, update parent to refresh progress
     if (!open) {
       onUpdate();
     }
@@ -51,7 +51,7 @@ export const WorkflowDialog = ({ open, onOpenChange, project, onUpdate }: Workfl
   };
 
   const handleTaskUpdate = async () => {
-    // Reload tasks and update progress without closing modal
+    // Reload tasks to show updated status without closing modal
     await loadTasks();
     await updateProjectProgress();
   };

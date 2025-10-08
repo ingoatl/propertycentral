@@ -27,12 +27,14 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
     task.field_value && task.field_type === "date" ? new Date(task.field_value) : undefined
   );
   const [uploading, setUploading] = useState(false);
+  const [showNAField, setShowNAField] = useState(task.field_value === "N/A");
+  const [naReason, setNAReason] = useState(task.notes || "");
 
-  const autoSave = async (value: string, isCompleted: boolean = true) => {
+  const autoSave = async (value: string, isCompleted: boolean = true, notesValue?: string) => {
     try {
       const updateData: any = {
         field_value: value,
-        notes,
+        notes: notesValue ?? notes,
         status: isCompleted && value ? "completed" : "pending",
         completed_date: isCompleted && value ? new Date().toISOString() : null,
       };
@@ -42,8 +44,7 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
         .update(updateData)
         .eq("id", task.id);
 
-      // Update the UI after save
-      onUpdate();
+      // Silently update - parent will refresh when dialog closes
     } catch (error) {
       console.error("Failed to auto-save task:", error);
     }
@@ -76,12 +77,36 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
         .eq("id", task.id);
 
       setFieldValue(file.name);
-      onUpdate();
+      setShowNAField(false);
     } catch (error: any) {
       console.error("Failed to upload file:", error);
       toast.error("Failed to upload file");
     } finally {
       setUploading(false);
+    }
+  };
+
+  const handleMarkAsNA = async () => {
+    if (!naReason.trim()) {
+      toast.error("Please provide a reason");
+      return;
+    }
+
+    try {
+      await supabase
+        .from("onboarding_tasks")
+        .update({
+          field_value: "N/A",
+          notes: naReason,
+          status: "completed",
+          completed_date: new Date().toISOString(),
+        })
+        .eq("id", task.id);
+
+      setFieldValue("N/A");
+    } catch (error) {
+      console.error("Failed to mark as N/A:", error);
+      toast.error("Failed to save");
     }
   };
 
@@ -172,26 +197,83 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
 
       case "file":
         return (
-          <div className="space-y-2">
+          <div className="space-y-3">
             <Label>{task.title}</Label>
-            <div className="flex items-center gap-2">
-              <Input 
-                type="file" 
-                onChange={handleFileUpload}
-                disabled={uploading}
-                className="flex-1"
-              />
-              {task.file_path && (
-                <CheckCircle2 className="w-5 h-5 text-green-600" />
-              )}
-            </div>
-            {uploading && (
-              <p className="text-xs text-muted-foreground">Uploading...</p>
+            
+            {!showNAField ? (
+              <>
+                <div className="flex items-center gap-2">
+                  <Input 
+                    type="file" 
+                    onChange={handleFileUpload}
+                    disabled={uploading || task.field_value === "N/A"}
+                    className="flex-1"
+                  />
+                  {task.file_path && (
+                    <CheckCircle2 className="w-5 h-5 text-green-600" />
+                  )}
+                </div>
+                
+                {uploading && (
+                  <p className="text-xs text-muted-foreground">Uploading...</p>
+                )}
+                
+                {task.file_path && !uploading && (
+                  <div className="flex items-center gap-2 text-xs text-green-600">
+                    <FileText className="w-4 h-4" />
+                    <span>{task.field_value}</span>
+                  </div>
+                )}
+                
+                {!task.file_path && task.field_value !== "N/A" && (
+                  <Button 
+                    type="button"
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => setShowNAField(true)}
+                    className="w-full"
+                  >
+                    Mark as Not Applicable
+                  </Button>
+                )}
+              </>
+            ) : (
+              <div className="space-y-2">
+                <Textarea
+                  value={naReason}
+                  onChange={(e) => setNAReason(e.target.value)}
+                  placeholder="Explain why this document is not available (e.g., owner opted out, not required, etc.)"
+                  rows={3}
+                />
+                <div className="flex gap-2">
+                  <Button 
+                    type="button"
+                    size="sm" 
+                    onClick={handleMarkAsNA}
+                  >
+                    Save as N/A
+                  </Button>
+                  <Button 
+                    type="button"
+                    size="sm" 
+                    variant="outline"
+                    onClick={() => setShowNAField(false)}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
             )}
-            {task.file_path && !uploading && (
-              <div className="flex items-center gap-2 text-xs text-green-600">
-                <FileText className="w-4 h-4" />
-                <span>{task.field_value || "File uploaded"}</span>
+            
+            {task.field_value === "N/A" && (
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-md">
+                <div className="flex items-start gap-2">
+                  <CheckCircle2 className="w-5 h-5 text-amber-600 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-amber-900">Marked as Not Applicable</p>
+                    <p className="text-xs text-amber-700 mt-1">{task.notes}</p>
+                  </div>
+                </div>
               </div>
             )}
           </div>
