@@ -1,6 +1,6 @@
 export type TaskStatus = 'pending' | 'in-progress' | 'completed' | 'overdue';
 export type ProjectStatus = 'pending' | 'in-progress' | 'completed';
-export type FieldType = 'text' | 'textarea' | 'checkbox' | 'date' | 'file' | 'currency' | 'phone' | 'radio' | 'multiselect';
+export type FieldType = 'text' | 'textarea' | 'checkbox' | 'date' | 'file' | 'currency' | 'phone' | 'radio' | 'multiselect' | 'section_header';
 
 export interface OnboardingTask {
   id: string;

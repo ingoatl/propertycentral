@@ -160,6 +160,18 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
 
   const renderField = () => {
     switch (task.field_type) {
+      case "section_header":
+        return (
+          <div className="my-6 pt-6 first:mt-0 first:pt-0 border-t-2 border-primary/30 first:border-t-0">
+            <div className="bg-primary/5 -mx-4 px-4 py-3 rounded-lg">
+              <h3 className="text-base font-bold text-primary uppercase tracking-wide flex items-center gap-2">
+                <span className="text-xl">{task.title.split(" ")[0]}</span>
+                <span>{task.title.substring(task.title.indexOf(" ") + 1)}</span>
+              </h3>
+            </div>
+          </div>
+        );
+
       case "checkbox":
         return (
           <div className="flex items-center gap-2">
@@ -178,7 +190,21 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
         return (
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label>{task.title}</Label>
+              <div className="flex items-center gap-2">
+                <Label>{task.title}</Label>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={async () => {
+                    await navigator.clipboard.writeText(task.title);
+                    toast.success("Task name copied!");
+                  }}
+                  className="h-5 w-5"
+                >
+                  <Copy className="w-3 h-3" />
+                </Button>
+              </div>
               {hasValue && (
                 <div className="flex gap-1">
                   <Button
@@ -222,7 +248,21 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
         return (
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label>{task.title}</Label>
+              <div className="flex items-center gap-2">
+                <Label>{task.title}</Label>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={async () => {
+                    await navigator.clipboard.writeText(task.title);
+                    toast.success("Task name copied!");
+                  }}
+                  className="h-5 w-5"
+                >
+                  <Copy className="w-3 h-3" />
+                </Button>
+              </div>
               {hasValue && (
                 <Button
                   type="button"
@@ -266,7 +306,21 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
       case "file":
         return (
           <div className="space-y-2">
-            <Label>{task.title}</Label>
+            <div className="flex items-center gap-2">
+              <Label>{task.title}</Label>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={async () => {
+                  await navigator.clipboard.writeText(task.title);
+                  toast.success("Task name copied!");
+                }}
+                className="h-5 w-5"
+              >
+                <Copy className="w-3 h-3" />
+              </Button>
+            </div>
             
             {!showNAField ? (
               <>
@@ -359,7 +413,21 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
         return (
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label>{task.title}</Label>
+              <div className="flex items-center gap-2">
+                <Label>{task.title}</Label>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={async () => {
+                    await navigator.clipboard.writeText(task.title);
+                    toast.success("Task name copied!");
+                  }}
+                  className="h-5 w-5"
+                >
+                  <Copy className="w-3 h-3" />
+                </Button>
+              </div>
               {hasValue && (
                 <div className="flex gap-1">
                   <Button
@@ -407,7 +475,21 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
         return (
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label>{task.title}</Label>
+              <div className="flex items-center gap-2">
+                <Label>{task.title}</Label>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={async () => {
+                    await navigator.clipboard.writeText(task.title);
+                    toast.success("Task name copied!");
+                  }}
+                  className="h-5 w-5"
+                >
+                  <Copy className="w-3 h-3" />
+                </Button>
+              </div>
               {hasValue && (
                 <div className="flex gap-1">
                   <Button
@@ -450,7 +532,21 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
       case "radio":
         return (
           <div className="space-y-2">
-            <Label>{task.title}</Label>
+            <div className="flex items-center gap-2">
+              <Label>{task.title}</Label>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={async () => {
+                  await navigator.clipboard.writeText(task.title);
+                  toast.success("Task name copied!");
+                }}
+                className="h-5 w-5"
+              >
+                <Copy className="w-3 h-3" />
+              </Button>
+            </div>
             <RadioGroup value={fieldValue} onValueChange={handleRadioChange}>
               {["Yes", "No", "N/A"].map((option) => (
                 <div key={option} className="flex items-center space-x-2">
@@ -466,7 +562,21 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
         return (
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label>{task.title}</Label>
+              <div className="flex items-center gap-2">
+                <Label>{task.title}</Label>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={async () => {
+                    await navigator.clipboard.writeText(task.title);
+                    toast.success("Task name copied!");
+                  }}
+                  className="h-5 w-5"
+                >
+                  <Copy className="w-3 h-3" />
+                </Button>
+              </div>
               {hasValue && (
                 <div className="flex gap-1">
                   <Button
@@ -506,6 +616,11 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
         );
     }
   };
+
+  // Don't wrap section headers in cards
+  if (task.field_type === "section_header") {
+    return renderField();
+  }
 
   return (
     <Card className={cn(
