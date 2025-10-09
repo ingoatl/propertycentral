@@ -68,6 +68,7 @@ export const WorkflowPhases = ({ projectId, tasks, onTaskUpdate, searchQuery = "
             onToggle={() => togglePhase(phase.id)}
             onTaskUpdate={onTaskUpdate}
             highlighted={isHighlighted}
+            projectId={projectId}
           />
         );
       })}

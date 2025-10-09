@@ -1,9 +1,12 @@
+import { useState } from "react";
 import { PhaseDefinition, OnboardingTask } from "@/types/onboarding";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Badge } from "@/components/ui/badge";
-import { ChevronDown, Lock, CheckCircle2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { ChevronDown, Lock, CheckCircle2, Plus } from "lucide-react";
 import { TaskItem } from "./TaskItem";
+import { AddTaskDialog } from "./AddTaskDialog";
 import { cn } from "@/lib/utils";
 
 interface PhaseCardProps {
@@ -15,6 +18,7 @@ interface PhaseCardProps {
   onToggle: () => void;
   onTaskUpdate: () => void;
   highlighted?: boolean;
+  projectId: string;
 }
 
 export const PhaseCard = ({
@@ -26,8 +30,10 @@ export const PhaseCard = ({
   onToggle,
   onTaskUpdate,
   highlighted = false,
+  projectId,
 }: PhaseCardProps) => {
   const isComplete = completion === 100;
+  const [showAddTaskDialog, setShowAddTaskDialog] = useState(false);
 
   return (
     <Card className={cn(
@@ -85,9 +91,28 @@ export const PhaseCard = ({
                 onUpdate={onTaskUpdate}
               />
             ))}
+            
+            <Button
+              onClick={() => setShowAddTaskDialog(true)}
+              variant="outline"
+              size="sm"
+              className="w-full mt-4"
+            >
+              <Plus className="w-3 h-3 mr-2" />
+              Add Task to Phase {phase.id}
+            </Button>
           </CardContent>
         </CollapsibleContent>
       </Collapsible>
+
+      <AddTaskDialog
+        open={showAddTaskDialog}
+        onOpenChange={setShowAddTaskDialog}
+        projectId={projectId}
+        phaseNumber={phase.id}
+        phaseTitle={phase.title}
+        onSuccess={onTaskUpdate}
+      />
     </Card>
   );
 };

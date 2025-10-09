@@ -9,11 +9,19 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
-import { CalendarIcon, Upload, FileText, CheckCircle2, Edit2, Copy, Check, Loader2 } from "lucide-react";
+import { CalendarIcon, Upload, FileText, CheckCircle2, Edit2, Copy, Check, Loader2, Settings, MessageSquare, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { PinVerificationDialog } from "./PinVerificationDialog";
+import { TaskCommentsDialog } from "./TaskCommentsDialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface TaskItemProps {
   task: OnboardingTask;
@@ -32,6 +40,9 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
   const [taskStatus, setTaskStatus] = useState(task.status);
   const [isEditing, setIsEditing] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [showPinDialog, setShowPinDialog] = useState(false);
+  const [showCommentsDialog, setShowCommentsDialog] = useState(false);
+  const [pendingAction, setPendingAction] = useState<"edit" | "delete" | null>(null);
 
   const hasValue = task.field_value && task.field_value.trim() !== "";
   const isReadOnly = hasValue && !isEditing;
@@ -130,6 +141,42 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
       console.error("Failed to mark as N/A:", error);
       toast.error("Failed to save");
     }
+  };
+
+  const handlePinVerified = () => {
+    if (pendingAction === "delete") {
+      handleDeleteTask();
+    } else if (pendingAction === "edit") {
+      setIsEditing(true);
+    }
+    setPendingAction(null);
+  };
+
+  const handleDeleteTask = async () => {
+    try {
+      const { error } = await supabase
+        .from("onboarding_tasks")
+        .delete()
+        .eq("id", task.id);
+
+      if (error) throw error;
+
+      toast.success("Task deleted");
+      onUpdate();
+    } catch (error) {
+      console.error("Failed to delete task:", error);
+      toast.error("Failed to delete task");
+    }
+  };
+
+  const handleRequestEdit = () => {
+    setPendingAction("edit");
+    setShowPinDialog(true);
+  };
+
+  const handleRequestDelete = () => {
+    setPendingAction("delete");
+    setShowPinDialog(true);
   };
 
   const handleCheckboxChange = async (checked: boolean) => {
@@ -562,7 +609,18 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
         return (
           <div className="space-y-1.5">
             <div className="flex items-center gap-1.5">
-              <Label className="text-xs font-medium">{task.title}</Label>
+              <Label className="text-xs font-medium flex-1">{task.title}</Label>
+              
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={() => setShowCommentsDialog(true)}
+                className="h-4 w-4"
+              >
+                <MessageSquare className="w-2.5 h-2.5" />
+              </Button>
+              
               <Button
                 type="button"
                 variant="ghost"
@@ -604,17 +662,28 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
                 </Button>
               </label>
 
-              {hasValue && !isEditing && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setIsEditing(true)}
-                  className="h-4 w-4 ml-auto"
-                >
-                  <Edit2 className="w-2.5 h-2.5" />
-                </Button>
-              )}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-4 w-4"
+                  >
+                    <Settings className="w-2.5 h-2.5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={handleRequestEdit}>
+                    <Edit2 className="w-3 h-3 mr-2" />
+                    Edit Task
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleRequestDelete} className="text-red-600">
+                    <Trash2 className="w-3 h-3 mr-2" />
+                    Delete Task
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
             
             <Input
@@ -668,13 +737,28 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
   }
 
   return (
-    <Card className={cn(
-      "transition-colors py-2",
-      taskStatus === "completed" && "bg-green-50/50 border-green-200"
-    )}>
-      <CardContent className="py-2 px-3">
-        {renderField()}
-      </CardContent>
-    </Card>
+    <>
+      <Card className={cn(
+        "transition-colors py-2",
+        taskStatus === "completed" && "bg-green-50/50 border-green-200"
+      )}>
+        <CardContent className="py-2 px-3">
+          {renderField()}
+        </CardContent>
+      </Card>
+
+      <PinVerificationDialog
+        open={showPinDialog}
+        onOpenChange={setShowPinDialog}
+        onVerified={handlePinVerified}
+      />
+
+      <TaskCommentsDialog
+        open={showCommentsDialog}
+        onOpenChange={setShowCommentsDialog}
+        taskId={task.id}
+        taskTitle={task.title}
+      />
+    </>
   );
 };
