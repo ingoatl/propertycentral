@@ -15,7 +15,7 @@ import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { PinVerificationDialog } from "./PinVerificationDialog";
-import { TaskCommentsDialog } from "./TaskCommentsDialog";
+import { InlineComments } from "./InlineComments";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -40,7 +40,8 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
   const [taskStatus, setTaskStatus] = useState(task.status);
   const [copied, setCopied] = useState(false);
   const [showPinDialog, setShowPinDialog] = useState(false);
-  const [showCommentsDialog, setShowCommentsDialog] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [pendingAction, setPendingAction] = useState<'edit' | 'delete' | null>(null);
 
   const hasValue = task.field_value && task.field_value.trim() !== "";
   const isReadOnly = hasValue;
@@ -141,14 +142,6 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
     }
   };
 
-  const handlePinVerified = async () => {
-    await handleDeleteTask();
-  };
-
-  const handleRequestDelete = () => {
-    setShowPinDialog(true);
-  };
-
   const handleDeleteTask = async () => {
     try {
       const { error } = await supabase
@@ -164,6 +157,26 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
       console.error("Failed to delete task:", error);
       toast.error("Failed to delete task");
     }
+  };
+
+  const handlePinVerified = () => {
+    if (pendingAction === 'delete') {
+      handleDeleteTask();
+    } else if (pendingAction === 'edit') {
+      setIsEditing(true);
+      toast.success("You can now edit this field");
+    }
+    setPendingAction(null);
+  };
+
+  const handleRequestEdit = () => {
+    setPendingAction('edit');
+    setShowPinDialog(true);
+  };
+
+  const handleRequestDelete = () => {
+    setPendingAction('delete');
+    setShowPinDialog(true);
   };
 
   const handleCheckboxChange = async (checked: boolean) => {
@@ -218,15 +231,6 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
               <Label htmlFor={task.id} className="cursor-pointer">
                 {task.title}
               </Label>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                onClick={() => setShowCommentsDialog(true)}
-                className="h-5 w-5"
-              >
-                <MessageSquare className="w-3 h-3" />
-              </Button>
             </div>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -240,6 +244,10 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={handleRequestEdit}>
+                  <Edit2 className="w-3 h-3 mr-2" />
+                  Edit Field
+                </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={handleRequestDelete}
                   className="text-destructive"
@@ -249,6 +257,7 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+            <InlineComments taskId={task.id} />
           </div>
         );
 
@@ -258,15 +267,6 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Label>{task.title}</Label>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setShowCommentsDialog(true)}
-                  className="h-5 w-5"
-                >
-                  <MessageSquare className="w-3 h-3" />
-                </Button>
                 <Button
                   type="button"
                   variant="ghost"
@@ -303,6 +303,10 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={handleRequestEdit}>
+                    <Edit2 className="w-3 h-3 mr-2" />
+                    Edit Field
+                  </DropdownMenuItem>
                   <DropdownMenuItem
                     onClick={handleRequestDelete}
                     className="text-destructive"
@@ -338,15 +342,6 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
                   type="button"
                   variant="ghost"
                   size="icon"
-                  onClick={() => setShowCommentsDialog(true)}
-                  className="h-5 w-5"
-                >
-                  <MessageSquare className="w-3 h-3" />
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
                   onClick={async () => {
                     await navigator.clipboard.writeText(task.title);
                     toast.success("Task name copied!");
@@ -368,6 +363,10 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={handleRequestEdit}>
+                    <Edit2 className="w-3 h-3 mr-2" />
+                    Edit Field
+                  </DropdownMenuItem>
                   <DropdownMenuItem
                     onClick={handleRequestDelete}
                     className="text-destructive"
@@ -378,6 +377,7 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
+            <InlineComments taskId={task.id} />
             <Popover>
               <PopoverTrigger asChild>
                 <Button
@@ -415,15 +415,6 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
                   type="button"
                   variant="ghost"
                   size="icon"
-                  onClick={() => setShowCommentsDialog(true)}
-                  className="h-5 w-5"
-                >
-                  <MessageSquare className="w-3 h-3" />
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
                   onClick={async () => {
                     await navigator.clipboard.writeText(task.title);
                     toast.success("Task name copied!");
@@ -445,6 +436,10 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={handleRequestEdit}>
+                    <Edit2 className="w-3 h-3 mr-2" />
+                    Edit Field
+                  </DropdownMenuItem>
                   <DropdownMenuItem
                     onClick={handleRequestDelete}
                     className="text-destructive"
@@ -455,6 +450,7 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
+            <InlineComments taskId={task.id} />
             
             {!showNAField ? (
               <>
@@ -553,15 +549,6 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
                   type="button"
                   variant="ghost"
                   size="icon"
-                  onClick={() => setShowCommentsDialog(true)}
-                  className="h-5 w-5"
-                >
-                  <MessageSquare className="w-3 h-3" />
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
                   onClick={async () => {
                     await navigator.clipboard.writeText(task.title);
                     toast.success("Task name copied!");
@@ -594,6 +581,10 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={handleRequestEdit}>
+                    <Edit2 className="w-3 h-3 mr-2" />
+                    Edit Field
+                  </DropdownMenuItem>
                   <DropdownMenuItem
                     onClick={handleRequestDelete}
                     className="text-destructive"
@@ -604,6 +595,7 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
+            <InlineComments taskId={task.id} />
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
               <Input
@@ -633,15 +625,6 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
                   type="button"
                   variant="ghost"
                   size="icon"
-                  onClick={() => setShowCommentsDialog(true)}
-                  className="h-5 w-5"
-                >
-                  <MessageSquare className="w-3 h-3" />
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
                   onClick={async () => {
                     await navigator.clipboard.writeText(task.title);
                     toast.success("Task name copied!");
@@ -674,6 +657,10 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={handleRequestEdit}>
+                    <Edit2 className="w-3 h-3 mr-2" />
+                    Edit Field
+                  </DropdownMenuItem>
                   <DropdownMenuItem
                     onClick={handleRequestDelete}
                     className="text-destructive"
@@ -684,6 +671,7 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
+            <InlineComments taskId={task.id} />
             <Input
               type="tel"
               value={fieldValue}
@@ -705,15 +693,6 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Label>{task.title}</Label>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => setShowCommentsDialog(true)}
-                  className="h-5 w-5"
-                >
-                  <MessageSquare className="w-3 h-3" />
-                </Button>
                 <Button
                   type="button"
                   variant="ghost"
@@ -771,16 +750,6 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
                   type="button"
                   variant="ghost"
                   size="icon"
-                  onClick={() => setShowCommentsDialog(true)}
-                  className="h-4 w-4"
-                >
-                  <MessageSquare className="w-2.5 h-2.5" />
-                </Button>
-                
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
                   onClick={async () => {
                     await navigator.clipboard.writeText(task.title);
                     toast.success("Copied!");
@@ -831,6 +800,10 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={handleRequestEdit}>
+                    <Edit2 className="w-3 h-3 mr-2" />
+                    Edit Field
+                  </DropdownMenuItem>
                   <DropdownMenuItem
                     onClick={handleRequestDelete}
                     className="text-destructive"
@@ -841,6 +814,7 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
+            <InlineComments taskId={task.id} />
             
             <Input
               value={fieldValue}
@@ -898,13 +872,6 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
         open={showPinDialog}
         onOpenChange={setShowPinDialog}
         onVerified={handlePinVerified}
-      />
-
-      <TaskCommentsDialog
-        open={showCommentsDialog}
-        onOpenChange={setShowCommentsDialog}
-        taskId={task.id}
-        taskTitle={task.title}
       />
     </>
   );
