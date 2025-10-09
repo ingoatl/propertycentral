@@ -21,6 +21,9 @@ interface TaskItemProps {
 }
 
 export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
+  // Check if this is a category header
+  const isCategoryHeader = task.title.startsWith("📋");
+  
   const [fieldValue, setFieldValue] = useState(task.field_value || "");
   const [notes, setNotes] = useState(task.notes || "");
   const [date, setDate] = useState<Date | undefined>(
@@ -35,6 +38,20 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
 
   const hasValue = task.field_value && task.field_value.trim() !== "";
   const isReadOnly = hasValue && !isEditing;
+  
+  // Render category header differently
+  if (isCategoryHeader) {
+    return (
+      <div className="my-4 pt-4 border-t-2 border-primary/20">
+        <h4 className="text-sm font-bold text-primary uppercase tracking-wide">
+          {task.title.replace("📋 ", "")}
+        </h4>
+        {task.description && (
+          <p className="text-xs text-muted-foreground mt-1">{task.description}</p>
+        )}
+      </div>
+    );
+  }
 
   const handleCopy = async () => {
     if (fieldValue) {
