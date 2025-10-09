@@ -38,14 +38,12 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
   const [showNAField, setShowNAField] = useState(task.field_value === "N/A");
   const [naReason, setNAReason] = useState(task.notes || "");
   const [taskStatus, setTaskStatus] = useState(task.status);
-  const [isEditing, setIsEditing] = useState(false);
   const [copied, setCopied] = useState(false);
   const [showPinDialog, setShowPinDialog] = useState(false);
   const [showCommentsDialog, setShowCommentsDialog] = useState(false);
-  const [pendingAction, setPendingAction] = useState<"edit" | "delete" | null>(null);
 
   const hasValue = task.field_value && task.field_value.trim() !== "";
-  const isReadOnly = hasValue && !isEditing;
+  const isReadOnly = hasValue;
 
   const handleCopy = async () => {
     if (fieldValue) {
@@ -144,23 +142,10 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
   };
 
   const handlePinVerified = async () => {
-    if (pendingAction === "delete") {
-      await handleDeleteTask();
-    } else if (pendingAction === "edit") {
-      // Enable editing mode
-      setIsEditing(true);
-      toast.success("You can now edit this task");
-    }
-    setPendingAction(null);
-  };
-
-  const handleRequestEdit = () => {
-    setPendingAction("edit");
-    setShowPinDialog(true);
+    await handleDeleteTask();
   };
 
   const handleRequestDelete = () => {
-    setPendingAction("delete");
     setShowPinDialog(true);
   };
 
@@ -223,15 +208,47 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
 
       case "checkbox":
         return (
-          <div className="flex items-center gap-2">
-            <Checkbox
-              id={task.id}
-              checked={taskStatus === "completed"}
-              onCheckedChange={handleCheckboxChange}
-            />
-            <Label htmlFor={task.id} className="cursor-pointer">
-              {task.title}
-            </Label>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id={task.id}
+                checked={taskStatus === "completed"}
+                onCheckedChange={handleCheckboxChange}
+              />
+              <Label htmlFor={task.id} className="cursor-pointer">
+                {task.title}
+              </Label>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={() => setShowCommentsDialog(true)}
+                className="h-5 w-5"
+              >
+                <MessageSquare className="w-3 h-3" />
+              </Button>
+            </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-5 w-5"
+                >
+                  <Settings className="w-3 h-3" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  onClick={handleRequestDelete}
+                  className="text-destructive"
+                >
+                  <Trash2 className="w-3 h-3 mr-2" />
+                  Delete Task
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         );
 
@@ -245,6 +262,15 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
                   type="button"
                   variant="ghost"
                   size="icon"
+                  onClick={() => setShowCommentsDialog(true)}
+                  className="h-5 w-5"
+                >
+                  <MessageSquare className="w-3 h-3" />
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
                   onClick={async () => {
                     await navigator.clipboard.writeText(task.title);
                     toast.success("Task name copied!");
@@ -253,9 +279,7 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
                 >
                   <Copy className="w-3 h-3" />
                 </Button>
-              </div>
-              {hasValue && (
-                <div className="flex gap-1">
+                {hasValue && (
                   <Button
                     type="button"
                     variant="ghost"
@@ -265,18 +289,29 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
                   >
                     {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
                   </Button>
+                )}
+              </div>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
                   <Button
                     type="button"
                     variant="ghost"
-                    size="sm"
-                    onClick={() => setIsEditing(!isEditing)}
-                    className="h-6 px-2 text-xs"
+                    size="icon"
+                    className="h-5 w-5"
                   >
-                    <Edit2 className="w-3 h-3 mr-1" />
-                    {isEditing ? "Cancel" : "Edit"}
+                    <Settings className="w-3 h-3" />
                   </Button>
-                </div>
-              )}
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem
+                    onClick={handleRequestDelete}
+                    className="text-destructive"
+                  >
+                    <Trash2 className="w-3 h-3 mr-2" />
+                    Delete Task
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
             <Textarea
               value={fieldValue}
@@ -303,6 +338,15 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
                   type="button"
                   variant="ghost"
                   size="icon"
+                  onClick={() => setShowCommentsDialog(true)}
+                  className="h-5 w-5"
+                >
+                  <MessageSquare className="w-3 h-3" />
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
                   onClick={async () => {
                     await navigator.clipboard.writeText(task.title);
                     toast.success("Task name copied!");
@@ -312,18 +356,27 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
                   <Copy className="w-3 h-3" />
                 </Button>
               </div>
-              {hasValue && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setIsEditing(!isEditing)}
-                  className="h-6 px-2 text-xs"
-                >
-                  <Edit2 className="w-3 h-3 mr-1" />
-                  {isEditing ? "Cancel" : "Edit"}
-                </Button>
-              )}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-5 w-5"
+                  >
+                    <Settings className="w-3 h-3" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem
+                    onClick={handleRequestDelete}
+                    className="text-destructive"
+                  >
+                    <Trash2 className="w-3 h-3 mr-2" />
+                    Delete Task
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
             <Popover>
               <PopoverTrigger asChild>
@@ -355,20 +408,52 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
       case "file":
         return (
           <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <Label>{task.title}</Label>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                onClick={async () => {
-                  await navigator.clipboard.writeText(task.title);
-                  toast.success("Task name copied!");
-                }}
-                className="h-5 w-5"
-              >
-                <Copy className="w-3 h-3" />
-              </Button>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Label>{task.title}</Label>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setShowCommentsDialog(true)}
+                  className="h-5 w-5"
+                >
+                  <MessageSquare className="w-3 h-3" />
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={async () => {
+                    await navigator.clipboard.writeText(task.title);
+                    toast.success("Task name copied!");
+                  }}
+                  className="h-5 w-5"
+                >
+                  <Copy className="w-3 h-3" />
+                </Button>
+              </div>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-5 w-5"
+                  >
+                    <Settings className="w-3 h-3" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem
+                    onClick={handleRequestDelete}
+                    className="text-destructive"
+                  >
+                    <Trash2 className="w-3 h-3 mr-2" />
+                    Delete Task
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
             
             {!showNAField ? (
@@ -468,6 +553,15 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
                   type="button"
                   variant="ghost"
                   size="icon"
+                  onClick={() => setShowCommentsDialog(true)}
+                  className="h-5 w-5"
+                >
+                  <MessageSquare className="w-3 h-3" />
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
                   onClick={async () => {
                     await navigator.clipboard.writeText(task.title);
                     toast.success("Task name copied!");
@@ -476,9 +570,7 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
                 >
                   <Copy className="w-3 h-3" />
                 </Button>
-              </div>
-              {hasValue && (
-                <div className="flex gap-1">
+                {hasValue && (
                   <Button
                     type="button"
                     variant="ghost"
@@ -488,18 +580,29 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
                   >
                     {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
                   </Button>
+                )}
+              </div>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
                   <Button
                     type="button"
                     variant="ghost"
-                    size="sm"
-                    onClick={() => setIsEditing(!isEditing)}
-                    className="h-6 px-2 text-xs"
+                    size="icon"
+                    className="h-5 w-5"
                   >
-                    <Edit2 className="w-3 h-3 mr-1" />
-                    {isEditing ? "Cancel" : "Edit"}
+                    <Settings className="w-3 h-3" />
                   </Button>
-                </div>
-              )}
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem
+                    onClick={handleRequestDelete}
+                    className="text-destructive"
+                  >
+                    <Trash2 className="w-3 h-3 mr-2" />
+                    Delete Task
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
@@ -530,6 +633,15 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
                   type="button"
                   variant="ghost"
                   size="icon"
+                  onClick={() => setShowCommentsDialog(true)}
+                  className="h-5 w-5"
+                >
+                  <MessageSquare className="w-3 h-3" />
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
                   onClick={async () => {
                     await navigator.clipboard.writeText(task.title);
                     toast.success("Task name copied!");
@@ -538,9 +650,7 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
                 >
                   <Copy className="w-3 h-3" />
                 </Button>
-              </div>
-              {hasValue && (
-                <div className="flex gap-1">
+                {hasValue && (
                   <Button
                     type="button"
                     variant="ghost"
@@ -550,18 +660,29 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
                   >
                     {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
                   </Button>
+                )}
+              </div>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
                   <Button
                     type="button"
                     variant="ghost"
-                    size="sm"
-                    onClick={() => setIsEditing(!isEditing)}
-                    className="h-6 px-2 text-xs"
+                    size="icon"
+                    className="h-5 w-5"
                   >
-                    <Edit2 className="w-3 h-3 mr-1" />
-                    {isEditing ? "Cancel" : "Edit"}
+                    <Settings className="w-3 h-3" />
                   </Button>
-                </div>
-              )}
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem
+                    onClick={handleRequestDelete}
+                    className="text-destructive"
+                  >
+                    <Trash2 className="w-3 h-3 mr-2" />
+                    Delete Task
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
             <Input
               type="tel"
@@ -581,20 +702,52 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
       case "radio":
         return (
           <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <Label>{task.title}</Label>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                onClick={async () => {
-                  await navigator.clipboard.writeText(task.title);
-                  toast.success("Task name copied!");
-                }}
-                className="h-5 w-5"
-              >
-                <Copy className="w-3 h-3" />
-              </Button>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Label>{task.title}</Label>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setShowCommentsDialog(true)}
+                  className="h-5 w-5"
+                >
+                  <MessageSquare className="w-3 h-3" />
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={async () => {
+                    await navigator.clipboard.writeText(task.title);
+                    toast.success("Task name copied!");
+                  }}
+                  className="h-5 w-5"
+                >
+                  <Copy className="w-3 h-3" />
+                </Button>
+              </div>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-5 w-5"
+                  >
+                    <Settings className="w-3 h-3" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem
+                    onClick={handleRequestDelete}
+                    className="text-destructive"
+                  >
+                    <Trash2 className="w-3 h-3 mr-2" />
+                    Delete Task
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
             <RadioGroup value={fieldValue} onValueChange={handleRadioChange}>
               {["Yes", "No", "N/A"].map((option) => (
@@ -678,11 +831,10 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={handleRequestEdit}>
-                    <Edit2 className="w-3 h-3 mr-2" />
-                    Edit Task
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={handleRequestDelete} className="text-red-600">
+                  <DropdownMenuItem
+                    onClick={handleRequestDelete}
+                    className="text-destructive"
+                  >
                     <Trash2 className="w-3 h-3 mr-2" />
                     Delete Task
                   </DropdownMenuItem>
@@ -693,19 +845,12 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
             <Input
               value={fieldValue}
               onChange={(e) => handleInputChange(e.target.value)}
-              onBlur={() => {
-                handleInputBlur();
-                if (isEditing) {
-                  setIsEditing(false);
-                  toast.success("Changes saved");
-                }
-              }}
+              onBlur={handleInputBlur}
               placeholder={task.description || "Enter value..."}
-              disabled={isReadOnly && !isEditing}
+              disabled={isReadOnly}
               className={cn(
                 "h-7 text-xs",
-                isReadOnly && !isEditing && "border-green-200 bg-green-50/30 text-foreground font-medium",
-                isEditing && "border-blue-500 ring-1 ring-blue-500"
+                isReadOnly && "border-green-200 bg-green-50/30 text-foreground font-medium"
               )}
             />
             
