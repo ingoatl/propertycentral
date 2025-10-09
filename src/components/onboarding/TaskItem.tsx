@@ -314,12 +314,23 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
               onBlur={handleInputBlur}
               placeholder={task.description || "Enter details..."}
               rows={2}
-              disabled={isReadOnly}
+              disabled={isReadOnly && !isEditing}
               className={cn(
                 "text-sm",
                 isReadOnly && "border-2 border-green-200 bg-green-50/30 text-foreground font-medium resize-none"
               )}
             />
+            {!hasValue && (
+              <Button 
+                type="button"
+                variant="ghost" 
+                size="sm"
+                onClick={() => setShowNAField(true)}
+                className="h-7 text-xs"
+              >
+                Mark as Not Applicable
+              </Button>
+            )}
           </div>
         );
 
@@ -600,9 +611,20 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
                   isReadOnly && "border-2 border-green-200 bg-green-50/30 text-foreground font-medium"
                 )}
                 placeholder="0.00"
-                disabled={isReadOnly}
+                disabled={isReadOnly && !isEditing}
               />
             </div>
+            {!hasValue && (
+              <Button 
+                type="button"
+                variant="ghost" 
+                size="sm"
+                onClick={() => setShowNAField(true)}
+                className="h-7 text-xs"
+              >
+                Mark as Not Applicable
+              </Button>
+            )}
           </div>
         );
 
@@ -669,12 +691,23 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
               onChange={(e) => handleInputChange(e.target.value)}
               onBlur={handleInputBlur}
               placeholder="(555) 123-4567"
-              disabled={isReadOnly}
+              disabled={isReadOnly && !isEditing}
               className={cn(
                 "h-9 text-sm",
                 isReadOnly && "border-2 border-green-200 bg-green-50/30 text-foreground font-medium"
               )}
             />
+            {!hasValue && (
+              <Button 
+                type="button"
+                variant="ghost" 
+                size="sm"
+                onClick={() => setShowNAField(true)}
+                className="h-7 text-xs"
+              >
+                Mark as Not Applicable
+              </Button>
+            )}
           </div>
         );
 
@@ -719,6 +752,7 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
+            <InlineComments taskId={task.id} />
             <RadioGroup value={fieldValue} onValueChange={handleRadioChange}>
               {["Yes", "No", "N/A"].map((option) => (
                 <div key={option} className="flex items-center space-x-2">
@@ -812,7 +846,7 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
               onChange={(e) => handleInputChange(e.target.value)}
               onBlur={handleInputBlur}
               placeholder={task.description || "Enter value..."}
-              disabled={isReadOnly}
+              disabled={isReadOnly && !isEditing}
               className={cn(
                 "h-7 text-xs",
                 isReadOnly && "border-green-200 bg-green-50/30 text-foreground font-medium"
@@ -836,6 +870,49 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
             {task.notes && (
               <div className="bg-muted/50 rounded p-1.5 border border-border/50">
                 <p className="text-[10px] text-muted-foreground whitespace-pre-wrap">{task.notes}</p>
+              </div>
+            )}
+            
+            {!hasValue && !showNAField && (
+              <Button 
+                type="button"
+                variant="ghost" 
+                size="sm"
+                onClick={() => setShowNAField(true)}
+                className="h-7 text-xs"
+              >
+                Mark as Not Applicable
+              </Button>
+            )}
+            
+            {showNAField && (
+              <div className="space-y-2">
+                <Textarea
+                  value={naReason}
+                  onChange={(e) => setNAReason(e.target.value)}
+                  placeholder="Reason for N/A..."
+                  rows={2}
+                  className="text-xs"
+                />
+                <div className="flex gap-2">
+                  <Button 
+                    type="button"
+                    size="sm" 
+                    onClick={handleMarkAsNA}
+                    className="h-7 text-xs"
+                  >
+                    Save
+                  </Button>
+                  <Button 
+                    type="button"
+                    size="sm" 
+                    variant="outline"
+                    onClick={() => setShowNAField(false)}
+                    className="h-7 text-xs"
+                  >
+                    Cancel
+                  </Button>
+                </div>
               </div>
             )}
           </div>
