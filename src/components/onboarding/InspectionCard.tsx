@@ -81,11 +81,9 @@ export const InspectionCard = ({ projectId }: InspectionCardProps) => {
 
         <CollapsibleContent>
           <CardContent className="space-y-4">
-            {!inspectionLink && (
-              <div className="p-3 bg-amber-50 border border-amber-200 rounded text-sm mb-4">
-                💡 Add the inspection report link in <strong>Phase 1: Owner Intake & Legal</strong> → "Inspection report link" field to enable photo links.
-              </div>
-            )}
+            <div className="p-3 bg-blue-50 border border-blue-200 rounded text-sm mb-4">
+              ℹ️ All detailed inspection information and photos are available at: <a href="https://peachhaus-str-inspect.lovable.app/" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-700 hover:underline font-medium">peachhaus-str-inspect.lovable.app</a>
+            </div>
             {/* Inspection Summary */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               <div className="flex items-center gap-2 text-sm">

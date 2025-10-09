@@ -171,9 +171,6 @@ export const WorkflowDialog = ({ open, onOpenChange, project, onUpdate }: Workfl
             <div className="py-12 text-center text-muted-foreground">Loading workflow...</div>
           ) : (
             <div className="space-y-4">
-              {/* Inspection Card */}
-              <InspectionCard projectId={project.id} />
-
               {/* Workflow Phases */}
               <WorkflowPhases
                 projectId={project.id}
@@ -187,6 +184,9 @@ export const WorkflowDialog = ({ open, onOpenChange, project, onUpdate }: Workfl
                   No results found for "{searchQuery}"
                 </div>
               )}
+
+              {/* Inspection Card - moved to end */}
+              <InspectionCard projectId={project.id} />
             </div>
           )}
         </ScrollArea>

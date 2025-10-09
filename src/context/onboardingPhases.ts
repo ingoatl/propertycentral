@@ -6,7 +6,6 @@ export const ONBOARDING_PHASES: PhaseDefinition[] = [
     title: "Owner Intake & Legal",
     description: "Capture all legal documentation, permits, and insurance requirements",
     tasks: [
-      { title: "Inspection report link", field_type: "text", description: "Paste the full URL to the property inspection report with photos" },
       { title: "Owner Onboarding Form Completed", field_type: "checkbox" },
       { title: "Owner Name", field_type: "text" },
       { title: "Owner Email", field_type: "text" },
