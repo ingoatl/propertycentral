@@ -85,13 +85,13 @@ export const TaskCommentsDialog = ({
 
       if (error) throw error;
 
-      // Add comment to the list immediately
+      // Add the new comment to the top of the list immediately
       if (data) {
-        setComments([data as OnboardingComment, ...comments]);
+        const newCommentData = data as OnboardingComment;
+        setComments([newCommentData, ...comments]);
+        setNewComment("");
+        toast.success("Comment added");
       }
-      
-      toast.success("Comment added");
-      setNewComment("");
     } catch (error) {
       console.error("Failed to add comment:", error);
       toast.error("Failed to add comment");
@@ -117,20 +117,22 @@ export const TaskCommentsDialog = ({
             </div>
           ) : comments.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-8">
-              No comments yet
+              No comments yet. Add one below!
             </p>
           ) : (
-            comments.map((comment) => (
-              <div key={comment.id} className="border rounded-lg p-3 space-y-1">
-                <div className="flex justify-between items-start">
-                  <span className="text-xs font-medium">{comment.user_name}</span>
-                  <span className="text-[10px] text-muted-foreground">
-                    {format(new Date(comment.created_at), "MMM d, yyyy h:mm a")}
-                  </span>
+            <div className="space-y-2">
+              {comments.map((comment) => (
+                <div key={comment.id} className="border rounded-lg p-3 space-y-1 bg-card">
+                  <div className="flex justify-between items-start gap-2">
+                    <span className="text-xs font-medium text-foreground">{comment.user_name}</span>
+                    <span className="text-[10px] text-muted-foreground whitespace-nowrap">
+                      {format(new Date(comment.created_at), "MMM d, h:mm a")}
+                    </span>
+                  </div>
+                  <p className="text-xs text-foreground/90">{comment.comment}</p>
                 </div>
-                <p className="text-xs text-foreground">{comment.comment}</p>
-              </div>
-            ))
+              ))}
+            </div>
           )}
         </div>
 
@@ -141,6 +143,12 @@ export const TaskCommentsDialog = ({
             placeholder="Add a comment..."
             rows={2}
             className="text-sm"
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                handleAddComment();
+              }
+            }}
           />
           <Button
             onClick={handleAddComment}

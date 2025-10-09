@@ -143,13 +143,25 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
     }
   };
 
-  const handlePinVerified = () => {
+  const handlePinVerified = async () => {
     if (pendingAction === "delete") {
-      handleDeleteTask();
+      await handleDeleteTask();
     } else if (pendingAction === "edit") {
+      // Enable editing mode
       setIsEditing(true);
+      toast.success("You can now edit this task");
     }
     setPendingAction(null);
+  };
+
+  const handleRequestEdit = () => {
+    setPendingAction("edit");
+    setShowPinDialog(true);
+  };
+
+  const handleRequestDelete = () => {
+    setPendingAction("delete");
+    setShowPinDialog(true);
   };
 
   const handleDeleteTask = async () => {
@@ -167,16 +179,6 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
       console.error("Failed to delete task:", error);
       toast.error("Failed to delete task");
     }
-  };
-
-  const handleRequestEdit = () => {
-    setPendingAction("edit");
-    setShowPinDialog(true);
-  };
-
-  const handleRequestDelete = () => {
-    setPendingAction("delete");
-    setShowPinDialog(true);
   };
 
   const handleCheckboxChange = async (checked: boolean) => {
@@ -693,13 +695,17 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
               onChange={(e) => handleInputChange(e.target.value)}
               onBlur={() => {
                 handleInputBlur();
-                if (isEditing) setIsEditing(false);
+                if (isEditing) {
+                  setIsEditing(false);
+                  toast.success("Changes saved");
+                }
               }}
               placeholder={task.description || "Enter value..."}
-              disabled={!isEditing && isReadOnly}
+              disabled={isReadOnly && !isEditing}
               className={cn(
                 "h-7 text-xs",
-                !isEditing && isReadOnly && "border-green-200 bg-green-50/30 text-foreground font-medium"
+                isReadOnly && !isEditing && "border-green-200 bg-green-50/30 text-foreground font-medium",
+                isEditing && "border-blue-500 ring-1 ring-blue-500"
               )}
             />
             
