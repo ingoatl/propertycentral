@@ -9,7 +9,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
-import { CalendarIcon, Upload, FileText, CheckCircle2, Edit2, Copy, Check } from "lucide-react";
+import { CalendarIcon, Upload, FileText, CheckCircle2, Edit2, Copy, Check, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -560,58 +560,103 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
 
       default:
         return (
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Label>{task.title}</Label>
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-1.5">
+              <Label className="text-xs font-medium">{task.title}</Label>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={async () => {
+                  await navigator.clipboard.writeText(task.title);
+                  toast.success("Copied!");
+                }}
+                className="h-4 w-4"
+              >
+                <Copy className="w-2.5 h-2.5" />
+              </Button>
+              
+              {/* Inline screenshot upload */}
+              <label className="cursor-pointer">
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                  disabled={uploading}
+                />
                 <Button
                   type="button"
                   variant="ghost"
                   size="icon"
-                  onClick={async () => {
-                    await navigator.clipboard.writeText(task.title);
-                    toast.success("Task name copied!");
-                  }}
-                  className="h-5 w-5"
+                  className="h-4 w-4"
+                  asChild
                 >
-                  <Copy className="w-3 h-3" />
+                  <span>
+                    {uploading ? (
+                      <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                    ) : task.file_path ? (
+                      <CheckCircle2 className="w-2.5 h-2.5 text-green-600" />
+                    ) : (
+                      <Upload className="w-2.5 h-2.5" />
+                    )}
+                  </span>
                 </Button>
-              </div>
-              {hasValue && (
-                <div className="flex gap-1">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleCopy}
-                    className="h-6 px-2 text-xs"
-                  >
-                    {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setIsEditing(!isEditing)}
-                    className="h-6 px-2 text-xs"
-                  >
-                    <Edit2 className="w-3 h-3 mr-1" />
-                    {isEditing ? "Cancel" : "Edit"}
-                  </Button>
-                </div>
+              </label>
+
+              {hasValue && !isEditing && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setIsEditing(true)}
+                  className="h-4 w-4 ml-auto"
+                >
+                  <Edit2 className="w-2.5 h-2.5" />
+                </Button>
               )}
             </div>
+            
             <Input
               value={fieldValue}
               onChange={(e) => handleInputChange(e.target.value)}
               onBlur={handleInputBlur}
               placeholder={task.description || "Enter value..."}
-              disabled={isReadOnly}
+              disabled={isReadOnly && !isEditing}
               className={cn(
-                "h-9 text-sm",
-                isReadOnly && "border-2 border-green-200 bg-green-50/30 text-foreground font-medium"
+                "h-7 text-xs",
+                isReadOnly && !isEditing && "border-green-200 bg-green-50/30 text-foreground font-medium"
               )}
             />
+            
+            {/* Screenshot preview if uploaded */}
+            {task.file_path && (
+              <a
+                href={`${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/onboarding-documents/${task.file_path}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1 text-[10px] text-green-600 hover:underline"
+              >
+                <FileText className="w-3 h-3" />
+                Screenshot uploaded
+              </a>
+            )}
+            
+            {/* Notes section */}
+            {(task.notes || isEditing) && (
+              <Textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                onBlur={() => {
+                  if (notes !== task.notes) {
+                    autoSave(fieldValue, !!fieldValue, notes);
+                  }
+                }}
+                placeholder="Add notes..."
+                rows={1}
+                className="text-[10px] h-6 resize-none"
+              />
+            )}
           </div>
         );
     }
@@ -624,10 +669,10 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
 
   return (
     <Card className={cn(
-      "transition-colors",
-      taskStatus === "completed" && "bg-green-50 border-green-200"
+      "transition-colors py-2",
+      taskStatus === "completed" && "bg-green-50/50 border-green-200"
     )}>
-      <CardContent className="pt-4">
+      <CardContent className="py-2 px-3">
         {renderField()}
       </CardContent>
     </Card>
