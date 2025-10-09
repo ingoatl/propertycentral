@@ -57,10 +57,7 @@ export const InspectionCard = ({ projectId }: InspectionCardProps) => {
     notes: "Inspection completed with minor issues. First aid kit missing in kitchen.",
   };
 
-  const photoLink = inspectionLink || "https://peachhaus-str-inspect.lovable.app/property/04c0c98d-443f-4d53-9f2a-8234f8bc1b34#photos";
-
-  // Show a placeholder message if no link is set
-  const showPlaceholder = !inspectionLink;
+  const photoLink = inspectionLink || "#";
 
   return (
     <Card className="border-blue-200 bg-blue-50/50">
@@ -83,14 +80,12 @@ export const InspectionCard = ({ projectId }: InspectionCardProps) => {
         </CardHeader>
 
         <CollapsibleContent>
-          {showPlaceholder ? (
-            <CardContent className="py-6">
-              <div className="text-center text-muted-foreground text-sm">
-                Add the inspection report link in the "Inspection report link" field to view inspection details here.
+          <CardContent className="space-y-4">
+            {!inspectionLink && (
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded text-sm mb-4">
+                💡 Add the inspection report link in <strong>Phase 1: Owner Intake & Legal</strong> → "Inspection report link" field to enable photo links.
               </div>
-            </CardContent>
-          ) : (
-            <CardContent className="space-y-4">
+            )}
             {/* Inspection Summary */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               <div className="flex items-center gap-2 text-sm">
@@ -218,18 +213,19 @@ export const InspectionCard = ({ projectId }: InspectionCardProps) => {
             </div>
 
             {/* Link to Full Report */}
-            <div className="pt-2">
-              <a
-                href={photoLink}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-sm text-blue-600 hover:text-blue-700 hover:underline flex items-center gap-1"
-              >
-                View Full Inspection Report with Photos →
-              </a>
-            </div>
+            {inspectionLink && (
+              <div className="pt-2">
+                <a
+                  href={photoLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm text-blue-600 hover:text-blue-700 hover:underline flex items-center gap-1"
+                >
+                  View Full Inspection Report with Photos →
+                </a>
+              </div>
+            )}
           </CardContent>
-          )}
         </CollapsibleContent>
       </Collapsible>
     </Card>
