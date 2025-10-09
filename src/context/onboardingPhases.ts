@@ -104,6 +104,13 @@ export const ONBOARDING_PHASES: PhaseDefinition[] = [
     title: "Listings & Booking Platforms",
     description: "Publish property across all relevant booking channels",
     tasks: [
+      // Legacy/General Fields (for backward compatibility)
+      { title: "Mid-term marketplace listings created", field_type: "checkbox" },
+      { title: "Airbnb listing published", field_type: "checkbox" },
+      { title: "VRBO listing published", field_type: "checkbox" },
+      { title: "Insurance housing provider platforms", field_type: "multiselect", options: ["Furnished Finder", "Corporate Housing by Owner", "Other"] },
+      { title: "Corporate housing provider platforms", field_type: "textarea" },
+      
       // Mid-term Marketplaces Section
       { title: "📋 MID-TERM MARKETPLACES", field_type: "text", description: "Category header - no action needed" },
       { title: "Furnished Finder", field_type: "text", description: "Enter Listing URL" },

@@ -42,13 +42,16 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
   // Render category header differently
   if (isCategoryHeader) {
     return (
-      <div className="my-4 pt-4 border-t-2 border-primary/20">
-        <h4 className="text-sm font-bold text-primary uppercase tracking-wide">
-          {task.title.replace("📋 ", "")}
-        </h4>
-        {task.description && (
-          <p className="text-xs text-muted-foreground mt-1">{task.description}</p>
-        )}
+      <div className="my-6 pt-6 first:mt-0 first:pt-0 border-t-2 border-primary/30 first:border-t-0">
+        <div className="bg-primary/5 -mx-4 px-4 py-3 rounded-lg">
+          <h4 className="text-base font-bold text-primary uppercase tracking-wide flex items-center gap-2">
+            <span className="text-xl">{task.title.split(" ")[0]}</span>
+            <span>{task.title.replace("📋 ", "")}</span>
+          </h4>
+          {task.description && (
+            <p className="text-xs text-muted-foreground mt-1.5">{task.description}</p>
+          )}
+        </div>
       </div>
     );
   }
