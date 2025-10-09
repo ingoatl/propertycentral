@@ -8,7 +8,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { ONBOARDING_PHASES } from "@/context/onboardingPhases";
 import { InspectionCard } from "./InspectionCard";
 import { Input } from "@/components/ui/input";
-import { Search } from "lucide-react";
+import { Search, RefreshCw } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 interface WorkflowDialogProps {
   open: boolean;
@@ -22,6 +23,7 @@ export const WorkflowDialog = ({ open, onOpenChange, project, onUpdate }: Workfl
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [filteredTasks, setFilteredTasks] = useState<OnboardingTask[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -145,14 +147,69 @@ export const WorkflowDialog = ({ open, onOpenChange, project, onUpdate }: Workfl
     }
   };
 
+  const handleRefreshTasks = async () => {
+    try {
+      setRefreshing(true);
+      
+      // Delete all existing tasks for this project
+      const { error: deleteError } = await supabase
+        .from("onboarding_tasks")
+        .delete()
+        .eq("project_id", project.id);
+      
+      if (deleteError) throw deleteError;
+      
+      // Create all tasks from current phase definitions
+      const allTasks = ONBOARDING_PHASES.flatMap((phase) =>
+        phase.tasks.map((task) => ({
+          project_id: project.id,
+          phase_number: phase.id,
+          phase_title: phase.title,
+          title: task.title,
+          description: task.description,
+          field_type: task.field_type,
+          status: "pending" as const,
+        }))
+      );
+      
+      const { error: insertError } = await supabase
+        .from("onboarding_tasks")
+        .insert(allTasks);
+      
+      if (insertError) throw insertError;
+      
+      toast.success("Tasks refreshed successfully!");
+      loadTasks(); // Reload tasks
+    } catch (error: any) {
+      toast.error("Failed to refresh tasks: " + error.message);
+      console.error(error);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-5xl max-h-[90vh]">
         <DialogHeader>
-          <DialogTitle className="text-2xl">
-            {project.owner_name} - Onboarding Workflow
-          </DialogTitle>
-          <p className="text-sm text-muted-foreground">{project.property_address}</p>
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex-1">
+              <DialogTitle className="text-2xl">
+                {project.owner_name} - Onboarding Workflow
+              </DialogTitle>
+              <p className="text-sm text-muted-foreground">{project.property_address}</p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleRefreshTasks}
+              disabled={refreshing}
+              className="gap-2 shrink-0"
+            >
+              <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+              Refresh Tasks
+            </Button>
+          </div>
         </DialogHeader>
 
         {/* Search Field */}
