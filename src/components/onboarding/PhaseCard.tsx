@@ -35,7 +35,6 @@ export const PhaseCard = ({
 }: PhaseCardProps) => {
   const isComplete = completion === 100;
   const [showAddTaskDialog, setShowAddTaskDialog] = useState(false);
-  const [isNotApplicable, setIsNotApplicable] = useState(false);
 
   return (
     <Card className={cn(
@@ -80,21 +79,6 @@ export const PhaseCard = ({
                 )}
                 style={{ width: `${completion}%` }}
               />
-            </div>
-
-            {/* Not Applicable Checkbox */}
-            <div className="flex items-center space-x-2 mt-3">
-              <Checkbox 
-                id={`na-phase-${phase.id}`}
-                checked={isNotApplicable}
-                onCheckedChange={(checked) => setIsNotApplicable(checked as boolean)}
-              />
-              <label
-                htmlFor={`na-phase-${phase.id}`}
-                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-              >
-                Not Applicable
-              </label>
             </div>
           </CardHeader>
         </CollapsibleTrigger>

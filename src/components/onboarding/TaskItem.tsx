@@ -41,7 +41,6 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
   const [copied, setCopied] = useState(false);
   const [showPinDialog, setShowPinDialog] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-  const [pendingAction, setPendingAction] = useState<'edit' | 'delete' | null>(null);
 
   const hasValue = task.field_value && task.field_value.trim() !== "";
   const isReadOnly = hasValue;
@@ -160,22 +159,14 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
   };
 
   const handlePinVerified = () => {
-    if (pendingAction === 'delete') {
-      handleDeleteTask();
-    } else if (pendingAction === 'edit') {
-      setIsEditing(true);
-      toast.success("You can now edit this field");
-    }
-    setPendingAction(null);
+    handleDeleteTask();
   };
 
   const handleRequestEdit = () => {
-    setPendingAction('edit');
-    setShowPinDialog(true);
+    setIsEditing(true);
   };
 
   const handleRequestDelete = () => {
-    setPendingAction('delete');
     setShowPinDialog(true);
   };
 
