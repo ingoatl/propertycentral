@@ -104,52 +104,11 @@ export const ONBOARDING_PHASES: PhaseDefinition[] = [
     title: "Listings & Booking Platforms",
     description: "Publish property across all relevant booking channels",
     tasks: [
-      // Legacy/General Fields (for backward compatibility)
       { title: "Mid-term marketplace listings created", field_type: "checkbox" },
       { title: "Airbnb listing published", field_type: "checkbox" },
       { title: "VRBO listing published", field_type: "checkbox" },
       { title: "Insurance housing provider platforms", field_type: "multiselect", options: ["Furnished Finder", "Corporate Housing by Owner", "Other"] },
       { title: "Corporate housing provider platforms", field_type: "textarea" },
-      
-      // Mid-term Marketplaces Section
-      { title: "📋 MID-TERM MARKETPLACES", field_type: "text", description: "Category header - no action needed" },
-      { title: "Furnished Finder", field_type: "text", description: "Enter Listing URL" },
-      { title: "CHBO (Corporate Housing by Owner)", field_type: "text", description: "Enter Listing URL" },
-      { title: "Homads", field_type: "text", description: "Enter Listing URL" },
-      { title: "MidTermRentalProperties.com", field_type: "text", description: "Enter Listing URL" },
-      { title: "Anyplace", field_type: "text", description: "Enter Placeholder" },
-      { title: "June Homes", field_type: "text", description: "Enter Placeholder" },
-      { title: "Kopa", field_type: "text", description: "Enter Placeholder" },
-      
-      // Core Booking Platforms Section
-      { title: "📋 CORE BOOKING PLATFORMS", field_type: "text", description: "Category header - no action needed" },
-      { title: "Airbnb", field_type: "text", description: "Alex will setup the listing - Enter Listing URL" },
-      { title: "Airbnb - 1 year Listing", field_type: "text", description: "Alex will setup the listing - Enter Listing URL" },
-      { title: "VRBO", field_type: "text", description: "Alex will setup the listing - Enter Listing URL" },
-      { title: "Zillow", field_type: "text", description: "Chris Please setup - Enter Listing URL" },
-      { title: "Booking", field_type: "text", description: "Do not create new Listings (only existing Listing) - Enter Listing URL" },
-      
-      // Insurance Housing Providers Section
-      { title: "📋 INSURANCE HOUSING PROVIDERS", field_type: "text", description: "Category header - no action needed" },
-      { title: "ALE Solutions", field_type: "text", description: "Enter Placeholder" },
-      { title: "Alacrity", field_type: "text", description: "Enter Placeholder" },
-      { title: "CRS Temporary Housing", field_type: "text", description: "Enter Placeholder" },
-      { title: "Assured Relocation", field_type: "text", description: "Enter Placeholder" },
-      { title: "THD (Temporary Housing Directory)", field_type: "text", description: "Enter Placeholder" },
-      { title: "Housing Headquarters", field_type: "text", description: "Enter Placeholder" },
-      { title: "Sedgwick Temporary Housing", field_type: "text", description: "Enter Placeholder" },
-      { title: "Homelink", field_type: "text", description: "Their website is https://homelinkhelps.com/ - Enter Placeholder" },
-      
-      // Corporate Housing Providers Section
-      { title: "📋 CORPORATE HOUSING PROVIDERS", field_type: "text", description: "Category header - no action needed" },
-      { title: "Blueground", field_type: "text", description: "Enter Listing URL" },
-      { title: "Landing", field_type: "text", description: "Enter Listing URL" },
-      { title: "2nd Address", field_type: "text", description: "Enter Listing URL" },
-      { title: "Aleph Living", field_type: "text", description: "Enter Listing URL" },
-      { title: "Zeus Living", field_type: "text", description: "Enter Placeholder" },
-      { title: "Travel Nurse Housing", field_type: "text", description: "Enter Placeholder" },
-      
-      // General Fields
       { title: "Direct booking website setup", field_type: "checkbox" },
       { title: "Upload platform listing screenshots", field_type: "file" },
     ]
