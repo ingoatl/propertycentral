@@ -608,59 +608,61 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
       default:
         return (
           <div className="space-y-1.5">
-            <div className="flex items-center gap-1.5">
-              <Label className="text-xs font-medium flex-1">{task.title}</Label>
-              
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                onClick={() => setShowCommentsDialog(true)}
-                className="h-4 w-4"
-              >
-                <MessageSquare className="w-2.5 h-2.5" />
-              </Button>
-              
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                onClick={async () => {
-                  await navigator.clipboard.writeText(task.title);
-                  toast.success("Copied!");
-                }}
-                className="h-4 w-4"
-              >
-                <Copy className="w-2.5 h-2.5" />
-              </Button>
-              
-              {/* Inline screenshot upload */}
-              <label className="cursor-pointer">
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleFileUpload}
-                  className="hidden"
-                  disabled={uploading}
-                />
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5">
+                <Label className="text-xs font-medium">{task.title}</Label>
+                
                 <Button
                   type="button"
                   variant="ghost"
                   size="icon"
+                  onClick={() => setShowCommentsDialog(true)}
                   className="h-4 w-4"
-                  asChild
                 >
-                  <span>
-                    {uploading ? (
-                      <Loader2 className="w-2.5 h-2.5 animate-spin" />
-                    ) : task.file_path ? (
-                      <CheckCircle2 className="w-2.5 h-2.5 text-green-600" />
-                    ) : (
-                      <Upload className="w-2.5 h-2.5" />
-                    )}
-                  </span>
+                  <MessageSquare className="w-2.5 h-2.5" />
                 </Button>
-              </label>
+                
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  onClick={async () => {
+                    await navigator.clipboard.writeText(task.title);
+                    toast.success("Copied!");
+                  }}
+                  className="h-4 w-4"
+                >
+                  <Copy className="w-2.5 h-2.5" />
+                </Button>
+                
+                {/* Inline screenshot upload */}
+                <label className="cursor-pointer">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileUpload}
+                    className="hidden"
+                    disabled={uploading}
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-4 w-4"
+                    asChild
+                  >
+                    <span>
+                      {uploading ? (
+                        <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                      ) : task.file_path ? (
+                        <CheckCircle2 className="w-2.5 h-2.5 text-green-600" />
+                      ) : (
+                        <Upload className="w-2.5 h-2.5" />
+                      )}
+                    </span>
+                  </Button>
+                </label>
+              </div>
 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -689,12 +691,15 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
             <Input
               value={fieldValue}
               onChange={(e) => handleInputChange(e.target.value)}
-              onBlur={handleInputBlur}
+              onBlur={() => {
+                handleInputBlur();
+                if (isEditing) setIsEditing(false);
+              }}
               placeholder={task.description || "Enter value..."}
-              disabled={isReadOnly && !isEditing}
+              disabled={!isEditing && isReadOnly}
               className={cn(
                 "h-7 text-xs",
-                isReadOnly && !isEditing && "border-green-200 bg-green-50/30 text-foreground font-medium"
+                !isEditing && isReadOnly && "border-green-200 bg-green-50/30 text-foreground font-medium"
               )}
             />
             
@@ -711,20 +716,11 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
               </a>
             )}
             
-            {/* Notes section */}
-            {(task.notes || isEditing) && (
-              <Textarea
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                onBlur={() => {
-                  if (notes !== task.notes) {
-                    autoSave(fieldValue, !!fieldValue, notes);
-                  }
-                }}
-                placeholder="Add notes..."
-                rows={1}
-                className="text-[10px] h-6 resize-none"
-              />
+            {/* Notes section - always show if there are notes */}
+            {task.notes && (
+              <div className="bg-muted/50 rounded p-1.5 border border-border/50">
+                <p className="text-[10px] text-muted-foreground whitespace-pre-wrap">{task.notes}</p>
+              </div>
             )}
           </div>
         );

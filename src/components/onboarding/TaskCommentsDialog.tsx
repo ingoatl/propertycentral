@@ -72,20 +72,26 @@ export const TaskCommentsDialog = ({
         .eq("id", user?.id)
         .single();
 
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from("onboarding_comments")
         .insert({
           task_id: taskId,
           user_id: user?.id,
           user_name: profile?.email || "Unknown",
           comment: newComment.trim(),
-        });
+        })
+        .select()
+        .single();
 
       if (error) throw error;
 
+      // Add comment to the list immediately
+      if (data) {
+        setComments([data as OnboardingComment, ...comments]);
+      }
+      
       toast.success("Comment added");
       setNewComment("");
-      loadComments();
     } catch (error) {
       console.error("Failed to add comment:", error);
       toast.error("Failed to add comment");
