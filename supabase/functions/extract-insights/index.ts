@@ -43,26 +43,34 @@ ${propertyList}
 **MATCHING RULES - IF EITHER OWNER NAME OR PROPERTY ADDRESS IS FOUND, MARK AS RELEVANT:**
 
 **Owner Matching (HIGHEST PRIORITY):**
-1. Search the ENTIRE email text (subject + body + addresses) for EXACT FULL owner names from the list above
+1. Search the ENTIRE email text (subject + body + shipping addresses) for EXACT FULL owner names from the list above
 2. Owner names must match EXACTLY as shown (case-insensitive but complete name)
-3. Examples: "Canadian Way Owner - Michael Georgiades", "Shaletha Colbert", "Timberlake - John Hackney"
+3. Examples: "Canadian Way Owner - Michael Georgiades", "Shaletha Colbert", "Timberlake - John Hackney", "PeachHausGroup - Shaletha Colbert"
 4. If found, set ownerEmail to that owner's email
 
-**Property Matching (SECOND PRIORITY):**
-1. Search for EXACT property addresses in email body (especially shipping/delivery sections)
-2. Look for full addresses like "3708 Canadian Way, Tucker, GA" or "14 Villa Ct SE, Smyrna, GA 30080"
-3. Property addresses should match significantly (at least street + city)
-4. If found, set propertyName to that property's name
+**Property Matching (SECOND PRIORITY - ENHANCED FOR SHIPPING ADDRESSES):**
+1. Search for property addresses ANYWHERE in the email, especially in shipping/delivery sections
+2. CRITICAL: Addresses may appear with PREFIXES like "CompanyName - OwnerName - Address"
+3. Look for STREET ADDRESS patterns like:
+   - "14 Villa Ct" (even if it says "PeachHausGroup - Name - 14 Villa Ct")
+   - "3708 Canadian Way" (even with any prefix)
+   - Street number + street name combinations
+4. Match addresses by extracting just the core street address (number + street name)
+5. Examples of formats to catch:
+   - "PeachHausGroup - Shaletha Colbert - 14 Villa Ct 1387 TYSONS COR"
+   - "Shipped to: 3708 Canadian Way, Tucker, GA"
+   - "14 Villa Ct SE, Smyrna, GA 30080"
+6. If found, set propertyName AND deliveryAddress
 
 **IF EITHER an owner name OR a property address is found, the email IS RELEVANT and should be processed**
 
-CRITICAL INSTRUCTIONS FOR EXPENSE EXTRACTION:
+**CRITICAL INSTRUCTIONS FOR EXPENSE EXTRACTION:**
 You MUST extract ALL details accurately. Missing fields cause problems.
 
 Analyze the email comprehensively and extract:
 
 1. **Relevance**: Is this email relevant to any property or owner? (yes/no)
-2. **Property Match**: Which property is it related to? (match by name or address in email body - look carefully!)
+2. **Property Match**: Which property is it related to? (match by address - extract street number + name)
 3. **Owner Match**: Which owner is it related to? (match by email or name)
 4. **Category**: maintenance, payment, booking, tenant_communication, legal, insurance, utilities, expense, order, or other
 5. **Summary**: 2-3 sentence summary of the email content
@@ -76,12 +84,16 @@ Analyze the email comprehensively and extract:
    
    **CRITICAL - FOR AMAZON EMAILS:**
    - Amazon emails have VERY specific patterns you MUST recognize
-   - Look for "Order Confirmation" headers (can appear multiple times)
+   - Look for "Order Confirmation" OR "Shipping Confirmation" headers
+   - CRITICAL: Shipping addresses often have PREFIXES - extract the actual address!
+     * Format: "CompanyName - OwnerName - StreetAddress City, State ZIP"
+     * Example: "PeachHausGroup - Shaletha Colbert - 14 Villa Ct 1387 TYSONS COR MARIETTA, GA"
+     * MUST extract: "14 Villa Ct" or full address "14 Villa Ct, Marietta, GA 30062"
    - Each order has:
      * Order number in format: ###-#######-####### (EXTRACT THIS!)
-     * Delivery estimate like "Tuesday, October 1" (CONVERT TO YYYY-MM-DD!)
+     * Delivery estimate like "Tuesday, October 1" or "Monday, September 22" (CONVERT TO YYYY-MM-DD!)
      * Item list with individual prices
-     * Delivery address (EXTRACT FULL ADDRESS!)
+     * Delivery address (EXTRACT EVEN IF IT HAS PREFIX!)
    
    **STEP BY STEP EXTRACTION PROCESS:**
    
@@ -90,10 +102,14 @@ Analyze the email comprehensively and extract:
    - Or in links: "amazon.com/your-orders/order-details?orderID=113-4868842-1944206"
    - Save the FIRST order number you find
    
-   Step 2: Find delivery address
-   - Look for "Shipping address:" or "Deliver to:"
-   - Extract the COMPLETE address including street, city, state, ZIP
-   - Format: "123 Main St, City, State 12345"
+   Step 2: Find delivery address - HANDLE PREFIXES!
+   - Look for "Shipping address:" or "Deliver to:" or "Shipped to:"
+   - Address may have company/owner prefix: "CompanyName - OwnerName - ActualAddress"
+   - Extract the COMPLETE street address including:
+     * Street number and name (e.g., "14 Villa Ct")
+     * Full address with city, state, ZIP (e.g., "14 Villa Ct, Marietta, GA 30062")
+   - Remove company/owner prefixes but keep the actual address
+   - Format: "Street Address, City, State ZIP" (e.g., "14 Villa Ct, Marietta, GA 30062-2075")
    
    Step 3: Find ALL items and prices
    - Look for item names followed by prices like "$339.99"
@@ -229,14 +245,25 @@ ANALYZE CAREFULLY - Extract ALL order details including order number and deliver
     
     // STEP 3: Try to match property by delivery address (HIGHEST PRIORITY for properties)
     if (analysis.deliveryAddress) {
+      // Extract core street address (number + street name) for flexible matching
+      const extractStreetAddress = (addr: string) => {
+        // Remove common prefixes like company/owner names
+        const cleaned = addr.replace(/^[^0-9]*-\s*/g, '');
+        // Extract street number and name (e.g., "14 Villa Ct" from "14 Villa Ct 1387 TYSONS COR")
+        const match = cleaned.match(/^(\d+\s+[A-Za-z\s]+(?:St|Ave|Dr|Ct|Rd|Ln|Way|Blvd|Pl|Cir))/i);
+        return match ? match[1].toLowerCase().trim() : cleaned.toLowerCase().replace(/[,.\s]+/g, '');
+      };
+      
+      const deliveryStreet = extractStreetAddress(analysis.deliveryAddress);
+      
       property = properties.find((p: any) => {
-        const deliveryLower = analysis.deliveryAddress.toLowerCase().replace(/[,.\s]/g, '');
-        const propAddressLower = p.address.toLowerCase().replace(/[,.\s]/g, '');
-        // Check if addresses match (either way)
-        return deliveryLower.includes(propAddressLower) || propAddressLower.includes(deliveryLower);
+        const propStreet = extractStreetAddress(p.address);
+        // Check if either contains the other (handles various formats)
+        return deliveryStreet.includes(propStreet) || propStreet.includes(deliveryStreet);
       });
+      
       if (property) {
-        console.log(`Matched property by delivery address: ${property.name} (${property.address})`);
+        console.log(`Matched property by delivery address: ${property.name} (${property.address}) from "${analysis.deliveryAddress}"`);
       }
     }
     
