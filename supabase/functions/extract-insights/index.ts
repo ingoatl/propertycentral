@@ -34,25 +34,27 @@ serve(async (req) => {
 
     const systemPrompt = `You are an AI assistant analyzing property management emails with advanced sentiment analysis and expense detection capabilities.
 
-Properties: ${propertyList}
-Owners: ${ownerList}
+**CRITICAL: Search for EXACT FULL NAMES of owners anywhere in the email (subject or body):**
+${ownerList}
 
-CRITICAL INSTRUCTIONS FOR OWNER/PROPERTY MATCHING:
-You MUST scan the email body, subject, and delivery addresses to match owners and properties.
+**Properties and their addresses:**
+${propertyList}
 
-**Owner Matching Priority:**
-1. FIRST: Check if any owner NAME appears in the email body or delivery address
-2. SECOND: Check if owner email matches sender
-3. THIRD: Match delivery address to property address
+**MATCHING RULES - IF EITHER OWNER NAME OR PROPERTY ADDRESS IS FOUND, MARK AS RELEVANT:**
 
-**Property Matching Priority:**
-1. FIRST: Check if delivery address matches any property address (exact or partial match)
-2. SECOND: Check if property name appears in email body
-3. THIRD: Match via owner (if owner identified, use their associated properties)
+**Owner Matching (HIGHEST PRIORITY):**
+1. Search the ENTIRE email text (subject + body + addresses) for EXACT FULL owner names from the list above
+2. Owner names must match EXACTLY as shown (case-insensitive but complete name)
+3. Examples: "Canadian Way Owner - Michael Georgiades", "Shaletha Colbert", "Timberlake - John Hackney"
+4. If found, set ownerEmail to that owner's email
 
-When you find an owner's name like "Shaletha Colbert" or "Canadian Way" in the email, you MUST:
-- Set ownerEmail to the matching owner's email from the owner list
-- Set propertyName to the property associated with that owner or the delivery address
+**Property Matching (SECOND PRIORITY):**
+1. Search for EXACT property addresses in email body (especially shipping/delivery sections)
+2. Look for full addresses like "3708 Canadian Way, Tucker, GA" or "14 Villa Ct SE, Smyrna, GA 30080"
+3. Property addresses should match significantly (at least street + city)
+4. If found, set propertyName to that property's name
+
+**IF EITHER an owner name OR a property address is found, the email IS RELEVANT and should be processed**
 
 CRITICAL INSTRUCTIONS FOR EXPENSE EXTRACTION:
 You MUST extract ALL details accurately. Missing fields cause problems.
@@ -201,43 +203,81 @@ ANALYZE CAREFULLY - Extract ALL order details including order number and deliver
       );
     }
 
-    // Enhanced property and owner matching
-    // First try to find by delivery address if available
+    // Enhanced property and owner matching with full name checking
     let property: any = null;
     let owner: any = null;
     
+    const emailContent = `${subject} ${body}`.toLowerCase();
+    
+    // STEP 1: Try to match owner by EXACT FULL NAME in email content
+    for (const ownerData of owners) {
+      const ownerNameLower = ownerData.name.toLowerCase();
+      if (emailContent.includes(ownerNameLower)) {
+        owner = ownerData;
+        console.log(`Matched owner by full name in email: ${ownerData.name}`);
+        break;
+      }
+    }
+    
+    // STEP 2: Try to match owner by email if not already matched
+    if (!owner && analysis.ownerEmail) {
+      owner = owners.find((o: any) => o.email.toLowerCase() === analysis.ownerEmail.toLowerCase());
+      if (owner) {
+        console.log(`Matched owner by email: ${owner.name}`);
+      }
+    }
+    
+    // STEP 3: Try to match property by delivery address (HIGHEST PRIORITY for properties)
     if (analysis.deliveryAddress) {
-      // Try to match property by delivery address
       property = properties.find((p: any) => {
-        const normalizedAddress = analysis.deliveryAddress.toLowerCase().replace(/[,.\s]/g, '');
-        const normalizedPropAddress = p.address.toLowerCase().replace(/[,.\s]/g, '');
-        return normalizedPropAddress.includes(normalizedAddress) || 
-               normalizedAddress.includes(normalizedPropAddress);
+        const deliveryLower = analysis.deliveryAddress.toLowerCase().replace(/[,.\s]/g, '');
+        const propAddressLower = p.address.toLowerCase().replace(/[,.\s]/g, '');
+        // Check if addresses match (either way)
+        return deliveryLower.includes(propAddressLower) || propAddressLower.includes(deliveryLower);
       });
+      if (property) {
+        console.log(`Matched property by delivery address: ${property.name} (${property.address})`);
+      }
     }
     
-    // If no match by address, try by property name
+    // STEP 4: Try to match property by name if not already matched
     if (!property && analysis.propertyName) {
-      property = properties.find(
-        (p: any) => p.name === analysis.propertyName || 
-                   p.address.includes(analysis.propertyName) ||
-                   analysis.propertyName.includes(p.name)
+      property = properties.find((p: any) => 
+        p.name.toLowerCase() === analysis.propertyName.toLowerCase() ||
+        p.address.toLowerCase().includes(analysis.propertyName.toLowerCase())
       );
+      if (property) {
+        console.log(`Matched property by name: ${property.name}`);
+      }
     }
     
-    // Try to find owner by email or by property owner_id
-    if (analysis.ownerEmail) {
-      owner = owners.find((o: any) => o.email === analysis.ownerEmail);
-    }
-    
-    // If we found a property with an owner_id, use that owner
-    if (property?.owner_id && !owner) {
-      owner = owners.find((o: any) => o.id === property.owner_id);
-    }
-    
-    // If we found an owner but no property, find their property
+    // STEP 5: If we have an owner but no property, try to find their property
     if (owner && !property) {
-      property = properties.find((p: any) => p.owner_id === owner.id);
+      const ownerProperties = properties.filter((p: any) => p.owner_id === owner.id);
+      if (ownerProperties.length === 1) {
+        property = ownerProperties[0];
+        console.log(`Matched single property from owner: ${property.name}`);
+      } else if (ownerProperties.length > 1) {
+        // Try to match by delivery address among owner's properties
+        if (analysis.deliveryAddress) {
+          property = ownerProperties.find((p: any) => {
+            const deliveryLower = analysis.deliveryAddress.toLowerCase().replace(/[,.\s]/g, '');
+            const propAddressLower = p.address.toLowerCase().replace(/[,.\s]/g, '');
+            return deliveryLower.includes(propAddressLower) || propAddressLower.includes(deliveryLower);
+          });
+        }
+        if (property) {
+          console.log(`Matched property from owner's multiple properties: ${property.name}`);
+        }
+      }
+    }
+    
+    // STEP 6: If we have a property but no owner, get the owner from the property
+    if (property && !owner && property.owner_id) {
+      owner = owners.find((o: any) => o.id === property.owner_id);
+      if (owner) {
+        console.log(`Matched owner from property: ${owner.name}`);
+      }
     }
 
     if (!property && !owner) {

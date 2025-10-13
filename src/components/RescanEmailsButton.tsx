@@ -8,29 +8,21 @@ export function RescanEmailsButton() {
   const [scanning, setScanning] = useState(false);
 
   const handleRescan = async () => {
-    if (!confirm("This will delete all existing email insights and rescan emails with the improved AI analysis. Continue?")) {
+    if (!confirm("This will rescan emails from the last 6 weeks with improved owner name and property address matching. Continue?")) {
       return;
     }
 
     try {
       setScanning(true);
-      toast.loading("Clearing old insights and rescanning emails...");
+      toast.loading("Rescanning emails from the last 6 weeks...");
 
-      // Delete all existing insights
-      const { error: deleteError } = await supabase
-        .from('email_insights')
-        .delete()
-        .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all
-
-      if (deleteError) throw deleteError;
-
-      // Trigger new scan
+      // Trigger new scan (scan-gmail will automatically scan last 6 weeks)
       const { data, error } = await supabase.functions.invoke('scan-gmail');
 
       if (error) throw error;
 
       toast.dismiss();
-      toast.success(`Rescan complete! Processed ${data.emailsProcessed} emails, generated ${data.insightsGenerated} insights with expense detection and sentiment analysis`);
+      toast.success(`Rescan complete! Processed ${data.emailsProcessed} emails, generated ${data.insightsGenerated} insights with enhanced owner and property matching`);
       
       // Reload the page to show new insights
       setTimeout(() => window.location.reload(), 2000);

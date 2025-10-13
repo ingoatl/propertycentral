@@ -1,0 +1,1 @@
+UPDATE properties SET rental_type = 'mid_term' WHERE name = 'Timberlake'
