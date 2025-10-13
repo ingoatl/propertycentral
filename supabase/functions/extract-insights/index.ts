@@ -37,6 +37,23 @@ serve(async (req) => {
 Properties: ${propertyList}
 Owners: ${ownerList}
 
+CRITICAL INSTRUCTIONS FOR OWNER/PROPERTY MATCHING:
+You MUST scan the email body, subject, and delivery addresses to match owners and properties.
+
+**Owner Matching Priority:**
+1. FIRST: Check if any owner NAME appears in the email body or delivery address
+2. SECOND: Check if owner email matches sender
+3. THIRD: Match delivery address to property address
+
+**Property Matching Priority:**
+1. FIRST: Check if delivery address matches any property address (exact or partial match)
+2. SECOND: Check if property name appears in email body
+3. THIRD: Match via owner (if owner identified, use their associated properties)
+
+When you find an owner's name like "Shaletha Colbert" or "Canadian Way" in the email, you MUST:
+- Set ownerEmail to the matching owner's email from the owner list
+- Set propertyName to the property associated with that owner or the delivery address
+
 CRITICAL INSTRUCTIONS FOR EXPENSE EXTRACTION:
 You MUST extract ALL details accurately. Missing fields cause problems.
 
@@ -184,11 +201,44 @@ ANALYZE CAREFULLY - Extract ALL order details including order number and deliver
       );
     }
 
-    // Find property and owner IDs
-    const property = properties.find(
-      (p: any) => p.name === analysis.propertyName || p.address.includes(analysis.propertyName)
-    );
-    const owner = owners.find((o: any) => o.email === analysis.ownerEmail);
+    // Enhanced property and owner matching
+    // First try to find by delivery address if available
+    let property: any = null;
+    let owner: any = null;
+    
+    if (analysis.deliveryAddress) {
+      // Try to match property by delivery address
+      property = properties.find((p: any) => {
+        const normalizedAddress = analysis.deliveryAddress.toLowerCase().replace(/[,.\s]/g, '');
+        const normalizedPropAddress = p.address.toLowerCase().replace(/[,.\s]/g, '');
+        return normalizedPropAddress.includes(normalizedAddress) || 
+               normalizedAddress.includes(normalizedPropAddress);
+      });
+    }
+    
+    // If no match by address, try by property name
+    if (!property && analysis.propertyName) {
+      property = properties.find(
+        (p: any) => p.name === analysis.propertyName || 
+                   p.address.includes(analysis.propertyName) ||
+                   analysis.propertyName.includes(p.name)
+      );
+    }
+    
+    // Try to find owner by email or by property owner_id
+    if (analysis.ownerEmail) {
+      owner = owners.find((o: any) => o.email === analysis.ownerEmail);
+    }
+    
+    // If we found a property with an owner_id, use that owner
+    if (property?.owner_id && !owner) {
+      owner = owners.find((o: any) => o.id === property.owner_id);
+    }
+    
+    // If we found an owner but no property, find their property
+    if (owner && !property) {
+      property = properties.find((p: any) => p.owner_id === owner.id);
+    }
 
     if (!property && !owner) {
       console.log('Could not match to any property or owner, skipping...');
@@ -252,16 +302,20 @@ ANALYZE CAREFULLY - Extract ALL order details including order number and deliver
 
     // If expense detected and we have a property, check for duplicates before creating
     if (analysis.expenseDetected && analysis.expenseAmount && property?.id) {
-      console.log('Checking for duplicate expenses...');
+      console.log('Checking for duplicate expenses with order number:', analysis.orderNumber);
       
-      // Check if duplicate using the database function
-      const { data: isDuplicate } = await supabase.rpc('is_duplicate_expense', {
+      // Check if duplicate using the database function - order number takes precedence
+      const { data: isDuplicate, error: dupeCheckError } = await supabase.rpc('is_duplicate_expense', {
         p_property_id: property.id,
         p_amount: analysis.expenseAmount,
         p_date: analysis.orderDate || new Date(emailDate).toISOString().split('T')[0],
         p_purpose: analysis.expenseDescription || subject,
-        p_order_number: analysis.orderNumber
+        p_order_number: analysis.orderNumber || null
       });
+      
+      if (dupeCheckError) {
+        console.error('Error checking for duplicates:', dupeCheckError);
+      }
 
       if (isDuplicate) {
         console.log('Duplicate expense detected, skipping creation...');
