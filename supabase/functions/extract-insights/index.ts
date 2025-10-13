@@ -344,63 +344,65 @@ ANALYZE CAREFULLY - Extract ALL order details including order number and deliver
     if (analysis.expenseDetected && analysis.expenseAmount && property?.id) {
       console.log('Checking for duplicate expenses with order number:', analysis.orderNumber);
       
-      // Check if duplicate using the database function - order number takes precedence
-      const { data: isDuplicate, error: dupeCheckError } = await supabase.rpc('is_duplicate_expense', {
-        p_property_id: property.id,
-        p_amount: analysis.expenseAmount,
-        p_date: analysis.orderDate || new Date(emailDate).toISOString().split('T')[0],
-        p_purpose: analysis.expenseDescription || subject,
-        p_order_number: analysis.orderNumber || null
-      });
-      
-      if (dupeCheckError) {
-        console.error('Error checking for duplicates:', dupeCheckError);
-      }
-
-      if (isDuplicate) {
-        console.log('Duplicate expense detected, skipping creation...');
-        await supabase
-          .from('email_insights')
-          .update({ 
-            expense_created: false,
-            suggested_actions: (analysis.suggestedActions || '') + ' (Duplicate expense detected - not created)'
-          })
-          .eq('id', insertedInsight.id);
-      } else {
-        console.log('Creating expense record with full details...');
-        
-        const { data: userData } = await supabase
-          .from('gmail_oauth_tokens')
-          .select('user_id')
+      // First check: If order_number exists, check if it's already logged
+      if (analysis.orderNumber) {
+        const { data: existingExpense } = await supabase
+          .from('expenses')
+          .select('id, order_number')
+          .eq('property_id', property.id)
+          .eq('order_number', analysis.orderNumber)
           .maybeSingle();
 
-        const { error: expenseError } = await supabase
-          .from('expenses')
-          .insert({
-            property_id: property.id,
-            amount: analysis.expenseAmount,
-            date: analysis.orderDate || new Date(emailDate).toISOString().split('T')[0],
-            purpose: analysis.expenseDescription || `Email expense: ${subject}`,
-            category: analysis.category || 'order',
-            order_number: analysis.orderNumber || null,
-            order_date: analysis.orderDate || null,
-            tracking_number: analysis.trackingNumber || null,
-            vendor: analysis.vendor || null,
-            items_detail: analysis.expenseDescription || null,
-            delivery_address: analysis.deliveryAddress || null,
-            user_id: userData?.user_id || null,
-          });
-
-        if (expenseError) {
-          console.error('Failed to create expense:', expenseError);
-        } else {
+        if (existingExpense) {
+          console.log('Duplicate order number found, skipping expense creation:', analysis.orderNumber);
           await supabase
             .from('email_insights')
-            .update({ expense_created: true })
+            .update({ 
+              expense_created: false,
+              suggested_actions: (analysis.suggestedActions || '') + ` (Duplicate order ${analysis.orderNumber} - already logged)`
+            })
             .eq('id', insertedInsight.id);
           
-          console.log('Expense record created successfully with order details');
+          return new Response(
+            JSON.stringify({ shouldSave: true, analysis, duplicate: true }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
         }
+      }
+      
+      console.log('Creating expense record with full details...');
+      
+      const { data: userData } = await supabase
+        .from('gmail_oauth_tokens')
+        .select('user_id')
+        .maybeSingle();
+
+      const { error: expenseError } = await supabase
+        .from('expenses')
+        .insert({
+          property_id: property.id,
+          amount: analysis.expenseAmount,
+          date: analysis.orderDate || new Date(emailDate).toISOString().split('T')[0],
+          purpose: analysis.expenseDescription || `Email expense: ${subject}`,
+          category: analysis.category || 'order',
+          order_number: analysis.orderNumber || null,
+          order_date: analysis.orderDate || null,
+          tracking_number: analysis.trackingNumber || null,
+          vendor: analysis.vendor || null,
+          items_detail: analysis.expenseDescription || null,
+          delivery_address: analysis.deliveryAddress || null,
+          user_id: userData?.user_id || null,
+        });
+
+      if (expenseError) {
+        console.error('Failed to create expense:', expenseError);
+      } else {
+        await supabase
+          .from('email_insights')
+          .update({ expense_created: true })
+          .eq('id', insertedInsight.id);
+        
+        console.log('Expense record created successfully with order details');
       }
     }
 
