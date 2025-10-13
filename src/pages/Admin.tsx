@@ -24,6 +24,7 @@ interface Profile {
   email: string;
   status: "pending" | "approved" | "rejected";
   is_admin: boolean;
+  has_user_role: boolean;
   created_at: string;
 }
 
@@ -72,17 +73,18 @@ const Admin = () => {
 
       if (profilesError) throw profilesError;
 
-      // Get admin roles for all users
+      // Get all roles for all users
       const { data: rolesData } = await supabase
         .from("user_roles")
-        .select("user_id, role")
-        .eq("role", "admin");
+        .select("user_id, role");
 
       // Merge the data
-      const adminUserIds = new Set(rolesData?.map(r => r.user_id) || []);
+      const adminUserIds = new Set(rolesData?.filter(r => r.role === 'admin').map(r => r.user_id) || []);
+      const userRoleIds = new Set(rolesData?.filter(r => r.role === 'user').map(r => r.user_id) || []);
       const profilesWithRoles = profilesData?.map(profile => ({
         ...profile,
-        is_admin: adminUserIds.has(profile.id)
+        is_admin: adminUserIds.has(profile.id),
+        has_user_role: userRoleIds.has(profile.id)
       })) || [];
 
       setProfiles(profilesWithRoles);
@@ -225,6 +227,36 @@ const Admin = () => {
         console.error("Error updating admin status:", error);
       }
       toast.error("Failed to update admin status");
+    }
+  };
+
+  const toggleUserRole = async (userId: string, currentStatus: boolean) => {
+    try {
+      if (currentStatus) {
+        // Remove user role
+        const { error } = await supabase
+          .from("user_roles")
+          .delete()
+          .eq("user_id", userId)
+          .eq("role", "user");
+
+        if (error) throw error;
+      } else {
+        // Add user role
+        const { error } = await supabase
+          .from("user_roles")
+          .insert({ user_id: userId, role: "user" });
+
+        if (error) throw error;
+      }
+
+      await loadProfiles();
+      toast.success(`User role ${!currentStatus ? "granted" : "revoked"}`);
+    } catch (error: any) {
+      if (import.meta.env.DEV) {
+        console.error("Error updating user role:", error);
+      }
+      toast.error("Failed to update user role");
     }
   };
 
@@ -413,7 +445,7 @@ const Admin = () => {
                   className="p-4 border border-border/50 rounded-lg flex items-center justify-between gap-4"
                 >
                   <div className="flex-1">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <p className="font-medium">{profile.email}</p>
                       {profile.is_admin && (
                         <Badge variant="secondary" className="gap-1">
@@ -421,18 +453,30 @@ const Admin = () => {
                           Admin
                         </Badge>
                       )}
+                      {profile.has_user_role && (
+                        <Badge variant="outline" className="gap-1">
+                          User Access
+                        </Badge>
+                      )}
                     </div>
                     <p className="text-sm text-muted-foreground">
                       Joined: {new Date(profile.created_at).toLocaleDateString()}
                     </p>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 flex-wrap">
                     <Button
                       size="sm"
                       variant="outline"
                       onClick={() => toggleAdminStatus(profile.id, profile.is_admin)}
                     >
                       {profile.is_admin ? "Remove Admin" : "Make Admin"}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={profile.has_user_role ? "secondary" : "default"}
+                      onClick={() => toggleUserRole(profile.id, profile.has_user_role)}
+                    >
+                      {profile.has_user_role ? "Remove User Role" : "Grant User Role"}
                     </Button>
                     <Button
                       size="sm"

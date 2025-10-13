@@ -15,22 +15,22 @@ const Layout = ({ children }: LayoutProps) => {
   const location = useLocation();
   const { user, loading, pendingApproval } = useAuth() as any;
   const [isAdmin, setIsAdmin] = useState(false);
+  const [hasUserRole, setHasUserRole] = useState(false);
 
   useEffect(() => {
-    const checkAdminStatus = async () => {
+    const checkRoles = async () => {
       if (!user) return;
       
       const { data: roles } = await supabase
         .from("user_roles")
         .select("role")
-        .eq("user_id", user.id)
-        .eq("role", "admin")
-        .maybeSingle();
+        .eq("user_id", user.id);
       
-      setIsAdmin(!!roles);
+      setIsAdmin(roles?.some(r => r.role === 'admin') || false);
+      setHasUserRole(roles?.some(r => r.role === 'user') || false);
     };
 
-    checkAdminStatus();
+    checkRoles();
   }, [user]);
 
   const handleLogout = async () => {
@@ -82,13 +82,16 @@ const Layout = ({ children }: LayoutProps) => {
     );
   }
 
+  // Build nav items based on roles
   const navItems = [
-    { path: "/", label: "Dashboard", icon: Home },
-    { path: "/properties", label: "Properties", icon: Building2 },
-    { path: "/visits", label: "Log Visit", icon: Calendar },
-    { path: "/expenses", label: "Expenses", icon: DollarSign },
-    { path: "/bookings", label: "Bookings", icon: CalendarDays },
-    { path: "/mid-term-bookings", label: "Mid-term Bookings", icon: FileText },
+    ...(isAdmin || hasUserRole ? [
+      { path: "/", label: "Dashboard", icon: Home },
+      { path: "/properties", label: "Properties", icon: Building2 },
+      { path: "/visits", label: "Log Visit", icon: Calendar },
+      { path: "/expenses", label: "Expenses", icon: DollarSign },
+      { path: "/bookings", label: "Bookings", icon: CalendarDays },
+      { path: "/mid-term-bookings", label: "Mid-term Bookings", icon: FileText },
+    ] : []),
     ...(isAdmin ? [
       { path: "/owners", label: "Owners", icon: Users },
       { path: "/charges", label: "Charges", icon: Receipt },
