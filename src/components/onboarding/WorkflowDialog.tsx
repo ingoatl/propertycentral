@@ -127,15 +127,23 @@ export const WorkflowDialog = ({ open, onOpenChange, project, onUpdate }: Workfl
   };
 
   const updateProjectProgress = async () => {
-    const totalTasks = tasks.length;
-    const completedTasks = tasks.filter(t => t.status === "completed").length;
+    // Fetch fresh task data to calculate accurate progress
+    const { data: freshTasks } = await supabase
+      .from("onboarding_tasks")
+      .select("status")
+      .eq("project_id", project.id);
+
+    if (!freshTasks) return;
+
+    const totalTasks = freshTasks.length;
+    const completedTasks = freshTasks.filter(t => t.status === "completed").length;
     const progress = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0;
 
     const { error } = await supabase
       .from("onboarding_projects")
       .update({
         progress,
-        status: progress === 100 ? "completed" : "in-progress",
+        status: progress === 100 ? "completed" : progress > 0 ? "in-progress" : "pending",
         updated_at: new Date().toISOString(),
       })
       .eq("id", project.id);

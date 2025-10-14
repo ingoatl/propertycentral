@@ -71,6 +71,7 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
 
       // Update local status immediately for visual feedback
       setTaskStatus(newStatus);
+      onUpdate(); // Trigger progress update
     } catch (error) {
       console.error("Failed to auto-save task:", error);
     }
@@ -135,6 +136,7 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
       setShowNAField(false);
       setTaskStatus("completed");
       toast.success("Marked as not applicable");
+      onUpdate(); // Trigger progress update
     } catch (error) {
       console.error("Failed to mark as N/A:", error);
       toast.error("Failed to save");
