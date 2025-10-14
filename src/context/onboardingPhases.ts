@@ -133,14 +133,8 @@ export const ONBOARDING_PHASES: PhaseDefinition[] = [
       { title: "Sedgwick Temporary Housing", field_type: "text", description: "Enter Placeholder" },
       { title: "Homelink", field_type: "text", description: "https://homelinkhelps.com/" },
       
-      // Corporate Housing Providers
+      // Corporate Housing Providers - Only operational platforms
       { title: "💼 Corporate Housing Providers", field_type: "section_header" },
-      { title: "Blueground", field_type: "text", description: "Enter Listing URL" },
-      { title: "Landing", field_type: "text", description: "Enter Listing URL" },
-      { title: "2nd Address", field_type: "text", description: "Enter Listing URL" },
-      { title: "Aleph Living", field_type: "text", description: "Enter Listing URL" },
-      { title: "Zeus Living", field_type: "text", description: "Enter Placeholder" },
-      { title: "Travel Nurse Housing", field_type: "text", description: "Enter Placeholder" },
       
       // Direct Booking
       { title: "Direct booking website setup", field_type: "checkbox" },
