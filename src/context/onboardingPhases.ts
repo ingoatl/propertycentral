@@ -127,8 +127,6 @@ export const ONBOARDING_PHASES: PhaseDefinition[] = [
       { title: "ALE Solutions", field_type: "text", description: "Enter Placeholder" },
       { title: "Alacrity", field_type: "text", description: "Enter Placeholder" },
       { title: "CRS Temporary Housing", field_type: "text", description: "Enter Placeholder" },
-      { title: "Assured Relocation", field_type: "text", description: "Enter Placeholder" },
-      { title: "THD (Temporary Housing Directory)", field_type: "text", description: "Enter Placeholder" },
       { title: "Housing Headquarters", field_type: "text", description: "Enter Placeholder" },
       { title: "Sedgwick Temporary Housing", field_type: "text", description: "Enter Placeholder" },
       { title: "Homelink", field_type: "text", description: "https://homelinkhelps.com/" },
