@@ -165,29 +165,42 @@ serve(async (req) => {
 
     const systemPrompt = `You are an AI Property Assistant for a property management system. You help users find information about their properties, bookings, expenses, email insights, visits, and onboarding details.
 
-Key capabilities:
-- Search for properties and get their details
-- Access onboarding information (WiFi codes, access codes, vendor contacts, etc.)
-- View and analyze expenses
-- Check email insights and action items
-- View bookings and visits
-- Answer frequently asked questions
-
 CRITICAL SECURITY RULES:
 - NEVER share credit card numbers, bank account numbers, routing numbers, or any payment card information
 - NEVER display full credit card details or sensitive financial data
 - If you encounter such data, respond that you cannot share sensitive financial information for security reasons
 
-IMPORTANT WORKFLOW INSTRUCTIONS:
-- When asked about property-specific information (WiFi, codes, addresses, etc.), ALWAYS:
-  1. First use search_properties to find the property by name or address
-  2. Once you have the property_id, use get_property_onboarding to get the details
-  3. Then extract and share the specific information requested
-- Be smart about property names - "villa 15" should match "Villa Ct SE - Unit 15"
-- Always chain tool calls together - don't stop after just searching
-- When you find a property, proactively get its onboarding details if the user is asking about property-specific info
+TOOL USAGE WORKFLOW - FOLLOW THIS EXACTLY:
 
-Always be helpful, concise, and proactive. Format your responses in a clear, organized way.`;
+When a user asks about property information (WiFi, codes, cleaners, vendors, etc.):
+1. ALWAYS use search_properties FIRST to find the property
+2. Extract the property_id from the search results
+3. IMMEDIATELY use get_property_onboarding with that property_id to get all details
+4. Answer the user's question using the onboarding data
+
+Example workflow for "who is the cleaner of villa 15":
+Step 1: Call search_properties with query="villa 15"
+Step 2: Get property_id from results (e.g., "abc-123")
+Step 3: Call get_property_onboarding with property_id="abc-123"
+Step 4: Search the tasks for cleaner information and respond
+
+YOU MUST CALL BOTH TOOLS - searching alone is not enough!
+
+Property name matching tips:
+- "villa 15" matches "Villa Ct SE - Unit 15"
+- "unit 7" matches "7th Avenue - Unit 7"
+- Be flexible with partial names and addresses
+
+Available tools and when to use them:
+- search_properties: Find properties by name/address (ALWAYS USE FIRST)
+- get_property_onboarding: Get WiFi, codes, vendor info (USE AFTER SEARCH)
+- get_property_expenses: View expenses and costs
+- get_email_insights: Check emails and action items
+- get_bookings: View reservations
+- get_visits: See scheduled visits
+- get_faqs: Answer common questions
+
+Always be helpful, concise, and proactive. Format responses clearly.`;
 
     let pendingToolCalls: any[] = [];
     let assistantMessage = "";
@@ -402,6 +415,11 @@ Always be helpful, concise, and proactive. Format your responses in a clear, org
                 }
 
                 console.log("Making follow-up request with tool results");
+                console.log("Tool results summary:", toolResults.map(r => ({ 
+                  id: r.tool_call_id, 
+                  length: r.content.length 
+                })));
+                
                 const followUpResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
                   method: "POST",
                   headers: {
@@ -413,7 +431,11 @@ Always be helpful, concise, and proactive. Format your responses in a clear, org
                     messages: [
                       { role: "system", content: systemPrompt },
                       ...messages,
-                      { role: "assistant", content: assistantMessage || null, tool_calls: pendingToolCalls },
+                      { 
+                        role: "assistant", 
+                        content: assistantMessage || "", 
+                        tool_calls: pendingToolCalls 
+                      },
                       ...toolResults
                     ],
                     stream: true,
@@ -423,14 +445,39 @@ Always be helpful, concise, and proactive. Format your responses in a clear, org
                 if (!followUpResponse.ok) {
                   const errorText = await followUpResponse.text();
                   console.error("Follow-up AI gateway error:", followUpResponse.status, errorText);
-                  controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "content", content: "I found the information but encountered an error processing it. Please try again." })}\n\n`));
+                  
+                  // Fallback: provide raw tool results
+                  const fallbackMessage = `I found information but had trouble formatting it. Here's what I found:\n\n${
+                    toolResults.map((r, i) => {
+                      const data = JSON.parse(r.content);
+                      return `Tool ${i + 1} results: ${Array.isArray(data) ? `${data.length} items` : 'data returned'}`;
+                    }).join('\n')
+                  }`;
+                  
+                  controller.enqueue(encoder.encode(`data: ${JSON.stringify({ 
+                    type: "content", 
+                    content: fallbackMessage 
+                  })}\n\n`));
                 } else {
+                  console.log("Follow-up response OK, starting stream...");
                   const followUpReader = followUpResponse.body?.getReader();
-                  if (followUpReader) {
+                  
+                  if (!followUpReader) {
+                    console.error("No follow-up reader available");
+                    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ 
+                      type: "content", 
+                      content: "I encountered an issue reading the response. Please try again." 
+                    })}\n\n`));
+                  } else {
                     let followUpBuffer = "";
+                    let contentReceived = false;
+                    
                     while (true) {
                       const { done, value } = await followUpReader.read();
-                      if (done) break;
+                      if (done) {
+                        console.log("Follow-up stream complete. Content received:", contentReceived);
+                        break;
+                      }
 
                       followUpBuffer += decoder.decode(value, { stream: true });
                       const followUpLines = followUpBuffer.split("\n");
@@ -441,19 +488,35 @@ Always be helpful, concise, and proactive. Format your responses in a clear, org
                         if (!followUpLine.startsWith("data: ")) continue;
 
                         const followUpData = followUpLine.slice(6);
-                        if (followUpData === "[DONE]") continue;
+                        if (followUpData === "[DONE]") {
+                          console.log("Received [DONE] marker");
+                          continue;
+                        }
 
                         try {
                           const followUpParsed = JSON.parse(followUpData);
                           const followUpContent = followUpParsed.choices?.[0]?.delta?.content;
+                          
                           if (followUpContent) {
-                            console.log("Streaming follow-up content:", followUpContent.substring(0, 50));
-                            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "content", content: followUpContent })}\n\n`));
+                            contentReceived = true;
+                            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ 
+                              type: "content", 
+                              content: followUpContent 
+                            })}\n\n`));
                           }
                         } catch (e) {
-                          console.error("Error parsing follow-up stream:", e, "Data:", followUpData);
+                          console.error("Error parsing follow-up stream:", e, "Data:", followUpData.substring(0, 100));
                         }
                       }
+                    }
+                    
+                    // If no content was received at all, send a fallback
+                    if (!contentReceived) {
+                      console.error("No content received from follow-up stream");
+                      controller.enqueue(encoder.encode(`data: ${JSON.stringify({ 
+                        type: "content", 
+                        content: "I found the information but couldn't format the response. Please try asking again." 
+                      })}\n\n`));
                     }
                   }
                 }
