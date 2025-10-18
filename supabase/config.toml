@@ -35,3 +35,6 @@ verify_jwt = true
 
 [functions.schedule-daily-scan]
 verify_jwt = false
+
+[functions.ai-property-chat]
+verify_jwt = false

@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useAuth } from "./ProtectedRoute";
+import { FloatingChatButton } from "@/components/ai-assistant/FloatingChatButton";
 
 interface LayoutProps {
   children: ReactNode;
@@ -154,6 +155,7 @@ const Layout = ({ children }: LayoutProps) => {
       </nav>
 
       <main className="container mx-auto px-4 py-8">{children}</main>
+      <FloatingChatButton />
     </div>
   );
 };
