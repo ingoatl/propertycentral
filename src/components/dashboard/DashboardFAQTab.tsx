@@ -1,11 +1,15 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { FAQ } from "@/types/onboarding";
 import { toast } from "sonner";
-import { Search, MessageCircleQuestion, Building2 } from "lucide-react";
+import { Search, MessageCircleQuestion, Building2, Plus } from "lucide-react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
@@ -27,6 +31,13 @@ export function DashboardFAQTab() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All Categories");
   const [selectedProperty, setSelectedProperty] = useState("all");
+  const [showAddDialog, setShowAddDialog] = useState(false);
+  const [newFAQ, setNewFAQ] = useState({
+    question: "",
+    answer: "",
+    category: "",
+    property_id: "",
+  });
 
   useEffect(() => {
     loadData();
@@ -58,6 +69,41 @@ export function DashboardFAQTab() {
       toast.error('Failed to load FAQs');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleAddFAQ = async () => {
+    try {
+      if (!newFAQ.question.trim() || !newFAQ.answer.trim() || !newFAQ.property_id) {
+        toast.error("Please fill in all required fields");
+        return;
+      }
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast.error("You must be logged in to add FAQs");
+        return;
+      }
+
+      const { error } = await supabase
+        .from('frequently_asked_questions')
+        .insert({
+          question: newFAQ.question.trim(),
+          answer: newFAQ.answer.trim(),
+          category: newFAQ.category || 'Other',
+          property_id: newFAQ.property_id,
+          answered_by: user.id,
+        });
+
+      if (error) throw error;
+
+      toast.success("FAQ added successfully!");
+      setShowAddDialog(false);
+      setNewFAQ({ question: "", answer: "", category: "", property_id: "" });
+      loadData();
+    } catch (error: any) {
+      console.error('Error adding FAQ:', error);
+      toast.error("Failed to add FAQ");
     }
   };
 
@@ -112,11 +158,17 @@ export function DashboardFAQTab() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h2 className="text-3xl font-bold tracking-tight">Property FAQs</h2>
-        <p className="text-muted-foreground">
-          Frequently asked questions across all properties
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-3xl font-bold tracking-tight">Property FAQs</h2>
+          <p className="text-muted-foreground">
+            Frequently asked questions across all properties
+          </p>
+        </div>
+        <Button onClick={() => setShowAddDialog(true)}>
+          <Plus className="h-4 w-4 mr-2" />
+          Add FAQ
+        </Button>
       </div>
 
       {/* Filters */}
@@ -234,6 +286,88 @@ export function DashboardFAQTab() {
           </CardContent>
         </Card>
       )}
+
+      {/* Add FAQ Dialog */}
+      <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Add New FAQ</DialogTitle>
+            <DialogDescription>
+              Add a frequently asked question for a property
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="property">Property *</Label>
+              <Select
+                value={newFAQ.property_id}
+                onValueChange={(value) => setNewFAQ({ ...newFAQ, property_id: value })}
+              >
+                <SelectTrigger id="property">
+                  <SelectValue placeholder="Select a property" />
+                </SelectTrigger>
+                <SelectContent>
+                  {properties.map(property => (
+                    <SelectItem key={property.id} value={property.id}>
+                      {property.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="category">Category</Label>
+              <Select
+                value={newFAQ.category}
+                onValueChange={(value) => setNewFAQ({ ...newFAQ, category: value })}
+              >
+                <SelectTrigger id="category">
+                  <SelectValue placeholder="Select a category" />
+                </SelectTrigger>
+                <SelectContent>
+                  {FAQ_CATEGORIES.filter(cat => cat !== 'All Categories').map(cat => (
+                    <SelectItem key={cat} value={cat}>
+                      {cat}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="question">Question *</Label>
+              <Input
+                id="question"
+                placeholder="What is the WiFi password?"
+                value={newFAQ.question}
+                onChange={(e) => setNewFAQ({ ...newFAQ, question: e.target.value })}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="answer">Answer *</Label>
+              <Textarea
+                id="answer"
+                placeholder="The WiFi network is 'PropertyName-Guest' and the password is..."
+                rows={6}
+                value={newFAQ.answer}
+                onChange={(e) => setNewFAQ({ ...newFAQ, answer: e.target.value })}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAddDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleAddFAQ}>
+              Add FAQ
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
