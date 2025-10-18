@@ -476,18 +476,23 @@ const Properties = () => {
                   <Tabs 
                     defaultValue="insights" 
                     className="w-full"
-                    onValueChange={(value) => {
-                      if (value === "details" && propertyProjects[property.id]) {
-                        setSelectedPropertyForDetails({
-                          id: property.id,
-                          name: property.name,
-                          projectId: propertyProjects[property.id]
-                        });
-                      }
-                    }}
                   >
                     <TabsList className="grid w-full grid-cols-3">
-                      <TabsTrigger value="details">Details</TabsTrigger>
+                      <TabsTrigger 
+                        value="details"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          if (propertyProjects[property.id]) {
+                            setSelectedPropertyForDetails({
+                              id: property.id,
+                              name: property.name,
+                              projectId: propertyProjects[property.id]
+                            });
+                          }
+                        }}
+                      >
+                        Details
+                      </TabsTrigger>
                       <TabsTrigger value="insights">
                         <Mail className="w-4 h-4 mr-1" />
                         Insights
