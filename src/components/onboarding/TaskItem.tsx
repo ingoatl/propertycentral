@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { OnboardingTask } from "@/types/onboarding";
+import { useState, useEffect } from "react";
+import { OnboardingTask, OnboardingSOP } from "@/types/onboarding";
 import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -9,13 +9,15 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
-import { CalendarIcon, Upload, FileText, CheckCircle2, Edit2, Copy, Check, Loader2, Settings, MessageSquare, Trash2 } from "lucide-react";
+import { CalendarIcon, Upload, FileText, CheckCircle2, Edit2, Copy, Check, Loader2, Settings, MessageSquare, Trash2, BookOpen } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { PinVerificationDialog } from "./PinVerificationDialog";
 import { InlineComments } from "./InlineComments";
+import { SOPDialog } from "./SOPDialog";
+import { SOPFormDialog } from "./SOPFormDialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -41,9 +43,46 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
   const [copied, setCopied] = useState(false);
   const [showPinDialog, setShowPinDialog] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [sop, setSOP] = useState<OnboardingSOP | null>(null);
+  const [showSOPDialog, setShowSOPDialog] = useState(false);
+  const [showSOPFormDialog, setShowSOPFormDialog] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   const hasValue = task.field_value && task.field_value.trim() !== "";
   const isReadOnly = hasValue;
+
+  useEffect(() => {
+    checkAdminRole();
+    loadSOP();
+  }, [task.id]);
+
+  const checkAdminRole = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { data: roles } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", user.id);
+
+    setIsAdmin(roles?.some(r => r.role === "admin") || false);
+  };
+
+  const loadSOP = async () => {
+    const { data } = await supabase
+      .from("onboarding_sops")
+      .select("*")
+      .eq("project_id", task.project_id)
+      .eq("task_id", task.id)
+      .is("phase_number", null)
+      .maybeSingle();
+
+    setSOP(data);
+  };
+
+  const handleSOPSuccess = () => {
+    loadSOP();
+  };
 
   const handleCopy = async () => {
     if (fieldValue) {
@@ -934,7 +973,36 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
         taskStatus === "completed" && "bg-green-50/50 border-green-200"
       )}>
         <CardContent className="py-2 px-3">
-          {renderField()}
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex-1">
+              {renderField()}
+            </div>
+            {/* SOP Buttons */}
+            <div className="flex items-center gap-1 flex-shrink-0">
+              {isAdmin && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowSOPFormDialog(true)}
+                  className="h-7 px-2"
+                >
+                  <FileText className="w-3 h-3 mr-1" />
+                  {sop ? "Edit" : "Add"} SOP
+                </Button>
+              )}
+              {sop && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowSOPDialog(true)}
+                  className="h-7 px-2"
+                >
+                  <BookOpen className="w-3 h-3 mr-1" />
+                  View SOP
+                </Button>
+              )}
+            </div>
+          </div>
         </CardContent>
       </Card>
 
@@ -942,6 +1010,21 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
         open={showPinDialog}
         onOpenChange={setShowPinDialog}
         onVerified={handlePinVerified}
+      />
+
+      <SOPDialog
+        sop={sop}
+        open={showSOPDialog}
+        onOpenChange={setShowSOPDialog}
+      />
+
+      <SOPFormDialog
+        projectId={task.project_id}
+        taskId={task.id}
+        existingSOP={sop}
+        open={showSOPFormDialog}
+        onOpenChange={setShowSOPFormDialog}
+        onSuccess={handleSOPSuccess}
       />
     </>
   );

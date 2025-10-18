@@ -1,14 +1,17 @@
-import { useState } from "react";
-import { PhaseDefinition, OnboardingTask } from "@/types/onboarding";
+import { useState, useEffect } from "react";
+import { PhaseDefinition, OnboardingTask, OnboardingSOP } from "@/types/onboarding";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ChevronDown, Lock, CheckCircle2, Plus } from "lucide-react";
+import { ChevronDown, Lock, CheckCircle2, Plus, FileText, BookOpen } from "lucide-react";
 import { TaskItem } from "./TaskItem";
 import { AddTaskDialog } from "./AddTaskDialog";
+import { SOPDialog } from "./SOPDialog";
+import { SOPFormDialog } from "./SOPFormDialog";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
 
 interface PhaseCardProps {
   phase: PhaseDefinition;
@@ -35,6 +38,43 @@ export const PhaseCard = ({
 }: PhaseCardProps) => {
   const isComplete = completion === 100;
   const [showAddTaskDialog, setShowAddTaskDialog] = useState(false);
+  const [sop, setSOP] = useState<OnboardingSOP | null>(null);
+  const [showSOPDialog, setShowSOPDialog] = useState(false);
+  const [showSOPFormDialog, setShowSOPFormDialog] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    checkAdminRole();
+    loadSOP();
+  }, [phase.id, projectId]);
+
+  const checkAdminRole = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { data: roles } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", user.id);
+
+    setIsAdmin(roles?.some(r => r.role === "admin") || false);
+  };
+
+  const loadSOP = async () => {
+    const { data } = await supabase
+      .from("onboarding_sops")
+      .select("*")
+      .eq("project_id", projectId)
+      .eq("phase_number", phase.id)
+      .is("task_id", null)
+      .maybeSingle();
+
+    setSOP(data);
+  };
+
+  const handleSOPSuccess = () => {
+    loadSOP();
+  };
 
   return (
     <Card className={cn(
@@ -53,6 +93,30 @@ export const PhaseCard = ({
                   </Badge>
                   {isComplete && <CheckCircle2 className="w-5 h-5 text-green-600" />}
                   <CardTitle className="text-lg">{phase.title}</CardTitle>
+                  
+                  {/* SOP Buttons */}
+                  <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                    {isAdmin && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setShowSOPFormDialog(true)}
+                      >
+                        <FileText className="w-4 h-4 mr-1" />
+                        {sop ? "Edit SOP" : "Add SOP"}
+                      </Button>
+                    )}
+                    {sop && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowSOPDialog(true)}
+                      >
+                        <BookOpen className="w-4 h-4 mr-1" />
+                        View SOP
+                      </Button>
+                    )}
+                  </div>
                 </div>
                 <CardDescription className="mt-2">{phase.description}</CardDescription>
               </div>
@@ -113,6 +177,21 @@ export const PhaseCard = ({
         phaseNumber={phase.id}
         phaseTitle={phase.title}
         onSuccess={onTaskUpdate}
+      />
+
+      <SOPDialog
+        sop={sop}
+        open={showSOPDialog}
+        onOpenChange={setShowSOPDialog}
+      />
+
+      <SOPFormDialog
+        projectId={projectId}
+        phaseNumber={phase.id}
+        existingSOP={sop}
+        open={showSOPFormDialog}
+        onOpenChange={setShowSOPFormDialog}
+        onSuccess={handleSOPSuccess}
       />
     </Card>
   );

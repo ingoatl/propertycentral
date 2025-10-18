@@ -55,3 +55,16 @@ export interface TaskDefinition {
   field_type: FieldType;
   options?: string[];
 }
+
+export interface OnboardingSOP {
+  id: string;
+  project_id: string;
+  phase_number?: number;
+  task_id?: string;
+  title: string;
+  description?: string;
+  loom_video_url?: string;
+  created_by?: string;
+  created_at: string;
+  updated_at: string;
+}

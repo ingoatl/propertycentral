@@ -411,6 +411,60 @@ export type Database = {
           },
         ]
       }
+      onboarding_sops: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          loom_video_url: string | null
+          phase_number: number | null
+          project_id: string
+          task_id: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          loom_video_url?: string | null
+          phase_number?: number | null
+          project_id: string
+          task_id?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          loom_video_url?: string | null
+          phase_number?: number | null
+          project_id?: string
+          task_id?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "onboarding_sops_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_sops_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       onboarding_tasks: {
         Row: {
           assigned_to: string | null
