@@ -49,7 +49,7 @@ const handler = async (req: Request): Promise<Response> => {
       `;
 
     const emailResponse = await resend.emails.send({
-      from: "PeachHaus Group <onboarding@resend.dev>",
+      from: "PeachHaus Group <noreply@peachhausgroup.com>",
       to: [email],
       bcc: ["ingo@peachhausgroup.com"],
       subject: "Welcome to PeachHaus Property Management System",
