@@ -489,39 +489,20 @@ const Properties = () => {
                       className="flex-1"
                     >
                       <FileText className="w-4 h-4 mr-2" />
-                      View Details
+                      View Property Details
                     </Button>
                   </div>
 
                   <Tabs 
-                    defaultValue="insights" 
+                    defaultValue="onboarding" 
                     className="w-full"
                   >
-                    <TabsList className="grid w-full grid-cols-2">
-                      <TabsTrigger value="insights">
-                        <Mail className="w-4 h-4 mr-1" />
-                        Insights
-                      </TabsTrigger>
+                    <TabsList className="grid w-full grid-cols-1">
                       <TabsTrigger value="onboarding">
                         <ClipboardList className="w-4 h-4 mr-1" />
                         Onboarding
                       </TabsTrigger>
                     </TabsList>
-
-                    <TabsContent value="insights" className="mt-4">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setSelectedPropertyForInsights(property);
-                          setEmailInsightsDialogOpen(true);
-                        }}
-                        className="w-full"
-                      >
-                        <Mail className="w-4 h-4 mr-2" />
-                        View Email Insights
-                      </Button>
-                    </TabsContent>
 
                     <TabsContent value="onboarding" className="mt-4">
                       <OnboardingTab

@@ -4,8 +4,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Badge } from "@/components/ui/badge";
 import { OnboardingTask } from "@/types/onboarding";
-import { Loader2, MapPin, User, Lock, Phone, Link as LinkIcon, Mail, Home, Search, DollarSign } from "lucide-react";
+import { Loader2, MapPin, User, Lock, Phone, Link as LinkIcon, Mail, Home, Search, DollarSign, AlertCircle, Clock, Heart, Frown, Meh, Zap, Lightbulb } from "lucide-react";
 import { toast } from "sonner";
 
 interface PropertyDetailsModalProps {
@@ -25,6 +26,7 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [propertyInfo, setPropertyInfo] = useState<any>(null);
+  const [emailInsights, setEmailInsights] = useState<any[]>([]);
 
   useEffect(() => {
     if (open) {
@@ -58,12 +60,67 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
         } else {
           setPropertyInfo(propertyData);
         }
+
+        // Load email insights for this property
+        const { data: insightsData, error: insightsError } = await supabase
+          .from('email_insights')
+          .select('*')
+          .eq('property_id', propertyId)
+          .order('email_date', { ascending: false })
+          .limit(10);
+
+        if (insightsError) {
+          console.error('Error loading insights:', insightsError);
+        } else {
+          setEmailInsights(insightsData || []);
+        }
       }
     } catch (error: any) {
       console.error('Error loading property details:', error);
       toast.error('Failed to load property information');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const getCategoryIcon = (category: string) => {
+    switch (category) {
+      case 'maintenance': return '🔧';
+      case 'payment': return '💳';
+      case 'booking': return '📅';
+      case 'tenant_communication': return '💬';
+      case 'legal': return '⚖️';
+      case 'insurance': return '🛡️';
+      case 'utilities': return '⚡';
+      case 'expense': return '💰';
+      case 'order': return '📦';
+      default: return '📧';
+    }
+  };
+
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case 'urgent': return 'bg-red-100 text-red-800 border-red-300';
+      case 'high': return 'bg-orange-100 text-orange-800 border-orange-300';
+      case 'normal': return 'bg-blue-100 text-blue-800 border-blue-300';
+      default: return 'bg-gray-100 text-gray-800 border-gray-300';
+    }
+  };
+
+  const getSentimentIcon = (sentiment: string | null) => {
+    if (!sentiment) return null;
+    switch (sentiment.toLowerCase()) {
+      case 'positive':
+        return <Heart className="w-4 h-4 text-green-600" />;
+      case 'negative':
+      case 'concerning':
+        return <Frown className="w-4 h-4 text-red-600" />;
+      case 'urgent':
+        return <Zap className="w-4 h-4 text-orange-600" />;
+      case 'neutral':
+        return <Meh className="w-4 h-4 text-gray-600" />;
+      default:
+        return null;
     }
   };
 
@@ -202,9 +259,98 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
             <div className="flex items-center justify-center py-8">
               <Loader2 className="h-6 w-6 animate-spin text-primary" />
             </div>
-          ) : (
-            <ScrollArea className="h-[400px] pr-4">
+           ) : (
+            <ScrollArea className="h-[500px] pr-4">
               <div className="space-y-4">
+                {/* Email Insights Section */}
+                {emailInsights.length > 0 && (
+                  <Card className="border-2 border-primary/20">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                        <Mail className="h-4 w-4" />
+                        Email Insights ({emailInsights.length})
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      {emailInsights.map((insight) => (
+                        <div key={insight.id} className="border rounded-lg p-3 space-y-2 bg-muted/30">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-base">{getCategoryIcon(insight.category)}</span>
+                            <Badge variant="outline" className="capitalize text-xs">
+                              {insight.category.replace('_', ' ')}
+                            </Badge>
+                            <Badge variant="outline" className={`text-xs ${getPriorityColor(insight.priority)}`}>
+                              {insight.priority}
+                            </Badge>
+                            {insight.action_required && insight.status === 'new' && (
+                              <Badge variant="destructive" className="gap-1 text-xs">
+                                <AlertCircle className="w-3 h-3" />
+                                Action Required
+                              </Badge>
+                            )}
+                          </div>
+                          
+                          <p className="font-medium text-sm line-clamp-1">{insight.subject}</p>
+                          <p className="text-xs text-muted-foreground line-clamp-2">{insight.summary}</p>
+                          
+                          {insight.sentiment && (
+                            <div className="flex items-center gap-2">
+                              {getSentimentIcon(insight.sentiment)}
+                              <Badge variant="outline" className="capitalize text-xs">
+                                {insight.sentiment}
+                              </Badge>
+                            </div>
+                          )}
+
+                          {insight.suggested_actions && (
+                            <div className="bg-blue-50 dark:bg-blue-950/30 p-2 rounded border border-blue-200 dark:border-blue-800">
+                              <div className="flex items-start gap-2">
+                                <Lightbulb className="w-3 h-3 text-blue-600 mt-0.5 flex-shrink-0" />
+                                <div className="space-y-1">
+                                  <p className="text-xs font-medium text-blue-900 dark:text-blue-100">Suggested Actions:</p>
+                                  <ul className="text-xs text-blue-800 dark:text-blue-200 space-y-0.5">
+                                    {insight.suggested_actions.split(',').map((action: string, idx: number) => (
+                                      <li key={idx}>• {action.trim()}</li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
+                          {insight.expense_detected && (
+                            <div className="bg-green-50 dark:bg-green-950/30 p-2 rounded border border-green-200 dark:border-green-800">
+                              <div className="flex items-start gap-2">
+                                <DollarSign className="w-3 h-3 text-green-600 mt-0.5 flex-shrink-0" />
+                                <div className="flex-1">
+                                  <p className="text-xs font-medium text-green-900 dark:text-green-100">
+                                    Expense: ${insight.expense_amount?.toFixed(2)}
+                                  </p>
+                                  {insight.expense_description && (
+                                    <p className="text-xs text-green-800 dark:text-green-200">{insight.expense_description}</p>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                          
+                          <div className="flex items-center gap-3 text-xs text-muted-foreground pt-1">
+                            <span className="flex items-center gap-1">
+                              <Mail className="w-3 h-3" />
+                              {insight.sender_email}
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <Clock className="w-3 h-3" />
+                              {new Date(insight.email_date).toLocaleDateString()}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Property Details Sections */}
                 {Object.keys(filteredData).length > 0 ? (
                   <div className="grid gap-4">
                     {Object.entries(filteredData).map(([category, items]) => (
