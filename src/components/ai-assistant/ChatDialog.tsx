@@ -48,12 +48,6 @@ export const ChatDialog = ({ open, onOpenChange }: ChatDialogProps) => {
     setIsLoading(true);
 
     try {
-      const { data, error } = await supabase.functions.invoke("ai-property-chat", {
-        body: { messages: newMessages.map(m => ({ role: m.role, content: m.content })) }
-      });
-
-      if (error) throw error;
-
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-property-chat`,
         {
@@ -66,7 +60,11 @@ export const ChatDialog = ({ open, onOpenChange }: ChatDialogProps) => {
         }
       );
 
-      if (!response.ok) throw new Error("Failed to get response");
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("API error:", response.status, errorText);
+        throw new Error(`Failed to get response: ${response.status}`);
+      }
 
       const reader = response.body?.getReader();
       if (!reader) throw new Error("No response body");
@@ -75,6 +73,7 @@ export const ChatDialog = ({ open, onOpenChange }: ChatDialogProps) => {
       let assistantMessage = "";
       let buffer = "";
 
+      // Add empty assistant message that we'll update
       setMessages([...newMessages, { role: "assistant", content: "" }]);
 
       while (true) {
@@ -99,11 +98,12 @@ export const ChatDialog = ({ open, onOpenChange }: ChatDialogProps) => {
               setMessages([...newMessages, { role: "assistant", content: assistantMessage }]);
             }
           } catch (e) {
-            console.error("Error parsing stream:", e);
+            console.error("Error parsing stream:", e, "Data:", data);
           }
         }
       }
 
+      // Process any remaining buffer
       if (buffer.trim()) {
         const lines = buffer.split("\n");
         for (const line of lines) {
@@ -122,10 +122,21 @@ export const ChatDialog = ({ open, onOpenChange }: ChatDialogProps) => {
           }
         }
       }
+
+      // If no content was received, show error
+      if (!assistantMessage) {
+        setMessages([...newMessages, { 
+          role: "assistant", 
+          content: "I apologize, but I encountered an issue processing your request. Please try again." 
+        }]);
+      }
     } catch (error) {
       console.error("Error:", error);
       toast.error("Failed to get response. Please try again.");
-      setMessages(newMessages);
+      setMessages([...newMessages, { 
+        role: "assistant", 
+        content: "Sorry, I encountered an error. Please try again." 
+      }]);
     } finally {
       setIsLoading(false);
     }
