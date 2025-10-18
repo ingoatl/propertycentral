@@ -80,6 +80,10 @@ export const OnboardingProjectCard = ({ project, onUpdate }: OnboardingProjectCa
         open={showWorkflow}
         onOpenChange={setShowWorkflow}
         project={project}
+        propertyId={project.property_id || ''}
+        propertyName={project.owner_name}
+        propertyAddress={project.property_address}
+        visitPrice={0}
         onUpdate={handleUpdate}
       />
     </>

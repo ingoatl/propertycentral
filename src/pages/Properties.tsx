@@ -33,7 +33,7 @@ const Properties = () => {
   const [emailInsightsDialogOpen, setEmailInsightsDialogOpen] = useState(false);
   const [selectedPropertyForInsights, setSelectedPropertyForInsights] = useState<Property | null>(null);
   const [selectedPropertyForDetails, setSelectedPropertyForDetails] = useState<{ id: string; name: string; projectId: string | null } | null>(null);
-  const [selectedPropertyForWorkflow, setSelectedPropertyForWorkflow] = useState<{ id: string; name: string; address: string; projectId: string } | null>(null);
+  const [selectedPropertyForWorkflow, setSelectedPropertyForWorkflow] = useState<{ id: string; name: string; address: string; projectId: string | null; visitPrice: number } | null>(null);
   const [propertyProjects, setPropertyProjects] = useState<Record<string, string>>({});
   const [formData, setFormData] = useState({
     name: "",
@@ -501,14 +501,13 @@ const Properties = () => {
                       <TabsTrigger 
                         value="onboarding"
                         onClick={() => {
-                          if (propertyProjects[property.id]) {
-                            setSelectedPropertyForWorkflow({
-                              id: property.id,
-                              name: property.name,
-                              address: property.address,
-                              projectId: propertyProjects[property.id]
-                            });
-                          }
+                          setSelectedPropertyForWorkflow({
+                            id: property.id,
+                            name: property.name,
+                            address: property.address,
+                            projectId: propertyProjects[property.id] || null,
+                            visitPrice: property.visitPrice
+                          });
                         }}
                       >
                         <ClipboardList className="w-4 h-4 mr-1" />
@@ -523,13 +522,13 @@ const Properties = () => {
         )}
       </div>
 
-        {selectedPropertyForWorkflow && propertyProjects[selectedPropertyForWorkflow.id] && (
+        {selectedPropertyForWorkflow && (
           <WorkflowDialog
             open={!!selectedPropertyForWorkflow}
             onOpenChange={(open) => {
               if (!open) setSelectedPropertyForWorkflow(null);
             }}
-            project={{
+            project={selectedPropertyForWorkflow.projectId ? {
               id: selectedPropertyForWorkflow.projectId,
               property_id: selectedPropertyForWorkflow.id,
               owner_name: '',
@@ -538,7 +537,11 @@ const Properties = () => {
               progress: 0,
               created_at: '',
               updated_at: ''
-            }}
+            } : null}
+            propertyId={selectedPropertyForWorkflow.id}
+            propertyName={selectedPropertyForWorkflow.name}
+            propertyAddress={selectedPropertyForWorkflow.address}
+            visitPrice={selectedPropertyForWorkflow.visitPrice}
             onUpdate={loadPropertyProjects}
           />
         )}
