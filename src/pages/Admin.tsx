@@ -172,6 +172,43 @@ const Admin = () => {
     }
   };
 
+  const handleSendWelcomeEmail = async (email: string, password: string) => {
+    try {
+      console.log("Sending welcome email to:", email);
+
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error("Not authenticated");
+        return;
+      }
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-welcome-email`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            email,
+            tempPassword: password,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to send email");
+      }
+
+      toast.success(`Welcome email sent to ${email}`);
+    } catch (error: any) {
+      console.error("Error sending welcome email:", error);
+      toast.error(error.message || "Failed to send welcome email");
+    }
+  };
+
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -334,9 +371,20 @@ const Admin = () => {
                   Auto-approve user
                 </Label>
               </div>
-              <Button type="submit" disabled={creatingUser} className="w-full">
-                {creatingUser ? "Creating..." : "Create User"}
-              </Button>
+              <div className="flex gap-2">
+                <Button type="submit" disabled={creatingUser} className="flex-1">
+                  {creatingUser ? "Creating..." : "Create User"}
+                </Button>
+                {newUserEmail && newUserPassword && (
+                  <Button 
+                    type="button" 
+                    variant="outline"
+                    onClick={() => handleSendWelcomeEmail(newUserEmail, newUserPassword)}
+                  >
+                    Send Welcome Email
+                  </Button>
+                )}
+              </div>
             </form>
           </CardContent>
         </Card>
