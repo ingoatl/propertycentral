@@ -210,6 +210,58 @@ const Admin = () => {
     }
   };
 
+  const generateRandomPassword = () => {
+    const length = 12;
+    const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*";
+    let password = "";
+    for (let i = 0; i < length; i++) {
+      password += charset.charAt(Math.floor(Math.random() * charset.length));
+    }
+    return password;
+  };
+
+  const handleResetPasswordAndEmail = async (userId: string, email: string) => {
+    try {
+      const newPassword = generateRandomPassword();
+      console.log("Resetting password for:", email);
+
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error("Not authenticated");
+        return;
+      }
+
+      // Update password using admin API
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/auth/v1/admin/users/${userId}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${session.access_token}`,
+            "apikey": import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          },
+          body: JSON.stringify({
+            password: newPassword,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to reset password");
+      }
+
+      // Send email with new password
+      await handleSendWelcomeEmail(email, newPassword, false);
+      
+      toast.success(`Password reset and email sent to ${email}`);
+    } catch (error: any) {
+      console.error("Error resetting password:", error);
+      toast.error(error.message || "Failed to reset password");
+    }
+  };
+
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -529,9 +581,9 @@ const Admin = () => {
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => handleSendWelcomeEmail(profile.email, "", true)}
+                      onClick={() => handleResetPasswordAndEmail(profile.id, profile.email)}
                     >
-                      Send Welcome Email
+                      Reset Password & Email
                     </Button>
                     <Button
                       size="sm"
