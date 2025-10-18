@@ -231,25 +231,25 @@ const Admin = () => {
         return;
       }
 
-      // Update password using admin API
+      // Call edge function to reset password
       const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/auth/v1/admin/users/${userId}`,
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/reset-user-password`,
         {
-          method: "PUT",
+          method: "POST",
           headers: {
             "Content-Type": "application/json",
             "Authorization": `Bearer ${session.access_token}`,
-            "apikey": import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
           },
           body: JSON.stringify({
-            password: newPassword,
+            userId,
+            newPassword,
           }),
         }
       );
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.message || "Failed to reset password");
+        throw new Error(error.error || "Failed to reset password");
       }
 
       // Send email with new password
