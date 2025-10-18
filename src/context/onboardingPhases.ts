@@ -6,16 +6,14 @@ export const ONBOARDING_PHASES: PhaseDefinition[] = [
     title: "Owner Intake & Legal",
     description: "Capture all legal documentation, permits, and insurance requirements",
     tasks: [
-      { title: "Owner Onboarding Form Completed", field_type: "checkbox" },
       { title: "Owner Name", field_type: "text" },
       { title: "Owner Email", field_type: "text" },
       { title: "Owner Phone", field_type: "phone" },
       { title: "STR Permit Number", field_type: "text" },
       { title: "Upload STR License/Permit", field_type: "file" },
-      { title: "Upload Signed Management Agreement", field_type: "file" },
+      { title: "Signed Management Agreement Link", field_type: "text", description: "Google Drive link to signed agreement" },
       { title: "HOA Information", field_type: "textarea", description: "If applicable" },
-      { title: "Insurance Provider", field_type: "text" },
-      { title: "Insurance Policy Number", field_type: "text" },
+      { title: "Insurance Provider & Policy Number", field_type: "textarea", description: "Provider name and policy number" },
       { title: "Upload Insurance Policy", field_type: "file" },
       { title: "PeachHaus Listed as Additional Insured", field_type: "radio", options: ["Yes", "No"] },
     ]
@@ -42,14 +40,10 @@ export const ONBOARDING_PHASES: PhaseDefinition[] = [
     title: "Utilities & Services",
     description: "Document all utility accounts and service provider information",
     tasks: [
-      { title: "Water Provider", field_type: "text" },
-      { title: "Water Account Number", field_type: "text" },
-      { title: "Electric Provider", field_type: "text" },
-      { title: "Electric Account Number", field_type: "text" },
-      { title: "Gas Provider", field_type: "text" },
-      { title: "Gas Account Number", field_type: "text" },
-      { title: "Internet Provider", field_type: "text" },
-      { title: "Internet Account Number", field_type: "text" },
+      { title: "Water Details", field_type: "textarea", description: "Provider and account number" },
+      { title: "Electric Details", field_type: "textarea", description: "Provider and account number" },
+      { title: "Gas Details", field_type: "textarea", description: "Provider and account number" },
+      { title: "Internet Details", field_type: "textarea", description: "Provider and account number" },
       { title: "Trash Service Provider", field_type: "text" },
       { title: "HOA Contact Information", field_type: "textarea" },
     ]
@@ -82,7 +76,6 @@ export const ONBOARDING_PHASES: PhaseDefinition[] = [
       { title: "Truvi package selected", field_type: "text" },
       { title: "Breezeway setup completed", field_type: "checkbox" },
       { title: "Property entered in owner portal", field_type: "checkbox" },
-      { title: "Upload internet speed test results", field_type: "file" },
     ]
   },
   {
