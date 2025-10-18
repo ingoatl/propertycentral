@@ -172,7 +172,7 @@ const Admin = () => {
     }
   };
 
-  const handleSendWelcomeEmail = async (email: string, password: string) => {
+  const handleSendWelcomeEmail = async (email: string, password: string, isExistingUser: boolean = false) => {
     try {
       console.log("Sending welcome email to:", email);
 
@@ -193,6 +193,7 @@ const Admin = () => {
           body: JSON.stringify({
             email,
             tempPassword: password,
+            isExistingUser,
           }),
         }
       );
@@ -524,6 +525,13 @@ const Admin = () => {
                       onClick={() => toggleUserRole(profile.id, profile.has_user_role)}
                     >
                       {profile.has_user_role ? "Remove User Role" : "Grant User Role"}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleSendWelcomeEmail(profile.email, "", true)}
+                    >
+                      Send Welcome Email
                     </Button>
                     <Button
                       size="sm"
