@@ -474,7 +474,7 @@ const Properties = () => {
                 </CardHeader>
                 <CardContent>
                   <Tabs 
-                    defaultValue="details" 
+                    defaultValue="insights" 
                     className="w-full"
                     onValueChange={(value) => {
                       if (value === "details" && propertyProjects[property.id]) {
@@ -499,9 +499,7 @@ const Properties = () => {
                     </TabsList>
 
                     <TabsContent value="details" className="mt-4">
-                      <div className="text-center py-8 text-muted-foreground text-sm">
-                        Click the Details tab to view property information
-                      </div>
+                      {/* Empty - modal will open on tab click */}
                     </TabsContent>
 
                     <TabsContent value="insights" className="mt-4">
