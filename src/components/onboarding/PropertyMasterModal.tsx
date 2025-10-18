@@ -166,14 +166,14 @@ export function PropertyMasterModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl max-h-[85vh]">
-        <DialogHeader>
+      <DialogContent className="max-w-5xl h-[85vh] flex flex-col">
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle className="text-2xl">{propertyName}</DialogTitle>
           <p className="text-sm text-muted-foreground">{propertyAddress}</p>
         </DialogHeader>
 
         {/* Search Bar */}
-        <div className="relative">
+        <div className="relative flex-shrink-0">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search all property information..."
@@ -183,15 +183,15 @@ export function PropertyMasterModal({
           />
         </div>
 
-        <Separator />
+        <Separator className="flex-shrink-0" />
 
         {loading ? (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
           </div>
         ) : (
-          <ScrollArea className="h-[55vh] pr-4">
-            <div className="space-y-6">
+          <ScrollArea className="flex-1 min-h-0">
+            <div className="space-y-6 pr-4">
               {/* Categorized Information */}
               {Object.keys(filteredData).length > 0 && (
                 <div className="grid gap-6 md:grid-cols-2">
