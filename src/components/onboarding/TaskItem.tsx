@@ -1064,17 +1064,32 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
             <InlineComments taskId={task.id} />
             
             {task.field_value !== "N/A" && (
-              <Input
-                value={fieldValue}
-                onChange={(e) => handleInputChange(e.target.value)}
-                onBlur={handleInputBlur}
-                placeholder={task.description || "Enter value..."}
-                disabled={isReadOnly}
-                className={cn(
-                  "h-7 text-xs",
-                  isReadOnly && "border-green-200 bg-green-50/30 text-foreground font-medium"
+              <>
+                <Input
+                  value={fieldValue}
+                  onChange={(e) => handleInputChange(e.target.value)}
+                  onBlur={handleInputBlur}
+                  placeholder={task.description || "Enter value..."}
+                  disabled={isReadOnly}
+                  className={cn(
+                    "h-7 text-xs",
+                    isReadOnly && "border-green-200 bg-green-50/30 text-foreground font-medium"
+                  )}
+                />
+                
+                {/* Show clickable link if it's a URL */}
+                {fieldValue && (fieldValue.startsWith('http://') || fieldValue.startsWith('https://')) && (
+                  <a
+                    href={fieldValue}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1 text-[10px] text-primary hover:underline"
+                  >
+                    <FileText className="w-3 h-3" />
+                    Open link
+                  </a>
                 )}
-              />
+              </>
             )}
             
             {/* Screenshot preview if uploaded */}
