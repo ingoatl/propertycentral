@@ -12,7 +12,7 @@ import { toast } from "sonner";
 interface PropertyDetailsModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  projectId: string;
+  projectId: string | null;
   propertyName: string;
   propertyId?: string;
 }
@@ -38,15 +38,17 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
     try {
       setLoading(true);
       
-      const { data: tasksData, error: tasksError } = await supabase
-        .from('onboarding_tasks')
-        .select('*')
-        .eq('project_id', projectId)
-        .order('phase_number', { ascending: true });
+      // Only load tasks if projectId exists
+      if (projectId) {
+        const { data: tasksData, error: tasksError } = await supabase
+          .from('onboarding_tasks')
+          .select('*')
+          .eq('project_id', projectId)
+          .order('phase_number', { ascending: true });
 
-      if (tasksError) throw tasksError;
-      setTasks((tasksData || []) as OnboardingTask[]);
-
+        if (tasksError) throw tasksError;
+        setTasks((tasksData || []) as OnboardingTask[]);
+      }
       // Load property info if propertyId is available
       if (propertyId) {
         const { data: propertyData, error: propertyError } = await supabase
@@ -262,7 +264,112 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
            ) : (
             <ScrollArea className="h-[500px] pr-4">
               <div className="space-y-4">
-                {/* Email Insights Section */}
+                {/* Property Information - Always show at top */}
+                {propertyInfo && (
+                  <Card className="border-2 border-primary/20">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                        <Home className="h-4 w-4" />
+                        Property Information
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2">
+                      {propertyInfo.visit_price && (
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <DollarSign className="h-3.5 w-3.5 text-muted-foreground" />
+                            <p className="text-xs font-medium text-muted-foreground">Visit Price</p>
+                          </div>
+                          <p className="text-sm ml-5 font-semibold text-primary">${propertyInfo.visit_price}</p>
+                        </div>
+                      )}
+                      {propertyInfo.rental_type && (
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <Home className="h-3.5 w-3.5 text-muted-foreground" />
+                            <p className="text-xs font-medium text-muted-foreground">Rental Type</p>
+                          </div>
+                          <p className="text-sm ml-5 capitalize">{propertyInfo.rental_type.replace('_', ' ')}</p>
+                        </div>
+                      )}
+                      {propertyInfo.address && (
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
+                            <p className="text-xs font-medium text-muted-foreground">Address</p>
+                          </div>
+                          <p className="text-sm ml-5">{propertyInfo.address}</p>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Onboarding Details Sections */}
+                {Object.keys(filteredData).length > 0 ? (
+                  <div className="grid gap-4">
+                    {Object.entries(filteredData).map(([category, items]) => (
+                      <Card key={category}>
+                        <CardHeader className="pb-3">
+                          <CardTitle className="text-sm font-semibold">{category}</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-2">
+                          {items.map((item, idx) => {
+                            const Icon = item.icon;
+                            const labelMatch = searchQuery && item.label.toLowerCase().includes(searchQuery.toLowerCase());
+                            const valueMatch = searchQuery && item.value.toLowerCase().includes(searchQuery.toLowerCase());
+                            
+                            return (
+                              <div key={idx} className="space-y-1">
+                                <div className="flex items-center gap-2">
+                                  {Icon && <Icon className="h-3.5 w-3.5 text-muted-foreground" />}
+                                  <p className="text-xs font-medium text-muted-foreground">
+                                    {labelMatch ? (
+                                      <span className="bg-yellow-200 dark:bg-yellow-900">{item.label}</span>
+                                    ) : (
+                                      item.label
+                                    )}
+                                  </p>
+                                </div>
+                                <div className="text-sm ml-5 break-words">
+                                  {isUrl(item.value) ? (
+                                    <a 
+                                      href={item.value.startsWith('http') ? item.value : `https://${item.value}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-primary hover:underline inline-flex items-center gap-1"
+                                    >
+                                      {valueMatch ? (
+                                        <span className="bg-yellow-200 dark:bg-yellow-900">{item.value}</span>
+                                      ) : (
+                                        item.value
+                                      )}
+                                      <LinkIcon className="h-3 w-3" />
+                                    </a>
+                                  ) : valueMatch ? (
+                                    <span className="bg-yellow-200 dark:bg-yellow-900">{item.value}</span>
+                                  ) : (
+                                    item.value
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                ) : searchQuery ? (
+                  <div className="text-center py-8 text-muted-foreground text-sm">
+                    No results found for "{searchQuery}"
+                  </div>
+                ) : !propertyInfo && (
+                  <div className="text-center py-8 text-muted-foreground text-sm">
+                    No property information completed yet. Complete onboarding tasks to see details here.
+                  </div>
+                )}
+
+                {/* Email Insights Section - At Bottom */}
                 {emailInsights.length > 0 && (
                   <Card className="border-2 border-primary/20">
                     <CardHeader className="pb-3">
@@ -348,70 +455,6 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
                       ))}
                     </CardContent>
                   </Card>
-                )}
-
-                {/* Property Details Sections */}
-                {Object.keys(filteredData).length > 0 ? (
-                  <div className="grid gap-4">
-                    {Object.entries(filteredData).map(([category, items]) => (
-                      <Card key={category}>
-                        <CardHeader className="pb-3">
-                          <CardTitle className="text-sm font-semibold">{category}</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-2">
-                          {items.map((item, idx) => {
-                            const Icon = item.icon;
-                            const labelMatch = searchQuery && item.label.toLowerCase().includes(searchQuery.toLowerCase());
-                            const valueMatch = searchQuery && item.value.toLowerCase().includes(searchQuery.toLowerCase());
-                            
-                            return (
-                              <div key={idx} className="space-y-1">
-                                <div className="flex items-center gap-2">
-                                  {Icon && <Icon className="h-3.5 w-3.5 text-muted-foreground" />}
-                                  <p className="text-xs font-medium text-muted-foreground">
-                                    {labelMatch ? (
-                                      <span className="bg-yellow-200 dark:bg-yellow-900">{item.label}</span>
-                                    ) : (
-                                      item.label
-                                    )}
-                                  </p>
-                                </div>
-                                 <div className="text-sm ml-5 break-words">
-                                  {isUrl(item.value) ? (
-                                    <a 
-                                      href={item.value.startsWith('http') ? item.value : `https://${item.value}`}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="text-primary hover:underline inline-flex items-center gap-1"
-                                    >
-                                      {valueMatch ? (
-                                        <span className="bg-yellow-200 dark:bg-yellow-900">{item.value}</span>
-                                      ) : (
-                                        item.value
-                                      )}
-                                      <LinkIcon className="h-3 w-3" />
-                                    </a>
-                                  ) : valueMatch ? (
-                                    <span className="bg-yellow-200 dark:bg-yellow-900">{item.value}</span>
-                                  ) : (
-                                    item.value
-                                  )}
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </CardContent>
-                      </Card>
-                    ))}
-                  </div>
-                ) : searchQuery ? (
-                  <div className="text-center py-8 text-muted-foreground text-sm">
-                    No results found for "{searchQuery}"
-                  </div>
-                ) : (
-                  <div className="text-center py-8 text-muted-foreground text-sm">
-                    No property information completed yet. Complete onboarding tasks to see details here.
-                  </div>
                 )}
               </div>
             </ScrollArea>

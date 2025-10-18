@@ -478,13 +478,11 @@ const Properties = () => {
                       variant="outline"
                       size="sm"
                       onClick={() => {
-                        if (propertyProjects[property.id]) {
-                          setSelectedPropertyForDetails({
-                            id: property.id,
-                            name: property.name,
-                            projectId: propertyProjects[property.id]
-                          });
-                        }
+                        setSelectedPropertyForDetails({
+                          id: property.id,
+                          name: property.name,
+                          projectId: propertyProjects[property.id] || null
+                        });
                       }}
                       className="flex-1"
                     >
