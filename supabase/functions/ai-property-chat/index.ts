@@ -401,6 +401,7 @@ Always be helpful, concise, and proactive. Format your responses in a clear, org
                   });
                 }
 
+                console.log("Making follow-up request with tool results");
                 const followUpResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
                   method: "POST",
                   headers: {
@@ -419,32 +420,39 @@ Always be helpful, concise, and proactive. Format your responses in a clear, org
                   }),
                 });
 
-                const followUpReader = followUpResponse.body?.getReader();
-                if (followUpReader) {
-                  let followUpBuffer = "";
-                  while (true) {
-                    const { done, value } = await followUpReader.read();
-                    if (done) break;
+                if (!followUpResponse.ok) {
+                  const errorText = await followUpResponse.text();
+                  console.error("Follow-up AI gateway error:", followUpResponse.status, errorText);
+                  controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "content", content: "I found the information but encountered an error processing it. Please try again." })}\n\n`));
+                } else {
+                  const followUpReader = followUpResponse.body?.getReader();
+                  if (followUpReader) {
+                    let followUpBuffer = "";
+                    while (true) {
+                      const { done, value } = await followUpReader.read();
+                      if (done) break;
 
-                    followUpBuffer += decoder.decode(value, { stream: true });
-                    const followUpLines = followUpBuffer.split("\n");
-                    followUpBuffer = followUpLines.pop() || "";
+                      followUpBuffer += decoder.decode(value, { stream: true });
+                      const followUpLines = followUpBuffer.split("\n");
+                      followUpBuffer = followUpLines.pop() || "";
 
-                    for (const followUpLine of followUpLines) {
-                      if (!followUpLine.trim() || followUpLine.startsWith(":")) continue;
-                      if (!followUpLine.startsWith("data: ")) continue;
+                      for (const followUpLine of followUpLines) {
+                        if (!followUpLine.trim() || followUpLine.startsWith(":")) continue;
+                        if (!followUpLine.startsWith("data: ")) continue;
 
-                      const followUpData = followUpLine.slice(6);
-                      if (followUpData === "[DONE]") continue;
+                        const followUpData = followUpLine.slice(6);
+                        if (followUpData === "[DONE]") continue;
 
-                      try {
-                        const followUpParsed = JSON.parse(followUpData);
-                        const followUpContent = followUpParsed.choices?.[0]?.delta?.content;
-                        if (followUpContent) {
-                          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "content", content: followUpContent })}\n\n`));
+                        try {
+                          const followUpParsed = JSON.parse(followUpData);
+                          const followUpContent = followUpParsed.choices?.[0]?.delta?.content;
+                          if (followUpContent) {
+                            console.log("Streaming follow-up content:", followUpContent.substring(0, 50));
+                            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ type: "content", content: followUpContent })}\n\n`));
+                          }
+                        } catch (e) {
+                          console.error("Error parsing follow-up stream:", e, "Data:", followUpData);
                         }
-                      } catch (e) {
-                        console.error("Error parsing follow-up stream:", e);
                       }
                     }
                   }
