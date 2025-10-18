@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Plus, Trash2, MapPin, Building2, Edit, Mail, ClipboardList } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { OnboardingTab } from "@/components/onboarding/OnboardingTab";
-import { PropertyDetailsView } from "@/components/onboarding/PropertyDetailsView";
+import { PropertyDetailsModal } from "@/components/onboarding/PropertyDetailsModal";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -31,6 +31,7 @@ const Properties = () => {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [emailInsightsDialogOpen, setEmailInsightsDialogOpen] = useState(false);
   const [selectedPropertyForInsights, setSelectedPropertyForInsights] = useState<Property | null>(null);
+  const [selectedPropertyForDetails, setSelectedPropertyForDetails] = useState<{ id: string; name: string; projectId: string } | null>(null);
   const [propertyProjects, setPropertyProjects] = useState<Record<string, string>>({});
   const [formData, setFormData] = useState({
     name: "",
@@ -472,7 +473,19 @@ const Properties = () => {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <Tabs defaultValue="details" className="w-full">
+                  <Tabs 
+                    defaultValue="details" 
+                    className="w-full"
+                    onValueChange={(value) => {
+                      if (value === "details" && propertyProjects[property.id]) {
+                        setSelectedPropertyForDetails({
+                          id: property.id,
+                          name: property.name,
+                          projectId: propertyProjects[property.id]
+                        });
+                      }
+                    }}
+                  >
                     <TabsList className="grid w-full grid-cols-3">
                       <TabsTrigger value="details">Details</TabsTrigger>
                       <TabsTrigger value="insights">
@@ -486,16 +499,9 @@ const Properties = () => {
                     </TabsList>
 
                     <TabsContent value="details" className="mt-4">
-                      {propertyProjects[property.id] ? (
-                        <PropertyDetailsView
-                          projectId={propertyProjects[property.id]}
-                          propertyId={property.id}
-                        />
-                      ) : (
-                        <div className="text-center py-8 text-muted-foreground text-sm">
-                          No onboarding project found. Create one in the Onboarding tab.
-                        </div>
-                      )}
+                      <div className="text-center py-8 text-muted-foreground text-sm">
+                        Click the Details tab to view property information
+                      </div>
                     </TabsContent>
 
                     <TabsContent value="insights" className="mt-4">
@@ -527,6 +533,15 @@ const Properties = () => {
           ))
         )}
       </div>
+
+      {selectedPropertyForDetails && (
+        <PropertyDetailsModal
+          open={!!selectedPropertyForDetails}
+          onOpenChange={(open) => !open && setSelectedPropertyForDetails(null)}
+          projectId={selectedPropertyForDetails.projectId}
+          propertyName={selectedPropertyForDetails.name}
+        />
+      )}
     </div>
   );
 };
