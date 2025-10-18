@@ -278,12 +278,29 @@ Always be helpful, concise, and proactive. Format your responses in a clear, org
                   try {
                     switch (functionName) {
                       case "search_properties": {
-                        const { data } = await supabase
-                          .from("properties")
-                          .select("*")
-                          .or(`name.ilike.%${args.query}%,address.ilike.%${args.query}%`)
-                          .limit(10);
-                        result = data || [];
+                        // Smart search: split query into words and search flexibly
+                        const searchWords = args.query.toLowerCase().trim().split(/\s+/);
+                        
+                        // Build a flexible search that matches all words anywhere in name or address
+                        let query = supabase.from("properties").select("*");
+                        
+                        // For each word, ensure it appears somewhere in name OR address
+                        searchWords.forEach((word: string) => {
+                          query = query.or(`name.ilike.%${word}%,address.ilike.%${word}%`);
+                        });
+                        
+                        const { data } = await query.limit(20);
+                        
+                        // Further filter results to ensure ALL search words are present
+                        const filteredData = (data || []).filter(property => {
+                          const nameAndAddress = `${property.name} ${property.address}`.toLowerCase();
+                          return searchWords.every((word: string) => nameAndAddress.includes(word));
+                        });
+                        
+                        console.log(`Search for "${args.query}" found ${filteredData.length} properties:`, 
+                          filteredData.map(p => p.name));
+                        
+                        result = filteredData;
                         break;
                       }
                       case "get_property_onboarding": {
