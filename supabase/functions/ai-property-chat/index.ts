@@ -170,37 +170,35 @@ CRITICAL SECURITY RULES:
 - NEVER display full credit card details or sensitive financial data
 - If you encounter such data, respond that you cannot share sensitive financial information for security reasons
 
-TOOL USAGE WORKFLOW - FOLLOW THIS EXACTLY:
+CRITICAL TOOL USAGE RULES - YOU MUST FOLLOW THESE:
 
-When a user asks about property information (WiFi, codes, cleaners, vendors, etc.):
-1. ALWAYS use search_properties FIRST to find the property
-2. Extract the property_id from the search results
-3. IMMEDIATELY use get_property_onboarding with that property_id to get all details
-4. Answer the user's question using the onboarding data
+When a user asks about property details (WiFi password, access codes, cleaner info, vendor contacts, inspections, etc.):
+1. Call search_properties to find the property
+2. The search result will tell you to call get_property_onboarding
+3. You MUST immediately call get_property_onboarding with the property_id
+4. Only after getting onboarding data, answer the user's question
 
-Example workflow for "who is the cleaner of villa 15":
-Step 1: Call search_properties with query="villa 15"
-Step 2: Get property_id from results (e.g., "abc-123")
-Step 3: Call get_property_onboarding with property_id="abc-123"
-Step 4: Search the tasks for cleaner information and respond
+IMPORTANT: Just searching is NOT enough! You MUST call get_property_onboarding to get the actual details.
 
-YOU MUST CALL BOTH TOOLS - searching alone is not enough!
+Example for "who is the cleaner of villa 15":
+✅ CORRECT: search_properties → get_property_onboarding → extract cleaner from tasks → answer
+❌ WRONG: search_properties → try to answer (you don't have the data yet!)
 
-Property name matching tips:
-- "villa 15" matches "Villa Ct SE - Unit 15"
-- "unit 7" matches "7th Avenue - Unit 7"
-- Be flexible with partial names and addresses
+Property name matching:
+- "villa 15" = "Villa Ct SE - Unit 15"
+- "unit 7" = "7th Avenue - Unit 7"
+- Be flexible with partial names
 
-Available tools and when to use them:
-- search_properties: Find properties by name/address (ALWAYS USE FIRST)
-- get_property_onboarding: Get WiFi, codes, vendor info (USE AFTER SEARCH)
-- get_property_expenses: View expenses and costs
-- get_email_insights: Check emails and action items
+Tool guide:
+- search_properties: Find properties (ALWAYS FIRST STEP)
+- get_property_onboarding: Get details after search (REQUIRED FOR PROPERTY INFO)
+- get_property_expenses: View expenses
+- get_email_insights: Check emails
 - get_bookings: View reservations
-- get_visits: See scheduled visits
-- get_faqs: Answer common questions
+- get_visits: See visits
+- get_faqs: Answer FAQs
 
-Always be helpful, concise, and proactive. Format responses clearly.`;
+Be helpful and concise.`;
 
     let pendingToolCalls: any[] = [];
     let assistantMessage = "";
@@ -313,7 +311,55 @@ Always be helpful, concise, and proactive. Format responses clearly.`;
                         console.log(`Search for "${args.query}" found ${filteredData.length} properties:`, 
                           filteredData.map(p => p.name));
                         
-                        result = filteredData;
+                        // Auto-fetch onboarding data if only one property found
+                        // This helps with questions like "who is the cleaner for villa 15"
+                        if (filteredData.length === 1) {
+                          const propertyId = filteredData[0].id;
+                          console.log(`Auto-fetching onboarding data for single property: ${propertyId}`);
+                          
+                          const { data: project } = await supabase
+                            .from("onboarding_projects")
+                            .select("id")
+                            .eq("property_id", propertyId)
+                            .single();
+                          
+                          if (project) {
+                            const { data: tasks } = await supabase
+                              .from("onboarding_tasks")
+                              .select("*")
+                              .eq("project_id", project.id)
+                              .order("phase_number");
+                            
+                            // Filter sensitive data
+                            const safeTasks = (tasks || []).map(task => ({
+                              ...task,
+                              field_value: task.field_value && 
+                                (task.field_value.match(/\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4}/) || 
+                                 task.title?.toLowerCase().includes('credit card') ||
+                                 task.title?.toLowerCase().includes('bank account'))
+                                ? '[REDACTED - Sensitive Financial Data]'
+                                : task.field_value
+                            }));
+                            
+                            result = {
+                              properties: filteredData,
+                              onboarding_data: safeTasks,
+                              message: "Found 1 property and automatically retrieved onboarding details."
+                            };
+                          } else {
+                            result = {
+                              properties: filteredData,
+                              message: "Found 1 property but no onboarding data available."
+                            };
+                          }
+                        } else {
+                          result = {
+                            properties: filteredData,
+                            message: filteredData.length > 0 
+                              ? `Found ${filteredData.length} properties. Use get_property_onboarding with a property_id to get details.`
+                              : "No properties found."
+                          };
+                        }
                         break;
                       }
                       case "get_property_onboarding": {
