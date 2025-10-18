@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Plus, Trash2, MapPin, Building2, Edit, Mail, ClipboardList } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { OnboardingTab } from "@/components/onboarding/OnboardingTab";
+import { PropertyMasterModal } from "@/components/onboarding/PropertyMasterModal";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -30,6 +31,8 @@ const Properties = () => {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [emailInsightsDialogOpen, setEmailInsightsDialogOpen] = useState(false);
   const [selectedPropertyForInsights, setSelectedPropertyForInsights] = useState<Property | null>(null);
+  const [propertyMasterModalOpen, setPropertyMasterModalOpen] = useState(false);
+  const [selectedPropertyForMaster, setSelectedPropertyForMaster] = useState<{ property: Property; projectId: string } | null>(null);
   const [formData, setFormData] = useState({
     name: "",
     address: "",
@@ -201,6 +204,31 @@ const Properties = () => {
       toast.error(error.message || "Failed to update property");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDetailsClick = async (property: Property) => {
+    try {
+      // Get the latest onboarding project for this property
+      const { data, error } = await supabase
+        .from("onboarding_projects")
+        .select("id")
+        .eq("property_id", property.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (error) throw error;
+
+      if (data) {
+        setSelectedPropertyForMaster({ property, projectId: data.id });
+        setPropertyMasterModalOpen(true);
+      } else {
+        toast.info("No onboarding project found for this property");
+      }
+    } catch (error: any) {
+      console.error("Error loading project:", error);
+      toast.error("Failed to load property details");
     }
   };
 
@@ -461,10 +489,13 @@ const Properties = () => {
                     </TabsList>
 
                     <TabsContent value="details" className="mt-4">
-                      <div className="flex items-baseline gap-2 bg-gradient-subtle p-4 rounded-lg">
-                        <span className="text-sm text-muted-foreground">Visit Price:</span>
-                        <span className="text-2xl font-bold text-primary">${property.visitPrice.toFixed(2)}</span>
-                      </div>
+                      <Button
+                        variant="outline"
+                        onClick={() => handleDetailsClick(property)}
+                        className="w-full"
+                      >
+                        View Property Details
+                      </Button>
                     </TabsContent>
 
                     <TabsContent value="insights" className="mt-4">
@@ -496,6 +527,18 @@ const Properties = () => {
           ))
         )}
       </div>
+
+      {/* Property Master Modal */}
+      {selectedPropertyForMaster && (
+        <PropertyMasterModal
+          open={propertyMasterModalOpen}
+          onOpenChange={setPropertyMasterModalOpen}
+          projectId={selectedPropertyForMaster.projectId}
+          propertyId={selectedPropertyForMaster.property.id}
+          propertyName={selectedPropertyForMaster.property.name}
+          propertyAddress={selectedPropertyForMaster.property.address}
+        />
+      )}
     </div>
   );
 };

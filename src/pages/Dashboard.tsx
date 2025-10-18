@@ -2,12 +2,14 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Download, Building2, Calendar, DollarSign, MapPin, Activity } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Download, Building2, Calendar, DollarSign, MapPin, Activity, MessageCircleQuestion, BarChart3 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { PropertySummary, Visit, Expense, OwnerRezBooking } from "@/types";
 import { toast } from "sonner";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { EmailInsightsCard } from "@/components/EmailInsightsCard";
+import { DashboardFAQTab } from "@/components/dashboard/DashboardFAQTab";
 
 const Dashboard = () => {
   const [summaries, setSummaries] = useState<PropertySummary[]>([]);
@@ -497,11 +499,25 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* Email Insights Card */}
-      <EmailInsightsCard showHeader={true} />
+      {/* Main Tabs */}
+      <Tabs defaultValue="overview" className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="overview" className="gap-2">
+            <BarChart3 className="h-4 w-4" />
+            Overview
+          </TabsTrigger>
+          <TabsTrigger value="faqs" className="gap-2">
+            <MessageCircleQuestion className="h-4 w-4" />
+            FAQs
+          </TabsTrigger>
+        </TabsList>
 
-      {/* Stats Grid */}
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+        <TabsContent value="overview" className="space-y-8 mt-6">
+          {/* Email Insights Card */}
+          <EmailInsightsCard showHeader={true} />
+
+          {/* Stats Grid */}
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
         <Card className="shadow-card hover:shadow-warm transition-all duration-300 border-border/50 hover:scale-105">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Total Properties</CardTitle>
@@ -900,6 +916,12 @@ const Dashboard = () => {
           </div>
         </DialogContent>
       </Dialog>
+        </TabsContent>
+
+        <TabsContent value="faqs" className="mt-6">
+          <DashboardFAQTab />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };
