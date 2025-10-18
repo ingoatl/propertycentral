@@ -69,12 +69,37 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
           .select('*')
           .eq('property_id', propertyId)
           .order('email_date', { ascending: false })
-          .limit(10);
+          .limit(50);
 
         if (insightsError) {
           console.error('Error loading insights:', insightsError);
         } else {
-          setEmailInsights(insightsData || []);
+          // Filter out Amazon and booking platform emails
+          const filteredInsights = (insightsData || []).filter(insight => {
+            const senderEmail = insight.sender_email?.toLowerCase() || '';
+            const category = insight.category?.toLowerCase() || '';
+            
+            // Exclude Amazon emails
+            if (senderEmail.includes('amazon.com') || 
+                senderEmail.includes('amazon.') ||
+                senderEmail.includes('amzn.')) {
+              return false;
+            }
+            
+            // Exclude booking platform emails
+            if (senderEmail.includes('booking.com') ||
+                senderEmail.includes('airbnb.com') ||
+                senderEmail.includes('vrbo.com') ||
+                senderEmail.includes('expedia.com') ||
+                category === 'booking') {
+              return false;
+            }
+            
+            // Include all other emails (transactional, organizational, vendor emails)
+            return true;
+          }).slice(0, 10); // Limit to 10 after filtering
+          
+          setEmailInsights(filteredInsights);
         }
       }
     } catch (error: any) {
