@@ -2,13 +2,11 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { OnboardingProject } from "@/types/onboarding";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Clipboard, FileText, CheckSquare } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Plus, Clipboard } from "lucide-react";
 import { toast } from "sonner";
 import { OnboardingProjectCard } from "./OnboardingProjectCard";
 import { CreateProjectDialog } from "./CreateProjectDialog";
-import { PropertyMasterPage } from "./PropertyMasterPage";
 
 interface OnboardingTabProps {
   propertyId: string;
@@ -56,8 +54,8 @@ export const OnboardingTab = ({ propertyId, propertyName, propertyAddress }: Onb
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold">Onboarding</h2>
-          <p className="text-sm text-muted-foreground">Manage property onboarding and information</p>
+          <h2 className="text-2xl font-bold">Onboarding Workflow</h2>
+          <p className="text-sm text-muted-foreground">9-phase STR property onboarding system</p>
         </div>
         <Button onClick={() => setShowCreateDialog(true)} size="sm" className="gap-2">
           <Plus className="w-4 h-4" />
@@ -83,39 +81,15 @@ export const OnboardingTab = ({ propertyId, propertyName, propertyAddress }: Onb
           </CardContent>
         </Card>
       ) : (
-        <Tabs defaultValue="master" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="master" className="gap-2">
-              <FileText className="h-4 w-4" />
-              Property Master Page
-            </TabsTrigger>
-            <TabsTrigger value="workflow" className="gap-2">
-              <CheckSquare className="h-4 w-4" />
-              Onboarding Workflow
-            </TabsTrigger>
-          </TabsList>
-          
-          <TabsContent value="master" className="mt-6">
-            <PropertyMasterPage
-              projectId={latestProject.id}
-              propertyId={propertyId}
-              propertyName={propertyName}
-              propertyAddress={propertyAddress}
+        <div className="grid gap-4">
+          {projects.map((project) => (
+            <OnboardingProjectCard
+              key={project.id}
+              project={project}
+              onUpdate={loadProjects}
             />
-          </TabsContent>
-          
-          <TabsContent value="workflow" className="mt-6">
-            <div className="grid gap-4">
-              {projects.map((project) => (
-                <OnboardingProjectCard
-                  key={project.id}
-                  project={project}
-                  onUpdate={loadProjects}
-                />
-              ))}
-            </div>
-          </TabsContent>
-        </Tabs>
+          ))}
+        </div>
       )}
 
       <CreateProjectDialog

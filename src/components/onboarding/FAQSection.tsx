@@ -43,6 +43,30 @@ export function FAQSection({ propertyId, projectId, faqs, onUpdate }: FAQSection
   const [deletingFAQ, setDeletingFAQ] = useState<FAQ | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    checkAdminRole();
+  }, []);
+
+  const checkAdminRole = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setIsAdmin(false);
+        return;
+      }
+
+      const { data, error } = await supabase
+        .rpc('has_role', { _user_id: user.id, _role: 'admin' });
+
+      if (error) throw error;
+      setIsAdmin(data === true);
+    } catch (error) {
+      console.error('Error checking admin role:', error);
+      setIsAdmin(false);
+    }
+  };
 
   const filteredFAQs = faqs.filter(faq => {
     const matchesSearch = searchQuery === "" || 
@@ -97,10 +121,12 @@ export function FAQSection({ propertyId, projectId, faqs, onUpdate }: FAQSection
               Common questions and answers about this property
             </CardDescription>
           </div>
-          <Button onClick={() => setShowAddDialog(true)} size="sm">
-            <Plus className="h-4 w-4 mr-2" />
-            Add FAQ
-          </Button>
+          {isAdmin && (
+            <Button onClick={() => setShowAddDialog(true)} size="sm">
+              <Plus className="h-4 w-4 mr-2" />
+              Add FAQ
+            </Button>
+          )}
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -157,27 +183,29 @@ export function FAQSection({ propertyId, projectId, faqs, onUpdate }: FAQSection
                         <p className="text-sm text-muted-foreground whitespace-pre-wrap">
                           {faq.answer}
                         </p>
-                        <div className="flex items-center gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              setEditingFAQ(faq);
-                              setShowAddDialog(true);
-                            }}
-                          >
-                            <Edit className="h-3 w-3 mr-1" />
-                            Edit
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setDeletingFAQ(faq)}
-                          >
-                            <Trash2 className="h-3 w-3 mr-1" />
-                            Delete
-                          </Button>
-                        </div>
+                        {isAdmin && (
+                          <div className="flex items-center gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setEditingFAQ(faq);
+                                setShowAddDialog(true);
+                              }}
+                            >
+                              <Edit className="h-3 w-3 mr-1" />
+                              Edit
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setDeletingFAQ(faq)}
+                            >
+                              <Trash2 className="h-3 w-3 mr-1" />
+                              Delete
+                            </Button>
+                          </div>
+                        )}
                       </div>
                     </AccordionContent>
                   </AccordionItem>
