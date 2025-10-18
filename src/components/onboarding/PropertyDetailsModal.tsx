@@ -170,6 +170,7 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
       'Service Providers': [],
       'Utilities & Accounts': [],
       'Emergency & Safety': [],
+      'Other': [], // Catch-all for uncategorized items
     };
 
     // Add property info first
@@ -198,11 +199,13 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
     }
 
     tasks.forEach(task => {
-      if (!task.field_value) return;
+      // Only skip if no field_value AND no description
+      if (!task.field_value && !task.description) return;
 
       const title = task.title.toLowerCase();
-      const value = task.field_value;
+      const value = task.field_value || task.description || '';
 
+      // Categorize based on title keywords
       if (title.includes('owner') || title.includes('contact')) {
         if (title.includes('email')) {
           categories['Owner Information'].push({ label: task.title, value, icon: Mail });
@@ -229,9 +232,13 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
         categories['Utilities & Accounts'].push({ label: task.title, value });
       } else if (title.includes('emergency') || title.includes('safety') || title.includes('fire') || title.includes('alarm')) {
         categories['Emergency & Safety'].push({ label: task.title, value });
+      } else {
+        // Add to "Other" category instead of skipping
+        categories['Other'].push({ label: task.title, value });
       }
     });
 
+    // Remove empty categories
     Object.keys(categories).forEach(key => {
       if (categories[key].length === 0) {
         delete categories[key];
@@ -241,7 +248,23 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
     return categories;
   };
 
-  const categorizedData = useMemo(() => organizeTasksByCategory(), [tasks]);
+  // Organize tasks by phase
+  const organizeTasksByPhase = () => {
+    const phases: { [phaseTitle: string]: OnboardingTask[] } = {};
+    
+    tasks.forEach(task => {
+      const phaseTitle = task.phase_title || `Phase ${task.phase_number}`;
+      if (!phases[phaseTitle]) {
+        phases[phaseTitle] = [];
+      }
+      phases[phaseTitle].push(task);
+    });
+
+    return phases;
+  };
+
+  const categorizedData = useMemo(() => organizeTasksByCategory(), [tasks, propertyInfo]);
+  const phasedData = useMemo(() => organizeTasksByPhase(), [tasks]);
 
   const filteredData = useMemo(() => {
     if (!searchQuery) return categorizedData;
@@ -263,6 +286,28 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
 
     return filtered;
   }, [categorizedData, searchQuery]);
+
+  const filteredPhases = useMemo(() => {
+    if (!searchQuery) return phasedData;
+
+    const query = searchQuery.toLowerCase();
+    const filtered: { [phaseTitle: string]: OnboardingTask[] } = {};
+
+    Object.entries(phasedData).forEach(([phaseTitle, tasks]) => {
+      const matchingTasks = tasks.filter(
+        task =>
+          task.title.toLowerCase().includes(query) ||
+          task.description?.toLowerCase().includes(query) ||
+          task.field_value?.toLowerCase().includes(query)
+      );
+
+      if (matchingTasks.length > 0) {
+        filtered[phaseTitle] = matchingTasks;
+      }
+    });
+
+    return filtered;
+  }, [phasedData, searchQuery]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -384,11 +429,111 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
                       </Card>
                     ))}
                   </div>
-                ) : searchQuery ? (
+                ) : null}
+
+                {/* All Onboarding Phases - Complete View */}
+                {Object.keys(filteredPhases).length > 0 && (
+                  <>
+                    <div className="pt-4">
+                      <h3 className="text-base font-semibold mb-4">All Onboarding Phases</h3>
+                    </div>
+                    <div className="space-y-4">
+                      {Object.entries(filteredPhases)
+                        .sort(([, tasksA], [, tasksB]) => (tasksA[0]?.phase_number || 0) - (tasksB[0]?.phase_number || 0))
+                        .map(([phaseTitle, phaseTasks]) => (
+                          <Card key={phaseTitle}>
+                            <CardHeader className="pb-3">
+                              <CardTitle className="text-sm font-semibold">
+                                Phase {phaseTasks[0]?.phase_number}: {phaseTitle}
+                              </CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-3">
+                              {phaseTasks.map((task) => {
+                                const labelMatch = searchQuery && task.title.toLowerCase().includes(searchQuery.toLowerCase());
+                                const valueMatch = searchQuery && (
+                                  task.field_value?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                                  task.description?.toLowerCase().includes(searchQuery.toLowerCase())
+                                );
+                                
+                                return (
+                                  <div key={task.id} className={`space-y-1.5 pb-2 border-b last:border-b-0 ${valueMatch || labelMatch ? 'bg-yellow-50 dark:bg-yellow-950/20 p-2 rounded' : ''}`}>
+                                    <div className="flex items-start justify-between gap-2">
+                                      <p className="text-xs font-medium">
+                                        {labelMatch ? (
+                                          <span className="bg-yellow-200 dark:bg-yellow-900">{task.title}</span>
+                                        ) : (
+                                          task.title
+                                        )}
+                                      </p>
+                                      {task.status && (
+                                        <Badge 
+                                          variant={task.status === 'completed' ? 'default' : 'secondary'}
+                                          className="text-xs"
+                                        >
+                                          {task.status}
+                                        </Badge>
+                                      )}
+                                    </div>
+                                    
+                                    {task.description && (
+                                      <p className="text-xs text-muted-foreground italic">
+                                        {task.description}
+                                      </p>
+                                    )}
+                                    
+                                    {task.field_value && (
+                                      <div className="text-sm break-words pl-2 border-l-2 border-primary/30">
+                                        {isUrl(task.field_value) ? (
+                                          <a 
+                                            href={task.field_value.startsWith('http') ? task.field_value : `https://${task.field_value}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="text-primary hover:underline inline-flex items-center gap-1"
+                                          >
+                                            {valueMatch ? (
+                                              <span className="bg-yellow-200 dark:bg-yellow-900">{task.field_value}</span>
+                                            ) : (
+                                              task.field_value
+                                            )}
+                                            <LinkIcon className="h-3 w-3" />
+                                          </a>
+                                        ) : valueMatch ? (
+                                          <span className="bg-yellow-200 dark:bg-yellow-900">{task.field_value}</span>
+                                        ) : (
+                                          task.field_value
+                                        )}
+                                      </div>
+                                    )}
+                                    
+                                    {task.assigned_to && (
+                                      <p className="text-xs text-muted-foreground flex items-center gap-1">
+                                        <User className="h-3 w-3" />
+                                        Assigned to: {task.assigned_to}
+                                      </p>
+                                    )}
+                                    
+                                    {task.due_date && (
+                                      <p className="text-xs text-muted-foreground flex items-center gap-1">
+                                        <Clock className="h-3 w-3" />
+                                        Due: {new Date(task.due_date).toLocaleDateString()}
+                                      </p>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </CardContent>
+                          </Card>
+                        ))}
+                    </div>
+                  </>
+                )}
+                
+                {/* Empty State */}
+                {searchQuery && Object.keys(filteredData).length === 0 && Object.keys(filteredPhases).length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground text-sm">
                     No results found for "{searchQuery}"
                   </div>
-                ) : !propertyInfo && (
+                ) : !searchQuery && Object.keys(filteredData).length === 0 && Object.keys(filteredPhases).length === 0 && !propertyInfo && (
                   <div className="text-center py-8 text-muted-foreground text-sm">
                     No property information completed yet. Complete onboarding tasks to see details here.
                   </div>
