@@ -68,3 +68,16 @@ export interface OnboardingSOP {
   created_at: string;
   updated_at: string;
 }
+
+export interface FAQ {
+  id: string;
+  property_id: string;
+  project_id: string;
+  question: string;
+  answer: string;
+  asked_by?: string;
+  answered_by?: string;
+  category?: string;
+  created_at: string;
+  updated_at: string;
+}

@@ -190,6 +190,60 @@ export type Database = {
           },
         ]
       }
+      frequently_asked_questions: {
+        Row: {
+          answer: string
+          answered_by: string | null
+          asked_by: string | null
+          category: string | null
+          created_at: string
+          id: string
+          project_id: string | null
+          property_id: string | null
+          question: string
+          updated_at: string
+        }
+        Insert: {
+          answer: string
+          answered_by?: string | null
+          asked_by?: string | null
+          category?: string | null
+          created_at?: string
+          id?: string
+          project_id?: string | null
+          property_id?: string | null
+          question: string
+          updated_at?: string
+        }
+        Update: {
+          answer?: string
+          answered_by?: string | null
+          asked_by?: string | null
+          category?: string | null
+          created_at?: string
+          id?: string
+          project_id?: string | null
+          property_id?: string | null
+          question?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "frequently_asked_questions_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "frequently_asked_questions_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       gmail_oauth_tokens: {
         Row: {
           access_token: string
