@@ -23,21 +23,27 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error("Missing authorization header");
     }
 
-    // Initialize Supabase client with service role
+    // Initialize Supabase clients
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+    
+    // Create client with anon key for auth verification
+    const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
     // Verify the caller is authenticated
     const token = authHeader.replace("Bearer ", "");
-    const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token);
+    const { data: { user }, error: userError } = await supabase.auth.getUser(token);
     
     if (userError || !user) {
+      console.error("Auth error:", userError);
       throw new Error("Unauthorized");
     }
 
-    // Check if the caller is an admin
-    const { data: roles, error: rolesError } = await supabaseAdmin
+    console.log("User authenticated:", user.email);
+
+    // Check if the caller is an admin using the anon client
+    const { data: roles, error: rolesError } = await supabase
       .from("user_roles")
       .select("role")
       .eq("user_id", user.id)
@@ -45,14 +51,20 @@ const handler = async (req: Request): Promise<Response> => {
       .single();
 
     if (rolesError || !roles) {
+      console.error("Not an admin:", rolesError);
       throw new Error("Admin access required");
     }
+
+    console.log("Admin verified");
 
     // Parse request body
     const { userId, newPassword }: ResetPasswordRequest = await req.json();
 
     console.log("Resetting password for user:", userId);
 
+    // Create service role client for password update
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+    
     // Update user password using admin API
     const { data, error } = await supabaseAdmin.auth.admin.updateUserById(
       userId,
