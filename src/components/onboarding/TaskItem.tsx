@@ -37,8 +37,8 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
     task.field_value && task.field_type === "date" ? new Date(task.field_value) : undefined
   );
   const [uploading, setUploading] = useState(false);
-  const [showNAField, setShowNAField] = useState(task.field_value === "N/A");
-  const [naReason, setNAReason] = useState(task.notes || "");
+  const [showNAField, setShowNAField] = useState(false);
+  const [naReason, setNAReason] = useState("");
   const [taskStatus, setTaskStatus] = useState(task.status);
   const [copied, setCopied] = useState(false);
   const [showPinDialog, setShowPinDialog] = useState(false);
@@ -172,6 +172,7 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
         .eq("id", task.id);
 
       setFieldValue("N/A");
+      setNotes(naReason);
       setShowNAField(false);
       setTaskStatus("completed");
       toast.success("Marked as not applicable");
