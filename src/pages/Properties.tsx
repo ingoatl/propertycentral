@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Plus, Trash2, MapPin, Building2, Edit, Mail, ClipboardList, FileText } from "lucide-react";
+import { WorkflowDialog } from "@/components/onboarding/WorkflowDialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { OnboardingTab } from "@/components/onboarding/OnboardingTab";
 import { PropertyDetailsModal } from "@/components/onboarding/PropertyDetailsModal";
@@ -31,7 +32,8 @@ const Properties = () => {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [emailInsightsDialogOpen, setEmailInsightsDialogOpen] = useState(false);
   const [selectedPropertyForInsights, setSelectedPropertyForInsights] = useState<Property | null>(null);
-  const [selectedPropertyForDetails, setSelectedPropertyForDetails] = useState<{ id: string; name: string; projectId: string } | null>(null);
+  const [selectedPropertyForDetails, setSelectedPropertyForDetails] = useState<{ id: string; name: string; projectId: string | null } | null>(null);
+  const [selectedPropertyForWorkflow, setSelectedPropertyForWorkflow] = useState<{ id: string; name: string; address: string; projectId: string } | null>(null);
   const [propertyProjects, setPropertyProjects] = useState<Record<string, string>>({});
   const [formData, setFormData] = useState({
     name: "",
@@ -496,19 +498,23 @@ const Properties = () => {
                     className="w-full"
                   >
                     <TabsList className="grid w-full grid-cols-1">
-                      <TabsTrigger value="onboarding">
+                      <TabsTrigger 
+                        value="onboarding"
+                        onClick={() => {
+                          if (propertyProjects[property.id]) {
+                            setSelectedPropertyForWorkflow({
+                              id: property.id,
+                              name: property.name,
+                              address: property.address,
+                              projectId: propertyProjects[property.id]
+                            });
+                          }
+                        }}
+                      >
                         <ClipboardList className="w-4 h-4 mr-1" />
                         Onboarding
                       </TabsTrigger>
                     </TabsList>
-
-                    <TabsContent value="onboarding" className="mt-4">
-                      <OnboardingTab
-                        propertyId={property.id}
-                        propertyName={property.name}
-                        propertyAddress={property.address}
-                      />
-                    </TabsContent>
                   </Tabs>
                 </CardContent>
               </Card>
@@ -516,6 +522,26 @@ const Properties = () => {
           ))
         )}
       </div>
+
+        {selectedPropertyForWorkflow && propertyProjects[selectedPropertyForWorkflow.id] && (
+          <WorkflowDialog
+            open={!!selectedPropertyForWorkflow}
+            onOpenChange={(open) => {
+              if (!open) setSelectedPropertyForWorkflow(null);
+            }}
+            project={{
+              id: selectedPropertyForWorkflow.projectId,
+              property_id: selectedPropertyForWorkflow.id,
+              owner_name: '',
+              property_address: selectedPropertyForWorkflow.address,
+              status: 'in-progress',
+              progress: 0,
+              created_at: '',
+              updated_at: ''
+            }}
+            onUpdate={loadPropertyProjects}
+          />
+        )}
 
         {selectedPropertyForDetails && (
           <PropertyDetailsModal
