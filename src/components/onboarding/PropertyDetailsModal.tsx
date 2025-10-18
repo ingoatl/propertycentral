@@ -266,13 +266,13 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[80vh]">
-        <DialogHeader>
+      <DialogContent className="max-w-3xl max-h-[85vh] overflow-hidden flex flex-col">
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle>{propertyName} - Details</DialogTitle>
         </DialogHeader>
         
-        <div className="space-y-4">
-          <div className="relative">
+        <div className="space-y-4 flex-1 overflow-hidden flex flex-col">
+          <div className="relative flex-shrink-0">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search property information..."
@@ -287,7 +287,7 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
               <Loader2 className="h-6 w-6 animate-spin text-primary" />
             </div>
            ) : (
-            <ScrollArea className="h-[500px] pr-4">
+            <ScrollArea className="flex-1 pr-4">
               <div className="space-y-4">
                 {/* Property Information - Always show at top */}
                 {propertyInfo && (
