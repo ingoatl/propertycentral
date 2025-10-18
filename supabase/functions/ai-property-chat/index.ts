@@ -173,7 +173,21 @@ Key capabilities:
 - View bookings and visits
 - Answer frequently asked questions
 
-Always be helpful, concise, and proactive. When users ask about a property, use the search tool first to find it, then use other tools to get the specific information they need. Format your responses in a clear, organized way.`;
+CRITICAL SECURITY RULES:
+- NEVER share credit card numbers, bank account numbers, routing numbers, or any payment card information
+- NEVER display full credit card details or sensitive financial data
+- If you encounter such data, respond that you cannot share sensitive financial information for security reasons
+
+IMPORTANT WORKFLOW INSTRUCTIONS:
+- When asked about property-specific information (WiFi, codes, addresses, etc.), ALWAYS:
+  1. First use search_properties to find the property by name or address
+  2. Once you have the property_id, use get_property_onboarding to get the details
+  3. Then extract and share the specific information requested
+- Be smart about property names - "villa 15" should match "Villa Ct SE - Unit 15"
+- Always chain tool calls together - don't stop after just searching
+- When you find a property, proactively get its onboarding details if the user is asking about property-specific info
+
+Always be helpful, concise, and proactive. Format your responses in a clear, organized way.`;
 
     let pendingToolCalls: any[] = [];
     let assistantMessage = "";
@@ -285,7 +299,19 @@ Always be helpful, concise, and proactive. When users ask about a property, use 
                             .select("*")
                             .eq("project_id", project.id)
                             .order("phase_number");
-                          result = tasks || [];
+                          
+                          // Filter out any sensitive financial data
+                          const safeTasks = (tasks || []).map(task => ({
+                            ...task,
+                            // Remove sensitive fields if they contain credit card or bank info
+                            field_value: task.field_value && 
+                              (task.field_value.match(/\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4}/) || 
+                               task.title?.toLowerCase().includes('credit card') ||
+                               task.title?.toLowerCase().includes('bank account'))
+                              ? '[REDACTED - Sensitive Financial Data]'
+                              : task.field_value
+                          }));
+                          result = safeTasks;
                         } else {
                           result = [];
                         }
@@ -297,7 +323,15 @@ Always be helpful, concise, and proactive. When users ask about a property, use 
                         if (args.start_date) query = query.gte("date", args.start_date);
                         if (args.end_date) query = query.lte("date", args.end_date);
                         const { data } = await query.order("date", { ascending: false }).limit(50);
-                        result = data || [];
+                        
+                        // Filter out sensitive payment information
+                        const safeExpenses = (data || []).map(expense => ({
+                          ...expense,
+                          // Remove any credit card or bank details from purpose/notes
+                          purpose: expense.purpose?.replace(/\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4}/g, '[REDACTED]'),
+                          order_number: expense.order_number // Keep order numbers as they're not sensitive
+                        }));
+                        result = safeExpenses;
                         break;
                       }
                       case "get_email_insights": {

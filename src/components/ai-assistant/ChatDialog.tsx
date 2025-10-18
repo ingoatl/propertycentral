@@ -21,7 +21,7 @@ export const ChatDialog = ({ open, onOpenChange }: ChatDialogProps) => {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: "assistant",
-      content: "Hi! I'm your AI Property Assistant. I can help you find information about your properties, bookings, expenses, email insights, and more. What would you like to know?"
+      content: "Hi! I'm your AI Property Assistant. I can help you find information about your properties, bookings, expenses, email insights, and more.\n\nTry asking me things like:\n• \"What's the WiFi password for Villa 15?\"\n• \"Show me expenses for this month\"\n• \"What bookings do we have coming up?\"\n• \"What's the access code for [property name]?\"\n\nWhat would you like to know?"
     }
   ]);
   const [input, setInput] = useState("");
