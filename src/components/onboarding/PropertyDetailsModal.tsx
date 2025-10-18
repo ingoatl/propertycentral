@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { OnboardingTask } from "@/types/onboarding";
-import { Loader2, MapPin, User, Lock, Phone, Link as LinkIcon, Mail, Home, Search } from "lucide-react";
+import { Loader2, MapPin, User, Lock, Phone, Link as LinkIcon, Mail, Home, Search, DollarSign } from "lucide-react";
 import { toast } from "sonner";
 
 interface PropertyDetailsModalProps {
@@ -13,16 +13,18 @@ interface PropertyDetailsModalProps {
   onOpenChange: (open: boolean) => void;
   projectId: string;
   propertyName: string;
+  propertyId?: string;
 }
 
 interface CategorizedData {
   [category: string]: { label: string; value: string; icon?: any }[];
 }
 
-export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyName }: PropertyDetailsModalProps) {
+export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyName, propertyId }: PropertyDetailsModalProps) {
   const [tasks, setTasks] = useState<OnboardingTask[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [propertyInfo, setPropertyInfo] = useState<any>(null);
 
   useEffect(() => {
     if (open) {
@@ -42,6 +44,21 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
 
       if (tasksError) throw tasksError;
       setTasks((tasksData || []) as OnboardingTask[]);
+
+      // Load property info if propertyId is available
+      if (propertyId) {
+        const { data: propertyData, error: propertyError } = await supabase
+          .from('properties')
+          .select('*')
+          .eq('id', propertyId)
+          .single();
+
+        if (propertyError) {
+          console.error('Error loading property:', propertyError);
+        } else {
+          setPropertyInfo(propertyData);
+        }
+      }
     } catch (error: any) {
       console.error('Error loading property details:', error);
       toast.error('Failed to load property information');
@@ -50,8 +67,18 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
     }
   };
 
+  const isUrl = (text: string): boolean => {
+    try {
+      new URL(text);
+      return true;
+    } catch {
+      return text.startsWith('http://') || text.startsWith('https://') || text.startsWith('www.');
+    }
+  };
+
   const organizeTasksByCategory = (): CategorizedData => {
     const categories: CategorizedData = {
+      'Property Information': [],
       'Owner Information': [],
       'Access & Codes': [],
       'Property Details': [],
@@ -60,6 +87,31 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
       'Utilities & Accounts': [],
       'Emergency & Safety': [],
     };
+
+    // Add property info first
+    if (propertyInfo) {
+      if (propertyInfo.visit_price) {
+        categories['Property Information'].push({ 
+          label: 'Visit Price', 
+          value: `$${propertyInfo.visit_price}`,
+          icon: DollarSign 
+        });
+      }
+      if (propertyInfo.rental_type) {
+        categories['Property Information'].push({ 
+          label: 'Rental Type', 
+          value: propertyInfo.rental_type,
+          icon: Home 
+        });
+      }
+      if (propertyInfo.address) {
+        categories['Property Information'].push({ 
+          label: 'Address', 
+          value: propertyInfo.address,
+          icon: MapPin 
+        });
+      }
+    }
 
     tasks.forEach(task => {
       if (!task.field_value) return;
@@ -178,13 +230,27 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
                                     )}
                                   </p>
                                 </div>
-                                <p className="text-sm ml-5 break-words">
-                                  {valueMatch ? (
+                                 <div className="text-sm ml-5 break-words">
+                                  {isUrl(item.value) ? (
+                                    <a 
+                                      href={item.value.startsWith('http') ? item.value : `https://${item.value}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-primary hover:underline inline-flex items-center gap-1"
+                                    >
+                                      {valueMatch ? (
+                                        <span className="bg-yellow-200 dark:bg-yellow-900">{item.value}</span>
+                                      ) : (
+                                        item.value
+                                      )}
+                                      <LinkIcon className="h-3 w-3" />
+                                    </a>
+                                  ) : valueMatch ? (
                                     <span className="bg-yellow-200 dark:bg-yellow-900">{item.value}</span>
                                   ) : (
                                     item.value
                                   )}
-                                </p>
+                                </div>
                               </div>
                             );
                           })}

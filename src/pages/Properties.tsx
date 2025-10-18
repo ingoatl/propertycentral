@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Trash2, MapPin, Building2, Edit, Mail, ClipboardList } from "lucide-react";
+import { Plus, Trash2, MapPin, Building2, Edit, Mail, ClipboardList, FileText } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { OnboardingTab } from "@/components/onboarding/OnboardingTab";
 import { PropertyDetailsModal } from "@/components/onboarding/PropertyDetailsModal";
@@ -473,26 +473,31 @@ const Properties = () => {
                   </div>
                 </CardHeader>
                 <CardContent>
+                  <div className="flex items-center gap-2 mb-3">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        if (propertyProjects[property.id]) {
+                          setSelectedPropertyForDetails({
+                            id: property.id,
+                            name: property.name,
+                            projectId: propertyProjects[property.id]
+                          });
+                        }
+                      }}
+                      className="flex-1"
+                    >
+                      <FileText className="w-4 h-4 mr-2" />
+                      View Details
+                    </Button>
+                  </div>
+
                   <Tabs 
                     defaultValue="insights" 
                     className="w-full"
                   >
-                    <TabsList className="grid w-full grid-cols-3">
-                      <TabsTrigger 
-                        value="details"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          if (propertyProjects[property.id]) {
-                            setSelectedPropertyForDetails({
-                              id: property.id,
-                              name: property.name,
-                              projectId: propertyProjects[property.id]
-                            });
-                          }
-                        }}
-                      >
-                        Details
-                      </TabsTrigger>
+                    <TabsList className="grid w-full grid-cols-2">
                       <TabsTrigger value="insights">
                         <Mail className="w-4 h-4 mr-1" />
                         Insights
@@ -502,10 +507,6 @@ const Properties = () => {
                         Onboarding
                       </TabsTrigger>
                     </TabsList>
-
-                    <TabsContent value="details" className="mt-4">
-                      {/* Empty - modal will open on tab click */}
-                    </TabsContent>
 
                     <TabsContent value="insights" className="mt-4">
                       <Button
@@ -537,14 +538,15 @@ const Properties = () => {
         )}
       </div>
 
-      {selectedPropertyForDetails && (
-        <PropertyDetailsModal
-          open={!!selectedPropertyForDetails}
-          onOpenChange={(open) => !open && setSelectedPropertyForDetails(null)}
-          projectId={selectedPropertyForDetails.projectId}
-          propertyName={selectedPropertyForDetails.name}
-        />
-      )}
+        {selectedPropertyForDetails && (
+          <PropertyDetailsModal
+            open={!!selectedPropertyForDetails}
+            onOpenChange={(open) => !open && setSelectedPropertyForDetails(null)}
+            projectId={selectedPropertyForDetails.projectId}
+            propertyName={selectedPropertyForDetails.name}
+            propertyId={selectedPropertyForDetails.id}
+          />
+        )}
     </div>
   );
 };
