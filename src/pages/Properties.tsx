@@ -35,6 +35,7 @@ const Properties = () => {
   const [selectedPropertyForDetails, setSelectedPropertyForDetails] = useState<{ id: string; name: string; projectId: string | null } | null>(null);
   const [selectedPropertyForWorkflow, setSelectedPropertyForWorkflow] = useState<{ id: string; name: string; address: string; projectId: string | null; visitPrice: number } | null>(null);
   const [propertyProjects, setPropertyProjects] = useState<Record<string, string>>({});
+  const [propertyProjectsProgress, setPropertyProjectsProgress] = useState<Record<string, number>>({});
   const [formData, setFormData] = useState({
     name: "",
     address: "",
@@ -82,19 +83,23 @@ const Properties = () => {
     try {
       const { data, error } = await supabase
         .from("onboarding_projects")
-        .select("id, property_id")
+        .select("id, property_id, progress")
         .order("created_at", { ascending: false });
 
       if (error) throw error;
 
       const projectMap: Record<string, string> = {};
+      const progressMap: Record<string, number> = {};
+      
       data?.forEach(project => {
         if (project.property_id && !projectMap[project.property_id]) {
           projectMap[project.property_id] = project.id;
+          progressMap[project.property_id] = project.progress || 0;
         }
       });
       
       setPropertyProjects(projectMap);
+      setPropertyProjectsProgress(progressMap);
     } catch (error: any) {
       console.error("Error loading projects:", error);
     }
@@ -475,6 +480,22 @@ const Properties = () => {
                   </div>
                 </CardHeader>
                 <CardContent>
+                  {/* Onboarding Progress */}
+                  {propertyProjects[property.id] && (
+                    <div className="mb-4 space-y-2">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground">Onboarding Progress</span>
+                        <span className="font-medium">{Math.round(propertyProjectsProgress[property.id] || 0)}%</span>
+                      </div>
+                      <div className="w-full bg-muted rounded-full h-2">
+                        <div
+                          className="bg-primary h-2 rounded-full transition-all duration-300"
+                          style={{ width: `${propertyProjectsProgress[property.id] || 0}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
+
                   <div className="flex items-center gap-2 mb-3">
                     <Button
                       variant="outline"

@@ -15,12 +15,14 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 
 const FAQ_CATEGORIES = [
   'All Categories',
-  'Access & Entry',
-  'Utilities & Amenities',
-  'House Rules',
-  'Maintenance',
-  'Guest Experience',
-  'Emergency',
+  'Property Operations',
+  'Guest Management',
+  'Maintenance & Repairs',
+  'Cleaning & Turnover',
+  'Systems & Tools',
+  'Vendor Communication',
+  'Emergency Procedures',
+  'Best Practices',
   'Other'
 ];
 
@@ -160,9 +162,9 @@ export function DashboardFAQTab() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">Property FAQs</h2>
+          <h2 className="text-3xl font-bold tracking-tight">Operational FAQs</h2>
           <p className="text-muted-foreground">
-            Frequently asked questions across all properties
+            Operational questions and answers for Peachhaus team members
           </p>
         </div>
         <Button onClick={() => setShowAddDialog(true)}>
@@ -291,9 +293,9 @@ export function DashboardFAQTab() {
       <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Add New FAQ</DialogTitle>
+            <DialogTitle>Add Operational FAQ</DialogTitle>
             <DialogDescription>
-              Add a frequently asked question for a property
+              Add an operational question and answer for Peachhaus team members
             </DialogDescription>
           </DialogHeader>
           
@@ -340,7 +342,7 @@ export function DashboardFAQTab() {
               <Label htmlFor="question">Question *</Label>
               <Input
                 id="question"
-                placeholder="What is the WiFi password?"
+                placeholder="How do I handle a maintenance emergency after hours?"
                 value={newFAQ.question}
                 onChange={(e) => setNewFAQ({ ...newFAQ, question: e.target.value })}
               />
@@ -350,7 +352,7 @@ export function DashboardFAQTab() {
               <Label htmlFor="answer">Answer *</Label>
               <Textarea
                 id="answer"
-                placeholder="The WiFi network is 'PropertyName-Guest' and the password is..."
+                placeholder="For after-hours emergencies, contact the on-call manager at..."
                 rows={6}
                 value={newFAQ.answer}
                 onChange={(e) => setNewFAQ({ ...newFAQ, answer: e.target.value })}
