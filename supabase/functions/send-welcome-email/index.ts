@@ -29,40 +29,58 @@ const handler = async (req: Request): Promise<Response> => {
       bcc: ["ingo@peachhausgroup.com"],
       subject: "Welcome to PeachHaus Property Management System",
       html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h1 style="color: #333;">Welcome to PeachHaus Property Management System</h1>
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <h1 style="color: #f97316;">Welcome to PeachHaus Property Management System</h1>
           
           <p>Hello,</p>
           
-          <p>Your account has been created for the PeachHaus Property Management System. This system is designed to streamline property onboarding and task management.</p>
+          <p>Your account has been created for the PeachHaus Property Management System. We're excited to have you on our team!</p>
           
-          <h2 style="color: #555;">Your Login Details</h2>
-          <div style="background-color: #f5f5f5; padding: 15px; border-radius: 5px; margin: 20px 0;">
-            <p><strong>Email:</strong> ${email}</p>
-            <p><strong>Temporary Password:</strong> ${tempPassword}</p>
+          <h2 style="color: #555; margin-top: 30px;">🔑 Your Login Details</h2>
+          <div style="background-color: #f5f5f5; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #f97316;">
+            <p style="margin: 5px 0;"><strong>Email:</strong> ${email}</p>
+            <p style="margin: 5px 0;"><strong>Temporary Password:</strong> <code style="background-color: #fff; padding: 4px 8px; border-radius: 4px; font-family: monospace;">${tempPassword}</code></p>
           </div>
           
-          <p style="color: #d32f2f;"><strong>Important:</strong> Please change your password after your first login for security purposes.</p>
+          <div style="background-color: #fff3cd; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #ffc107;">
+            <p style="margin: 0; color: #856404;"><strong>⚠️ Important Security Note:</strong> Please change your password after your first login for security purposes.</p>
+          </div>
           
-          <h2 style="color: #555;">What This System Does</h2>
-          <p>Our property management system helps you:</p>
-          <ul>
-            <li>Track and manage property onboarding tasks</li>
-            <li>Monitor property visits and expenses</li>
-            <li>Collaborate with team members on property projects</li>
-            <li>Access property details and documentation</li>
+          <h2 style="color: #555; margin-top: 30px;">📋 What This System Does</h2>
+          <p>The PeachHaus Property Management System is your central hub for managing property onboarding and operations. Here's what you can do:</p>
+          <ul style="line-height: 1.8;">
+            <li><strong>Property Onboarding:</strong> When we bring on a new property, we assign you specific tasks through this system. You'll be able to track all assigned tasks, upload documents, and mark items as complete.</li>
+            <li><strong>Task Management:</strong> View all your assigned tasks with due dates, priorities, and detailed instructions.</li>
+            <li><strong>Property Visits:</strong> Log and track property visits with detailed notes and timestamps.</li>
+            <li><strong>Expense Tracking:</strong> Monitor property-related expenses and maintain accurate financial records.</li>
+            <li><strong>Team Collaboration:</strong> Work seamlessly with other team members on property projects.</li>
+            <li><strong>Document Access:</strong> Access important property details, documents, and information all in one place.</li>
           </ul>
           
-          <p><strong>📌 Please bookmark this page</strong> so you can easily access the system whenever you need it.</p>
-          
-          <div style="margin: 30px 0; padding: 20px; background-color: #e3f2fd; border-radius: 5px;">
-            <p style="margin: 0;"><strong>Login URL:</strong> <a href="${Deno.env.get("VITE_SUPABASE_URL") || "https://property-visit-expense-tracker.lovable.app"}">${Deno.env.get("VITE_SUPABASE_URL") || "https://property-visit-expense-tracker.lovable.app"}</a></p>
+          <div style="background-color: #e3f2fd; padding: 20px; border-radius: 8px; margin: 30px 0; border-left: 4px solid #2196f3;">
+            <h3 style="margin-top: 0; color: #1976d2;">📌 Bookmark This Page!</h3>
+            <p style="margin: 10px 0;">Please save this link to your browser bookmarks for quick and easy access:</p>
+            <p style="margin: 10px 0;">
+              <strong>Login URL:</strong><br>
+              <a href="https://property-visit-expense-tracker.lovable.app" style="color: #2196f3; font-size: 16px; word-break: break-all;">https://property-visit-expense-tracker.lovable.app</a>
+            </p>
           </div>
           
-          <p>If you have any questions or need assistance, please don't hesitate to reach out to our team.</p>
+          <h2 style="color: #555; margin-top: 30px;">🚀 Getting Started</h2>
+          <ol style="line-height: 1.8;">
+            <li>Click the login link above</li>
+            <li>Enter your email and temporary password</li>
+            <li>Change your password to something secure and memorable</li>
+            <li>Explore your dashboard and check for any assigned tasks</li>
+            <li>Bookmark the page for easy access</li>
+          </ol>
           
-          <p>Best regards,<br>
-          The PeachHaus Group Team</p>
+          <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #ddd;">
+            <p>If you have any questions or need assistance getting started, please don't hesitate to reach out to our team.</p>
+            
+            <p style="margin-top: 30px;">Best regards,<br>
+            <strong>The PeachHaus Group Team</strong></p>
+          </div>
         </div>
       `,
     });

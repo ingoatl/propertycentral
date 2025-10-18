@@ -375,15 +375,14 @@ const Admin = () => {
                 <Button type="submit" disabled={creatingUser} className="flex-1">
                   {creatingUser ? "Creating..." : "Create User"}
                 </Button>
-                {newUserEmail && newUserPassword && (
-                  <Button 
-                    type="button" 
-                    variant="outline"
-                    onClick={() => handleSendWelcomeEmail(newUserEmail, newUserPassword)}
-                  >
-                    Send Welcome Email
-                  </Button>
-                )}
+                <Button 
+                  type="button" 
+                  variant="outline"
+                  onClick={() => handleSendWelcomeEmail(newUserEmail, newUserPassword)}
+                  disabled={!newUserEmail || !newUserPassword}
+                >
+                  Send Welcome Email
+                </Button>
               </div>
             </form>
           </CardContent>
