@@ -1,10 +1,11 @@
 import { OverdueTasksCard } from "./OverdueTasksCard";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { OnboardingTask } from "@/types/onboarding";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, CheckCircle2, Clock, TrendingUp } from "lucide-react";
+import { Calendar, CheckCircle2, Clock, TrendingUp, ExternalLink } from "lucide-react";
 import { format, addDays, differenceInDays } from "date-fns";
 
 interface TaskStats {
@@ -15,6 +16,7 @@ interface TaskStats {
 }
 
 export const UserTasksDashboard = () => {
+  const navigate = useNavigate();
   const [stats, setStats] = useState<TaskStats>({
     totalAssigned: 0,
     completedThisWeek: 0,
@@ -31,6 +33,23 @@ export const UserTasksDashboard = () => {
       const today = new Date();
       const sevenDaysFromNow = addDays(today, 7);
       const sevenDaysAgo = addDays(today, -7);
+
+      // First, update any uncompleted tasks without due dates to have a due date 1 week out
+      const { error: updateError } = await supabase
+        .from("onboarding_tasks")
+        .update({ 
+          due_date: sevenDaysFromNow.toISOString().split('T')[0],
+          original_due_date: sevenDaysFromNow.toISOString().split('T')[0]
+        })
+        .eq("assigned_to_uuid", user.id)
+        .neq("status", "completed")
+        .is("due_date", null);
+
+      if (updateError) {
+        console.error("Error updating tasks without due dates:", updateError);
+      } else {
+        console.log("Updated tasks without due dates");
+      }
 
       // Total assigned tasks
       const { count: totalCount } = await supabase
@@ -174,10 +193,14 @@ export const UserTasksDashboard = () => {
                 return (
                   <div
                     key={task.id}
-                    className="flex items-start justify-between p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors"
+                    className="flex items-start justify-between p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors cursor-pointer"
+                    onClick={() => navigate(`/onboarding?project=${task.project_id}`)}
                   >
                     <div className="space-y-1">
-                      <p className="font-medium">{task.title}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium">{task.title}</p>
+                        <ExternalLink className="h-3 w-3 opacity-50" />
+                      </div>
                       <p className="text-sm text-muted-foreground">
                         {task.onboarding_projects?.property_address}
                       </p>

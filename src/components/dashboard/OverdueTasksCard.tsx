@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { OnboardingTask } from "@/types/onboarding";
-import { AlertCircle, Calendar, ChevronDown, ChevronRight } from "lucide-react";
+import { AlertCircle, Calendar, ChevronDown, ChevronRight, ExternalLink } from "lucide-react";
 import { format, differenceInDays } from "date-fns";
 import { RescheduleDueDateDialog } from "@/components/onboarding/RescheduleDueDateDialog";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -27,6 +28,7 @@ interface GroupedTasks {
 }
 
 export const OverdueTasksCard = () => {
+  const navigate = useNavigate();
   const [overdueTasks, setOverdueTasks] = useState<OverdueTaskWithProject[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
@@ -183,11 +185,15 @@ export const OverdueTasksCard = () => {
                       return (
                         <div
                           key={task.id}
-                          className={`p-3 rounded-lg border ${getUrgencyColor(daysOverdue)}`}
+                          className={`p-3 rounded-lg border ${getUrgencyColor(daysOverdue)} cursor-pointer hover:opacity-80 transition-opacity`}
+                          onClick={() => navigate(`/onboarding?project=${task.project_id}`)}
                         >
                           <div className="flex items-start justify-between gap-3">
                             <div className="flex-1 space-y-1">
-                              <p className="font-medium">{task.title}</p>
+                              <div className="flex items-center gap-2">
+                                <p className="font-medium">{task.title}</p>
+                                <ExternalLink className="h-3 w-3 opacity-50" />
+                              </div>
                               <div className="flex items-center gap-2 text-sm">
                                 <Calendar className="h-3 w-3" />
                                 <span>
@@ -204,7 +210,10 @@ export const OverdueTasksCard = () => {
                             <Button
                               size="sm"
                               variant="outline"
-                              onClick={() => setRescheduleTask(task)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setRescheduleTask(task);
+                              }}
                             >
                               Reschedule
                             </Button>

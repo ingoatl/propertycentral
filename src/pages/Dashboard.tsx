@@ -467,34 +467,61 @@ const Dashboard = () => {
           <p className="text-muted-foreground mt-1">Overview of all PeachHaus properties</p>
         </div>
         <div className="flex gap-2">
-          <Button 
-            onClick={syncOwnerRez}
-            disabled={syncing}
-            className="shadow-warm hover:scale-105 transition-transform gap-2"
-            variant="outline"
-          >
-            {syncing ? "Syncing..." : "Sync OwnerRez"}
-          </Button>
-          <Button 
-            onClick={async () => {
-              try {
-                const { error } = await supabase.functions.invoke("send-monthly-report");
-                if (error) {
-                  console.error("Email error:", error);
-                  toast.error("Failed to send test email");
-                } else {
-                  toast.success("Test email sent to anja@peachhausgroup.com!");
-                }
-              } catch (error) {
-                console.error("Test email error:", error);
-                toast.error("Failed to send test email");
-              }
-            }} 
-            className="shadow-warm hover:scale-105 transition-transform gap-2"
-            variant="outline"
-          >
-            Send Test Email
-          </Button>
+          {isAdmin && (
+            <>
+              <Button 
+                onClick={syncOwnerRez}
+                disabled={syncing}
+                className="shadow-warm hover:scale-105 transition-transform gap-2"
+                variant="outline"
+              >
+                {syncing ? "Syncing..." : "Sync OwnerRez"}
+              </Button>
+              <Button 
+                onClick={async () => {
+                  try {
+                    toast.loading("Sending overdue task emails...");
+                    const { data, error } = await supabase.functions.invoke("send-overdue-task-emails");
+                    toast.dismiss();
+                    if (error) {
+                      console.error("Email error:", error);
+                      toast.error("Failed to send overdue task emails");
+                    } else {
+                      toast.success(`Sent ${data.emailsSent} overdue task email(s) for ${data.overdueTasksFound} task(s)`);
+                    }
+                  } catch (error) {
+                    console.error("Error:", error);
+                    toast.dismiss();
+                    toast.error("Failed to send emails");
+                  }
+                }} 
+                className="shadow-warm hover:scale-105 transition-transform gap-2"
+                variant="outline"
+              >
+                Send Overdue Emails
+              </Button>
+              <Button 
+                onClick={async () => {
+                  try {
+                    const { error } = await supabase.functions.invoke("send-monthly-report");
+                    if (error) {
+                      console.error("Email error:", error);
+                      toast.error("Failed to send test email");
+                    } else {
+                      toast.success("Test email sent to anja@peachhausgroup.com!");
+                    }
+                  } catch (error) {
+                    console.error("Test email error:", error);
+                    toast.error("Failed to send test email");
+                  }
+                }} 
+                className="shadow-warm hover:scale-105 transition-transform gap-2"
+                variant="outline"
+              >
+                Send Test Email
+              </Button>
+            </>
+          )}
           <Button onClick={exportToCSV} className="shadow-warm hover:scale-105 transition-transform gap-2">
             <Download className="w-4 h-4" />
             Export Report
