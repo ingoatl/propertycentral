@@ -39,6 +39,14 @@ export const OverdueTasksCard = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
+      // Get user's team role IDs
+      const { data: teamRoles } = await supabase
+        .from("user_team_roles")
+        .select("role_id")
+        .eq("user_id", user.id);
+
+      const userRoleIds = teamRoles?.map(tr => tr.role_id) || [];
+
       const today = new Date().toISOString().split('T')[0];
 
       const { data, error } = await supabase
@@ -50,7 +58,7 @@ export const OverdueTasksCard = () => {
             property_address
           )
         `)
-        .eq("assigned_to_uuid", user.id)
+        .or(`assigned_to_uuid.eq.${user.id},assigned_role_id.in.(${userRoleIds.join(",")})`)
         .lt("due_date", today)
         .neq("status", "completed")
         .order("due_date", { ascending: true });

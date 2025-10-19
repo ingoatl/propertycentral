@@ -38,6 +38,14 @@ export const UserTasksDashboard = () => {
 
       const isAdmin = roles?.some(r => r.role === "admin");
 
+      // Get user's team role IDs
+      const { data: teamRoles } = await supabase
+        .from("user_team_roles")
+        .select("role_id")
+        .eq("user_id", user.id);
+
+      const userRoleIds = teamRoles?.map(tr => tr.role_id) || [];
+
       const today = new Date();
       const sevenDaysFromNow = addDays(today, 7);
       const sevenDaysAgo = addDays(today, -7);
@@ -69,7 +77,7 @@ export const UserTasksDashboard = () => {
         .neq("status", "completed");
 
       if (!isAdmin) {
-        totalQuery = totalQuery.eq("assigned_to_uuid", user.id);
+        totalQuery = totalQuery.or(`assigned_to_uuid.eq.${user.id},assigned_role_id.in.(${userRoleIds.join(",")})`);
       }
 
       const { count: totalCount } = await totalQuery;
@@ -82,7 +90,7 @@ export const UserTasksDashboard = () => {
         .gte("completed_date", sevenDaysAgo.toISOString());
 
       if (!isAdmin) {
-        completedQuery = completedQuery.eq("assigned_to_uuid", user.id);
+        completedQuery = completedQuery.or(`assigned_to_uuid.eq.${user.id},assigned_role_id.in.(${userRoleIds.join(",")})`);
       }
 
       const { count: completedCount } = await completedQuery;
@@ -106,7 +114,7 @@ export const UserTasksDashboard = () => {
         .limit(10);
 
       if (!isAdmin) {
-        upcomingQuery = upcomingQuery.eq("assigned_to_uuid", user.id);
+        upcomingQuery = upcomingQuery.or(`assigned_to_uuid.eq.${user.id},assigned_role_id.in.(${userRoleIds.join(",")})`);
       }
 
       const { data: upcomingData } = await upcomingQuery;
@@ -126,7 +134,7 @@ export const UserTasksDashboard = () => {
         .limit(10);
 
       if (!isAdmin) {
-        recentlyCompletedQuery = recentlyCompletedQuery.eq("assigned_to_uuid", user.id);
+        recentlyCompletedQuery = recentlyCompletedQuery.or(`assigned_to_uuid.eq.${user.id},assigned_role_id.in.(${userRoleIds.join(",")})`);
       }
 
       const { data: completedData } = await recentlyCompletedQuery;
