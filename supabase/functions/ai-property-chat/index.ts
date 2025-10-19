@@ -6,6 +6,90 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Smart fallback response generator when AI model returns empty response
+function generateAnswerFromToolResults(toolResults: any[], userQuery: string): string {
+  const query = userQuery.toLowerCase();
+  
+  for (const result of toolResults) {
+    try {
+      const data = JSON.parse(result.content);
+      
+      // Handle property search results
+      if (data?.properties && Array.isArray(data.properties)) {
+        if (data.properties.length === 0) {
+          return "I couldn't find any properties matching your search.";
+        }
+        if (data.properties.length === 1) {
+          const prop = data.properties[0];
+          return `I found ${prop.name} at ${prop.address}. What would you like to know about it?`;
+        }
+        return `I found ${data.properties.length} properties:\n${data.properties.map((p: any) => `• ${p.name}`).join('\n')}\n\nWhich one would you like details about?`;
+      }
+      
+      // Handle onboarding tasks
+      if (Array.isArray(data) && data.length > 0 && data[0]?.title) {
+        // Extract specific info based on query keywords
+        if (query.includes('clean')) {
+          const cleanerTask = data.find((t: any) => t.title?.toLowerCase().includes('cleaner'));
+          if (cleanerTask?.field_value) {
+            return `**Cleaner Information:**\n${cleanerTask.field_value}`;
+          }
+        }
+        
+        if (query.includes('wifi') || query.includes('password') || query.includes('internet')) {
+          const wifiTask = data.find((t: any) => 
+            t.title?.toLowerCase().includes('wifi') || 
+            t.title?.toLowerCase().includes('password') ||
+            t.title?.toLowerCase().includes('internet')
+          );
+          if (wifiTask?.field_value) {
+            return `**WiFi Details:**\n${wifiTask.field_value}`;
+          }
+        }
+        
+        if (query.includes('access') || query.includes('code') || query.includes('lock') || query.includes('pin')) {
+          const accessTasks = data.filter((t: any) => 
+            t.title?.toLowerCase().includes('access') || 
+            t.title?.toLowerCase().includes('code') ||
+            t.title?.toLowerCase().includes('lock') ||
+            t.title?.toLowerCase().includes('pin')
+          );
+          if (accessTasks.length > 0) {
+            const details = accessTasks
+              .filter((t: any) => t.field_value)
+              .map((t: any) => `• **${t.title}:** ${t.field_value}`)
+              .join('\n');
+            return details || "I found access-related tasks but no details have been filled in yet.";
+          }
+        }
+        
+        if (query.includes('vendor') || query.includes('contact')) {
+          const vendorTasks = data.filter((t: any) => 
+            t.title?.toLowerCase().includes('vendor') || 
+            t.title?.toLowerCase().includes('contact')
+          );
+          if (vendorTasks.length > 0) {
+            const details = vendorTasks
+              .filter((t: any) => t.field_value)
+              .map((t: any) => `• **${t.title}:** ${t.field_value}`)
+              .join('\n');
+            return details || "I found vendor-related tasks but no details have been filled in yet.";
+          }
+        }
+        
+        // Generic: show task summary
+        const completed = data.filter((t: any) => t.status === 'completed').length;
+        const tasksWithData = data.filter((t: any) => t.field_value).length;
+        return `I found ${data.length} onboarding tasks for this property:\n• ${completed} completed\n• ${tasksWithData} have data filled in\n\nWhat specific information do you need? (e.g., WiFi, access codes, cleaner, vendors)`;
+      }
+    } catch (e) {
+      console.error("Error parsing tool result:", e);
+    }
+  }
+  
+  return "I found some information but need more context. Could you be more specific about what you're looking for?";
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -163,40 +247,25 @@ serve(async (req) => {
       }
     ];
 
-    const systemPrompt = `You are an AI Property Assistant for a property management system. You help users find information about their properties, bookings, expenses, email insights, visits, and onboarding details.
+    const systemPrompt = `You are a Property Assistant AI. Help users find information about properties, bookings, expenses, and onboarding details.
 
-CRITICAL SECURITY RULES:
-- NEVER share credit card numbers, bank account numbers, routing numbers, or any payment card information
-- NEVER display full credit card details or sensitive financial data
-- If you encounter such data, respond that you cannot share sensitive financial information for security reasons
+SECURITY:
+- Never share credit card numbers, bank account numbers, or financial data
+- Respond with security error if you see such data
 
-CRITICAL TOOL USAGE RULES - YOU MUST FOLLOW THESE:
+WORKFLOW:
+1. User asks about property → Call search_properties
+2. If user needs specific details (WiFi, codes, cleaner, etc.) → Call get_property_onboarding
+3. Answer based on the data
 
-When a user asks about property details (WiFi password, access codes, cleaner info, vendor contacts, inspections, etc.):
-1. Call search_properties to find the property
-2. The search result will tell you to call get_property_onboarding
-3. You MUST immediately call get_property_onboarding with the property_id
-4. Only after getting onboarding data, answer the user's question
-
-IMPORTANT: Just searching is NOT enough! You MUST call get_property_onboarding to get the actual details.
-
-Example for "who is the cleaner of villa 15":
-✅ CORRECT: search_properties → get_property_onboarding → extract cleaner from tasks → answer
-❌ WRONG: search_properties → try to answer (you don't have the data yet!)
-
-Property name matching:
-- "villa 15" = "Villa Ct SE - Unit 15"
-- "unit 7" = "7th Avenue - Unit 7"
-- Be flexible with partial names
-
-Tool guide:
-- search_properties: Find properties (ALWAYS FIRST STEP)
-- get_property_onboarding: Get details after search (REQUIRED FOR PROPERTY INFO)
+TOOLS:
+- search_properties: Find properties by name/address
+- get_property_onboarding: Get property details, tasks, vendors, access codes
 - get_property_expenses: View expenses
-- get_email_insights: Check emails
-- get_bookings: View reservations
-- get_visits: See visits
-- get_faqs: Answer FAQs
+- get_email_insights: Email notifications
+- get_bookings: Reservations
+- get_visits: Scheduled visits
+- get_faqs: FAQs
 
 Be helpful and concise.`;
 
@@ -210,7 +279,7 @@ Be helpful and concise.`;
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: "google/gemini-2.5-pro",
         messages: [
           { role: "system", content: systemPrompt },
           ...messages,
@@ -311,81 +380,47 @@ Be helpful and concise.`;
                         console.log(`Search for "${args.query}" found ${filteredData.length} properties:`, 
                           filteredData.map(p => p.name));
                         
-                        // Auto-fetch onboarding data if only one property found
-                        // This helps with questions like "who is the cleaner for villa 15"
-                        if (filteredData.length === 1) {
-                          const propertyId = filteredData[0].id;
-                          console.log(`Auto-fetching onboarding data for single property: ${propertyId}`);
-                          
-                          const { data: project } = await supabase
-                            .from("onboarding_projects")
-                            .select("id")
-                            .eq("property_id", propertyId)
-                            .maybeSingle();
-                          
-                          if (project) {
-                            const { data: tasks } = await supabase
-                              .from("onboarding_tasks")
-                              .select("*")
-                              .eq("project_id", project.id)
-                              .order("phase_number");
-                            
-                            // Filter sensitive data
-                            const safeTasks = (tasks || []).map(task => ({
-                              ...task,
-                              field_value: task.field_value && 
-                                (task.field_value.match(/\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4}/) || 
-                                 task.title?.toLowerCase().includes('credit card') ||
-                                 task.title?.toLowerCase().includes('bank account'))
-                                ? '[REDACTED - Sensitive Financial Data]'
-                                : task.field_value
-                            }));
-                            
-                            result = {
-                              properties: filteredData,
-                              onboarding_data: safeTasks,
-                              message: "Found 1 property and automatically retrieved onboarding details."
-                            };
-                          } else {
-                            result = {
-                              properties: filteredData,
-                              message: "Found 1 property but no onboarding data available."
-                            };
-                          }
-                        } else {
-                          result = {
-                            properties: filteredData,
-                            message: filteredData.length > 0 
-                              ? `Found ${filteredData.length} properties. Use get_property_onboarding with a property_id to get details.`
-                              : "No properties found."
-                          };
-                        }
+                        result = {
+                          properties: filteredData,
+                          message: filteredData.length > 0 
+                            ? `Found ${filteredData.length} properties.`
+                            : "No properties found."
+                        };
                         break;
                       }
                       case "get_property_onboarding": {
-                        const { data: project } = await supabase
+                        const { data: projects } = await supabase
                           .from("onboarding_projects")
-                          .select("id")
+                          .select("id, created_at, progress")
                           .eq("property_id", args.property_id)
-                          .maybeSingle();
+                          .order("created_at", { ascending: false });
                         
-                        if (project) {
+                        if (projects && projects.length > 0) {
+                          // Use most recent project
+                          const project = projects[0];
+                          
+                          if (projects.length > 1) {
+                            console.log(`Warning: Found ${projects.length} projects for property ${args.property_id}, using most recent`);
+                          }
+                          
                           const { data: tasks } = await supabase
                             .from("onboarding_tasks")
-                            .select("*")
+                            .select("title, field_value, status, phase_title, notes, phase_number")
                             .eq("project_id", project.id)
                             .order("phase_number");
                           
-                          // Filter out any sensitive financial data
+                          // Filter out sensitive financial data and return only essential fields
                           const safeTasks = (tasks || []).map(task => ({
-                            ...task,
-                            // Remove sensitive fields if they contain credit card or bank info
+                            title: task.title,
                             field_value: task.field_value && 
                               (task.field_value.match(/\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4}/) || 
                                task.title?.toLowerCase().includes('credit card') ||
                                task.title?.toLowerCase().includes('bank account'))
-                              ? '[REDACTED - Sensitive Financial Data]'
-                              : task.field_value
+                              ? '[REDACTED]'
+                              : task.field_value,
+                            status: task.status,
+                            phase_title: task.phase_title,
+                            notes: task.notes
                           }));
                           result = safeTasks;
                         } else {
@@ -466,6 +501,23 @@ Be helpful and concise.`;
                   length: r.content.length 
                 })));
                 
+                const followUpMessages = [
+                  { role: "system", content: systemPrompt },
+                  ...messages,
+                  { 
+                    role: "assistant", 
+                    content: assistantMessage || "", 
+                    tool_calls: pendingToolCalls 
+                  },
+                  ...toolResults
+                ];
+                
+                console.log("Follow-up conversation context:", {
+                  messageCount: followUpMessages.length,
+                  lastUserMessage: messages[messages.length - 1]?.content?.substring(0, 100),
+                  toolCallCount: pendingToolCalls.length
+                });
+                
                 const followUpResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
                   method: "POST",
                   headers: {
@@ -473,17 +525,8 @@ Be helpful and concise.`;
                     "Content-Type": "application/json",
                   },
                   body: JSON.stringify({
-                    model: "google/gemini-2.5-flash",
-                    messages: [
-                      { role: "system", content: systemPrompt },
-                      ...messages,
-                      { 
-                        role: "assistant", 
-                        content: assistantMessage || "", 
-                        tool_calls: pendingToolCalls 
-                      },
-                      ...toolResults
-                    ],
+                    model: "google/gemini-2.5-pro",
+                    messages: followUpMessages,
                     stream: true,
                   }),
                 });
@@ -556,12 +599,14 @@ Be helpful and concise.`;
                       }
                     }
                     
-                    // If no content was received at all, send a fallback
+                    // If no content was received, generate a smart fallback from tool results
                     if (!contentReceived) {
-                      console.error("No content received from follow-up stream");
+                      console.error("No content received from follow-up stream, generating fallback");
+                      const userQuery = messages[messages.length - 1]?.content || "";
+                      const fallbackAnswer = generateAnswerFromToolResults(toolResults, userQuery);
                       controller.enqueue(encoder.encode(`data: ${JSON.stringify({ 
                         type: "content", 
-                        content: "I found the information but couldn't format the response. Please try asking again." 
+                        content: fallbackAnswer 
                       })}\n\n`));
                     }
                   }
