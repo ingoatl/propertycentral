@@ -247,7 +247,7 @@ export const UserTasksDashboard = () => {
                   <div
                     key={task.id}
                     className="flex items-start justify-between p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors cursor-pointer"
-                    onClick={() => navigate(`/onboarding?project=${task.project_id}`)}
+                    onClick={() => navigate(`/properties?project=${task.project_id}`)}
                   >
                      <div className="space-y-1">
                       <div className="flex items-center gap-2">

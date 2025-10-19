@@ -214,7 +214,7 @@ export const OverdueTasksCard = () => {
                         <div
                           key={task.id}
                           className={`p-3 rounded-lg border ${getUrgencyColor(daysOverdue)} cursor-pointer hover:opacity-80 transition-opacity`}
-                          onClick={() => navigate(`/onboarding?project=${task.project_id}`)}
+                          onClick={() => navigate(`/properties?project=${task.project_id}`)}
                         >
                           <div className="flex items-start justify-between gap-3">
                             <div className="flex-1 space-y-1">
