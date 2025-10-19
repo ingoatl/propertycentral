@@ -12,6 +12,7 @@ import { CheckCircle, XCircle, Clock, Shield, UserPlus, Key, Users, MessageCircl
 import { z } from "zod";
 import { TeamMatrixTab } from "@/components/admin/TeamMatrixTab";
 import { AllFAQsManagement } from "@/components/admin/AllFAQsManagement";
+import { AssignUnassignedTasksButton } from "@/components/onboarding/AssignUnassignedTasksButton";
 
 const createUserSchema = z.object({
   email: z.string().email("Invalid email address").max(255),
@@ -395,6 +396,22 @@ const Admin = () => {
         </TabsList>
 
         <TabsContent value="users" className="space-y-8 mt-8">
+          {/* Quick Actions */}
+          <Card className="shadow-card border-border/50">
+            <CardHeader className="bg-gradient-subtle rounded-t-lg">
+              <CardTitle className="flex items-center gap-2">
+                <UserPlus className="w-5 h-5" />
+                Quick Actions
+              </CardTitle>
+              <CardDescription>
+                Bulk operations and system management
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="pt-6">
+              <AssignUnassignedTasksButton />
+            </CardContent>
+          </Card>
+
           {/* Admin Actions */}
           <div className="grid gap-6 md:grid-cols-2">
         <Card className="shadow-card border-border/50">
