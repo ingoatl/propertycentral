@@ -16,12 +16,11 @@ interface TeamRole {
   description: string | null;
 }
 
-interface UserWithRole {
+interface UserWithRoles {
   id: string;
   email: string;
   first_name: string | null;
-  role_id: string | null;
-  role_name: string | null;
+  roles: { role_id: string; role_name: string }[];
 }
 
 interface PhaseAssignment {
@@ -32,7 +31,7 @@ interface PhaseAssignment {
 
 export const TeamMatrixTab = () => {
   const [roles, setRoles] = useState<TeamRole[]>([]);
-  const [users, setUsers] = useState<UserWithRole[]>([]);
+  const [users, setUsers] = useState<UserWithRoles[]>([]);
   const [phaseAssignments, setPhaseAssignments] = useState<PhaseAssignment[]>([]);
   const [loading, setLoading] = useState(true);
   const [newRoleName, setNewRoleName] = useState("");
@@ -70,17 +69,19 @@ export const TeamMatrixTab = () => {
 
     if (profilesError) throw profilesError;
 
-    // Get user team role assignments
+    // Get all user team role assignments
     const { data: teamRolesData } = await supabase
       .from("user_team_roles")
       .select("user_id, role_id, team_roles(role_name)");
 
     const usersWithRoles = profilesData?.map((profile) => {
-      const teamRole = teamRolesData?.find((tr) => tr.user_id === profile.id);
+      const userRoles = teamRolesData?.filter((tr) => tr.user_id === profile.id) || [];
       return {
         ...profile,
-        role_id: teamRole?.role_id || null,
-        role_name: teamRole?.team_roles?.role_name || null,
+        roles: userRoles.map((tr) => ({
+          role_id: tr.role_id,
+          role_name: tr.team_roles?.role_name || "",
+        })),
       };
     }) || [];
 
@@ -149,44 +150,39 @@ export const TeamMatrixTab = () => {
     }
   };
 
-  const handleAssignUserToRole = async (userId: string, roleId: string | null) => {
+  const handleAddRoleToUser = async (userId: string, roleId: string) => {
     try {
-      // Convert "unassigned" string to null
-      const actualRoleId = roleId === "unassigned" ? null : roleId;
-      
-      if (!actualRoleId) {
-        // Remove user from role
-        await supabase
-          .from("user_team_roles")
-          .delete()
-          .eq("user_id", userId);
-      } else {
-        // Upsert user to role
-        const { error } = await supabase
-          .from("user_team_roles")
-          .upsert({
-            user_id: userId,
-            role_id: actualRoleId,
-            is_primary: true,
-          }, {
-            onConflict: "user_id,role_id",
-          });
+      const { error } = await supabase
+        .from("user_team_roles")
+        .insert({
+          user_id: userId,
+          role_id: roleId,
+          is_primary: false,
+        });
 
-        if (error) {
-          // Try delete first then insert
-          await supabase.from("user_team_roles").delete().eq("user_id", userId);
-          await supabase.from("user_team_roles").insert({
-            user_id: userId,
-            role_id: actualRoleId,
-            is_primary: true,
-          });
-        }
-      }
+      if (error) throw error;
 
-      toast.success("User role updated");
+      toast.success("Role added");
       loadUsers();
     } catch (error: any) {
-      toast.error("Failed to assign role: " + error.message);
+      toast.error("Failed to add role: " + error.message);
+    }
+  };
+
+  const handleRemoveRoleFromUser = async (userId: string, roleId: string) => {
+    try {
+      const { error } = await supabase
+        .from("user_team_roles")
+        .delete()
+        .eq("user_id", userId)
+        .eq("role_id", roleId);
+
+      if (error) throw error;
+
+      toast.success("Role removed");
+      loadUsers();
+    } catch (error: any) {
+      toast.error("Failed to remove role: " + error.message);
     }
   };
 
@@ -342,48 +338,74 @@ export const TeamMatrixTab = () => {
               {users.map((user) => (
                 <div
                   key={user.id}
-                  className="border rounded-lg p-4 grid grid-cols-1 md:grid-cols-3 gap-4 items-center"
+                  className="border rounded-lg p-4 space-y-3"
                 >
-                  <div>
-                    <Label htmlFor={`name-${user.id}`} className="text-xs text-muted-foreground">
-                      Display Name
-                    </Label>
-                    <Input
-                      id={`name-${user.id}`}
-                      value={user.first_name || user.email.split("@")[0]}
-                      onBlur={(e) => handleUpdateFirstName(user.id, e.target.value)}
-                      onChange={(e) => {
-                        setUsers((prev) =>
-                          prev.map((u) =>
-                            u.id === user.id ? { ...u, first_name: e.target.value } : u
-                          )
-                        );
-                      }}
-                      className="mt-1"
-                    />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor={`name-${user.id}`} className="text-xs text-muted-foreground">
+                        Display Name
+                      </Label>
+                      <Input
+                        id={`name-${user.id}`}
+                        value={user.first_name || user.email.split("@")[0]}
+                        onBlur={(e) => handleUpdateFirstName(user.id, e.target.value)}
+                        onChange={(e) => {
+                          setUsers((prev) =>
+                            prev.map((u) =>
+                              u.id === user.id ? { ...u, first_name: e.target.value } : u
+                            )
+                          );
+                        }}
+                        className="mt-1"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Email</Label>
+                      <p className="text-sm mt-1">{user.email}</p>
+                    </div>
                   </div>
+                  
                   <div>
-                    <Label className="text-xs text-muted-foreground">Email</Label>
-                    <p className="text-sm mt-1">{user.email}</p>
-                  </div>
-                  <div>
-                    <Label htmlFor={`role-${user.id}`} className="text-xs text-muted-foreground">
-                      Team Role
+                    <Label className="text-xs text-muted-foreground mb-2 block">
+                      Assigned Roles
                     </Label>
+                    <div className="flex flex-wrap gap-2 mb-2">
+                      {user.roles.length === 0 ? (
+                        <span className="text-sm text-muted-foreground">No roles assigned</span>
+                      ) : (
+                        user.roles.map((role) => (
+                          <div
+                            key={role.role_id}
+                            className="flex items-center gap-1 bg-primary/10 text-primary px-2 py-1 rounded-md text-sm"
+                          >
+                            <span>{role.role_name}</span>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-4 w-4 p-0 hover:bg-destructive/20"
+                              onClick={() => handleRemoveRoleFromUser(user.id, role.role_id)}
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </Button>
+                          </div>
+                        ))
+                      )}
+                    </div>
                     <Select
-                      value={user.role_id || "unassigned"}
-                      onValueChange={(value) => handleAssignUserToRole(user.id, value)}
+                      value=""
+                      onValueChange={(value) => handleAddRoleToUser(user.id, value)}
                     >
-                      <SelectTrigger className="mt-1">
-                        <SelectValue placeholder="Select role..." />
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Add a role..." />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="unassigned">Unassigned</SelectItem>
-                        {roles.map((role) => (
-                          <SelectItem key={role.id} value={role.id}>
-                            {role.role_name}
-                          </SelectItem>
-                        ))}
+                        {roles
+                          .filter((role) => !user.roles.some((ur) => ur.role_id === role.id))
+                          .map((role) => (
+                            <SelectItem key={role.id} value={role.id}>
+                              {role.role_name}
+                            </SelectItem>
+                          ))}
                       </SelectContent>
                     </Select>
                   </div>
