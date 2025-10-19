@@ -20,7 +20,6 @@ export interface OnboardingTask {
   notes?: string;
   field_value?: string;
   file_path?: string;
-  requires_proof?: boolean;
   max_reschedule_weeks?: number;
   created_at: string;
   updated_at: string;

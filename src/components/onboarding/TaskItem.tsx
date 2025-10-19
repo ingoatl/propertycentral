@@ -11,7 +11,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { CalendarIcon, Upload, FileText, CheckCircle2, Edit2, Copy, Check, Loader2, Settings, MessageSquare, Trash2, BookOpen, Paperclip } from "lucide-react";
+import { CalendarIcon, Upload, FileText, CheckCircle2, Edit2, Copy, Check, Loader2, Settings, MessageSquare, Trash2, BookOpen } from "lucide-react";
 import { format, addWeeks } from "date-fns";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -54,7 +54,6 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
 
   const hasValue = task.field_value && task.field_value.trim() !== "";
   const isReadOnly = hasValue && !isAdmin && !isEditing;
-  const hasProof = !!(task.file_path || (fieldValue && fieldValue.startsWith('http')) || (fieldValue && fieldValue !== "N/A" && fieldValue.length > 10));
 
   useEffect(() => {
     checkAdminRole();
@@ -111,20 +110,9 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
 
   const autoSave = async (value: string, isCompleted: boolean = true, notesValue?: string) => {
     try {
-      // Validate proof requirement if completing
-      if (isCompleted && task.requires_proof) {
-        const proof = 
-          task.file_path || 
-          (value && value.startsWith('http')) || 
-          (value && value !== "N/A" && value.length > 10);
-        
-        if (!proof) {
-          toast.error("This task requires proof (file, link, or detailed notes)");
-          return;
-        }
-      }
-
-      const newStatus = isCompleted && value ? "completed" : "pending";
+      // Task is complete if any data exists: field_value, file_path, or notes
+      const hasData = value || task.file_path || notesValue;
+      const newStatus = isCompleted && hasData ? "completed" : "pending";
       const updateData: any = {
         field_value: value,
         notes: notesValue ?? notes,
@@ -1262,7 +1250,7 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
     <>
       <Card className={cn(
         "transition-colors py-2 border-2",
-        taskStatus === "completed" && hasProof && "bg-green-50/50 border-green-500"
+        taskStatus === "completed" && "bg-green-50/50 border-green-500"
       )}>
         <CardContent className="py-2 px-3">
           {/* Assignment Row */}
@@ -1288,18 +1276,6 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
             />
             <Label htmlFor={`tpl-${task.id}`} className="cursor-pointer whitespace-nowrap">Template</Label>
           </div>
-
-          {/* Proof Badges */}
-          {task.requires_proof && taskStatus !== "completed" && (
-            <Badge variant="outline" className="mb-2 text-xs gap-1 bg-amber-50">
-              <Paperclip className="w-3 h-3" />Proof Required
-            </Badge>
-          )}
-          {taskStatus === "completed" && hasProof && (
-            <Badge variant="outline" className="mb-2 text-xs gap-1 bg-green-50 border-green-500">
-              <CheckCircle2 className="w-3 h-3" />Proof Provided
-            </Badge>
-          )}
           
           <div className="flex items-start justify-between gap-2">
             <div className="flex-1">

@@ -198,7 +198,6 @@ export const CreateProjectDialog = ({
             assigned_role_id: assignedRoleId,
             due_date: oneWeekOut.toISOString().split('T')[0],
             original_due_date: oneWeekOut.toISOString().split('T')[0],
-            requires_proof: true,
             max_reschedule_weeks: 4,
           };
         })
