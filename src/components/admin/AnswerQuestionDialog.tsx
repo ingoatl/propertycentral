@@ -3,19 +3,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
-const FAQ_CATEGORIES = [
-  "General",
-  "Maintenance",
-  "Booking",
-  "Payment",
-  "Property Access",
-  "Amenities",
-  "Other"
-];
 
 interface Question {
   id: string;
@@ -35,7 +26,6 @@ interface AnswerQuestionDialogProps {
 
 export const AnswerQuestionDialog = ({ open, onOpenChange, question, onAnswered }: AnswerQuestionDialogProps) => {
   const [answer, setAnswer] = useState("");
-  const [category, setCategory] = useState<string>("");
   const [publishAsFAQ, setPublishAsFAQ] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
@@ -63,8 +53,7 @@ export const AnswerQuestionDialog = ({ open, onOpenChange, question, onAnswered 
           answer: answer.trim(),
           answered_by: user.id,
           answered_at: new Date().toISOString(),
-          status: "answered",
-          category: category || question.category || "General"
+          status: "answered"
         })
         .eq("id", question.id);
 
@@ -75,7 +64,7 @@ export const AnswerQuestionDialog = ({ open, onOpenChange, question, onAnswered 
         await supabase.from("frequently_asked_questions").insert({
           question: question.question,
           answer: answer.trim(),
-          category: category || question.category || "General",
+          category: question.category || "General",
           property_id: question.property_id,
           project_id: question.project_id,
           asked_by: question.asked_by,
@@ -120,7 +109,6 @@ export const AnswerQuestionDialog = ({ open, onOpenChange, question, onAnswered 
       });
 
       setAnswer("");
-      setCategory("");
       setPublishAsFAQ(true);
       onOpenChange(false);
       onAnswered();
@@ -143,24 +131,17 @@ export const AnswerQuestionDialog = ({ open, onOpenChange, question, onAnswered 
           <DialogTitle>Answer Question</DialogTitle>
         </DialogHeader>
         <div className="space-y-4 pt-4">
-          <div className="bg-muted p-4 rounded-lg">
-            <p className="text-sm font-medium mb-2">Question:</p>
-            <p className="text-sm">{question?.question}</p>
-          </div>
-          <div>
-            <label className="text-sm font-medium mb-2 block">Category</label>
-            <Select value={category} onValueChange={setCategory}>
-              <SelectTrigger>
-                <SelectValue placeholder={question?.category || "Select a category"} />
-              </SelectTrigger>
-              <SelectContent>
-                {FAQ_CATEGORIES.map((cat) => (
-                  <SelectItem key={cat} value={cat}>
-                    {cat}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="bg-muted p-4 rounded-lg space-y-2">
+            <div>
+              <p className="text-sm font-medium mb-1">Question:</p>
+              <p className="text-sm">{question?.question}</p>
+            </div>
+            {question?.category && (
+              <div>
+                <p className="text-sm font-medium mb-1">Category:</p>
+                <Badge variant="outline">{question.category}</Badge>
+              </div>
+            )}
           </div>
           <div>
             <label className="text-sm font-medium mb-2 block">Your Answer</label>
