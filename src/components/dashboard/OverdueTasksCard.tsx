@@ -214,7 +214,10 @@ export const OverdueTasksCard = () => {
                         <div
                           key={task.id}
                           className={`p-3 rounded-lg border ${getUrgencyColor(daysOverdue)} cursor-pointer hover:opacity-80 transition-opacity`}
-                          onClick={() => navigate(`/properties?project=${task.project_id}`)}
+                          onClick={() => {
+                            // Navigate to properties page and trigger the workflow dialog
+                            navigate(`/properties?openWorkflow=${task.project_id}`);
+                          }}
                         >
                           <div className="flex items-start justify-between gap-3">
                             <div className="flex-1 space-y-1">
@@ -232,7 +235,7 @@ export const OverdueTasksCard = () => {
                                 </Badge>
                               </div>
                               <p className="text-xs opacity-90">
-                                Phase {task.phase_number}: {task.phase_title}
+                                {task.phase_title}
                               </p>
                             </div>
                             <Button

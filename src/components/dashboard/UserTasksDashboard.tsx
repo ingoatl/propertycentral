@@ -247,7 +247,10 @@ export const UserTasksDashboard = () => {
                   <div
                     key={task.id}
                     className="flex items-start justify-between p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors cursor-pointer"
-                    onClick={() => navigate(`/properties?project=${task.project_id}`)}
+                    onClick={() => {
+                      // Navigate to properties page and trigger the workflow dialog
+                      navigate(`/properties?openWorkflow=${task.project_id}`);
+                    }}
                   >
                      <div className="space-y-1">
                       <div className="flex items-center gap-2">
@@ -259,7 +262,7 @@ export const UserTasksDashboard = () => {
                       </p>
                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
                         <Badge variant="outline" className="text-xs">
-                          Phase {task.phase_number}
+                          {task.phase_title}
                         </Badge>
                         {task.assigned_to && (
                           <span>Assigned to: {task.assigned_to}</span>

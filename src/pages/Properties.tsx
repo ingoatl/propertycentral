@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -25,6 +26,7 @@ const propertySchema = z.object({
 });
 
 const Properties = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [properties, setProperties] = useState<Property[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -53,6 +55,34 @@ const Properties = () => {
     loadProperties();
     loadPropertyProjects();
   }, []);
+
+  // Handle opening workflow from URL parameter
+  useEffect(() => {
+    const openWorkflowId = searchParams.get('openWorkflow');
+    if (openWorkflowId && properties.length > 0) {
+      // Find the project and associated property
+      const projectId = openWorkflowId;
+      const propertyId = Object.entries(propertyProjects).find(
+        ([_, pId]) => pId === projectId
+      )?.[0];
+
+      if (propertyId) {
+        const property = properties.find(p => p.id === propertyId);
+        if (property) {
+          setSelectedPropertyForWorkflow({
+            id: property.id,
+            name: property.name,
+            address: property.address,
+            projectId: projectId,
+            visitPrice: property.visitPrice
+          });
+          // Clear the URL parameter
+          searchParams.delete('openWorkflow');
+          setSearchParams(searchParams);
+        }
+      }
+    }
+  }, [searchParams, properties, propertyProjects]);
 
   const loadProperties = async () => {
     try {
