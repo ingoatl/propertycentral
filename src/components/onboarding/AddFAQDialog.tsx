@@ -79,12 +79,12 @@ export function AddFAQDialog({
         if (error) throw error;
         toast.success("FAQ updated successfully");
       } else {
-        // Create new FAQ
+        // Create new FAQ - no property/project required for general FAQs
         const { error } = await supabase
           .from('frequently_asked_questions')
           .insert({
-            property_id: propertyId,
-            project_id: projectId,
+            property_id: null,
+            project_id: null,
             question: question.trim(),
             answer: answer.trim(),
             category,

@@ -87,17 +87,19 @@ export const UserTasksDashboard = () => {
 
       const { count: completedCount } = await completedQuery;
 
-      // Upcoming tasks (next 7 days)
+      // Upcoming tasks (next 7 days) - filter for tasks in active/in-progress projects
       let upcomingQuery = supabase
         .from("onboarding_tasks")
         .select(`
           *,
-          onboarding_projects (
+          onboarding_projects!inner (
             owner_name,
-            property_address
+            property_address,
+            status
           )
         `)
         .neq("status", "completed")
+        .in("onboarding_projects.status", ["pending", "in-progress"])
         .gte("due_date", today.toISOString().split('T')[0])
         .lte("due_date", sevenDaysFromNow.toISOString().split('T')[0])
         .order("due_date", { ascending: true })
@@ -227,7 +229,7 @@ export const UserTasksDashboard = () => {
                     className="flex items-start justify-between p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors cursor-pointer"
                     onClick={() => navigate(`/onboarding?project=${task.project_id}`)}
                   >
-                    <div className="space-y-1">
+                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
                         <p className="font-medium">{task.title}</p>
                         <ExternalLink className="h-3 w-3 opacity-50" />
@@ -235,6 +237,14 @@ export const UserTasksDashboard = () => {
                       <p className="text-sm text-muted-foreground">
                         {task.onboarding_projects?.property_address}
                       </p>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <Badge variant="outline" className="text-xs">
+                          Phase {task.phase_number}
+                        </Badge>
+                        {task.assigned_to && (
+                          <span>Assigned to: {task.assigned_to}</span>
+                        )}
+                      </div>
                       <div className="flex items-center gap-2 text-sm">
                         <Calendar className="h-3 w-3" />
                         <span>
