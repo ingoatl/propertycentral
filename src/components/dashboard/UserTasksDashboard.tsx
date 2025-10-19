@@ -77,7 +77,11 @@ export const UserTasksDashboard = () => {
         .neq("status", "completed");
 
       if (!isAdmin) {
-        totalQuery = totalQuery.or(`assigned_to_uuid.eq.${user.id},assigned_role_id.in.(${userRoleIds.join(",")})`);
+        if (userRoleIds.length > 0) {
+          totalQuery = totalQuery.or(`assigned_to_uuid.eq.${user.id},assigned_role_id.in.(${userRoleIds.join(",")})`);
+        } else {
+          totalQuery = totalQuery.eq("assigned_to_uuid", user.id);
+        }
       }
 
       const { count: totalCount } = await totalQuery;
@@ -90,7 +94,11 @@ export const UserTasksDashboard = () => {
         .gte("completed_date", sevenDaysAgo.toISOString());
 
       if (!isAdmin) {
-        completedQuery = completedQuery.or(`assigned_to_uuid.eq.${user.id},assigned_role_id.in.(${userRoleIds.join(",")})`);
+        if (userRoleIds.length > 0) {
+          completedQuery = completedQuery.or(`assigned_to_uuid.eq.${user.id},assigned_role_id.in.(${userRoleIds.join(",")})`);
+        } else {
+          completedQuery = completedQuery.eq("assigned_to_uuid", user.id);
+        }
       }
 
       const { count: completedCount } = await completedQuery;
@@ -114,7 +122,11 @@ export const UserTasksDashboard = () => {
         .limit(10);
 
       if (!isAdmin) {
-        upcomingQuery = upcomingQuery.or(`assigned_to_uuid.eq.${user.id},assigned_role_id.in.(${userRoleIds.join(",")})`);
+        if (userRoleIds.length > 0) {
+          upcomingQuery = upcomingQuery.or(`assigned_to_uuid.eq.${user.id},assigned_role_id.in.(${userRoleIds.join(",")})`);
+        } else {
+          upcomingQuery = upcomingQuery.eq("assigned_to_uuid", user.id);
+        }
       }
 
       const { data: upcomingData } = await upcomingQuery;
@@ -134,7 +146,11 @@ export const UserTasksDashboard = () => {
         .limit(10);
 
       if (!isAdmin) {
-        recentlyCompletedQuery = recentlyCompletedQuery.or(`assigned_to_uuid.eq.${user.id},assigned_role_id.in.(${userRoleIds.join(",")})`);
+        if (userRoleIds.length > 0) {
+          recentlyCompletedQuery = recentlyCompletedQuery.or(`assigned_to_uuid.eq.${user.id},assigned_role_id.in.(${userRoleIds.join(",")})`);
+        } else {
+          recentlyCompletedQuery = recentlyCompletedQuery.eq("assigned_to_uuid", user.id);
+        }
       }
 
       const { data: completedData } = await recentlyCompletedQuery;

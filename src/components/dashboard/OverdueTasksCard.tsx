@@ -49,7 +49,7 @@ export const OverdueTasksCard = () => {
 
       const today = new Date().toISOString().split('T')[0];
 
-      const { data, error } = await supabase
+      let query = supabase
         .from("onboarding_tasks")
         .select(`
           *,
@@ -58,10 +58,18 @@ export const OverdueTasksCard = () => {
             property_address
           )
         `)
-        .or(`assigned_to_uuid.eq.${user.id},assigned_role_id.in.(${userRoleIds.join(",")})`)
         .lt("due_date", today)
         .neq("status", "completed")
         .order("due_date", { ascending: true });
+
+      // Filter by user assignment - either directly assigned or by role
+      if (userRoleIds.length > 0) {
+        query = query.or(`assigned_to_uuid.eq.${user.id},assigned_role_id.in.(${userRoleIds.join(",")})`);
+      } else {
+        query = query.eq("assigned_to_uuid", user.id);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
 
