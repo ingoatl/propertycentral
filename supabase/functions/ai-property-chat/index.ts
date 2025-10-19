@@ -321,7 +321,7 @@ Be helpful and concise.`;
                             .from("onboarding_projects")
                             .select("id")
                             .eq("property_id", propertyId)
-                            .single();
+                            .maybeSingle();
                           
                           if (project) {
                             const { data: tasks } = await supabase
@@ -367,7 +367,7 @@ Be helpful and concise.`;
                           .from("onboarding_projects")
                           .select("id")
                           .eq("property_id", args.property_id)
-                          .single();
+                          .maybeSingle();
                         
                         if (project) {
                           const { data: tasks } = await supabase
