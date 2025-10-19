@@ -9,8 +9,10 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
-import { CalendarIcon, Upload, FileText, CheckCircle2, Edit2, Copy, Check, Loader2, Settings, MessageSquare, Trash2, BookOpen } from "lucide-react";
-import { format } from "date-fns";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { CalendarIcon, Upload, FileText, CheckCircle2, Edit2, Copy, Check, Loader2, Settings, MessageSquare, Trash2, BookOpen, Paperclip } from "lucide-react";
+import { format, addWeeks } from "date-fns";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -47,13 +49,17 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
   const [showSOPDialog, setShowSOPDialog] = useState(false);
   const [showSOPFormDialog, setShowSOPFormDialog] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [approvedUsers, setApprovedUsers] = useState<any[]>([]);
+  const [saveAsTemplate, setSaveAsTemplate] = useState(false);
 
   const hasValue = task.field_value && task.field_value.trim() !== "";
   const isReadOnly = hasValue && !isAdmin && !isEditing;
+  const hasProof = !!(task.file_path || (fieldValue && fieldValue.startsWith('http')) || (fieldValue && fieldValue !== "N/A" && fieldValue.length > 10));
 
   useEffect(() => {
     checkAdminRole();
     loadSOP();
+    loadApprovedUsers();
   }, [task.id]);
 
   const checkAdminRole = async () => {
@@ -80,6 +86,16 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
     setSOP(data);
   };
 
+  const loadApprovedUsers = async () => {
+    const { data } = await supabase
+      .from("profiles")
+      .select("id, email, first_name")
+      .eq("status", "approved")
+      .order("first_name");
+
+    setApprovedUsers(data || []);
+  };
+
   const handleSOPSuccess = () => {
     loadSOP();
   };
@@ -95,6 +111,19 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
 
   const autoSave = async (value: string, isCompleted: boolean = true, notesValue?: string) => {
     try {
+      // Validate proof requirement if completing
+      if (isCompleted && task.requires_proof) {
+        const proof = 
+          task.file_path || 
+          (value && value.startsWith('http')) || 
+          (value && value !== "N/A" && value.length > 10);
+        
+        if (!proof) {
+          toast.error("This task requires proof (file, link, or detailed notes)");
+          return;
+        }
+      }
+
       const newStatus = isCompleted && value ? "completed" : "pending";
       const updateData: any = {
         field_value: value,
@@ -113,6 +142,48 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
       onUpdate(); // Trigger progress update
     } catch (error) {
       console.error("Failed to auto-save task:", error);
+    }
+  };
+
+  const handleReassign = async (userId: string) => {
+    try {
+      const updateData: any = { assigned_to_uuid: userId };
+
+      // If "Save as template" is checked, also update the template
+      if (saveAsTemplate) {
+        const { data: roleData } = await supabase
+          .from("user_team_roles")
+          .select("role_id")
+          .eq("user_id", userId)
+          .eq("is_primary", true)
+          .maybeSingle();
+
+        if (roleData?.role_id) {
+          updateData.assigned_role_id = roleData.role_id;
+
+          // Upsert task template
+          await supabase.from("task_templates").upsert({
+            phase_number: task.phase_number,
+            task_title: task.title,
+            default_role_id: roleData.role_id,
+            field_type: task.field_type,
+          }, {
+            onConflict: "phase_number,task_title",
+          });
+
+          toast.success("Assignment saved as template for future projects");
+        }
+      }
+
+      await supabase
+        .from("onboarding_tasks")
+        .update(updateData)
+        .eq("id", task.id);
+
+      toast.success("Task reassigned");
+      onUpdate();
+    } catch (error: any) {
+      toast.error("Failed to reassign task");
     }
   };
 
@@ -1187,10 +1258,46 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
   return (
     <>
       <Card className={cn(
-        "transition-colors py-2",
-        taskStatus === "completed" && "bg-green-50/50 border-green-200"
+        "transition-colors py-2 border-2",
+        taskStatus === "completed" && hasProof && "bg-green-50/50 border-green-500"
       )}>
         <CardContent className="py-2 px-3">
+          {/* Assignment Row */}
+          <div className="flex items-center gap-2 mb-2 p-2 bg-muted/30 rounded text-xs">
+            <Label className="min-w-[70px]">Assigned:</Label>
+            <Select value={task.assigned_to_uuid || ""} onValueChange={handleReassign}>
+              <SelectTrigger className="h-7 text-xs flex-1">
+                <SelectValue placeholder="Unassigned" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">Unassigned</SelectItem>
+                {approvedUsers.map(user => (
+                  <SelectItem key={user.id} value={user.id}>
+                    {user.first_name || user.email.split('@')[0]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Checkbox 
+              id={`tpl-${task.id}`}
+              checked={saveAsTemplate}
+              onCheckedChange={(c) => setSaveAsTemplate(c as boolean)}
+            />
+            <Label htmlFor={`tpl-${task.id}`} className="cursor-pointer whitespace-nowrap">Template</Label>
+          </div>
+
+          {/* Proof Badges */}
+          {task.requires_proof && taskStatus !== "completed" && (
+            <Badge variant="outline" className="mb-2 text-xs gap-1 bg-amber-50">
+              <Paperclip className="w-3 h-3" />Proof Required
+            </Badge>
+          )}
+          {taskStatus === "completed" && hasProof && (
+            <Badge variant="outline" className="mb-2 text-xs gap-1 bg-green-50 border-green-500">
+              <CheckCircle2 className="w-3 h-3" />Proof Provided
+            </Badge>
+          )}
+          
           <div className="flex items-start justify-between gap-2">
             <div className="flex-1">
               {renderField()}

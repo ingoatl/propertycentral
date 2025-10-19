@@ -11,12 +11,17 @@ export interface OnboardingTask {
   description?: string;
   field_type: FieldType;
   assigned_to?: string;
+  assigned_to_uuid?: string;
+  assigned_role_id?: string;
   status: TaskStatus;
   due_date?: string;
+  original_due_date?: string;
   completed_date?: string;
   notes?: string;
   field_value?: string;
   file_path?: string;
+  requires_proof?: boolean;
+  max_reschedule_weeks?: number;
   created_at: string;
   updated_at: string;
 }

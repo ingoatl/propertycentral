@@ -521,7 +521,9 @@ export type Database = {
       }
       onboarding_tasks: {
         Row: {
+          assigned_role_id: string | null
           assigned_to: string | null
+          assigned_to_uuid: string | null
           completed_date: string | null
           created_at: string
           description: string | null
@@ -530,16 +532,21 @@ export type Database = {
           field_value: string | null
           file_path: string | null
           id: string
+          max_reschedule_weeks: number | null
           notes: string | null
+          original_due_date: string | null
           phase_number: number
           phase_title: string
           project_id: string
+          requires_proof: boolean | null
           status: string
           title: string
           updated_at: string
         }
         Insert: {
+          assigned_role_id?: string | null
           assigned_to?: string | null
+          assigned_to_uuid?: string | null
           completed_date?: string | null
           created_at?: string
           description?: string | null
@@ -548,16 +555,21 @@ export type Database = {
           field_value?: string | null
           file_path?: string | null
           id?: string
+          max_reschedule_weeks?: number | null
           notes?: string | null
+          original_due_date?: string | null
           phase_number: number
           phase_title: string
           project_id: string
+          requires_proof?: boolean | null
           status?: string
           title: string
           updated_at?: string
         }
         Update: {
+          assigned_role_id?: string | null
           assigned_to?: string | null
+          assigned_to_uuid?: string | null
           completed_date?: string | null
           created_at?: string
           description?: string | null
@@ -566,15 +578,32 @@ export type Database = {
           field_value?: string | null
           file_path?: string | null
           id?: string
+          max_reschedule_weeks?: number | null
           notes?: string | null
+          original_due_date?: string | null
           phase_number?: number
           phase_title?: string
           project_id?: string
+          requires_proof?: boolean | null
           status?: string
           title?: string
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "onboarding_tasks_assigned_role_id_fkey"
+            columns: ["assigned_role_id"]
+            isOneToOne: false
+            referencedRelation: "team_roles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_tasks_assigned_to_uuid_fkey"
+            columns: ["assigned_to_uuid"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "onboarding_tasks_project_id_fkey"
             columns: ["project_id"]
@@ -643,10 +672,46 @@ export type Database = {
           },
         ]
       }
+      phase_role_assignments: {
+        Row: {
+          created_at: string
+          id: string
+          phase_number: number
+          phase_title: string
+          role_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          phase_number: number
+          phase_title: string
+          role_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          phase_number?: number
+          phase_title?: string
+          role_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "phase_role_assignments_role_id_fkey"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "team_roles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string
           email: string
+          first_name: string | null
           id: string
           is_admin: boolean
           status: Database["public"]["Enums"]["account_status"]
@@ -655,6 +720,7 @@ export type Database = {
         Insert: {
           created_at?: string
           email: string
+          first_name?: string | null
           id: string
           is_admin?: boolean
           status?: Database["public"]["Enums"]["account_status"]
@@ -663,6 +729,7 @@ export type Database = {
         Update: {
           created_at?: string
           email?: string
+          first_name?: string | null
           id?: string
           is_admin?: boolean
           status?: Database["public"]["Enums"]["account_status"]
@@ -744,6 +811,65 @@ export type Database = {
         }
         Relationships: []
       }
+      task_templates: {
+        Row: {
+          created_at: string
+          default_role_id: string | null
+          field_type: string
+          id: string
+          phase_number: number
+          task_title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          default_role_id?: string | null
+          field_type: string
+          id?: string
+          phase_number: number
+          task_title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          default_role_id?: string | null
+          field_type?: string
+          id?: string
+          phase_number?: number
+          task_title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_templates_default_role_id_fkey"
+            columns: ["default_role_id"]
+            isOneToOne: false
+            referencedRelation: "team_roles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      team_roles: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          role_name: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          role_name: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          role_name?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string | null
@@ -764,6 +890,45 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      user_team_roles: {
+        Row: {
+          created_at: string
+          id: string
+          is_primary: boolean | null
+          role_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_primary?: boolean | null
+          role_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_primary?: boolean | null
+          role_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_team_roles_role_id_fkey"
+            columns: ["role_id"]
+            isOneToOne: false
+            referencedRelation: "team_roles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_team_roles_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       visits: {
         Row: {

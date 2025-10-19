@@ -6,9 +6,11 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { CheckCircle, XCircle, Clock, Shield, UserPlus, Key } from "lucide-react";
+import { CheckCircle, XCircle, Clock, Shield, UserPlus, Key, Users } from "lucide-react";
 import { z } from "zod";
+import { TeamMatrixTab } from "@/components/admin/TeamMatrixTab";
 
 const createUserSchema = z.object({
   email: z.string().email("Invalid email address").max(255),
@@ -368,14 +370,28 @@ const Admin = () => {
   const rejectedUsers = profiles.filter((p) => p.status === "rejected");
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      <div className="pb-4 border-b border-border/50">
-        <h1 className="text-4xl font-bold bg-gradient-primary bg-clip-text text-transparent">Admin Panel</h1>
-        <p className="text-muted-foreground mt-1">Manage user access and permissions</p>
+    <div className="space-y-8 pb-20">
+      <div className="mb-8">
+        <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-primary via-primary-light to-accent bg-clip-text text-transparent">
+          Admin Panel
+        </h1>
+        <p className="text-muted-foreground">
+          Manage user accounts, permissions, team roles, and access to the system
+        </p>
       </div>
 
-      {/* Admin Actions */}
-      <div className="grid gap-6 md:grid-cols-2">
+      <Tabs defaultValue="users" className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="users">User Management</TabsTrigger>
+          <TabsTrigger value="team-matrix">
+            <Users className="w-4 h-4 mr-2" />
+            Team Matrix
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="users" className="space-y-8 mt-8">
+          {/* Admin Actions */}
+          <div className="grid gap-6 md:grid-cols-2">
         <Card className="shadow-card border-border/50">
           <CardHeader className="bg-gradient-subtle rounded-t-lg">
             <CardTitle className="flex items-center gap-2">
@@ -635,6 +651,12 @@ const Admin = () => {
           </CardContent>
         </Card>
       )}
+        </TabsContent>
+
+        <TabsContent value="team-matrix" className="mt-8">
+          <TeamMatrixTab />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };

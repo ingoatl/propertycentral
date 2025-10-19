@@ -3,11 +3,13 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { ONBOARDING_PHASES } from "@/context/onboardingPhases";
 import { Plus } from "lucide-react";
+import { addWeeks } from "date-fns";
 
 interface CreateProjectDialogProps {
   open: boolean;
@@ -30,6 +32,7 @@ export const CreateProjectDialog = ({
   const [owners, setOwners] = useState<any[]>([]);
   const [selectedOwnerId, setSelectedOwnerId] = useState<string>("");
   const [showNewOwnerForm, setShowNewOwnerForm] = useState(false);
+  const [autoAssign, setAutoAssign] = useState(true);
   const [newOwnerData, setNewOwnerData] = useState({
     name: "",
     email: "",
@@ -132,17 +135,73 @@ export const CreateProjectDialog = ({
 
       if (projectError) throw projectError;
 
-      // Create all tasks for all 9 phases
+      // Get phase assignments and task templates if auto-assign is enabled
+      let phaseAssignments: any[] = [];
+      let taskTemplates: any[] = [];
+      let userTeamRoles: any[] = [];
+
+      if (autoAssign) {
+        const [phaseData, templateData, roleData] = await Promise.all([
+          supabase.from("phase_role_assignments").select("*"),
+          supabase.from("task_templates").select("*"),
+          supabase.from("user_team_roles").select("user_id, role_id").eq("is_primary", true),
+        ]);
+
+        phaseAssignments = phaseData.data || [];
+        taskTemplates = templateData.data || [];
+        userTeamRoles = roleData.data || [];
+      }
+
+      // Create all tasks for all 9 phases with auto-assignment
+      const oneWeekOut = addWeeks(new Date(), 1);
       const allTasks = ONBOARDING_PHASES.flatMap((phase) =>
-        phase.tasks.map((task) => ({
-          project_id: project.id,
-          phase_number: phase.id,
-          phase_title: phase.title,
-          title: task.title,
-          description: task.description,
-          field_type: task.field_type,
-          status: "pending" as const,
-        }))
+        phase.tasks.map((task) => {
+          let assignedToUuid = null;
+          let assignedRoleId = null;
+
+          if (autoAssign) {
+            // Check for task-level template override
+            const taskTemplate = taskTemplates.find(
+              (t: any) => t.phase_number === phase.id && t.task_title === task.title
+            );
+
+            if (taskTemplate?.default_role_id) {
+              assignedRoleId = taskTemplate.default_role_id;
+            } else {
+              // Use phase assignment
+              const phaseAssignment = phaseAssignments.find(
+                (p: any) => p.phase_number === phase.id
+              );
+              if (phaseAssignment) {
+                assignedRoleId = phaseAssignment.role_id;
+              }
+            }
+
+            // Find user with that role
+            if (assignedRoleId) {
+              const userRole = userTeamRoles.find((ur: any) => ur.role_id === assignedRoleId);
+              if (userRole) {
+                assignedToUuid = userRole.user_id;
+              }
+            }
+          }
+
+          return {
+            project_id: project.id,
+            phase_number: phase.id,
+            phase_title: phase.title,
+            title: task.title,
+            description: task.description,
+            field_type: task.field_type,
+            status: "pending" as const,
+            assigned_to_uuid: assignedToUuid,
+            assigned_role_id: assignedRoleId,
+            due_date: oneWeekOut.toISOString().split('T')[0],
+            original_due_date: oneWeekOut.toISOString().split('T')[0],
+            requires_proof: true,
+            max_reschedule_weeks: 4,
+          };
+        })
       );
 
       const { error: tasksError } = await supabase
@@ -151,7 +210,15 @@ export const CreateProjectDialog = ({
 
       if (tasksError) throw tasksError;
 
-      toast.success("Onboarding project created successfully!");
+      const assignedCount = allTasks.filter(t => t.assigned_to_uuid).length;
+      const totalCount = allTasks.length;
+
+      if (autoAssign && assignedCount > 0) {
+        toast.success(`Project created with ${assignedCount}/${totalCount} tasks assigned to team`);
+      } else {
+        toast.success("Onboarding project created successfully!");
+      }
+
       setSelectedOwnerId("");
       setShowNewOwnerForm(false);
       setNewOwnerData({ name: "", email: "", phone: "" });
@@ -270,6 +337,20 @@ export const CreateProjectDialog = ({
                 </div>
               </div>
             )}
+          </div>
+
+          <div className="flex items-center space-x-2 pt-4 border-t">
+            <Checkbox
+              id="auto-assign"
+              checked={autoAssign}
+              onCheckedChange={(checked) => setAutoAssign(checked as boolean)}
+            />
+            <Label
+              htmlFor="auto-assign"
+              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+            >
+              Auto-assign tasks based on Team Matrix
+            </Label>
           </div>
         </div>
 
