@@ -147,14 +147,17 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
 
   const handleReassign = async (userId: string) => {
     try {
-      const updateData: any = { assigned_to_uuid: userId };
+      // Convert "unassigned" to null
+      const actualUserId = userId === "unassigned" ? null : userId;
+      
+      const updateData: any = { assigned_to_uuid: actualUserId };
 
       // If "Save as template" is checked, also update the template
-      if (saveAsTemplate) {
+      if (saveAsTemplate && actualUserId) {
         const { data: roleData } = await supabase
           .from("user_team_roles")
           .select("role_id")
-          .eq("user_id", userId)
+          .eq("user_id", actualUserId)
           .eq("is_primary", true)
           .maybeSingle();
 
@@ -1265,12 +1268,12 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
           {/* Assignment Row */}
           <div className="flex items-center gap-2 mb-2 p-2 bg-muted/30 rounded text-xs">
             <Label className="min-w-[70px]">Assigned:</Label>
-            <Select value={task.assigned_to_uuid || ""} onValueChange={handleReassign}>
+            <Select value={task.assigned_to_uuid || "unassigned"} onValueChange={handleReassign}>
               <SelectTrigger className="h-7 text-xs flex-1">
                 <SelectValue placeholder="Unassigned" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Unassigned</SelectItem>
+                <SelectItem value="unassigned">Unassigned</SelectItem>
                 {approvedUsers.map(user => (
                   <SelectItem key={user.id} value={user.id}>
                     {user.first_name || user.email.split('@')[0]}

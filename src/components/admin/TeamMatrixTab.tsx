@@ -151,7 +151,10 @@ export const TeamMatrixTab = () => {
 
   const handleAssignUserToRole = async (userId: string, roleId: string | null) => {
     try {
-      if (!roleId) {
+      // Convert "unassigned" string to null
+      const actualRoleId = roleId === "unassigned" ? null : roleId;
+      
+      if (!actualRoleId) {
         // Remove user from role
         await supabase
           .from("user_team_roles")
@@ -163,7 +166,7 @@ export const TeamMatrixTab = () => {
           .from("user_team_roles")
           .upsert({
             user_id: userId,
-            role_id: roleId,
+            role_id: actualRoleId,
             is_primary: true,
           }, {
             onConflict: "user_id,role_id",
@@ -174,7 +177,7 @@ export const TeamMatrixTab = () => {
           await supabase.from("user_team_roles").delete().eq("user_id", userId);
           await supabase.from("user_team_roles").insert({
             user_id: userId,
-            role_id: roleId,
+            role_id: actualRoleId,
             is_primary: true,
           });
         }
@@ -208,7 +211,10 @@ export const TeamMatrixTab = () => {
       const phase = ONBOARDING_PHASES.find((p) => p.id === phaseNumber);
       if (!phase) return;
 
-      if (!roleId) {
+      // Convert "unassigned" string to null
+      const actualRoleId = roleId === "unassigned" ? null : roleId;
+
+      if (!actualRoleId) {
         // Remove assignment
         await supabase
           .from("phase_role_assignments")
@@ -221,7 +227,7 @@ export const TeamMatrixTab = () => {
           .upsert({
             phase_number: phaseNumber,
             phase_title: phase.title,
-            role_id: roleId,
+            role_id: actualRoleId,
           }, {
             onConflict: "phase_number",
           });
@@ -365,20 +371,19 @@ export const TeamMatrixTab = () => {
                       Team Role
                     </Label>
                     <Select
-                      value={user.role_id || ""}
-                      onValueChange={(value) => handleAssignUserToRole(user.id, value || null)}
+                      value={user.role_id || "unassigned"}
+                      onValueChange={(value) => handleAssignUserToRole(user.id, value)}
                     >
                       <SelectTrigger className="mt-1">
                         <SelectValue placeholder="Select role..." />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">Unassigned</SelectItem>
+                        <SelectItem value="unassigned">Unassigned</SelectItem>
                         {roles.map((role) => (
                           <SelectItem key={role.id} value={role.id}>
                             {role.role_name}
                           </SelectItem>
-                        ))
-                        }
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
@@ -415,22 +420,21 @@ export const TeamMatrixTab = () => {
                 </div>
                 <div>
                   <Select
-                    value={assignment.role_id || ""}
+                    value={assignment.role_id || "unassigned"}
                     onValueChange={(value) =>
-                      handleAssignPhaseToRole(assignment.phase_number, value || null)
+                      handleAssignPhaseToRole(assignment.phase_number, value)
                     }
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select role..." />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Unassigned</SelectItem>
+                      <SelectItem value="unassigned">Unassigned</SelectItem>
                       {roles.map((role) => (
                         <SelectItem key={role.id} value={role.id}>
                           {role.role_name}
                         </SelectItem>
-                      ))
-                      }
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
