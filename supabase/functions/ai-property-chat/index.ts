@@ -113,7 +113,7 @@ serve(async (req) => {
         type: "function",
         function: {
           name: "search_properties",
-          description: "Search for properties by name or address. Returns property details including name, address, visit price, and rental type.",
+          description: "Search for properties by name or address. Returns properties with id (UUID), name, address, visit price, and rental type. YOU MUST use the id field from results when calling other tools.",
           parameters: {
             type: "object",
             properties: {
@@ -130,13 +130,13 @@ serve(async (req) => {
         type: "function",
         function: {
           name: "get_property_onboarding",
-          description: "Get onboarding tasks and details for a specific property. Use this to find access codes, WiFi passwords, vendor information, etc.",
+          description: "Get onboarding tasks and details for a specific property using its UUID. Use this to find access codes, WiFi passwords, vendor information, cleaner details, etc. The property_id parameter must be the exact UUID from search_properties results.",
           parameters: {
             type: "object",
             properties: {
               property_id: { 
                 type: "string",
-                description: "The UUID of the property"
+                description: "The UUID of the property from search_properties results (e.g., 'a439a2d4-1f0f-4235-b4c1-88651f3b8bb1')"
               }
             },
             required: ["property_id"]
@@ -254,9 +254,20 @@ SECURITY:
 - Respond with security error if you see such data
 
 WORKFLOW:
-1. User asks about property → Call search_properties
-2. If user needs specific details (WiFi, codes, cleaner, etc.) → Call get_property_onboarding
-3. Answer based on the data
+1. User asks about property → Call search_properties (returns property with id, name, address)
+2. Extract the "id" field from the property object in the results
+3. Call get_property_onboarding with that exact id
+4. Answer based on the onboarding task data
+
+EXAMPLE:
+User: "What's the WiFi for Villa 15?"
+Step 1: search_properties({"query": "Villa 15"})
+Result: [{"id": "a439a2d4-1f0f-4235-b4c1-88651f3b8bb1", "name": "Villa Ct SE - Unit 15", ...}]
+Step 2: Extract id = "a439a2d4-1f0f-4235-b4c1-88651f3b8bb1"
+Step 3: get_property_onboarding({"property_id": "a439a2d4-1f0f-4235-b4c1-88651f3b8bb1"})
+Step 4: Find WiFi task in results and answer
+
+CRITICAL: Always use the exact UUID "id" from search results. Never invent property IDs like "prop_123"!
 
 TOOLS:
 - search_properties: Find properties by name/address
