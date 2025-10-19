@@ -29,7 +29,7 @@ const handler = async (req: Request): Promise<Response> => {
     if (type === 'new_question') {
       // Notify admin about new question
       const emailResponse = await resend.emails.send({
-        from: "PeachHaus <onboarding@resend.dev>",
+        from: "PeachHaus <admin@peachhausgroup.com>",
         to: ["ingo@peachhausgroup.com"],
         subject: `New FAQ Question from ${user_name || 'User'}`,
         html: `
@@ -38,7 +38,10 @@ const handler = async (req: Request): Promise<Response> => {
           ${property_address ? `<p><strong>Property:</strong> ${property_address}</p>` : ''}
           <p><strong>Question:</strong></p>
           <p>${question_text}</p>
-          <p><a href="${Deno.env.get('VITE_SUPABASE_URL')}/dashboard">View in Admin Dashboard</a></p>
+          <br/>
+          <p><a href="https://9ed06ecd-51b7-4166-a07a-107b37f1e8c1.lovableproject.com/" style="display: inline-block; padding: 10px 20px; background-color: #007bff; color: white; text-decoration: none; border-radius: 5px;">Answer Question in Dashboard</a></p>
+          <br/>
+          <p style="color: #666; font-size: 12px;">Click the button above to view and answer this question in the admin dashboard.</p>
         `,
       });
 
@@ -50,7 +53,7 @@ const handler = async (req: Request): Promise<Response> => {
     } else if (type === 'question_answered') {
       // Notify user about answered question
       const emailResponse = await resend.emails.send({
-        from: "PeachHaus <onboarding@resend.dev>",
+        from: "PeachHaus <admin@peachhausgroup.com>",
         to: [user_email!],
         subject: "Your Question Has Been Answered",
         html: `

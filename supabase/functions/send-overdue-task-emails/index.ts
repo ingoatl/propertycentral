@@ -180,7 +180,7 @@ const handler = async (req: Request): Promise<Response> => {
         `;
 
         const emailResponse = await resend.emails.send({
-          from: "PeachHaus Tasks <onboarding@resend.dev>",
+          from: "PeachHaus <admin@peachhausgroup.com>",
           to: [userEmail],
           subject: `⚠️ You have ${tasks.length} overdue task${tasks.length !== 1 ? 's' : ''}`,
           html: emailHTML,
