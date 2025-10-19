@@ -11,8 +11,8 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { CalendarIcon, Upload, FileText, CheckCircle2, Edit2, Copy, Check, Loader2, Settings, MessageSquare, Trash2, BookOpen, User } from "lucide-react";
-import { format, addWeeks } from "date-fns";
+import { CalendarIcon, Upload, FileText, CheckCircle2, Edit2, Copy, Check, Loader2, Settings, MessageSquare, Trash2, BookOpen, User, Clock } from "lucide-react";
+import { format, addWeeks, isBefore, startOfDay, isPast } from "date-fns";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -21,6 +21,8 @@ import { InlineComments } from "./InlineComments";
 import { SOPDialog } from "./SOPDialog";
 import { SOPFormDialog } from "./SOPFormDialog";
 import { TaskAssignmentDialog } from "./TaskAssignmentDialog";
+import { RescheduleDueDateDialog } from "./RescheduleDueDateDialog";
+import { useAdminCheck } from "@/hooks/useAdminCheck";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -49,28 +51,26 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
   const [sop, setSOP] = useState<OnboardingSOP | null>(null);
   const [showSOPDialog, setShowSOPDialog] = useState(false);
   const [showSOPFormDialog, setShowSOPFormDialog] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
   const [showAssignmentDialog, setShowAssignmentDialog] = useState(false);
-
+  const [showRescheduleDialog, setShowRescheduleDialog] = useState(false);
+  const [showDueDatePicker, setShowDueDatePicker] = useState(false);
+  const [newDueDate, setNewDueDate] = useState<Date | undefined>(
+    task.due_date ? new Date(task.due_date) : undefined
+  );
+  
+  const { isAdmin } = useAdminCheck();
   const hasValue = task.field_value && task.field_value.trim() !== "";
   const isReadOnly = hasValue && !isAdmin && !isEditing;
+  
+  const isDueDateOverdue = task.due_date && isPast(new Date(task.due_date)) && task.status !== "completed";
 
   useEffect(() => {
-    checkAdminRole();
     loadSOP();
   }, [task.id]);
 
-  const checkAdminRole = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
-
-    const { data: roles } = await supabase
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", user.id);
-
-    setIsAdmin(roles?.some(r => r.role === "admin") || false);
-  };
+  useEffect(() => {
+    setNewDueDate(task.due_date ? new Date(task.due_date) : undefined);
+  }, [task.due_date]);
 
   const loadSOP = async () => {
     const { data } = await supabase
@@ -86,6 +86,54 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
 
   const handleSOPSuccess = () => {
     loadSOP();
+  };
+
+  const handleDueDateClick = () => {
+    if (isDueDateOverdue) {
+      setShowRescheduleDialog(true);
+    } else {
+      setShowDueDatePicker(true);
+    }
+  };
+
+  const handleDueDateChange = async (selectedDate: Date | undefined) => {
+    if (!selectedDate) return;
+
+    const today = startOfDay(new Date());
+    const maxDate = addWeeks(today, 4);
+
+    if (isBefore(selectedDate, today)) {
+      toast.error("Due date cannot be in the past");
+      return;
+    }
+
+    if (isBefore(maxDate, selectedDate)) {
+      toast.error("Due date cannot be more than 4 weeks out");
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from("onboarding_tasks")
+        .update({ due_date: format(selectedDate, "yyyy-MM-dd") })
+        .eq("id", task.id);
+
+      if (error) throw error;
+
+      setNewDueDate(selectedDate);
+      toast.success("Due date updated");
+      onUpdate();
+      setShowDueDatePicker(false);
+    } catch (error: any) {
+      toast.error("Failed to update due date");
+    }
+  };
+
+  const getAssignmentDisplay = () => {
+    if (task.assigned_to_uuid) {
+      return task.assigned_to || "Assigned";
+    }
+    return "Uses Phase Default";
   };
 
   const handleCopy = async () => {
@@ -122,14 +170,6 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
     }
   };
 
-  const getAssignmentDisplay = () => {
-    // If task has specific assignment, show that
-    if (task.assigned_to_uuid) {
-      return task.assigned_to || "Assigned";
-    }
-    // Otherwise show "Uses Phase Default"
-    return "Uses Phase Default";
-  };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -1207,21 +1247,49 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
       )}>
         <CardContent className="py-2 px-3">
           {/* Assignment & Due Date Row - Compact */}
-          <div className="flex items-center gap-2 mb-2 text-xs">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowAssignmentDialog(true)}
-              className="h-6 px-2 gap-1 text-xs"
-            >
-              <User className="w-3 h-3" />
-              {getAssignmentDisplay()}
-            </Button>
+          <div className="flex items-center gap-2 mb-2 text-xs flex-wrap">
+            {isAdmin && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowAssignmentDialog(true)}
+                className="h-6 px-2 gap-1 text-xs"
+              >
+                <User className="w-3 h-3" />
+                {getAssignmentDisplay()}
+              </Button>
+            )}
+            
             {task.due_date && (
-              <Badge variant="outline" className="h-6 px-2 gap-1">
-                <CalendarIcon className="w-3 h-3" />
-                {format(new Date(task.due_date), "MMM d")}
-              </Badge>
+              <Popover open={showDueDatePicker} onOpenChange={setShowDueDatePicker}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleDueDateClick}
+                    className={cn(
+                      "h-6 px-2 gap-1 text-xs",
+                      isDueDateOverdue && "text-destructive hover:text-destructive"
+                    )}
+                  >
+                    <Clock className="w-3 h-3" />
+                    {format(new Date(task.due_date), "MMM d, yyyy")}
+                    {isDueDateOverdue && " (Overdue)"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                  <Calendar
+                    mode="single"
+                    selected={newDueDate}
+                    onSelect={handleDueDateChange}
+                    disabled={(date) => 
+                      isBefore(date, startOfDay(new Date())) || 
+                      isBefore(addWeeks(new Date(), 4), date)
+                    }
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
             )}
           </div>
           
@@ -1286,7 +1354,16 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
         projectId={task.project_id}
         phaseNumber={task.phase_number}
         currentAssignedToUuid={task.assigned_to_uuid || null}
-        currentDueDate={task.due_date || null}
+        onUpdate={onUpdate}
+      />
+
+      <RescheduleDueDateDialog
+        open={showRescheduleDialog}
+        onOpenChange={setShowRescheduleDialog}
+        taskId={task.id}
+        taskTitle={task.title}
+        currentDueDate={task.due_date || ""}
+        originalDueDate={task.original_due_date || task.due_date || ""}
         onUpdate={onUpdate}
       />
     </>

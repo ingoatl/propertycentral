@@ -9,7 +9,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { ONBOARDING_PHASES } from "@/context/onboardingPhases";
 import { Plus } from "lucide-react";
-import { addWeeks } from "date-fns";
+import { addWeeks, format } from "date-fns";
 
 interface CreateProjectDialogProps {
   open: boolean;

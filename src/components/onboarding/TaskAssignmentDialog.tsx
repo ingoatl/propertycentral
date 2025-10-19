@@ -4,11 +4,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
-import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon, Info } from "lucide-react";
-import { format } from "date-fns";
-import { cn } from "@/lib/utils";
+import { Info } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -19,7 +15,6 @@ interface TaskAssignmentDialogProps {
   projectId: string;
   phaseNumber: number;
   currentAssignedToUuid: string | null;
-  currentDueDate: string | null;
   onUpdate: () => void;
 }
 
@@ -30,15 +25,11 @@ export const TaskAssignmentDialog = ({
   projectId,
   phaseNumber,
   currentAssignedToUuid,
-  currentDueDate,
   onUpdate 
 }: TaskAssignmentDialogProps) => {
   const [approvedUsers, setApprovedUsers] = useState<any[]>([]);
   const [selectedUser, setSelectedUser] = useState<string>(currentAssignedToUuid || "unassigned");
   const [saveAsTemplate, setSaveAsTemplate] = useState(false);
-  const [dueDate, setDueDate] = useState<Date | undefined>(
-    currentDueDate ? new Date(currentDueDate) : undefined
-  );
   const [phaseRoleInfo, setPhaseRoleInfo] = useState<{ roleName: string; userName: string } | null>(null);
 
   useEffect(() => {
@@ -48,8 +39,7 @@ export const TaskAssignmentDialog = ({
 
   useEffect(() => {
     setSelectedUser(currentAssignedToUuid || "unassigned");
-    setDueDate(currentDueDate ? new Date(currentDueDate) : undefined);
-  }, [currentAssignedToUuid, currentDueDate, open]);
+  }, [currentAssignedToUuid, open]);
 
   const loadApprovedUsers = async () => {
     const { data } = await supabase
@@ -103,8 +93,7 @@ export const TaskAssignmentDialog = ({
       const actualUserId = selectedUser === "unassigned" ? null : selectedUser;
       
       const updateData: any = { 
-        assigned_to_uuid: actualUserId,
-        due_date: dueDate ? format(dueDate, "yyyy-MM-dd") : null
+        assigned_to_uuid: actualUserId
       };
 
       // If "Save as template" is checked, also update the template
@@ -158,7 +147,7 @@ export const TaskAssignmentDialog = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>Task Assignment & Due Date</DialogTitle>
+          <DialogTitle>Task Assignment (Admin Only)</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4 py-4">
@@ -206,32 +195,6 @@ export const TaskAssignmentDialog = ({
             </p>
           </div>
 
-          {/* Due Date */}
-          <div className="space-y-2">
-            <Label>Due Date</Label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className={cn(
-                    "w-full justify-start text-left font-normal",
-                    !dueDate && "text-muted-foreground"
-                  )}
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {dueDate ? format(dueDate, "PPP") : <span>Pick a date</span>}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0">
-                <Calendar
-                  mode="single"
-                  selected={dueDate}
-                  onSelect={setDueDate}
-                  initialFocus
-                />
-              </PopoverContent>
-            </Popover>
-          </div>
 
           {/* Save as Template */}
           {selectedUser !== "unassigned" && (
