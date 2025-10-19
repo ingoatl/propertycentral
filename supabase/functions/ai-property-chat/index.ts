@@ -6,88 +6,120 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Smart fallback response generator when AI model returns empty response
+// Detect user query intent for smart auto-chaining
+function detectQueryIntent(query: string): { 
+  needsOnboardingData: boolean;
+  keywords: string[];
+} {
+  const lower = query.toLowerCase();
+  const detailKeywords = [
+    'wifi', 'password', 'code', 'access', 'cleaner', 
+    'vendor', 'lock', 'pin', 'entry', 'internet', 'network'
+  ];
+  
+  const foundKeywords = detailKeywords.filter(kw => lower.includes(kw));
+  
+  return {
+    needsOnboardingData: foundKeywords.length > 0,
+    keywords: foundKeywords
+  };
+}
+
+// Enhanced fallback response generator - answers from combined tool results
 function generateAnswerFromToolResults(toolResults: any[], userQuery: string): string {
   const query = userQuery.toLowerCase();
+  let propertyName = '';
+  let propertyAddress = '';
+  let onboardingTasks: any[] = [];
   
+  // Parse all tool results to collect data
   for (const result of toolResults) {
     try {
       const data = JSON.parse(result.content);
       
-      // Handle property search results
-      if (data?.properties && Array.isArray(data.properties)) {
-        if (data.properties.length === 0) {
-          return "I couldn't find any properties matching your search.";
-        }
-        if (data.properties.length === 1) {
-          const prop = data.properties[0];
-          return `I found ${prop.name} at ${prop.address}. What would you like to know about it?`;
-        }
-        return `I found ${data.properties.length} properties:\n${data.properties.map((p: any) => `• ${p.name}`).join('\n')}\n\nWhich one would you like details about?`;
+      // Collect property info
+      if (data?.properties?.[0]) {
+        propertyName = data.properties[0].name;
+        propertyAddress = data.properties[0].address;
       }
       
-      // Handle onboarding tasks
-      if (Array.isArray(data) && data.length > 0 && data[0]?.title) {
-        // Extract specific info based on query keywords
-        if (query.includes('clean')) {
-          const cleanerTask = data.find((t: any) => t.title?.toLowerCase().includes('cleaner'));
-          if (cleanerTask?.field_value) {
-            return `**Cleaner Information:**\n${cleanerTask.field_value}`;
-          }
-        }
-        
-        if (query.includes('wifi') || query.includes('password') || query.includes('internet')) {
-          const wifiTask = data.find((t: any) => 
-            t.title?.toLowerCase().includes('wifi') || 
-            t.title?.toLowerCase().includes('password') ||
-            t.title?.toLowerCase().includes('internet')
-          );
-          if (wifiTask?.field_value) {
-            return `**WiFi Details:**\n${wifiTask.field_value}`;
-          }
-        }
-        
-        if (query.includes('access') || query.includes('code') || query.includes('lock') || query.includes('pin')) {
-          const accessTasks = data.filter((t: any) => 
-            t.title?.toLowerCase().includes('access') || 
-            t.title?.toLowerCase().includes('code') ||
-            t.title?.toLowerCase().includes('lock') ||
-            t.title?.toLowerCase().includes('pin')
-          );
-          if (accessTasks.length > 0) {
-            const details = accessTasks
-              .filter((t: any) => t.field_value)
-              .map((t: any) => `• **${t.title}:** ${t.field_value}`)
-              .join('\n');
-            return details || "I found access-related tasks but no details have been filled in yet.";
-          }
-        }
-        
-        if (query.includes('vendor') || query.includes('contact')) {
-          const vendorTasks = data.filter((t: any) => 
-            t.title?.toLowerCase().includes('vendor') || 
-            t.title?.toLowerCase().includes('contact')
-          );
-          if (vendorTasks.length > 0) {
-            const details = vendorTasks
-              .filter((t: any) => t.field_value)
-              .map((t: any) => `• **${t.title}:** ${t.field_value}`)
-              .join('\n');
-            return details || "I found vendor-related tasks but no details have been filled in yet.";
-          }
-        }
-        
-        // Generic: show task summary
-        const completed = data.filter((t: any) => t.status === 'completed').length;
-        const tasksWithData = data.filter((t: any) => t.field_value).length;
-        return `I found ${data.length} onboarding tasks for this property:\n• ${completed} completed\n• ${tasksWithData} have data filled in\n\nWhat specific information do you need? (e.g., WiFi, access codes, cleaner, vendors)`;
+      // Collect onboarding tasks
+      if (Array.isArray(data) && data[0]?.title) {
+        onboardingTasks = data;
       }
     } catch (e) {
       console.error("Error parsing tool result:", e);
     }
   }
   
-  return "I found some information but need more context. Could you be more specific about what you're looking for?";
+  // If we have both property and tasks, answer specific queries
+  if (onboardingTasks.length > 0 && propertyName) {
+    // WiFi query
+    if (/wifi|password|internet/i.test(query)) {
+      const wifiTask = onboardingTasks.find(t => 
+        /wifi|password|network|internet/i.test(t.title || '')
+      );
+      if (wifiTask?.field_value) {
+        return `**WiFi information for ${propertyName}:**\n\n${wifiTask.field_value}`;
+      }
+      return `I found ${propertyName} but the WiFi information hasn't been added to the onboarding tasks yet.`;
+    }
+    
+    // Access code query
+    if (/code|access|lock|pin|entry/i.test(query)) {
+      const accessTasks = onboardingTasks.filter(t =>
+        /code|access|lock|pin|entry|door/i.test(t.title || '')
+      );
+      if (accessTasks.length > 0) {
+        const accessInfo = accessTasks
+          .filter(t => t.field_value)
+          .map(t => `• **${t.title}:** ${t.field_value}`)
+          .join('\n');
+        return accessInfo 
+          ? `**Access information for ${propertyName}:**\n\n${accessInfo}`
+          : `I found access tasks for ${propertyName} but they haven't been completed yet.`;
+      }
+    }
+    
+    // Cleaner query
+    if (/clean|cleaner|housekeep/i.test(query)) {
+      const cleanerTask = onboardingTasks.find(t =>
+        /clean|housekeep/i.test(t.title || '')
+      );
+      if (cleanerTask?.field_value) {
+        return `**Cleaner information for ${propertyName}:**\n\n${cleanerTask.field_value}`;
+      }
+      return `I found ${propertyName} but the cleaner information hasn't been added yet.`;
+    }
+    
+    // Vendor query
+    if (/vendor|contact/i.test(query)) {
+      const vendorTasks = onboardingTasks.filter(t =>
+        /vendor|contact/i.test(t.title || '')
+      );
+      if (vendorTasks.length > 0) {
+        const vendorInfo = vendorTasks
+          .filter(t => t.field_value)
+          .map(t => `• **${t.title}:** ${t.field_value}`)
+          .join('\n');
+        return vendorInfo 
+          ? `**Vendor information for ${propertyName}:**\n\n${vendorInfo}`
+          : `I found vendor tasks for ${propertyName} but they haven't been completed yet.`;
+      }
+    }
+    
+    // Generic onboarding summary
+    const completed = onboardingTasks.filter(t => t.status === 'completed').length;
+    const tasksWithData = onboardingTasks.filter(t => t.field_value).length;
+    return `I found ${onboardingTasks.length} onboarding tasks for ${propertyName}:\n• ${completed} completed\n• ${tasksWithData} have data filled in\n\nWhat specific information do you need? (e.g., WiFi, access codes, cleaner, vendors)`;
+  }
+  
+  // If we only have property info
+  if (propertyName) {
+    return `I found ${propertyName} at ${propertyAddress}, but I couldn't retrieve the onboarding details. The property might not have onboarding tasks set up yet.`;
+  }
+  
+  return "I couldn't find the information you're looking for. Could you try rephrasing your question?";
 }
 
 serve(async (req) => {
@@ -360,6 +392,10 @@ Be helpful and concise.`;
                 console.log("Processing tool calls:", pendingToolCalls);
                 
                 const toolResults = [];
+                const userQuery = messages[messages.length - 1]?.content || "";
+                const queryIntent = detectQueryIntent(userQuery);
+                let searchedProperty: any = null;
+                
                 for (const toolCall of pendingToolCalls) {
                   const functionName = toolCall.function.name;
                   const args = JSON.parse(toolCall.function.arguments);
@@ -397,6 +433,11 @@ Be helpful and concise.`;
                             ? `Found ${filteredData.length} properties.`
                             : "No properties found."
                         };
+                        
+                        // Store for potential auto-chaining
+                        if (filteredData.length === 1) {
+                          searchedProperty = filteredData[0];
+                        }
                         break;
                       }
                       case "get_property_onboarding": {
@@ -504,6 +545,60 @@ Be helpful and concise.`;
                     tool_call_id: toolCall.id,
                     content: JSON.stringify(result)
                   });
+                }
+                
+                // AUTO-CHAIN: If user query needs onboarding data and we found exactly 1 property,
+                // automatically fetch onboarding even if AI didn't explicitly call it
+                if (queryIntent.needsOnboardingData && searchedProperty) {
+                  const alreadyCalledOnboarding = pendingToolCalls.some(
+                    tc => tc.function.name === "get_property_onboarding"
+                  );
+                  
+                  if (!alreadyCalledOnboarding) {
+                    console.log("Auto-chaining: User asked for details, calling get_property_onboarding for", searchedProperty.name);
+                    
+                    try {
+                      const { data: projects } = await supabase
+                        .from("onboarding_projects")
+                        .select("id, created_at, progress")
+                        .eq("property_id", searchedProperty.id)
+                        .order("created_at", { ascending: false });
+                      
+                      let onboardingResult: any[] = [];
+                      if (projects && projects.length > 0) {
+                        const project = projects[0];
+                        const { data: tasks } = await supabase
+                          .from("onboarding_tasks")
+                          .select("title, field_value, status, phase_title, notes, phase_number")
+                          .eq("project_id", project.id)
+                          .order("phase_number");
+                        
+                        const safeTasks = (tasks || []).map(task => ({
+                          title: task.title,
+                          field_value: task.field_value && 
+                            (task.field_value.match(/\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4}/) || 
+                             task.title?.toLowerCase().includes('credit card') ||
+                             task.title?.toLowerCase().includes('bank account'))
+                            ? '[REDACTED]'
+                            : task.field_value,
+                          status: task.status,
+                          phase_title: task.phase_title,
+                          notes: task.notes
+                        }));
+                        onboardingResult = safeTasks;
+                      }
+                      
+                      toolResults.push({
+                        role: "tool",
+                        tool_call_id: `auto_chain_${Date.now()}`,
+                        content: JSON.stringify(onboardingResult)
+                      });
+                      
+                      console.log("Auto-chained onboarding data:", onboardingResult.length, "tasks");
+                    } catch (error) {
+                      console.error("Error in auto-chaining:", error);
+                    }
+                  }
                 }
 
                 console.log("Making follow-up request with tool results");
