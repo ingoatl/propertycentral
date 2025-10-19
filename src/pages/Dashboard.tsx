@@ -10,6 +10,8 @@ import { toast } from "sonner";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { EmailInsightsCard } from "@/components/EmailInsightsCard";
 import { DashboardFAQTab } from "@/components/dashboard/DashboardFAQTab";
+import { UserTasksDashboard } from "@/components/dashboard/UserTasksDashboard";
+import { useAdminCheck } from "@/hooks/useAdminCheck";
 
 const Dashboard = () => {
   const [summaries, setSummaries] = useState<PropertySummary[]>([]);
@@ -20,6 +22,7 @@ const Dashboard = () => {
   const [allVisits, setAllVisits] = useState<Record<string, Visit[]>>({});
   const [ownerrezBookings, setOwnerrezBookings] = useState<OwnerRezBooking[]>([]);
   const [syncing, setSyncing] = useState(false);
+  const { isAdmin } = useAdminCheck();
 
   useEffect(() => {
     loadData();
@@ -500,11 +503,17 @@ const Dashboard = () => {
       </div>
 
       {/* Main Tabs */}
-      <Tabs defaultValue="overview" className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="overview" className="gap-2">
-            <BarChart3 className="h-4 w-4" />
-            Overview
+      <Tabs defaultValue={isAdmin ? "overview" : "tasks"} className="w-full">
+        <TabsList className="grid w-full grid-cols-3">
+          {isAdmin && (
+            <TabsTrigger value="overview" className="gap-2">
+              <BarChart3 className="h-4 w-4" />
+              Overview
+            </TabsTrigger>
+          )}
+          <TabsTrigger value="tasks" className="gap-2">
+            <Calendar className="h-4 w-4" />
+            My Tasks
           </TabsTrigger>
           <TabsTrigger value="faqs" className="gap-2">
             <MessageCircleQuestion className="h-4 w-4" />
@@ -512,7 +521,8 @@ const Dashboard = () => {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview" className="space-y-8 mt-6">
+        {isAdmin && (
+          <TabsContent value="overview" className="space-y-8 mt-6">
           {/* Email Insights Card */}
           <EmailInsightsCard showHeader={true} />
 
@@ -916,6 +926,11 @@ const Dashboard = () => {
           </div>
         </DialogContent>
       </Dialog>
+          </TabsContent>
+        )}
+
+        <TabsContent value="tasks" className="mt-6">
+          <UserTasksDashboard />
         </TabsContent>
 
         <TabsContent value="faqs" className="mt-6">

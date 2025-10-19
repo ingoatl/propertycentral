@@ -22,6 +22,7 @@ import { SOPDialog } from "./SOPDialog";
 import { SOPFormDialog } from "./SOPFormDialog";
 import { TaskAssignmentDialog } from "./TaskAssignmentDialog";
 import { RescheduleDueDateDialog } from "./RescheduleDueDateDialog";
+import { UpdateDueDateDialog } from "./UpdateDueDateDialog";
 import { useAdminCheck } from "@/hooks/useAdminCheck";
 import {
   DropdownMenu,
@@ -53,6 +54,7 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
   const [showSOPFormDialog, setShowSOPFormDialog] = useState(false);
   const [showAssignmentDialog, setShowAssignmentDialog] = useState(false);
   const [showRescheduleDialog, setShowRescheduleDialog] = useState(false);
+  const [showUpdateDueDateDialog, setShowUpdateDueDateDialog] = useState(false);
   const [showDueDatePicker, setShowDueDatePicker] = useState(false);
   const [newDueDate, setNewDueDate] = useState<Date | undefined>(
     task.due_date ? new Date(task.due_date) : undefined
@@ -92,7 +94,7 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
     if (isDueDateOverdue) {
       setShowRescheduleDialog(true);
     } else {
-      setShowDueDatePicker(true);
+      setShowUpdateDueDateDialog(true);
     }
   };
 
@@ -1364,6 +1366,15 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
         taskTitle={task.title}
         currentDueDate={task.due_date || ""}
         originalDueDate={(task.original_due_date && task.original_due_date.trim()) || task.due_date || ""}
+        onUpdate={onUpdate}
+      />
+
+      <UpdateDueDateDialog
+        open={showUpdateDueDateDialog}
+        onOpenChange={setShowUpdateDueDateDialog}
+        taskId={task.id}
+        taskTitle={task.title}
+        currentDueDate={task.due_date || ""}
         onUpdate={onUpdate}
       />
     </>
