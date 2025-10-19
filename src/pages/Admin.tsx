@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { CheckCircle, XCircle, Clock, Shield, UserPlus, Key, Users, MessageCircleQuestion } from "lucide-react";
+import { CheckCircle, XCircle, Clock, Shield, UserPlus, Key, Users, MessageCircleQuestion, UserCog } from "lucide-react";
 import { z } from "zod";
 import { TeamMatrixTab } from "@/components/admin/TeamMatrixTab";
 import { AllFAQsManagement } from "@/components/admin/AllFAQsManagement";
@@ -413,6 +413,31 @@ const Admin = () => {
           </Card>
 
           {/* Admin Actions */}
+          <div className="space-y-6">
+        <Card className="shadow-card border-border/50">
+          <CardHeader className="bg-gradient-subtle rounded-t-lg">
+            <CardTitle className="flex items-center gap-2">
+              <UserCog className="w-5 h-5" />
+              Quick Actions
+            </CardTitle>
+            <CardDescription>
+              Bulk operations and system management
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="pt-6">
+            <div className="space-y-4">
+              <div className="p-4 rounded-lg border bg-muted/50">
+                <h4 className="font-medium mb-2">Assign Unassigned Tasks</h4>
+                <p className="text-sm text-muted-foreground mb-3">
+                  Automatically assign existing unassigned tasks to team members based on the current Team Matrix configuration. 
+                  This is useful when you've set up your team roles but have existing projects with unassigned tasks.
+                </p>
+                <AssignUnassignedTasksButton />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
           <div className="grid gap-6 md:grid-cols-2">
         <Card className="shadow-card border-border/50">
           <CardHeader className="bg-gradient-subtle rounded-t-lg">
@@ -478,6 +503,7 @@ const Admin = () => {
             </form>
           </CardContent>
         </Card>
+          </div>
 
         <Card className="shadow-card border-border/50">
           <CardHeader className="bg-gradient-subtle rounded-t-lg">
