@@ -35,7 +35,7 @@ const Properties = () => {
   const [emailInsightsDialogOpen, setEmailInsightsDialogOpen] = useState(false);
   const [selectedPropertyForInsights, setSelectedPropertyForInsights] = useState<Property | null>(null);
   const [selectedPropertyForDetails, setSelectedPropertyForDetails] = useState<{ id: string; name: string; projectId: string | null } | null>(null);
-  const [selectedPropertyForWorkflow, setSelectedPropertyForWorkflow] = useState<{ id: string; name: string; address: string; projectId: string | null; visitPrice: number } | null>(null);
+  const [selectedPropertyForWorkflow, setSelectedPropertyForWorkflow] = useState<{ id: string; name: string; address: string; projectId: string | null; visitPrice: number; taskId?: string } | null>(null);
   const [propertyProjects, setPropertyProjects] = useState<Record<string, string>>({});
   const [propertyProjectsProgress, setPropertyProjectsProgress] = useState<Record<string, number>>({});
   const [formData, setFormData] = useState({
@@ -59,6 +59,8 @@ const Properties = () => {
   // Handle opening workflow from URL parameter
   useEffect(() => {
     const openWorkflowId = searchParams.get('openWorkflow');
+    const taskId = searchParams.get('taskId');
+    
     if (openWorkflowId && properties.length > 0) {
       // Find the project and associated property
       const projectId = openWorkflowId;
@@ -74,10 +76,12 @@ const Properties = () => {
             name: property.name,
             address: property.address,
             projectId: projectId,
-            visitPrice: property.visitPrice
+            visitPrice: property.visitPrice,
+            taskId: taskId || undefined
           });
-          // Clear the URL parameter
+          // Clear the URL parameters
           searchParams.delete('openWorkflow');
+          searchParams.delete('taskId');
           setSearchParams(searchParams);
         }
       }
@@ -593,6 +597,7 @@ const Properties = () => {
             propertyName={selectedPropertyForWorkflow.name}
             propertyAddress={selectedPropertyForWorkflow.address}
             visitPrice={selectedPropertyForWorkflow.visitPrice}
+            taskId={selectedPropertyForWorkflow.taskId}
             onUpdate={loadPropertyProjects}
           />
         )}

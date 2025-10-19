@@ -1243,10 +1243,13 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
 
   return (
     <>
-      <Card className={cn(
-        "transition-colors py-2 border-2",
-        taskStatus === "completed" && "bg-green-50/50 border-green-500"
-      )}>
+      <Card 
+        id={`task-${task.id}`}
+        className={cn(
+          "transition-colors py-2 border-2",
+          taskStatus === "completed" && "bg-green-50/50 border-green-500"
+        )}
+      >
         <CardContent className="py-2 px-3">
           {/* Assignment & Due Date Row - Compact */}
           <div className="flex items-center gap-2 mb-2 text-xs flex-wrap">

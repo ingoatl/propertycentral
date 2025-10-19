@@ -215,8 +215,8 @@ export const OverdueTasksCard = () => {
                           key={task.id}
                           className={`p-3 rounded-lg border ${getUrgencyColor(daysOverdue)} cursor-pointer hover:opacity-80 transition-opacity`}
                           onClick={() => {
-                            // Navigate to properties page and trigger the workflow dialog
-                            navigate(`/properties?openWorkflow=${task.project_id}`);
+                            // Navigate to properties page and open workflow at this specific task
+                            navigate(`/properties?openWorkflow=${task.project_id}&taskId=${task.id}`);
                           }}
                         >
                           <div className="flex items-start justify-between gap-3">

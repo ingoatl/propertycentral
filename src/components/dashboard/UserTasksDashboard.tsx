@@ -1,4 +1,5 @@
 import { OverdueTasksCard } from "./OverdueTasksCard";
+import { ActiveTasksModal } from "./ActiveTasksModal";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -24,6 +25,8 @@ export const UserTasksDashboard = () => {
     recentlyCompleted: [],
   });
   const [loading, setLoading] = useState(true);
+  const [showActiveTasksModal, setShowActiveTasksModal] = useState(false);
+  const [allActiveTasks, setAllActiveTasks] = useState<OnboardingTask[]>([]);
 
   const loadTaskStats = async () => {
     try {
@@ -84,6 +87,28 @@ export const UserTasksDashboard = () => {
       }
 
       const { count: totalCount } = await totalQuery;
+
+      // Also get all active tasks for the modal
+      let allActiveQuery = supabase
+        .from("onboarding_tasks")
+        .select(`
+          *,
+          onboarding_projects (
+            owner_name,
+            property_address
+          )
+        `)
+        .neq("status", "completed")
+        .order("due_date", { ascending: true });
+
+      if (userRoleIds.length > 0) {
+        allActiveQuery = allActiveQuery.or(`assigned_to_uuid.eq.${user.id},assigned_role_id.in.(${userRoleIds.join(",")})`);
+      } else {
+        allActiveQuery = allActiveQuery.eq("assigned_to_uuid", user.id);
+      }
+
+      const { data: allActiveData } = await allActiveQuery;
+      setAllActiveTasks((allActiveData as OnboardingTask[]) || []);
 
       // Completed this week
       let completedQuery = supabase
@@ -183,7 +208,10 @@ export const UserTasksDashboard = () => {
 
       {/* Task Statistics */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        <Card>
+        <Card 
+          className="cursor-pointer hover:shadow-md transition-shadow"
+          onClick={() => setShowActiveTasksModal(true)}
+        >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Active Tasks</CardTitle>
             <Clock className="h-4 w-4 text-muted-foreground" />
@@ -191,7 +219,7 @@ export const UserTasksDashboard = () => {
           <CardContent>
             <div className="text-2xl font-bold">{stats.totalAssigned}</div>
             <p className="text-xs text-muted-foreground">
-              Currently assigned to you
+              Click to view all active tasks
             </p>
           </CardContent>
         </Card>
@@ -248,8 +276,8 @@ export const UserTasksDashboard = () => {
                     key={task.id}
                     className="flex items-start justify-between p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors cursor-pointer"
                     onClick={() => {
-                      // Navigate to properties page and trigger the workflow dialog
-                      navigate(`/properties?openWorkflow=${task.project_id}`);
+                      // Navigate to properties page and open workflow at this specific task
+                      navigate(`/properties?openWorkflow=${task.project_id}&taskId=${task.id}`);
                     }}
                   >
                      <div className="space-y-1">
@@ -332,6 +360,13 @@ export const UserTasksDashboard = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* Active Tasks Modal */}
+      <ActiveTasksModal
+        open={showActiveTasksModal}
+        onOpenChange={setShowActiveTasksModal}
+        tasks={allActiveTasks}
+      />
     </div>
   );
 };

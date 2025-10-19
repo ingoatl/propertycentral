@@ -20,9 +20,10 @@ interface WorkflowDialogProps {
   propertyAddress: string;
   visitPrice: number;
   onUpdate: () => void;
+  taskId?: string;
 }
 
-export const WorkflowDialog = ({ open, onOpenChange, project, propertyId, propertyName, propertyAddress, visitPrice, onUpdate }: WorkflowDialogProps) => {
+export const WorkflowDialog = ({ open, onOpenChange, project, propertyId, propertyName, propertyAddress, visitPrice, onUpdate, taskId }: WorkflowDialogProps) => {
   const [tasks, setTasks] = useState<OnboardingTask[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -59,6 +60,23 @@ export const WorkflowDialog = ({ open, onOpenChange, project, propertyId, proper
       onUpdate();
     }
   }, [open]);
+
+  useEffect(() => {
+    // Scroll to specific task if taskId is provided
+    if (taskId && tasks.length > 0 && !loading) {
+      setTimeout(() => {
+        const taskElement = document.getElementById(`task-${taskId}`);
+        if (taskElement) {
+          taskElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          // Add highlight effect
+          taskElement.classList.add('ring-2', 'ring-primary', 'ring-offset-2');
+          setTimeout(() => {
+            taskElement.classList.remove('ring-2', 'ring-primary', 'ring-offset-2');
+          }, 2000);
+        }
+      }, 300);
+    }
+  }, [taskId, tasks, loading]);
 
   const loadTasks = async () => {
     if (!project?.id) {
@@ -157,6 +175,10 @@ export const WorkflowDialog = ({ open, onOpenChange, project, propertyId, proper
       if (projectError) throw projectError;
 
       // Create initial tasks for each phase
+      const oneWeekOut = new Date();
+      oneWeekOut.setDate(oneWeekOut.getDate() + 7);
+      const dueDateString = oneWeekOut.toISOString().split('T')[0];
+      
       const initialTasks = ONBOARDING_PHASES.flatMap(phase => 
         phase.tasks.map(task => ({
           project_id: newProject.id,
@@ -165,7 +187,9 @@ export const WorkflowDialog = ({ open, onOpenChange, project, propertyId, proper
           title: task.title,
           description: task.description,
           field_type: task.field_type,
-          status: 'pending' as const
+          status: 'pending' as const,
+          due_date: dueDateString,
+          original_due_date: dueDateString
         }))
       );
 
