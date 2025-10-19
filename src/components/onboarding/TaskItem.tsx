@@ -11,7 +11,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { CalendarIcon, Upload, FileText, CheckCircle2, Edit2, Copy, Check, Loader2, Settings, MessageSquare, Trash2, BookOpen } from "lucide-react";
+import { CalendarIcon, Upload, FileText, CheckCircle2, Edit2, Copy, Check, Loader2, Settings, MessageSquare, Trash2, BookOpen, User } from "lucide-react";
 import { format, addWeeks } from "date-fns";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -20,6 +20,7 @@ import { PinVerificationDialog } from "./PinVerificationDialog";
 import { InlineComments } from "./InlineComments";
 import { SOPDialog } from "./SOPDialog";
 import { SOPFormDialog } from "./SOPFormDialog";
+import { TaskAssignmentDialog } from "./TaskAssignmentDialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -49,8 +50,7 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
   const [showSOPDialog, setShowSOPDialog] = useState(false);
   const [showSOPFormDialog, setShowSOPFormDialog] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [approvedUsers, setApprovedUsers] = useState<any[]>([]);
-  const [saveAsTemplate, setSaveAsTemplate] = useState(false);
+  const [showAssignmentDialog, setShowAssignmentDialog] = useState(false);
 
   const hasValue = task.field_value && task.field_value.trim() !== "";
   const isReadOnly = hasValue && !isAdmin && !isEditing;
@@ -58,7 +58,6 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
   useEffect(() => {
     checkAdminRole();
     loadSOP();
-    loadApprovedUsers();
   }, [task.id]);
 
   const checkAdminRole = async () => {
@@ -83,16 +82,6 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
       .maybeSingle();
 
     setSOP(data);
-  };
-
-  const loadApprovedUsers = async () => {
-    const { data } = await supabase
-      .from("profiles")
-      .select("id, email, first_name")
-      .eq("status", "approved")
-      .order("first_name");
-
-    setApprovedUsers(data || []);
   };
 
   const handleSOPSuccess = () => {
@@ -133,49 +122,13 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
     }
   };
 
-  const handleReassign = async (userId: string) => {
-    try {
-      // Convert "unassigned" to null
-      const actualUserId = userId === "unassigned" ? null : userId;
-      
-      const updateData: any = { assigned_to_uuid: actualUserId };
-
-      // If "Save as template" is checked, also update the template
-      if (saveAsTemplate && actualUserId) {
-        const { data: roleData } = await supabase
-          .from("user_team_roles")
-          .select("role_id")
-          .eq("user_id", actualUserId)
-          .eq("is_primary", true)
-          .maybeSingle();
-
-        if (roleData?.role_id) {
-          updateData.assigned_role_id = roleData.role_id;
-
-          // Upsert task template
-          await supabase.from("task_templates").upsert({
-            phase_number: task.phase_number,
-            task_title: task.title,
-            default_role_id: roleData.role_id,
-            field_type: task.field_type,
-          }, {
-            onConflict: "phase_number,task_title",
-          });
-
-          toast.success("Assignment saved as template for future projects");
-        }
-      }
-
-      await supabase
-        .from("onboarding_tasks")
-        .update(updateData)
-        .eq("id", task.id);
-
-      toast.success("Task reassigned");
-      onUpdate();
-    } catch (error: any) {
-      toast.error("Failed to reassign task");
+  const getAssignmentDisplay = () => {
+    // If task has specific assignment, show that
+    if (task.assigned_to_uuid) {
+      return task.assigned_to || "Assigned";
     }
+    // Otherwise show "Uses Phase Default"
+    return "Uses Phase Default";
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1253,28 +1206,23 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
         taskStatus === "completed" && "bg-green-50/50 border-green-500"
       )}>
         <CardContent className="py-2 px-3">
-          {/* Assignment Row */}
-          <div className="flex items-center gap-2 mb-2 p-2 bg-muted/30 rounded text-xs">
-            <Label className="min-w-[70px]">Assigned:</Label>
-            <Select value={task.assigned_to_uuid || "unassigned"} onValueChange={handleReassign}>
-              <SelectTrigger className="h-7 text-xs flex-1">
-                <SelectValue placeholder="Unassigned" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="unassigned">Unassigned</SelectItem>
-                {approvedUsers.map(user => (
-                  <SelectItem key={user.id} value={user.id}>
-                    {user.first_name || user.email.split('@')[0]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Checkbox 
-              id={`tpl-${task.id}`}
-              checked={saveAsTemplate}
-              onCheckedChange={(c) => setSaveAsTemplate(c as boolean)}
-            />
-            <Label htmlFor={`tpl-${task.id}`} className="cursor-pointer whitespace-nowrap">Template</Label>
+          {/* Assignment & Due Date Row - Compact */}
+          <div className="flex items-center gap-2 mb-2 text-xs">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowAssignmentDialog(true)}
+              className="h-6 px-2 gap-1 text-xs"
+            >
+              <User className="w-3 h-3" />
+              {getAssignmentDisplay()}
+            </Button>
+            {task.due_date && (
+              <Badge variant="outline" className="h-6 px-2 gap-1">
+                <CalendarIcon className="w-3 h-3" />
+                {format(new Date(task.due_date), "MMM d")}
+              </Badge>
+            )}
           </div>
           
           <div className="flex items-start justify-between gap-2">
@@ -1329,6 +1277,17 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
         open={showSOPFormDialog}
         onOpenChange={setShowSOPFormDialog}
         onSuccess={handleSOPSuccess}
+      />
+
+      <TaskAssignmentDialog
+        open={showAssignmentDialog}
+        onOpenChange={setShowAssignmentDialog}
+        taskId={task.id}
+        projectId={task.project_id}
+        phaseNumber={task.phase_number}
+        currentAssignedToUuid={task.assigned_to_uuid || null}
+        currentDueDate={task.due_date || null}
+        onUpdate={onUpdate}
       />
     </>
   );
