@@ -76,12 +76,11 @@ export const UserTasksDashboard = () => {
         .select("*", { count: "exact", head: true })
         .neq("status", "completed");
 
-      if (!isAdmin) {
-        if (userRoleIds.length > 0) {
-          totalQuery = totalQuery.or(`assigned_to_uuid.eq.${user.id},assigned_role_id.in.(${userRoleIds.join(",")})`);
-        } else {
-          totalQuery = totalQuery.eq("assigned_to_uuid", user.id);
-        }
+      // All users (including admins) only see their assigned tasks
+      if (userRoleIds.length > 0) {
+        totalQuery = totalQuery.or(`assigned_to_uuid.eq.${user.id},assigned_role_id.in.(${userRoleIds.join(",")})`);
+      } else {
+        totalQuery = totalQuery.eq("assigned_to_uuid", user.id);
       }
 
       const { count: totalCount } = await totalQuery;
@@ -93,12 +92,11 @@ export const UserTasksDashboard = () => {
         .eq("status", "completed")
         .gte("completed_date", sevenDaysAgo.toISOString());
 
-      if (!isAdmin) {
-        if (userRoleIds.length > 0) {
-          completedQuery = completedQuery.or(`assigned_to_uuid.eq.${user.id},assigned_role_id.in.(${userRoleIds.join(",")})`);
-        } else {
-          completedQuery = completedQuery.eq("assigned_to_uuid", user.id);
-        }
+      // All users (including admins) only see their assigned tasks
+      if (userRoleIds.length > 0) {
+        completedQuery = completedQuery.or(`assigned_to_uuid.eq.${user.id},assigned_role_id.in.(${userRoleIds.join(",")})`);
+      } else {
+        completedQuery = completedQuery.eq("assigned_to_uuid", user.id);
       }
 
       const { count: completedCount } = await completedQuery;
@@ -121,12 +119,11 @@ export const UserTasksDashboard = () => {
         .order("due_date", { ascending: true })
         .limit(10);
 
-      if (!isAdmin) {
-        if (userRoleIds.length > 0) {
-          upcomingQuery = upcomingQuery.or(`assigned_to_uuid.eq.${user.id},assigned_role_id.in.(${userRoleIds.join(",")})`);
-        } else {
-          upcomingQuery = upcomingQuery.eq("assigned_to_uuid", user.id);
-        }
+      // All users (including admins) only see their assigned tasks
+      if (userRoleIds.length > 0) {
+        upcomingQuery = upcomingQuery.or(`assigned_to_uuid.eq.${user.id},assigned_role_id.in.(${userRoleIds.join(",")})`);
+      } else {
+        upcomingQuery = upcomingQuery.eq("assigned_to_uuid", user.id);
       }
 
       const { data: upcomingData } = await upcomingQuery;
@@ -145,12 +142,11 @@ export const UserTasksDashboard = () => {
         .order("completed_date", { ascending: false })
         .limit(10);
 
-      if (!isAdmin) {
-        if (userRoleIds.length > 0) {
-          recentlyCompletedQuery = recentlyCompletedQuery.or(`assigned_to_uuid.eq.${user.id},assigned_role_id.in.(${userRoleIds.join(",")})`);
-        } else {
-          recentlyCompletedQuery = recentlyCompletedQuery.eq("assigned_to_uuid", user.id);
-        }
+      // All users (including admins) only see their assigned tasks
+      if (userRoleIds.length > 0) {
+        recentlyCompletedQuery = recentlyCompletedQuery.or(`assigned_to_uuid.eq.${user.id},assigned_role_id.in.(${userRoleIds.join(",")})`);
+      } else {
+        recentlyCompletedQuery = recentlyCompletedQuery.eq("assigned_to_uuid", user.id);
       }
 
       const { data: completedData } = await recentlyCompletedQuery;

@@ -39,14 +39,15 @@ export const OverdueTasksCard = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Get user's team role IDs
-      const { data: teamRoles } = await supabase
-        .from("user_team_roles")
-        .select("role_id")
-        .eq("user_id", user.id);
+      // Check if user is admin
+      const { data: adminRole } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", user.id)
+        .eq("role", "admin")
+        .maybeSingle();
 
-      const userRoleIds = teamRoles?.map(tr => tr.role_id) || [];
-
+      const isAdmin = !!adminRole;
       const today = new Date().toISOString().split('T')[0];
 
       let query = supabase
@@ -62,11 +63,22 @@ export const OverdueTasksCard = () => {
         .neq("status", "completed")
         .order("due_date", { ascending: true });
 
-      // Filter by user assignment - either directly assigned or by role
-      if (userRoleIds.length > 0) {
-        query = query.or(`assigned_to_uuid.eq.${user.id},assigned_role_id.in.(${userRoleIds.join(",")})`);
-      } else {
-        query = query.eq("assigned_to_uuid", user.id);
+      // Admins see ALL overdue tasks, regular users only see their assigned tasks
+      if (!isAdmin) {
+        // Get user's team role IDs
+        const { data: teamRoles } = await supabase
+          .from("user_team_roles")
+          .select("role_id")
+          .eq("user_id", user.id);
+
+        const userRoleIds = teamRoles?.map(tr => tr.role_id) || [];
+
+        // Filter by user assignment - either directly assigned or by role
+        if (userRoleIds.length > 0) {
+          query = query.or(`assigned_to_uuid.eq.${user.id},assigned_role_id.in.(${userRoleIds.join(",")})`);
+        } else {
+          query = query.eq("assigned_to_uuid", user.id);
+        }
       }
 
       const { data, error } = await query;
