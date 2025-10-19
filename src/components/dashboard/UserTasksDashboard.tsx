@@ -30,44 +30,65 @@ export const UserTasksDashboard = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
+      // Check if user is admin
+      const { data: roles } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", user.id);
+
+      const isAdmin = roles?.some(r => r.role === "admin");
+
       const today = new Date();
       const sevenDaysFromNow = addDays(today, 7);
       const sevenDaysAgo = addDays(today, -7);
 
       // First, update any uncompleted tasks without due dates to have a due date 1 week out
-      const { error: updateError } = await supabase
+      let updateQuery = supabase
         .from("onboarding_tasks")
         .update({ 
           due_date: sevenDaysFromNow.toISOString().split('T')[0],
           original_due_date: sevenDaysFromNow.toISOString().split('T')[0]
         })
-        .eq("assigned_to_uuid", user.id)
         .neq("status", "completed")
         .is("due_date", null);
 
+      if (!isAdmin) {
+        updateQuery = updateQuery.eq("assigned_to_uuid", user.id);
+      }
+
+      const { error: updateError } = await updateQuery;
+
       if (updateError) {
         console.error("Error updating tasks without due dates:", updateError);
-      } else {
-        console.log("Updated tasks without due dates");
       }
 
       // Total assigned tasks
-      const { count: totalCount } = await supabase
+      let totalQuery = supabase
         .from("onboarding_tasks")
         .select("*", { count: "exact", head: true })
-        .eq("assigned_to_uuid", user.id)
         .neq("status", "completed");
 
+      if (!isAdmin) {
+        totalQuery = totalQuery.eq("assigned_to_uuid", user.id);
+      }
+
+      const { count: totalCount } = await totalQuery;
+
       // Completed this week
-      const { count: completedCount } = await supabase
+      let completedQuery = supabase
         .from("onboarding_tasks")
         .select("*", { count: "exact", head: true })
-        .eq("assigned_to_uuid", user.id)
         .eq("status", "completed")
         .gte("completed_date", sevenDaysAgo.toISOString());
 
+      if (!isAdmin) {
+        completedQuery = completedQuery.eq("assigned_to_uuid", user.id);
+      }
+
+      const { count: completedCount } = await completedQuery;
+
       // Upcoming tasks (next 7 days)
-      const { data: upcomingData } = await supabase
+      let upcomingQuery = supabase
         .from("onboarding_tasks")
         .select(`
           *,
@@ -76,15 +97,20 @@ export const UserTasksDashboard = () => {
             property_address
           )
         `)
-        .eq("assigned_to_uuid", user.id)
         .neq("status", "completed")
         .gte("due_date", today.toISOString().split('T')[0])
         .lte("due_date", sevenDaysFromNow.toISOString().split('T')[0])
         .order("due_date", { ascending: true })
         .limit(10);
 
+      if (!isAdmin) {
+        upcomingQuery = upcomingQuery.eq("assigned_to_uuid", user.id);
+      }
+
+      const { data: upcomingData } = await upcomingQuery;
+
       // Recently completed
-      const { data: completedData } = await supabase
+      let recentlyCompletedQuery = supabase
         .from("onboarding_tasks")
         .select(`
           *,
@@ -93,10 +119,15 @@ export const UserTasksDashboard = () => {
             property_address
           )
         `)
-        .eq("assigned_to_uuid", user.id)
         .eq("status", "completed")
         .order("completed_date", { ascending: false })
         .limit(10);
+
+      if (!isAdmin) {
+        recentlyCompletedQuery = recentlyCompletedQuery.eq("assigned_to_uuid", user.id);
+      }
+
+      const { data: completedData } = await recentlyCompletedQuery;
 
       setStats({
         totalAssigned: totalCount || 0,

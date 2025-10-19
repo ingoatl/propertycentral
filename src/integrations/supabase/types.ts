@@ -190,6 +190,72 @@ export type Database = {
           },
         ]
       }
+      faq_questions: {
+        Row: {
+          answer: string | null
+          answered_at: string | null
+          answered_by: string | null
+          asked_by: string
+          category: string | null
+          created_at: string | null
+          email_sent_to_admin: boolean | null
+          email_sent_to_user: boolean | null
+          id: string
+          project_id: string | null
+          property_id: string | null
+          question: string
+          status: string
+          updated_at: string | null
+        }
+        Insert: {
+          answer?: string | null
+          answered_at?: string | null
+          answered_by?: string | null
+          asked_by: string
+          category?: string | null
+          created_at?: string | null
+          email_sent_to_admin?: boolean | null
+          email_sent_to_user?: boolean | null
+          id?: string
+          project_id?: string | null
+          property_id?: string | null
+          question: string
+          status?: string
+          updated_at?: string | null
+        }
+        Update: {
+          answer?: string | null
+          answered_at?: string | null
+          answered_by?: string | null
+          asked_by?: string
+          category?: string | null
+          created_at?: string | null
+          email_sent_to_admin?: boolean | null
+          email_sent_to_user?: boolean | null
+          id?: string
+          project_id?: string | null
+          property_id?: string | null
+          question?: string
+          status?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "faq_questions_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "faq_questions_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       frequently_asked_questions: {
         Row: {
           answer: string

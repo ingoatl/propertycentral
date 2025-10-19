@@ -3,9 +3,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, MessageCircleQuestion, Edit, Trash2 } from "lucide-react";
+import { Plus, Search, MessageCircleQuestion, Edit, Trash2, MessageSquare } from "lucide-react";
 import { FAQ } from "@/types/onboarding";
 import { AddFAQDialog } from "./AddFAQDialog";
+import { AskQuestionDialog } from "../faq/AskQuestionDialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -39,6 +40,7 @@ const FAQ_CATEGORIES = [
 
 export function FAQSection({ propertyId, projectId, faqs, onUpdate }: FAQSectionProps) {
   const [showAddDialog, setShowAddDialog] = useState(false);
+  const [showAskDialog, setShowAskDialog] = useState(false);
   const [editingFAQ, setEditingFAQ] = useState<FAQ | null>(null);
   const [deletingFAQ, setDeletingFAQ] = useState<FAQ | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -120,6 +122,18 @@ export function FAQSection({ propertyId, projectId, faqs, onUpdate }: FAQSection
             <CardDescription>
               Common questions and answers about this property
             </CardDescription>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setShowAskDialog(true)}>
+              <MessageSquare className="h-4 w-4 mr-2" />
+              Ask a Question
+            </Button>
+            {isAdmin && (
+              <Button onClick={() => setShowAddDialog(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add FAQ
+              </Button>
+            )}
           </div>
           {isAdmin && (
             <Button onClick={() => setShowAddDialog(true)} size="sm">
@@ -235,6 +249,13 @@ export function FAQSection({ propertyId, projectId, faqs, onUpdate }: FAQSection
           onUpdate();
           setEditingFAQ(null);
         }}
+      />
+
+      <AskQuestionDialog
+        open={showAskDialog}
+        onOpenChange={setShowAskDialog}
+        propertyId={propertyId}
+        projectId={projectId}
       />
 
       <AlertDialog open={!!deletingFAQ} onOpenChange={() => setDeletingFAQ(null)}>

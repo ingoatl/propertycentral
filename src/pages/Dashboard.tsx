@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { EmailInsightsCard } from "@/components/EmailInsightsCard";
 import { DashboardFAQTab } from "@/components/dashboard/DashboardFAQTab";
 import { UserTasksDashboard } from "@/components/dashboard/UserTasksDashboard";
+import { PendingQuestionsCard } from "@/components/admin/PendingQuestionsCard";
 import { useAdminCheck } from "@/hooks/useAdminCheck";
 
 const Dashboard = () => {
@@ -550,6 +551,9 @@ const Dashboard = () => {
 
         {isAdmin && (
           <TabsContent value="overview" className="space-y-8 mt-6">
+          {/* Pending Questions */}
+          <PendingQuestionsCard />
+          
           {/* Email Insights Card */}
           <EmailInsightsCard showHeader={true} />
 

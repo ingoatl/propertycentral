@@ -1,375 +1,149 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { FAQSection } from "../onboarding/FAQSection";
+import { AskQuestionDialog } from "../faq/AskQuestionDialog";
 import { supabase } from "@/integrations/supabase/client";
-import { FAQ } from "@/types/onboarding";
-import { toast } from "sonner";
-import { Search, MessageCircleQuestion, Building2, Plus } from "lucide-react";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { MessageSquare, HelpCircle } from "lucide-react";
+import { format } from "date-fns";
 
-const FAQ_CATEGORIES = [
-  'All Categories',
-  'Property Operations',
-  'Guest Management',
-  'Maintenance & Repairs',
-  'Cleaning & Turnover',
-  'Systems & Tools',
-  'Vendor Communication',
-  'Emergency Procedures',
-  'Best Practices',
-  'Other'
-];
+interface UserQuestion {
+  id: string;
+  question: string;
+  category: string | null;
+  status: string;
+  answer: string | null;
+  created_at: string;
+  answered_at: string | null;
+}
 
-export function DashboardFAQTab() {
-  const [faqs, setFaqs] = useState<FAQ[]>([]);
-  const [properties, setProperties] = useState<any[]>([]);
+export const DashboardFAQTab = () => {
+  const [showAskDialog, setShowAskDialog] = useState(false);
+  const [myQuestions, setMyQuestions] = useState<UserQuestion[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState("All Categories");
-  const [selectedProperty, setSelectedProperty] = useState("all");
-  const [showAddDialog, setShowAddDialog] = useState(false);
-  const [newFAQ, setNewFAQ] = useState({
-    question: "",
-    answer: "",
-    category: "",
-    property_id: "",
-  });
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  const loadData = async () => {
+  const loadMyQuestions = async () => {
     try {
-      setLoading(true);
-      
-      // Load all FAQs
-      const { data: faqsData, error: faqsError } = await supabase
-        .from('frequently_asked_questions')
-        .select('*')
-        .order('created_at', { ascending: false });
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
 
-      if (faqsError) throw faqsError;
-      setFaqs(faqsData || []);
+      const { data, error } = await supabase
+        .from("faq_questions")
+        .select("*")
+        .eq("asked_by", user.id)
+        .order("created_at", { ascending: false });
 
-      // Load properties
-      const { data: propertiesData, error: propertiesError } = await supabase
-        .from('properties')
-        .select('id, name')
-        .order('name', { ascending: true });
-
-      if (propertiesError) throw propertiesError;
-      setProperties(propertiesData || []);
-    } catch (error: any) {
-      console.error('Error loading FAQs:', error);
-      toast.error('Failed to load FAQs');
+      if (error) throw error;
+      setMyQuestions(data || []);
+    } catch (error) {
+      console.error("Error loading questions:", error);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleAddFAQ = async () => {
-    try {
-      if (!newFAQ.question.trim() || !newFAQ.answer.trim() || !newFAQ.property_id) {
-        toast.error("Please fill in all required fields");
-        return;
-      }
-
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        toast.error("You must be logged in to add FAQs");
-        return;
-      }
-
-      const { error } = await supabase
-        .from('frequently_asked_questions')
-        .insert({
-          question: newFAQ.question.trim(),
-          answer: newFAQ.answer.trim(),
-          category: newFAQ.category || 'Other',
-          property_id: newFAQ.property_id,
-          answered_by: user.id,
-        });
-
-      if (error) throw error;
-
-      toast.success("FAQ added successfully!");
-      setShowAddDialog(false);
-      setNewFAQ({ question: "", answer: "", category: "", property_id: "" });
-      loadData();
-    } catch (error: any) {
-      console.error('Error adding FAQ:', error);
-      toast.error("Failed to add FAQ");
-    }
-  };
-
-  const filteredFAQs = faqs.filter(faq => {
-    const matchesSearch = searchQuery === "" || 
-      faq.question.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      faq.answer.toLowerCase().includes(searchQuery.toLowerCase());
-    
-    const matchesCategory = selectedCategory === "All Categories" || faq.category === selectedCategory;
-    const matchesProperty = selectedProperty === "all" || faq.property_id === selectedProperty;
-    
-    return matchesSearch && matchesCategory && matchesProperty;
-  });
-
-  // Group FAQs by property
-  const faqsByProperty = filteredFAQs.reduce((acc, faq) => {
-    const propertyId = faq.property_id;
-    if (!acc[propertyId]) {
-      acc[propertyId] = [];
-    }
-    acc[propertyId].push(faq);
-    return acc;
-  }, {} as Record<string, FAQ[]>);
-
-  // Group FAQs by category within each property
-  const groupedFAQs = Object.entries(faqsByProperty).map(([propertyId, propertyFaqs]) => {
-    const property = properties.find(p => p.id === propertyId);
-    const faqsByCategory = propertyFaqs.reduce((acc, faq) => {
-      const category = faq.category || 'Other';
-      if (!acc[category]) {
-        acc[category] = [];
-      }
-      acc[category].push(faq);
-      return acc;
-    }, {} as Record<string, FAQ[]>);
-
-    return {
-      propertyId,
-      propertyName: property?.name || 'Unknown Property',
-      faqsByCategory
-    };
-  });
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <p className="text-muted-foreground">Loading FAQs...</p>
-      </div>
-    );
-  }
+  useEffect(() => {
+    loadMyQuestions();
+  }, []);
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight">Operational FAQs</h2>
-          <p className="text-muted-foreground">
-            Operational questions and answers for Peachhaus team members
-          </p>
-        </div>
-        <Button onClick={() => setShowAddDialog(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          Add FAQ
-        </Button>
-      </div>
-
-      {/* Filters */}
+      {/* Ask a Question Section */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2">
-            <Search className="h-5 w-5" />
-            Search & Filter
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <HelpCircle className="h-5 w-5" />
+                Have a Question?
+              </CardTitle>
+              <CardDescription>
+                Ask our team anything about property management
+              </CardDescription>
+            </div>
+            <Button onClick={() => setShowAskDialog(true)}>
+              <MessageSquare className="h-4 w-4 mr-2" />
+              Ask a Question
+            </Button>
+          </div>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search questions and answers..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9"
-            />
-          </div>
-          
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Category</label>
-              <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {FAQ_CATEGORIES.map(cat => (
-                    <SelectItem key={cat} value={cat}>
-                      {cat}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Property</label>
-              <Select value={selectedProperty} onValueChange={setSelectedProperty}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Properties</SelectItem>
-                  {properties.map(property => (
-                    <SelectItem key={property.id} value={property.id}>
-                      {property.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </CardContent>
       </Card>
 
-      {/* FAQs Grouped by Property and Category */}
-      {groupedFAQs.length > 0 ? (
-        <div className="space-y-6">
-          {groupedFAQs.map(({ propertyId, propertyName, faqsByCategory }) => (
-            <Card key={propertyId}>
-              <CardHeader className="bg-gradient-subtle">
-                <CardTitle className="flex items-center gap-2">
-                  <Building2 className="h-5 w-5" />
-                  {propertyName}
-                </CardTitle>
-                <CardDescription>
-                  {Object.values(faqsByCategory).flat().length} FAQ{Object.values(faqsByCategory).flat().length !== 1 ? 's' : ''}
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="pt-6">
-                <Accordion type="multiple" className="w-full">
-                  {Object.entries(faqsByCategory).map(([category, categoryFAQs]) => (
-                    <div key={category} className="space-y-2">
-                      <h3 className="text-sm font-semibold text-muted-foreground mt-4 mb-2 flex items-center gap-2">
-                        <MessageCircleQuestion className="h-4 w-4" />
-                        {category}
-                      </h3>
-                      {categoryFAQs.map((faq) => {
-                        const isHighlighted = searchQuery && (
-                          faq.question.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          faq.answer.toLowerCase().includes(searchQuery.toLowerCase())
-                        );
-                        return (
-                          <AccordionItem key={faq.id} value={faq.id} className={isHighlighted ? 'bg-primary/5 rounded-lg' : ''}>
-                            <AccordionTrigger className="text-left hover:no-underline px-4">
-                              <span className="font-medium">{faq.question}</span>
-                            </AccordionTrigger>
-                            <AccordionContent className="px-4 pb-4">
-                              <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                                {faq.answer}
-                              </p>
-                            </AccordionContent>
-                          </AccordionItem>
-                        );
-                      })}
-                    </div>
-                  ))}
-                </Accordion>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      ) : (
+      {/* My Questions Section */}
+      {myQuestions.length > 0 && (
         <Card>
-          <CardContent className="py-12 text-center">
-            <MessageCircleQuestion className="h-12 w-12 text-muted-foreground mx-auto mb-4 opacity-50" />
-            <p className="text-muted-foreground">
-              {searchQuery || selectedCategory !== "All Categories" || selectedProperty !== "all"
-                ? "No FAQs match your search criteria"
-                : "No FAQs have been added yet"}
-            </p>
+          <CardHeader>
+            <CardTitle>My Questions</CardTitle>
+            <CardDescription>
+              Questions you've asked and their status
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {myQuestions.map((q) => (
+                <div key={q.id} className="border rounded-lg p-4 space-y-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        {q.category && (
+                          <Badge variant="outline">{q.category}</Badge>
+                        )}
+                        <Badge
+                          variant={q.status === "answered" ? "default" : "secondary"}
+                        >
+                          {q.status === "answered" ? "Answered" : "Pending"}
+                        </Badge>
+                        <span className="text-sm text-muted-foreground">
+                          {format(new Date(q.created_at), "MMM d, yyyy")}
+                        </span>
+                      </div>
+                      <p className="font-medium mb-2">{q.question}</p>
+                      {q.answer && (
+                        <div className="mt-3 p-3 bg-muted rounded-md">
+                          <p className="text-sm font-medium mb-1">Answer:</p>
+                          <p className="text-sm">{q.answer}</p>
+                          {q.answered_at && (
+                            <p className="text-xs text-muted-foreground mt-2">
+                              Answered on {format(new Date(q.answered_at), "MMM d, yyyy")}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           </CardContent>
         </Card>
       )}
 
-      {/* Add FAQ Dialog */}
-      <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Add Operational FAQ</DialogTitle>
-            <DialogDescription>
-              Add an operational question and answer for Peachhaus team members
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="property">Property *</Label>
-              <Select
-                value={newFAQ.property_id}
-                onValueChange={(value) => setNewFAQ({ ...newFAQ, property_id: value })}
-              >
-                <SelectTrigger id="property">
-                  <SelectValue placeholder="Select a property" />
-                </SelectTrigger>
-                <SelectContent>
-                  {properties.map(property => (
-                    <SelectItem key={property.id} value={property.id}>
-                      {property.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+      {/* FAQs Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Frequently Asked Questions</CardTitle>
+          <CardDescription>
+            Common questions and answers about property management
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <FAQSection
+            propertyId={undefined}
+            projectId={undefined}
+            faqs={[]}
+            onUpdate={() => {}}
+          />
+        </CardContent>
+      </Card>
 
-            <div className="space-y-2">
-              <Label htmlFor="category">Category</Label>
-              <Select
-                value={newFAQ.category}
-                onValueChange={(value) => setNewFAQ({ ...newFAQ, category: value })}
-              >
-                <SelectTrigger id="category">
-                  <SelectValue placeholder="Select a category" />
-                </SelectTrigger>
-                <SelectContent>
-                  {FAQ_CATEGORIES.filter(cat => cat !== 'All Categories').map(cat => (
-                    <SelectItem key={cat} value={cat}>
-                      {cat}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="question">Question *</Label>
-              <Input
-                id="question"
-                placeholder="How do I handle a maintenance emergency after hours?"
-                value={newFAQ.question}
-                onChange={(e) => setNewFAQ({ ...newFAQ, question: e.target.value })}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="answer">Answer *</Label>
-              <Textarea
-                id="answer"
-                placeholder="For after-hours emergencies, contact the on-call manager at..."
-                rows={6}
-                value={newFAQ.answer}
-                onChange={(e) => setNewFAQ({ ...newFAQ, answer: e.target.value })}
-              />
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAddDialog(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleAddFAQ}>
-              Add FAQ
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <AskQuestionDialog
+        open={showAskDialog}
+        onOpenChange={(open) => {
+          setShowAskDialog(open);
+          if (!open) loadMyQuestions();
+        }}
+      />
     </div>
   );
-}
+};
