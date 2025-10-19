@@ -97,9 +97,11 @@ export const RescheduleDueDateDialog = ({
                 <p className="text-muted-foreground">
                   Task: <span className="font-semibold">{taskTitle}</span>
                 </p>
-                <p className="text-muted-foreground">
-                  Original due date: <span className="font-semibold">{format(new Date(originalDueDate), "MMM d, yyyy")}</span>
-                </p>
+                {originalDueDate && (
+                  <p className="text-muted-foreground">
+                    Original due date: <span className="font-semibold">{format(new Date(originalDueDate), "MMM d, yyyy")}</span>
+                  </p>
+                )}
               </div>
             </div>
           </div>

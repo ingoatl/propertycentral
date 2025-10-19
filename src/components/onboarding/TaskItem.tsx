@@ -1363,7 +1363,7 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
         taskId={task.id}
         taskTitle={task.title}
         currentDueDate={task.due_date || ""}
-        originalDueDate={task.original_due_date || task.due_date || ""}
+        originalDueDate={(task.original_due_date && task.original_due_date.trim()) || task.due_date || ""}
         onUpdate={onUpdate}
       />
     </>
