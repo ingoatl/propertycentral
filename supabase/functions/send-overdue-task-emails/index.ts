@@ -48,14 +48,14 @@ const handler = async (req: Request): Promise<Response> => {
         due_date,
         project_id,
         assigned_to_uuid,
+        assigned_role_id,
         onboarding_projects (
           property_address,
           owner_name
         )
       `)
       .lt("due_date", today)
-      .neq("status", "completed")
-      .not("assigned_to_uuid", "is", null);
+      .neq("status", "completed");
 
     if (tasksError) {
       console.error("Error fetching overdue tasks:", tasksError);
@@ -72,15 +72,37 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log(`Found ${overdueTasks.length} overdue tasks`);
 
-    // Group tasks by user
+    // Get all user-role assignments
+    const { data: userRoles } = await supabase
+      .from("user_team_roles")
+      .select("user_id, role_id");
+
+    // Group tasks by user (either directly assigned or through role)
     const tasksByUser = new Map<string, any[]>();
+    
     for (const task of overdueTasks) {
-      if (!task.assigned_to_uuid) continue;
+      const userIds = new Set<string>();
       
-      if (!tasksByUser.has(task.assigned_to_uuid)) {
-        tasksByUser.set(task.assigned_to_uuid, []);
+      // Add directly assigned user
+      if (task.assigned_to_uuid) {
+        userIds.add(task.assigned_to_uuid);
       }
-      tasksByUser.get(task.assigned_to_uuid)!.push(task);
+      
+      // Add users with the assigned role
+      if (task.assigned_role_id && userRoles) {
+        const usersWithRole = userRoles
+          .filter(ur => ur.role_id === task.assigned_role_id)
+          .map(ur => ur.user_id);
+        usersWithRole.forEach(uid => userIds.add(uid));
+      }
+      
+      // Add task to each user's list
+      for (const userId of userIds) {
+        if (!tasksByUser.has(userId)) {
+          tasksByUser.set(userId, []);
+        }
+        tasksByUser.get(userId)!.push(task);
+      }
     }
 
     console.log(`Tasks grouped for ${tasksByUser.size} users`);
@@ -92,7 +114,7 @@ const handler = async (req: Request): Promise<Response> => {
         .from("profiles")
         .select("email")
         .eq("id", userId)
-        .single();
+        .maybeSingle();
       
       if (profile?.email) {
         userEmails.set(userId, profile.email);
@@ -165,7 +187,7 @@ const handler = async (req: Request): Promise<Response> => {
               </div>
               
               <div style="text-align: center; margin-top: 30px;">
-                <a href="${supabaseUrl.replace('https://', 'https://').replace('.supabase.co', '.lovableproject.com')}/onboarding" 
+                <a href="https://9ed06ecd-51b7-4166-a07a-107b37f1e8c1.lovableproject.com/" 
                    style="display: inline-block; background-color: #667eea; color: white; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px;">
                   View My Tasks
                 </a>
