@@ -52,21 +52,44 @@ export const AddTaskDialog = ({
 
     setSubmitting(true);
     try {
-      const { error } = await supabase
-        .from("onboarding_tasks")
+      // Step 1: Create task template for all future projects
+      const { error: templateError } = await supabase
+        .from("task_templates")
         .insert({
-          project_id: projectId,
+          phase_number: phaseNumber,
+          task_title: title.trim(),
+          field_type: fieldType,
+        });
+
+      if (templateError) throw templateError;
+
+      // Step 2: Get all existing projects
+      const { data: projects, error: projectsError } = await supabase
+        .from("onboarding_projects")
+        .select("id");
+
+      if (projectsError) throw projectsError;
+
+      // Step 3: Create task instance for all existing projects in this phase
+      if (projects && projects.length > 0) {
+        const taskInstances = projects.map(project => ({
+          project_id: project.id,
           phase_number: phaseNumber,
           phase_title: phaseTitle,
           title: title.trim(),
           description: description.trim() || null,
           field_type: fieldType,
-          status: "pending",
-        });
+          status: "pending" as const,
+        }));
 
-      if (error) throw error;
+        const { error: tasksError } = await supabase
+          .from("onboarding_tasks")
+          .insert(taskInstances);
 
-      toast.success("Task added successfully");
+        if (tasksError) throw tasksError;
+      }
+
+      toast.success(`Task added globally to all ${projects?.length || 0} properties`);
       setTitle("");
       setDescription("");
       setFieldType("text");
@@ -74,7 +97,7 @@ export const AddTaskDialog = ({
       onSuccess();
     } catch (error) {
       console.error("Failed to add task:", error);
-      toast.error("Failed to add task");
+      toast.error("Failed to add task globally");
     } finally {
       setSubmitting(false);
     }
