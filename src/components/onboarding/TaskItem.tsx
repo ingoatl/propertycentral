@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { OnboardingTask, OnboardingSOP } from "@/types/onboarding";
 import { Card, CardContent } from "@/components/ui/card";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -11,7 +12,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { CalendarIcon, Upload, FileText, CheckCircle2, Edit2, Copy, Check, Loader2, Settings, MessageSquare, Trash2, BookOpen, User, Clock } from "lucide-react";
+import { CalendarIcon, Upload, FileText, CheckCircle2, Edit2, Copy, Check, Loader2, Settings, MessageSquare, Trash2, BookOpen, User, Clock, ChevronDown } from "lucide-react";
 import { format, addWeeks, isBefore, startOfDay, isPast } from "date-fns";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -55,6 +56,7 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
   const [showRescheduleDialog, setShowRescheduleDialog] = useState(false);
   const [showUpdateDueDateDialog, setShowUpdateDueDateDialog] = useState(false);
   const [showEditTaskDialog, setShowEditTaskDialog] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(task.status === "completed");
   
   const { isAdmin } = useAdminCheck();
   const hasValue = task.field_value && task.field_value.trim() !== "";
@@ -92,11 +94,31 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
 
 
   const handleCopy = async () => {
-    if (fieldValue) {
-      await navigator.clipboard.writeText(fieldValue);
+    const valueToCopy = task.field_value || fieldValue;
+    if (valueToCopy) {
+      await navigator.clipboard.writeText(valueToCopy);
       setCopied(true);
       toast.success("Copied to clipboard");
       setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  const getDisplayValue = () => {
+    if (!task.field_value) return "No value entered";
+    
+    switch (task.field_type) {
+      case "file":
+        return task.field_value;
+      case "date":
+        return format(new Date(task.field_value), "MMM d, yyyy");
+      case "checkbox":
+        return task.field_value === "true" ? "Yes ✓" : "No";
+      case "currency":
+        return `$${task.field_value}`;
+      default:
+        return task.field_value.length > 60 
+          ? task.field_value.substring(0, 60) + "..." 
+          : task.field_value;
     }
   };
 
@@ -807,13 +829,59 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
     return renderField();
   }
 
+  // COMPLETED TASK - COLLAPSED VIEW
+  if (taskStatus === "completed" && isCollapsed) {
+    return (
+      <Card 
+        id={`task-${task.id}`}
+        className="bg-green-50 border-green-500 hover:bg-green-100 transition-colors cursor-pointer"
+        onClick={() => setIsCollapsed(false)}
+      >
+        <div className="p-4">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3 flex-1 min-w-0">
+              <CheckCircle2 className="w-5 h-5 text-green-600 flex-shrink-0" />
+              <div className="flex items-center gap-2 min-w-0 flex-1">
+                <span className="font-semibold text-base truncate">{task.title}</span>
+                <span className="text-muted-foreground">|</span>
+                <span className="text-sm text-muted-foreground truncate">
+                  {getDisplayValue()}
+                </span>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleCopy();
+                }}
+                className="h-8 w-8 p-0"
+              >
+                {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+              </Button>
+              <ChevronDown className="w-4 h-4 text-muted-foreground" />
+            </div>
+          </div>
+          
+          <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground ml-8">
+            <span>Completed {task.completed_date && format(new Date(task.completed_date), "MMM d, yyyy")}</span>
+            {task.assigned_to && <span>by {task.assigned_to}</span>}
+          </div>
+        </div>
+      </Card>
+    );
+  }
+
   return (
     <>
       <Card 
         id={`task-${task.id}`}
         className={cn(
           "transition-colors overflow-hidden",
-          taskStatus === "completed" && "border-green-500/50"
+          taskStatus === "completed" && "bg-green-50/30 border-green-500"
         )}
       >
         {/* HEADER SECTION - Prominent Title & Status */}
@@ -826,6 +894,27 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
               )}
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
+              {task.field_value && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleCopy}
+                  className="h-8 w-8 p-0"
+                  title="Copy value"
+                >
+                  {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                </Button>
+              )}
+              {taskStatus === "completed" && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsCollapsed(true)}
+                  className="h-8 px-2 text-xs"
+                >
+                  Collapse
+                </Button>
+              )}
               <TaskStatusBadge status={taskStatus} dueDate={task.due_date} />
             </div>
           </div>
