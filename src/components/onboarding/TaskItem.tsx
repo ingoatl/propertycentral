@@ -442,6 +442,7 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
                     onChange={handleFileUpload}
                     disabled={uploading || task.field_value === "N/A"}
                     className="flex-1"
+                    accept="image/*,.pdf,.doc,.docx,.xls,.xlsx"
                   />
                   {task.file_path && (
                     <CheckCircle2 className="w-5 h-5 text-green-600" />
@@ -449,19 +450,42 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
                 </div>
                 
                 {uploading && (
-                  <p className="text-xs text-muted-foreground">Uploading...</p>
+                  <div className="flex items-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <p className="text-xs text-muted-foreground">Uploading...</p>
+                  </div>
                 )}
                 
                 {task.file_path && !uploading && (
-                  <a
-                    href={`${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/onboarding-documents/${task.file_path}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-2 text-xs text-green-600 hover:text-green-700 hover:underline"
-                  >
-                    <FileText className="w-4 h-4" />
-                    <span>{task.field_value}</span>
-                  </a>
+                  <>
+                    {isImageFile(task.file_path) ? (
+                      <div 
+                        className="relative group cursor-pointer"
+                        onClick={() => setShowImagePreview(true)}
+                      >
+                        <img
+                          src={getFileUrl(task.file_path)}
+                          alt={task.field_value || "Uploaded image"}
+                          className="w-full max-w-md rounded-lg border border-green-200 hover:border-green-400 transition-colors"
+                        />
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors rounded-lg flex items-center justify-center">
+                          <span className="text-white text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity">
+                            Click to view full size
+                          </span>
+                        </div>
+                      </div>
+                    ) : (
+                      <a
+                        href={getFileUrl(task.file_path)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 text-xs text-green-600 hover:text-green-700 hover:underline"
+                      >
+                        <FileText className="w-4 h-4" />
+                        <span>{task.field_value}</span>
+                      </a>
+                    )}
+                  </>
                 )}
                 
                 {!task.file_path && task.field_value !== "N/A" && (
@@ -748,16 +772,48 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
               </>
             )}
             
-            {/* Screenshot preview if uploaded */}
-            {task.file_path && (
+            {/* Upload button for all users */}
+            <div className="flex items-center gap-2">
+              <Input 
+                type="file" 
+                onChange={handleFileUpload}
+                disabled={uploading}
+                className="flex-1 text-xs h-8"
+                accept="image/*,.pdf,.doc,.docx"
+                id={`upload-${task.id}`}
+              />
+              {uploading && <Loader2 className="w-4 h-4 animate-spin" />}
+            </div>
+            
+            {/* Image preview if uploaded */}
+            {task.file_path && isImageFile(task.file_path) && (
+              <div 
+                className="relative group cursor-pointer"
+                onClick={() => setShowImagePreview(true)}
+              >
+                <img
+                  src={getFileUrl(task.file_path)}
+                  alt={task.field_value || "Uploaded image"}
+                  className="w-full max-w-md rounded-lg border border-green-200 hover:border-green-400 transition-colors"
+                />
+                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors rounded-lg flex items-center justify-center">
+                  <span className="text-white text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity">
+                    Click to view full size
+                  </span>
+                </div>
+              </div>
+            )}
+            
+            {/* File link if not an image */}
+            {task.file_path && !isImageFile(task.file_path) && (
               <a
-                href={`${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/onboarding-documents/${task.file_path}`}
+                href={getFileUrl(task.file_path)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-1 text-[10px] text-green-600 hover:underline"
               >
                 <FileText className="w-3 h-3" />
-                Screenshot uploaded
+                {task.field_value || "File uploaded"}
               </a>
             )}
             
@@ -846,11 +902,13 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
       <>
         <Card 
           id={`task-${task.id}`}
-          className="bg-green-50 border-green-500 hover:bg-green-100 transition-colors cursor-pointer"
-          onClick={() => setIsCollapsed(false)}
+          className="bg-green-50 border-green-500 hover:bg-green-100 transition-colors"
         >
           <div className="p-4">
-            <div className="flex items-center justify-between gap-4">
+            <div 
+              className="flex items-center justify-between gap-4 cursor-pointer"
+              onClick={() => setIsCollapsed(false)}
+            >
               <div className="flex items-center gap-3 flex-1 min-w-0">
                 <CheckCircle2 className="w-5 h-5 text-green-600 flex-shrink-0" />
                 <div className="flex items-center gap-2 min-w-0 flex-1">
@@ -864,15 +922,19 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
               
               <div className="flex items-center gap-2 flex-shrink-0">
                 {task.file_path && isImageFile(task.file_path) && (
-                  <img
-                    src={getFileUrl(task.file_path)}
-                    alt="Uploaded"
-                    className="w-10 h-10 object-cover rounded border border-green-300"
+                  <div
                     onClick={(e) => {
                       e.stopPropagation();
                       setShowImagePreview(true);
                     }}
-                  />
+                    className="cursor-pointer"
+                  >
+                    <img
+                      src={getFileUrl(task.file_path)}
+                      alt="Uploaded"
+                      className="w-10 h-10 object-cover rounded border border-green-300"
+                    />
+                  </div>
                 )}
                 <Button
                   variant="ghost"
