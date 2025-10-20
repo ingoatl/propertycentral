@@ -940,7 +940,7 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
         <div 
           className="bg-muted/30 p-4 border-b"
           onClick={(e) => {
-            // Stop propagation for completed tasks so clicking header doesn't collapse
+            // Stop propagation so clicking header doesn't trigger card collapse
             if (taskStatus === "completed") {
               e.stopPropagation();
             }
