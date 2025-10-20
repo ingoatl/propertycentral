@@ -57,7 +57,7 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
   const [showRescheduleDialog, setShowRescheduleDialog] = useState(false);
   const [showUpdateDueDateDialog, setShowUpdateDueDateDialog] = useState(false);
   const [showEditTaskDialog, setShowEditTaskDialog] = useState(false);
-  const [isCollapsed, setIsCollapsed] = useState(task.status === "completed");
+  const [isCollapsed, setIsCollapsed] = useState(false);
   const [showImagePreview, setShowImagePreview] = useState(false);
   
   const { isAdmin } = useAdminCheck();
@@ -851,25 +851,36 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
     return renderField();
   }
 
-  // COMPLETED TASK - COLLAPSED VIEW
-  if (taskStatus === "completed" && isCollapsed) {
+  // COLLAPSED VIEW (for all tasks)
+  if (isCollapsed) {
     return (
       <>
         <Card 
           id={`task-${task.id}`}
-          className="bg-green-50 border-green-500 hover:bg-green-100 transition-colors cursor-pointer"
+          className={cn(
+            "hover:bg-accent/50 transition-colors cursor-pointer",
+            taskStatus === "completed" && "bg-green-50 border-green-500"
+          )}
           onClick={() => setIsCollapsed(false)}
         >
-          <div className="p-4">
+          <div className="p-3">
             <div className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-3 flex-1 min-w-0">
-                <CheckCircle2 className="w-5 h-5 text-green-600 flex-shrink-0" />
+                {taskStatus === "completed" ? (
+                  <CheckCircle2 className="w-5 h-5 text-green-600 flex-shrink-0" />
+                ) : (
+                  <div className="w-5 h-5 flex-shrink-0" />
+                )}
                 <div className="flex items-center gap-2 min-w-0 flex-1">
-                  <span className="font-semibold text-base truncate">{task.title}</span>
-                  <span className="text-muted-foreground">|</span>
-                  <span className="text-sm text-muted-foreground truncate">
-                    {getDisplayValue()}
-                  </span>
+                  <span className="font-semibold text-sm truncate">{task.title}</span>
+                  {task.field_value && (
+                    <>
+                      <span className="text-muted-foreground">|</span>
+                      <span className="text-xs text-muted-foreground truncate">
+                        {getDisplayValue()}
+                      </span>
+                    </>
+                  )}
                 </div>
               </div>
               
@@ -885,27 +896,13 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
                     <img
                       src={getFileUrl(task.file_path)}
                       alt="Uploaded"
-                      className="w-10 h-10 object-cover rounded border border-green-300"
+                      className="w-8 h-8 object-cover rounded border"
                     />
                   </div>
                 )}
-                <div
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleCopy();
-                  }}
-                  className="h-8 w-8 flex items-center justify-center rounded-md hover:bg-accent cursor-pointer"
-                  title="Copy value"
-                >
-                  {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                </div>
+                <TaskStatusBadge status={taskStatus} dueDate={task.due_date} />
                 <ChevronDown className="w-4 h-4 text-muted-foreground" />
               </div>
-            </div>
-            
-            <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground ml-8">
-              <span>Completed {task.completed_date && format(new Date(task.completed_date), "MMM d, yyyy")}</span>
-              {task.assigned_to && <span>by {task.assigned_to}</span>}
             </div>
           </div>
         </Card>
@@ -926,25 +923,20 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
     );
   }
 
+  // EXPANDED VIEW
   return (
     <>
       <Card 
         id={`task-${task.id}`}
         className={cn(
           "transition-colors overflow-hidden",
-          taskStatus === "completed" && "bg-green-50/30 border-green-500 cursor-pointer"
+          taskStatus === "completed" && "bg-green-50/30 border-green-500"
         )}
-        onClick={taskStatus === "completed" ? () => setIsCollapsed(true) : undefined}
       >
-        {/* HEADER SECTION - Prominent Title & Status */}
+        {/* HEADER SECTION - Click to collapse */}
         <div 
-          className="bg-muted/30 p-4 border-b"
-          onClick={(e) => {
-            // Stop propagation so clicking header doesn't trigger card collapse
-            if (taskStatus === "completed") {
-              e.stopPropagation();
-            }
-          }}
+          className="bg-muted/30 p-4 border-b cursor-pointer hover:bg-muted/50 transition-colors"
+          onClick={() => setIsCollapsed(true)}
         >
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1">
@@ -959,13 +951,10 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
           </div>
         </div>
 
-        {/* MAIN CONTENT + ADMIN SIDEBAR */}
+        {/* MAIN CONTENT + ADMIN SIDEBAR - Click events don't collapse */}
         <div 
           className="flex"
-          onClick={(e) => {
-            // Stop propagation for interactive elements
-            e.stopPropagation();
-          }}
+          onClick={(e) => e.stopPropagation()}
         >
           {/* LEFT: Main Content (VA-focused) */}
           <div className="flex-1 p-4 space-y-4">
