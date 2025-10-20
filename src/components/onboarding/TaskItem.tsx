@@ -857,13 +857,11 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
       <>
         <Card 
           id={`task-${task.id}`}
-          className="bg-green-50 border-green-500 hover:bg-green-100 transition-colors"
+          className="bg-green-50 border-green-500 hover:bg-green-100 transition-colors cursor-pointer"
+          onClick={() => setIsCollapsed(false)}
         >
           <div className="p-4">
-            <div 
-              className="flex items-center justify-between gap-4 cursor-pointer"
-              onClick={() => setIsCollapsed(false)}
-            >
+            <div className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-3 flex-1 min-w-0">
                 <CheckCircle2 className="w-5 h-5 text-green-600 flex-shrink-0" />
                 <div className="flex items-center gap-2 min-w-0 flex-1">
@@ -891,18 +889,16 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
                     />
                   </div>
                 )}
-                <Button
-                  variant="ghost"
-                  size="sm"
+                <div
                   onClick={(e) => {
                     e.stopPropagation();
                     handleCopy();
                   }}
-                  className="h-8 w-8 p-0"
+                  className="h-8 w-8 flex items-center justify-center rounded-md hover:bg-accent cursor-pointer"
                   title="Copy value"
                 >
                   {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                </Button>
+                </div>
                 <ChevronDown className="w-4 h-4 text-muted-foreground" />
               </div>
             </div>
@@ -910,25 +906,9 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
             <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground ml-8">
               <span>Completed {task.completed_date && format(new Date(task.completed_date), "MMM d, yyyy")}</span>
               {task.assigned_to && <span>by {task.assigned_to}</span>}
+            </div>
           </div>
-        </div>
-
-        {/* Image Preview Dialog for all images */}
-        {task.file_path && isImageFile(task.file_path) && (
-          <Dialog open={showImagePreview} onOpenChange={setShowImagePreview}>
-            <DialogContent className="max-w-4xl">
-              <img
-                src={getFileUrl(task.file_path)}
-                alt={task.field_value || "Uploaded image"}
-                className="w-full h-auto"
-                onError={(e) => {
-                  console.error("Preview image failed to load:", getFileUrl(task.file_path));
-                }}
-              />
-            </DialogContent>
-          </Dialog>
-        )}
-      </Card>
+        </Card>
 
         {/* Image Preview Dialog */}
         {task.file_path && isImageFile(task.file_path) && (
