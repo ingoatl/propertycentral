@@ -57,7 +57,7 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
   const [showRescheduleDialog, setShowRescheduleDialog] = useState(false);
   const [showUpdateDueDateDialog, setShowUpdateDueDateDialog] = useState(false);
   const [showEditTaskDialog, setShowEditTaskDialog] = useState(false);
-  const [isCollapsed, setIsCollapsed] = useState(true);
+  const [isCollapsed, setIsCollapsed] = useState(task.status !== 'completed');
   const [showImagePreview, setShowImagePreview] = useState(false);
   
   const { isAdmin } = useAdminCheck();
@@ -136,7 +136,7 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
   const autoSave = async (value: string, isCompleted: boolean = true, notesValue?: string) => {
     try {
       // Task is complete if any data exists: field_value, file_path, or notes
-      const hasData = value || task.file_path || notesValue;
+      const hasData = value || task.file_path || notesValue || task.field_value;
       const newStatus = isCompleted && hasData ? "completed" : "pending";
       const updateData: any = {
         field_value: value,
