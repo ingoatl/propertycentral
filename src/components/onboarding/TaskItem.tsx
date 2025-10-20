@@ -57,7 +57,7 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
   const [showRescheduleDialog, setShowRescheduleDialog] = useState(false);
   const [showUpdateDueDateDialog, setShowUpdateDueDateDialog] = useState(false);
   const [showEditTaskDialog, setShowEditTaskDialog] = useState(false);
-  const [isCollapsed, setIsCollapsed] = useState(task.status === "completed");
+  const [isCollapsed, setIsCollapsed] = useState(true);
   const [showImagePreview, setShowImagePreview] = useState(false);
   
   const { isAdmin } = useAdminCheck();
@@ -227,15 +227,34 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
   };
 
   const handleDeleteTask = async () => {
+    if (!isAdmin) {
+      toast.error("Only admins can delete tasks");
+      return;
+    }
+
     try {
-      const { error } = await supabase
+      // Delete the task instance
+      const { error: taskError } = await supabase
         .from("onboarding_tasks")
         .delete()
         .eq("id", task.id);
 
-      if (error) throw error;
+      if (taskError) throw taskError;
 
-      toast.success("Task deleted");
+      // Also delete from task templates to prevent it from appearing in future projects
+      // Match by phase_number and task_title
+      const { error: templateError } = await supabase
+        .from("task_templates")
+        .delete()
+        .eq("phase_number", task.phase_number)
+        .eq("task_title", task.title);
+
+      // Don't throw on template error - the template might not exist
+      if (templateError) {
+        console.warn("Template deletion warning:", templateError);
+      }
+
+      toast.success("Task deleted globally");
       onUpdate();
     } catch (error) {
       console.error("Failed to delete task:", error);
