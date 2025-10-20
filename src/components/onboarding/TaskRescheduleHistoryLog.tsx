@@ -24,7 +24,7 @@ interface TaskRescheduleHistoryLogProps {
 export const TaskRescheduleHistoryLog = ({ taskId }: TaskRescheduleHistoryLogProps) => {
   const [logs, setLogs] = useState<RescheduleLog[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(true);
 
   useEffect(() => {
     loadLogs();

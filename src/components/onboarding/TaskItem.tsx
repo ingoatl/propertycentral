@@ -23,17 +23,12 @@ import { SOPFormDialog } from "./SOPFormDialog";
 import { TaskAssignmentDialog } from "./TaskAssignmentDialog";
 import { RescheduleDueDateDialog } from "./RescheduleDueDateDialog";
 import { UpdateDueDateDialog } from "./UpdateDueDateDialog";
+import { EditTaskDialog } from "./EditTaskDialog";
 import { useAdminCheck } from "@/hooks/useAdminCheck";
 import { TaskStatusBadge } from "./TaskStatusBadge";
 import { TaskDueDateDisplay } from "./TaskDueDateDisplay";
 import { TaskRescheduleHistoryLog } from "./TaskRescheduleHistoryLog";
 import { AdminControlsSidebar } from "./AdminControlsSidebar";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 
 interface TaskItemProps {
   task: OnboardingTask;
@@ -59,10 +54,7 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
   const [showAssignmentDialog, setShowAssignmentDialog] = useState(false);
   const [showRescheduleDialog, setShowRescheduleDialog] = useState(false);
   const [showUpdateDueDateDialog, setShowUpdateDueDateDialog] = useState(false);
-  const [showDueDatePicker, setShowDueDatePicker] = useState(false);
-  const [newDueDate, setNewDueDate] = useState<Date | undefined>(
-    task.due_date ? new Date(task.due_date) : undefined
-  );
+  const [showEditTaskDialog, setShowEditTaskDialog] = useState(false);
   
   const { isAdmin } = useAdminCheck();
   const hasValue = task.field_value && task.field_value.trim() !== "";
@@ -73,10 +65,6 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
   useEffect(() => {
     loadSOP();
   }, [task.id]);
-
-  useEffect(() => {
-    setNewDueDate(task.due_date ? new Date(task.due_date) : undefined);
-  }, [task.due_date]);
 
   const loadSOP = async () => {
     const { data } = await supabase
@@ -102,45 +90,6 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
     }
   };
 
-  const handleDueDateChange = async (selectedDate: Date | undefined) => {
-    if (!selectedDate) return;
-
-    const today = startOfDay(new Date());
-    const maxDate = addWeeks(today, 4);
-
-    if (isBefore(selectedDate, today)) {
-      toast.error("Due date cannot be in the past");
-      return;
-    }
-
-    if (isBefore(maxDate, selectedDate)) {
-      toast.error("Due date cannot be more than 4 weeks out");
-      return;
-    }
-
-    try {
-      const { error } = await supabase
-        .from("onboarding_tasks")
-        .update({ due_date: format(selectedDate, "yyyy-MM-dd") })
-        .eq("id", task.id);
-
-      if (error) throw error;
-
-      setNewDueDate(selectedDate);
-      toast.success("Due date updated");
-      onUpdate();
-      setShowDueDatePicker(false);
-    } catch (error: any) {
-      toast.error("Failed to update due date");
-    }
-  };
-
-  const getAssignmentDisplay = () => {
-    if (task.assigned_to_uuid) {
-      return task.assigned_to || "Assigned";
-    }
-    return "Uses Phase Default";
-  };
 
   const handleCopy = async () => {
     if (fieldValue) {
@@ -266,7 +215,7 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
   };
 
   const handleRequestEdit = () => {
-    setIsEditing(true);
+    setShowEditTaskDialog(true);
   };
 
   const handleRequestDelete = () => {
@@ -315,102 +264,21 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
 
       case "checkbox":
         return (
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Checkbox
-                id={task.id}
-                checked={taskStatus === "completed"}
-                onCheckedChange={handleCheckboxChange}
-              />
-              <Label htmlFor={task.id} className="cursor-pointer">
-                {task.title}
-              </Label>
-            </div>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="h-5 w-5"
-                >
-                  <Settings className="w-3 h-3" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={handleRequestEdit}>
-                  <Edit2 className="w-3 h-3 mr-2" />
-                  Edit Field
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={handleRequestDelete}
-                  className="text-destructive"
-                >
-                  <Trash2 className="w-3 h-3 mr-2" />
-                  Delete Task
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <InlineComments taskId={task.id} />
+          <div className="flex items-center gap-2">
+            <Checkbox
+              id={task.id}
+              checked={taskStatus === "completed"}
+              onCheckedChange={handleCheckboxChange}
+            />
+            <Label htmlFor={task.id} className="cursor-pointer">
+              {task.title}
+            </Label>
           </div>
         );
 
       case "textarea":
         return (
           <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Label>{task.title}</Label>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  onClick={async () => {
-                    await navigator.clipboard.writeText(task.title);
-                    toast.success("Task name copied!");
-                  }}
-                  className="h-5 w-5"
-                >
-                  <Copy className="w-3 h-3" />
-                </Button>
-                {hasValue && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleCopy}
-                    className="h-6 px-2 text-xs"
-                  >
-                    {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                  </Button>
-                )}
-              </div>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-5 w-5"
-                  >
-                    <Settings className="w-3 h-3" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={handleRequestEdit}>
-                    <Edit2 className="w-3 h-3 mr-2" />
-                    Edit Field
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={handleRequestDelete}
-                    className="text-destructive"
-                  >
-                    <Trash2 className="w-3 h-3 mr-2" />
-                    Delete Task
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
             {task.field_value !== "N/A" && (
               <>
                 <Textarea
@@ -502,49 +370,6 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
       case "date":
         return (
           <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Label>{task.title}</Label>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  onClick={async () => {
-                    await navigator.clipboard.writeText(task.title);
-                    toast.success("Task name copied!");
-                  }}
-                  className="h-5 w-5"
-                >
-                  <Copy className="w-3 h-3" />
-                </Button>
-              </div>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-5 w-5"
-                  >
-                    <Settings className="w-3 h-3" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={handleRequestEdit}>
-                    <Edit2 className="w-3 h-3 mr-2" />
-                    Edit Field
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={handleRequestDelete}
-                    className="text-destructive"
-                  >
-                    <Trash2 className="w-3 h-3 mr-2" />
-                    Delete Task
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-            <InlineComments taskId={task.id} />
             <Popover>
               <PopoverTrigger asChild>
                 <Button
@@ -575,49 +400,6 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
       case "file":
         return (
           <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Label>{task.title}</Label>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  onClick={async () => {
-                    await navigator.clipboard.writeText(task.title);
-                    toast.success("Task name copied!");
-                  }}
-                  className="h-5 w-5"
-                >
-                  <Copy className="w-3 h-3" />
-                </Button>
-              </div>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-5 w-5"
-                  >
-                    <Settings className="w-3 h-3" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={handleRequestEdit}>
-                    <Edit2 className="w-3 h-3 mr-2" />
-                    Edit Field
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={handleRequestDelete}
-                    className="text-destructive"
-                  >
-                    <Trash2 className="w-3 h-3 mr-2" />
-                    Delete Task
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-            <InlineComments taskId={task.id} />
             
             {!showNAField ? (
               <>
@@ -709,60 +491,6 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
       case "currency":
         return (
           <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Label>{task.title}</Label>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  onClick={async () => {
-                    await navigator.clipboard.writeText(task.title);
-                    toast.success("Task name copied!");
-                  }}
-                  className="h-5 w-5"
-                >
-                  <Copy className="w-3 h-3" />
-                </Button>
-                {hasValue && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleCopy}
-                    className="h-6 px-2 text-xs"
-                  >
-                    {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                  </Button>
-                )}
-              </div>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-5 w-5"
-                  >
-                    <Settings className="w-3 h-3" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={handleRequestEdit}>
-                    <Edit2 className="w-3 h-3 mr-2" />
-                    Edit Field
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={handleRequestDelete}
-                    className="text-destructive"
-                  >
-                    <Trash2 className="w-3 h-3 mr-2" />
-                    Delete Task
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-            <InlineComments taskId={task.id} />
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
               <Input
@@ -854,60 +582,6 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
       case "phone":
         return (
           <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Label>{task.title}</Label>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  onClick={async () => {
-                    await navigator.clipboard.writeText(task.title);
-                    toast.success("Task name copied!");
-                  }}
-                  className="h-5 w-5"
-                >
-                  <Copy className="w-3 h-3" />
-                </Button>
-                {hasValue && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleCopy}
-                    className="h-6 px-2 text-xs"
-                  >
-                    {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                  </Button>
-                )}
-              </div>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-5 w-5"
-                  >
-                    <Settings className="w-3 h-3" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={handleRequestEdit}>
-                    <Edit2 className="w-3 h-3 mr-2" />
-                    Edit Field
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={handleRequestDelete}
-                    className="text-destructive"
-                  >
-                    <Trash2 className="w-3 h-3 mr-2" />
-                    Delete Task
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-            <InlineComments taskId={task.id} />
             {task.field_value !== "N/A" && (
               <Input
                 type="tel"
@@ -997,45 +671,6 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
       case "radio":
         return (
           <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Label>{task.title}</Label>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  onClick={async () => {
-                    await navigator.clipboard.writeText(task.title);
-                    toast.success("Task name copied!");
-                  }}
-                  className="h-5 w-5"
-                >
-                  <Copy className="w-3 h-3" />
-                </Button>
-              </div>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-5 w-5"
-                  >
-                    <Settings className="w-3 h-3" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem
-                    onClick={handleRequestDelete}
-                    className="text-destructive"
-                  >
-                    <Trash2 className="w-3 h-3 mr-2" />
-                    Delete Task
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-            <InlineComments taskId={task.id} />
             <RadioGroup value={fieldValue} onValueChange={handleRadioChange}>
               {["Yes", "No", "N/A"].map((option) => (
                 <div key={option} className="flex items-center space-x-2">
@@ -1049,80 +684,7 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
 
       default:
         return (
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-1.5">
-                <Label className="text-xs font-medium">{task.title}</Label>
-                
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  onClick={async () => {
-                    await navigator.clipboard.writeText(task.title);
-                    toast.success("Copied!");
-                  }}
-                  className="h-4 w-4"
-                >
-                  <Copy className="w-2.5 h-2.5" />
-                </Button>
-                
-                {/* Inline screenshot upload */}
-                <label className="cursor-pointer">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleFileUpload}
-                    className="hidden"
-                    disabled={uploading}
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-4 w-4"
-                    asChild
-                  >
-                    <span>
-                      {uploading ? (
-                        <Loader2 className="w-2.5 h-2.5 animate-spin" />
-                      ) : task.file_path ? (
-                        <CheckCircle2 className="w-2.5 h-2.5 text-green-600" />
-                      ) : (
-                        <Upload className="w-2.5 h-2.5" />
-                      )}
-                    </span>
-                  </Button>
-                </label>
-              </div>
-
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-4 w-4"
-                  >
-                    <Settings className="w-2.5 h-2.5" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={handleRequestEdit}>
-                    <Edit2 className="w-3 h-3 mr-2" />
-                    Edit Field
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={handleRequestDelete}
-                    className="text-destructive"
-                  >
-                    <Trash2 className="w-3 h-3 mr-2" />
-                    Delete Task
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-            <InlineComments taskId={task.id} />
+          <div className="space-y-2">
             
             {task.field_value !== "N/A" && (
               <>
@@ -1258,7 +820,7 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
         <div className="bg-muted/30 p-4 border-b">
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1">
-              <h3 className="text-lg font-semibold leading-tight mb-1">{task.title}</h3>
+              <h3 className="text-[20px] font-bold leading-tight mb-1">{task.title}</h3>
               {task.description && (
                 <p className="text-sm text-muted-foreground">{task.description}</p>
               )}
@@ -1365,6 +927,13 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
         onOpenChange={setShowUpdateDueDateDialog}
         task={task}
         onUpdate={onUpdate}
+      />
+
+      <EditTaskDialog
+        task={task}
+        open={showEditTaskDialog}
+        onOpenChange={setShowEditTaskDialog}
+        onSuccess={onUpdate}
       />
     </>
   );
