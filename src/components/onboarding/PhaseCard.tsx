@@ -79,7 +79,7 @@ export const PhaseCard = ({
   return (
     <Card className={cn(
       "transition-all",
-      isComplete && "border-green-500/50",
+      isComplete && "bg-green-50 border-green-500",
       highlighted && "ring-2 ring-blue-500 shadow-lg"
     )}>
       <Collapsible open={expanded} onOpenChange={onToggle}>

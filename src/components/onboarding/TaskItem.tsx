@@ -57,7 +57,7 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
   const [showRescheduleDialog, setShowRescheduleDialog] = useState(false);
   const [showUpdateDueDateDialog, setShowUpdateDueDateDialog] = useState(false);
   const [showEditTaskDialog, setShowEditTaskDialog] = useState(false);
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(task.status === "completed");
   const [showImagePreview, setShowImagePreview] = useState(false);
   
   const { isAdmin } = useAdminCheck();
