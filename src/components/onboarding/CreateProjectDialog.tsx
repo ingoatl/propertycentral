@@ -105,6 +105,19 @@ export const CreateProjectDialog = ({
     try {
       setLoading(true);
 
+      // Check for existing active projects for this property
+      const { data: existingProjects } = await supabase
+        .from("onboarding_projects")
+        .select("id, property_address, status")
+        .eq("property_address", propertyAddress)
+        .in("status", ["pending", "in-progress"]);
+
+      if (existingProjects && existingProjects.length > 0) {
+        toast.error("An active onboarding project already exists for this property");
+        setLoading(false);
+        return;
+      }
+
       // Get owner details
       const { data: ownerData } = await supabase
         .from("property_owners")

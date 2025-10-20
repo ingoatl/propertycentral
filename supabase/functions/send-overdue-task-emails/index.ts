@@ -49,13 +49,17 @@ const handler = async (req: Request): Promise<Response> => {
         project_id,
         assigned_to_uuid,
         assigned_role_id,
-        onboarding_projects (
+        onboarding_projects!inner (
           property_address,
-          owner_name
+          owner_name,
+          status
         )
       `)
       .lt("due_date", today)
-      .neq("status", "completed");
+      .neq("status", "completed")
+      .eq("onboarding_projects.status", "in-progress")
+      .or("field_value.is.null,field_value.eq.")
+      .is("file_path", null);
 
     if (tasksError) {
       console.error("Error fetching overdue tasks:", tasksError);

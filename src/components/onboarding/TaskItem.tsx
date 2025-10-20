@@ -162,17 +162,22 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
 
   const autoSave = async (value: string, isCompleted: boolean = true, notesValue?: string) => {
     try {
-      // Task is complete if any data exists: field_value, file_path, or notes
-      const hasData = value || task.file_path || notesValue || task.field_value;
-      const newStatus = isCompleted && hasData ? "completed" : "pending";
+      const normalizedValue = value?.trim() || '';
+      const hasNotes = (notesValue?.trim() || notes?.trim())?.length > 0;
+      const hasFile = !!task.file_path;
+      
+      // Task is complete if it has ANY meaningful data
+      const hasData = normalizedValue.length > 0 || hasFile || hasNotes;
+      const newStatus = (isCompleted && hasData) ? "completed" : "pending";
       
       const { data: { user } } = await supabase.auth.getUser();
+      
       const updateData: any = {
-        field_value: value,
+        field_value: normalizedValue || null,
         notes: notesValue ?? notes,
         status: newStatus,
-        completed_date: isCompleted && value ? new Date().toISOString() : null,
-        completed_by: isCompleted && value ? user?.id : null,
+        completed_date: (newStatus === "completed") ? new Date().toISOString() : null,
+        completed_by: (newStatus === "completed") ? user?.id : null,
       };
 
       await supabase
@@ -180,9 +185,8 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
         .update(updateData)
         .eq("id", task.id);
 
-      // Update local status immediately for visual feedback
       setTaskStatus(newStatus);
-      onUpdate(); // Trigger progress update
+      onUpdate();
     } catch (error) {
       console.error("Failed to auto-save task:", error);
     }

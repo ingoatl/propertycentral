@@ -54,13 +54,17 @@ export const OverdueTasksCard = () => {
         .from("onboarding_tasks")
         .select(`
           *,
-          onboarding_projects (
+          onboarding_projects!inner (
             owner_name,
-            property_address
+            property_address,
+            status
           )
         `)
         .lt("due_date", today)
         .neq("status", "completed")
+        .eq("onboarding_projects.status", "in-progress")
+        .or("field_value.is.null,field_value.eq.")
+        .is("file_path", null)
         .order("due_date", { ascending: true });
 
       // Admins see ALL overdue tasks, regular users only see their assigned tasks
