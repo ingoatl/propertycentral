@@ -12,7 +12,7 @@ interface WorkflowPhasesProps {
 }
 
 export const WorkflowPhases = ({ projectId, tasks, onTaskUpdate, searchQuery = "", taskId }: WorkflowPhasesProps) => {
-  const [expandedPhases, setExpandedPhases] = useState<Set<number>>(new Set([1]));
+  const [expandedPhases, setExpandedPhases] = useState<Set<number>>(new Set());
 
   // Auto-expand phase containing the target task
   useEffect(() => {

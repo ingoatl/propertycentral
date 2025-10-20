@@ -879,6 +879,21 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
                       <span className="text-xs text-muted-foreground truncate">
                         {getDisplayValue()}
                       </span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleCopy();
+                        }}
+                        className="h-6 px-2 ml-1 flex-shrink-0"
+                      >
+                        {copied ? (
+                          <Check className="w-3 h-3 text-green-600" />
+                        ) : (
+                          <Copy className="w-3 h-3" />
+                        )}
+                      </Button>
                     </>
                   )}
                 </div>
