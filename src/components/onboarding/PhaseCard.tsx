@@ -152,13 +152,34 @@ export const PhaseCard = ({
 
         <CollapsibleContent>
           <CardContent className="space-y-2 pt-0">
-            {tasks.map((task) => (
-              <TaskItem
-                key={task.id}
-                task={task}
-                onUpdate={onTaskUpdate}
-              />
-            ))}
+            {tasks
+              .sort((a, b) => {
+                // Define priority order based on title keywords
+                const getPriority = (title: string) => {
+                  const lowerTitle = title.toLowerCase();
+                  if (lowerTitle.includes('owner name') || lowerTitle.includes('owner\'s name')) return 1;
+                  if (lowerTitle.includes('owner email') || lowerTitle.includes('owner\'s email')) return 2;
+                  if (lowerTitle.includes('owner phone') || lowerTitle.includes('owner\'s phone')) return 3;
+                  return 999; // Everything else comes after
+                };
+                
+                const priorityA = getPriority(a.title);
+                const priorityB = getPriority(b.title);
+                
+                if (priorityA !== priorityB) {
+                  return priorityA - priorityB;
+                }
+                
+                // If same priority, maintain original order (by creation date)
+                return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+              })
+              .map((task) => (
+                <TaskItem
+                  key={task.id}
+                  task={task}
+                  onUpdate={onTaskUpdate}
+                />
+              ))}
             
             <Button
               onClick={() => setShowAddTaskDialog(true)}

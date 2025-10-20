@@ -57,7 +57,7 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
   const [showRescheduleDialog, setShowRescheduleDialog] = useState(false);
   const [showUpdateDueDateDialog, setShowUpdateDueDateDialog] = useState(false);
   const [showEditTaskDialog, setShowEditTaskDialog] = useState(false);
-  const [isCollapsed, setIsCollapsed] = useState(task.status === 'completed');
+  const [isCollapsed, setIsCollapsed] = useState(true); // All tasks closed by default
   const [showImagePreview, setShowImagePreview] = useState(false);
   
   const { isAdmin } = useAdminCheck();
@@ -76,11 +76,13 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
       const hasData = task.field_value || task.file_path;
       if (hasData && task.status === 'pending') {
         try {
+          const { data: { user } } = await supabase.auth.getUser();
           await supabase
             .from("onboarding_tasks")
             .update({ 
               status: 'completed',
-              completed_date: new Date().toISOString()
+              completed_date: new Date().toISOString(),
+              completed_by: user?.id
             })
             .eq("id", task.id);
           
@@ -163,11 +165,14 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
       // Task is complete if any data exists: field_value, file_path, or notes
       const hasData = value || task.file_path || notesValue || task.field_value;
       const newStatus = isCompleted && hasData ? "completed" : "pending";
+      
+      const { data: { user } } = await supabase.auth.getUser();
       const updateData: any = {
         field_value: value,
         notes: notesValue ?? notes,
         status: newStatus,
         completed_date: isCompleted && value ? new Date().toISOString() : null,
+        completed_by: isCompleted && value ? user?.id : null,
       };
 
       await supabase
@@ -200,6 +205,7 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
       if (uploadError) throw uploadError;
 
       // Update task with file path
+      const { data: { user } } = await supabase.auth.getUser();
       await supabase
         .from("onboarding_tasks")
         .update({
@@ -207,6 +213,7 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
           field_value: file.name,
           status: "completed",
           completed_date: new Date().toISOString(),
+          completed_by: user?.id,
         })
         .eq("id", task.id);
 
@@ -229,6 +236,7 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
     }
 
     try {
+      const { data: { user } } = await supabase.auth.getUser();
       await supabase
         .from("onboarding_tasks")
         .update({
@@ -236,6 +244,7 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
           notes: naReason,
           status: "completed",
           completed_date: new Date().toISOString(),
+          completed_by: user?.id,
         })
         .eq("id", task.id);
 
@@ -1043,20 +1052,54 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
 
             {/* Field Input with Copy Button */}
             <div className="space-y-2">
-              {task.field_value && (
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-sm font-medium">Value entered:</span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleCopy}
-                    className="h-7 px-2 text-xs"
-                    title="Copy value"
-                  >
-                    {copied ? <><Check className="w-3 h-3 mr-1" /> Copied</> : <><Copy className="w-3 h-3 mr-1" /> Copy</>}
-                  </Button>
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <div className="flex items-center gap-2">
+                  {task.field_value && (
+                    <>
+                      <span className="text-sm font-medium">Value entered:</span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleCopy}
+                        className="h-7 px-2 text-xs"
+                        title="Copy value"
+                      >
+                        {copied ? <><Check className="w-3 h-3 mr-1" /> Copied</> : <><Copy className="w-3 h-3 mr-1" /> Copy</>}
+                      </Button>
+                    </>
+                  )}
                 </div>
-              )}
+                {taskStatus !== 'completed' && (
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={async () => {
+                      try {
+                        const { data: { user } } = await supabase.auth.getUser();
+                        await supabase
+                          .from("onboarding_tasks")
+                          .update({
+                            status: 'completed',
+                            completed_date: new Date().toISOString(),
+                            completed_by: user?.id,
+                          })
+                          .eq("id", task.id);
+                        
+                        setTaskStatus('completed');
+                        toast.success("Task marked as complete");
+                        onUpdate();
+                      } catch (error) {
+                        console.error("Failed to mark as complete:", error);
+                        toast.error("Failed to update task");
+                      }
+                    }}
+                    className="h-8"
+                  >
+                    <CheckCircle2 className="w-4 h-4 mr-1" />
+                    Mark Complete
+                  </Button>
+                )}
+              </div>
               {renderField()}
               
               {/* Upload button for all tasks (not just file type) */}

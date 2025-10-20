@@ -590,6 +590,7 @@ export type Database = {
           assigned_role_id: string | null
           assigned_to: string | null
           assigned_to_uuid: string | null
+          completed_by: string | null
           completed_date: string | null
           created_at: string
           description: string | null
@@ -613,6 +614,7 @@ export type Database = {
           assigned_role_id?: string | null
           assigned_to?: string | null
           assigned_to_uuid?: string | null
+          completed_by?: string | null
           completed_date?: string | null
           created_at?: string
           description?: string | null
@@ -636,6 +638,7 @@ export type Database = {
           assigned_role_id?: string | null
           assigned_to?: string | null
           assigned_to_uuid?: string | null
+          completed_by?: string | null
           completed_date?: string | null
           created_at?: string
           description?: string | null
