@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { OnboardingTask } from "@/types/onboarding";
 import { ONBOARDING_PHASES } from "@/context/onboardingPhases";
 import { PhaseCard } from "./PhaseCard";
@@ -8,10 +8,21 @@ interface WorkflowPhasesProps {
   tasks: OnboardingTask[];
   onTaskUpdate: () => void;
   searchQuery?: string;
+  taskId?: string;
 }
 
-export const WorkflowPhases = ({ projectId, tasks, onTaskUpdate, searchQuery = "" }: WorkflowPhasesProps) => {
+export const WorkflowPhases = ({ projectId, tasks, onTaskUpdate, searchQuery = "", taskId }: WorkflowPhasesProps) => {
   const [expandedPhases, setExpandedPhases] = useState<Set<number>>(new Set([1]));
+
+  // Auto-expand phase containing the target task
+  useEffect(() => {
+    if (taskId && tasks.length > 0) {
+      const targetTask = tasks.find(t => t.id === taskId);
+      if (targetTask) {
+        setExpandedPhases(prev => new Set([...prev, targetTask.phase_number]));
+      }
+    }
+  }, [taskId, tasks]);
 
   const getPhaseCompletion = (phaseNumber: number) => {
     const phaseTasks = tasks.filter(t => t.phase_number === phaseNumber);

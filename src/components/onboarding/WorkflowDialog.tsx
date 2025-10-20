@@ -68,13 +68,13 @@ export const WorkflowDialog = ({ open, onOpenChange, project, propertyId, proper
         const taskElement = document.getElementById(`task-${taskId}`);
         if (taskElement) {
           taskElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          // Add highlight effect
-          taskElement.classList.add('ring-2', 'ring-primary', 'ring-offset-2');
+          // Add highlight effect with pulsing animation
+          taskElement.classList.add('ring-4', 'ring-primary', 'ring-offset-4', 'transition-all', 'duration-300');
           setTimeout(() => {
-            taskElement.classList.remove('ring-2', 'ring-primary', 'ring-offset-2');
-          }, 2000);
+            taskElement.classList.remove('ring-4', 'ring-primary', 'ring-offset-4');
+          }, 3000);
         }
-      }, 300);
+      }, 500);
     }
   }, [taskId, tasks, loading]);
 
@@ -311,6 +311,7 @@ export const WorkflowDialog = ({ open, onOpenChange, project, propertyId, proper
                     tasks={searchQuery ? filteredTasks : tasks}
                     onTaskUpdate={handleTaskUpdate}
                     searchQuery={searchQuery}
+                    taskId={taskId}
                   />
 
                   {searchQuery && filteredTasks.length === 0 && (
