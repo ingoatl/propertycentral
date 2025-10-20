@@ -42,13 +42,16 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log("User authenticated:", user.email);
 
-    // Check if the caller is an admin using the anon client
-    const { data: roles, error: rolesError } = await supabase
+    // Create service role client for admin check (bypasses RLS)
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
+    
+    // Check if the caller is an admin using service role client
+    const { data: roles, error: rolesError } = await supabaseAdmin
       .from("user_roles")
       .select("role")
       .eq("user_id", user.id)
       .eq("role", "admin")
-      .single();
+      .maybeSingle();
 
     if (rolesError || !roles) {
       console.error("Not an admin:", rolesError);
@@ -61,9 +64,6 @@ const handler = async (req: Request): Promise<Response> => {
     const { userId, newPassword }: ResetPasswordRequest = await req.json();
 
     console.log("Resetting password for user:", userId);
-
-    // Create service role client for password update
-    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
     
     // Update user password using admin API
     const { data, error } = await supabaseAdmin.auth.admin.updateUserById(
