@@ -24,6 +24,10 @@ import { TaskAssignmentDialog } from "./TaskAssignmentDialog";
 import { RescheduleDueDateDialog } from "./RescheduleDueDateDialog";
 import { UpdateDueDateDialog } from "./UpdateDueDateDialog";
 import { useAdminCheck } from "@/hooks/useAdminCheck";
+import { TaskStatusBadge } from "./TaskStatusBadge";
+import { TaskDueDateDisplay } from "./TaskDueDateDisplay";
+import { TaskRescheduleHistoryLog } from "./TaskRescheduleHistoryLog";
+import { AdminControlsSidebar } from "./AdminControlsSidebar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -1246,89 +1250,73 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
       <Card 
         id={`task-${task.id}`}
         className={cn(
-          "transition-colors py-2 border-2",
-          taskStatus === "completed" && "bg-green-50/50 border-green-500"
+          "transition-colors overflow-hidden",
+          taskStatus === "completed" && "border-green-500/50"
         )}
       >
-        <CardContent className="py-2 px-3">
-          {/* Assignment & Due Date Row - Compact */}
-          <div className="flex items-center gap-2 mb-2 text-xs flex-wrap">
-            {isAdmin && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowAssignmentDialog(true)}
-                className="h-6 px-2 gap-1 text-xs"
-              >
-                <User className="w-3 h-3" />
-                {getAssignmentDisplay()}
-              </Button>
-            )}
-            
-            {task.due_date && (
-              <Popover open={showDueDatePicker} onOpenChange={setShowDueDatePicker}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleDueDateClick}
-                    className={cn(
-                      "h-6 px-2 gap-1 text-xs",
-                      isDueDateOverdue && "text-destructive hover:text-destructive"
-                    )}
-                  >
-                    <Clock className="w-3 h-3" />
-                    {format(new Date(task.due_date), "MMM d, yyyy")}
-                    {isDueDateOverdue && " (Overdue)"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
-                  <Calendar
-                    mode="single"
-                    selected={newDueDate}
-                    onSelect={handleDueDateChange}
-                    disabled={(date) => 
-                      isBefore(date, startOfDay(new Date())) || 
-                      isBefore(addWeeks(new Date(), 4), date)
-                    }
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-            )}
-          </div>
-          
-          <div className="flex items-start justify-between gap-2">
+        {/* HEADER SECTION - Prominent Title & Status */}
+        <div className="bg-muted/30 p-4 border-b">
+          <div className="flex items-start justify-between gap-4">
             <div className="flex-1">
+              <h3 className="text-lg font-semibold leading-tight mb-1">{task.title}</h3>
+              {task.description && (
+                <p className="text-sm text-muted-foreground">{task.description}</p>
+              )}
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <TaskStatusBadge status={taskStatus} dueDate={task.due_date} />
+            </div>
+          </div>
+        </div>
+
+        {/* MAIN CONTENT + ADMIN SIDEBAR */}
+        <div className="flex">
+          {/* LEFT: Main Content (VA-focused) */}
+          <div className="flex-1 p-4 space-y-4">
+            {/* Due Date & Assignment Info */}
+            <div className="flex gap-3 flex-wrap items-center">
+              {task.due_date && (
+                <TaskDueDateDisplay
+                  dueDate={task.due_date}
+                  status={taskStatus}
+                  onClick={handleDueDateClick}
+                />
+              )}
+              
+              {task.assigned_to_uuid && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <User className="w-4 h-4" />
+                  <span>Assigned to: <span className="font-medium">{task.assigned_to}</span></span>
+                </div>
+              )}
+            </div>
+
+            {/* Field Input */}
+            <div>
               {renderField()}
             </div>
-            {/* SOP Buttons */}
-            <div className="flex items-center gap-1 flex-shrink-0">
-              {isAdmin && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShowSOPFormDialog(true)}
-                  className="h-7 px-2"
-                >
-                  <FileText className="w-3 h-3 mr-1" />
-                  {sop ? "Edit" : "Add"} SOP
-                </Button>
-              )}
-              {sop && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowSOPDialog(true)}
-                  className="h-7 px-2"
-                >
-                  <BookOpen className="w-3 h-3 mr-1" />
-                  View SOP
-                </Button>
-              )}
-            </div>
+
+            {/* Reschedule History Log */}
+            <TaskRescheduleHistoryLog taskId={task.id} />
+
+            {/* Comments Section */}
+            <InlineComments taskId={task.id} />
           </div>
-        </CardContent>
+
+          {/* RIGHT: Admin Sidebar */}
+          {isAdmin && (
+            <AdminControlsSidebar
+              task={task}
+              sop={sop}
+              onEditTask={handleRequestEdit}
+              onDeleteTask={handleRequestDelete}
+              onViewSOP={() => setShowSOPDialog(true)}
+              onEditSOP={() => setShowSOPFormDialog(true)}
+              onAssignTask={() => setShowAssignmentDialog(true)}
+              onUpdateDueDate={handleDueDateClick}
+            />
+          )}
+        </div>
       </Card>
 
       <PinVerificationDialog

@@ -87,15 +87,19 @@ export const PhaseCard = ({
           <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
             <div className="flex items-start justify-between">
               <div className="flex-1 text-left">
-                <div className="flex items-center gap-3">
-                  <Badge variant="outline" className="font-mono">
+                <div className="flex items-center gap-3 mb-2">
+                  <Badge variant="outline" className="font-mono text-sm px-3 py-1">
                     Phase {phase.id}
                   </Badge>
                   {isComplete && <CheckCircle2 className="w-5 h-5 text-green-600" />}
-                  <CardTitle className="text-lg">{phase.title}</CardTitle>
-                  
-                  {/* SOP Buttons */}
-                  <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                </div>
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1">
+                    <CardTitle className="text-xl font-bold mb-2">{phase.title}</CardTitle>
+                    <CardDescription>{phase.description}</CardDescription>
+                  </div>
+                  {/* SOP Buttons - Right Side */}
+                  <div className="flex items-center gap-2 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
                     {isAdmin && (
                       <Button
                         variant="ghost"
@@ -118,13 +122,12 @@ export const PhaseCard = ({
                     )}
                   </div>
                 </div>
-                <CardDescription className="mt-2">{phase.description}</CardDescription>
               </div>
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-4 ml-4">
                 <div className="text-right">
-                  <div className="text-sm font-medium">{Math.round(completion)}%</div>
+                  <div className="text-lg font-semibold">{Math.round(completion)}%</div>
                   <div className="text-xs text-muted-foreground">
-                    {tasks.filter(t => t.status === "completed").length} / {tasks.length}
+                    {tasks.filter(t => t.status === "completed").length} of {tasks.length} tasks
                   </div>
                 </div>
                 <ChevronDown className={cn(
@@ -134,11 +137,11 @@ export const PhaseCard = ({
               </div>
             </div>
 
-            {/* Progress Bar */}
-            <div className="w-full bg-muted rounded-full h-2 mt-4">
+            {/* Progress Bar - Full Width */}
+            <div className="w-full bg-muted rounded-full h-2.5 mt-4">
               <div
                 className={cn(
-                  "h-2 rounded-full transition-all duration-300",
+                  "h-2.5 rounded-full transition-all duration-300",
                   isComplete ? "bg-green-600" : "bg-primary"
                 )}
                 style={{ width: `${completion}%` }}
