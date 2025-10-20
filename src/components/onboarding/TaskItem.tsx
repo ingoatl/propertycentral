@@ -934,6 +934,12 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
                     />
                   </div>
                 )}
+                {task.due_date && (
+                  <div className="text-xs text-muted-foreground flex items-center gap-1">
+                    <Clock className="w-3 h-3" />
+                    {format(new Date(task.due_date), "MMM d")}
+                  </div>
+                )}
                 <TaskStatusBadge status={taskStatus} dueDate={task.due_date} />
                 <ChevronDown className="w-4 h-4 text-muted-foreground" />
               </div>
