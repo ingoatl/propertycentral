@@ -166,9 +166,26 @@ export const CreateProjectDialog = ({
       }
 
       // Create all tasks for all 9 phases with auto-assignment
-      const oneWeekOut = addWeeks(new Date(), 1);
-      const allTasks = ONBOARDING_PHASES.flatMap((phase) =>
-        phase.tasks.map((task) => {
+      // Phase-specific scheduling:
+      // - Phases 1-2: 1 week out
+      // - Phases 3-4: 3 weeks out  
+      // - Phases 5-9: 2 weeks out
+      const allTasks = ONBOARDING_PHASES.flatMap((phase) => {
+        let dueDate: Date;
+        
+        if (phase.id === 1 || phase.id === 2) {
+          // Owner Intake & Legal, Property Details & Access: 1 week
+          dueDate = addWeeks(new Date(), 1);
+        } else if (phase.id === 3 || phase.id === 4) {
+          // Utilities & Services, Cleaners & Maintenance: 3 weeks
+          dueDate = addWeeks(new Date(), 3);
+        } else {
+          // PMS & Tools Setup, Pictures & Assets, Listings & Booking Platforms,
+          // Marketing and Guest Experience, Emergency & Safety Setup: 2 weeks
+          dueDate = addWeeks(new Date(), 2);
+        }
+        
+        return phase.tasks.map((task) => {
           let assignedToUuid = null;
           let assignedRoleId = null;
 
@@ -209,12 +226,12 @@ export const CreateProjectDialog = ({
             status: "pending" as const,
             assigned_to_uuid: assignedToUuid,
             assigned_role_id: assignedRoleId,
-            due_date: oneWeekOut.toISOString().split('T')[0],
-            original_due_date: oneWeekOut.toISOString().split('T')[0],
+            due_date: dueDate.toISOString().split('T')[0],
+            original_due_date: dueDate.toISOString().split('T')[0],
             max_reschedule_weeks: 4,
           };
         })
-      );
+      });
 
       const { error: tasksError } = await supabase
         .from("onboarding_tasks")
