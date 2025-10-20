@@ -772,51 +772,6 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
               </>
             )}
             
-            {/* Upload button for all users */}
-            <div className="flex items-center gap-2">
-              <Input 
-                type="file" 
-                onChange={handleFileUpload}
-                disabled={uploading}
-                className="flex-1 text-xs h-8"
-                accept="image/*,.pdf,.doc,.docx"
-                id={`upload-${task.id}`}
-              />
-              {uploading && <Loader2 className="w-4 h-4 animate-spin" />}
-            </div>
-            
-            {/* Image preview if uploaded */}
-            {task.file_path && isImageFile(task.file_path) && (
-              <div 
-                className="relative group cursor-pointer"
-                onClick={() => setShowImagePreview(true)}
-              >
-                <img
-                  src={getFileUrl(task.file_path)}
-                  alt={task.field_value || "Uploaded image"}
-                  className="w-full max-w-md rounded-lg border border-green-200 hover:border-green-400 transition-colors"
-                />
-                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors rounded-lg flex items-center justify-center">
-                  <span className="text-white text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity">
-                    Click to view full size
-                  </span>
-                </div>
-              </div>
-            )}
-            
-            {/* File link if not an image */}
-            {task.file_path && !isImageFile(task.file_path) && (
-              <a
-                href={getFileUrl(task.file_path)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1 text-[10px] text-green-600 hover:underline"
-              >
-                <FileText className="w-3 h-3" />
-                {task.field_value || "File uploaded"}
-              </a>
-            )}
-            
             {!hasValue && !showNAField && task.field_value !== "N/A" && (
               <Button 
                 type="button"
@@ -955,9 +910,25 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
             <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground ml-8">
               <span>Completed {task.completed_date && format(new Date(task.completed_date), "MMM d, yyyy")}</span>
               {task.assigned_to && <span>by {task.assigned_to}</span>}
-            </div>
           </div>
-        </Card>
+        </div>
+
+        {/* Image Preview Dialog for all images */}
+        {task.file_path && isImageFile(task.file_path) && (
+          <Dialog open={showImagePreview} onOpenChange={setShowImagePreview}>
+            <DialogContent className="max-w-4xl">
+              <img
+                src={getFileUrl(task.file_path)}
+                alt={task.field_value || "Uploaded image"}
+                className="w-full h-auto"
+                onError={(e) => {
+                  console.error("Preview image failed to load:", getFileUrl(task.file_path));
+                }}
+              />
+            </DialogContent>
+          </Dialog>
+        )}
+      </Card>
 
         {/* Image Preview Dialog */}
         {task.file_path && isImageFile(task.file_path) && (
@@ -981,11 +952,20 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
         id={`task-${task.id}`}
         className={cn(
           "transition-colors overflow-hidden",
-          taskStatus === "completed" && "bg-green-50/30 border-green-500"
+          taskStatus === "completed" && "bg-green-50/30 border-green-500 cursor-pointer"
         )}
+        onClick={taskStatus === "completed" ? () => setIsCollapsed(true) : undefined}
       >
         {/* HEADER SECTION - Prominent Title & Status */}
-        <div className="bg-muted/30 p-4 border-b">
+        <div 
+          className="bg-muted/30 p-4 border-b"
+          onClick={(e) => {
+            // Stop propagation for completed tasks so clicking header doesn't collapse
+            if (taskStatus === "completed") {
+              e.stopPropagation();
+            }
+          }}
+        >
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1">
               <h3 className="text-[20px] font-bold leading-tight mb-1">{task.title}</h3>
@@ -994,23 +974,19 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
               )}
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
-              {taskStatus === "completed" && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setIsCollapsed(true)}
-                  className="h-8 px-2 text-xs"
-                >
-                  Collapse
-                </Button>
-              )}
               <TaskStatusBadge status={taskStatus} dueDate={task.due_date} />
             </div>
           </div>
         </div>
 
         {/* MAIN CONTENT + ADMIN SIDEBAR */}
-        <div className="flex">
+        <div 
+          className="flex"
+          onClick={(e) => {
+            // Stop propagation for interactive elements
+            e.stopPropagation();
+          }}
+        >
           {/* LEFT: Main Content (VA-focused) */}
           <div className="flex-1 p-4 space-y-4">
             {/* Due Date & Assignment Info */}
@@ -1048,6 +1024,70 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
                 </div>
               )}
               {renderField()}
+              
+              {/* Upload button for all tasks (not just file type) */}
+              {!["section_header", "file"].includes(task.field_type) && (
+                <div className="mt-2">
+                  <label 
+                    htmlFor={`upload-${task.id}`}
+                    className="inline-flex items-center gap-2 px-3 py-1.5 text-xs border border-input rounded-md cursor-pointer hover:bg-accent hover:text-accent-foreground transition-colors"
+                  >
+                    <Upload className="w-3 h-3" />
+                    Upload file/screenshot
+                  </label>
+                  <Input 
+                    type="file" 
+                    onChange={handleFileUpload}
+                    disabled={uploading}
+                    className="hidden"
+                    accept="image/*,.pdf,.doc,.docx"
+                    id={`upload-${task.id}`}
+                  />
+                  {uploading && (
+                    <div className="flex items-center gap-2 mt-1">
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                      <span className="text-xs text-muted-foreground">Uploading...</span>
+                    </div>
+                  )}
+                  
+                  {/* Display uploaded image/file */}
+                  {task.file_path && (
+                    <div className="mt-2">
+                      {isImageFile(task.file_path) ? (
+                        <div 
+                          className="relative group cursor-pointer max-w-md"
+                          onClick={() => setShowImagePreview(true)}
+                        >
+                          <img
+                            src={getFileUrl(task.file_path)}
+                            alt={task.field_value || "Uploaded image"}
+                            className="w-full rounded-lg border border-border hover:border-primary transition-colors"
+                            onError={(e) => {
+                              console.error("Image failed to load:", getFileUrl(task.file_path));
+                              e.currentTarget.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3Crect fill='%23ddd' width='100' height='100'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%23999'%3EImage Error%3C/text%3E%3C/svg%3E";
+                            }}
+                          />
+                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors rounded-lg flex items-center justify-center">
+                            <span className="text-white text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity">
+                              Click to view full size
+                            </span>
+                          </div>
+                        </div>
+                      ) : (
+                        <a
+                          href={getFileUrl(task.file_path)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-2 text-xs text-primary hover:underline"
+                        >
+                          <FileText className="w-4 h-4" />
+                          {task.field_value || "View uploaded file"}
+                        </a>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Reschedule History Log */}
@@ -1071,6 +1111,22 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
             />
           )}
         </div>
+
+        {/* Image Preview Dialog for all images */}
+        {task.file_path && isImageFile(task.file_path) && (
+          <Dialog open={showImagePreview} onOpenChange={setShowImagePreview}>
+            <DialogContent className="max-w-4xl">
+              <img
+                src={getFileUrl(task.file_path)}
+                alt={task.field_value || "Uploaded image"}
+                className="w-full h-auto"
+                onError={(e) => {
+                  console.error("Preview image failed to load:", getFileUrl(task.file_path));
+                }}
+              />
+            </DialogContent>
+          </Dialog>
+        )}
       </Card>
 
       <PinVerificationDialog
