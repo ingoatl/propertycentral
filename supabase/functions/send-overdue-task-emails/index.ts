@@ -153,18 +153,38 @@ const handler = async (req: Request): Promise<Response> => {
         // Sort by most overdue first
         tasksWithDaysOverdue.sort((a, b) => b.daysOverdue - a.daysOverdue);
 
-        // Generate HTML list of tasks
+        // Generate HTML list of tasks with better structure
         const taskListHTML = tasksWithDaysOverdue
-          .map(task => `
-            <li style="margin-bottom: 15px; padding: 12px; background-color: #fee2e2; border-left: 4px solid #dc2626; border-radius: 4px;">
-              <strong style="color: #991b1b;">${task.title}</strong><br/>
-              <span style="color: #6b7280; font-size: 14px;">
-                ${task.onboarding_projects?.property_address || 'Unknown Property'} - ${task.phase_title}
-              </span><br/>
-              <span style="color: #dc2626; font-weight: 600; font-size: 14px;">
-                Due: ${new Date(task.due_date).toLocaleDateString()} (${task.daysOverdue} day${task.daysOverdue !== 1 ? 's' : ''} overdue)
-              </span>
-            </li>
+          .map((task, index) => `
+            <div style="margin-bottom: 20px; padding: 16px; background-color: ${task.daysOverdue >= 7 ? '#fee2e2' : task.daysOverdue >= 3 ? '#fef3c7' : '#fef9c3'}; border-left: 4px solid ${task.daysOverdue >= 7 ? '#dc2626' : task.daysOverdue >= 3 ? '#f59e0b' : '#eab308'}; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+              <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 8px;">
+                <h3 style="margin: 0; color: #111827; font-size: 16px; font-weight: 600;">
+                  ${index + 1}. ${task.title}
+                </h3>
+                <span style="background-color: ${task.daysOverdue >= 7 ? '#dc2626' : task.daysOverdue >= 3 ? '#f59e0b' : '#eab308'}; color: white; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 600; white-space: nowrap; margin-left: 12px;">
+                  ${task.daysOverdue} day${task.daysOverdue !== 1 ? 's' : ''} overdue
+                </span>
+              </div>
+              
+              <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(0,0,0,0.1);">
+                <table style="width: 100%; font-size: 14px; color: #4b5563;">
+                  <tr>
+                    <td style="padding: 4px 0; width: 100px; font-weight: 600;">Property:</td>
+                    <td style="padding: 4px 0;">${task.onboarding_projects?.property_address || 'Unknown Property'}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 4px 0; font-weight: 600;">Phase:</td>
+                    <td style="padding: 4px 0;">${task.phase_title}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 4px 0; font-weight: 600;">Due Date:</td>
+                    <td style="padding: 4px 0; color: #dc2626; font-weight: 500;">
+                      ${new Date(task.due_date).toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })}
+                    </td>
+                  </tr>
+                </table>
+              </div>
+            </div>
           `)
           .join('');
 
@@ -175,36 +195,59 @@ const handler = async (req: Request): Promise<Response> => {
             <meta charset="utf-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
           </head>
-          <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 8px 8px 0 0; text-align: center;">
-              <h1 style="color: white; margin: 0;">⚠️ Overdue Tasks Alert</h1>
+          <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 650px; margin: 0 auto; padding: 0; background-color: #f3f4f6;">
+            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 40px 30px; text-align: center;">
+              <h1 style="color: white; margin: 0; font-size: 28px; font-weight: 700; text-shadow: 0 2px 4px rgba(0,0,0,0.2);">
+                ⚠️ Overdue Tasks Reminder
+              </h1>
+              <p style="color: rgba(255,255,255,0.95); margin: 10px 0 0 0; font-size: 16px;">
+                PeachHaus Group Task Management
+              </p>
             </div>
             
-            <div style="background-color: #f9fafb; padding: 30px; border-radius: 0 0 8px 8px;">
-              <p style="font-size: 16px; margin-bottom: 20px;">
-                You have <strong style="color: #dc2626;">${tasks.length}</strong> overdue task${tasks.length !== 1 ? 's' : ''} that require your attention:
-              </p>
-              
-              <ul style="list-style: none; padding: 0; margin: 20px 0;">
-                ${taskListHTML}
-              </ul>
-              
-              <div style="background-color: #eff6ff; padding: 15px; border-radius: 6px; margin: 20px 0; border-left: 4px solid #3b82f6;">
-                <p style="margin: 0; color: #1e40af;">
-                  <strong>💡 Tip:</strong> Click on any task in your dashboard to reschedule it and provide a reason for the delay. This helps maintain accountability and keeps everyone informed.
+            <div style="background-color: white; padding: 30px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+              <div style="background-color: #fef3c7; border-left: 4px solid #f59e0b; padding: 16px; margin-bottom: 24px; border-radius: 4px;">
+                <p style="margin: 0; font-size: 16px; color: #92400e; font-weight: 500;">
+                  You have <strong style="color: #dc2626; font-size: 20px;">${tasks.length}</strong> overdue task${tasks.length !== 1 ? 's' : ''} requiring immediate attention.
                 </p>
               </div>
               
-              <div style="text-align: center; margin-top: 30px;">
+              <h2 style="color: #111827; font-size: 20px; font-weight: 600; margin: 0 0 20px 0; padding-bottom: 12px; border-bottom: 2px solid #e5e7eb;">
+                Your Overdue Tasks:
+              </h2>
+              
+              <div style="margin: 20px 0;">
+                ${taskListHTML}
+              </div>
+              
+              <div style="background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); padding: 20px; border-radius: 8px; margin: 30px 0; border: 1px solid #93c5fd;">
+                <p style="margin: 0 0 8px 0; color: #1e40af; font-size: 15px;">
+                  <strong style="font-size: 16px;">💡 Next Steps:</strong>
+                </p>
+                <ul style="margin: 0; padding-left: 20px; color: #1e3a8a; font-size: 14px; line-height: 1.8;">
+                  <li>Click the button below to view all your tasks</li>
+                  <li>Update each task's status or reschedule with a reason</li>
+                  <li>Keep the team informed of any delays or blockers</li>
+                </ul>
+              </div>
+              
+              <div style="text-align: center; margin: 30px 0;">
                 <a href="https://9ed06ecd-51b7-4166-a07a-107b37f1e8c1.lovableproject.com/" 
-                   style="display: inline-block; background-color: #667eea; color: white; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px;">
-                  View My Tasks
+                   style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 16px 40px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 6px rgba(102, 126, 234, 0.4); transition: transform 0.2s;">
+                  View Dashboard & Update Tasks
                 </a>
               </div>
               
-              <p style="color: #6b7280; font-size: 14px; margin-top: 30px; text-align: center;">
-                This is an automated reminder. Please update your tasks to keep projects on track.
-              </p>
+              <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #e5e7eb; text-align: center;">
+                <p style="color: #6b7280; font-size: 13px; margin: 0; line-height: 1.5;">
+                  This is an automated reminder from PeachHaus Group.<br/>
+                  Please update your tasks to keep all projects on track.
+                </p>
+              </div>
+            </div>
+            
+            <div style="text-align: center; padding: 20px; color: #9ca3af; font-size: 12px;">
+              <p style="margin: 0;">© ${new Date().getFullYear()} PeachHaus Group. All rights reserved.</p>
             </div>
           </body>
           </html>
