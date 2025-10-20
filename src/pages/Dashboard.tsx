@@ -402,6 +402,23 @@ const Dashboard = () => {
     }
   };
 
+  const sendOverdueTaskEmails = async () => {
+    try {
+      toast.loading("Sending overdue task emails...");
+      
+      const { data, error } = await supabase.functions.invoke("send-overdue-task-emails");
+      
+      if (error) throw error;
+      
+      toast.dismiss();
+      toast.success(`Sent ${data.emailsSent || 0} email(s) for ${data.overdueTasksFound || 0} overdue task(s)`);
+    } catch (error: any) {
+      console.error("Send emails error:", error);
+      toast.dismiss();
+      toast.error("Failed to send overdue task emails");
+    }
+  };
+
   const totalVisits = summaries.reduce((sum, s) => sum + s.visitCount, 0);
   const totalRevenue = summaries.reduce((sum, s) => sum + s.visitTotal, 0);
   const totalExpenses = summaries.reduce((sum, s) => sum + s.expenseTotal, 0);
