@@ -70,6 +70,31 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
     loadSOP();
   }, [task.id]);
 
+  // Auto-correct status if task has data but is marked as pending
+  useEffect(() => {
+    const correctStatus = async () => {
+      const hasData = task.field_value || task.file_path;
+      if (hasData && task.status === 'pending') {
+        try {
+          await supabase
+            .from("onboarding_tasks")
+            .update({ 
+              status: 'completed',
+              completed_date: new Date().toISOString()
+            })
+            .eq("id", task.id);
+          
+          setTaskStatus('completed');
+          onUpdate(); // Refresh to show updated progress
+        } catch (error) {
+          console.error("Failed to correct task status:", error);
+        }
+      }
+    };
+    
+    correctStatus();
+  }, [task.id, task.field_value, task.file_path, task.status, onUpdate]);
+
   const loadSOP = async () => {
     const { data } = await supabase
       .from("onboarding_sops")
