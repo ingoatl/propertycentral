@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { OnboardingTask, OnboardingSOP } from "@/types/onboarding";
 import { Card, CardContent } from "@/components/ui/card";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -57,6 +58,7 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
   const [showUpdateDueDateDialog, setShowUpdateDueDateDialog] = useState(false);
   const [showEditTaskDialog, setShowEditTaskDialog] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(task.status === "completed");
+  const [showImagePreview, setShowImagePreview] = useState(false);
   
   const { isAdmin } = useAdminCheck();
   const hasValue = task.field_value && task.field_value.trim() !== "";
@@ -101,6 +103,15 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
       toast.success("Copied to clipboard");
       setTimeout(() => setCopied(false), 2000);
     }
+  };
+
+  const isImageFile = (filePath: string) => {
+    const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.bmp'];
+    return imageExtensions.some(ext => filePath.toLowerCase().endsWith(ext));
+  };
+
+  const getFileUrl = (filePath: string) => {
+    return `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/onboarding-documents/${filePath}`;
   };
 
   const getDisplayValue = () => {
@@ -832,46 +843,73 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
   // COMPLETED TASK - COLLAPSED VIEW
   if (taskStatus === "completed" && isCollapsed) {
     return (
-      <Card 
-        id={`task-${task.id}`}
-        className="bg-green-50 border-green-500 hover:bg-green-100 transition-colors cursor-pointer"
-        onClick={() => setIsCollapsed(false)}
-      >
-        <div className="p-4">
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3 flex-1 min-w-0">
-              <CheckCircle2 className="w-5 h-5 text-green-600 flex-shrink-0" />
-              <div className="flex items-center gap-2 min-w-0 flex-1">
-                <span className="font-semibold text-base truncate">{task.title}</span>
-                <span className="text-muted-foreground">|</span>
-                <span className="text-sm text-muted-foreground truncate">
-                  {getDisplayValue()}
-                </span>
+      <>
+        <Card 
+          id={`task-${task.id}`}
+          className="bg-green-50 border-green-500 hover:bg-green-100 transition-colors cursor-pointer"
+          onClick={() => setIsCollapsed(false)}
+        >
+          <div className="p-4">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3 flex-1 min-w-0">
+                <CheckCircle2 className="w-5 h-5 text-green-600 flex-shrink-0" />
+                <div className="flex items-center gap-2 min-w-0 flex-1">
+                  <span className="font-semibold text-base truncate">{task.title}</span>
+                  <span className="text-muted-foreground">|</span>
+                  <span className="text-sm text-muted-foreground truncate">
+                    {getDisplayValue()}
+                  </span>
+                </div>
+              </div>
+              
+              <div className="flex items-center gap-2 flex-shrink-0">
+                {task.file_path && isImageFile(task.file_path) && (
+                  <img
+                    src={getFileUrl(task.file_path)}
+                    alt="Uploaded"
+                    className="w-10 h-10 object-cover rounded border border-green-300"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowImagePreview(true);
+                    }}
+                  />
+                )}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleCopy();
+                  }}
+                  className="h-8 w-8 p-0"
+                  title="Copy value"
+                >
+                  {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                </Button>
+                <ChevronDown className="w-4 h-4 text-muted-foreground" />
               </div>
             </div>
             
-            <div className="flex items-center gap-2 flex-shrink-0">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleCopy();
-                }}
-                className="h-8 w-8 p-0"
-              >
-                {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-              </Button>
-              <ChevronDown className="w-4 h-4 text-muted-foreground" />
+            <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground ml-8">
+              <span>Completed {task.completed_date && format(new Date(task.completed_date), "MMM d, yyyy")}</span>
+              {task.assigned_to && <span>by {task.assigned_to}</span>}
             </div>
           </div>
-          
-          <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground ml-8">
-            <span>Completed {task.completed_date && format(new Date(task.completed_date), "MMM d, yyyy")}</span>
-            {task.assigned_to && <span>by {task.assigned_to}</span>}
-          </div>
-        </div>
-      </Card>
+        </Card>
+
+        {/* Image Preview Dialog */}
+        {task.file_path && isImageFile(task.file_path) && (
+          <Dialog open={showImagePreview} onOpenChange={setShowImagePreview}>
+            <DialogContent className="max-w-4xl">
+              <img
+                src={getFileUrl(task.file_path)}
+                alt={task.field_value || "Uploaded image"}
+                className="w-full h-auto"
+              />
+            </DialogContent>
+          </Dialog>
+        )}
+      </>
     );
   }
 
@@ -894,17 +932,6 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
               )}
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
-              {task.field_value && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleCopy}
-                  className="h-8 w-8 p-0"
-                  title="Copy value"
-                >
-                  {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                </Button>
-              )}
               {taskStatus === "completed" && (
                 <Button
                   variant="ghost"
@@ -942,8 +969,22 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
               )}
             </div>
 
-            {/* Field Input */}
-            <div>
+            {/* Field Input with Copy Button */}
+            <div className="space-y-2">
+              {task.field_value && (
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-sm font-medium">Value entered:</span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleCopy}
+                    className="h-7 px-2 text-xs"
+                    title="Copy value"
+                  >
+                    {copied ? <><Check className="w-3 h-3 mr-1" /> Copied</> : <><Copy className="w-3 h-3 mr-1" /> Copy</>}
+                  </Button>
+                </div>
+              )}
               {renderField()}
             </div>
 
