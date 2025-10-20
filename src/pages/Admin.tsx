@@ -9,6 +9,7 @@ import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { CheckCircle, XCircle, Clock, Shield, UserPlus, Key, Users, MessageCircleQuestion, UserCog } from "lucide-react";
+import { RescheduleLogsTab } from "@/components/admin/RescheduleLogsTab";
 import { z } from "zod";
 import { TeamMatrixTab } from "@/components/admin/TeamMatrixTab";
 import { AllFAQsManagement } from "@/components/admin/AllFAQsManagement";
@@ -383,7 +384,7 @@ const Admin = () => {
       </div>
 
       <Tabs defaultValue="users" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="users">User Management</TabsTrigger>
           <TabsTrigger value="team-matrix">
             <Users className="w-4 h-4 mr-2" />
@@ -392,6 +393,10 @@ const Admin = () => {
           <TabsTrigger value="faqs">
             <MessageCircleQuestion className="w-4 h-4 mr-2" />
             FAQs
+          </TabsTrigger>
+          <TabsTrigger value="reschedule-logs">
+            <Clock className="w-4 h-4 mr-2" />
+            Reschedule Logs
           </TabsTrigger>
         </TabsList>
 
@@ -707,6 +712,10 @@ const Admin = () => {
 
         <TabsContent value="faqs" className="mt-8">
           <AllFAQsManagement />
+        </TabsContent>
+
+        <TabsContent value="reschedule-logs" className="mt-8">
+          <RescheduleLogsTab />
         </TabsContent>
       </Tabs>
     </div>

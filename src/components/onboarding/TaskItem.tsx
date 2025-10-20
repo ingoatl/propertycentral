@@ -1375,9 +1375,7 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
       <UpdateDueDateDialog
         open={showUpdateDueDateDialog}
         onOpenChange={setShowUpdateDueDateDialog}
-        taskId={task.id}
-        taskTitle={task.title}
-        currentDueDate={task.due_date || ""}
+        task={task}
         onUpdate={onUpdate}
       />
     </>

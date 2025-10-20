@@ -877,6 +877,70 @@ export type Database = {
         }
         Relationships: []
       }
+      task_reschedule_logs: {
+        Row: {
+          created_at: string
+          days_delayed: number
+          id: string
+          new_due_date: string
+          previous_due_date: string
+          project_id: string
+          reason: string
+          rescheduled_at: string
+          rescheduled_by: string | null
+          rescheduled_by_name: string
+          task_id: string
+        }
+        Insert: {
+          created_at?: string
+          days_delayed: number
+          id?: string
+          new_due_date: string
+          previous_due_date: string
+          project_id: string
+          reason: string
+          rescheduled_at?: string
+          rescheduled_by?: string | null
+          rescheduled_by_name: string
+          task_id: string
+        }
+        Update: {
+          created_at?: string
+          days_delayed?: number
+          id?: string
+          new_due_date?: string
+          previous_due_date?: string
+          project_id?: string
+          reason?: string
+          rescheduled_at?: string
+          rescheduled_by?: string | null
+          rescheduled_by_name?: string
+          task_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_reschedule_logs_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_reschedule_logs_rescheduled_by_fkey"
+            columns: ["rescheduled_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "task_reschedule_logs_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       task_templates: {
         Row: {
           created_at: string

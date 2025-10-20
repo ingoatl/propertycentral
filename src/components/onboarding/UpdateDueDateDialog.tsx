@@ -5,33 +5,31 @@ import { Textarea } from "@/components/ui/textarea";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { CalendarIcon } from "lucide-react";
-import { format } from "date-fns";
+import { format, differenceInDays } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { OnboardingTask } from "@/types/onboarding";
 
 interface UpdateDueDateDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  taskId: string;
-  taskTitle: string;
-  currentDueDate: string;
+  task: OnboardingTask;
   onUpdate: () => void;
 }
 
 export const UpdateDueDateDialog = ({
   open,
   onOpenChange,
-  taskId,
-  taskTitle,
-  currentDueDate,
+  task,
   onUpdate,
 }: UpdateDueDateDialogProps) => {
   const [newDueDate, setNewDueDate] = useState<Date | undefined>(
-    currentDueDate ? new Date(currentDueDate) : undefined
+    task.due_date ? new Date(task.due_date) : undefined
   );
   const [comment, setComment] = useState("");
   const [loading, setLoading] = useState(false);
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const { toast } = useToast();
 
   const handleSave = async () => {
@@ -55,19 +53,59 @@ export const UpdateDueDateDialog = ({
 
     setLoading(true);
     try {
+      // Get current user info
+      const { data: { user } } = await supabase.auth.getUser();
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("first_name, email")
+        .eq("id", user?.id)
+        .single();
+
+      const { data: taskData } = await supabase
+        .from("onboarding_tasks")
+        .select("notes")
+        .eq("id", task.id)
+        .single();
+
+      const previousDueDate = task.due_date || task.original_due_date;
+      const daysDelayed = previousDueDate 
+        ? differenceInDays(newDueDate, new Date(previousDueDate))
+        : 0;
+
+      // Create reschedule log entry
+      const { error: logError } = await supabase
+        .from("task_reschedule_logs")
+        .insert({
+          task_id: task.id,
+          project_id: task.project_id,
+          previous_due_date: previousDueDate,
+          new_due_date: format(newDueDate, "yyyy-MM-dd"),
+          reason: comment.trim(),
+          rescheduled_by: user?.id,
+          rescheduled_by_name: profile?.first_name || profile?.email || "Unknown",
+          days_delayed: daysDelayed,
+        });
+
+      if (logError) throw logError;
+
+      // Update task with new due date, preserving existing notes
+      const updatedNotes = taskData?.notes 
+        ? `${taskData.notes}\n\n[Updated ${format(new Date(), "PPP")}]: ${comment.trim()}`
+        : `[Updated ${format(new Date(), "PPP")}]: ${comment.trim()}`;
+
       const { error } = await supabase
         .from("onboarding_tasks")
         .update({
           due_date: format(newDueDate, "yyyy-MM-dd"),
-          notes: comment.trim(),
+          notes: updatedNotes,
         })
-        .eq("id", taskId);
+        .eq("id", task.id);
 
       if (error) throw error;
 
       toast({
         title: "Due Date Updated",
-        description: "The task due date has been updated successfully.",
+        description: "The task due date has been updated and logged successfully.",
       });
 
       onUpdate();
@@ -98,12 +136,12 @@ export const UpdateDueDateDialog = ({
         <div className="space-y-4 py-4">
           <div className="space-y-2">
             <p className="text-sm text-muted-foreground">
-              Task: <span className="font-semibold text-foreground">{taskTitle}</span>
+              Task: <span className="font-semibold text-foreground">{task.title}</span>
             </p>
-            {currentDueDate && (
+            {task.due_date && (
               <p className="text-sm text-muted-foreground">
                 Current due date: <span className="font-semibold text-foreground">
-                  {format(new Date(currentDueDate), "MMM d, yyyy")}
+                  {format(new Date(task.due_date), "MMM d, yyyy")}
                 </span>
               </p>
             )}
@@ -111,7 +149,7 @@ export const UpdateDueDateDialog = ({
 
           <div className="space-y-2">
             <label className="text-sm font-medium">New Due Date</label>
-            <Popover>
+            <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
               <PopoverTrigger asChild>
                 <Button
                   variant="outline"
@@ -128,10 +166,13 @@ export const UpdateDueDateDialog = ({
                 <Calendar
                   mode="single"
                   selected={newDueDate}
-                  onSelect={setNewDueDate}
+                  onSelect={(date) => {
+                    setNewDueDate(date);
+                    setIsCalendarOpen(false);
+                  }}
                   disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
                   initialFocus
-                  className="pointer-events-auto"
+                  className={cn("p-3 pointer-events-auto")}
                 />
               </PopoverContent>
             </Popover>

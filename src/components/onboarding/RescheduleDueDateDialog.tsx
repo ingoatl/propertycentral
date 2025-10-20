@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { CalendarIcon, AlertCircle } from "lucide-react";
-import { format, addWeeks, isBefore, startOfDay } from "date-fns";
+import { format, addWeeks, isBefore, startOfDay, differenceInDays } from "date-fns";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -35,6 +35,7 @@ export const RescheduleDueDateDialog = ({
   );
   const [comment, setComment] = useState("");
   const [loading, setLoading] = useState(false);
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
 
   const maxDate = addWeeks(new Date(), 4);
   const today = startOfDay(new Date());
@@ -58,18 +59,58 @@ export const RescheduleDueDateDialog = ({
     try {
       setLoading(true);
 
+      // Get current user info and task details
+      const { data: { user } } = await supabase.auth.getUser();
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("first_name, email")
+        .eq("id", user?.id)
+        .single();
+
+      const { data: task } = await supabase
+        .from("onboarding_tasks")
+        .select("project_id, due_date, notes")
+        .eq("id", taskId)
+        .single();
+
+      if (!task) throw new Error("Task not found");
+
+      const previousDueDate = task.due_date || currentDueDate;
+      const daysDelayed = differenceInDays(newDueDate, new Date(previousDueDate));
+
+      // Create reschedule log entry
+      const { error: logError } = await supabase
+        .from("task_reschedule_logs")
+        .insert({
+          task_id: taskId,
+          project_id: task.project_id,
+          previous_due_date: previousDueDate,
+          new_due_date: format(newDueDate, "yyyy-MM-dd"),
+          reason: comment.trim(),
+          rescheduled_by: user?.id,
+          rescheduled_by_name: profile?.first_name || profile?.email || "Unknown",
+          days_delayed: daysDelayed,
+        });
+
+      if (logError) throw logError;
+
+      // Update task with new due date, preserving existing notes
+      const updatedNotes = task.notes 
+        ? `${task.notes}\n\n[Rescheduled ${format(new Date(), "PPP")}]: ${comment.trim()}`
+        : `[Rescheduled ${format(new Date(), "PPP")}]: ${comment.trim()}`;
+
       // Update task with new due date
       const { error } = await supabase
         .from("onboarding_tasks")
         .update({ 
           due_date: format(newDueDate, "yyyy-MM-dd"),
-          notes: comment.trim()
+          notes: updatedNotes
         })
         .eq("id", taskId);
 
       if (error) throw error;
 
-      toast.success("Due date rescheduled");
+      toast.success("Due date rescheduled and logged");
       onUpdate();
       onOpenChange(false);
       setComment("");
@@ -109,7 +150,7 @@ export const RescheduleDueDateDialog = ({
           {/* New Due Date */}
           <div className="space-y-2">
             <Label>New Due Date (max 4 weeks out)</Label>
-            <Popover>
+            <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
               <PopoverTrigger asChild>
                 <Button
                   variant="outline"
@@ -126,11 +167,15 @@ export const RescheduleDueDateDialog = ({
                 <Calendar
                   mode="single"
                   selected={newDueDate}
-                  onSelect={setNewDueDate}
+                  onSelect={(date) => {
+                    setNewDueDate(date);
+                    setIsCalendarOpen(false);
+                  }}
                   disabled={(date) => 
                     isBefore(date, today) || isBefore(maxDate, date)
                   }
                   initialFocus
+                  className={cn("p-3 pointer-events-auto")}
                 />
               </PopoverContent>
             </Popover>
