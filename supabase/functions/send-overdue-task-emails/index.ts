@@ -121,15 +121,24 @@ const handler = async (req: Request): Promise<Response> => {
       }
     }
 
-    // Send emails
+    // Send emails with delay to avoid rate limiting
     let emailsSent = 0;
     const errors: any[] = [];
 
-    for (const [userId, tasks] of tasksByUser.entries()) {
+    const userEntries = Array.from(tasksByUser.entries());
+    
+    for (let i = 0; i < userEntries.length; i++) {
+      const [userId, tasks] = userEntries[i];
       const userEmail = userEmails.get(userId);
+      
       if (!userEmail) {
         console.log(`No email found for user ${userId}`);
         continue;
+      }
+
+      // Add delay between emails to respect rate limits (2 per second = 500ms minimum)
+      if (i > 0) {
+        await new Promise(resolve => setTimeout(resolve, 600));
       }
 
       try {
