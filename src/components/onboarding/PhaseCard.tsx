@@ -92,6 +92,20 @@ export const PhaseCard = ({
                     Phase {phase.id}
                   </Badge>
                   {isComplete && <CheckCircle2 className="w-5 h-5 text-green-600" />}
+                  {sop && (
+                    <Button
+                      variant="link"
+                      size="sm"
+                      className="h-auto p-0 text-blue-600 hover:text-blue-700"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowSOPDialog(true);
+                      }}
+                    >
+                      <BookOpen className="w-4 h-4 mr-1" />
+                      View SOP
+                    </Button>
+                  )}
                 </div>
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1">

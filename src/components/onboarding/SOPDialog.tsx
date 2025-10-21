@@ -40,7 +40,18 @@ export const SOPDialog = ({ sop, open, onOpenChange }: SOPDialogProps) => {
             )}
             {sop.description && (
               <div className="prose prose-sm max-w-none">
-                <p className="whitespace-pre-wrap text-muted-foreground">{sop.description}</p>
+                <div className="whitespace-pre-wrap text-foreground leading-relaxed space-y-4">
+                  {sop.description.split('\n\n').map((paragraph, idx) => (
+                    <p key={idx} className="mb-4">
+                      {paragraph.split('\n').map((line, lineIdx) => (
+                        <span key={lineIdx}>
+                          {line}
+                          {lineIdx < paragraph.split('\n').length - 1 && <br />}
+                        </span>
+                      ))}
+                    </p>
+                  ))}
+                </div>
               </div>
             )}
           </div>
