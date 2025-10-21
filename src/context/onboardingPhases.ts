@@ -62,7 +62,10 @@ export const ONBOARDING_PHASES: PhaseDefinition[] = [
       { title: "Backup cleaner phone number", field_type: "phone" },
       { title: "Owner satisfaction with existing cleaner", field_type: "radio", options: ["Yes", "No", "N/A"] },
       { title: "Cleaner payment arrangement", field_type: "textarea" },
-      { title: "Lawncare", field_type: "text", description: "Provider name and contact" },
+      { title: "Lawncare Company Name", field_type: "text" },
+      { title: "Lawncare Phone Number", field_type: "phone" },
+      { title: "Lawncare Schedule", field_type: "radio", options: ["Semi-Weekly", "Monthly"] },
+      { title: "Lawncare Negotiated Payment", field_type: "currency" },
     ]
   },
   {
