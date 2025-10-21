@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { Edit2, BookOpen, FileText, User, Calendar, Trash2 } from "lucide-react";
+import { Edit2, BookOpen, FileText, User, Calendar, Trash2, MessageCircleQuestion } from "lucide-react";
 import { OnboardingTask, OnboardingSOP } from "@/types/onboarding";
 
 interface AdminControlsSidebarProps {
@@ -12,6 +12,7 @@ interface AdminControlsSidebarProps {
   onEditSOP: () => void;
   onAssignTask: () => void;
   onUpdateDueDate: () => void;
+  onAddFAQ: () => void;
 }
 
 export const AdminControlsSidebar = ({
@@ -23,6 +24,7 @@ export const AdminControlsSidebar = ({
   onEditSOP,
   onAssignTask,
   onUpdateDueDate,
+  onAddFAQ,
 }: AdminControlsSidebarProps) => {
   return (
     <div className="w-48 border-l bg-muted/10 p-3 space-y-2 flex-shrink-0">
@@ -102,6 +104,18 @@ export const AdminControlsSidebar = ({
           Assigned to: {task.assigned_to || "User"}
         </div>
       )}
+
+      <Separator className="my-2" />
+
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={onAddFAQ}
+        className="w-full justify-start text-xs"
+      >
+        <MessageCircleQuestion className="w-3 h-3 mr-2" />
+        Add FAQ
+      </Button>
     </div>
   );
 };

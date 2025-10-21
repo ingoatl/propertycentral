@@ -13,7 +13,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { CalendarIcon, Upload, FileText, CheckCircle2, Edit2, Copy, Check, Loader2, Settings, MessageSquare, Trash2, BookOpen, User, Clock, ChevronDown } from "lucide-react";
+import { CalendarIcon, Upload, FileText, CheckCircle2, Edit2, Copy, Check, Loader2, Settings, MessageSquare, Trash2, BookOpen, User, Clock, ChevronDown, MessageCircleQuestion } from "lucide-react";
 import { format, addWeeks, isBefore, startOfDay, isPast } from "date-fns";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -31,6 +31,7 @@ import { TaskStatusBadge } from "./TaskStatusBadge";
 import { TaskDueDateDisplay } from "./TaskDueDateDisplay";
 import { TaskRescheduleHistoryLog } from "./TaskRescheduleHistoryLog";
 import { AdminControlsSidebar } from "./AdminControlsSidebar";
+import { AskQuestionDialog } from "@/components/faq/AskQuestionDialog";
 
 interface TaskItemProps {
   task: OnboardingTask;
@@ -59,6 +60,7 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
   const [showEditTaskDialog, setShowEditTaskDialog] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(true); // All tasks closed by default
   const [showImagePreview, setShowImagePreview] = useState(false);
+  const [showFAQDialog, setShowFAQDialog] = useState(false);
   
   const { isAdmin } = useAdminCheck();
   const hasValue = task.field_value && task.field_value.trim() !== "";
@@ -1217,6 +1219,7 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
               onEditSOP={() => setShowSOPFormDialog(true)}
               onAssignTask={() => setShowAssignmentDialog(true)}
               onUpdateDueDate={handleDueDateClick}
+              onAddFAQ={() => setShowFAQDialog(true)}
             />
           )}
         </div>
@@ -1293,6 +1296,12 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
         open={showEditTaskDialog}
         onOpenChange={setShowEditTaskDialog}
         onSuccess={onUpdate}
+      />
+
+      <AskQuestionDialog
+        open={showFAQDialog}
+        onOpenChange={setShowFAQDialog}
+        projectId={task.project_id}
       />
     </>
   );

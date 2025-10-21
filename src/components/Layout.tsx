@@ -1,13 +1,12 @@
 import { ReactNode, useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Home, Building2, DollarSign, Calendar, LogOut, Shield, Users, Receipt, FileText, CalendarDays, MessageCircleQuestion } from "lucide-react";
+import { Home, Building2, DollarSign, Calendar, LogOut, Shield, Users, Receipt, FileText, CalendarDays } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useAuth } from "./ProtectedRoute";
 import { FloatingChatButton } from "@/components/ai-assistant/FloatingChatButton";
-import { AskQuestionDialog } from "@/components/faq/AskQuestionDialog";
 
 interface LayoutProps {
   children: ReactNode;
@@ -18,7 +17,6 @@ const Layout = ({ children }: LayoutProps) => {
   const { user, loading, pendingApproval } = useAuth() as any;
   const [isAdmin, setIsAdmin] = useState(false);
   const [hasUserRole, setHasUserRole] = useState(false);
-  const [showFAQDialog, setShowFAQDialog] = useState(false);
 
   useEffect(() => {
     const checkRoles = async () => {
@@ -120,10 +118,6 @@ const Layout = ({ children }: LayoutProps) => {
               {user && (
                 <>
                   <span className="text-sm text-muted-foreground hidden sm:inline">{user.email}</span>
-                  <Button variant="outline" size="sm" onClick={() => setShowFAQDialog(true)}>
-                    <MessageCircleQuestion className="h-4 w-4 sm:mr-2" />
-                    <span className="hidden sm:inline">Add FAQ</span>
-                  </Button>
                   <Button variant="outline" size="sm" onClick={handleLogout}>
                     <LogOut className="h-4 w-4 sm:mr-2" />
                     <span className="hidden sm:inline">Logout</span>
@@ -162,10 +156,6 @@ const Layout = ({ children }: LayoutProps) => {
 
       <main className="container mx-auto px-4 py-8">{children}</main>
       <FloatingChatButton />
-      <AskQuestionDialog 
-        open={showFAQDialog} 
-        onOpenChange={setShowFAQDialog}
-      />
     </div>
   );
 };
