@@ -21,9 +21,10 @@ interface AskQuestionDialogProps {
   onOpenChange: (open: boolean) => void;
   propertyId?: string;
   projectId?: string;
+  taskId?: string;
 }
 
-export const AskQuestionDialog = ({ open, onOpenChange, propertyId, projectId }: AskQuestionDialogProps) => {
+export const AskQuestionDialog = ({ open, onOpenChange, propertyId, projectId, taskId }: AskQuestionDialogProps) => {
   const [question, setQuestion] = useState("");
   const [category, setCategory] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -59,6 +60,7 @@ export const AskQuestionDialog = ({ open, onOpenChange, propertyId, projectId }:
           category: category || "General",
           property_id: propertyId || null,
           project_id: projectId || null,
+          task_id: taskId || null,
           asked_by: user.id,
           status: "pending"
         })

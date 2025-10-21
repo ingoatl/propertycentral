@@ -61,6 +61,7 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
   const [isCollapsed, setIsCollapsed] = useState(true); // All tasks closed by default
   const [showImagePreview, setShowImagePreview] = useState(false);
   const [showFAQDialog, setShowFAQDialog] = useState(false);
+  const [answeredFAQs, setAnsweredFAQs] = useState<any[]>([]);
   
   const { isAdmin } = useAdminCheck();
   const hasValue = task.field_value && task.field_value.trim() !== "";
@@ -70,6 +71,7 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
 
   useEffect(() => {
     loadSOP();
+    loadAnsweredFAQs();
   }, [task.id]);
 
   // Auto-correct status if task has data but is marked as pending
@@ -111,8 +113,22 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
     setSOP(data);
   };
 
+  const loadAnsweredFAQs = async () => {
+    const { data } = await supabase
+      .from("frequently_asked_questions")
+      .select("*")
+      .eq("task_id", task.id)
+      .order("created_at", { ascending: false });
+
+    setAnsweredFAQs(data || []);
+  };
+
   const handleSOPSuccess = () => {
     loadSOP();
+  };
+
+  const handleFAQSuccess = () => {
+    loadAnsweredFAQs();
   };
 
   const handleDueDateClick = () => {
@@ -1201,6 +1217,29 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
               )}
             </div>
 
+            {/* Answered FAQs Section */}
+            {answeredFAQs.length > 0 && (
+              <div className="mt-4 border-t pt-4">
+                <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                  <MessageCircleQuestion className="w-4 h-4" />
+                  Answered FAQs for this Task
+                </h4>
+                <div className="space-y-3">
+                  {answeredFAQs.map((faq) => (
+                    <div key={faq.id} className="bg-muted/50 rounded-lg p-3">
+                      <p className="text-sm font-medium mb-1">{faq.question}</p>
+                      <p className="text-sm text-muted-foreground">{faq.answer}</p>
+                      {faq.category && (
+                        <Badge variant="outline" className="mt-2 text-xs">
+                          {faq.category}
+                        </Badge>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Reschedule History Log */}
             <TaskRescheduleHistoryLog taskId={task.id} />
 
@@ -1300,8 +1339,12 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
 
       <AskQuestionDialog
         open={showFAQDialog}
-        onOpenChange={setShowFAQDialog}
+        onOpenChange={(open) => {
+          setShowFAQDialog(open);
+          if (!open) handleFAQSuccess();
+        }}
         projectId={task.project_id}
+        taskId={task.id}
       />
     </>
   );

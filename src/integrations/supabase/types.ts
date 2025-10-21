@@ -205,6 +205,7 @@ export type Database = {
           property_id: string | null
           question: string
           status: string
+          task_id: string | null
           updated_at: string | null
         }
         Insert: {
@@ -221,6 +222,7 @@ export type Database = {
           property_id?: string | null
           question: string
           status?: string
+          task_id?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -237,6 +239,7 @@ export type Database = {
           property_id?: string | null
           question?: string
           status?: string
+          task_id?: string | null
           updated_at?: string | null
         }
         Relationships: [
@@ -254,6 +257,13 @@ export type Database = {
             referencedRelation: "properties"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "faq_questions_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_tasks"
+            referencedColumns: ["id"]
+          },
         ]
       }
       frequently_asked_questions: {
@@ -267,6 +277,7 @@ export type Database = {
           project_id: string | null
           property_id: string | null
           question: string
+          task_id: string | null
           updated_at: string
         }
         Insert: {
@@ -279,6 +290,7 @@ export type Database = {
           project_id?: string | null
           property_id?: string | null
           question: string
+          task_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -291,6 +303,7 @@ export type Database = {
           project_id?: string | null
           property_id?: string | null
           question?: string
+          task_id?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -306,6 +319,13 @@ export type Database = {
             columns: ["property_id"]
             isOneToOne: false
             referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "frequently_asked_questions_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_tasks"
             referencedColumns: ["id"]
           },
         ]
