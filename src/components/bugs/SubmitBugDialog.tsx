@@ -1,0 +1,194 @@
+import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import { Loader2 } from "lucide-react";
+
+const bugSchema = z.object({
+  title: z.string().min(1, "Title is required").max(200, "Title must be less than 200 characters"),
+  description: z.string().min(10, "Description must be at least 10 characters").max(2000, "Description must be less than 2000 characters"),
+  loom_video_url: z.string().url("Must be a valid URL").optional().or(z.literal("")),
+  priority: z.enum(["low", "medium", "high", "critical"]),
+});
+
+type BugFormData = z.infer<typeof bugSchema>;
+
+interface SubmitBugDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  propertyId?: string;
+  projectId?: string;
+  taskId?: string;
+}
+
+export function SubmitBugDialog({ open, onOpenChange, propertyId, projectId, taskId }: SubmitBugDialogProps) {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const form = useForm<BugFormData>({
+    resolver: zodResolver(bugSchema),
+    defaultValues: {
+      title: "",
+      description: "",
+      loom_video_url: "",
+      priority: "medium",
+    },
+  });
+
+  const onSubmit = async (data: BugFormData) => {
+    setIsSubmitting(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast.error("You must be logged in to submit a bug report");
+        return;
+      }
+
+      const { data: bugReport, error: insertError } = await supabase
+        .from("bug_reports")
+        .insert({
+          title: data.title,
+          description: data.description,
+          loom_video_url: data.loom_video_url || null,
+          priority: data.priority,
+          submitted_by: user.id,
+          property_id: propertyId || null,
+          project_id: projectId || null,
+          task_id: taskId || null,
+        })
+        .select()
+        .single();
+
+      if (insertError) throw insertError;
+
+      // Send email notification
+      const { error: emailError } = await supabase.functions.invoke("send-bug-notification", {
+        body: {
+          type: "new_bug",
+          bugId: bugReport.id,
+        },
+      });
+
+      if (emailError) {
+        console.error("Error sending email notification:", emailError);
+      }
+
+      toast.success("Bug report submitted successfully!");
+      form.reset();
+      onOpenChange(false);
+    } catch (error: any) {
+      console.error("Error submitting bug report:", error);
+      toast.error(error.message || "Failed to submit bug report");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-[600px]">
+        <DialogHeader>
+          <DialogTitle>Submit a Bug Report</DialogTitle>
+          <DialogDescription>
+            Help us improve by reporting any bugs you encounter. Include as much detail as possible.
+          </DialogDescription>
+        </DialogHeader>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <FormField
+              control={form.control}
+              name="title"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Bug Title</FormLabel>
+                  <FormControl>
+                    <Input placeholder="Brief description of the bug" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="description"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Description</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      placeholder="Describe the bug in detail. What happened? What did you expect to happen? Steps to reproduce?"
+                      className="min-h-[120px]"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="loom_video_url"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Loom Video URL (Optional)</FormLabel>
+                  <FormControl>
+                    <Input placeholder="https://www.loom.com/share/..." {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="priority"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Priority</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select priority" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="low">Low</SelectItem>
+                      <SelectItem value="medium">Medium</SelectItem>
+                      <SelectItem value="high">High</SelectItem>
+                      <SelectItem value="critical">Critical</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <div className="flex justify-end gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => onOpenChange(false)}
+                disabled={isSubmitting}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Submit Bug Report
+              </Button>
+            </div>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
+  );
+}

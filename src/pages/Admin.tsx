@@ -8,12 +8,13 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { CheckCircle, XCircle, Clock, Shield, UserPlus, Key, Users, MessageCircleQuestion, UserCog } from "lucide-react";
+import { CheckCircle, XCircle, Clock, Shield, UserPlus, Key, Users, MessageCircleQuestion, UserCog, Bug } from "lucide-react";
 import { RescheduleLogsTab } from "@/components/admin/RescheduleLogsTab";
 import { z } from "zod";
 import { TeamMatrixTab } from "@/components/admin/TeamMatrixTab";
 import { AllFAQsManagement } from "@/components/admin/AllFAQsManagement";
 import { AssignUnassignedTasksButton } from "@/components/onboarding/AssignUnassignedTasksButton";
+import { BugTrackerCard } from "@/components/admin/BugTrackerCard";
 
 const createUserSchema = z.object({
   email: z.string().email("Invalid email address").max(255),
@@ -384,7 +385,7 @@ const Admin = () => {
       </div>
 
       <Tabs defaultValue="users" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="users">User Management</TabsTrigger>
           <TabsTrigger value="team-matrix">
             <Users className="w-4 h-4 mr-2" />
@@ -393,6 +394,10 @@ const Admin = () => {
           <TabsTrigger value="faqs">
             <MessageCircleQuestion className="w-4 h-4 mr-2" />
             FAQs
+          </TabsTrigger>
+          <TabsTrigger value="bugs">
+            <Bug className="w-4 h-4 mr-2" />
+            Bug Tracker
           </TabsTrigger>
           <TabsTrigger value="reschedule-logs">
             <Clock className="w-4 h-4 mr-2" />
@@ -712,6 +717,10 @@ const Admin = () => {
 
         <TabsContent value="faqs" className="mt-8">
           <AllFAQsManagement />
+        </TabsContent>
+
+        <TabsContent value="bugs" className="mt-8">
+          <BugTrackerCard />
         </TabsContent>
 
         <TabsContent value="reschedule-logs" className="mt-8">

@@ -3,7 +3,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Download, Building2, Calendar, DollarSign, MapPin, Activity, MessageCircleQuestion, BarChart3 } from "lucide-react";
+import { Download, Building2, Calendar, DollarSign, MapPin, Activity, MessageCircleQuestion, BarChart3, Bug } from "lucide-react";
+import { SubmitBugDialog } from "@/components/bugs/SubmitBugDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { PropertySummary, Visit, Expense, OwnerRezBooking } from "@/types";
 import { toast } from "sonner";
@@ -24,6 +25,7 @@ const Dashboard = () => {
   const [ownerrezBookings, setOwnerrezBookings] = useState<OwnerRezBooking[]>([]);
   const [syncing, setSyncing] = useState(false);
   const { isAdmin } = useAdminCheck();
+  const [isBugDialogOpen, setIsBugDialogOpen] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -485,6 +487,14 @@ const Dashboard = () => {
           <p className="text-muted-foreground mt-1">Overview of all PeachHaus properties</p>
         </div>
         <div className="flex gap-2">
+          <Button 
+            onClick={() => setIsBugDialogOpen(true)}
+            className="shadow-warm hover:scale-105 transition-transform gap-2"
+            variant="outline"
+          >
+            <Bug className="w-4 h-4" />
+            Submit a Bug
+          </Button>
           {isAdmin && (
             <>
               <Button 
@@ -985,6 +995,11 @@ const Dashboard = () => {
           <DashboardFAQTab />
         </TabsContent>
       </Tabs>
+
+      <SubmitBugDialog 
+        open={isBugDialogOpen} 
+        onOpenChange={setIsBugDialogOpen}
+      />
     </div>
   );
 };

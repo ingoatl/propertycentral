@@ -14,6 +14,82 @@ export type Database = {
   }
   public: {
     Tables: {
+      bug_reports: {
+        Row: {
+          description: string
+          id: string
+          loom_video_url: string | null
+          priority: string
+          project_id: string | null
+          property_id: string | null
+          resolution_notes: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          status: string
+          submitted_at: string
+          submitted_by: string
+          task_id: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          description: string
+          id?: string
+          loom_video_url?: string | null
+          priority?: string
+          project_id?: string | null
+          property_id?: string | null
+          resolution_notes?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
+          submitted_at?: string
+          submitted_by: string
+          task_id?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          description?: string
+          id?: string
+          loom_video_url?: string | null
+          priority?: string
+          project_id?: string | null
+          property_id?: string | null
+          resolution_notes?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
+          submitted_at?: string
+          submitted_by?: string
+          task_id?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bug_reports_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bug_reports_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bug_reports_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       email_insights: {
         Row: {
           action_required: boolean | null

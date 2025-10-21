@@ -1,5 +1,8 @@
 project_id = "ijsxcaaqphaciaenlegl"
 
+[functions.send-bug-notification]
+verify_jwt = true
+
 [functions.send-overdue-task-emails]
 verify_jwt = false
 
