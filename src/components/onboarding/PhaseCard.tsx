@@ -83,85 +83,76 @@ export const PhaseCard = ({
       highlighted && "ring-2 ring-blue-500 shadow-lg"
     )}>
       <Collapsible open={expanded} onOpenChange={onToggle}>
-        <CollapsibleTrigger className="w-full">
-          <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
-            <div className="flex items-start justify-between">
-              <div className="flex-1 text-left">
-                <div className="flex items-center gap-3 mb-2">
-                  <Badge variant="outline" className="font-mono text-sm px-3 py-1">
-                    Phase {phase.id}
-                  </Badge>
-                  {isComplete && <CheckCircle2 className="w-5 h-5 text-green-600" />}
-                  {sop && (
-                    <Button
-                      variant="link"
-                      size="sm"
-                      className="h-auto p-0 text-blue-600 hover:text-blue-700"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setShowSOPDialog(true);
-                      }}
-                    >
-                      <BookOpen className="w-4 h-4 mr-1" />
-                      View SOP
-                    </Button>
-                  )}
-                </div>
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1">
-                    <CardTitle className="text-xl font-bold mb-2">{phase.title}</CardTitle>
-                    <CardDescription>{phase.description}</CardDescription>
-                  </div>
-                  {/* SOP Buttons - Right Side */}
-                  <div className="flex items-center gap-2 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
-                    {isAdmin && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setShowSOPFormDialog(true)}
-                      >
-                        <FileText className="w-4 h-4 mr-1" />
-                        {sop ? "Edit SOP" : "Add SOP"}
-                      </Button>
-                    )}
+        <CollapsibleTrigger asChild>
+          <div className="w-full cursor-pointer">
+            <CardHeader className="hover:bg-muted/50 transition-colors">
+              <div className="flex items-start justify-between">
+                <div className="flex-1 text-left">
+                  <div className="flex items-center gap-3 mb-2">
+                    <Badge variant="outline" className="font-mono text-sm px-3 py-1">
+                      Phase {phase.id}
+                    </Badge>
+                    {isComplete && <CheckCircle2 className="w-5 h-5 text-green-600" />}
                     {sop && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setShowSOPDialog(true)}
+                      <button
+                        type="button"
+                        className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-700 text-sm font-medium hover:underline"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setShowSOPDialog(true);
+                        }}
                       >
-                        <BookOpen className="w-4 h-4 mr-1" />
+                        <BookOpen className="w-4 h-4" />
                         View SOP
-                      </Button>
+                      </button>
                     )}
                   </div>
-                </div>
-              </div>
-              <div className="flex items-center gap-4 ml-4">
-                <div className="text-right">
-                  <div className="text-lg font-semibold">{Math.round(completion)}%</div>
-                  <div className="text-xs text-muted-foreground">
-                    {tasks.filter(t => t.status === "completed").length} of {tasks.length} tasks
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1">
+                      <CardTitle className="text-xl font-bold mb-2">{phase.title}</CardTitle>
+                      <CardDescription>{phase.description}</CardDescription>
+                    </div>
+                    {/* SOP Buttons - Right Side */}
+                    <div className="flex items-center gap-2 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                      {isAdmin && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setShowSOPFormDialog(true)}
+                        >
+                          <FileText className="w-4 h-4 mr-1" />
+                          {sop ? "Edit SOP" : "Add SOP"}
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 </div>
-                <ChevronDown className={cn(
-                  "w-5 h-5 transition-transform",
-                  expanded && "transform rotate-180"
-                )} />
+                <div className="flex items-center gap-4 ml-4">
+                  <div className="text-right">
+                    <div className="text-lg font-semibold">{Math.round(completion)}%</div>
+                    <div className="text-xs text-muted-foreground">
+                      {tasks.filter(t => t.status === "completed").length} of {tasks.length} tasks
+                    </div>
+                  </div>
+                  <ChevronDown className={cn(
+                    "w-5 h-5 transition-transform",
+                    expanded && "transform rotate-180"
+                  )} />
+                </div>
               </div>
-            </div>
 
-            {/* Progress Bar - Full Width */}
-            <div className="w-full bg-muted rounded-full h-2.5 mt-4">
-              <div
-                className={cn(
-                  "h-2.5 rounded-full transition-all duration-300",
-                  isComplete ? "bg-green-600" : "bg-primary"
-                )}
-                style={{ width: `${completion}%` }}
-              />
-            </div>
-          </CardHeader>
+              {/* Progress Bar - Full Width */}
+              <div className="w-full bg-muted rounded-full h-2.5 mt-4">
+                <div
+                  className={cn(
+                    "h-2.5 rounded-full transition-all duration-300",
+                    isComplete ? "bg-green-600" : "bg-primary"
+                  )}
+                  style={{ width: `${completion}%` }}
+                />
+              </div>
+            </CardHeader>
+          </div>
         </CollapsibleTrigger>
 
         <CollapsibleContent>

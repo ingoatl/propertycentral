@@ -931,18 +931,17 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
                 <div className="flex items-center gap-2 min-w-0 flex-1">
                   <span className="font-semibold text-sm truncate">{task.title}</span>
                   {sop && (
-                    <Button
-                      variant="link"
-                      size="sm"
-                      className="h-auto p-0 text-blue-600 hover:text-blue-700 flex-shrink-0"
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-700 text-xs font-medium hover:underline flex-shrink-0"
                       onClick={(e) => {
                         e.stopPropagation();
                         setShowSOPDialog(true);
                       }}
                     >
-                      <BookOpen className="w-3 h-3 mr-1" />
+                      <BookOpen className="w-3 h-3" />
                       SOP
-                    </Button>
+                    </button>
                   )}
                   {task.field_value && (
                     <>
@@ -1035,18 +1034,17 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
               <div className="flex items-center gap-3 mb-1">
                 <h3 className="text-[20px] font-bold leading-tight">{task.title}</h3>
                 {sop && (
-                  <Button
-                    variant="link"
-                    size="sm"
-                    className="h-auto p-0 text-blue-600 hover:text-blue-700"
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-700 text-sm font-medium hover:underline"
                     onClick={(e) => {
                       e.stopPropagation();
                       setShowSOPDialog(true);
                     }}
                   >
-                    <BookOpen className="w-4 h-4 mr-1" />
+                    <BookOpen className="w-4 h-4" />
                     View SOP
-                  </Button>
+                  </button>
                 )}
               </div>
               {task.description && (
