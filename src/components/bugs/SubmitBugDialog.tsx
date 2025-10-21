@@ -97,7 +97,17 @@ export function SubmitBugDialog({ open, onOpenChange, propertyId, projectId, tas
         <DialogHeader>
           <DialogTitle>Submit a Bug Report</DialogTitle>
           <DialogDescription>
-            Help us improve by reporting any bugs you encounter. Include as much detail as possible.
+            <div className="space-y-2 text-sm">
+              <p>
+                <strong>Purpose:</strong> This form is for reporting technical errors or tools that don't work as intended.
+              </p>
+              <p className="font-semibold">
+                Please include improvement tips in your description to help us enhance the platform.
+              </p>
+              <p className="text-muted-foreground">
+                Include as much detail as possible: what happened, what you expected to happen, and steps to reproduce the issue.
+              </p>
+            </div>
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
@@ -124,8 +134,8 @@ export function SubmitBugDialog({ open, onOpenChange, propertyId, projectId, tas
                   <FormLabel>Description</FormLabel>
                   <FormControl>
                     <Textarea
-                      placeholder="Describe the bug in detail. What happened? What did you expect to happen? Steps to reproduce?"
-                      className="min-h-[120px]"
+                      placeholder="Describe the bug in detail:&#10;- What happened?&#10;- What did you expect to happen?&#10;- Steps to reproduce?&#10;&#10;Improvement suggestions (please include):&#10;- How could this be better?&#10;- What would improve your workflow?"
+                      className="min-h-[160px]"
                       {...field}
                     />
                   </FormControl>
