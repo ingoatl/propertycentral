@@ -58,6 +58,7 @@ export interface TaskDefinition {
   description?: string;
   field_type: FieldType;
   options?: string[];
+  subFields?: TaskDefinition[];
 }
 
 export interface OnboardingSOP {
