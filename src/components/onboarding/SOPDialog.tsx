@@ -19,6 +19,69 @@ export const SOPDialog = ({ sop, open, onOpenChange }: SOPDialogProps) => {
 
   const embedUrl = sop.loom_video_url ? getLoomEmbedUrl(sop.loom_video_url) : null;
 
+  // Format the description with better styling for steps and headlines
+  const formatDescription = (text: string) => {
+    const lines = text.split('\n');
+    const formattedContent: JSX.Element[] = [];
+    let key = 0;
+
+    lines.forEach((line, idx) => {
+      const trimmedLine = line.trim();
+      
+      // Empty line - add spacing
+      if (!trimmedLine) {
+        formattedContent.push(<div key={key++} className="h-3" />);
+        return;
+      }
+
+      // Step numbers (e.g., "1.", "Step 1:", "1)")
+      if (/^(Step\s+)?\d+[.:)]/.test(trimmedLine)) {
+        formattedContent.push(
+          <div key={key++} className="mt-4 first:mt-0">
+            <div className="flex items-start gap-3 bg-blue-50 dark:bg-blue-950/30 p-3 rounded-lg border-l-4 border-blue-500">
+              <span className="font-bold text-blue-700 dark:text-blue-400 text-lg">{trimmedLine}</span>
+            </div>
+          </div>
+        );
+        return;
+      }
+
+      // Headlines (all caps, or starts with ##, or ends with :)
+      if (trimmedLine === trimmedLine.toUpperCase() && trimmedLine.length > 3 || 
+          trimmedLine.startsWith('##') || 
+          (trimmedLine.endsWith(':') && trimmedLine.length < 50)) {
+        const cleanedLine = trimmedLine.replace(/^#+\s*/, '');
+        formattedContent.push(
+          <h4 key={key++} className="text-base font-bold text-primary mt-4 first:mt-0 mb-2 pb-1 border-b border-primary/20">
+            {cleanedLine}
+          </h4>
+        );
+        return;
+      }
+
+      // Bullet points
+      if (trimmedLine.startsWith('•') || trimmedLine.startsWith('-') || trimmedLine.startsWith('*')) {
+        const content = trimmedLine.replace(/^[•\-*]\s*/, '');
+        formattedContent.push(
+          <div key={key++} className="flex items-start gap-2 ml-4 mb-1">
+            <span className="text-primary mt-1.5">•</span>
+            <span className="flex-1">{content}</span>
+          </div>
+        );
+        return;
+      }
+
+      // Regular paragraph
+      formattedContent.push(
+        <p key={key++} className="mb-2 leading-relaxed">
+          {trimmedLine}
+        </p>
+      );
+    });
+
+    return formattedContent;
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh]">
@@ -40,17 +103,8 @@ export const SOPDialog = ({ sop, open, onOpenChange }: SOPDialogProps) => {
             )}
             {sop.description && (
               <div className="prose prose-sm max-w-none">
-                <div className="whitespace-pre-wrap text-foreground leading-relaxed space-y-4">
-                  {sop.description.split('\n\n').map((paragraph, idx) => (
-                    <p key={idx} className="mb-4">
-                      {paragraph.split('\n').map((line, lineIdx) => (
-                        <span key={lineIdx}>
-                          {line}
-                          {lineIdx < paragraph.split('\n').length - 1 && <br />}
-                        </span>
-                      ))}
-                    </p>
-                  ))}
+                <div className="text-foreground">
+                  {formatDescription(sop.description)}
                 </div>
               </div>
             )}

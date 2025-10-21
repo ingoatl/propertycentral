@@ -930,6 +930,20 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
                 )}
                 <div className="flex items-center gap-2 min-w-0 flex-1">
                   <span className="font-semibold text-sm truncate">{task.title}</span>
+                  {sop && (
+                    <Button
+                      variant="link"
+                      size="sm"
+                      className="h-auto p-0 text-blue-600 hover:text-blue-700 flex-shrink-0"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowSOPDialog(true);
+                      }}
+                    >
+                      <BookOpen className="w-3 h-3 mr-1" />
+                      SOP
+                    </Button>
+                  )}
                   {task.field_value && (
                     <>
                       <span className="text-muted-foreground">|</span>
@@ -1018,7 +1032,23 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
         >
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1">
-              <h3 className="text-[20px] font-bold leading-tight mb-1">{task.title}</h3>
+              <div className="flex items-center gap-3 mb-1">
+                <h3 className="text-[20px] font-bold leading-tight">{task.title}</h3>
+                {sop && (
+                  <Button
+                    variant="link"
+                    size="sm"
+                    className="h-auto p-0 text-blue-600 hover:text-blue-700"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowSOPDialog(true);
+                    }}
+                  >
+                    <BookOpen className="w-4 h-4 mr-1" />
+                    View SOP
+                  </Button>
+                )}
+              </div>
               {task.description && (
                 <p className="text-sm text-muted-foreground">{task.description}</p>
               )}
