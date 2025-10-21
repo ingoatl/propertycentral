@@ -115,9 +115,10 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
 
   const loadAnsweredFAQs = async () => {
     const { data } = await supabase
-      .from("frequently_asked_questions")
+      .from("faq_questions")
       .select("*")
       .eq("task_id", task.id)
+      .eq("status", "answered")
       .order("created_at", { ascending: false });
 
     setAnsweredFAQs(data || []);
