@@ -1152,6 +1152,58 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
               </div>
               {renderField()}
               
+              {/* Lawncare Subcard with Additional Fields */}
+              {task.title === "Lawncare" && (
+                <Card className="mt-4 bg-muted/30">
+                  <CardContent className="p-4 space-y-4">
+                    <h4 className="text-sm font-semibold mb-3">Lawncare Details</h4>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor={`lawncare-company-${task.id}`}>Company Name</Label>
+                      <Input
+                        id={`lawncare-company-${task.id}`}
+                        placeholder="Enter lawncare company name"
+                        className="w-full"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor={`lawncare-phone-${task.id}`}>Phone Number</Label>
+                      <Input
+                        id={`lawncare-phone-${task.id}`}
+                        type="tel"
+                        placeholder="Enter phone number"
+                        className="w-full"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor={`lawncare-schedule-${task.id}`}>Schedule</Label>
+                      <Select>
+                        <SelectTrigger id={`lawncare-schedule-${task.id}`} className="w-full">
+                          <SelectValue placeholder="Select schedule" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="semi-weekly">Semi-Weekly</SelectItem>
+                          <SelectItem value="weekly">Weekly</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor={`lawncare-payment-${task.id}`}>Negotiated Payment</Label>
+                      <Input
+                        id={`lawncare-payment-${task.id}`}
+                        type="number"
+                        step="0.01"
+                        placeholder="Enter amount"
+                        className="w-full"
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+              
               {/* Upload button for all tasks (not just file type) */}
               {!["section_header", "file"].includes(task.field_type) && (
                 <div className="mt-2">
