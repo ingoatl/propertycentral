@@ -98,12 +98,12 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
   }, [task.id, task.field_value, task.file_path, task.status, onUpdate]);
 
   const loadSOP = async () => {
-    // Load global SOP for this task (not project-specific)
+    // Load global SOP for this task by matching title and phase
     const { data } = await supabase
       .from("onboarding_sops")
       .select("*")
-      .eq("task_id", task.id)
-      .is("phase_number", null)
+      .eq("task_title", task.title)
+      .eq("phase_number", task.phase_number)
       .maybeSingle();
 
     setSOP(data);
@@ -1254,7 +1254,9 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
 
       <SOPFormDialog
         projectId={task.project_id}
+        phaseNumber={task.phase_number}
         taskId={task.id}
+        taskTitle={task.title}
         existingSOP={sop}
         open={showSOPFormDialog}
         onOpenChange={setShowSOPFormDialog}

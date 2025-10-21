@@ -541,6 +541,7 @@ export type Database = {
           phase_number: number | null
           project_id: string | null
           task_id: string | null
+          task_title: string | null
           title: string
           updated_at: string
         }
@@ -553,6 +554,7 @@ export type Database = {
           phase_number?: number | null
           project_id?: string | null
           task_id?: string | null
+          task_title?: string | null
           title: string
           updated_at?: string
         }
@@ -565,6 +567,7 @@ export type Database = {
           phase_number?: number | null
           project_id?: string | null
           task_id?: string | null
+          task_title?: string | null
           title?: string
           updated_at?: string
         }

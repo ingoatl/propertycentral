@@ -12,6 +12,7 @@ interface SOPFormDialogProps {
   projectId: string;
   phaseNumber?: number;
   taskId?: string;
+  taskTitle?: string;  // Add task title for global SOPs
   existingSOP?: OnboardingSOP | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -22,6 +23,7 @@ export const SOPFormDialog = ({
   projectId,
   phaseNumber,
   taskId,
+  taskTitle,
   existingSOP,
   open,
   onOpenChange,
@@ -71,6 +73,7 @@ export const SOPFormDialog = ({
         project_id: null, // Make SOPs global, not project-specific
         phase_number: phaseNumber,
         task_id: taskId,
+        task_title: taskTitle, // Store task title for global matching
         title: title.trim(),
         description: description.trim() || null,
         loom_video_url: loomUrl.trim() || null,
