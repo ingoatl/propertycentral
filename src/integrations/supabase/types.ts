@@ -811,6 +811,7 @@ export type Database = {
           address: string
           created_at: string
           id: string
+          image_path: string | null
           name: string
           owner_id: string | null
           rental_type: string | null
@@ -821,6 +822,7 @@ export type Database = {
           address: string
           created_at?: string
           id?: string
+          image_path?: string | null
           name: string
           owner_id?: string | null
           rental_type?: string | null
@@ -831,6 +833,7 @@ export type Database = {
           address?: string
           created_at?: string
           id?: string
+          image_path?: string | null
           name?: string
           owner_id?: string | null
           rental_type?: string | null

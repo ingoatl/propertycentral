@@ -5,6 +5,7 @@ export interface Property {
   visitPrice: number;
   rentalType?: "hybrid" | "mid_term" | "long_term";
   createdAt: string;
+  image_path?: string;
 }
 
 export interface Visit {

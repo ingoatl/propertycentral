@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Trash2, MapPin, Building2, Edit, Mail, ClipboardList, FileText } from "lucide-react";
+import { Plus, Trash2, MapPin, Building2, Edit, Mail, ClipboardList, FileText, Upload, Image as ImageIcon } from "lucide-react";
+import villa14Image from "@/assets/villa14.jpg";
 import { WorkflowDialog } from "@/components/onboarding/WorkflowDialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { OnboardingTab } from "@/components/onboarding/OnboardingTab";
@@ -38,6 +39,7 @@ const Properties = () => {
   const [selectedPropertyForWorkflow, setSelectedPropertyForWorkflow] = useState<{ id: string; name: string; address: string; projectId: string | null; visitPrice: number; taskId?: string } | null>(null);
   const [propertyProjects, setPropertyProjects] = useState<Record<string, string>>({});
   const [propertyProjectsProgress, setPropertyProjectsProgress] = useState<Record<string, number>>({});
+  const [uploadingImage, setUploadingImage] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: "",
     address: "",
@@ -104,6 +106,7 @@ const Properties = () => {
         visitPrice: Number(p.visit_price),
         rentalType: p.rental_type as "hybrid" | "mid_term" | "long_term" | undefined,
         createdAt: p.created_at,
+        image_path: p.image_path || (p.name.includes("Villa") && p.name.includes("14") ? villa14Image : undefined),
       })));
     } catch (error: any) {
       if (import.meta.env.DEV) {
@@ -136,6 +139,44 @@ const Properties = () => {
       setPropertyProjectsProgress(progressMap);
     } catch (error: any) {
       console.error("Error loading projects:", error);
+    }
+  };
+
+  const handleImageUpload = async (propertyId: string, file: File) => {
+    try {
+      setUploadingImage(propertyId);
+      
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${propertyId}-${Date.now()}.${fileExt}`;
+      const filePath = `${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('property-images')
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: true
+        });
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('property-images')
+        .getPublicUrl(filePath);
+
+      const { error: updateError } = await supabase
+        .from('properties')
+        .update({ image_path: publicUrl })
+        .eq('id', propertyId);
+
+      if (updateError) throw updateError;
+
+      toast.success("Image uploaded successfully");
+      await loadProperties();
+    } catch (error) {
+      console.error("Error uploading image:", error);
+      toast.error("Failed to upload image");
+    } finally {
+      setUploadingImage(null);
     }
   };
 
@@ -466,51 +507,99 @@ const Properties = () => {
           properties.map((property, index) => (
             <div key={property.id} className="space-y-4">
               <Card 
-                className="shadow-card hover:shadow-warm transition-all duration-300 border-border/50 hover:scale-105 group"
+                className="shadow-card hover:shadow-warm transition-all duration-300 border-border/50 overflow-hidden group"
                 style={{ animationDelay: `${index * 0.1}s` }}
               >
-                <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <CardTitle className="text-foreground group-hover:text-primary transition-colors">
-                        {property.name}
-                      </CardTitle>
-                      <CardDescription className="flex items-center gap-1.5 mt-2 text-muted-foreground">
-                        <MapPin className="w-3.5 h-3.5" />
-                        {property.address}
-                      </CardDescription>
-                      {property.rentalType && (
-                        <div className="mt-2">
-                          <span className={`inline-block px-2 py-1 text-xs rounded-full ${
-                            property.rentalType === 'hybrid' ? 'bg-blue-100 text-blue-800' :
-                            property.rentalType === 'mid_term' ? 'bg-orange-100 text-orange-800' :
-                            'bg-green-100 text-green-800'
-                          }`}>
-                            {property.rentalType === 'hybrid' ? '🔄 Hybrid' :
-                             property.rentalType === 'mid_term' ? '🏠 Mid-term' :
-                             '🏡 Long-term'}
-                          </span>
-                        </div>
-                      )}
+                {/* Property Image */}
+                <div className="relative w-full aspect-[16/10] bg-muted overflow-hidden">
+                  {property.image_path ? (
+                    <img 
+                      src={property.image_path} 
+                      alt={property.name}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-gradient-subtle">
+                      <ImageIcon className="w-16 h-16 text-muted-foreground/30" />
                     </div>
-                    <div className="flex gap-2">
+                  )}
+                  
+                  {/* Upload Button Overlay */}
+                  <div className="absolute top-2 right-2">
+                    <label 
+                      htmlFor={`upload-${property.id}`}
+                      className="cursor-pointer"
+                    >
                       <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleEdit(property)}
-                        className="text-primary hover:text-primary hover:bg-primary/10"
+                        type="button"
+                        size="sm"
+                        variant="secondary"
+                        className="gap-2 shadow-lg backdrop-blur-sm bg-background/80 hover:bg-background/90"
+                        disabled={uploadingImage === property.id}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          document.getElementById(`upload-${property.id}`)?.click();
+                        }}
                       >
-                        <Edit className="w-4 h-4" />
+                        <Upload className="w-3.5 h-3.5" />
+                        {uploadingImage === property.id ? "Uploading..." : "Upload"}
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleDelete(property.id)}
-                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
+                    </label>
+                    <input
+                      id={`upload-${property.id}`}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleImageUpload(property.id, file);
+                      }}
+                    />
+                  </div>
+
+                  {/* Action Buttons Overlay */}
+                  <div className="absolute top-2 left-2 flex gap-2">
+                    <Button
+                      variant="secondary"
+                      size="icon"
+                      className="h-8 w-8 shadow-lg backdrop-blur-sm bg-background/80 hover:bg-background/90"
+                      onClick={() => handleEdit(property)}
+                    >
+                      <Edit className="w-3.5 h-3.5" />
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="icon"
+                      className="h-8 w-8 shadow-lg backdrop-blur-sm bg-background/80 hover:bg-destructive hover:text-destructive-foreground"
+                      onClick={() => handleDelete(property.id)}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
+                </div>
+
+                <CardHeader className="pb-3">
+                  <div className="space-y-2">
+                    <CardTitle className="text-xl text-foreground group-hover:text-primary transition-colors">
+                      {property.name}
+                    </CardTitle>
+                    <CardDescription className="flex items-center gap-1.5 text-muted-foreground">
+                      <MapPin className="w-3.5 h-3.5 flex-shrink-0" />
+                      <span className="line-clamp-1">{property.address}</span>
+                    </CardDescription>
+                    {property.rentalType && (
+                      <div className="pt-1">
+                        <span className={`inline-block px-2.5 py-1 text-xs font-medium rounded-full ${
+                          property.rentalType === 'hybrid' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' :
+                          property.rentalType === 'mid_term' ? 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300' :
+                          'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
+                        }`}>
+                          {property.rentalType === 'hybrid' ? '🔄 Hybrid' :
+                           property.rentalType === 'mid_term' ? '🏠 Mid-term' :
+                           '🏡 Long-term'}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </CardHeader>
                 <CardContent>
