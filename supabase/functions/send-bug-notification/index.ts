@@ -170,9 +170,9 @@ const handler = async (req: Request): Promise<Response> => {
           ${loomHtml}
 
           <div style="padding: 32px 40px;">
-            <a href="https://app.peachhausgroup.com/admin" 
+            <a href="https://ijsxcaaqphaciaenlegl.lovableproject.com" 
                style="display: block; background: #2563eb; color: #ffffff; text-align: center; padding: 14px 24px; text-decoration: none; border-radius: 6px; font-size: 16px; font-weight: bold;">
-              View in Bug Tracker →
+              View in Dashboard →
             </a>
           </div>
 

@@ -13,6 +13,7 @@ import { EmailInsightsCard } from "@/components/EmailInsightsCard";
 import { DashboardFAQTab } from "@/components/dashboard/DashboardFAQTab";
 import { UserTasksDashboard } from "@/components/dashboard/UserTasksDashboard";
 import { PendingQuestionsCard } from "@/components/admin/PendingQuestionsCard";
+import { DashboardBugReportsCard } from "@/components/admin/DashboardBugReportsCard";
 import { useAdminCheck } from "@/hooks/useAdminCheck";
 
 const Dashboard = () => {
@@ -580,6 +581,9 @@ const Dashboard = () => {
           <TabsContent value="overview" className="space-y-8 mt-6">
           {/* Pending Questions */}
           <PendingQuestionsCard />
+          
+          {/* Bug Reports & Improvement Requests */}
+          <DashboardBugReportsCard />
           
           {/* Email Insights Card */}
           <EmailInsightsCard showHeader={true} />
