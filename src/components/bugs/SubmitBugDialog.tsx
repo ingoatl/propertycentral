@@ -95,17 +95,17 @@ export function SubmitBugDialog({ open, onOpenChange, propertyId, projectId, tas
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
-          <DialogTitle>Submit a Bug Report</DialogTitle>
+          <DialogTitle>Submit a Bug or Improvement Request</DialogTitle>
           <DialogDescription>
             <div className="space-y-2 text-sm">
               <p>
-                <strong>Purpose:</strong> This form is for reporting technical errors or tools that don't work as intended.
+                <strong>Purpose:</strong> This form is for reporting technical errors, tools that don't work as intended, or suggesting improvements to the platform.
               </p>
               <p className="font-semibold">
-                Please include improvement tips in your description to help us enhance the platform.
+                Please include improvement tips and suggestions in your description to help us enhance the platform.
               </p>
               <p className="text-muted-foreground">
-                Include as much detail as possible: what happened, what you expected to happen, and steps to reproduce the issue.
+                Include as much detail as possible: what happened, what you expected to happen, steps to reproduce the issue, and any ideas for improvement.
               </p>
             </div>
           </DialogDescription>

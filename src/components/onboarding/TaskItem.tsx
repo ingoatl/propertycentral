@@ -1306,7 +1306,7 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
                 className="w-full gap-2"
               >
                 <Bug className="w-4 h-4" />
-                Submit a Bug for this Task
+                Submit a Bug or Improvement Request
               </Button>
             </div>
 

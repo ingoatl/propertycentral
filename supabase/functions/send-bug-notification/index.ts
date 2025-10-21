@@ -185,7 +185,7 @@ const handler = async (req: Request): Promise<Response> => {
       `;
 
       const emailResponse = await resend.emails.send({
-        from: "PeachHaus <onboarding@resend.dev>",
+        from: "PeachHaus <admin@peachhausgroup.com>",
         to: ["ingo@peachhausgroup.com"],
         subject: `🐛 New Bug Report: ${bug.title}`,
         html: emailHtml,
@@ -250,7 +250,7 @@ const handler = async (req: Request): Promise<Response> => {
       `;
 
       const emailResponse = await resend.emails.send({
-        from: "PeachHaus <onboarding@resend.dev>",
+        from: "PeachHaus <admin@peachhausgroup.com>",
         to: [submittedByProfile?.email || ""],
         subject: `✅ Your Bug Report Has Been Resolved: ${bug.title}`,
         html: emailHtml,

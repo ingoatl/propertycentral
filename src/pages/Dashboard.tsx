@@ -493,7 +493,7 @@ const Dashboard = () => {
             variant="outline"
           >
             <Bug className="w-4 h-4" />
-            Submit a Bug
+            Submit a Bug or Improvement Request
           </Button>
           {isAdmin && (
             <>
