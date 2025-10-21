@@ -1250,17 +1250,18 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
 
                     {/* Schedule */}
                     <div>
-                      <Label className="text-xs font-medium mb-2 block">Schedule</Label>
-                      <RadioGroup>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="Semi-Weekly" id={`semi-weekly-${task.id}`} />
-                          <Label htmlFor={`semi-weekly-${task.id}`} className="text-sm font-normal">Semi-Weekly</Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="Monthly" id={`monthly-${task.id}`} />
-                          <Label htmlFor={`monthly-${task.id}`} className="text-sm font-normal">Monthly</Label>
-                        </div>
-                      </RadioGroup>
+                      <Label htmlFor={`lawncare-schedule-${task.id}`} className="text-xs font-medium mb-1 block">
+                        Schedule
+                      </Label>
+                      <Select>
+                        <SelectTrigger id={`lawncare-schedule-${task.id}`} className="h-9 text-sm bg-background">
+                          <SelectValue placeholder="Select schedule..." />
+                        </SelectTrigger>
+                        <SelectContent className="bg-background z-50">
+                          <SelectItem value="Semi-Weekly">Semi-Weekly</SelectItem>
+                          <SelectItem value="Weekly">Weekly</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
 
                     {/* Negotiated Payment */}
