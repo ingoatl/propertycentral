@@ -62,6 +62,7 @@ export const ONBOARDING_PHASES: PhaseDefinition[] = [
       { title: "Backup cleaner phone number", field_type: "phone" },
       { title: "Owner satisfaction with existing cleaner", field_type: "radio", options: ["Yes", "No", "N/A"] },
       { title: "Cleaner payment arrangement", field_type: "textarea" },
+      { title: "Lawncare", field_type: "text", description: "Provider name and contact" },
     ]
   },
   {
@@ -128,7 +129,7 @@ export const ONBOARDING_PHASES: PhaseDefinition[] = [
       { title: "💼 Corporate Housing Providers", field_type: "section_header" },
       
       // Direct Booking
-      { title: "Direct booking website setup", field_type: "checkbox" },
+      { title: "Direct Booking Page", field_type: "text", description: "Enter direct booking page URL" },
     ]
   },
   {
