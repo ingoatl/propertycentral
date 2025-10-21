@@ -68,7 +68,7 @@ export const SOPFormDialog = ({
 
     try {
       const sopData = {
-        project_id: projectId,
+        project_id: null, // Make SOPs global, not project-specific
         phase_number: phaseNumber,
         task_id: taskId,
         title: title.trim(),

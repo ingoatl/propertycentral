@@ -61,10 +61,10 @@ export const PhaseCard = ({
   };
 
   const loadSOP = async () => {
+    // Load global SOP for this phase (not project-specific)
     const { data } = await supabase
       .from("onboarding_sops")
       .select("*")
-      .eq("project_id", projectId)
       .eq("phase_number", phase.id)
       .is("task_id", null)
       .maybeSingle();

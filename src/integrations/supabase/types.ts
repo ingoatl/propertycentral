@@ -539,7 +539,7 @@ export type Database = {
           id: string
           loom_video_url: string | null
           phase_number: number | null
-          project_id: string
+          project_id: string | null
           task_id: string | null
           title: string
           updated_at: string
@@ -551,7 +551,7 @@ export type Database = {
           id?: string
           loom_video_url?: string | null
           phase_number?: number | null
-          project_id: string
+          project_id?: string | null
           task_id?: string | null
           title: string
           updated_at?: string
@@ -563,7 +563,7 @@ export type Database = {
           id?: string
           loom_video_url?: string | null
           phase_number?: number | null
-          project_id?: string
+          project_id?: string | null
           task_id?: string | null
           title?: string
           updated_at?: string

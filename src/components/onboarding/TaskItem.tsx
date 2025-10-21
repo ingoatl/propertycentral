@@ -98,10 +98,10 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
   }, [task.id, task.field_value, task.file_path, task.status, onUpdate]);
 
   const loadSOP = async () => {
+    // Load global SOP for this task (not project-specific)
     const { data } = await supabase
       .from("onboarding_sops")
       .select("*")
-      .eq("project_id", task.project_id)
       .eq("task_id", task.id)
       .is("phase_number", null)
       .maybeSingle();
