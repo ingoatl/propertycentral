@@ -13,7 +13,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { CalendarIcon, Upload, FileText, CheckCircle2, Edit2, Copy, Check, Loader2, Settings, MessageSquare, Trash2, BookOpen, User, Clock, ChevronDown, MessageCircleQuestion } from "lucide-react";
+import { CalendarIcon, Upload, FileText, CheckCircle2, Edit2, Copy, Check, Loader2, Settings, MessageSquare, Trash2, BookOpen, User, Clock, ChevronDown, MessageCircleQuestion, Bug } from "lucide-react";
 import { format, addWeeks, isBefore, startOfDay, isPast } from "date-fns";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -32,6 +32,7 @@ import { TaskDueDateDisplay } from "./TaskDueDateDisplay";
 import { TaskRescheduleHistoryLog } from "./TaskRescheduleHistoryLog";
 import { AdminControlsSidebar } from "./AdminControlsSidebar";
 import { AskQuestionDialog } from "@/components/faq/AskQuestionDialog";
+import { SubmitBugDialog } from "@/components/bugs/SubmitBugDialog";
 
 interface TaskItemProps {
   task: OnboardingTask;
@@ -62,6 +63,7 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
   const [showImagePreview, setShowImagePreview] = useState(false);
   const [showFAQDialog, setShowFAQDialog] = useState(false);
   const [answeredFAQs, setAnsweredFAQs] = useState<any[]>([]);
+  const [showBugDialog, setShowBugDialog] = useState(false);
   
   const { isAdmin } = useAdminCheck();
   const hasValue = task.field_value && task.field_value.trim() !== "";
@@ -1295,6 +1297,19 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
             {/* Reschedule History Log */}
             <TaskRescheduleHistoryLog taskId={task.id} />
 
+            {/* Submit a Bug Button - Available to all users */}
+            <div className="mt-4 border-t pt-4">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowBugDialog(true)}
+                className="w-full gap-2"
+              >
+                <Bug className="w-4 h-4" />
+                Submit a Bug for this Task
+              </Button>
+            </div>
+
             {/* Comments Section */}
             <InlineComments taskId={task.id} />
           </div>
@@ -1397,6 +1412,13 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
         }}
         projectId={task.project_id}
         taskId={task.id}
+      />
+
+      <SubmitBugDialog
+        open={showBugDialog}
+        onOpenChange={setShowBugDialog}
+        taskId={task.id}
+        projectId={task.project_id}
       />
     </>
   );
