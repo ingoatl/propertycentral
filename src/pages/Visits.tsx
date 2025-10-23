@@ -11,9 +11,11 @@ import { Property, Visit } from "@/types";
 import { toast } from "sonner";
 import { z } from "zod";
 
+const HOURLY_RATE = 50;
+
 const visitSchema = z.object({
   propertyId: z.string().uuid("Please select a property"),
-  price: z.number().positive("Price must be positive").max(10000, "Price cannot exceed $10,000"),
+  hours: z.number().positive("Hours must be positive").max(24, "Hours cannot exceed 24"),
   notes: z.string().max(2000, "Notes must be less than 2000 characters").optional(),
 });
 
@@ -23,7 +25,7 @@ const Visits = () => {
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     propertyId: "",
-    price: "",
+    hours: "1",
     notes: "",
   });
 
@@ -75,23 +77,27 @@ const Visits = () => {
   };
 
   const handlePropertySelect = (propertyId: string) => {
-    const property = properties.find((p) => p.id === propertyId);
     setFormData({
       ...formData,
       propertyId,
-      price: property ? property.visitPrice.toString() : "",
     });
+  };
+
+  const calculatePrice = () => {
+    const hours = parseFloat(formData.hours) || 0;
+    return hours * HOURLY_RATE;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const price = parseFloat(formData.price);
+    const hours = parseFloat(formData.hours);
+    const price = calculatePrice();
     
     // Validate with zod
     const validation = visitSchema.safeParse({
       propertyId: formData.propertyId,
-      price,
+      hours,
       notes: formData.notes,
     });
 
@@ -112,27 +118,44 @@ const Visits = () => {
       const currentDate = now.toISOString().split("T")[0];
       const currentTime = now.toTimeString().slice(0, 5);
 
-      const { error } = await supabase
+      // Insert visit
+      const { error: visitError } = await supabase
         .from("visits")
         .insert({
           property_id: formData.propertyId,
           date: currentDate,
           time: currentTime,
           price,
+          hours,
           notes: formData.notes || null,
           user_id: user.id,
         });
 
-      if (error) throw error;
+      if (visitError) throw visitError;
+
+      // Create expense for visit charges
+      const { error: expenseError } = await supabase
+        .from("expenses")
+        .insert({
+          property_id: formData.propertyId,
+          amount: price,
+          date: currentDate,
+          purpose: `Visit charges - ${hours} hour${hours !== 1 ? 's' : ''} @ $${HOURLY_RATE}/hr`,
+          category: "Visit Charges",
+          vendor: "PeachHaus",
+          user_id: user.id,
+        });
+
+      if (expenseError) throw expenseError;
 
       setFormData({
         propertyId: "",
-        price: "",
+        hours: "1",
         notes: "",
       });
 
       await loadData();
-      toast.success("Visit logged successfully!");
+      toast.success("Visit and expense logged successfully!");
     } catch (error: any) {
       if (import.meta.env.DEV) {
         console.error("Error adding visit:", error);
@@ -189,21 +212,24 @@ const Visits = () => {
               </Select>
             </div>
 
-            {/* Visit Price - Large input */}
+            {/* Hours Input - Large input */}
             <div className="space-y-3">
-              <Label htmlFor="price" className="text-base font-semibold">Visit Price ($) *</Label>
+              <Label htmlFor="hours" className="text-base font-semibold">Hours *</Label>
               <Input
-                  id="price"
+                  id="hours"
                   type="number"
-                  step="0.01"
-                  min="0"
-                  max="10000"
-                  value={formData.price}
-                  onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                  step="0.25"
+                  min="0.25"
+                  max="24"
+                  value={formData.hours}
+                  onChange={(e) => setFormData({ ...formData, hours: e.target.value })}
                   className="h-14 text-lg border-2 focus:border-primary"
-                  placeholder="Auto-filled from property"
+                  placeholder="Enter hours"
                   required
                 />
+              <p className="text-sm text-muted-foreground">
+                Rate: ${HOURLY_RATE}/hour | Total: <span className="font-semibold text-primary">${calculatePrice().toFixed(2)}</span>
+              </p>
             </div>
 
             {/* Notes - Optional */}
