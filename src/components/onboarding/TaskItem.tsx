@@ -981,6 +981,18 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
               </div>
               
               <div className="flex items-center gap-2 flex-shrink-0">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowBugDialog(true);
+                  }}
+                  className="h-7 px-2 text-xs gap-1"
+                  title="Submit a bug or improvement request"
+                >
+                  <Bug className="w-3 h-3" />
+                </Button>
                 {task.file_path && isImageFile(task.file_path) && (
                   <div
                     onClick={(e) => {
