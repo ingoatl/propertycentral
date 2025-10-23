@@ -27,6 +27,10 @@ interface BugReport {
   properties?: {
     name: string;
   } | null;
+  onboarding_tasks?: {
+    title: string;
+    phase_title: string;
+  } | null;
 }
 
 export const DashboardBugReportsCard = () => {
@@ -47,7 +51,7 @@ export const DashboardBugReportsCard = () => {
 
       if (error) throw error;
 
-      // Fetch profiles and properties separately
+      // Fetch profiles, properties, and tasks separately
       const bugsWithDetails = await Promise.all((data || []).map(async (bug) => {
         const profilePromise = supabase
           .from("profiles")
@@ -59,15 +63,21 @@ export const DashboardBugReportsCard = () => {
           ? supabase.from("properties").select("name").eq("id", bug.property_id).single()
           : Promise.resolve({ data: null });
 
-        const [{ data: profile }, { data: property }] = await Promise.all([
+        const taskPromise = bug.task_id
+          ? supabase.from("onboarding_tasks").select("title, phase_title").eq("id", bug.task_id).single()
+          : Promise.resolve({ data: null });
+
+        const [{ data: profile }, { data: property }, { data: task }] = await Promise.all([
           profilePromise,
           propertyPromise,
+          taskPromise,
         ]);
 
         return {
           ...bug,
           profiles: profile,
           properties: property,
+          onboarding_tasks: task,
         };
       }));
 
@@ -190,7 +200,10 @@ export const DashboardBugReportsCard = () => {
                       <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
                         <span>Submitted by: {bug.profiles?.first_name || bug.profiles?.email || "Unknown"}</span>
                         {bug.properties && (
-                          <span>Property: {bug.properties.name}</span>
+                          <span>• Property: {bug.properties.name}</span>
+                        )}
+                        {bug.onboarding_tasks && (
+                          <span>• Task: {bug.onboarding_tasks.phase_title} - {bug.onboarding_tasks.title}</span>
                         )}
                       </div>
                       {bug.loom_video_url && (
