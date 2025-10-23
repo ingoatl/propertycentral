@@ -13,8 +13,16 @@ import { z } from "zod";
 
 const HOURLY_RATE = 50;
 
+const VISITOR_OPTIONS = [
+  "Anja Schaer",
+  "Ingo Schaer",
+  "Contractor",
+  "Cleaner"
+];
+
 const visitSchema = z.object({
   propertyId: z.string().uuid("Please select a property"),
+  visitedBy: z.string().min(1, "Please select who visited"),
   hours: z.number().min(0, "Hours cannot be negative").max(24, "Hours cannot exceed 24"),
   notes: z.string().max(2000, "Notes must be less than 2000 characters").optional(),
 });
@@ -25,6 +33,7 @@ const Visits = () => {
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     propertyId: "",
+    visitedBy: "",
     hours: "0",
     notes: "",
   });
@@ -100,6 +109,7 @@ const Visits = () => {
     // Validate with zod
     const validation = visitSchema.safeParse({
       propertyId: formData.propertyId,
+      visitedBy: formData.visitedBy,
       hours,
       notes: formData.notes,
     });
@@ -134,6 +144,7 @@ const Visits = () => {
           time: currentTime,
           price: totalPrice,
           hours,
+          visited_by: formData.visitedBy,
           notes: formData.notes || null,
           user_id: user.id,
         });
@@ -177,6 +188,7 @@ const Visits = () => {
 
       setFormData({
         propertyId: "",
+        visitedBy: "",
         hours: "0",
         notes: "",
       });
@@ -239,7 +251,24 @@ const Visits = () => {
               </Select>
             </div>
 
-            {/* Hours Input - Large input */}
+
+            {/* Visited By Selection */}
+            <div className="space-y-3">
+              <Label htmlFor="visitedBy" className="text-base font-semibold">Visited By *</Label>
+              <Select value={formData.visitedBy} onValueChange={(value) => setFormData({ ...formData, visitedBy: value })}>
+                <SelectTrigger id="visitedBy" className="h-14 text-lg border-2 focus:border-primary">
+                  <SelectValue placeholder="Select who visited" />
+                </SelectTrigger>
+                <SelectContent>
+                  {VISITOR_OPTIONS.map((visitor) => (
+                    <SelectItem key={visitor} value={visitor} className="text-base py-3">
+                      {visitor}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
             <div className="space-y-3">
               <Label htmlFor="hours" className="text-base font-semibold">Hours (Optional)</Label>
               <Input
@@ -318,7 +347,7 @@ const Visits = () => {
                   style={{ animationDelay: `${index * 0.05}s` }}
                 >
                   <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
-                    <div className="flex-1 space-y-2">
+                  <div className="flex-1 space-y-2">
                       <h3 className="font-semibold text-base sm:text-lg text-foreground">
                         {getPropertyName(visit.propertyId)}
                       </h3>
@@ -340,6 +369,11 @@ const Visits = () => {
                           {visit.time}
                         </span>
                       </div>
+                      {(visit as any).visited_by && (
+                        <p className="text-sm font-medium text-foreground">
+                          👤 {(visit as any).visited_by}
+                        </p>
+                      )}
                       {visit.notes && (
                         <p className="text-sm text-muted-foreground mt-2 italic border-l-2 border-primary/30 pl-3">
                           {visit.notes}

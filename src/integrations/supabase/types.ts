@@ -1176,6 +1176,7 @@ export type Database = {
           property_id: string
           time: string
           user_id: string | null
+          visited_by: string | null
         }
         Insert: {
           created_at?: string
@@ -1187,6 +1188,7 @@ export type Database = {
           property_id: string
           time: string
           user_id?: string | null
+          visited_by?: string | null
         }
         Update: {
           created_at?: string
@@ -1198,6 +1200,7 @@ export type Database = {
           property_id?: string
           time?: string
           user_id?: string | null
+          visited_by?: string | null
         }
         Relationships: [
           {
