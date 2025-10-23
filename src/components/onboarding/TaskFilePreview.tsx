@@ -17,6 +17,7 @@ interface TaskAttachment {
 interface TaskFilePreviewProps {
   taskId: string;
   onFilesChange?: () => void;
+  key?: number; // Allow key prop for forcing refresh
 }
 
 export const TaskFilePreview = ({ taskId, onFilesChange }: TaskFilePreviewProps) => {
@@ -27,7 +28,7 @@ export const TaskFilePreview = ({ taskId, onFilesChange }: TaskFilePreviewProps)
 
   useEffect(() => {
     loadAttachments();
-  }, [taskId]);
+  }, [taskId]); // Reload when taskId changes OR component remounts
 
   const loadAttachments = async () => {
     try {

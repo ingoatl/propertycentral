@@ -513,12 +513,16 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
             <TaskFilePreview 
               key={attachmentsKey}
               taskId={task.id} 
-              onFilesChange={() => setAttachmentsKey(prev => prev + 1)} 
+              onFilesChange={() => {
+                setAttachmentsKey(prev => prev + 1);
+                onUpdate();
+              }} 
             />
             
             <TaskFileUpload 
               taskId={task.id} 
               onFilesUploaded={() => {
+                setUploading(false);
                 setAttachmentsKey(prev => prev + 1);
                 onUpdate();
               }} 
@@ -1159,30 +1163,8 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
               
               {/* Upload button for all tasks (not just file type) */}
               {!["section_header", "file"].includes(task.field_type) && (
-                <div className="mt-2">
-                  <label 
-                    htmlFor={`upload-${task.id}`}
-                    className="inline-flex items-center gap-2 px-3 py-1.5 text-xs border border-input rounded-md cursor-pointer hover:bg-accent hover:text-accent-foreground transition-colors"
-                  >
-                    <Upload className="w-3 h-3" />
-                    Upload file/screenshot
-                  </label>
-                  <Input 
-                    type="file" 
-                    onChange={handleFileUpload}
-                    disabled={uploading}
-                    className="hidden"
-                    accept="image/*,.pdf,.doc,.docx"
-                    id={`upload-${task.id}`}
-                  />
-                  {uploading && (
-                    <div className="flex items-center gap-2 mt-1">
-                      <Loader2 className="w-3 h-3 animate-spin" />
-                      <span className="text-xs text-muted-foreground">Uploading...</span>
-                    </div>
-                  )}
-                  
-                  {/* All file attachments are now handled by TaskFilePreview component */}
+                <div className="mt-2 space-y-3">
+                  {/* All file attachments handled by TaskFilePreview and TaskFileUpload components */}
                   <TaskFilePreview 
                     key={attachmentsKey}
                     taskId={task.id} 
@@ -1190,6 +1172,15 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
                       setAttachmentsKey(prev => prev + 1);
                       onUpdate();
                     }}
+                  />
+                  
+                  <TaskFileUpload 
+                    taskId={task.id} 
+                    onFilesUploaded={() => {
+                      setUploading(false);
+                      setAttachmentsKey(prev => prev + 1);
+                      onUpdate();
+                    }} 
                   />
                 </div>
               )}

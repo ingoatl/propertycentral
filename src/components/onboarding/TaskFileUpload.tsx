@@ -78,6 +78,8 @@ export const TaskFileUpload = ({ taskId, onFilesUploaded }: TaskFileUploadProps)
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
+      
+      // Trigger callback to refresh the preview
       onFilesUploaded?.();
     } catch (error: any) {
       console.error("Upload error:", error);
