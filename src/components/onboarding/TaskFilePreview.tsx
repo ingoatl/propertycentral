@@ -154,15 +154,23 @@ export const TaskFilePreview = ({ taskId, onFilesChange }: TaskFilePreviewProps)
                 "hover:ring-2 hover:ring-primary hover:shadow-md cursor-pointer"
               )}>
                 <div className="w-full h-full bg-muted flex items-center justify-center p-2">
-                  {imageUrls[attachment.id] ? (
+                  {isImage && imageUrls[attachment.id] ? (
                     <img
                       src={imageUrls[attachment.id]}
                       alt={attachment.file_name}
                       className="w-full h-full object-cover"
+                      onError={(e) => {
+                        // If image fails to load, hide it and show icon instead
+                        e.currentTarget.style.display = 'none';
+                        const icon = e.currentTarget.parentElement?.querySelector('.fallback-icon');
+                        if (icon) icon.classList.remove('hidden');
+                      }}
                     />
-                  ) : (
-                    <FileIconComponent className="w-6 h-6 text-muted-foreground" />
-                  )}
+                  ) : null}
+                  <FileIconComponent className={cn(
+                    "w-6 h-6 text-muted-foreground fallback-icon",
+                    isImage && imageUrls[attachment.id] && "hidden"
+                  )} />
                 </div>
 
                 {/* Actions overlay - shows on hover */}
