@@ -21,6 +21,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 import { FieldType } from "@/types/onboarding";
+import { TaskFileUpload } from "./TaskFileUpload";
 
 interface AddTaskDialogProps {
   open: boolean;
@@ -43,6 +44,7 @@ export const AddTaskDialog = ({
   const [description, setDescription] = useState("");
   const [fieldType, setFieldType] = useState<FieldType>("text");
   const [submitting, setSubmitting] = useState(false);
+  const [createdTaskId, setCreatedTaskId] = useState<string | null>(null);
 
   const handleSubmit = async () => {
     if (!title.trim()) {
@@ -82,25 +84,42 @@ export const AddTaskDialog = ({
           status: "pending" as const,
         }));
 
-        const { error: tasksError } = await supabase
+        const { data: insertedTasks, error: tasksError } = await supabase
           .from("onboarding_tasks")
-          .insert(taskInstances);
+          .insert(taskInstances)
+          .select();
 
         if (tasksError) throw tasksError;
+        
+        // Store the first created task ID for file uploads
+        if (insertedTasks && insertedTasks.length > 0) {
+          setCreatedTaskId(insertedTasks[0].id);
+        }
       }
 
       toast.success(`Task added globally to all ${projects?.length || 0} properties`);
       setTitle("");
       setDescription("");
       setFieldType("text");
-      onOpenChange(false);
-      onSuccess();
+      
+      // Don't close dialog if we want to upload files
+      // onOpenChange(false);
+      // onSuccess();
     } catch (error) {
       console.error("Failed to add task:", error);
       toast.error("Failed to add task globally");
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleClose = () => {
+    setTitle("");
+    setDescription("");
+    setFieldType("text");
+    setCreatedTaskId(null);
+    onOpenChange(false);
+    onSuccess();
   };
 
   return (
@@ -154,20 +173,36 @@ export const AddTaskDialog = ({
             </Select>
           </div>
 
-          <Button
-            onClick={handleSubmit}
-            disabled={submitting}
-            className="w-full"
-          >
-            {submitting ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Adding...
-              </>
+          {createdTaskId && (
+            <TaskFileUpload taskId={createdTaskId} />
+          )}
+
+          <div className="flex gap-2">
+            {createdTaskId ? (
+              <Button
+                type="button"
+                onClick={handleClose}
+                className="w-full"
+              >
+                Done
+              </Button>
             ) : (
-              "Add Task"
+              <Button
+                onClick={handleSubmit}
+                disabled={submitting}
+                className="w-full"
+              >
+                {submitting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Adding...
+                  </>
+                ) : (
+                  "Add Task"
+                )}
+              </Button>
             )}
-          </Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>
