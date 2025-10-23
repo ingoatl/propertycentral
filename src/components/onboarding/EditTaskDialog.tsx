@@ -53,9 +53,8 @@ export const EditTaskDialog = ({ task, open, onOpenChange, onSuccess }: EditTask
 
       if (error) throw error;
 
-      toast.success("Task updated successfully");
       onSuccess();
-      onOpenChange(false);
+      toast.success("Task updated successfully");
     } catch (error) {
       console.error("Failed to update task:", error);
       toast.error("Failed to update task");
