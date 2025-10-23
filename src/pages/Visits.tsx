@@ -15,7 +15,7 @@ const HOURLY_RATE = 50;
 
 const visitSchema = z.object({
   propertyId: z.string().uuid("Please select a property"),
-  hours: z.number().positive("Hours must be positive").max(24, "Hours cannot exceed 24"),
+  hours: z.number().min(0, "Hours cannot be negative").max(24, "Hours cannot exceed 24"),
   notes: z.string().max(2000, "Notes must be less than 2000 characters").optional(),
 });
 
@@ -25,7 +25,7 @@ const Visits = () => {
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     propertyId: "",
-    hours: "1",
+    hours: "0",
     notes: "",
   });
 
@@ -118,6 +118,10 @@ const Visits = () => {
       const currentDate = now.toISOString().split("T")[0];
       const currentTime = now.toTimeString().slice(0, 5);
 
+      // Get the property to get visit price
+      const property = properties.find(p => p.id === formData.propertyId);
+      if (!property) throw new Error("Property not found");
+
       // Insert visit
       const { error: visitError } = await supabase
         .from("visits")
@@ -133,24 +137,43 @@ const Visits = () => {
 
       if (visitError) throw visitError;
 
-      // Create expense for visit charges
-      const { error: expenseError } = await supabase
-        .from("expenses")
-        .insert({
+      // Create expenses array
+      const expenses = [];
+
+      // 1. Always add visit price expense
+      expenses.push({
+        property_id: formData.propertyId,
+        amount: property.visitPrice,
+        date: currentDate,
+        purpose: "Visit fee",
+        category: "Visit Charges",
+        vendor: "PeachHaus",
+        user_id: user.id,
+      });
+
+      // 2. Add hourly charges expense only if hours > 0
+      if (hours > 0) {
+        expenses.push({
           property_id: formData.propertyId,
           amount: price,
           date: currentDate,
-          purpose: `Visit charges - ${hours} hour${hours !== 1 ? 's' : ''} @ $${HOURLY_RATE}/hr`,
+          purpose: `Hourly charges - ${hours} hour${hours !== 1 ? 's' : ''} @ $${HOURLY_RATE}/hr`,
           category: "Visit Charges",
           vendor: "PeachHaus",
           user_id: user.id,
         });
+      }
+
+      // Insert all expenses
+      const { error: expenseError } = await supabase
+        .from("expenses")
+        .insert(expenses);
 
       if (expenseError) throw expenseError;
 
       setFormData({
         propertyId: "",
-        hours: "1",
+        hours: "0",
         notes: "",
       });
 
@@ -214,21 +237,20 @@ const Visits = () => {
 
             {/* Hours Input - Large input */}
             <div className="space-y-3">
-              <Label htmlFor="hours" className="text-base font-semibold">Hours *</Label>
+              <Label htmlFor="hours" className="text-base font-semibold">Hours (Optional)</Label>
               <Input
                   id="hours"
                   type="number"
                   step="0.25"
-                  min="0.25"
+                  min="0"
                   max="24"
                   value={formData.hours}
                   onChange={(e) => setFormData({ ...formData, hours: e.target.value })}
                   className="h-14 text-lg border-2 focus:border-primary"
-                  placeholder="Enter hours"
-                  required
+                  placeholder="Enter hours (0 if just visiting)"
                 />
               <p className="text-sm text-muted-foreground">
-                Rate: ${HOURLY_RATE}/hour | Total: <span className="font-semibold text-primary">${calculatePrice().toFixed(2)}</span>
+                Rate: ${HOURLY_RATE}/hour{parseFloat(formData.hours) > 0 ? ` | Hourly Total: $${calculatePrice().toFixed(2)}` : ''}
               </p>
             </div>
 
