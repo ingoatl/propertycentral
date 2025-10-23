@@ -242,6 +242,8 @@ export const CreateProjectDialog = ({
       const assignedCount = allTasks.filter(t => t.assigned_to_uuid).length;
       const totalCount = allTasks.length;
 
+      onSuccess();
+      
       if (autoAssign && assignedCount > 0) {
         toast.success(`Project created with ${assignedCount}/${totalCount} tasks assigned to team`);
       } else {
@@ -252,7 +254,6 @@ export const CreateProjectDialog = ({
       setShowNewOwnerForm(false);
       setNewOwnerData({ name: "", email: "", phone: "" });
       onOpenChange(false);
-      onSuccess();
     } catch (error: any) {
       toast.error("Failed to create project");
       console.error(error);

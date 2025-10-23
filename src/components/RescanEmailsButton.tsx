@@ -23,9 +23,6 @@ export function RescanEmailsButton() {
 
       toast.dismiss();
       toast.success(`Rescan complete! Processed ${data.emailsProcessed} emails, generated ${data.insightsGenerated} insights with enhanced owner and property matching`);
-      
-      // Reload the page to show new insights
-      setTimeout(() => window.location.reload(), 2000);
     } catch (error: any) {
       console.error('Error rescanning emails:', error);
       toast.dismiss();

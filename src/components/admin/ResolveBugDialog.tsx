@@ -56,22 +56,20 @@ export function ResolveBugDialog({ bug, open, onOpenChange, onResolved }: Resolv
 
       if (updateError) throw updateError;
 
-      // Send email notification
-      const { error: emailError } = await supabase.functions.invoke("send-bug-notification", {
+      form.reset();
+      onOpenChange(false);
+      onResolved();
+      toast.success("Bug marked as resolved!");
+
+      // Send email notification in background
+      supabase.functions.invoke("send-bug-notification", {
         body: {
           type: "bug_resolved",
           bugId: bug.id,
         },
-      });
-
-      if (emailError) {
+      }).catch((emailError) => {
         console.error("Error sending email notification:", emailError);
-      }
-
-      toast.success("Bug marked as resolved!");
-      form.reset();
-      onOpenChange(false);
-      onResolved();
+      });
     } catch (error: any) {
       console.error("Error resolving bug:", error);
       toast.error(error.message || "Failed to resolve bug");

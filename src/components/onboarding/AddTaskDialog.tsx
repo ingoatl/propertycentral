@@ -101,10 +101,7 @@ export const AddTaskDialog = ({
       setTitle("");
       setDescription("");
       setFieldType("text");
-      
-      // Don't close dialog if we want to upload files
-      // onOpenChange(false);
-      // onSuccess();
+      onSuccess();
     } catch (error) {
       console.error("Failed to add task:", error);
       toast.error("Failed to add task globally");
@@ -119,7 +116,6 @@ export const AddTaskDialog = ({
     setFieldType("text");
     setCreatedTaskId(null);
     onOpenChange(false);
-    onSuccess();
   };
 
   return (

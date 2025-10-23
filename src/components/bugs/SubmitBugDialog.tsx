@@ -76,13 +76,13 @@ export function SubmitBugDialog({ open, onOpenChange, propertyId, projectId, tas
         },
       });
 
+      onOpenChange(false);
+      form.reset();
+      toast.success("Bug report submitted successfully!");
+      
       if (emailError) {
         console.error("Error sending email notification:", emailError);
       }
-
-      toast.success("Bug report submitted successfully!");
-      form.reset();
-      onOpenChange(false);
     } catch (error: any) {
       console.error("Error submitting bug report:", error);
       toast.error(error.message || "Failed to submit bug report");

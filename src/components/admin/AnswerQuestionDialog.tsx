@@ -90,8 +90,18 @@ export const AnswerQuestionDialog = ({ open, onOpenChange, question, onAnswered 
         propertyAddress = property?.address || "";
       }
 
-      // Send notification to user
-      await supabase.functions.invoke("send-faq-notification", {
+      setAnswer("");
+      setPublishAsFAQ(true);
+      onOpenChange(false);
+      onAnswered();
+      
+      toast({
+        title: "Answer submitted",
+        description: publishAsFAQ ? "Question answered and published as FAQ" : "Question answered",
+      });
+
+      // Send notification to user in background
+      supabase.functions.invoke("send-faq-notification", {
         body: {
           type: "question_answered",
           question_id: question.id,
@@ -102,16 +112,6 @@ export const AnswerQuestionDialog = ({ open, onOpenChange, question, onAnswered 
           property_address: propertyAddress
         }
       });
-
-      toast({
-        title: "Answer submitted",
-        description: publishAsFAQ ? "Question answered and published as FAQ" : "Question answered",
-      });
-
-      setAnswer("");
-      setPublishAsFAQ(true);
-      onOpenChange(false);
-      onAnswered();
     } catch (error: any) {
       console.error("Error answering question:", error);
       toast({
