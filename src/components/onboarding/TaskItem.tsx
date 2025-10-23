@@ -66,6 +66,7 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
   const [showFAQDialog, setShowFAQDialog] = useState(false);
   const [answeredFAQs, setAnsweredFAQs] = useState<any[]>([]);
   const [showBugDialog, setShowBugDialog] = useState(false);
+  const [attachmentsKey, setAttachmentsKey] = useState(0);
   
   const { isAdmin } = useAdminCheck();
   const hasValue = task.field_value && task.field_value.trim() !== "";
@@ -517,75 +518,36 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
 
       case "file":
         return (
-          <div className="space-y-2">
+          <div className="space-y-3">
+            {/* Multiple file upload system */}
+            <TaskFilePreview 
+              key={attachmentsKey}
+              taskId={task.id} 
+              onFilesChange={() => setAttachmentsKey(prev => prev + 1)} 
+            />
             
-            {!showNAField ? (
-              <>
-                <div className="flex items-center gap-2">
-                  <Input 
-                    type="file" 
-                    onChange={handleFileUpload}
-                    disabled={uploading || task.field_value === "N/A"}
-                    className="flex-1"
-                    accept="image/*,.pdf,.doc,.docx,.xls,.xlsx"
-                  />
-                  {task.file_path && (
-                    <CheckCircle2 className="w-5 h-5 text-green-600" />
-                  )}
-                </div>
-                
-                {uploading && (
-                  <div className="flex items-center gap-2">
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <p className="text-xs text-muted-foreground">Uploading...</p>
-                  </div>
-                )}
-                
-                {task.file_path && !uploading && (
-                  <>
-                    {isImageFile(task.file_path) ? (
-                      <div 
-                        className="relative group cursor-pointer"
-                        onClick={() => setShowImagePreview(true)}
-                      >
-                        <img
-                          src={getFileUrl(task.file_path)}
-                          alt={task.field_value || "Uploaded image"}
-                          className="w-full max-w-md rounded-lg border border-green-200 hover:border-green-400 transition-colors"
-                        />
-                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors rounded-lg flex items-center justify-center">
-                          <span className="text-white text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity">
-                            Click to view full size
-                          </span>
-                        </div>
-                      </div>
-                    ) : (
-                      <a
-                        href={getFileUrl(task.file_path)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-2 text-xs text-green-600 hover:text-green-700 hover:underline"
-                      >
-                        <FileText className="w-4 h-4" />
-                        <span>{task.field_value}</span>
-                      </a>
-                    )}
-                  </>
-                )}
-                
-                {!task.file_path && task.field_value !== "N/A" && (
-                  <Button 
-                    type="button"
-                    variant="ghost" 
-                    size="sm"
-                    onClick={() => setShowNAField(true)}
-                    className="h-7 text-xs"
-                  >
-                    Mark as Not Applicable
-                  </Button>
-                )}
-              </>
-            ) : (
+            <TaskFileUpload 
+              taskId={task.id} 
+              onFilesUploaded={() => {
+                setAttachmentsKey(prev => prev + 1);
+                onUpdate();
+              }} 
+            />
+            
+            {/* Mark as N/A option */}
+            {!showNAField && (
+              <Button 
+                type="button"
+                variant="ghost" 
+                size="sm"
+                onClick={() => setShowNAField(true)}
+                className="h-7 text-xs"
+              >
+                Mark as Not Applicable
+              </Button>
+            )}
+            
+            {showNAField && task.field_value !== "N/A" && (
               <div className="space-y-2">
                 <Textarea
                   value={naReason}
