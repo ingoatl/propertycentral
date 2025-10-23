@@ -1,6 +1,10 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
+// Cache admin status to avoid repeated database calls
+let cachedAdminStatus: boolean | null = null;
+let cachedUserId: string | null = null;
+
 export const useAdminCheck = () => {
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -18,6 +22,13 @@ export const useAdminCheck = () => {
         return;
       }
 
+      // Use cached result if it's for the same user
+      if (cachedUserId === user.id && cachedAdminStatus !== null) {
+        setIsAdmin(cachedAdminStatus);
+        setLoading(false);
+        return;
+      }
+
       const { data, error } = await supabase
         .from("user_roles")
         .select("role")
@@ -26,7 +37,14 @@ export const useAdminCheck = () => {
         .maybeSingle();
 
       if (error) throw error;
-      setIsAdmin(!!data);
+      
+      const adminStatus = !!data;
+      
+      // Cache the result
+      cachedUserId = user.id;
+      cachedAdminStatus = adminStatus;
+      
+      setIsAdmin(adminStatus);
     } catch (error) {
       console.error("Error checking admin status:", error);
       setIsAdmin(false);
