@@ -83,16 +83,19 @@ const Visits = () => {
     });
   };
 
-  const calculatePrice = () => {
+  const calculateTotalPrice = () => {
+    const property = properties.find(p => p.id === formData.propertyId);
     const hours = parseFloat(formData.hours) || 0;
-    return hours * HOURLY_RATE;
+    const visitFee = property?.visitPrice || 0;
+    const hourlyCharges = hours * HOURLY_RATE;
+    return visitFee + hourlyCharges;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     const hours = parseFloat(formData.hours);
-    const price = calculatePrice();
+    const totalPrice = calculateTotalPrice();
     
     // Validate with zod
     const validation = visitSchema.safeParse({
@@ -129,7 +132,7 @@ const Visits = () => {
           property_id: formData.propertyId,
           date: currentDate,
           time: currentTime,
-          price,
+          price: totalPrice,
           hours,
           notes: formData.notes || null,
           user_id: user.id,
@@ -153,9 +156,10 @@ const Visits = () => {
 
       // 2. Add hourly charges expense only if hours > 0
       if (hours > 0) {
+        const hourlyCharges = hours * HOURLY_RATE;
         expenses.push({
           property_id: formData.propertyId,
-          amount: price,
+          amount: hourlyCharges,
           date: currentDate,
           purpose: `Hourly charges - ${hours} hour${hours !== 1 ? 's' : ''} @ $${HOURLY_RATE}/hr`,
           category: "Visit Charges",
@@ -250,7 +254,7 @@ const Visits = () => {
                   placeholder="Enter hours (0 if just visiting)"
                 />
               <p className="text-sm text-muted-foreground">
-                Rate: ${HOURLY_RATE}/hour{parseFloat(formData.hours) > 0 ? ` | Hourly Total: $${calculatePrice().toFixed(2)}` : ''}
+                Rate: ${HOURLY_RATE}/hour{parseFloat(formData.hours) > 0 ? ` | Hourly charges: $${(parseFloat(formData.hours) * HOURLY_RATE).toFixed(2)}` : ''} | Total with visit fee: ${calculateTotalPrice().toFixed(2)}
               </p>
             </div>
 
