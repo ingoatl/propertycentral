@@ -41,11 +41,10 @@ export const TaskFilePreview = ({ taskId, onFilesChange }: TaskFilePreviewProps)
 
       setAttachments(data || []);
       
-      // Load preview URLs for images
-      const imageFiles = (data || []).filter(f => f.file_type.startsWith('image/'));
+      // Load preview URLs for images (bucket is private, need signed URLs)
       const urls: Record<string, string> = {};
       
-      for (const file of imageFiles) {
+      for (const file of (data || [])) {
         const { data: urlData } = await supabase.storage
           .from('task-attachments')
           .createSignedUrl(file.file_path, 3600);
@@ -58,6 +57,7 @@ export const TaskFilePreview = ({ taskId, onFilesChange }: TaskFilePreviewProps)
       setImageUrls(urls);
     } catch (error) {
       console.error("Error loading attachments:", error);
+      toast.error("Failed to load attachments");
     } finally {
       setLoading(false);
     }
@@ -154,7 +154,7 @@ export const TaskFilePreview = ({ taskId, onFilesChange }: TaskFilePreviewProps)
                 "hover:ring-2 hover:ring-primary hover:shadow-md cursor-pointer"
               )}>
                 <div className="w-full h-full bg-muted flex items-center justify-center p-2">
-                  {isImage && imageUrls[attachment.id] ? (
+                  {imageUrls[attachment.id] ? (
                     <img
                       src={imageUrls[attachment.id]}
                       alt={attachment.file_name}
@@ -200,14 +200,26 @@ export const TaskFilePreview = ({ taskId, onFilesChange }: TaskFilePreviewProps)
                 </div>
               </div>
 
-              {/* Enlarged preview on hover - only for images */}
-              {hoveredFile === attachment.id && isImage && imageUrls[attachment.id] && (
+              {/* Enlarged preview on hover - for all files with URLs */}
+              {hoveredFile === attachment.id && imageUrls[attachment.id] && (
                 <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] max-w-[90vw] h-[500px] max-h-[90vh] pointer-events-none z-50 hidden lg:block">
-                  <img
-                    src={imageUrls[attachment.id]}
-                    alt={attachment.file_name}
-                    className="w-full h-full object-contain bg-background/95 backdrop-blur-sm border-4 border-primary rounded-lg shadow-2xl"
-                  />
+                  {isImage ? (
+                    <img
+                      src={imageUrls[attachment.id]}
+                      alt={attachment.file_name}
+                      className="w-full h-full object-contain bg-background/95 backdrop-blur-sm border-4 border-primary rounded-lg shadow-2xl"
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-background/95 backdrop-blur-sm border-4 border-primary rounded-lg shadow-2xl flex items-center justify-center p-8">
+                      <div className="text-center">
+                        <FileIconComponent className="w-24 h-24 mx-auto mb-4 text-primary" />
+                        <p className="text-lg font-medium">{attachment.file_name}</p>
+                        <p className="text-sm text-muted-foreground mt-2">
+                          {(attachment.file_size / 1024).toFixed(1)} KB
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

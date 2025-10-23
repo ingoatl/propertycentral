@@ -8,8 +8,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { OnboardingTask, FieldType } from "@/types/onboarding";
-import { TaskFileUpload } from "./TaskFileUpload";
-import { TaskFilePreview } from "./TaskFilePreview";
 
 interface EditTaskDialogProps {
   task: OnboardingTask;
@@ -24,7 +22,6 @@ export const EditTaskDialog = ({ task, open, onOpenChange, onSuccess }: EditTask
   const [fieldType, setFieldType] = useState<FieldType>(task.field_type);
   const [phaseNumber, setPhaseNumber] = useState(task.phase_number.toString());
   const [submitting, setSubmitting] = useState(false);
-  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     if (open) {
@@ -131,17 +128,6 @@ export const EditTaskDialog = ({ task, open, onOpenChange, onSuccess }: EditTask
               </SelectContent>
             </Select>
           </div>
-
-          <TaskFilePreview 
-            key={refreshKey}
-            taskId={task.id} 
-            onFilesChange={() => setRefreshKey(prev => prev + 1)} 
-          />
-          
-          <TaskFileUpload 
-            taskId={task.id} 
-            onFilesUploaded={() => setRefreshKey(prev => prev + 1)} 
-          />
 
           <div className="flex justify-end gap-2">
             <Button
