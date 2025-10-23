@@ -1022,10 +1022,9 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
           taskStatus === "completed" && "bg-green-50/30 border-green-500"
         )}
       >
-        {/* HEADER SECTION - Click to collapse */}
+        {/* HEADER SECTION */}
         <div 
-          className="bg-muted/30 p-4 border-b cursor-pointer hover:bg-muted/50 transition-colors"
-          onClick={() => setIsCollapsed(true)}
+          className="bg-muted/30 p-4 border-b"
         >
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1">
