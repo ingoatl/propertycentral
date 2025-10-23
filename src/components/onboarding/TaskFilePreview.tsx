@@ -134,9 +134,9 @@ export const TaskFilePreview = ({ taskId, onFilesChange }: TaskFilePreviewProps)
   }
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-2 mt-3">
       <h4 className="text-sm font-medium text-muted-foreground">Attachments ({attachments.length})</h4>
-      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2">
+      <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 lg:grid-cols-10 gap-2">
         {attachments.map((attachment) => {
           const isImage = attachment.file_type.startsWith('image/');
           const FileIconComponent = getFileIcon(attachment.file_type);
@@ -151,9 +151,9 @@ export const TaskFilePreview = ({ taskId, onFilesChange }: TaskFilePreviewProps)
               {/* Small preview - always visible */}
               <div className={cn(
                 "aspect-square border border-border rounded-lg overflow-hidden transition-all duration-200",
-                "hover:ring-2 hover:ring-primary hover:shadow-md cursor-pointer"
+                "hover:ring-2 hover:ring-primary hover:shadow-md cursor-pointer w-16 h-16"
               )}>
-                <div className="w-full h-full bg-muted flex items-center justify-center p-2">
+                <div className="w-full h-full bg-muted flex items-center justify-center p-1.5">
                   {isImage && imageUrls[attachment.id] ? (
                     <img
                       src={imageUrls[attachment.id]}
@@ -168,31 +168,37 @@ export const TaskFilePreview = ({ taskId, onFilesChange }: TaskFilePreviewProps)
                     />
                   ) : null}
                   <FileIconComponent className={cn(
-                    "w-6 h-6 text-muted-foreground fallback-icon",
+                    "w-5 h-5 text-muted-foreground fallback-icon",
                     isImage && imageUrls[attachment.id] && "hidden"
                   )} />
                 </div>
 
                 {/* Actions overlay - shows on hover */}
                 <div className="absolute inset-0 bg-black/70 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={() => handleDownload(attachment)}
-                    className="h-6 w-6 p-0"
-                    title="Download"
-                  >
-                    <Download className="w-3 h-3" />
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="destructive"
-                    onClick={() => handleDelete(attachment)}
-                    className="h-6 w-6 p-0"
-                    title="Delete"
-                  >
-                    <X className="w-3 h-3" />
-                  </Button>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDownload(attachment);
+                  }}
+                  className="h-5 w-5 p-0"
+                  title="Download"
+                >
+                  <Download className="w-2.5 h-2.5" />
+                </Button>
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDelete(attachment);
+                  }}
+                  className="h-5 w-5 p-0"
+                  title="Delete"
+                >
+                  <X className="w-2.5 h-2.5" />
+                </Button>
                 </div>
               </div>
 
@@ -210,7 +216,7 @@ export const TaskFilePreview = ({ taskId, onFilesChange }: TaskFilePreviewProps)
 
               {/* Enlarged preview on hover - for all files with URLs */}
               {hoveredFile === attachment.id && imageUrls[attachment.id] && (
-                <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] max-w-[90vw] h-[500px] max-h-[90vh] pointer-events-none z-50 hidden lg:block">
+                <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] max-w-[90vw] h-[400px] max-h-[90vh] pointer-events-none z-50 hidden lg:block">
                   {isImage ? (
                     <img
                       src={imageUrls[attachment.id]}

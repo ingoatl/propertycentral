@@ -62,7 +62,6 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
   const [showUpdateDueDateDialog, setShowUpdateDueDateDialog] = useState(false);
   const [showEditTaskDialog, setShowEditTaskDialog] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(true); // All tasks closed by default
-  const [showImagePreview, setShowImagePreview] = useState(false);
   const [showFAQDialog, setShowFAQDialog] = useState(false);
   const [answeredFAQs, setAnsweredFAQs] = useState<any[]>([]);
   const [showBugDialog, setShowBugDialog] = useState(false);
@@ -154,36 +153,6 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
       setTimeout(() => setCopied(false), 2000);
     }
   };
-
-  const isImageFile = (filePath: string) => {
-    const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.bmp'];
-    return imageExtensions.some(ext => filePath.toLowerCase().endsWith(ext));
-  };
-
-  const [fileUrl, setFileUrl] = useState<string | null>(null);
-
-  useEffect(() => {
-    const loadFileUrl = async () => {
-      if (!task.file_path) {
-        setFileUrl(null);
-        return;
-      }
-
-      try {
-        const { data, error } = await supabase.storage
-          .from('task-attachments')
-          .createSignedUrl(task.file_path, 3600);
-
-        if (error) throw error;
-        setFileUrl(data.signedUrl);
-      } catch (error) {
-        console.error("Error loading file URL:", error);
-        setFileUrl(null);
-      }
-    };
-
-    loadFileUrl();
-  }, [task.file_path]);
 
   const getDisplayValue = () => {
     if (!task.field_value) return "No value entered";
@@ -993,21 +962,6 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
                 >
                   <Bug className="w-3 h-3" />
                 </Button>
-                {task.file_path && isImageFile(task.file_path) && (
-                  <div
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setShowImagePreview(true);
-                    }}
-                    className="cursor-pointer"
-                  >
-                    <img
-                      src={fileUrl || ""}
-                      alt="Uploaded"
-                      className="w-8 h-8 object-cover rounded border"
-                    />
-                  </div>
-                )}
                 {task.due_date && (() => {
                   try {
                     const dueDate = new Date(task.due_date);
@@ -1028,19 +982,6 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
             </div>
           </div>
         </Card>
-
-        {/* Image Preview Dialog */}
-        {task.file_path && isImageFile(task.file_path) && (
-          <Dialog open={showImagePreview} onOpenChange={setShowImagePreview}>
-            <DialogContent className="max-w-4xl">
-              <img
-                src={fileUrl || ""}
-                alt={task.field_value || "Uploaded image"}
-                className="w-full h-auto"
-              />
-            </DialogContent>
-          </Dialog>
-        )}
       </>
     );
   }
@@ -1241,42 +1182,15 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
                     </div>
                   )}
                   
-                  {/* Display uploaded image/file */}
-                  {task.file_path && (
-                    <div className="mt-2">
-                      {isImageFile(task.file_path) ? (
-                        <div 
-                          className="relative group cursor-pointer max-w-md"
-                          onClick={() => setShowImagePreview(true)}
-                        >
-                          <img
-                            src={fileUrl || ""}
-                            alt={task.field_value || "Uploaded image"}
-                            className="w-full rounded-lg border border-border hover:border-primary transition-colors"
-                            onError={(e) => {
-                              console.error("Image failed to load");
-                              e.currentTarget.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3Crect fill='%23ddd' width='100' height='100'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%23999'%3EImage Error%3C/text%3E%3C/svg%3E";
-                            }}
-                          />
-                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors rounded-lg flex items-center justify-center">
-                            <span className="text-white text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity">
-                              Click to view full size
-                            </span>
-                          </div>
-                        </div>
-                      ) : (
-                        <a
-                          href={fileUrl || "#"}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-2 text-xs text-primary hover:underline"
-                        >
-                          <FileText className="w-4 h-4" />
-                          {task.field_value || "View uploaded file"}
-                        </a>
-                      )}
-                    </div>
-                  )}
+                  {/* All file attachments are now handled by TaskFilePreview component */}
+                  <TaskFilePreview 
+                    key={attachmentsKey}
+                    taskId={task.id} 
+                    onFilesChange={() => {
+                      setAttachmentsKey(prev => prev + 1);
+                      onUpdate();
+                    }}
+                  />
                 </div>
               )}
             </div>
@@ -1339,22 +1253,6 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
             />
           )}
         </div>
-
-        {/* Image Preview Dialog for all images */}
-        {task.file_path && isImageFile(task.file_path) && (
-          <Dialog open={showImagePreview} onOpenChange={setShowImagePreview}>
-            <DialogContent className="max-w-4xl">
-              <img
-                src={fileUrl || ""}
-                alt={task.field_value || "Uploaded image"}
-                className="w-full h-auto"
-                onError={(e) => {
-                  console.error("Preview image failed to load");
-                }}
-              />
-            </DialogContent>
-          </Dialog>
-        )}
       </Card>
 
       <PinVerificationDialog
