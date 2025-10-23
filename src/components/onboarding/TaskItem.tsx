@@ -168,7 +168,13 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
       case "file":
         return task.field_value;
       case "date":
-        return format(new Date(task.field_value), "MMM d, yyyy");
+        try {
+          const date = new Date(task.field_value);
+          if (isNaN(date.getTime())) return "Invalid date";
+          return format(date, "MMM d, yyyy");
+        } catch {
+          return "Invalid date";
+        }
       case "checkbox":
         return task.field_value === "true" ? "Yes ✓" : "No";
       case "currency":
