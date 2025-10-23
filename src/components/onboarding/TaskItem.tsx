@@ -160,9 +160,30 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
     return imageExtensions.some(ext => filePath.toLowerCase().endsWith(ext));
   };
 
-  const getFileUrl = (filePath: string) => {
-    return `${import.meta.env.VITE_SUPABASE_URL}/storage/v1/object/public/onboarding-documents/${filePath}`;
-  };
+  const [fileUrl, setFileUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    const loadFileUrl = async () => {
+      if (!task.file_path) {
+        setFileUrl(null);
+        return;
+      }
+
+      try {
+        const { data, error } = await supabase.storage
+          .from('task-attachments')
+          .createSignedUrl(task.file_path, 3600);
+
+        if (error) throw error;
+        setFileUrl(data.signedUrl);
+      } catch (error) {
+        console.error("Error loading file URL:", error);
+        setFileUrl(null);
+      }
+    };
+
+    loadFileUrl();
+  }, [task.file_path]);
 
   const getDisplayValue = () => {
     if (!task.field_value) return "No value entered";
@@ -969,7 +990,7 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
                     className="cursor-pointer"
                   >
                     <img
-                      src={getFileUrl(task.file_path)}
+                      src={fileUrl || ""}
                       alt="Uploaded"
                       className="w-8 h-8 object-cover rounded border"
                     />
@@ -1001,7 +1022,7 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
           <Dialog open={showImagePreview} onOpenChange={setShowImagePreview}>
             <DialogContent className="max-w-4xl">
               <img
-                src={getFileUrl(task.file_path)}
+                src={fileUrl || ""}
                 alt={task.field_value || "Uploaded image"}
                 className="w-full h-auto"
               />
@@ -1217,11 +1238,11 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
                           onClick={() => setShowImagePreview(true)}
                         >
                           <img
-                            src={getFileUrl(task.file_path)}
+                            src={fileUrl || ""}
                             alt={task.field_value || "Uploaded image"}
                             className="w-full rounded-lg border border-border hover:border-primary transition-colors"
                             onError={(e) => {
-                              console.error("Image failed to load:", getFileUrl(task.file_path));
+                              console.error("Image failed to load");
                               e.currentTarget.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3Crect fill='%23ddd' width='100' height='100'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%23999'%3EImage Error%3C/text%3E%3C/svg%3E";
                             }}
                           />
@@ -1233,7 +1254,7 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
                         </div>
                       ) : (
                         <a
-                          href={getFileUrl(task.file_path)}
+                          href={fileUrl || "#"}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="flex items-center gap-2 text-xs text-primary hover:underline"
@@ -1312,11 +1333,11 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
           <Dialog open={showImagePreview} onOpenChange={setShowImagePreview}>
             <DialogContent className="max-w-4xl">
               <img
-                src={getFileUrl(task.file_path)}
+                src={fileUrl || ""}
                 alt={task.field_value || "Uploaded image"}
                 className="w-full h-auto"
                 onError={(e) => {
-                  console.error("Preview image failed to load:", getFileUrl(task.file_path));
+                  console.error("Preview image failed to load");
                 }}
               />
             </DialogContent>
