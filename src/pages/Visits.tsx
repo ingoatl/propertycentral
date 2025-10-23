@@ -154,12 +154,15 @@ const Visits = () => {
       // Create expenses array
       const expenses = [];
 
+      // Build base description with notes if present
+      const notesAddition = formData.notes ? ` - ${formData.notes}` : '';
+
       // 1. Always add visit price expense
       expenses.push({
         property_id: formData.propertyId,
         amount: property.visitPrice,
         date: currentDate,
-        purpose: "Visit fee",
+        purpose: `Visit fee (${formData.visitedBy})${notesAddition}`,
         category: "Visit Charges",
         vendor: "PeachHaus",
         user_id: user.id,
@@ -172,7 +175,7 @@ const Visits = () => {
           property_id: formData.propertyId,
           amount: hourlyCharges,
           date: currentDate,
-          purpose: `Hourly charges - ${hours} hour${hours !== 1 ? 's' : ''} @ $${HOURLY_RATE}/hr`,
+          purpose: `Hourly charges - ${hours} hour${hours !== 1 ? 's' : ''} @ $${HOURLY_RATE}/hr (${formData.visitedBy})${notesAddition}`,
           category: "Visit Charges",
           vendor: "PeachHaus",
           user_id: user.id,
