@@ -991,7 +991,10 @@ const Dashboard = () => {
           </TabsContent>
         )}
 
-        <TabsContent value="tasks" className="mt-6">
+        <TabsContent value="tasks" className="space-y-8 mt-6">
+          {/* Bug Reports & Improvement Requests */}
+          <DashboardBugReportsCard />
+          
           <UserTasksDashboard />
         </TabsContent>
 
