@@ -136,7 +136,7 @@ export const TaskFilePreview = ({ taskId, onFilesChange }: TaskFilePreviewProps)
   return (
     <div className="space-y-2">
       <h4 className="text-sm font-medium text-muted-foreground">Attachments ({attachments.length})</h4>
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-2">
         {attachments.map((attachment) => {
           const isImage = attachment.file_type.startsWith('image/');
           const FileIconComponent = getFileIcon(attachment.file_type);
@@ -144,63 +144,69 @@ export const TaskFilePreview = ({ taskId, onFilesChange }: TaskFilePreviewProps)
           return (
             <div
               key={attachment.id}
-              className={cn(
-                "relative group border border-border rounded-lg overflow-hidden transition-all duration-300",
-                hoveredFile === attachment.id && isImage ? "ring-2 ring-primary shadow-lg scale-105 z-10" : ""
-              )}
+              className="relative group"
               onMouseEnter={() => setHoveredFile(attachment.id)}
               onMouseLeave={() => setHoveredFile(null)}
             >
-              {/* Preview */}
-              <div className="aspect-square bg-muted flex items-center justify-center p-4">
-                {isImage && imageUrls[attachment.id] ? (
-                  <img
-                    src={imageUrls[attachment.id]}
-                    alt={attachment.file_name}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <FileIconComponent className="w-12 h-12 text-muted-foreground" />
-                )}
+              {/* Small preview - always visible */}
+              <div className={cn(
+                "aspect-square border border-border rounded-lg overflow-hidden transition-all duration-200",
+                "hover:ring-2 hover:ring-primary hover:shadow-md cursor-pointer"
+              )}>
+                <div className="w-full h-full bg-muted flex items-center justify-center p-2">
+                  {isImage && imageUrls[attachment.id] ? (
+                    <img
+                      src={imageUrls[attachment.id]}
+                      alt={attachment.file_name}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <FileIconComponent className="w-6 h-6 text-muted-foreground" />
+                  )}
+                </div>
+
+                {/* Actions overlay - shows on hover */}
+                <div className="absolute inset-0 bg-black/70 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => handleDownload(attachment)}
+                    className="h-6 w-6 p-0"
+                    title="Download"
+                  >
+                    <Download className="w-3 h-3" />
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    onClick={() => handleDelete(attachment)}
+                    className="h-6 w-6 p-0"
+                    title="Delete"
+                  >
+                    <X className="w-3 h-3" />
+                  </Button>
+                </div>
               </div>
 
-              {/* File info */}
-              <div className="p-2 bg-card">
-                <p className="text-xs font-medium truncate" title={attachment.file_name}>
-                  {attachment.file_name}
-                </p>
-                <p className="text-xs text-muted-foreground">
+              {/* File name tooltip on hover */}
+              <div className={cn(
+                "absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 bg-popover text-popover-foreground",
+                "text-xs rounded shadow-lg whitespace-nowrap pointer-events-none transition-opacity z-30",
+                "opacity-0 group-hover:opacity-100"
+              )}>
+                <div className="max-w-[200px] truncate">{attachment.file_name}</div>
+                <div className="text-[10px] text-muted-foreground">
                   {(attachment.file_size / 1024).toFixed(1)} KB
-                </p>
+                </div>
               </div>
 
-              {/* Actions overlay */}
-              <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  onClick={() => handleDownload(attachment)}
-                  className="h-8 w-8 p-0"
-                >
-                  <Download className="w-4 h-4" />
-                </Button>
-                <Button
-                  size="sm"
-                  variant="destructive"
-                  onClick={() => handleDelete(attachment)}
-                  className="h-8 w-8 p-0"
-                >
-                  <X className="w-4 h-4" />
-                </Button>
-              </div>
-
-              {/* Enlarged preview on hover */}
+              {/* Enlarged preview on hover - only for images */}
               {hoveredFile === attachment.id && isImage && imageUrls[attachment.id] && (
-                <div className="absolute left-full top-0 ml-2 w-64 h-64 pointer-events-none z-20 hidden lg:block">
+                <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] max-w-[90vw] h-[500px] max-h-[90vh] pointer-events-none z-50 hidden lg:block">
                   <img
                     src={imageUrls[attachment.id]}
                     alt={attachment.file_name}
-                    className="w-full h-full object-contain bg-background border-2 border-primary rounded-lg shadow-2xl"
+                    className="w-full h-full object-contain bg-background/95 backdrop-blur-sm border-4 border-primary rounded-lg shadow-2xl"
                   />
                 </div>
               )}

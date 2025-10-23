@@ -33,6 +33,8 @@ import { TaskRescheduleHistoryLog } from "./TaskRescheduleHistoryLog";
 import { AdminControlsSidebar } from "./AdminControlsSidebar";
 import { AskQuestionDialog } from "@/components/faq/AskQuestionDialog";
 import { SubmitBugDialog } from "@/components/bugs/SubmitBugDialog";
+import { TaskFilePreview } from "./TaskFilePreview";
+import { TaskFileUpload } from "./TaskFileUpload";
 
 interface TaskItemProps {
   task: OnboardingTask;
