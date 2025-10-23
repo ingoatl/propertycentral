@@ -354,7 +354,7 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
 
   const handleDateChange = (newDate: Date | undefined) => {
     setDate(newDate);
-    if (newDate) {
+    if (newDate && !isNaN(newDate.getTime())) {
       autoSave(format(newDate, "yyyy-MM-dd"));
     }
   };
@@ -498,7 +498,7 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
                   )}
                 >
                   <CalendarIcon className="mr-2 h-3.5 w-3.5" />
-                  {date ? format(date, "PPP") : <span>Pick a date</span>}
+                  {date && !isNaN(date.getTime()) ? format(date, "PPP") : <span>Pick a date</span>}
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0">
@@ -1011,12 +1011,20 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
                     />
                   </div>
                 )}
-                {task.due_date && (
-                  <div className="text-xs text-muted-foreground flex items-center gap-1">
-                    <Clock className="w-3 h-3" />
-                    {format(new Date(task.due_date), "MMM d")}
-                  </div>
-                )}
+                {task.due_date && (() => {
+                  try {
+                    const dueDate = new Date(task.due_date);
+                    if (isNaN(dueDate.getTime())) return null;
+                    return (
+                      <div className="text-xs text-muted-foreground flex items-center gap-1">
+                        <Clock className="w-3 h-3" />
+                        {format(dueDate, "MMM d")}
+                      </div>
+                    );
+                  } catch {
+                    return null;
+                  }
+                })()}
                 <TaskStatusBadge status={taskStatus} dueDate={task.due_date} />
                 <ChevronDown className="w-4 h-4 text-muted-foreground" />
               </div>
