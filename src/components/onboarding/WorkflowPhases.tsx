@@ -9,9 +9,10 @@ interface WorkflowPhasesProps {
   onTaskUpdate: () => void;
   searchQuery?: string;
   taskId?: string;
+  showMyTasksOnly?: boolean;
 }
 
-export const WorkflowPhases = ({ projectId, tasks, onTaskUpdate, searchQuery = "", taskId }: WorkflowPhasesProps) => {
+export const WorkflowPhases = ({ projectId, tasks, onTaskUpdate, searchQuery = "", taskId, showMyTasksOnly = false }: WorkflowPhasesProps) => {
   const [expandedPhases, setExpandedPhases] = useState<Set<number>>(new Set());
 
   // Auto-expand phase containing the target task
@@ -63,8 +64,8 @@ export const WorkflowPhases = ({ projectId, tasks, onTaskUpdate, searchQuery = "
         const isHighlighted = highlightedPhases.has(phase.id);
         const shouldExpand = isHighlighted || expandedPhases.has(phase.id);
 
-        // Skip phases with no tasks when searching
-        if (searchQuery && phaseTasks.length === 0) {
+        // Skip phases with no tasks when searching OR when showing "My Tasks" only
+        if ((searchQuery || showMyTasksOnly) && phaseTasks.length === 0) {
           return null;
         }
 

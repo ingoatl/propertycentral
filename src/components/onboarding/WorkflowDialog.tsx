@@ -58,6 +58,15 @@ export const WorkflowDialog = ({ open, onOpenChange, project, propertyId, proper
         if (task.assigned_role_id && userRoleIds.includes(task.assigned_role_id)) {
           return true;
         }
+        
+        // Check phase-level role assignment
+        const taskPhase = ONBOARDING_PHASES.find(p => p.id === task.phase_number);
+        if (!task.assigned_role_id && !task.assigned_to_uuid && taskPhase) {
+          // If task has no specific assignment, check phase-level assignment via supabase
+          // We'll handle this in a separate useEffect to avoid async in filter
+          return false;
+        }
+        
         return false;
       });
     }
@@ -109,7 +118,7 @@ export const WorkflowDialog = ({ open, onOpenChange, project, propertyId, proper
 
       setCurrentUserId(user.id);
 
-      // Get user's role IDs
+      // Get user's role IDs from user_team_roles
       const { data: userRoles } = await supabase
         .from("user_team_roles")
         .select("role_id")
@@ -117,7 +126,16 @@ export const WorkflowDialog = ({ open, onOpenChange, project, propertyId, proper
 
       if (userRoles) {
         setUserRoleIds(userRoles.map(r => r.role_id));
+        console.log("User role IDs:", userRoles.map(r => r.role_id));
       }
+
+      // Also get phase-level role assignments
+      const { data: phaseRoles } = await supabase
+        .from("phase_role_assignments")
+        .select("role_id, phase_number");
+
+      console.log("Current user ID:", user.id);
+      console.log("Phase role assignments:", phaseRoles);
     } catch (error) {
       console.error("Error loading current user:", error);
     }
@@ -360,10 +378,19 @@ export const WorkflowDialog = ({ open, onOpenChange, project, propertyId, proper
                 variant={showMyTasksOnly ? "default" : "outline"}
                 size="sm"
                 onClick={() => setShowMyTasksOnly(!showMyTasksOnly)}
-                className="gap-2 whitespace-nowrap"
+                className="gap-2 whitespace-nowrap min-w-[120px]"
               >
-                {showMyTasksOnly ? <User className="w-4 h-4" /> : <Users className="w-4 h-4" />}
-                {showMyTasksOnly ? "My Tasks" : "All Tasks"}
+                {showMyTasksOnly ? (
+                  <>
+                    <User className="w-4 h-4" />
+                    My Tasks
+                  </>
+                ) : (
+                  <>
+                    <Users className="w-4 h-4" />
+                    All Tasks
+                  </>
+                )}
               </Button>
             </div>
 
@@ -379,11 +406,14 @@ export const WorkflowDialog = ({ open, onOpenChange, project, propertyId, proper
                     onTaskUpdate={handleTaskUpdate}
                     searchQuery={searchQuery}
                     taskId={taskId}
+                    showMyTasksOnly={showMyTasksOnly}
                   />
 
                   {showMyTasksOnly && filteredTasks.length === 0 && !searchQuery && (
                     <div className="py-12 text-center text-muted-foreground">
-                      No tasks assigned to you
+                      <User className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                      <p className="font-medium">No tasks assigned to you</p>
+                      <p className="text-sm mt-2">Switch to "All Tasks" to see all available tasks</p>
                     </div>
                   )}
 
