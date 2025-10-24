@@ -5,8 +5,9 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { OnboardingTask } from "@/types/onboarding";
-import { Loader2, MapPin, User, Lock, Phone, Link as LinkIcon, Mail, Home, Search, DollarSign, AlertCircle, Clock, Heart, Frown, Meh, Zap, Lightbulb } from "lucide-react";
+import { Loader2, MapPin, User, Lock, Phone, Link as LinkIcon, Mail, Home, Search, DollarSign, AlertCircle, Clock, Heart, Frown, Meh, Zap, Lightbulb, Copy, Check } from "lucide-react";
 import { toast } from "sonner";
 
 interface PropertyDetailsModalProps {
@@ -27,6 +28,7 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
   const [searchQuery, setSearchQuery] = useState("");
   const [propertyInfo, setPropertyInfo] = useState<any>(null);
   const [emailInsights, setEmailInsights] = useState<any[]>([]);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
 
   useEffect(() => {
     if (open) {
@@ -157,6 +159,17 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
       return true;
     } catch {
       return text.startsWith('http://') || text.startsWith('https://') || text.startsWith('www.');
+    }
+  };
+
+  const copyToClipboard = async (text: string, fieldName: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedField(fieldName);
+      setTimeout(() => setCopiedField(null), 2000);
+      toast.success(`Copied ${fieldName}`);
+    } catch (error) {
+      toast.error("Failed to copy");
     }
   };
 
@@ -343,32 +356,170 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
                         Property Information
                       </CardTitle>
                     </CardHeader>
-                    <CardContent className="space-y-2">
-                      {propertyInfo.visit_price && (
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2">
-                            <DollarSign className="h-3.5 w-3.5 text-muted-foreground" />
-                            <p className="text-xs font-medium text-muted-foreground">Visit Price</p>
+                    <CardContent className="space-y-3">
+                      {/* Listing URLs First */}
+                      {(() => {
+                        const airbnbTask = tasks.find(t => t.title.toLowerCase().includes('airbnb'));
+                        const vrboTask = tasks.find(t => t.title.toLowerCase().includes('vrbo'));
+                        const directTask = tasks.find(t => t.title.toLowerCase().includes('direct booking'));
+                        
+                        return (airbnbTask?.field_value || vrboTask?.field_value || directTask?.field_value) && (
+                          <div className="pb-3 border-b border-border/50">
+                            <p className="text-xs font-semibold text-muted-foreground mb-2">Listing URLs</p>
+                            <div className="space-y-2">
+                              {airbnbTask?.field_value && (
+                                <div className="flex items-center justify-between gap-2">
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-xs text-muted-foreground">Airbnb</p>
+                                    <a 
+                                      href={airbnbTask.field_value.startsWith('http') ? airbnbTask.field_value : `https://${airbnbTask.field_value}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-xs text-primary hover:underline truncate block"
+                                    >
+                                      {airbnbTask.field_value}
+                                    </a>
+                                  </div>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7 flex-shrink-0"
+                                    onClick={() => copyToClipboard(airbnbTask.field_value!, "Airbnb URL")}
+                                  >
+                                    {copiedField === "Airbnb URL" ? (
+                                      <Check className="h-3.5 w-3.5 text-green-600" />
+                                    ) : (
+                                      <Copy className="h-3.5 w-3.5" />
+                                    )}
+                                  </Button>
+                                </div>
+                              )}
+                              {vrboTask?.field_value && (
+                                <div className="flex items-center justify-between gap-2">
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-xs text-muted-foreground">VRBO</p>
+                                    <a 
+                                      href={vrboTask.field_value.startsWith('http') ? vrboTask.field_value : `https://${vrboTask.field_value}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-xs text-primary hover:underline truncate block"
+                                    >
+                                      {vrboTask.field_value}
+                                    </a>
+                                  </div>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7 flex-shrink-0"
+                                    onClick={() => copyToClipboard(vrboTask.field_value!, "VRBO URL")}
+                                  >
+                                    {copiedField === "VRBO URL" ? (
+                                      <Check className="h-3.5 w-3.5 text-green-600" />
+                                    ) : (
+                                      <Copy className="h-3.5 w-3.5" />
+                                    )}
+                                  </Button>
+                                </div>
+                              )}
+                              {directTask?.field_value && (
+                                <div className="flex items-center justify-between gap-2">
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-xs text-muted-foreground">Direct Booking</p>
+                                    <a 
+                                      href={directTask.field_value.startsWith('http') ? directTask.field_value : `https://${directTask.field_value}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-xs text-primary hover:underline truncate block"
+                                    >
+                                      {directTask.field_value}
+                                    </a>
+                                  </div>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7 flex-shrink-0"
+                                    onClick={() => copyToClipboard(directTask.field_value!, "Direct Booking URL")}
+                                  >
+                                    {copiedField === "Direct Booking URL" ? (
+                                      <Check className="h-3.5 w-3.5 text-green-600" />
+                                    ) : (
+                                      <Copy className="h-3.5 w-3.5" />
+                                    )}
+                                  </Button>
+                                </div>
+                              )}
+                            </div>
                           </div>
-                          <p className="text-sm ml-5 font-semibold text-primary">${propertyInfo.visit_price}</p>
+                        );
+                      })()}
+                      
+                      {propertyInfo.visit_price && (
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <DollarSign className="h-3.5 w-3.5 text-muted-foreground" />
+                              <p className="text-xs font-medium text-muted-foreground">Visit Price</p>
+                            </div>
+                            <p className="text-sm ml-5 font-semibold text-primary">${propertyInfo.visit_price}</p>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 flex-shrink-0"
+                            onClick={() => copyToClipboard(`$${propertyInfo.visit_price}`, "Visit Price")}
+                          >
+                            {copiedField === "Visit Price" ? (
+                              <Check className="h-3.5 w-3.5 text-green-600" />
+                            ) : (
+                              <Copy className="h-3.5 w-3.5" />
+                            )}
+                          </Button>
                         </div>
                       )}
                       {propertyInfo.rental_type && (
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2">
-                            <Home className="h-3.5 w-3.5 text-muted-foreground" />
-                            <p className="text-xs font-medium text-muted-foreground">Rental Type</p>
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <Home className="h-3.5 w-3.5 text-muted-foreground" />
+                              <p className="text-xs font-medium text-muted-foreground">Rental Type</p>
+                            </div>
+                            <p className="text-sm ml-5 capitalize">{propertyInfo.rental_type.replace('_', ' ')}</p>
                           </div>
-                          <p className="text-sm ml-5 capitalize">{propertyInfo.rental_type.replace('_', ' ')}</p>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 flex-shrink-0"
+                            onClick={() => copyToClipboard(propertyInfo.rental_type.replace('_', ' '), "Rental Type")}
+                          >
+                            {copiedField === "Rental Type" ? (
+                              <Check className="h-3.5 w-3.5 text-green-600" />
+                            ) : (
+                              <Copy className="h-3.5 w-3.5" />
+                            )}
+                          </Button>
                         </div>
                       )}
                       {propertyInfo.address && (
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2">
-                            <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
-                            <p className="text-xs font-medium text-muted-foreground">Address</p>
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
+                              <p className="text-xs font-medium text-muted-foreground">Address</p>
+                            </div>
+                            <p className="text-sm ml-5">{propertyInfo.address}</p>
                           </div>
-                          <p className="text-sm ml-5">{propertyInfo.address}</p>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 flex-shrink-0"
+                            onClick={() => copyToClipboard(propertyInfo.address, "Address")}
+                          >
+                            {copiedField === "Address" ? (
+                              <Check className="h-3.5 w-3.5 text-green-600" />
+                            ) : (
+                              <Copy className="h-3.5 w-3.5" />
+                            )}
+                          </Button>
                         </div>
                       )}
                     </CardContent>
@@ -390,38 +541,52 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
                             const valueMatch = searchQuery && item.value.toLowerCase().includes(searchQuery.toLowerCase());
                             
                             return (
-                              <div key={idx} className="space-y-1">
-                                <div className="flex items-center gap-2">
-                                  {Icon && <Icon className="h-3.5 w-3.5 text-muted-foreground" />}
-                                  <p className="text-xs font-medium text-muted-foreground">
-                                    {labelMatch ? (
-                                      <span className="bg-yellow-200 dark:bg-yellow-900">{item.label}</span>
-                                    ) : (
-                                      item.label
-                                    )}
-                                  </p>
-                                </div>
-                                <div className="text-sm ml-5 break-words">
-                                  {isUrl(item.value) ? (
-                                    <a 
-                                      href={item.value.startsWith('http') ? item.value : `https://${item.value}`}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="text-primary hover:underline inline-flex items-center gap-1"
-                                    >
-                                      {valueMatch ? (
-                                        <span className="bg-yellow-200 dark:bg-yellow-900">{item.value}</span>
+                              <div key={idx} className="flex items-center justify-between gap-2 py-1">
+                                <div className="flex-1 min-w-0 space-y-1">
+                                  <div className="flex items-center gap-2">
+                                    {Icon && <Icon className="h-3.5 w-3.5 text-muted-foreground" />}
+                                    <p className="text-xs font-medium text-muted-foreground">
+                                      {labelMatch ? (
+                                        <span className="bg-yellow-200 dark:bg-yellow-900">{item.label}</span>
                                       ) : (
-                                        item.value
+                                        item.label
                                       )}
-                                      <LinkIcon className="h-3 w-3" />
-                                    </a>
-                                  ) : valueMatch ? (
-                                    <span className="bg-yellow-200 dark:bg-yellow-900">{item.value}</span>
-                                  ) : (
-                                    item.value
-                                  )}
+                                    </p>
+                                  </div>
+                                  <div className="text-sm ml-5 break-words">
+                                    {isUrl(item.value) ? (
+                                      <a 
+                                        href={item.value.startsWith('http') ? item.value : `https://${item.value}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-primary hover:underline inline-flex items-center gap-1"
+                                      >
+                                        {valueMatch ? (
+                                          <span className="bg-yellow-200 dark:bg-yellow-900">{item.value}</span>
+                                        ) : (
+                                          item.value
+                                        )}
+                                        <LinkIcon className="h-3 w-3" />
+                                      </a>
+                                    ) : valueMatch ? (
+                                      <span className="bg-yellow-200 dark:bg-yellow-900">{item.value}</span>
+                                    ) : (
+                                      item.value
+                                    )}
+                                  </div>
                                 </div>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7 flex-shrink-0"
+                                  onClick={() => copyToClipboard(item.value, item.label)}
+                                >
+                                  {copiedField === item.label ? (
+                                    <Check className="h-3.5 w-3.5 text-green-600" />
+                                  ) : (
+                                    <Copy className="h-3.5 w-3.5" />
+                                  )}
+                                </Button>
                               </div>
                             );
                           })}
