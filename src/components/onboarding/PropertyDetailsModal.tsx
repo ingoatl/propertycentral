@@ -175,7 +175,6 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
 
   const organizeTasksByCategory = (): CategorizedData => {
     const categories: CategorizedData = {
-      'Property Information': [],
       'Owner Information': [],
       'Access & Codes': [],
       'Property Details': [],
@@ -186,30 +185,8 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
       'Other': [], // Catch-all for uncategorized items
     };
 
-    // Add property info first
-    if (propertyInfo) {
-      if (propertyInfo.visit_price) {
-        categories['Property Information'].push({ 
-          label: 'Visit Price', 
-          value: `$${propertyInfo.visit_price}`,
-          icon: DollarSign 
-        });
-      }
-      if (propertyInfo.rental_type) {
-        categories['Property Information'].push({ 
-          label: 'Rental Type', 
-          value: propertyInfo.rental_type,
-          icon: Home 
-        });
-      }
-      if (propertyInfo.address) {
-        categories['Property Information'].push({ 
-          label: 'Address', 
-          value: propertyInfo.address,
-          icon: MapPin 
-        });
-      }
-    }
+    // Don't add property info here - it's shown in the top card
+    // So we skip adding visit_price, rental_type, and address from propertyInfo
 
     tasks.forEach(task => {
       // Only skip if no field_value AND no description
@@ -237,8 +214,9 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
         } else {
           categories['Property Details'].push({ label: task.title, value, icon: Home });
         }
-      } else if (title.includes('listing') || title.includes('airbnb') || title.includes('vrbo') || title.includes('link') || title.includes('url')) {
-        categories['Listings & Links'].push({ label: task.title, value, icon: LinkIcon });
+      } else if (title.includes('listing') || title.includes('airbnb') || title.includes('vrbo') || title.includes('link') || title.includes('url') || title.includes('direct booking')) {
+        // Skip listing URLs as they're shown in the top Property Information card
+        return;
       } else if (title.includes('cleaner') || title.includes('maintenance') || title.includes('vendor') || title.includes('service')) {
         categories['Service Providers'].push({ label: task.title, value });
       } else if (title.includes('utility') || title.includes('electric') || title.includes('water') || title.includes('gas') || title.includes('account')) {
@@ -424,7 +402,7 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
                               {directTask?.field_value && (
                                 <div className="flex items-center justify-between gap-2">
                                   <div className="flex-1 min-w-0">
-                                    <p className="text-xs text-muted-foreground">Direct Booking</p>
+                                    <p className="text-xs text-muted-foreground">Direct Booking Website</p>
                                     <a 
                                       href={directTask.field_value.startsWith('http') ? directTask.field_value : `https://${directTask.field_value}`}
                                       target="_blank"
