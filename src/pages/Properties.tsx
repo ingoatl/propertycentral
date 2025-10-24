@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import { z } from "zod";
 import { useAdminCheck } from "@/hooks/useAdminCheck";
 import { Badge } from "@/components/ui/badge";
+import { BulkUpdateListingURLs } from "@/components/onboarding/BulkUpdateListingURLs";
 
 const propertySchema = z.object({
   name: z.string().trim().min(1, "Name is required").max(200, "Name must be less than 200 characters"),
@@ -568,10 +569,13 @@ const Properties = () => {
           <h1 className="text-4xl font-bold bg-gradient-primary bg-clip-text text-transparent">Properties</h1>
           <p className="text-muted-foreground mt-1">Manage your property portfolio</p>
         </div>
-        <Button onClick={() => setShowForm(!showForm)} className="gap-2 shadow-warm hover:scale-105 transition-transform">
-          <Plus className="w-4 h-4" />
-          Add Property
-        </Button>
+        <div className="flex gap-2">
+          {isAdmin && <BulkUpdateListingURLs />}
+          <Button onClick={() => setShowForm(!showForm)} className="gap-2 shadow-warm hover:scale-105 transition-transform">
+            <Plus className="w-4 h-4" />
+            Add Property
+          </Button>
+        </div>
       </div>
 
       <div className="flex flex-col sm:flex-row gap-3">
