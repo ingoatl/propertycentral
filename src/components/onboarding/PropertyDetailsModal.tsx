@@ -358,7 +358,7 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
                         const directTask = tasks.find(t => {
                           const title = t.title.toLowerCase();
                           return title === 'direct booking website' || 
-                                 title.includes('direct booking') && title.includes('website');
+                                 (title.includes('direct') && title.includes('booking') && title.includes('website'));
                         });
                         
                         return (airbnbTask?.field_value || vrboTask?.field_value || directTask?.field_value) && (
