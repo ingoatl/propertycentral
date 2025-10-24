@@ -158,6 +158,17 @@ export const PhaseCard = ({
         <CollapsibleContent>
           <CardContent className="space-y-2 pt-0">
             {tasks
+              .filter((task) => {
+                // Admin-only tasks: hide from non-admins
+                const adminOnlyTasks = [
+                  'Signed Management Agreement Link',
+                  'ACH Details'
+                ];
+                if (!isAdmin && adminOnlyTasks.includes(task.title)) {
+                  return false;
+                }
+                return true;
+              })
               .sort((a, b) => {
                 // Define priority order based on title keywords
                 const getPriority = (title: string) => {
