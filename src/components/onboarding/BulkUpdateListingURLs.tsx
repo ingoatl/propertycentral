@@ -130,7 +130,7 @@ export const BulkUpdateListingURLs = () => {
           .from("onboarding_tasks")
           .select("id, title, field_value, status")
           .eq("project_id", projectId)
-          .or("title.ilike.%Airbnb%URL%,title.ilike.%Airbnb%Link%");
+          .ilike("title", "%Airbnb%");
 
         console.log(`Found ${airbnbTasks?.length || 0} Airbnb URL tasks`);
         
@@ -163,7 +163,7 @@ export const BulkUpdateListingURLs = () => {
           .from("onboarding_tasks")
           .select("id, title, field_value, status")
           .eq("project_id", projectId)
-          .or("title.ilike.%VRBO%URL%,title.ilike.%VRBO%Link%");
+          .ilike("title", "%VRBO%");
 
         console.log(`Found ${vrboTasks?.length || 0} VRBO URL tasks`);
 
