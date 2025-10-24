@@ -106,6 +106,9 @@ const Dashboard = () => {
         'canadian way': { address: '3708 Canadian Way, Tucker, GA 30084', managementFee: 0.20 },
         'canadian way haven': { address: '3708 Canadian Way, Tucker, GA 30084', managementFee: 0.20 },
         '3708': { address: '3708 Canadian Way, Tucker, GA 30084', managementFee: 0.20 },
+        
+        // Muirfield
+        'muirfield': { address: 'Muirfield Address', managementFee: 0.20 },
       };
 
       // Known unmanaged property addresses
@@ -559,7 +562,7 @@ const Dashboard = () => {
       </div>
 
       {/* Main Tabs */}
-      <Tabs defaultValue={isAdmin ? "overview" : "tasks"} className="w-full">
+      <Tabs defaultValue="tasks" className="w-full">
         <TabsList className="grid w-full grid-cols-3">
           {isAdmin && (
             <TabsTrigger value="overview" className="gap-2">
