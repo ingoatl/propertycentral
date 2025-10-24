@@ -1,5 +1,6 @@
 import { OverdueTasksCard } from "./OverdueTasksCard";
 import { ActiveTasksModal } from "./ActiveTasksModal";
+import { EnhancedTeamPerformance } from "./EnhancedTeamPerformance";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -16,6 +17,16 @@ interface TaskStats {
   recentlyCompleted: OnboardingTask[];
 }
 
+interface TeamMember {
+  name: string;
+  roleName?: string;
+  phases?: number[];
+  tasksCompleted: number;
+  tasksTotal: number;
+  completionRate: number;
+  properties?: string[];
+}
+
 export const UserTasksDashboard = () => {
   const navigate = useNavigate();
   const [stats, setStats] = useState<TaskStats>({
@@ -27,6 +38,9 @@ export const UserTasksDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [showActiveTasksModal, setShowActiveTasksModal] = useState(false);
   const [allActiveTasks, setAllActiveTasks] = useState<OnboardingTask[]>([]);
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
+  const [totalTasks, setTotalTasks] = useState(0);
+  const [completedTasks, setCompletedTasks] = useState(0);
 
   const loadTaskStats = async () => {
     try {
@@ -182,10 +196,105 @@ export const UserTasksDashboard = () => {
         upcomingTasks: (upcomingData as OnboardingTask[]) || [],
         recentlyCompleted: (completedData as OnboardingTask[]) || [],
       });
+
+      // Load team performance data
+      await loadTeamData();
     } catch (error) {
       console.error("Error loading task stats:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadTeamData = async () => {
+    try {
+      const { data: tasks } = await supabase
+        .from("onboarding_tasks")
+        .select(`
+          id,
+          status,
+          phase_number,
+          assigned_role_id,
+          project_id,
+          onboarding_projects!inner(property_address)
+        `);
+
+      const { data: userRoles } = await supabase
+        .from("user_team_roles")
+        .select(`
+          user_id,
+          role_id,
+          profiles!inner(first_name, id),
+          team_roles!inner(role_name, id)
+        `);
+
+      const { data: phaseRoles } = await supabase
+        .from("phase_role_assignments")
+        .select("phase_number, role_id");
+
+      if (!tasks || !userRoles) return;
+
+      const roleMap = new Map<string, { name: string; roleName: string; phases: Set<number>; properties: Set<string> }>();
+
+      userRoles.forEach((ur: any) => {
+        const key = `${ur.user_id}-${ur.role_id}`;
+        const phases = phaseRoles?.filter(pr => pr.role_id === ur.role_id).map(pr => pr.phase_number) || [];
+        
+        roleMap.set(key, {
+          name: ur.profiles.first_name || "Unknown",
+          roleName: ur.team_roles.role_name,
+          phases: new Set(phases),
+          properties: new Set()
+        });
+      });
+
+      const memberStats = new Map<string, { completed: number; total: number }>();
+
+      tasks.forEach((task: any) => {
+        if (!task.assigned_role_id) return;
+
+        const matchingRoles = userRoles.filter((ur: any) => ur.role_id === task.assigned_role_id);
+        const propertyAddress = task.onboarding_projects?.property_address;
+
+        matchingRoles.forEach((ur: any) => {
+          const key = `${ur.user_id}-${ur.role_id}`;
+          const member = roleMap.get(key);
+          if (member && propertyAddress) {
+            member.properties.add(propertyAddress);
+          }
+
+          if (!memberStats.has(key)) {
+            memberStats.set(key, { completed: 0, total: 0 });
+          }
+          const stats = memberStats.get(key)!;
+          stats.total += 1 / matchingRoles.length;
+          if (task.status === "completed") {
+            stats.completed += 1 / matchingRoles.length;
+          }
+        });
+      });
+
+      const members: TeamMember[] = Array.from(roleMap.entries()).map(([key, data]) => {
+        const stats = memberStats.get(key) || { completed: 0, total: 0 };
+        return {
+          name: data.name,
+          roleName: data.roleName,
+          phases: Array.from(data.phases),
+          tasksCompleted: Math.round(stats.completed),
+          tasksTotal: Math.round(stats.total),
+          completionRate: stats.total > 0 ? (stats.completed / stats.total) * 100 : 0,
+          properties: Array.from(data.properties)
+        };
+      });
+
+      const totalTasksCount = tasks.length;
+      const completedTasksCount = tasks.filter((t: any) => t.status === "completed").length;
+
+      setTeamMembers(members);
+      setTotalTasks(totalTasksCount);
+      setCompletedTasks(completedTasksCount);
+    } catch (error) {
+      console.error("Error loading team data:", error);
     }
   };
 
@@ -360,6 +469,15 @@ export const UserTasksDashboard = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* Team Performance */}
+      {teamMembers.length > 0 && (
+        <EnhancedTeamPerformance
+          teamMembers={teamMembers}
+          totalTasks={totalTasks}
+          completedTasks={completedTasks}
+        />
+      )}
 
       {/* Active Tasks Modal */}
       <ActiveTasksModal

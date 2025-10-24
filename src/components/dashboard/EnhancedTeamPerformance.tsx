@@ -24,21 +24,13 @@ interface EnhancedTeamPerformanceProps {
 export const EnhancedTeamPerformance = ({ teamMembers, totalTasks, completedTasks }: EnhancedTeamPerformanceProps) => {
   const overallCompletionRate = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0;
   
-  // Sort by tasks completed first, then completion rate for ties
-  const sortedMembers = [...teamMembers].sort((a, b) => {
-    if (b.tasksCompleted !== a.tasksCompleted) {
-      return b.tasksCompleted - a.tasksCompleted;
-    }
-    return b.completionRate - a.completionRate;
-  });
+  // Filter out Unassigned and sort by tasks completed first
+  const filteredMembers = teamMembers.filter(m => m.name !== "Unassigned");
+  const sortedMembers = [...filteredMembers].sort((a, b) => b.tasksCompleted - a.tasksCompleted);
   const topPerformer = sortedMembers[0];
 
-  const getPerformanceBadge = (rate: number) => {
-    if (rate >= 90) return { label: "Excellent", variant: "default" as const, color: "text-green-600" };
-    if (rate >= 70) return { label: "Good", variant: "secondary" as const, color: "text-blue-600" };
-    if (rate >= 50) return { label: "Average", variant: "outline" as const, color: "text-yellow-600" };
-    return { label: "Needs Improvement", variant: "destructive" as const, color: "text-red-600" };
-  };
+  // Calculate tasks per week (assuming 4 weeks tracking period)
+  const getTasksPerWeek = (completed: number) => (completed / 4).toFixed(1);
 
   return (
     <Card className="border-border/50">
@@ -146,7 +138,7 @@ export const EnhancedTeamPerformance = ({ teamMembers, totalTasks, completedTask
           ) : (
             <div className="space-y-4">
               {sortedMembers.map((member, index) => {
-                const badge = getPerformanceBadge(member.completionRate);
+                const tasksPerWeek = getTasksPerWeek(member.tasksCompleted);
                 return (
                   <div key={index} className="space-y-3 p-3 rounded-lg border border-border/50 hover:bg-muted/30 transition-colors">
                     <div className="flex items-center justify-between">
@@ -168,14 +160,6 @@ export const EnhancedTeamPerformance = ({ teamMembers, totalTasks, completedTask
                               Phases: {member.phases.sort((a, b) => a - b).join(", ")}
                             </p>
                           )}
-                          <div className="flex items-center gap-2 mt-1">
-                            <Badge variant={badge.variant} className="text-xs">
-                              {badge.label}
-                            </Badge>
-                            <span className="text-xs text-muted-foreground">
-                              {member.tasksCompleted}/{member.tasksTotal} tasks
-                            </span>
-                          </div>
                           {member.properties && member.properties.length > 0 && (
                             <div className="mt-1.5 flex flex-wrap gap-1">
                               {member.properties.slice(0, 2).map((property, idx) => (
@@ -193,10 +177,18 @@ export const EnhancedTeamPerformance = ({ teamMembers, totalTasks, completedTask
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className={`text-lg font-bold ${badge.color}`}>
-                          {member.completionRate.toFixed(0)}%
+                        <p className="text-2xl font-bold text-primary">
+                          {member.tasksCompleted}
+                        </p>
+                        <p className="text-xs text-muted-foreground">tasks completed</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {tasksPerWeek}/week
                         </p>
                       </div>
+                    </div>
+                    <div className="flex items-center justify-between text-xs text-muted-foreground mt-2">
+                      <span>Total: {member.tasksTotal} tasks</span>
+                      <span className="font-medium">{member.completionRate.toFixed(0)}% complete</span>
                     </div>
                     <Progress value={member.completionRate} className="h-2" />
                   </div>
@@ -209,18 +201,20 @@ export const EnhancedTeamPerformance = ({ teamMembers, totalTasks, completedTask
         {/* Performance Summary */}
         <div className="grid grid-cols-2 gap-3 pt-4 border-t border-border/50">
           <div className="text-center p-3 rounded-lg bg-muted/30">
-            <p className="text-xs text-muted-foreground mb-1">Avg Completion</p>
+            <p className="text-xs text-muted-foreground mb-1">Total Completed</p>
             <p className="text-lg font-bold">
-              {teamMembers.length > 0 
-                ? (teamMembers.reduce((sum, m) => sum + m.completionRate, 0) / teamMembers.length).toFixed(0)
-                : 0}%
+              {filteredMembers.reduce((sum, m) => sum + m.tasksCompleted, 0)}
             </p>
+            <p className="text-xs text-muted-foreground mt-0.5">tasks</p>
           </div>
           <div className="text-center p-3 rounded-lg bg-muted/30">
-            <p className="text-xs text-muted-foreground mb-1">High Performers</p>
+            <p className="text-xs text-muted-foreground mb-1">Avg Per Week</p>
             <p className="text-lg font-bold">
-              {teamMembers.filter(m => m.completionRate >= 90).length}/{teamMembers.length}
+              {filteredMembers.length > 0 
+                ? (filteredMembers.reduce((sum, m) => sum + m.tasksCompleted, 0) / filteredMembers.length / 4).toFixed(1)
+                : 0}
             </p>
+            <p className="text-xs text-muted-foreground mt-0.5">tasks/member</p>
           </div>
         </div>
       </CardContent>
