@@ -116,24 +116,44 @@ export const AdminDashboard = ({ summaries, onExport, onSync, syncing, onSendOve
     try {
       const { data: tasks } = await supabase
         .from("onboarding_tasks")
-        .select("assigned_to, status");
+        .select(`
+          assigned_to, 
+          status,
+          project_id,
+          onboarding_projects (
+            property_address
+          )
+        `);
 
       if (tasks) {
         const memberStats = tasks.reduce((acc, task) => {
           const name = task.assigned_to || "Unassigned";
           if (!acc[name]) {
-            acc[name] = { name, tasksCompleted: 0, tasksTotal: 0, completionRate: 0 };
+            acc[name] = { 
+              name, 
+              tasksCompleted: 0, 
+              tasksTotal: 0, 
+              completionRate: 0,
+              properties: new Set<string>()
+            };
           }
           acc[name].tasksTotal++;
           if (task.status === "completed") {
             acc[name].tasksCompleted++;
           }
+          // Add property address if available
+          if (task.onboarding_projects?.property_address) {
+            acc[name].properties.add(task.onboarding_projects.property_address);
+          }
           return acc;
         }, {} as Record<string, any>);
 
         const members = Object.values(memberStats).map((m: any) => ({
-          ...m,
+          name: m.name,
+          tasksCompleted: m.tasksCompleted,
+          tasksTotal: m.tasksTotal,
           completionRate: m.tasksTotal > 0 ? (m.tasksCompleted / m.tasksTotal) * 100 : 0,
+          properties: Array.from(m.properties),
         }));
 
         const totalTasks = tasks.length;

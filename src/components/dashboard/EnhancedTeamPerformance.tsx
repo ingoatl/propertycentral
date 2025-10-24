@@ -10,6 +10,7 @@ interface TeamMember {
   completionRate: number;
   overdueTasks?: number;
   avgResponseTime?: number;
+  properties?: string[]; // Property addresses
 }
 
 interface EnhancedTeamPerformanceProps {
@@ -21,8 +22,13 @@ interface EnhancedTeamPerformanceProps {
 export const EnhancedTeamPerformance = ({ teamMembers, totalTasks, completedTasks }: EnhancedTeamPerformanceProps) => {
   const overallCompletionRate = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0;
   
-  // Sort by completion rate and get top performers
-  const sortedMembers = [...teamMembers].sort((a, b) => b.completionRate - a.completionRate);
+  // Sort by tasks completed first, then completion rate for ties
+  const sortedMembers = [...teamMembers].sort((a, b) => {
+    if (b.tasksCompleted !== a.tasksCompleted) {
+      return b.tasksCompleted - a.tasksCompleted;
+    }
+    return b.completionRate - a.completionRate;
+  });
   const topPerformer = sortedMembers[0];
 
   const getPerformanceBadge = (rate: number) => {
@@ -78,19 +84,36 @@ export const EnhancedTeamPerformance = ({ teamMembers, totalTasks, completedTask
         {/* Top Performer Highlight */}
         {topPerformer && (
           <div className="p-4 rounded-lg bg-gradient-to-r from-primary/10 to-primary/5 border border-primary/20">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 mb-2">
               <div className="rounded-full bg-primary/20 p-2">
                 <Trophy className="h-5 w-5 text-primary" />
               </div>
               <div className="flex-1">
-                <p className="text-sm font-medium text-muted-foreground">Top Performer</p>
+                <p className="text-sm font-medium text-muted-foreground">Best Performer - Most Tasks Completed</p>
                 <p className="text-lg font-bold">{topPerformer.name}</p>
               </div>
               <div className="text-right">
-                <p className="text-2xl font-bold text-primary">{topPerformer.completionRate.toFixed(0)}%</p>
-                <p className="text-xs text-muted-foreground">{topPerformer.tasksCompleted}/{topPerformer.tasksTotal} tasks</p>
+                <p className="text-2xl font-bold text-primary">{topPerformer.tasksCompleted}</p>
+                <p className="text-xs text-muted-foreground">tasks completed</p>
               </div>
             </div>
+            {topPerformer.properties && topPerformer.properties.length > 0 && (
+              <div className="mt-2 pt-2 border-t border-primary/20">
+                <p className="text-xs text-muted-foreground mb-1">Working on:</p>
+                <div className="flex flex-wrap gap-1">
+                  {topPerformer.properties.slice(0, 3).map((property, idx) => (
+                    <Badge key={idx} variant="outline" className="text-xs">
+                      {property}
+                    </Badge>
+                  ))}
+                  {topPerformer.properties.length > 3 && (
+                    <Badge variant="outline" className="text-xs">
+                      +{topPerformer.properties.length - 3} more
+                    </Badge>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -117,7 +140,7 @@ export const EnhancedTeamPerformance = ({ teamMembers, totalTasks, completedTask
                         <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary font-semibold text-sm">
                           {index + 1}
                         </div>
-                        <div>
+                        <div className="flex-1">
                           <span className="text-sm font-medium text-foreground">{member.name}</span>
                           <div className="flex items-center gap-2 mt-1">
                             <Badge variant={badge.variant} className="text-xs">
@@ -127,6 +150,20 @@ export const EnhancedTeamPerformance = ({ teamMembers, totalTasks, completedTask
                               {member.tasksCompleted}/{member.tasksTotal} tasks
                             </span>
                           </div>
+                          {member.properties && member.properties.length > 0 && (
+                            <div className="mt-1.5 flex flex-wrap gap-1">
+                              {member.properties.slice(0, 2).map((property, idx) => (
+                                <span key={idx} className="text-xs text-muted-foreground/80 bg-muted/50 px-1.5 py-0.5 rounded">
+                                  {property}
+                                </span>
+                              ))}
+                              {member.properties.length > 2 && (
+                                <span className="text-xs text-muted-foreground/80">
+                                  +{member.properties.length - 2}
+                                </span>
+                              )}
+                            </div>
+                          )}
                         </div>
                       </div>
                       <div className="text-right">
