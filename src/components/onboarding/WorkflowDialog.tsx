@@ -10,6 +10,7 @@ import { ONBOARDING_PHASES } from "@/context/onboardingPhases";
 import { InspectionCard } from "./InspectionCard";
 import { Input } from "@/components/ui/input";
 import { Search, Building2, DollarSign, User, Users } from "lucide-react";
+import { useAdminCheck } from "@/hooks/useAdminCheck";
 
 interface WorkflowDialogProps {
   open: boolean;
@@ -29,10 +30,11 @@ export const WorkflowDialog = ({ open, onOpenChange, project, propertyId, proper
   const [searchQuery, setSearchQuery] = useState("");
   const [filteredTasks, setFilteredTasks] = useState<OnboardingTask[]>([]);
   const [creatingProject, setCreatingProject] = useState(false);
-  const [showMyTasksOnly, setShowMyTasksOnly] = useState(false);
+  const [showMyTasksOnly, setShowMyTasksOnly] = useState(true);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [userRoleIds, setUserRoleIds] = useState<string[]>([]);
   const [phaseToRoleMap, setPhaseToRoleMap] = useState<Map<number, string>>(new Map());
+  const { isAdmin } = useAdminCheck();
 
   useEffect(() => {
     loadCurrentUser();
@@ -46,8 +48,16 @@ export const WorkflowDialog = ({ open, onOpenChange, project, propertyId, proper
   }, [open, project?.id]);
 
   useEffect(() => {
-    // Filter tasks based on search query and "my tasks" filter
+    // Filter tasks based on search query, "my tasks" filter, and admin status
     let filtered = tasks;
+
+    // Filter admin-only tasks if user is not admin
+    if (!isAdmin) {
+      filtered = filtered.filter(task => {
+        const isAdminOnly = task.description?.includes("(Admin Only)");
+        return !isAdminOnly;
+      });
+    }
 
     // Apply "my tasks" filter
     if (showMyTasksOnly && currentUserId) {
@@ -88,7 +98,7 @@ export const WorkflowDialog = ({ open, onOpenChange, project, propertyId, proper
     }
 
     setFilteredTasks(filtered);
-  }, [searchQuery, tasks, showMyTasksOnly, currentUserId, userRoleIds, phaseToRoleMap]);
+  }, [searchQuery, tasks, showMyTasksOnly, currentUserId, userRoleIds, phaseToRoleMap, isAdmin]);
 
   useEffect(() => {
     // When dialog closes, update parent to refresh progress
