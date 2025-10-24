@@ -45,11 +45,13 @@ export function PropertyMasterModal({
     try {
       setLoading(true);
       
-      // Load all tasks for the project
+      // Load all tasks for the project that have values
       const { data: tasksData, error: tasksError } = await supabase
         .from('onboarding_tasks')
         .select('*')
         .eq('project_id', projectId)
+        .not('field_value', 'is', null)
+        .neq('field_value', '')
         .order('phase_number', { ascending: true });
 
       if (tasksError) throw tasksError;

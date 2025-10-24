@@ -224,14 +224,25 @@ export const WorkflowDialog = ({ open, onOpenChange, project, propertyId, proper
     // Fetch fresh task data to calculate accurate progress
     const { data: freshTasks } = await supabase
       .from("onboarding_tasks")
-      .select("status")
+      .select("status, field_value")
       .eq("project_id", project.id);
 
     if (!freshTasks) return;
 
     const totalTasks = freshTasks.length;
-    const completedTasks = freshTasks.filter(t => t.status === "completed").length;
-    const progress = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0;
+    
+    // Count tasks that are either completed OR have data filled in
+    const uniqueProgressTasks = new Set([
+      ...freshTasks.filter(t => t.status === "completed").map((_, i) => `completed-${i}`),
+      ...freshTasks.filter(t => t.field_value && t.field_value.trim() !== "").map((_, i) => `data-${i}`)
+    ]).size;
+    
+    // More accurate: count tasks that are completed OR have field_value
+    const tasksWithProgress = freshTasks.filter(
+      t => t.status === "completed" || (t.field_value && t.field_value.trim() !== "")
+    ).length;
+    
+    const progress = totalTasks > 0 ? (tasksWithProgress / totalTasks) * 100 : 0;
 
     const { error } = await supabase
       .from("onboarding_projects")

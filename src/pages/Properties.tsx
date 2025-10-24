@@ -115,7 +115,7 @@ const Properties = () => {
 
   const loadPropertyProjects = async () => {
     try {
-      const { data, error } = await supabase
+      const { data: projects, error } = await supabase
         .from("onboarding_projects")
         .select("id, property_id, progress")
         .order("created_at", { ascending: false });
@@ -125,12 +125,39 @@ const Properties = () => {
       const projectMap: Record<string, string> = {};
       const progressMap: Record<string, number> = {};
       
-      data?.forEach(project => {
+      // For each project, recalculate progress based on tasks with data
+      for (const project of projects || []) {
         if (project.property_id && !projectMap[project.property_id]) {
           projectMap[project.property_id] = project.id;
-          progressMap[project.property_id] = project.progress || 0;
+          
+          // Fetch tasks to calculate real-time progress
+          const { data: tasks } = await supabase
+            .from("onboarding_tasks")
+            .select("status, field_value")
+            .eq("project_id", project.id);
+          
+          if (tasks && tasks.length > 0) {
+            const tasksWithProgress = tasks.filter(
+              t => t.status === "completed" || (t.field_value && t.field_value.trim() !== "")
+            ).length;
+            const calculatedProgress = (tasksWithProgress / tasks.length) * 100;
+            progressMap[project.property_id] = calculatedProgress;
+            
+            // Update the project progress in the database if it changed
+            if (Math.abs(calculatedProgress - (project.progress || 0)) > 0.1) {
+              await supabase
+                .from("onboarding_projects")
+                .update({ 
+                  progress: calculatedProgress,
+                  status: calculatedProgress === 100 ? "completed" : calculatedProgress > 0 ? "in-progress" : "pending"
+                })
+                .eq("id", project.id);
+            }
+          } else {
+            progressMap[project.property_id] = project.progress || 0;
+          }
         }
-      });
+      }
       
       setPropertyProjects(projectMap);
       setPropertyProjectsProgress(progressMap);
@@ -352,7 +379,18 @@ const Properties = () => {
       className="shadow-card hover:shadow-warm transition-all duration-300 border-border/50 overflow-hidden group"
       style={{ animationDelay: `${index * 0.05}s` }}
     >
-      <div className="relative w-full aspect-[16/9] bg-muted overflow-hidden">
+      <div 
+        className="relative w-full aspect-[16/9] bg-muted overflow-hidden cursor-pointer"
+        onClick={() => {
+          if (propertyProjects[property.id]) {
+            setSelectedPropertyForDetails({
+              id: property.id,
+              name: property.name,
+              projectId: propertyProjects[property.id]
+            });
+          }
+        }}
+      >
         {property.image_path ? (
           <img 
             src={property.image_path} 
@@ -365,7 +403,7 @@ const Properties = () => {
           </div>
         )}
         
-        <div className="absolute top-1.5 right-1.5">
+        <div className="absolute top-1.5 right-1.5" onClick={(e) => e.stopPropagation()}>
           <label htmlFor={`upload-${property.id}`} className="cursor-pointer">
             <Button
               type="button"
@@ -375,6 +413,7 @@ const Properties = () => {
               disabled={uploadingImage === property.id}
               onClick={(e) => {
                 e.preventDefault();
+                e.stopPropagation();
                 document.getElementById(`upload-${property.id}`)?.click();
               }}
             >
@@ -394,12 +433,15 @@ const Properties = () => {
           />
         </div>
 
-        <div className="absolute top-1.5 left-1.5 flex gap-1.5">
+        <div className="absolute top-1.5 left-1.5 flex gap-1.5" onClick={(e) => e.stopPropagation()}>
           <Button
             variant="secondary"
             size="icon"
             className="h-7 w-7 shadow-lg backdrop-blur-sm bg-background/80 hover:bg-background/90"
-            onClick={() => handleEdit(property)}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleEdit(property);
+            }}
           >
             <Edit className="w-3 h-3" />
           </Button>
@@ -408,7 +450,10 @@ const Properties = () => {
               variant="secondary"
               size="icon"
               className="h-7 w-7 shadow-lg backdrop-blur-sm bg-background/80 hover:bg-destructive hover:text-destructive-foreground"
-              onClick={() => handleDelete(property.id)}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleDelete(property.id);
+              }}
             >
               <Trash2 className="w-3 h-3" />
             </Button>
