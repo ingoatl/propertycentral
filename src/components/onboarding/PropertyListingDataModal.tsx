@@ -79,8 +79,10 @@ export const PropertyListingDataModal = ({
   const loadListingData = async () => {
     setLoading(true);
     try {
+      console.log("Loading listing data for property:", propertyId);
+      
       // Get the project ID for this property (use maybeSingle to avoid errors)
-      const { data: projects } = await supabase
+      const { data: projects, error: projectError } = await supabase
         .from("onboarding_projects")
         .select("id")
         .eq("property_id", propertyId)
@@ -88,24 +90,31 @@ export const PropertyListingDataModal = ({
         .limit(1)
         .maybeSingle();
 
+      console.log("Projects query result:", { projects, projectError });
+
       if (!projects) {
+        console.error("No project found for property:", propertyId);
         toast.error("No onboarding project found for this property");
         setLoading(false);
         return;
       }
 
       // Fetch all onboarding tasks
-      const { data: tasks } = await supabase
+      const { data: tasks, error: tasksError } = await supabase
         .from("onboarding_tasks")
         .select("title, field_value")
         .eq("project_id", projects.id);
 
+      console.log("Tasks query result:", { taskCount: tasks?.length, tasksError });
+
       // Fetch property data from comprehensive view
-      const { data: propertyData } = await supabase
+      const { data: propertyData, error: propertyError } = await supabase
         .from("comprehensive_property_data")
         .select("*")
         .eq("id", propertyId)
         .maybeSingle();
+
+      console.log("Property data result:", { propertyData, propertyError });
 
       // Helper function to get task value
       const getTaskValue = (title: string) => {
@@ -129,7 +138,7 @@ export const PropertyListingDataModal = ({
         bathrooms: propertyData?.bathrooms?.toString() || getTaskValue("Bathrooms"),
         sqft: propertyData?.sqft?.toString() || getTaskValue("Square Footage"),
         
-        petsAllowed: propertyData?.pets_allowed ? "Yes" : "No",
+        petsAllowed: getTaskValue("Pets Allowed") || (propertyData?.pets_allowed ? "Yes" : "No"),
         petRules: propertyData?.pet_rules || getTaskValue("Pet Rules"),
         maxPets: propertyData?.max_pets?.toString() || getTaskValue("Maximum Number of Pets"),
         maxPetWeight: propertyData?.max_pet_weight?.toString() || getTaskValue("Maximum Pet Weight (lbs)"),
@@ -154,6 +163,7 @@ export const PropertyListingDataModal = ({
         listingDescriptions: getTaskValue("Digital guidebook published") || ""
       };
 
+      console.log("Built listing data:", data);
       setListingData(data);
     } catch (error) {
       console.error("Error loading listing data:", error);
