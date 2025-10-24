@@ -122,44 +122,44 @@ export const PropertyListingDataModal = ({
         return task?.field_value || "";
       };
 
-      // Build listing data object
+      // Build listing data object - PRIORITIZE task values over property data
       const data: ListingData = {
         propertyAddress: propertyData?.address || "",
-        brandName: propertyData?.brand_name || getTaskValue("Brand Name"),
+        brandName: getTaskValue("Brand Name") || propertyData?.brand_name || "",
         rentalType: propertyData?.rental_type || "",
-        propertyTypeDetail: propertyData?.property_type_detail || getTaskValue("Property Type Detail"),
-        stories: propertyData?.stories || getTaskValue("Stories"),
-        parking: `${propertyData?.parking_type || getTaskValue("Parking Type")} - ${propertyData?.parking_spaces || getTaskValue("Parking Capacity")} spaces`,
-        schoolDistrict: propertyData?.school_district || getTaskValue("School District"),
-        adaCompliant: getTaskValue("ADA Compliant"),
+        propertyTypeDetail: getTaskValue("Property Type Detail") || propertyData?.property_type_detail || "",
+        stories: getTaskValue("Stories") || propertyData?.stories || "",
+        parking: getTaskValue("Parking Type") ? `${getTaskValue("Parking Type")} - ${getTaskValue("Parking Capacity")} spaces` : (propertyData?.parking_type ? `${propertyData.parking_type} - ${propertyData.parking_spaces} spaces` : ""),
+        schoolDistrict: getTaskValue("School District") || propertyData?.school_district || "",
+        adaCompliant: getTaskValue("ADA Compliant") || "",
         basement: propertyData?.basement ? "Yes" : "No",
-        fencedYard: propertyData?.fenced_yard || getTaskValue("Fenced Yard"),
-        bedrooms: propertyData?.bedrooms?.toString() || getTaskValue("Bedrooms"),
-        bathrooms: propertyData?.bathrooms?.toString() || getTaskValue("Bathrooms"),
-        sqft: propertyData?.sqft?.toString() || getTaskValue("Square Footage"),
+        fencedYard: getTaskValue("Fenced Yard") || propertyData?.fenced_yard || "",
+        bedrooms: getTaskValue("Bedrooms") || propertyData?.bedrooms?.toString() || "",
+        bathrooms: getTaskValue("Bathrooms") || propertyData?.bathrooms?.toString() || "",
+        sqft: getTaskValue("Square Footage") || propertyData?.sqft?.toString() || "",
         
         petsAllowed: getTaskValue("Pets Allowed") || (propertyData?.pets_allowed ? "Yes" : "No"),
-        petRules: propertyData?.pet_rules || getTaskValue("Pet Rules"),
-        maxPets: propertyData?.max_pets?.toString() || getTaskValue("Maximum Number of Pets"),
-        maxPetWeight: propertyData?.max_pet_weight?.toString() || getTaskValue("Maximum Pet Weight (lbs)"),
+        petRules: getTaskValue("Pet Rules") || propertyData?.pet_rules || "",
+        maxPets: getTaskValue("Maximum Number of Pets") || propertyData?.max_pets?.toString() || "",
+        maxPetWeight: getTaskValue("Maximum Pet Weight (lbs)") || propertyData?.max_pet_weight?.toString() || "",
         
-        monthlyRent: propertyData?.monthly_rent ? `$${propertyData.monthly_rent}` : getTaskValue("Monthly Rent"),
-        nightlyRate: propertyData?.nightly_rate ? `$${propertyData.nightly_rate}` : getTaskValue("Nightly Rate"),
-        securityDeposit: propertyData?.security_deposit ? `$${propertyData.security_deposit}` : getTaskValue("Security Deposit"),
-        utilityCap: propertyData?.utility_cap ? `$${propertyData.utility_cap}` : getTaskValue("Utility Cap"),
-        cleaningFee: propertyData?.cleaning_fee ? `$${propertyData.cleaning_fee}` : getTaskValue("Cleaning Fee"),
-        adminFee: propertyData?.admin_fee ? `$${propertyData.admin_fee}` : getTaskValue("Admin Fee"),
-        petFee: propertyData?.pet_fee ? `$${propertyData.pet_fee}` : getTaskValue("Pet Fee"),
-        monthlyPetRent: propertyData?.monthly_pet_rent ? `$${propertyData.monthly_pet_rent}` : getTaskValue("Monthly Pet Rent"),
-        monthlyCleaningFee: propertyData?.monthly_cleaning_fee ? `$${propertyData.monthly_cleaning_fee}` : getTaskValue("Monthly Cleaning Fee"),
+        monthlyRent: getTaskValue("Monthly Rent") || (propertyData?.monthly_rent ? `$${propertyData.monthly_rent}` : ""),
+        nightlyRate: getTaskValue("Nightly Rate") || (propertyData?.nightly_rate ? `$${propertyData.nightly_rate}` : ""),
+        securityDeposit: getTaskValue("Security Deposit") || (propertyData?.security_deposit ? `$${propertyData.security_deposit}` : ""),
+        utilityCap: getTaskValue("Utility Cap") || (propertyData?.utility_cap ? `$${propertyData.utility_cap}` : ""),
+        cleaningFee: getTaskValue("Cleaning Fee") || (propertyData?.cleaning_fee ? `$${propertyData.cleaning_fee}` : ""),
+        adminFee: getTaskValue("Admin Fee") || (propertyData?.admin_fee ? `$${propertyData.admin_fee}` : ""),
+        petFee: getTaskValue("Pet Fee") || (propertyData?.pet_fee ? `$${propertyData.pet_fee}` : ""),
+        monthlyPetRent: getTaskValue("Monthly Pet Rent") || (propertyData?.monthly_pet_rent ? `$${propertyData.monthly_pet_rent}` : ""),
+        monthlyCleaningFee: getTaskValue("Monthly Cleaning Fee") || (propertyData?.monthly_cleaning_fee ? `$${propertyData.monthly_cleaning_fee}` : ""),
         
-        leaseTerm: propertyData?.lease_term || getTaskValue("Lease Term"),
-        noticeToVacate: propertyData?.notice_to_vacate || getTaskValue("Notice to Vacate"),
+        leaseTerm: getTaskValue("Lease Term") || propertyData?.lease_term || "",
+        noticeToVacate: getTaskValue("Notice to Vacate") || propertyData?.notice_to_vacate || "",
         
-        contactEmail: propertyData?.contact_email || getTaskValue("Contact Email"),
-        directBookingWebsite: propertyData?.website_url || getTaskValue("Direct Booking Website"),
+        contactEmail: getTaskValue("Contact Email") || propertyData?.contact_email || "",
+        directBookingWebsite: getTaskValue("Direct Booking Website") || propertyData?.website_url || "",
         
-        propertyPhotos: getTaskValue("Upload professional photos") || getTaskValue("Link to existing photos"),
+        propertyPhotos: getTaskValue("Upload professional photos") || getTaskValue("Link to existing photos") || "",
         listingDescriptions: getTaskValue("Digital guidebook published") || ""
       };
 
@@ -236,17 +236,25 @@ export const PropertyListingDataModal = ({
                   <DataRow label="House Type" value={listingData.propertyTypeDetail} />
                   <DataRow label="Stories" value={listingData.stories} />
                   <DataRow label="Parking" value={listingData.parking} />
-                  <DataRow label="School District" value={listingData.schoolDistrict} />
-                  <DataRow label="ADA Compliant" value={listingData.adaCompliant} />
-                  <DataRow label="Basement" value={listingData.basement} />
-                  <DataRow label="Fenced Yard" value={listingData.fencedYard} />
                   <DataRow label="Bedrooms" value={listingData.bedrooms} />
                   <DataRow label="Bathrooms" value={listingData.bathrooms} />
                   <DataRow label="Square Footage" value={listingData.sqft} />
+                  <DataRow label="ADA Compliant" value={listingData.adaCompliant} />
+                  <DataRow label="Basement" value={listingData.basement} />
+                  <DataRow label="Fenced Yard" value={listingData.fencedYard} />
                 </CardContent>
               </Card>
 
-              {/* Pet Policies */}
+              {/* Schools & Pet Policies */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">Schools</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-0">
+                  <DataRow label="School District" value={listingData.schoolDistrict} />
+                </CardContent>
+              </Card>
+
               <Card>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base">Pet Policies</CardTitle>
