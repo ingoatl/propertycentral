@@ -18,42 +18,42 @@ import {
 const LISTING_DATA = [
   {
     address: "169 Willow Stream Ct",
-    airbnb: "https://www.airbnb.com/rooms/37773037?source_impression_id=p3_1754931120_P3d__KQbpUEVinXG",
+    airbnb: "https://www.airbnb.com/rooms/37773037",
     vrbo: "https://www.vrbo.com/en-au/holiday-rental/p1738420vb"
   },
   {
     address: "3155 Duvall Pl",
-    airbnb: "https://www.airbnb.com/rooms/50104697?source_impression_id=p3_1754931120_P3UpGvPCfQCQvARE",
+    airbnb: "https://www.airbnb.com/rooms/50104697",
     vrbo: "https://www.vrbo.com/en-au/holiday-rental/p2334877vb"
   },
   {
     address: "4241 Osburn Ct",
-    airbnb: "https://www.airbnb.com/rooms/894861867040611368?source_impression_id=p3_1754931120_P3i1zplZJvRc1Oos",
+    airbnb: "https://www.airbnb.com/rooms/894861867040611368",
     vrbo: "https://www.vrbo.com/3432335"
   },
   {
     address: "5360 Durham Ridge Ct",
-    airbnb: "https://www.airbnb.com/rooms/707411807049153074?source_impression_id=p3_1754931120_P3fa1WSl7p1MEbul",
+    airbnb: "https://www.airbnb.com/rooms/707411807049153074",
     vrbo: "https://www.vrbo.com/3004492"
   },
   {
     address: "3069 Rita Way",
-    airbnb: "https://www.airbnb.com/rooms/39178226?source_impression_id=p3_1754931120_P3mAvqcvmkOs8npr",
+    airbnb: "https://www.airbnb.com/rooms/39178226",
     vrbo: "https://www.vrbo.com/2708824"
   },
   {
     address: "2580 Old Roswell Rd",
-    airbnb: "https://www.airbnb.com/rooms/581294085844536405?source_impression_id=p3_1754931120_P3B8FEkcFMlUZ185",
+    airbnb: "https://www.airbnb.com/rooms/581294085844536405",
     vrbo: "https://www.vrbo.com/2708824"
   },
   {
     address: "5198 Laurel Bridge Dr SE",
-    airbnb: "https://www.airbnb.com/rooms/43339882?source_impression_id=p3_1754931120_P3C1YsrWPeWm9qS_",
+    airbnb: "https://www.airbnb.com/rooms/43339882",
     vrbo: "https://www.vrbo.com/en-au/holiday-rental/p1976841vb"
   },
   {
     address: "184 Woodland Ln SW",
-    airbnb: "https://www.airbnb.com/rooms/1324567699805540986?source_impression_id=p3_1754931120_P3_6KfJOSCtfiGkA",
+    airbnb: "https://www.airbnb.com/rooms/1324567699805540986",
     vrbo: "https://www.vrbo.com/4722192"
   }
 ];
@@ -68,14 +68,18 @@ export const BulkUpdateListingURLs = () => {
       let errorCount = 0;
 
       for (const property of LISTING_DATA) {
-        console.log(`Processing ${property.address}...`);
+        console.log(`\n=== Processing ${property.address} ===`);
 
-        // Find the property by address
+        // Extract key parts of address for flexible matching
+        const addressParts = property.address.split(' ');
+        const streetNumber = addressParts[0];
+        const streetName = addressParts.slice(1).join(' ').toLowerCase();
+
+        // Find the property by address with flexible matching
         const { data: properties, error: propError } = await supabase
           .from("properties")
           .select("id, address")
-          .ilike("address", `%${property.address}%`)
-          .limit(1);
+          .or(`address.ilike.%${streetNumber}%,address.ilike.%${streetName}%`);
 
         if (propError) {
           console.error(`Error finding property ${property.address}:`, propError);
@@ -83,14 +87,21 @@ export const BulkUpdateListingURLs = () => {
           continue;
         }
 
-        if (!properties || properties.length === 0) {
+        // Find best match
+        const matchedProperty = properties?.find(p => 
+          p.address.includes(streetNumber) && 
+          streetName.split(' ').some(word => p.address.toLowerCase().includes(word))
+        );
+
+        if (!matchedProperty) {
           console.warn(`Property not found: ${property.address}`);
+          console.log(`Searched for: ${streetNumber} and ${streetName}`);
           errorCount++;
           continue;
         }
 
-        const propertyId = properties[0].id;
-        console.log(`Found property ${property.address} with ID ${propertyId}`);
+        const propertyId = matchedProperty.id;
+        console.log(`✓ Found property: ${matchedProperty.address} (ID: ${propertyId})`);
 
         // Find the onboarding project for this property
         const { data: projects, error: projectError } = await supabase
@@ -112,16 +123,21 @@ export const BulkUpdateListingURLs = () => {
         }
 
         const projectId = projects[0].id;
+        console.log(`✓ Found project ID: ${projectId}`);
 
-        // Update Airbnb URL task
+        // Find and update Airbnb URL task
         const { data: airbnbTasks } = await supabase
           .from("onboarding_tasks")
-          .select("id")
+          .select("id, title, field_value, status")
           .eq("project_id", projectId)
-          .ilike("title", "%Airbnb%URL%")
-          .limit(1);
+          .or("title.ilike.%Airbnb%URL%,title.ilike.%Airbnb%Link%");
 
+        console.log(`Found ${airbnbTasks?.length || 0} Airbnb URL tasks`);
+        
         if (airbnbTasks && airbnbTasks.length > 0) {
+          const airbnbTask = airbnbTasks[0];
+          console.log(`Airbnb task: "${airbnbTask.title}" (current: ${airbnbTask.field_value || 'empty'})`);
+          
           const { error: airbnbError } = await supabase
             .from("onboarding_tasks")
             .update({
@@ -129,26 +145,32 @@ export const BulkUpdateListingURLs = () => {
               status: "completed",
               completed_date: new Date().toISOString(),
             })
-            .eq("id", airbnbTasks[0].id);
+            .eq("id", airbnbTask.id);
 
           if (airbnbError) {
-            console.error(`Error updating Airbnb task for ${property.address}:`, airbnbError);
+            console.error(`✗ Error updating Airbnb task:`, airbnbError);
             errorCount++;
           } else {
-            console.log(`Updated Airbnb URL for ${property.address}`);
+            console.log(`✓ Updated Airbnb URL`);
             updatedCount++;
           }
+        } else {
+          console.warn(`✗ No Airbnb URL task found for ${property.address}`);
         }
 
-        // Update VRBO URL task
+        // Find and update VRBO URL task
         const { data: vrboTasks } = await supabase
           .from("onboarding_tasks")
-          .select("id")
+          .select("id, title, field_value, status")
           .eq("project_id", projectId)
-          .ilike("title", "%VRBO%URL%")
-          .limit(1);
+          .or("title.ilike.%VRBO%URL%,title.ilike.%VRBO%Link%");
+
+        console.log(`Found ${vrboTasks?.length || 0} VRBO URL tasks`);
 
         if (vrboTasks && vrboTasks.length > 0) {
+          const vrboTask = vrboTasks[0];
+          console.log(`VRBO task: "${vrboTask.title}" (current: ${vrboTask.field_value || 'empty'})`);
+          
           const { error: vrboError } = await supabase
             .from("onboarding_tasks")
             .update({
@@ -156,15 +178,17 @@ export const BulkUpdateListingURLs = () => {
               status: "completed",
               completed_date: new Date().toISOString(),
             })
-            .eq("id", vrboTasks[0].id);
+            .eq("id", vrboTask.id);
 
           if (vrboError) {
-            console.error(`Error updating VRBO task for ${property.address}:`, vrboError);
+            console.error(`✗ Error updating VRBO task:`, vrboError);
             errorCount++;
           } else {
-            console.log(`Updated VRBO URL for ${property.address}`);
+            console.log(`✓ Updated VRBO URL`);
             updatedCount++;
           }
+        } else {
+          console.warn(`✗ No VRBO URL task found for ${property.address}`);
         }
       }
 
