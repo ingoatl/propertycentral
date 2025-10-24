@@ -347,9 +347,19 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
                     <CardContent className="space-y-3">
                       {/* Listing URLs First */}
                       {(() => {
-                        const airbnbTask = tasks.find(t => t.title.toLowerCase().includes('airbnb'));
-                        const vrboTask = tasks.find(t => t.title.toLowerCase().includes('vrbo'));
-                        const directTask = tasks.find(t => t.title.toLowerCase().includes('direct booking') || t.title.toLowerCase().includes('direct website'));
+                        const airbnbTask = tasks.find(t => {
+                          const title = t.title.toLowerCase();
+                          return title === 'airbnb' || title.includes('airbnb url');
+                        });
+                        const vrboTask = tasks.find(t => {
+                          const title = t.title.toLowerCase();
+                          return title === 'vrbo' || title.includes('vrbo url');
+                        });
+                        const directTask = tasks.find(t => {
+                          const title = t.title.toLowerCase();
+                          return title === 'direct booking website' || 
+                                 title.includes('direct booking') && title.includes('website');
+                        });
                         
                         return (airbnbTask?.field_value || vrboTask?.field_value || directTask?.field_value) && (
                           <div className="pb-3 border-b border-border/50">
