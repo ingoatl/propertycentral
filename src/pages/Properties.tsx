@@ -495,7 +495,7 @@ const Properties = () => {
         </DialogContent>
       </Dialog>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3">
         {properties.length === 0 ? (
           <Card className="col-span-full shadow-card border-border/50">
             <CardContent className="pt-12 pb-12 text-center">
@@ -505,163 +505,154 @@ const Properties = () => {
           </Card>
         ) : (
           properties.map((property, index) => (
-            <div key={property.id} className="space-y-4">
-              <Card 
-                className="shadow-card hover:shadow-warm transition-all duration-300 border-border/50 overflow-hidden group"
-                style={{ animationDelay: `${index * 0.1}s` }}
-              >
-                {/* Property Image */}
-                <div className="relative w-full aspect-[16/10] bg-muted overflow-hidden">
-                  {property.image_path ? (
-                    <img 
-                      src={property.image_path} 
-                      alt={property.name}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center bg-gradient-subtle">
-                      <ImageIcon className="w-16 h-16 text-muted-foreground/30" />
-                    </div>
-                  )}
-                  
-                  {/* Upload Button Overlay */}
-                  <div className="absolute top-2 right-2">
-                    <label 
-                      htmlFor={`upload-${property.id}`}
-                      className="cursor-pointer"
-                    >
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="secondary"
-                        className="gap-2 shadow-lg backdrop-blur-sm bg-background/80 hover:bg-background/90"
-                        disabled={uploadingImage === property.id}
-                        onClick={(e) => {
-                          e.preventDefault();
-                          document.getElementById(`upload-${property.id}`)?.click();
-                        }}
-                      >
-                        <Upload className="w-3.5 h-3.5" />
-                        {uploadingImage === property.id ? "Uploading..." : "Upload"}
-                      </Button>
-                    </label>
-                    <input
-                      id={`upload-${property.id}`}
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) handleImageUpload(property.id, file);
+            <Card 
+              key={property.id}
+              className="shadow-card hover:shadow-warm transition-all duration-300 border-border/50 overflow-hidden group"
+              style={{ animationDelay: `${index * 0.05}s` }}
+            >
+              {/* Property Image - Reduced aspect ratio */}
+              <div className="relative w-full aspect-[16/9] bg-muted overflow-hidden">
+                {property.image_path ? (
+                  <img 
+                    src={property.image_path} 
+                    alt={property.name}
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center bg-gradient-subtle">
+                    <ImageIcon className="w-12 h-12 text-muted-foreground/30" />
+                  </div>
+                )}
+                
+                {/* Upload Button Overlay - Smaller */}
+                <div className="absolute top-1.5 right-1.5">
+                  <label 
+                    htmlFor={`upload-${property.id}`}
+                    className="cursor-pointer"
+                  >
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="secondary"
+                      className="h-7 px-2 text-xs gap-1.5 shadow-lg backdrop-blur-sm bg-background/80 hover:bg-background/90"
+                      disabled={uploadingImage === property.id}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        document.getElementById(`upload-${property.id}`)?.click();
                       }}
-                    />
-                  </div>
-
-                  {/* Action Buttons Overlay */}
-                  <div className="absolute top-2 left-2 flex gap-2">
-                    <Button
-                      variant="secondary"
-                      size="icon"
-                      className="h-8 w-8 shadow-lg backdrop-blur-sm bg-background/80 hover:bg-background/90"
-                      onClick={() => handleEdit(property)}
                     >
-                      <Edit className="w-3.5 h-3.5" />
+                      <Upload className="w-3 h-3" />
+                      {uploadingImage === property.id ? "..." : "Upload"}
                     </Button>
-                    <Button
-                      variant="secondary"
-                      size="icon"
-                      className="h-8 w-8 shadow-lg backdrop-blur-sm bg-background/80 hover:bg-destructive hover:text-destructive-foreground"
-                      onClick={() => handleDelete(property.id)}
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </Button>
-                  </div>
+                  </label>
+                  <input
+                    id={`upload-${property.id}`}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleImageUpload(property.id, file);
+                    }}
+                  />
                 </div>
 
-                <CardHeader className="pb-3">
-                  <div className="space-y-2">
-                    <CardTitle className="text-xl text-foreground group-hover:text-primary transition-colors">
-                      {property.name}
-                    </CardTitle>
-                    <CardDescription className="flex items-center gap-1.5 text-muted-foreground">
-                      <MapPin className="w-3.5 h-3.5 flex-shrink-0" />
-                      <span className="line-clamp-1">{property.address}</span>
-                    </CardDescription>
-                    {property.rentalType && (
-                      <div className="pt-1">
-                        <span className={`inline-block px-2.5 py-1 text-xs font-medium rounded-full ${
-                          property.rentalType === 'hybrid' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' :
-                          property.rentalType === 'mid_term' ? 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300' :
-                          'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
-                        }`}>
-                          {property.rentalType === 'hybrid' ? '🔄 Hybrid' :
-                           property.rentalType === 'mid_term' ? '🏠 Mid-term' :
-                           '🏡 Long-term'}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  {/* Onboarding Progress */}
-                  {propertyProjects[property.id] && (
-                    <div className="mb-4 space-y-2">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-muted-foreground">Onboarding Progress</span>
-                        <span className="font-medium">{Math.round(propertyProjectsProgress[property.id] || 0)}%</span>
-                      </div>
-                      <div className="w-full bg-muted rounded-full h-2">
-                        <div
-                          className="bg-primary h-2 rounded-full transition-all duration-300"
-                          style={{ width: `${propertyProjectsProgress[property.id] || 0}%` }}
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="flex items-center gap-2 mb-3">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setSelectedPropertyForDetails({
-                          id: property.id,
-                          name: property.name,
-                          projectId: propertyProjects[property.id] || null
-                        });
-                      }}
-                      className="flex-1"
-                    >
-                      <FileText className="w-4 h-4 mr-2" />
-                      View Property Details
-                    </Button>
-                  </div>
-
-                  <Tabs 
-                    defaultValue="onboarding" 
-                    className="w-full"
+                {/* Action Buttons Overlay - Smaller */}
+                <div className="absolute top-1.5 left-1.5 flex gap-1.5">
+                  <Button
+                    variant="secondary"
+                    size="icon"
+                    className="h-7 w-7 shadow-lg backdrop-blur-sm bg-background/80 hover:bg-background/90"
+                    onClick={() => handleEdit(property)}
                   >
-                    <TabsList className="grid w-full grid-cols-1">
-                      <TabsTrigger 
-                        value="onboarding"
-                        onClick={() => {
-                          setSelectedPropertyForWorkflow({
-                            id: property.id,
-                            name: property.name,
-                            address: property.address,
-                            projectId: propertyProjects[property.id] || null,
-                            visitPrice: property.visitPrice
-                          });
-                        }}
-                      >
-                        <ClipboardList className="w-4 h-4 mr-1" />
-                        Onboarding
-                      </TabsTrigger>
-                    </TabsList>
-                  </Tabs>
-                </CardContent>
-              </Card>
-            </div>
+                    <Edit className="w-3 h-3" />
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="icon"
+                    className="h-7 w-7 shadow-lg backdrop-blur-sm bg-background/80 hover:bg-destructive hover:text-destructive-foreground"
+                    onClick={() => handleDelete(property.id)}
+                  >
+                    <Trash2 className="w-3 h-3" />
+                  </Button>
+                </div>
+              </div>
+
+              <CardHeader className="pb-2 pt-3 px-3">
+                <CardTitle className="text-base text-foreground group-hover:text-primary transition-colors line-clamp-1">
+                  {property.name}
+                </CardTitle>
+                <CardDescription className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <MapPin className="w-3 h-3 flex-shrink-0" />
+                  <span className="line-clamp-1">{property.address}</span>
+                </CardDescription>
+                {property.rentalType && (
+                  <div className="pt-1">
+                    <span className={`inline-block px-2 py-0.5 text-[10px] font-medium rounded-full ${
+                      property.rentalType === 'hybrid' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' :
+                      property.rentalType === 'mid_term' ? 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300' :
+                      'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
+                    }`}>
+                      {property.rentalType === 'hybrid' ? '🔄 Hybrid' :
+                       property.rentalType === 'mid_term' ? '🏠 Mid-term' :
+                       '🏡 Long-term'}
+                    </span>
+                  </div>
+                )}
+              </CardHeader>
+              
+              <CardContent className="px-3 pb-3 space-y-2">
+                {/* Onboarding Progress - More compact */}
+                {propertyProjects[property.id] && (
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-muted-foreground">Progress</span>
+                      <span className="font-medium">{Math.round(propertyProjectsProgress[property.id] || 0)}%</span>
+                    </div>
+                    <div className="w-full bg-muted rounded-full h-1.5">
+                      <div
+                        className="bg-primary h-1.5 rounded-full transition-all duration-300"
+                        style={{ width: `${propertyProjectsProgress[property.id] || 0}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setSelectedPropertyForDetails({
+                      id: property.id,
+                      name: property.name,
+                      projectId: propertyProjects[property.id] || null
+                    });
+                  }}
+                  className="w-full h-8 text-xs"
+                >
+                  <FileText className="w-3 h-3 mr-1.5" />
+                  View Details
+                </Button>
+
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={() => {
+                    setSelectedPropertyForWorkflow({
+                      id: property.id,
+                      name: property.name,
+                      address: property.address,
+                      projectId: propertyProjects[property.id] || null,
+                      visitPrice: property.visitPrice
+                    });
+                  }}
+                  className="w-full h-8 text-xs"
+                >
+                  <ClipboardList className="w-3 h-3 mr-1.5" />
+                  Onboarding
+                </Button>
+              </CardContent>
+            </Card>
           ))
         )}
       </div>

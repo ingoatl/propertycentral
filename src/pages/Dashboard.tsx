@@ -109,6 +109,9 @@ const Dashboard = () => {
         
         // Muirfield
         'muirfield': { address: 'Muirfield Address', managementFee: 0.20 },
+        
+        // Timberlake
+        'timberlake': { address: 'Timberlake Address', managementFee: 0.20 },
       };
 
       // Known unmanaged property addresses
