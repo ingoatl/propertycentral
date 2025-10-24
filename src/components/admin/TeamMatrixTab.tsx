@@ -231,10 +231,63 @@ export const TeamMatrixTab = () => {
         if (error) throw error;
       }
 
-      toast.success("Phase assignment updated");
-      loadPhaseAssignments();
+      toast.success("Phase assignment updated - updating task assignments...");
+      await loadPhaseAssignments();
+      
+      // Auto-assign tasks based on new phase assignments
+      await autoAssignTasksForPhase(phaseNumber, actualRoleId);
     } catch (error: any) {
       toast.error("Failed to assign phase: " + error.message);
+    }
+  };
+
+  const autoAssignTasksForPhase = async (phaseNumber: number, roleId: string | null) => {
+    try {
+      // Get all unassigned or role-only tasks for this phase
+      const { data: tasks, error: tasksError } = await supabase
+        .from("onboarding_tasks")
+        .select("id, title")
+        .eq("phase_number", phaseNumber)
+        .neq("status", "completed");
+
+      if (tasksError) throw tasksError;
+      if (!tasks || tasks.length === 0) return;
+
+      // Find user with this role
+      let assignedToUuid = null;
+      if (roleId) {
+        const { data: userRole } = await supabase
+          .from("user_team_roles")
+          .select("user_id")
+          .eq("role_id", roleId)
+          .eq("is_primary", true)
+          .single();
+
+        assignedToUuid = userRole?.user_id || null;
+      }
+
+      // Update all tasks in this phase
+      const { error: updateError } = await supabase
+        .from("onboarding_tasks")
+        .update({
+          assigned_to_uuid: assignedToUuid,
+          assigned_role_id: roleId,
+        })
+        .eq("phase_number", phaseNumber)
+        .neq("status", "completed");
+
+      if (updateError) throw updateError;
+
+      if (assignedToUuid) {
+        toast.success(`Assigned ${tasks.length} tasks from this phase to team member`);
+      } else if (roleId) {
+        toast.info(`Assigned ${tasks.length} tasks to role (no primary user assigned yet)`);
+      } else {
+        toast.info(`Unassigned ${tasks.length} tasks from this phase`);
+      }
+    } catch (error: any) {
+      console.error("Error auto-assigning tasks:", error);
+      toast.error("Failed to auto-assign tasks: " + error.message);
     }
   };
 
