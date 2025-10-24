@@ -70,9 +70,11 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
         console.log('PropertyDetailsModal - All tasks loaded:', tasksData?.length);
         console.log('PropertyDetailsModal - Listing URL tasks:', 
           tasksData?.filter(t => 
-            t.title.toLowerCase() === 'airbnb' || 
-            t.title.toLowerCase() === 'vrbo' || 
-            t.title.toLowerCase() === 'direct booking website'
+            t.title.toLowerCase().includes('airbnb') || 
+            t.title.toLowerCase().includes('vrbo') || 
+            t.title.toLowerCase().includes('direct booking') ||
+            t.title.toLowerCase().includes('booking.com') ||
+            t.title.toLowerCase().includes('zillow')
           )
         );
         
@@ -223,11 +225,14 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
       const value = task.field_value || task.description || '';
 
       // Skip listing URLs completely - they're shown in the top Property Information card
-      if (title === 'airbnb' || 
-          title === 'vrbo' || 
-          title === 'direct booking website' ||
-          title === 'booking.com' ||
-          title === 'zillow') {
+      // Using fuzzy matching to handle variations in task titles
+      if (title.includes('airbnb') || 
+          title.includes('vrbo') || 
+          title.includes('direct booking') ||
+          title.includes('booking page') ||
+          title.includes('booking website') ||
+          title.includes('booking.com') ||
+          title.includes('zillow')) {
         return;
       }
 
@@ -373,11 +378,16 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
                     <CardContent className="space-y-3">
                       {/* Listing URLs First */}
                       {(() => {
-                        const airbnbTask = tasks.find(t => t.title.toLowerCase() === 'airbnb');
-                        const vrboTask = tasks.find(t => t.title.toLowerCase() === 'vrbo');
-                        const directTask = tasks.find(t => t.title.toLowerCase() === 'direct booking website');
-                        const bookingTask = tasks.find(t => t.title.toLowerCase() === 'booking.com');
-                        const zillowTask = tasks.find(t => t.title.toLowerCase() === 'zillow');
+                        // Fuzzy matching for listing platforms to handle variations
+                        const airbnbTask = tasks.find(t => t.title.toLowerCase().includes('airbnb'));
+                        const vrboTask = tasks.find(t => t.title.toLowerCase().includes('vrbo'));
+                        const directTask = tasks.find(t => 
+                          t.title.toLowerCase().includes('direct booking') || 
+                          t.title.toLowerCase().includes('booking page') ||
+                          t.title.toLowerCase().includes('booking website')
+                        );
+                        const bookingTask = tasks.find(t => t.title.toLowerCase().includes('booking.com'));
+                        const zillowTask = tasks.find(t => t.title.toLowerCase().includes('zillow'));
                         
                         return (airbnbTask?.field_value || vrboTask?.field_value || directTask?.field_value || bookingTask?.field_value || zillowTask?.field_value) && (
                           <div className="pb-3 border-b border-border/50">

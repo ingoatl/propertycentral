@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-interface PropertyListingDataModalProps {
+interface DataForListingPlatformsProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   propertyId: string;
@@ -66,12 +66,12 @@ interface ListingData {
   listingDescriptions: string;
 }
 
-export const PropertyListingDataModal = ({
+export const DataForListingPlatforms = ({
   open,
   onOpenChange,
   propertyId,
   propertyName
-}: PropertyListingDataModalProps) => {
+}: DataForListingPlatformsProps) => {
   const [loading, setLoading] = useState(false);
   const [listingData, setListingData] = useState<ListingData | null>(null);
   const [copiedField, setCopiedField] = useState<string | null>(null);

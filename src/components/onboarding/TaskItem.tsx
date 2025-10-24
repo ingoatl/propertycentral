@@ -66,6 +66,7 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
   const [answeredFAQs, setAnsweredFAQs] = useState<any[]>([]);
   const [showBugDialog, setShowBugDialog] = useState(false);
   const [attachmentsKey, setAttachmentsKey] = useState(0);
+  const [debounceTimer, setDebounceTimer] = useState<NodeJS.Timeout | null>(null);
   
   const { isAdmin } = useAdminCheck();
   const hasValue = task.field_value && task.field_value.trim() !== "";
@@ -340,9 +341,24 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
 
   const handleInputChange = (value: string) => {
     setFieldValue(value);
+    
+    // Debounce and auto-save for faster updates (300ms instead of waiting for blur)
+    if (debounceTimer) {
+      clearTimeout(debounceTimer);
+    }
+    
+    const timer = setTimeout(() => {
+      autoSave(value);
+    }, 300);
+    
+    setDebounceTimer(timer);
   };
 
   const handleInputBlur = () => {
+    // Clear any pending debounce and save immediately on blur
+    if (debounceTimer) {
+      clearTimeout(debounceTimer);
+    }
     if (fieldValue !== task.field_value) {
       autoSave(fieldValue);
     }
