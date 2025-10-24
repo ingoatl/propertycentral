@@ -78,6 +78,13 @@ export type Database = {
             foreignKeyName: "bug_reports_property_id_fkey"
             columns: ["property_id"]
             isOneToOne: false
+            referencedRelation: "comprehensive_property_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bug_reports_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
             referencedRelation: "properties"
             referencedColumns: ["id"]
           },
@@ -163,6 +170,13 @@ export type Database = {
             columns: ["owner_id"]
             isOneToOne: false
             referencedRelation: "property_owners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_insights_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "comprehensive_property_data"
             referencedColumns: ["id"]
           },
           {
@@ -261,6 +275,13 @@ export type Database = {
             foreignKeyName: "expenses_property_id_fkey"
             columns: ["property_id"]
             isOneToOne: false
+            referencedRelation: "comprehensive_property_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expenses_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
             referencedRelation: "properties"
             referencedColumns: ["id"]
           },
@@ -324,6 +345,13 @@ export type Database = {
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "onboarding_projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "faq_questions_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "comprehensive_property_data"
             referencedColumns: ["id"]
           },
           {
@@ -394,6 +422,13 @@ export type Database = {
             foreignKeyName: "frequently_asked_questions_property_id_fkey"
             columns: ["property_id"]
             isOneToOne: false
+            referencedRelation: "comprehensive_property_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "frequently_asked_questions_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
             referencedRelation: "properties"
             referencedColumns: ["id"]
           },
@@ -433,6 +468,36 @@ export type Database = {
           refresh_token?: string
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      listing_templates: {
+        Row: {
+          available_variables: string[] | null
+          created_at: string
+          created_by: string | null
+          id: string
+          platform_name: string
+          template_content: string
+          updated_at: string
+        }
+        Insert: {
+          available_variables?: string[] | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          platform_name: string
+          template_content: string
+          updated_at?: string
+        }
+        Update: {
+          available_variables?: string[] | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          platform_name?: string
+          template_content?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -486,6 +551,13 @@ export type Database = {
           user_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "mid_term_bookings_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "comprehensive_property_data"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "mid_term_bookings_property_id_fkey"
             columns: ["property_id"]
@@ -618,6 +690,13 @@ export type Database = {
           webhook_url?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "onboarding_projects_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "comprehensive_property_data"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "onboarding_projects_property_id_fkey"
             columns: ["property_id"]
@@ -835,6 +914,13 @@ export type Database = {
             foreignKeyName: "ownerrez_bookings_property_id_fkey"
             columns: ["property_id"]
             isOneToOne: false
+            referencedRelation: "comprehensive_property_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ownerrez_bookings_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
             referencedRelation: "properties"
             referencedColumns: ["id"]
           },
@@ -871,6 +957,54 @@ export type Database = {
             columns: ["role_id"]
             isOneToOne: false
             referencedRelation: "team_roles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      platform_listings: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean | null
+          last_updated: string | null
+          listing_url: string | null
+          platform_name: string
+          property_id: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean | null
+          last_updated?: string | null
+          listing_url?: string | null
+          platform_name: string
+          property_id: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean | null
+          last_updated?: string | null
+          listing_url?: string | null
+          platform_name?: string
+          property_id?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "platform_listings_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "comprehensive_property_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "platform_listings_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
             referencedColumns: ["id"]
           },
         ]
@@ -952,6 +1086,120 @@ export type Database = {
           },
         ]
       }
+      property_contact_info: {
+        Row: {
+          contact_email: string | null
+          contact_phone: string | null
+          created_at: string
+          id: string
+          property_id: string
+          updated_at: string
+          website_url: string | null
+        }
+        Insert: {
+          contact_email?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          id?: string
+          property_id: string
+          updated_at?: string
+          website_url?: string | null
+        }
+        Update: {
+          contact_email?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          id?: string
+          property_id?: string
+          updated_at?: string
+          website_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "property_contact_info_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: true
+            referencedRelation: "comprehensive_property_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "property_contact_info_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: true
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      property_details: {
+        Row: {
+          ada_compliant: boolean | null
+          basement: boolean | null
+          bathrooms: number | null
+          bedrooms: number | null
+          brand_name: string | null
+          created_at: string
+          fenced_yard: string | null
+          id: string
+          parking_spaces: string | null
+          parking_type: string | null
+          property_id: string
+          property_type_detail: string | null
+          sqft: number | null
+          stories: string | null
+          updated_at: string
+        }
+        Insert: {
+          ada_compliant?: boolean | null
+          basement?: boolean | null
+          bathrooms?: number | null
+          bedrooms?: number | null
+          brand_name?: string | null
+          created_at?: string
+          fenced_yard?: string | null
+          id?: string
+          parking_spaces?: string | null
+          parking_type?: string | null
+          property_id: string
+          property_type_detail?: string | null
+          sqft?: number | null
+          stories?: string | null
+          updated_at?: string
+        }
+        Update: {
+          ada_compliant?: boolean | null
+          basement?: boolean | null
+          bathrooms?: number | null
+          bedrooms?: number | null
+          brand_name?: string | null
+          created_at?: string
+          fenced_yard?: string | null
+          id?: string
+          parking_spaces?: string | null
+          parking_type?: string | null
+          property_id?: string
+          property_type_detail?: string | null
+          sqft?: number | null
+          stories?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "property_details_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: true
+            referencedRelation: "comprehensive_property_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "property_details_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: true
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       property_owners: {
         Row: {
           created_at: string
@@ -984,6 +1232,180 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      property_policies: {
+        Row: {
+          created_at: string
+          id: string
+          lease_term: string | null
+          max_pet_weight: number | null
+          max_pets: number | null
+          notice_to_vacate: string | null
+          pet_rules: string | null
+          pets_allowed: boolean | null
+          property_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          lease_term?: string | null
+          max_pet_weight?: number | null
+          max_pets?: number | null
+          notice_to_vacate?: string | null
+          pet_rules?: string | null
+          pets_allowed?: boolean | null
+          property_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          lease_term?: string | null
+          max_pet_weight?: number | null
+          max_pets?: number | null
+          notice_to_vacate?: string | null
+          pet_rules?: string | null
+          pets_allowed?: boolean | null
+          property_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "property_policies_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: true
+            referencedRelation: "comprehensive_property_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "property_policies_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: true
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      property_pricing_history: {
+        Row: {
+          admin_fee: number | null
+          cleaning_fee: number | null
+          created_at: string
+          effective_date: string
+          end_date: string | null
+          id: string
+          is_current: boolean | null
+          monthly_cleaning_fee: number | null
+          monthly_pet_rent: number | null
+          monthly_rent: number | null
+          nightly_rate: number | null
+          pet_fee: number | null
+          property_id: string
+          security_deposit: number | null
+          updated_by: string | null
+          utility_cap: number | null
+        }
+        Insert: {
+          admin_fee?: number | null
+          cleaning_fee?: number | null
+          created_at?: string
+          effective_date?: string
+          end_date?: string | null
+          id?: string
+          is_current?: boolean | null
+          monthly_cleaning_fee?: number | null
+          monthly_pet_rent?: number | null
+          monthly_rent?: number | null
+          nightly_rate?: number | null
+          pet_fee?: number | null
+          property_id: string
+          security_deposit?: number | null
+          updated_by?: string | null
+          utility_cap?: number | null
+        }
+        Update: {
+          admin_fee?: number | null
+          cleaning_fee?: number | null
+          created_at?: string
+          effective_date?: string
+          end_date?: string | null
+          id?: string
+          is_current?: boolean | null
+          monthly_cleaning_fee?: number | null
+          monthly_pet_rent?: number | null
+          monthly_rent?: number | null
+          nightly_rate?: number | null
+          pet_fee?: number | null
+          property_id?: string
+          security_deposit?: number | null
+          updated_by?: string | null
+          utility_cap?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "property_pricing_history_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "comprehensive_property_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "property_pricing_history_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      property_schools: {
+        Row: {
+          created_at: string
+          elementary_school: string | null
+          high_school: string | null
+          id: string
+          middle_school: string | null
+          property_id: string
+          school_district: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          elementary_school?: string | null
+          high_school?: string | null
+          id?: string
+          middle_school?: string | null
+          property_id: string
+          school_district?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          elementary_school?: string | null
+          high_school?: string | null
+          id?: string
+          middle_school?: string | null
+          property_id?: string
+          school_district?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "property_schools_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: true
+            referencedRelation: "comprehensive_property_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "property_schools_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: true
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       task_attachments: {
         Row: {
@@ -1251,6 +1673,13 @@ export type Database = {
             foreignKeyName: "visits_property_id_fkey"
             columns: ["property_id"]
             isOneToOne: false
+            referencedRelation: "comprehensive_property_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visits_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
             referencedRelation: "properties"
             referencedColumns: ["id"]
           },
@@ -1258,9 +1687,67 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      comprehensive_property_data: {
+        Row: {
+          ada_compliant: boolean | null
+          address: string | null
+          admin_fee: number | null
+          basement: boolean | null
+          bathrooms: number | null
+          bedrooms: number | null
+          brand_name: string | null
+          cleaning_fee: number | null
+          contact_email: string | null
+          contact_phone: string | null
+          elementary_school: string | null
+          fenced_yard: string | null
+          high_school: string | null
+          id: string | null
+          image_path: string | null
+          lease_term: string | null
+          max_pet_weight: number | null
+          max_pets: number | null
+          middle_school: string | null
+          monthly_cleaning_fee: number | null
+          monthly_pet_rent: number | null
+          monthly_rent: number | null
+          name: string | null
+          nightly_rate: number | null
+          notice_to_vacate: string | null
+          parking_spaces: string | null
+          parking_type: string | null
+          pet_fee: number | null
+          pet_rules: string | null
+          pets_allowed: boolean | null
+          pricing_effective_date: string | null
+          property_created_at: string | null
+          property_type: Database["public"]["Enums"]["property_type"] | null
+          property_type_detail: string | null
+          rental_type: string | null
+          school_district: string | null
+          security_deposit: number | null
+          sqft: number | null
+          stories: string | null
+          utility_cap: number | null
+          visit_price: number | null
+          website_url: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
+      get_listing_export_data: {
+        Args: { p_property_id: string }
+        Returns: Json
+      }
+      get_property_platforms: {
+        Args: { p_property_id: string }
+        Returns: {
+          is_active: boolean
+          listing_url: string
+          platform_name: string
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

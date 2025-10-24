@@ -104,6 +104,7 @@ export const ONBOARDING_PHASES: PhaseDefinition[] = [
       { title: "CHBO (Corporate Housing by Owner)", field_type: "text", description: "Enter Listing URL" },
       { title: "Homads", field_type: "text", description: "Enter Listing URL" },
       { title: "MidTermRentalProperties.com", field_type: "text", description: "Enter Listing URL" },
+      { title: "Midtermrentals.com", field_type: "text", description: "Enter Listing URL" },
       { title: "Anyplace", field_type: "text", description: "Enter Placeholder" },
       { title: "June Homes", field_type: "text", description: "Enter Placeholder" },
       { title: "Kopa", field_type: "text", description: "Enter Placeholder" },
@@ -127,6 +128,10 @@ export const ONBOARDING_PHASES: PhaseDefinition[] = [
       
       // Corporate Housing Providers - Only operational platforms
       { title: "💼 Corporate Housing Providers", field_type: "section_header" },
+      { title: "NCH (National Corporate Housing)", field_type: "text", description: "Enter Listing URL" },
+      { title: "CRU Homes", field_type: "text", description: "Enter Listing URL" },
+      { title: "UCH (United Corporate Housing)", field_type: "text", description: "Enter Listing URL" },
+      { title: "Mobile", field_type: "text", description: "Enter Listing URL" },
       
       // Direct Booking
       { title: "Direct Booking Page", field_type: "text", description: "Enter direct booking page URL" },
@@ -163,6 +168,79 @@ export const ONBOARDING_PHASES: PhaseDefinition[] = [
       { title: "Fire Extinguisher Locations", field_type: "textarea" },
       { title: "First Aid Kit Location", field_type: "text" },
       { title: "Water Main Shutoff Location", field_type: "text" },
+    ]
+  },
+  
+  {
+    id: 10,
+    title: "Property Specifications",
+    description: "Physical attributes and characteristics",
+    tasks: [
+      { title: "Brand Name", field_type: "text", description: "Marketing brand name for the property" },
+      { title: "Property Type Detail", field_type: "text", description: "SFH, Townhouse, Townhome, Condo, etc." },
+      { title: "Stories", field_type: "text", description: "Number of floors/stories" },
+      { title: "Square Footage", field_type: "text" },
+      { title: "Bedrooms", field_type: "text" },
+      { title: "Bathrooms", field_type: "text" },
+      { title: "Parking Type", field_type: "text", description: "Garage, driveway, carport, assigned spots, etc." },
+      { title: "Parking Capacity", field_type: "text", description: "Number of vehicles" },
+      { title: "Basement", field_type: "radio", options: ["Yes", "No"] },
+      { title: "Fenced Yard", field_type: "radio", options: ["Yes", "No", "Partially"] },
+      { title: "ADA Compliant", field_type: "radio", options: ["Yes", "No"] }
+    ]
+  },
+  
+  {
+    id: 11,
+    title: "Financial Terms & Pricing",
+    description: "Rent, deposits, fees, and financial details",
+    tasks: [
+      { title: "Monthly Rent", field_type: "currency" },
+      { title: "Nightly Rate", field_type: "currency" },
+      { title: "Security Deposit", field_type: "currency" },
+      { title: "Utility Cap", field_type: "currency" },
+      { title: "Cleaning Fee", field_type: "currency", description: "One-time move-out fee" },
+      { title: "Admin Fee", field_type: "currency", description: "One-time administrative fee" },
+      { title: "Pet Fee", field_type: "currency", description: "One-time pet fee per pet" },
+      { title: "Monthly Pet Rent", field_type: "currency", description: "Recurring monthly pet rent" },
+      { title: "Monthly Cleaning Fee", field_type: "currency", description: "Recurring monthly cleaning fee" }
+    ]
+  },
+  
+  {
+    id: 12,
+    title: "Pet & Lease Policies",
+    description: "Pet rules and lease term requirements",
+    tasks: [
+      { title: "Pets Allowed", field_type: "radio", options: ["Yes", "No"] },
+      { title: "Pet Rules", field_type: "textarea", description: "Max pets, weight limits, breed restrictions" },
+      { title: "Maximum Number of Pets", field_type: "text" },
+      { title: "Maximum Pet Weight (lbs)", field_type: "text" },
+      { title: "Lease Term", field_type: "text", description: "e.g., month to month, 2 months min., 12 months" },
+      { title: "Notice to Vacate", field_type: "text", description: "e.g., 30 days, 60 days" }
+    ]
+  },
+  
+  {
+    id: 13,
+    title: "Schools & Neighborhood",
+    description: "School district and nearby schools information",
+    tasks: [
+      { title: "School District", field_type: "text" },
+      { title: "Elementary School", field_type: "text" },
+      { title: "Middle School", field_type: "text" },
+      { title: "High School", field_type: "text" }
+    ]
+  },
+  
+  {
+    id: 14,
+    title: "Contact & Website Information",
+    description: "Property contact details and direct booking website",
+    tasks: [
+      { title: "Contact Email", field_type: "text" },
+      { title: "Contact Phone", field_type: "phone" },
+      { title: "Direct Booking Website", field_type: "text", description: "Property-specific website URL" }
     ]
   }
 ];
