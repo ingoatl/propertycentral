@@ -6,6 +6,7 @@ export interface Property {
   rentalType?: "hybrid" | "mid_term" | "long_term";
   createdAt: string;
   image_path?: string;
+  propertyType?: "Client-Managed" | "Company-Owned" | "Inactive";
 }
 
 export interface Visit {

@@ -913,6 +913,7 @@ export type Database = {
           image_path: string | null
           name: string
           owner_id: string | null
+          property_type: Database["public"]["Enums"]["property_type"] | null
           rental_type: string | null
           user_id: string | null
           visit_price: number
@@ -924,6 +925,7 @@ export type Database = {
           image_path?: string | null
           name: string
           owner_id?: string | null
+          property_type?: Database["public"]["Enums"]["property_type"] | null
           rental_type?: string | null
           user_id?: string | null
           visit_price?: number
@@ -935,6 +937,7 @@ export type Database = {
           image_path?: string | null
           name?: string
           owner_id?: string | null
+          property_type?: Database["public"]["Enums"]["property_type"] | null
           rental_type?: string | null
           user_id?: string | null
           visit_price?: number
@@ -1279,6 +1282,7 @@ export type Database = {
     Enums: {
       account_status: "pending" | "approved" | "rejected"
       app_role: "admin" | "user"
+      property_type: "Client-Managed" | "Company-Owned" | "Inactive"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1408,6 +1412,7 @@ export const Constants = {
     Enums: {
       account_status: ["pending", "approved", "rejected"],
       app_role: ["admin", "user"],
+      property_type: ["Client-Managed", "Company-Owned", "Inactive"],
     },
   },
 } as const

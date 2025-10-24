@@ -4,20 +4,16 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Trash2, MapPin, Building2, Edit, Mail, ClipboardList, FileText, Upload, Image as ImageIcon } from "lucide-react";
+import { Plus, Trash2, MapPin, Building2, Edit, ClipboardList, FileText, Upload, Image as ImageIcon, Search } from "lucide-react";
 import villa14Image from "@/assets/villa14.jpg";
 import { WorkflowDialog } from "@/components/onboarding/WorkflowDialog";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { OnboardingTab } from "@/components/onboarding/OnboardingTab";
 import { PropertyDetailsModal } from "@/components/onboarding/PropertyDetailsModal";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { supabase } from "@/integrations/supabase/client";
 import { Property } from "@/types";
 import { toast } from "sonner";
 import { z } from "zod";
-import { PropertyEmailInsights } from "@/components/PropertyEmailInsights";
 
 const propertySchema = z.object({
   name: z.string().trim().min(1, "Name is required").max(200, "Name must be less than 200 characters"),
@@ -33,13 +29,13 @@ const Properties = () => {
   const [loading, setLoading] = useState(false);
   const [editingProperty, setEditingProperty] = useState<Property | null>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [emailInsightsDialogOpen, setEmailInsightsDialogOpen] = useState(false);
-  const [selectedPropertyForInsights, setSelectedPropertyForInsights] = useState<Property | null>(null);
   const [selectedPropertyForDetails, setSelectedPropertyForDetails] = useState<{ id: string; name: string; projectId: string | null } | null>(null);
   const [selectedPropertyForWorkflow, setSelectedPropertyForWorkflow] = useState<{ id: string; name: string; address: string; projectId: string | null; visitPrice: number; taskId?: string } | null>(null);
   const [propertyProjects, setPropertyProjects] = useState<Record<string, string>>({});
   const [propertyProjectsProgress, setPropertyProjectsProgress] = useState<Record<string, number>>({});
   const [uploadingImage, setUploadingImage] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [propertyTypeFilter, setPropertyTypeFilter] = useState<"All" | "Client-Managed" | "Company-Owned" | "Inactive">("All");
   const [formData, setFormData] = useState({
     name: "",
     address: "",
@@ -58,13 +54,11 @@ const Properties = () => {
     loadPropertyProjects();
   }, []);
 
-  // Handle opening workflow from URL parameter
   useEffect(() => {
     const openWorkflowId = searchParams.get('openWorkflow');
     const taskId = searchParams.get('taskId');
     
     if (openWorkflowId && properties.length > 0) {
-      // Find the project and associated property
       const projectId = openWorkflowId;
       const propertyId = Object.entries(propertyProjects).find(
         ([_, pId]) => pId === projectId
@@ -81,7 +75,6 @@ const Properties = () => {
             visitPrice: property.visitPrice,
             taskId: taskId || undefined
           });
-          // Clear the URL parameters
           searchParams.delete('openWorkflow');
           searchParams.delete('taskId');
           setSearchParams(searchParams);
@@ -107,6 +100,7 @@ const Properties = () => {
         rentalType: p.rental_type as "hybrid" | "mid_term" | "long_term" | undefined,
         createdAt: p.created_at,
         image_path: p.image_path || (p.name.includes("Villa") && p.name.includes("14") ? villa14Image : undefined),
+        propertyType: p.property_type as "Client-Managed" | "Company-Owned" | "Inactive" | undefined,
       })));
     } catch (error: any) {
       if (import.meta.env.DEV) {
@@ -185,7 +179,6 @@ const Properties = () => {
 
     const visitPrice = parseFloat(formData.visitPrice);
     
-    // Validate with zod
     const validation = propertySchema.safeParse({
       name: formData.name,
       address: formData.address,
@@ -201,7 +194,6 @@ const Properties = () => {
     try {
       setLoading(true);
       
-      // Get current user
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
@@ -312,6 +304,196 @@ const Properties = () => {
     }
   };
 
+  // Filter properties
+  const filteredProperties = properties.filter(property => {
+    if (propertyTypeFilter !== "All") {
+      if (property.propertyType !== propertyTypeFilter) return false;
+    } else {
+      if (property.propertyType === "Inactive") return false;
+    }
+
+    if (searchQuery.trim()) {
+      const search = searchQuery.toLowerCase();
+      const matchesName = property.name.toLowerCase().includes(search);
+      const matchesAddress = property.address.toLowerCase().includes(search);
+      const matchesType = property.propertyType?.toLowerCase().includes(search);
+      const addressParts = property.address.split(',');
+      const city = addressParts.length > 1 ? addressParts[1].trim().toLowerCase() : '';
+      const matchesCity = city.includes(search);
+      return matchesName || matchesAddress || matchesCity || matchesType;
+    }
+
+    return true;
+  });
+
+  const clientManagedProperties = filteredProperties.filter(p => p.propertyType === "Client-Managed");
+  const companyOwnedProperties = filteredProperties.filter(p => p.propertyType === "Company-Owned");
+
+  const getPropertyTypeTag = (type?: string) => {
+    if (type === "Client-Managed") return "[Managed]";
+    if (type === "Company-Owned") return "[Owned]";
+    if (type === "Inactive") return "[Inactive]";
+    return "";
+  };
+
+  const getPropertyTypeColor = (type?: string) => {
+    if (type === "Client-Managed") return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300";
+    if (type === "Company-Owned") return "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300";
+    if (type === "Inactive") return "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300";
+    return "";
+  };
+
+  const renderPropertyCard = (property: Property, index: number) => (
+    <Card 
+      key={property.id}
+      className="shadow-card hover:shadow-warm transition-all duration-300 border-border/50 overflow-hidden group"
+      style={{ animationDelay: `${index * 0.05}s` }}
+    >
+      <div className="relative w-full aspect-[16/9] bg-muted overflow-hidden">
+        {property.image_path ? (
+          <img 
+            src={property.image_path} 
+            alt={property.name}
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center bg-gradient-subtle">
+            <ImageIcon className="w-12 h-12 text-muted-foreground/30" />
+          </div>
+        )}
+        
+        <div className="absolute top-1.5 right-1.5">
+          <label htmlFor={`upload-${property.id}`} className="cursor-pointer">
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              className="h-7 px-2 text-xs gap-1.5 shadow-lg backdrop-blur-sm bg-background/80 hover:bg-background/90"
+              disabled={uploadingImage === property.id}
+              onClick={(e) => {
+                e.preventDefault();
+                document.getElementById(`upload-${property.id}`)?.click();
+              }}
+            >
+              <Upload className="w-3 h-3" />
+              {uploadingImage === property.id ? "..." : "Upload"}
+            </Button>
+          </label>
+          <input
+            id={`upload-${property.id}`}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) handleImageUpload(property.id, file);
+            }}
+          />
+        </div>
+
+        <div className="absolute top-1.5 left-1.5 flex gap-1.5">
+          <Button
+            variant="secondary"
+            size="icon"
+            className="h-7 w-7 shadow-lg backdrop-blur-sm bg-background/80 hover:bg-background/90"
+            onClick={() => handleEdit(property)}
+          >
+            <Edit className="w-3 h-3" />
+          </Button>
+          <Button
+            variant="secondary"
+            size="icon"
+            className="h-7 w-7 shadow-lg backdrop-blur-sm bg-background/80 hover:bg-destructive hover:text-destructive-foreground"
+            onClick={() => handleDelete(property.id)}
+          >
+            <Trash2 className="w-3 h-3" />
+          </Button>
+        </div>
+      </div>
+
+      <CardHeader className="pb-2 pt-3 px-3">
+        <div className="flex items-start gap-2">
+          {property.propertyType && (
+            <span className={`inline-block px-2 py-0.5 text-[10px] font-bold rounded ${getPropertyTypeColor(property.propertyType)} flex-shrink-0`}>
+              {getPropertyTypeTag(property.propertyType)}
+            </span>
+          )}
+          <CardTitle className="text-base text-foreground group-hover:text-primary transition-colors line-clamp-2 flex-1">
+            {property.name}
+          </CardTitle>
+        </div>
+        <CardDescription className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
+          <MapPin className="w-3 h-3 flex-shrink-0" />
+          <span className="line-clamp-1">{property.address}</span>
+        </CardDescription>
+        {property.rentalType && (
+          <div className="pt-1">
+            <span className={`inline-block px-2 py-0.5 text-[10px] font-medium rounded-full ${
+              property.rentalType === 'hybrid' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' :
+              property.rentalType === 'mid_term' ? 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300' :
+              'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
+            }`}>
+              {property.rentalType === 'hybrid' ? '🔄 Hybrid' :
+               property.rentalType === 'mid_term' ? '🏠 Mid-term' :
+               '🏡 Long-term'}
+            </span>
+          </div>
+        )}
+      </CardHeader>
+      
+      <CardContent className="px-3 pb-3 space-y-2">
+        {propertyProjects[property.id] && (
+          <div className="space-y-1">
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-muted-foreground">Progress</span>
+              <span className="font-medium">{Math.round(propertyProjectsProgress[property.id] || 0)}%</span>
+            </div>
+            <div className="w-full bg-muted rounded-full h-1.5">
+              <div
+                className="bg-primary h-1.5 rounded-full transition-all duration-300"
+                style={{ width: `${propertyProjectsProgress[property.id] || 0}%` }}
+              />
+            </div>
+          </div>
+        )}
+
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            setSelectedPropertyForDetails({
+              id: property.id,
+              name: property.name,
+              projectId: propertyProjects[property.id] || null
+            });
+          }}
+          className="w-full h-8 text-xs"
+        >
+          <FileText className="w-3 h-3 mr-1.5" />
+          View Details
+        </Button>
+
+        <Button
+          variant="default"
+          size="sm"
+          onClick={() => {
+            setSelectedPropertyForWorkflow({
+              id: property.id,
+              name: property.name,
+              address: property.address,
+              projectId: propertyProjects[property.id] || null,
+              visitPrice: property.visitPrice
+            });
+          }}
+          className="w-full h-8 text-xs"
+        >
+          <ClipboardList className="w-3 h-3 mr-1.5" />
+          Onboarding
+        </Button>
+      </CardContent>
+    </Card>
+  );
+
   return (
     <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between pb-4 border-b border-border/50">
@@ -323,6 +505,34 @@ const Properties = () => {
           <Plus className="w-4 h-4" />
           Add Property
         </Button>
+      </div>
+
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            placeholder="Search by property name, address, city, or type..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+        <Select
+          value={propertyTypeFilter}
+          onValueChange={(value: "All" | "Client-Managed" | "Company-Owned" | "Inactive") =>
+            setPropertyTypeFilter(value)
+          }
+        >
+          <SelectTrigger className="w-full sm:w-[200px]">
+            <SelectValue placeholder="Filter by Type" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="All">All</SelectItem>
+            <SelectItem value="Client-Managed">Client-Managed</SelectItem>
+            <SelectItem value="Company-Owned">Company-Owned</SelectItem>
+            <SelectItem value="Inactive">Inactive</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       {showForm && (
@@ -374,11 +584,11 @@ const Properties = () => {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="rentalType">Rental Type</Label>
-              <Select
-                value={formData.rentalType}
-                onValueChange={(value: "hybrid" | "mid_term" | "long_term") =>
-                  setFormData({ ...formData, rentalType: value })
-                }
+                <Select
+                  value={formData.rentalType}
+                  onValueChange={(value: "hybrid" | "mid_term" | "long_term") =>
+                    setFormData({ ...formData, rentalType: value })
+                  }
                 >
                   <SelectTrigger id="rentalType">
                     <SelectValue placeholder="Select rental type..." />
@@ -403,22 +613,6 @@ const Properties = () => {
         </Card>
       )}
 
-      {/* Email Insights Dialog */}
-      <Dialog open={emailInsightsDialogOpen} onOpenChange={setEmailInsightsDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Email Insights - {selectedPropertyForInsights?.name}</DialogTitle>
-            <DialogDescription>
-              AI-generated insights from emails related to this property
-            </DialogDescription>
-          </DialogHeader>
-          {selectedPropertyForInsights && (
-            <PropertyEmailInsights propertyId={selectedPropertyForInsights.id} />
-          )}
-        </DialogContent>
-      </Dialog>
-
-      {/* Edit Property Dialog */}
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
         <DialogContent>
           <DialogHeader>
@@ -495,202 +689,83 @@ const Properties = () => {
         </DialogContent>
       </Dialog>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3">
-        {properties.length === 0 ? (
-          <Card className="col-span-full shadow-card border-border/50">
-            <CardContent className="pt-12 pb-12 text-center">
-              <Building2 className="h-12 w-12 text-muted-foreground mx-auto mb-4 opacity-50" />
-              <p className="text-muted-foreground">No properties yet. Add your first property to get started!</p>
-            </CardContent>
-          </Card>
-        ) : (
-          properties.map((property, index) => (
-            <Card 
-              key={property.id}
-              className="shadow-card hover:shadow-warm transition-all duration-300 border-border/50 overflow-hidden group"
-              style={{ animationDelay: `${index * 0.05}s` }}
-            >
-              {/* Property Image - Reduced aspect ratio */}
-              <div className="relative w-full aspect-[16/9] bg-muted overflow-hidden">
-                {property.image_path ? (
-                  <img 
-                    src={property.image_path} 
-                    alt={property.name}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center bg-gradient-subtle">
-                    <ImageIcon className="w-12 h-12 text-muted-foreground/30" />
-                  </div>
-                )}
-                
-                {/* Upload Button Overlay - Smaller */}
-                <div className="absolute top-1.5 right-1.5">
-                  <label 
-                    htmlFor={`upload-${property.id}`}
-                    className="cursor-pointer"
-                  >
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="secondary"
-                      className="h-7 px-2 text-xs gap-1.5 shadow-lg backdrop-blur-sm bg-background/80 hover:bg-background/90"
-                      disabled={uploadingImage === property.id}
-                      onClick={(e) => {
-                        e.preventDefault();
-                        document.getElementById(`upload-${property.id}`)?.click();
-                      }}
-                    >
-                      <Upload className="w-3 h-3" />
-                      {uploadingImage === property.id ? "..." : "Upload"}
-                    </Button>
-                  </label>
-                  <input
-                    id={`upload-${property.id}`}
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) handleImageUpload(property.id, file);
-                    }}
-                  />
-                </div>
+      {clientManagedProperties.length > 0 && (
+        <div className="space-y-4">
+          <div className="flex items-center gap-2 pb-2 border-b border-border/40">
+            <Building2 className="w-5 h-5 text-primary" />
+            <h2 className="text-xl font-semibold text-foreground">
+              UNDER MANAGEMENT (Client Properties)
+            </h2>
+            <span className="text-sm text-muted-foreground">({clientManagedProperties.length})</span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3">
+            {clientManagedProperties.map(renderPropertyCard)}
+          </div>
+        </div>
+      )}
 
-                {/* Action Buttons Overlay - Smaller */}
-                <div className="absolute top-1.5 left-1.5 flex gap-1.5">
-                  <Button
-                    variant="secondary"
-                    size="icon"
-                    className="h-7 w-7 shadow-lg backdrop-blur-sm bg-background/80 hover:bg-background/90"
-                    onClick={() => handleEdit(property)}
-                  >
-                    <Edit className="w-3 h-3" />
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    size="icon"
-                    className="h-7 w-7 shadow-lg backdrop-blur-sm bg-background/80 hover:bg-destructive hover:text-destructive-foreground"
-                    onClick={() => handleDelete(property.id)}
-                  >
-                    <Trash2 className="w-3 h-3" />
-                  </Button>
-                </div>
-              </div>
+      {companyOwnedProperties.length > 0 && (
+        <div className="space-y-4">
+          <div className="flex items-center gap-2 pb-2 border-b border-border/40">
+            <Building2 className="w-5 h-5 text-primary" />
+            <h2 className="text-xl font-semibold text-foreground">
+              PEACHAUS PORTFOLIO (Owned & Operated)
+            </h2>
+            <span className="text-sm text-muted-foreground">({companyOwnedProperties.length})</span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3">
+            {companyOwnedProperties.map(renderPropertyCard)}
+          </div>
+        </div>
+      )}
 
-              <CardHeader className="pb-2 pt-3 px-3">
-                <CardTitle className="text-base text-foreground group-hover:text-primary transition-colors line-clamp-1">
-                  {property.name}
-                </CardTitle>
-                <CardDescription className="flex items-center gap-1 text-xs text-muted-foreground">
-                  <MapPin className="w-3 h-3 flex-shrink-0" />
-                  <span className="line-clamp-1">{property.address}</span>
-                </CardDescription>
-                {property.rentalType && (
-                  <div className="pt-1">
-                    <span className={`inline-block px-2 py-0.5 text-[10px] font-medium rounded-full ${
-                      property.rentalType === 'hybrid' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' :
-                      property.rentalType === 'mid_term' ? 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300' :
-                      'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
-                    }`}>
-                      {property.rentalType === 'hybrid' ? '🔄 Hybrid' :
-                       property.rentalType === 'mid_term' ? '🏠 Mid-term' :
-                       '🏡 Long-term'}
-                    </span>
-                  </div>
-                )}
-              </CardHeader>
-              
-              <CardContent className="px-3 pb-3 space-y-2">
-                {/* Onboarding Progress - More compact */}
-                {propertyProjects[property.id] && (
-                  <div className="space-y-1">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-muted-foreground">Progress</span>
-                      <span className="font-medium">{Math.round(propertyProjectsProgress[property.id] || 0)}%</span>
-                    </div>
-                    <div className="w-full bg-muted rounded-full h-1.5">
-                      <div
-                        className="bg-primary h-1.5 rounded-full transition-all duration-300"
-                        style={{ width: `${propertyProjectsProgress[property.id] || 0}%` }}
-                      />
-                    </div>
-                  </div>
-                )}
+      {filteredProperties.length === 0 && (
+        <Card className="shadow-card border-border/50">
+          <CardContent className="pt-12 pb-12 text-center">
+            <Building2 className="h-12 w-12 text-muted-foreground mx-auto mb-4 opacity-50" />
+            <p className="text-muted-foreground">
+              {properties.length === 0 
+                ? "No properties yet. Add your first property to get started!" 
+                : "No properties match your search criteria."}
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setSelectedPropertyForDetails({
-                      id: property.id,
-                      name: property.name,
-                      projectId: propertyProjects[property.id] || null
-                    });
-                  }}
-                  className="w-full h-8 text-xs"
-                >
-                  <FileText className="w-3 h-3 mr-1.5" />
-                  View Details
-                </Button>
+      {selectedPropertyForWorkflow && (
+        <WorkflowDialog
+          open={!!selectedPropertyForWorkflow}
+          onOpenChange={(open) => {
+            if (!open) setSelectedPropertyForWorkflow(null);
+          }}
+          project={selectedPropertyForWorkflow.projectId ? {
+            id: selectedPropertyForWorkflow.projectId,
+            property_id: selectedPropertyForWorkflow.id,
+            owner_name: '',
+            property_address: selectedPropertyForWorkflow.address,
+            status: 'in-progress',
+            progress: 0,
+            created_at: '',
+            updated_at: ''
+          } : null}
+          propertyId={selectedPropertyForWorkflow.id}
+          propertyName={selectedPropertyForWorkflow.name}
+          propertyAddress={selectedPropertyForWorkflow.address}
+          visitPrice={selectedPropertyForWorkflow.visitPrice}
+          taskId={selectedPropertyForWorkflow.taskId}
+          onUpdate={loadPropertyProjects}
+        />
+      )}
 
-                <Button
-                  variant="default"
-                  size="sm"
-                  onClick={() => {
-                    setSelectedPropertyForWorkflow({
-                      id: property.id,
-                      name: property.name,
-                      address: property.address,
-                      projectId: propertyProjects[property.id] || null,
-                      visitPrice: property.visitPrice
-                    });
-                  }}
-                  className="w-full h-8 text-xs"
-                >
-                  <ClipboardList className="w-3 h-3 mr-1.5" />
-                  Onboarding
-                </Button>
-              </CardContent>
-            </Card>
-          ))
-        )}
-      </div>
-
-        {selectedPropertyForWorkflow && (
-          <WorkflowDialog
-            open={!!selectedPropertyForWorkflow}
-            onOpenChange={(open) => {
-              if (!open) setSelectedPropertyForWorkflow(null);
-            }}
-            project={selectedPropertyForWorkflow.projectId ? {
-              id: selectedPropertyForWorkflow.projectId,
-              property_id: selectedPropertyForWorkflow.id,
-              owner_name: '',
-              property_address: selectedPropertyForWorkflow.address,
-              status: 'in-progress',
-              progress: 0,
-              created_at: '',
-              updated_at: ''
-            } : null}
-            propertyId={selectedPropertyForWorkflow.id}
-            propertyName={selectedPropertyForWorkflow.name}
-            propertyAddress={selectedPropertyForWorkflow.address}
-            visitPrice={selectedPropertyForWorkflow.visitPrice}
-            taskId={selectedPropertyForWorkflow.taskId}
-            onUpdate={loadPropertyProjects}
-          />
-        )}
-
-        {selectedPropertyForDetails && (
-          <PropertyDetailsModal
-            open={!!selectedPropertyForDetails}
-            onOpenChange={(open) => !open && setSelectedPropertyForDetails(null)}
-            projectId={selectedPropertyForDetails.projectId}
-            propertyName={selectedPropertyForDetails.name}
-            propertyId={selectedPropertyForDetails.id}
-          />
-        )}
+      {selectedPropertyForDetails && (
+        <PropertyDetailsModal
+          open={!!selectedPropertyForDetails}
+          onOpenChange={(open) => !open && setSelectedPropertyForDetails(null)}
+          projectId={selectedPropertyForDetails.projectId}
+          propertyName={selectedPropertyForDetails.name}
+          propertyId={selectedPropertyForDetails.id}
+        />
+      )}
     </div>
   );
 };
