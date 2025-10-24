@@ -10,7 +10,6 @@ interface AdminControlsSidebarProps {
   onDeleteTask: () => void;
   onViewSOP: () => void;
   onEditSOP: () => void;
-  onAssignTask: () => void;
   onUpdateDueDate: () => void;
   onAddFAQ: () => void;
 }
@@ -22,7 +21,6 @@ export const AdminControlsSidebar = ({
   onDeleteTask,
   onViewSOP,
   onEditSOP,
-  onAssignTask,
   onUpdateDueDate,
   onAddFAQ,
 }: AdminControlsSidebarProps) => {
@@ -85,24 +83,6 @@ export const AdminControlsSidebar = ({
           <FileText className="w-3 h-3 mr-2" />
           Add SOP
         </Button>
-      )}
-
-      <Separator className="my-2" />
-
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={onAssignTask}
-        className="w-full justify-start text-xs"
-      >
-        <User className="w-3 h-3 mr-2" />
-        {task.assigned_to_uuid ? "Reassign" : "Assign Task"}
-      </Button>
-
-      {task.assigned_to_uuid && (
-        <div className="text-xs text-muted-foreground pl-2 py-1">
-          Assigned to: {task.assigned_to || "User"}
-        </div>
       )}
 
       <Separator className="my-2" />

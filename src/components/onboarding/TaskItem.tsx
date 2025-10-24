@@ -144,7 +144,7 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
     
     // Step 2: Check for role-based assignment on the task
     if (task.assigned_role_id) {
-      const { data: userRole } = await supabase
+      const { data: userRoles } = await supabase
         .from("user_team_roles")
         .select(`
           profiles (
@@ -153,12 +153,23 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
           )
         `)
         .eq("role_id", task.assigned_role_id)
-        .limit(1)
-        .maybeSingle();
+        .order('profiles(first_name)');
       
-      if (userRole?.profiles) {
-        const profile = userRole.profiles as any;
-        setAssignedUserName(profile.first_name || profile.email?.split('@')[0] || 'Unknown');
+      if (userRoles && userRoles.length > 0) {
+        const names = userRoles
+          .map(ur => {
+            const profile = ur.profiles as any;
+            return profile.first_name || profile.email?.split('@')[0] || 'Unknown';
+          })
+          .filter(name => name !== 'Unknown');
+        
+        if (names.length === 1) {
+          setAssignedUserName(names[0]);
+        } else if (names.length === 2) {
+          setAssignedUserName(names.join(', '));
+        } else if (names.length > 2) {
+          setAssignedUserName(`${names[0]} +${names.length - 1}`);
+        }
         return;
       }
     }
@@ -171,7 +182,7 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
       .maybeSingle();
     
     if (phaseAssignment?.role_id) {
-      const { data: userRole } = await supabase
+      const { data: userRoles } = await supabase
         .from("user_team_roles")
         .select(`
           profiles (
@@ -180,12 +191,23 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
           )
         `)
         .eq("role_id", phaseAssignment.role_id)
-        .limit(1)
-        .maybeSingle();
+        .order('profiles(first_name)');
       
-      if (userRole?.profiles) {
-        const profile = userRole.profiles as any;
-        setAssignedUserName(profile.first_name || profile.email?.split('@')[0] || 'Unknown');
+      if (userRoles && userRoles.length > 0) {
+        const names = userRoles
+          .map(ur => {
+            const profile = ur.profiles as any;
+            return profile.first_name || profile.email?.split('@')[0] || 'Unknown';
+          })
+          .filter(name => name !== 'Unknown');
+        
+        if (names.length === 1) {
+          setAssignedUserName(names[0]);
+        } else if (names.length === 2) {
+          setAssignedUserName(names.join(', '));
+        } else if (names.length > 2) {
+          setAssignedUserName(`${names[0]} +${names.length - 1}`);
+        }
       }
     }
   };
@@ -1145,9 +1167,9 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
                   variant="outline"
                   size="sm"
                   onClick={() => setShowAssignmentDialog(true)}
-                  className="h-8 gap-2 text-xs"
+                  className="h-8 gap-2 text-xs whitespace-nowrap"
                 >
-                  <User className="w-3.5 h-3.5" />
+                  <User className="w-3.5 h-3.5 flex-shrink-0" />
                   <span className="font-medium">{assignedUserName}</span>
                   <span className="text-muted-foreground">• Reassign</span>
                 </Button>
@@ -1335,7 +1357,6 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
               onDeleteTask={handleRequestDelete}
               onViewSOP={() => setShowSOPDialog(true)}
               onEditSOP={() => setShowSOPFormDialog(true)}
-              onAssignTask={() => setShowAssignmentDialog(true)}
               onUpdateDueDate={handleDueDateClick}
               onAddFAQ={() => setShowFAQDialog(true)}
             />
