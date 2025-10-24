@@ -20,7 +20,7 @@ interface UserWithRoles {
   id: string;
   email: string;
   first_name: string | null;
-  roles: { role_id: string; role_name: string }[];
+  roles: { role_id: string; role_name: string; is_primary: boolean }[];
 }
 
 interface PhaseAssignment {
@@ -69,10 +69,10 @@ export const TeamMatrixTab = () => {
 
     if (profilesError) throw profilesError;
 
-    // Get all user team role assignments
+    // Get all user team role assignments with is_primary
     const { data: teamRolesData } = await supabase
       .from("user_team_roles")
-      .select("user_id, role_id, team_roles(role_name)");
+      .select("user_id, role_id, is_primary, team_roles(role_name)");
 
     const usersWithRoles = profilesData?.map((profile) => {
       const userRoles = teamRolesData?.filter((tr) => tr.user_id === profile.id) || [];
@@ -81,6 +81,7 @@ export const TeamMatrixTab = () => {
         roles: userRoles.map((tr) => ({
           role_id: tr.role_id,
           role_name: tr.team_roles?.role_name || "",
+          is_primary: tr.is_primary || false,
         })),
       };
     }) || [];
@@ -152,17 +153,28 @@ export const TeamMatrixTab = () => {
 
   const handleAddRoleToUser = async (userId: string, roleId: string) => {
     try {
+      // Check if this role already has a primary user
+      const { data: existingPrimary } = await supabase
+        .from("user_team_roles")
+        .select("user_id")
+        .eq("role_id", roleId)
+        .eq("is_primary", true)
+        .single();
+
+      // If no primary exists, make this user primary
+      const isPrimary = !existingPrimary;
+
       const { error } = await supabase
         .from("user_team_roles")
         .insert({
           user_id: userId,
           role_id: roleId,
-          is_primary: false,
+          is_primary: isPrimary,
         });
 
       if (error) throw error;
 
-      toast.success("Role added");
+      toast.success(isPrimary ? "Role assigned as primary" : "Role assigned");
       loadUsers();
     } catch (error: any) {
       toast.error("Failed to add role: " + error.message);
@@ -171,6 +183,16 @@ export const TeamMatrixTab = () => {
 
   const handleRemoveRoleFromUser = async (userId: string, roleId: string) => {
     try {
+      // Check if this was the primary user
+      const { data: roleAssignment } = await supabase
+        .from("user_team_roles")
+        .select("is_primary")
+        .eq("user_id", userId)
+        .eq("role_id", roleId)
+        .single();
+
+      const wasPrimary = roleAssignment?.is_primary;
+
       const { error } = await supabase
         .from("user_team_roles")
         .delete()
@@ -179,10 +201,73 @@ export const TeamMatrixTab = () => {
 
       if (error) throw error;
 
+      // If we removed the primary user, promote another user with this role to primary
+      if (wasPrimary) {
+        const { data: otherUsers } = await supabase
+          .from("user_team_roles")
+          .select("user_id")
+          .eq("role_id", roleId)
+          .limit(1);
+
+        if (otherUsers && otherUsers.length > 0) {
+          await supabase
+            .from("user_team_roles")
+            .update({ is_primary: true })
+            .eq("user_id", otherUsers[0].user_id)
+            .eq("role_id", roleId);
+        }
+      }
+
       toast.success("Role removed");
       loadUsers();
     } catch (error: any) {
       toast.error("Failed to remove role: " + error.message);
+    }
+  };
+
+  const handleSetPrimaryRole = async (userId: string, roleId: string) => {
+    try {
+      // Remove primary status from all users with this role
+      await supabase
+        .from("user_team_roles")
+        .update({ is_primary: false })
+        .eq("role_id", roleId);
+
+      // Set this user as primary
+      const { error } = await supabase
+        .from("user_team_roles")
+        .update({ is_primary: true })
+        .eq("user_id", userId)
+        .eq("role_id", roleId);
+
+      if (error) throw error;
+
+      toast.success("Primary user updated");
+      loadUsers();
+      
+      // Auto-assign tasks for this role
+      await autoAssignTasksForRole(roleId, userId);
+    } catch (error: any) {
+      toast.error("Failed to set primary: " + error.message);
+    }
+  };
+
+  const autoAssignTasksForRole = async (roleId: string, userId: string) => {
+    try {
+      const { data: tasks, error } = await supabase
+        .from("onboarding_tasks")
+        .update({ assigned_to_uuid: userId })
+        .eq("assigned_role_id", roleId)
+        .neq("status", "completed")
+        .select("id");
+
+      if (error) throw error;
+      
+      if (tasks && tasks.length > 0) {
+        toast.success(`Reassigned ${tasks.length} tasks to new primary user`);
+      }
+    } catch (error: any) {
+      console.error("Error reassigning tasks:", error);
     }
   };
 
@@ -429,13 +514,28 @@ export const TeamMatrixTab = () => {
                         user.roles.map((role) => (
                           <div
                             key={role.role_id}
-                            className="flex items-center gap-1 bg-primary/10 text-primary px-2 py-1 rounded-md text-sm"
+                            className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm ${
+                              role.is_primary 
+                                ? 'bg-primary text-primary-foreground font-medium' 
+                                : 'bg-muted text-muted-foreground'
+                            }`}
                           >
                             <span>{role.role_name}</span>
+                            {role.is_primary && <span className="text-xs">(Primary)</span>}
+                            {!role.is_primary && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-5 px-2 text-xs hover:bg-background/20"
+                                onClick={() => handleSetPrimaryRole(user.id, role.role_id)}
+                              >
+                                Set Primary
+                              </Button>
+                            )}
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-4 w-4 p-0 hover:bg-destructive/20"
+                              className="h-4 w-4 p-0 hover:bg-destructive/20 ml-1"
                               onClick={() => handleRemoveRoleFromUser(user.id, role.role_id)}
                             >
                               <Trash2 className="w-3 h-3" />
