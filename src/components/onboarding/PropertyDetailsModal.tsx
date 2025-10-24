@@ -214,8 +214,11 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
         } else {
           categories['Property Details'].push({ label: task.title, value, icon: Home });
         }
-      } else if (title.includes('listing') || title.includes('airbnb') || title.includes('vrbo') || title.includes('link') || title.includes('url') || title.includes('direct booking')) {
+      } else if (title.includes('airbnb') || title.includes('vrbo') || title.includes('direct booking') || title.includes('direct website') || (title.includes('booking') && title.includes('website'))) {
         // Skip listing URLs as they're shown in the top Property Information card
+        return;
+      } else if (title.includes('listing') || title.includes('link') || title.includes('url')) {
+        // Skip other listing-related items
         return;
       } else if (title.includes('cleaner') || title.includes('maintenance') || title.includes('vendor') || title.includes('service')) {
         categories['Service Providers'].push({ label: task.title, value });
@@ -339,7 +342,7 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
                       {(() => {
                         const airbnbTask = tasks.find(t => t.title.toLowerCase().includes('airbnb'));
                         const vrboTask = tasks.find(t => t.title.toLowerCase().includes('vrbo'));
-                        const directTask = tasks.find(t => t.title.toLowerCase().includes('direct booking'));
+                        const directTask = tasks.find(t => t.title.toLowerCase().includes('direct booking') || t.title.toLowerCase().includes('direct website'));
                         
                         return (airbnbTask?.field_value || vrboTask?.field_value || directTask?.field_value) && (
                           <div className="pb-3 border-b border-border/50">
@@ -416,9 +419,9 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
                                     variant="ghost"
                                     size="icon"
                                     className="h-7 w-7 flex-shrink-0"
-                                    onClick={() => copyToClipboard(directTask.field_value!, "Direct Booking URL")}
+                                    onClick={() => copyToClipboard(directTask.field_value!, "Direct Booking Website")}
                                   >
-                                    {copiedField === "Direct Booking URL" ? (
+                                    {copiedField === "Direct Booking Website" ? (
                                       <Check className="h-3.5 w-3.5 text-green-600" />
                                     ) : (
                                       <Copy className="h-3.5 w-3.5" />
