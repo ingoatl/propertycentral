@@ -67,6 +67,7 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
   const [showBugDialog, setShowBugDialog] = useState(false);
   const [attachmentsKey, setAttachmentsKey] = useState(0);
   const [debounceTimer, setDebounceTimer] = useState<NodeJS.Timeout | null>(null);
+  const [assignedUserName, setAssignedUserName] = useState<string | null>(null);
   
   const { isAdmin } = useAdminCheck();
   const hasValue = task.field_value && task.field_value.trim() !== "";
@@ -81,6 +82,15 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
       loadAnsweredFAQs();
     }
   }, [task.id, isCollapsed]);
+  
+  useEffect(() => {
+    // Load assigned user's first name when task is assigned
+    if (task.assigned_to_uuid) {
+      loadAssignedUserName();
+    } else {
+      setAssignedUserName(null);
+    }
+  }, [task.assigned_to_uuid]);
 
   // Auto-correct status if task has data but is marked as pending
   useEffect(() => {
@@ -119,6 +129,20 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
       .maybeSingle();
 
     setSOP(data);
+  };
+  
+  const loadAssignedUserName = async () => {
+    if (!task.assigned_to_uuid) return;
+    
+    const { data } = await supabase
+      .from("profiles")
+      .select("first_name, email")
+      .eq("id", task.assigned_to_uuid)
+      .maybeSingle();
+    
+    if (data) {
+      setAssignedUserName(data.first_name || data.email?.split('@')[0] || 'Unknown');
+    }
   };
 
   const loadAnsweredFAQs = async () => {
@@ -1070,11 +1094,30 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
                 />
               )}
               
-              {task.assigned_to_uuid && (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <User className="w-4 h-4" />
-                  <span>Assigned to: <span className="font-medium">{task.assigned_to}</span></span>
-                </div>
+              {/* Show assigned user for admins */}
+              {isAdmin && task.assigned_to_uuid && assignedUserName && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowAssignmentDialog(true)}
+                  className="h-8 gap-2 text-xs"
+                >
+                  <User className="w-3.5 h-3.5" />
+                  Assigned to: <span className="font-medium">{assignedUserName}</span>
+                </Button>
+              )}
+              
+              {/* Show unassigned state for admins */}
+              {isAdmin && !task.assigned_to_uuid && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowAssignmentDialog(true)}
+                  className="h-8 gap-2 text-xs text-muted-foreground"
+                >
+                  <User className="w-3.5 h-3.5" />
+                  Unassigned - Click to assign
+                </Button>
               )}
             </div>
 
