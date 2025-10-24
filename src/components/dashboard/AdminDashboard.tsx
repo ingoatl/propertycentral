@@ -114,53 +114,122 @@ export const AdminDashboard = ({ summaries, onExport, onSync, syncing, onSendOve
 
   const loadTeamData = async () => {
     try {
+      // Fetch all tasks with role assignments
       const { data: tasks } = await supabase
         .from("onboarding_tasks")
         .select(`
-          assigned_to, 
+          id,
           status,
+          phase_number,
+          assigned_role_id,
           project_id,
-          onboarding_projects (
-            property_address
-          )
+          onboarding_projects!inner(property_address)
         `);
 
-      if (tasks) {
-        const memberStats = tasks.reduce((acc, task) => {
-          const name = task.assigned_to || "Unassigned";
-          if (!acc[name]) {
-            acc[name] = { 
-              name, 
-              tasksCompleted: 0, 
-              tasksTotal: 0, 
-              completionRate: 0,
-              properties: new Set<string>()
+      // Fetch user-role mappings
+      const { data: userRoles } = await supabase
+        .from("user_team_roles")
+        .select(`
+          user_id,
+          role_id,
+          profiles!inner(first_name, id),
+          team_roles!inner(role_name)
+        `);
+
+      if (!tasks || !userRoles) return;
+
+      // Create role->users mapping
+      const roleToUsers = userRoles.reduce((acc, ur: any) => {
+        const roleId = ur.role_id;
+        if (!acc[roleId]) {
+          acc[roleId] = [];
+        }
+        acc[roleId].push({
+          userId: ur.profiles.id,
+          name: ur.profiles.first_name,
+          roleName: ur.team_roles.role_name
+        });
+        return acc;
+      }, {} as Record<string, Array<{ userId: string; name: string; roleName: string }>>);
+
+      // Build member stats by aggregating tasks
+      const memberStats: Record<string, any> = {};
+
+      tasks.forEach((task: any) => {
+        const roleId = task.assigned_role_id;
+        
+        if (!roleId) {
+          // Handle unassigned tasks
+          if (!memberStats["Unassigned"]) {
+            memberStats["Unassigned"] = {
+              name: "Unassigned",
+              roleName: undefined,
+              tasksCompleted: 0,
+              tasksTotal: 0,
+              properties: new Set<string>(),
+              phases: new Set<number>()
             };
           }
-          acc[name].tasksTotal++;
+          memberStats["Unassigned"].tasksTotal++;
           if (task.status === "completed") {
-            acc[name].tasksCompleted++;
+            memberStats["Unassigned"].tasksCompleted++;
           }
-          // Add property address if available
           if (task.onboarding_projects?.property_address) {
-            acc[name].properties.add(task.onboarding_projects.property_address);
+            memberStats["Unassigned"].properties.add(task.onboarding_projects.property_address);
           }
-          return acc;
-        }, {} as Record<string, any>);
+          if (task.phase_number) {
+            memberStats["Unassigned"].phases.add(task.phase_number);
+          }
+          return;
+        }
 
-        const members = Object.values(memberStats).map((m: any) => ({
-          name: m.name,
-          tasksCompleted: m.tasksCompleted,
-          tasksTotal: m.tasksTotal,
-          completionRate: m.tasksTotal > 0 ? (m.tasksCompleted / m.tasksTotal) * 100 : 0,
-          properties: Array.from(m.properties),
-        }));
+        const usersForRole = roleToUsers[roleId] || [];
+        
+        // Split credit among users with this role
+        const taskShare = usersForRole.length > 0 ? 1 / usersForRole.length : 0;
 
-        const totalTasks = tasks.length;
-        const completedTasks = tasks.filter(t => t.status === "completed").length;
+        usersForRole.forEach((user) => {
+          const key = `${user.name}-${user.roleName}`;
+          
+          if (!memberStats[key]) {
+            memberStats[key] = {
+              name: user.name,
+              roleName: user.roleName,
+              tasksCompleted: 0,
+              tasksTotal: 0,
+              properties: new Set<string>(),
+              phases: new Set<number>()
+            };
+          }
 
-        setTeamData({ members, totalTasks, completedTasks });
-      }
+          memberStats[key].tasksTotal += taskShare;
+          if (task.status === "completed") {
+            memberStats[key].tasksCompleted += taskShare;
+          }
+          if (task.onboarding_projects?.property_address) {
+            memberStats[key].properties.add(task.onboarding_projects.property_address);
+          }
+          if (task.phase_number) {
+            memberStats[key].phases.add(task.phase_number);
+          }
+        });
+      });
+
+      // Convert to array format
+      const members = Object.values(memberStats).map((m: any) => ({
+        name: m.name,
+        roleName: m.roleName,
+        phases: Array.from(m.phases).sort((a: number, b: number) => a - b),
+        tasksCompleted: Math.round(m.tasksCompleted),
+        tasksTotal: Math.round(m.tasksTotal),
+        completionRate: m.tasksTotal > 0 ? (m.tasksCompleted / m.tasksTotal) * 100 : 0,
+        properties: Array.from(m.properties),
+      }));
+
+      const totalTasks = tasks.length;
+      const completedTasks = tasks.filter((t: any) => t.status === "completed").length;
+
+      setTeamData({ members, totalTasks, completedTasks });
     } catch (error) {
       console.error("Error loading team data:", error);
     }

@@ -5,6 +5,8 @@ import { Badge } from "@/components/ui/badge";
 
 interface TeamMember {
   name: string;
+  roleName?: string;
+  phases?: number[];
   tasksCompleted: number;
   tasksTotal: number;
   completionRate: number;
@@ -90,7 +92,19 @@ export const EnhancedTeamPerformance = ({ teamMembers, totalTasks, completedTask
               </div>
               <div className="flex-1">
                 <p className="text-sm font-medium text-muted-foreground">Best Performer - Most Tasks Completed</p>
-                <p className="text-lg font-bold">{topPerformer.name}</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-lg font-bold">{topPerformer.name}</p>
+                  {topPerformer.roleName && (
+                    <Badge variant="secondary" className="text-xs">
+                      {topPerformer.roleName}
+                    </Badge>
+                  )}
+                </div>
+                {topPerformer.phases && topPerformer.phases.length > 0 && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Owns Phases: {topPerformer.phases.sort((a, b) => a - b).join(", ")}
+                  </p>
+                )}
               </div>
               <div className="text-right">
                 <p className="text-2xl font-bold text-primary">{topPerformer.tasksCompleted}</p>
@@ -141,7 +155,19 @@ export const EnhancedTeamPerformance = ({ teamMembers, totalTasks, completedTask
                           {index + 1}
                         </div>
                         <div className="flex-1">
-                          <span className="text-sm font-medium text-foreground">{member.name}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium text-foreground">{member.name}</span>
+                            {member.roleName && (
+                              <Badge variant="secondary" className="text-xs">
+                                {member.roleName}
+                              </Badge>
+                            )}
+                          </div>
+                          {member.phases && member.phases.length > 0 && (
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              Phases: {member.phases.sort((a, b) => a - b).join(", ")}
+                            </p>
+                          )}
                           <div className="flex items-center gap-2 mt-1">
                             <Badge variant={badge.variant} className="text-xs">
                               {badge.label}
