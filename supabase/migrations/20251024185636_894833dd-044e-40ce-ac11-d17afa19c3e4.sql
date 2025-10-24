@@ -1,0 +1,98 @@
+-- Import comprehensive property data from CSV for all managed properties
+-- This will populate all onboarding task field_value entries with actual data
+
+-- Villa 14 (4241 Osburn Ct, Duluth) - The Alpine
+UPDATE onboarding_tasks SET field_value = 'The Alpine' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%4241 Osburn%') AND title = 'Brand Name';
+UPDATE onboarding_tasks SET field_value = 'SFH' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%4241 Osburn%') AND title = 'Property Type Detail';
+UPDATE onboarding_tasks SET field_value = '2' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%4241 Osburn%') AND title = 'Stories';
+UPDATE onboarding_tasks SET field_value = '1 car garage plus driveway parking for 4 cars' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%4241 Osburn%') AND title = 'Parking Type';
+UPDATE onboarding_tasks SET field_value = '5' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%4241 Osburn%') AND title = 'Parking Capacity';
+UPDATE onboarding_tasks SET field_value = 'YES' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%4241 Osburn%') AND title = 'Fenced Yard';
+UPDATE onboarding_tasks SET field_value = '3' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%4241 Osburn%') AND title = 'Bedrooms';
+UPDATE onboarding_tasks SET field_value = '3' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%4241 Osburn%') AND title = 'Bathrooms';
+UPDATE onboarding_tasks SET field_value = '2000' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%4241 Osburn%') AND title = 'Square Footage';
+UPDATE onboarding_tasks SET field_value = 'Yes' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%4241 Osburn%') AND title = 'Pets Allowed';
+UPDATE onboarding_tasks SET field_value = '2 dogs max, up to 40 lbs' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%4241 Osburn%') AND title = 'Pet Rules';
+UPDATE onboarding_tasks SET field_value = '2' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%4241 Osburn%') AND title = 'Maximum Number of Pets';
+UPDATE onboarding_tasks SET field_value = '40' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%4241 Osburn%') AND title = 'Maximum Pet Weight (lbs)';
+UPDATE onboarding_tasks SET field_value = '$7,050.00' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%4241 Osburn%') AND title = 'Monthly Rent';
+UPDATE onboarding_tasks SET field_value = '$235.00' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%4241 Osburn%') AND title = 'Nightly Rate';
+UPDATE onboarding_tasks SET field_value = '$1,500.00' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%4241 Osburn%') AND title = 'Security Deposit';
+UPDATE onboarding_tasks SET field_value = '$500.00' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%4241 Osburn%') AND title = 'Utility Cap';
+UPDATE onboarding_tasks SET field_value = '$450.00' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%4241 Osburn%') AND title = 'Cleaning Fee';
+UPDATE onboarding_tasks SET field_value = '$350.00' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%4241 Osburn%') AND title = 'Admin Fee';
+UPDATE onboarding_tasks SET field_value = '$300.00' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%4241 Osburn%') AND title = 'Pet Fee';
+UPDATE onboarding_tasks SET field_value = '$150.00' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%4241 Osburn%') AND title = 'Monthly Pet Rent';
+UPDATE onboarding_tasks SET field_value = '$150' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%4241 Osburn%') AND title = 'Monthly Cleaning Fee';
+UPDATE onboarding_tasks SET field_value = 'month to month' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%4241 Osburn%') AND title = 'Lease Term';
+UPDATE onboarding_tasks SET field_value = '30 days' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%4241 Osburn%') AND title = 'Notice to Vacate';
+UPDATE onboarding_tasks SET field_value = 'anja@peachhausgroup.com' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%4241 Osburn%') AND title = 'Contact Email';
+UPDATE onboarding_tasks SET field_value = 'https://www.thealpineduluth.com' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%4241 Osburn%') AND title = 'Direct Booking Website';
+UPDATE onboarding_tasks SET field_value = 'Chesney Elementary' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%4241 Osburn%') AND title = 'School District';
+UPDATE onboarding_tasks SET field_value = 'Chesney Elementary' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%4241 Osburn%') AND title = 'Elementary School';
+UPDATE onboarding_tasks SET field_value = 'Duluth MS' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%4241 Osburn%') AND title = 'Middle School';
+UPDATE onboarding_tasks SET field_value = 'Duluth HS' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%4241 Osburn%') AND title = 'High School';
+
+-- Villa 15 (5360 Durham Ridge Ct, Lilburn) - The Durham Retreat
+UPDATE onboarding_tasks SET field_value = 'The Durham Retreat' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%5360 Durham%') AND title = 'Brand Name';
+UPDATE onboarding_tasks SET field_value = 'SFH' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%5360 Durham%') AND title = 'Property Type Detail';
+UPDATE onboarding_tasks SET field_value = '2' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%5360 Durham%') AND title = 'Stories';
+UPDATE onboarding_tasks SET field_value = 'driveway parking 2 cars' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%5360 Durham%') AND title = 'Parking Type';
+UPDATE onboarding_tasks SET field_value = '2' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%5360 Durham%') AND title = 'Parking Capacity';
+UPDATE onboarding_tasks SET field_value = 'partially fenced in' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%5360 Durham%') AND title = 'Fenced Yard';
+UPDATE onboarding_tasks SET field_value = '3' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%5360 Durham%') AND title = 'Bedrooms';
+UPDATE onboarding_tasks SET field_value = '2.5' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%5360 Durham%') AND title = 'Bathrooms';
+UPDATE onboarding_tasks SET field_value = '2,170' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%5360 Durham%') AND title = 'Square Footage';
+UPDATE onboarding_tasks SET field_value = 'Yes' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%5360 Durham%') AND title = 'Pets Allowed';
+UPDATE onboarding_tasks SET field_value = '2 dogs max, up to 40 lbs' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%5360 Durham%') AND title = 'Pet Rules';
+UPDATE onboarding_tasks SET field_value = '2' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%5360 Durham%') AND title = 'Maximum Number of Pets';
+UPDATE onboarding_tasks SET field_value = '40' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%5360 Durham%') AND title = 'Maximum Pet Weight (lbs)';
+UPDATE onboarding_tasks SET field_value = '$6,420.00' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%5360 Durham%') AND title = 'Monthly Rent';
+UPDATE onboarding_tasks SET field_value = '$214.00' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%5360 Durham%') AND title = 'Nightly Rate';
+UPDATE onboarding_tasks SET field_value = '$1,500.00' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%5360 Durham%') AND title = 'Security Deposit';
+UPDATE onboarding_tasks SET field_value = '$500.00' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%5360 Durham%') AND title = 'Utility Cap';
+UPDATE onboarding_tasks SET field_value = '$450.00' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%5360 Durham%') AND title = 'Cleaning Fee';
+UPDATE onboarding_tasks SET field_value = '$350.00' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%5360 Durham%') AND title = 'Admin Fee';
+UPDATE onboarding_tasks SET field_value = '$300.00' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%5360 Durham%') AND title = 'Pet Fee';
+UPDATE onboarding_tasks SET field_value = '$150.00' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%5360 Durham%') AND title = 'Monthly Pet Rent';
+UPDATE onboarding_tasks SET field_value = '$150' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%5360 Durham%') AND title = 'Monthly Cleaning Fee';
+UPDATE onboarding_tasks SET field_value = 'month to month' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%5360 Durham%') AND title = 'Lease Term';
+UPDATE onboarding_tasks SET field_value = '30 days' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%5360 Durham%') AND title = 'Notice to Vacate';
+UPDATE onboarding_tasks SET field_value = 'anja@peachhausgroup.com' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%5360 Durham%') AND title = 'Contact Email';
+UPDATE onboarding_tasks SET field_value = 'https://www.durhamretreat.com' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%5360 Durham%') AND title = 'Direct Booking Website';
+UPDATE onboarding_tasks SET field_value = 'Hopkins Elementary' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%5360 Durham%') AND title = 'School District';
+UPDATE onboarding_tasks SET field_value = 'Hopkins Elementary' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%5360 Durham%') AND title = 'Elementary School';
+UPDATE onboarding_tasks SET field_value = 'Berkmar Middle' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%5360 Durham%') AND title = 'Middle School';
+UPDATE onboarding_tasks SET field_value = 'Berkmar High' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%5360 Durham%') AND title = 'High School';
+
+-- Villa 1 (5198 Laurel Bridge Dr SE, Smyrna) - The Scandinavian Retreat
+UPDATE onboarding_tasks SET field_value = 'The Scandinavian Retreat' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%5198 Laurel%') AND title = 'Brand Name';
+UPDATE onboarding_tasks SET field_value = 'Townhome' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%5198 Laurel%') AND title = 'Property Type Detail';
+UPDATE onboarding_tasks SET field_value = '2' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%5198 Laurel%') AND title = 'Stories';
+UPDATE onboarding_tasks SET field_value = 'driveway parking 2 cars' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%5198 Laurel%') AND title = 'Parking Type';
+UPDATE onboarding_tasks SET field_value = '2' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%5198 Laurel%') AND title = 'Parking Capacity';
+UPDATE onboarding_tasks SET field_value = 'NO' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%5198 Laurel%') AND title = 'Fenced Yard';
+UPDATE onboarding_tasks SET field_value = '2' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%5198 Laurel%') AND title = 'Bedrooms';
+UPDATE onboarding_tasks SET field_value = '2.5' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%5198 Laurel%') AND title = 'Bathrooms';
+UPDATE onboarding_tasks SET field_value = '1248' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%5198 Laurel%') AND title = 'Square Footage';
+UPDATE onboarding_tasks SET field_value = 'Yes' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%5198 Laurel%') AND title = 'Pets Allowed';
+UPDATE onboarding_tasks SET field_value = '2 dogs max, up to 40 lbs' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%5198 Laurel%') AND title = 'Pet Rules';
+UPDATE onboarding_tasks SET field_value = '2' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%5198 Laurel%') AND title = 'Maximum Number of Pets';
+UPDATE onboarding_tasks SET field_value = '40' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%5198 Laurel%') AND title = 'Maximum Pet Weight (lbs)';
+UPDATE onboarding_tasks SET field_value = '$4,770.00' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%5198 Laurel%') AND title = 'Monthly Rent';
+UPDATE onboarding_tasks SET field_value = '$159.00' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%5198 Laurel%') AND title = 'Nightly Rate';
+UPDATE onboarding_tasks SET field_value = '$1,500.00' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%5198 Laurel%') AND title = 'Security Deposit';
+UPDATE onboarding_tasks SET field_value = '$500.00' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%5198 Laurel%') AND title = 'Utility Cap';
+UPDATE onboarding_tasks SET field_value = '$400.00' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%5198 Laurel%') AND title = 'Cleaning Fee';
+UPDATE onboarding_tasks SET field_value = '$350.00' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%5198 Laurel%') AND title = 'Admin Fee';
+UPDATE onboarding_tasks SET field_value = '$300.00' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%5198 Laurel%') AND title = 'Pet Fee';
+UPDATE onboarding_tasks SET field_value = '$150.00' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%5198 Laurel%') AND title = 'Monthly Pet Rent';
+UPDATE onboarding_tasks SET field_value = '$120' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%5198 Laurel%') AND title = 'Monthly Cleaning Fee';
+UPDATE onboarding_tasks SET field_value = 'month to month' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%5198 Laurel%') AND title = 'Lease Term';
+UPDATE onboarding_tasks SET field_value = '30 days' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%5198 Laurel%') AND title = 'Notice to Vacate';
+UPDATE onboarding_tasks SET field_value = 'anja@peachhausgroup.com' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%5198 Laurel%') AND title = 'Contact Email';
+UPDATE onboarding_tasks SET field_value = 'scandi-retreat.peachhausgroup.com' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%5198 Laurel%') AND title = 'Direct Booking Website';
+UPDATE onboarding_tasks SET field_value = 'Nickajack Elem' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%5198 Laurel%') AND title = 'School District';
+UPDATE onboarding_tasks SET field_value = 'Nickajack Elem' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%5198 Laurel%') AND title = 'Elementary School';
+UPDATE onboarding_tasks SET field_value = 'Griffin MS' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%5198 Laurel%') AND title = 'Middle School';
+UPDATE onboarding_tasks SET field_value = 'Campbell HS' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%5198 Laurel%') AND title = 'High School';

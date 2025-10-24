@@ -1,0 +1,65 @@
+-- Continue importing property data for final properties
+
+-- Villa 8 (3708 Canadian Way, Tucker) - Canadian Way
+UPDATE onboarding_tasks SET field_value = 'The Canadian Way' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%3708 Canadian%') AND title = 'Brand Name';
+UPDATE onboarding_tasks SET field_value = 'SFH' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%3708 Canadian%') AND title = 'Property Type Detail';
+UPDATE onboarding_tasks SET field_value = '1' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%3708 Canadian%') AND title = 'Stories';
+UPDATE onboarding_tasks SET field_value = 'driveway 3 cars' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%3708 Canadian%') AND title = 'Parking Type';
+UPDATE onboarding_tasks SET field_value = '3' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%3708 Canadian%') AND title = 'Parking Capacity';
+UPDATE onboarding_tasks SET field_value = 'YES' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%3708 Canadian%') AND title = 'Fenced Yard';
+UPDATE onboarding_tasks SET field_value = '3' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%3708 Canadian%') AND title = 'Bedrooms';
+UPDATE onboarding_tasks SET field_value = '2' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%3708 Canadian%') AND title = 'Bathrooms';
+UPDATE onboarding_tasks SET field_value = '1500' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%3708 Canadian%') AND title = 'Square Footage';
+UPDATE onboarding_tasks SET field_value = 'Yes' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%3708 Canadian%') AND title = 'Pets Allowed';
+UPDATE onboarding_tasks SET field_value = '2 dogs max, up to 40 lbs' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%3708 Canadian%') AND title = 'Pet Rules';
+UPDATE onboarding_tasks SET field_value = '2' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%3708 Canadian%') AND title = 'Maximum Number of Pets';
+UPDATE onboarding_tasks SET field_value = '40' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%3708 Canadian%') AND title = 'Maximum Pet Weight (lbs)';
+UPDATE onboarding_tasks SET field_value = '$5,640.00' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%3708 Canadian%') AND title = 'Monthly Rent';
+UPDATE onboarding_tasks SET field_value = '$188.00' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%3708 Canadian%') AND title = 'Nightly Rate';
+UPDATE onboarding_tasks SET field_value = '$1,500.00' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%3708 Canadian%') AND title = 'Security Deposit';
+UPDATE onboarding_tasks SET field_value = '$500.00' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%3708 Canadian%') AND title = 'Utility Cap';
+UPDATE onboarding_tasks SET field_value = '$450.00' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%3708 Canadian%') AND title = 'Cleaning Fee';
+UPDATE onboarding_tasks SET field_value = '$350.00' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%3708 Canadian%') AND title = 'Admin Fee';
+UPDATE onboarding_tasks SET field_value = '$300.00' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%3708 Canadian%') AND title = 'Pet Fee';
+UPDATE onboarding_tasks SET field_value = '$150.00' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%3708 Canadian%') AND title = 'Monthly Pet Rent';
+UPDATE onboarding_tasks SET field_value = '$150' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%3708 Canadian%') AND title = 'Monthly Cleaning Fee';
+UPDATE onboarding_tasks SET field_value = 'month to month' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%3708 Canadian%') AND title = 'Lease Term';
+UPDATE onboarding_tasks SET field_value = '30 days' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%3708 Canadian%') AND title = 'Notice to Vacate';
+UPDATE onboarding_tasks SET field_value = 'anja@peachhausgroup.com' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%3708 Canadian%') AND title = 'Contact Email';
+UPDATE onboarding_tasks SET field_value = 'https://www.canadianway.peachhausgroup.com' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%3708 Canadian%') AND title = 'Direct Booking Website';
+UPDATE onboarding_tasks SET field_value = 'Indian Creek Elementary' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%3708 Canadian%') AND title = 'School District';
+UPDATE onboarding_tasks SET field_value = 'Indian Creek Elementary' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%3708 Canadian%') AND title = 'Elementary School';
+UPDATE onboarding_tasks SET field_value = 'Tucker Middle' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%3708 Canadian%') AND title = 'Middle School';
+UPDATE onboarding_tasks SET field_value = 'Tucker HS' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%3708 Canadian%') AND title = 'High School';
+
+-- Villa 10 (3580 Satellite Blvd NW Duluth) - Satellite Retreat
+UPDATE onboarding_tasks SET field_value = 'Satellite Retreat' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%3580 Satellite%') AND title = 'Brand Name';
+UPDATE onboarding_tasks SET field_value = 'Townhouse' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%3580 Satellite%') AND title = 'Property Type Detail';
+UPDATE onboarding_tasks SET field_value = '3' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%3580 Satellite%') AND title = 'Stories';
+UPDATE onboarding_tasks SET field_value = 'driveway 2 cars' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%3580 Satellite%') AND title = 'Parking Type';
+UPDATE onboarding_tasks SET field_value = '2' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%3580 Satellite%') AND title = 'Parking Capacity';
+UPDATE onboarding_tasks SET field_value = 'NO' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%3580 Satellite%') AND title = 'Fenced Yard';
+UPDATE onboarding_tasks SET field_value = '2' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%3580 Satellite%') AND title = 'Bedrooms';
+UPDATE onboarding_tasks SET field_value = '2.5' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%3580 Satellite%') AND title = 'Bathrooms';
+UPDATE onboarding_tasks SET field_value = '1352' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%3580 Satellite%') AND title = 'Square Footage';
+UPDATE onboarding_tasks SET field_value = 'Yes' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%3580 Satellite%') AND title = 'Pets Allowed';
+UPDATE onboarding_tasks SET field_value = '2 dogs max, up to 40 lbs' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%3580 Satellite%') AND title = 'Pet Rules';
+UPDATE onboarding_tasks SET field_value = '2' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%3580 Satellite%') AND title = 'Maximum Number of Pets';
+UPDATE onboarding_tasks SET field_value = '40' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%3580 Satellite%') AND title = 'Maximum Pet Weight (lbs)';
+UPDATE onboarding_tasks SET field_value = '$5,010.00' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%3580 Satellite%') AND title = 'Monthly Rent';
+UPDATE onboarding_tasks SET field_value = '$167.00' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%3580 Satellite%') AND title = 'Nightly Rate';
+UPDATE onboarding_tasks SET field_value = '$1,500.00' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%3580 Satellite%') AND title = 'Security Deposit';
+UPDATE onboarding_tasks SET field_value = '$500.00' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%3580 Satellite%') AND title = 'Utility Cap';
+UPDATE onboarding_tasks SET field_value = '$400.00' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%3580 Satellite%') AND title = 'Cleaning Fee';
+UPDATE onboarding_tasks SET field_value = '$350.00' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%3580 Satellite%') AND title = 'Admin Fee';
+UPDATE onboarding_tasks SET field_value = '$300.00' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%3580 Satellite%') AND title = 'Pet Fee';
+UPDATE onboarding_tasks SET field_value = '$150.00' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%3580 Satellite%') AND title = 'Monthly Pet Rent';
+UPDATE onboarding_tasks SET field_value = '$120' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%3580 Satellite%') AND title = 'Monthly Cleaning Fee';
+UPDATE onboarding_tasks SET field_value = 'month to month' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%3580 Satellite%') AND title = 'Lease Term';
+UPDATE onboarding_tasks SET field_value = '30 days' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%3580 Satellite%') AND title = 'Notice to Vacate';
+UPDATE onboarding_tasks SET field_value = 'anja@peachhausgroup.com' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%3580 Satellite%') AND title = 'Contact Email';
+UPDATE onboarding_tasks SET field_value = 'https://satellite-retreat.peachhausgroup.com/' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%3580 Satellite%') AND title = 'Direct Booking Website';
+UPDATE onboarding_tasks SET field_value = 'Duluth Elementary' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%3580 Satellite%') AND title = 'School District';
+UPDATE onboarding_tasks SET field_value = 'Duluth Elementary' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%3580 Satellite%') AND title = 'Elementary School';
+UPDATE onboarding_tasks SET field_value = 'Duluth Middle' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%3580 Satellite%') AND title = 'Middle School';
+UPDATE onboarding_tasks SET field_value = 'Duluth HS' WHERE project_id IN (SELECT id FROM onboarding_projects WHERE property_address LIKE '%3580 Satellite%') AND title = 'High School';
