@@ -40,15 +40,42 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
     try {
       setLoading(true);
       
-      // Only load tasks if projectId exists
-      if (projectId) {
+      let effectiveProjectId = projectId;
+      
+      // If we don't have a projectId but have a propertyId, try to find the project
+      if (!projectId && propertyId) {
+        const { data: projectData, error: projectError } = await supabase
+          .from('onboarding_projects')
+          .select('id')
+          .eq('property_id', propertyId)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        
+        if (!projectError && projectData) {
+          effectiveProjectId = projectData.id;
+        }
+      }
+      
+      // Load tasks if we have a projectId
+      if (effectiveProjectId) {
         const { data: tasksData, error: tasksError } = await supabase
           .from('onboarding_tasks')
           .select('*')
-          .eq('project_id', projectId)
+          .eq('project_id', effectiveProjectId)
           .order('phase_number', { ascending: true });
 
         if (tasksError) throw tasksError;
+        
+        console.log('PropertyDetailsModal - All tasks loaded:', tasksData?.length);
+        console.log('PropertyDetailsModal - Listing URL tasks:', 
+          tasksData?.filter(t => 
+            t.title.toLowerCase() === 'airbnb' || 
+            t.title.toLowerCase() === 'vrbo' || 
+            t.title.toLowerCase() === 'direct booking website'
+          )
+        );
+        
         setTasks((tasksData || []) as OnboardingTask[]);
       }
       // Load property info if propertyId is available
