@@ -105,9 +105,7 @@ export const ONBOARDING_PHASES: PhaseDefinition[] = [
       { title: "Homads", field_type: "text", description: "Enter Listing URL" },
       { title: "MidTermRentalProperties.com", field_type: "text", description: "Enter Listing URL" },
       { title: "Midtermrentals.com", field_type: "text", description: "Enter Listing URL" },
-      { title: "Anyplace", field_type: "text", description: "Enter Placeholder" },
       { title: "June Homes", field_type: "text", description: "Enter Placeholder" },
-      { title: "Kopa", field_type: "text", description: "Enter Placeholder" },
       
       // Core Booking Platforms
       { title: "🌐 Core Booking Platforms", field_type: "section_header" },
