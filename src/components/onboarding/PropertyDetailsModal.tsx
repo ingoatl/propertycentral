@@ -226,9 +226,8 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
       if (title === 'airbnb' || 
           title === 'vrbo' || 
           title === 'direct booking website' ||
-          title.includes('airbnb url') ||
-          title.includes('vrbo url') ||
-          title.includes('direct booking') && title.includes('website')) {
+          title === 'booking.com' ||
+          title === 'zillow') {
         return;
       }
 
@@ -374,21 +373,13 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
                     <CardContent className="space-y-3">
                       {/* Listing URLs First */}
                       {(() => {
-                        const airbnbTask = tasks.find(t => {
-                          const title = t.title.toLowerCase();
-                          return title === 'airbnb' || title.includes('airbnb url');
-                        });
-                        const vrboTask = tasks.find(t => {
-                          const title = t.title.toLowerCase();
-                          return title === 'vrbo' || title.includes('vrbo url');
-                        });
-                        const directTask = tasks.find(t => {
-                          const title = t.title.toLowerCase();
-                          return title === 'direct booking website' || 
-                                 (title.includes('direct') && title.includes('booking') && title.includes('website'));
-                        });
+                        const airbnbTask = tasks.find(t => t.title.toLowerCase() === 'airbnb');
+                        const vrboTask = tasks.find(t => t.title.toLowerCase() === 'vrbo');
+                        const directTask = tasks.find(t => t.title.toLowerCase() === 'direct booking website');
+                        const bookingTask = tasks.find(t => t.title.toLowerCase() === 'booking.com');
+                        const zillowTask = tasks.find(t => t.title.toLowerCase() === 'zillow');
                         
-                        return (airbnbTask?.field_value || vrboTask?.field_value || directTask?.field_value) && (
+                        return (airbnbTask?.field_value || vrboTask?.field_value || directTask?.field_value || bookingTask?.field_value || zillowTask?.field_value) && (
                           <div className="pb-3 border-b border-border/50">
                             <p className="text-xs font-semibold text-muted-foreground mb-2">Listing URLs</p>
                             <div className="space-y-2">
@@ -466,6 +457,60 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
                                     onClick={() => copyToClipboard(directTask.field_value!, "Direct Booking Website")}
                                   >
                                     {copiedField === "Direct Booking Website" ? (
+                                      <Check className="h-3.5 w-3.5 text-green-600" />
+                                    ) : (
+                                      <Copy className="h-3.5 w-3.5" />
+                                    )}
+                                  </Button>
+                                </div>
+                              )}
+                              {bookingTask?.field_value && (
+                                <div className="flex items-center justify-between gap-2">
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-xs text-muted-foreground">Booking.com</p>
+                                    <a 
+                                      href={bookingTask.field_value.startsWith('http') ? bookingTask.field_value : `https://${bookingTask.field_value}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-xs text-primary hover:underline truncate block"
+                                    >
+                                      {bookingTask.field_value}
+                                    </a>
+                                  </div>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7 flex-shrink-0"
+                                    onClick={() => copyToClipboard(bookingTask.field_value!, "Booking.com URL")}
+                                  >
+                                    {copiedField === "Booking.com URL" ? (
+                                      <Check className="h-3.5 w-3.5 text-green-600" />
+                                    ) : (
+                                      <Copy className="h-3.5 w-3.5" />
+                                    )}
+                                  </Button>
+                                </div>
+                              )}
+                              {zillowTask?.field_value && (
+                                <div className="flex items-center justify-between gap-2">
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-xs text-muted-foreground">Zillow</p>
+                                    <a 
+                                      href={zillowTask.field_value.startsWith('http') ? zillowTask.field_value : `https://${zillowTask.field_value}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-xs text-primary hover:underline truncate block"
+                                    >
+                                      {zillowTask.field_value}
+                                    </a>
+                                  </div>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7 flex-shrink-0"
+                                    onClick={() => copyToClipboard(zillowTask.field_value!, "Zillow URL")}
+                                  >
+                                    {copiedField === "Zillow URL" ? (
                                       <Check className="h-3.5 w-3.5 text-green-600" />
                                     ) : (
                                       <Copy className="h-3.5 w-3.5" />
