@@ -73,14 +73,33 @@ const Dashboard = () => {
         'timberlake': { address: 'Timberlake Address', managementFee: 0.20 },
       };
 
-      const unmanagedAddresses: Record<string, string> = {
-        'family retreat': '5360 Durham Ridge Ct, Lilburn, GA 30047',
-        'lavish living': '3069 Rita Way, Smyrna, GA 30080',
-        'luxurious & spacious apartment': '2580 Old Roswell Rd, Roswell, GA 30076',
-        'modern + cozy townhome': '169 Willow Stream Ct, Woodstock, GA 30188',
-        'scandi chic': '3155 Duvall Pl, Kennesaw, GA 30144',
-        'scandinavian retreat': '5198 Laurel Bridge Dr, Smyrna, GA 30082',
-        'alpine': '4241 Osburn Ct, Duluth, GA 30096',
+      // Improved name matching for owned properties
+      const ownedPropertyNames: Record<string, string[]> = {
+        'family retreat': ['family retreat'],
+        'lavish living': ['lavish living'],
+        'luxurious & spacious apartment': ['luxurious', 'spacious apartment'],
+        'modern + cozy townhome': ['modern', 'cozy townhome'],
+        'scandi chic': ['scandi chic'],
+        'scandinavian retreat': ['scandinavian retreat'],
+        'alpine': ['alpine'],
+      };
+
+      const matchPropertyToBooking = (propertyName: string, bookingName: string): boolean => {
+        const propLower = propertyName.toLowerCase();
+        const bookingLower = bookingName.toLowerCase();
+        
+        // Check owned properties mapping
+        for (const [key, variations] of Object.entries(ownedPropertyNames)) {
+          if (propLower.includes(key)) {
+            return variations.some(v => bookingLower.includes(v));
+          }
+        }
+        
+        // Simple substring matching as fallback
+        const propWords = propLower.split(/[\s-+]/);
+        const bookingWords = bookingLower.split(/[\s-+]/);
+        
+        return propWords.some(pw => pw.length > 3 && bookingWords.some(bw => bw.includes(pw) || pw.includes(bw)));
       };
 
       const isPropertyManaged = (name: string, address: string): boolean => {
@@ -104,19 +123,22 @@ const Dashboard = () => {
           }
         }
         
-        for (const [key, address] of Object.entries(unmanagedAddresses)) {
-          if (lowerName.includes(key)) {
-            return address;
-          }
-        }
-        
         return currentAddress || 'Address not available';
       };
 
       const summaryData = (properties || []).map(property => {
         const propertyVisits = (visits || []).filter(v => v.property_id === property.id);
         const propertyExpenses = (expenses || []).filter(e => e.property_id === property.id);
-        const propertyBookings = (bookings || []).filter(b => b.property_id === property.id);
+        
+        // Try to match bookings by property_id first, then by name matching
+        let propertyBookings = (bookings || []).filter(b => b.property_id === property.id);
+        
+        // If no direct match and property is owned, try name matching
+        if (propertyBookings.length === 0 && property.property_type === 'Company-Owned') {
+          propertyBookings = (bookings || []).filter(b => 
+            matchPropertyToBooking(property.name, b.ownerrez_listing_name)
+          );
+        }
         
         const visitTotal = propertyVisits.reduce((sum, v) => sum + Number(v.price), 0);
         const expenseTotal = propertyExpenses.reduce((sum, e) => sum + Number(e.amount), 0);
@@ -158,6 +180,7 @@ const Dashboard = () => {
             address: getPropertyAddress(property.name, property.address),
             visitPrice: Number(property.visit_price),
             createdAt: property.created_at,
+            propertyType: property.property_type,
           },
           visitCount: propertyVisits.length,
           visitTotal,
@@ -174,8 +197,21 @@ const Dashboard = () => {
         };
       });
 
+      // Get IDs of properties that already have bookings matched
       const localPropertyIds = (properties || []).map(p => p.id);
-      const unmappedBookings = (bookings || []).filter(b => !b.property_id || !localPropertyIds.includes(b.property_id));
+      const matchedBookingIds = summaryData
+        .filter(s => s.bookingCount > 0)
+        .flatMap(s => {
+          const prop = (properties || []).find(p => p.id === s.property.id);
+          if (!prop) return [];
+          return (bookings || [])
+            .filter(b => b.property_id === prop.id || matchPropertyToBooking(prop.name, b.ownerrez_listing_name))
+            .map(b => b.id);
+        });
+      
+      const unmappedBookings = (bookings || []).filter(b => 
+        !matchedBookingIds.includes(b.id) && (!b.property_id || !localPropertyIds.includes(b.property_id))
+      );
       
       const bookingsByListing = unmappedBookings.reduce((acc, booking) => {
         const key = booking.ownerrez_listing_id;

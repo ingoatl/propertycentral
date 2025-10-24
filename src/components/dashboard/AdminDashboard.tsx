@@ -33,18 +33,21 @@ export const AdminDashboard = ({ summaries, onExport, onSync, syncing, onSendOve
 
   // Calculate KPIs - separate managed vs owned
   const managedProperties = summaries.filter(s => s.isManaged);
-  const ownedProperties = summaries.filter(s => !s.isManaged && s.property.propertyType === "Company-Owned");
+  const ownedProperties = summaries.filter(s => s.property?.propertyType === "Company-Owned");
   const totalProperties = 14; // Fixed total count
-  const totalRevenue = managedProperties.reduce((sum, s) => sum + s.ownerrezRevenue, 0);
+  
+  const totalRevenue = summaries.reduce((sum, s) => sum + s.ownerrezRevenue, 0);
+  const ownedRevenue = ownedProperties.reduce((sum, s) => sum + s.ownerrezRevenue, 0);
+  const managedRevenue = managedProperties.reduce((sum, s) => sum + s.ownerrezRevenue, 0);
   const totalManagementFees = managedProperties.reduce((sum, s) => sum + s.managementFees, 0);
   const totalExpenses = managedProperties.reduce((sum, s) => sum + s.expenseTotal, 0);
-  const avgOccupancy = managedProperties.length > 0 
-    ? managedProperties.reduce((sum, s) => sum + s.occupancyRate, 0) / managedProperties.length 
+  const avgOccupancy = summaries.length > 0 
+    ? summaries.reduce((sum, s) => sum + s.occupancyRate, 0) / summaries.length 
     : 0;
 
   // Calculate trends (comparing this month vs last month)
-  const thisMonthRevenue = managedProperties.reduce((sum, s) => sum + (s.thisMonthRevenue || 0), 0);
-  const lastMonthRevenue = managedProperties.reduce((sum, s) => sum + (s.lastMonthRevenue || 0), 0);
+  const thisMonthRevenue = summaries.reduce((sum, s) => sum + (s.thisMonthRevenue || 0), 0);
+  const lastMonthRevenue = summaries.reduce((sum, s) => sum + (s.lastMonthRevenue || 0), 0);
   const revenueTrend = lastMonthRevenue > 0 ? ((thisMonthRevenue - lastMonthRevenue) / lastMonthRevenue) * 100 : 0;
 
   useEffect(() => {
@@ -223,12 +226,19 @@ export const AdminDashboard = ({ summaries, onExport, onSync, syncing, onSendOve
         </div>
 
         {/* KPI Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
           <KPICard
             title="Total Properties"
             value={totalProperties}
             icon={Building2}
             subtitle="Under management"
+          />
+          <KPICard
+            title="Owned Properties"
+            value={ownedProperties.length}
+            icon={Building2}
+            subtitle={`$${ownedRevenue.toLocaleString()} revenue`}
+            className="bg-gradient-to-br from-primary/5 to-primary/10"
           />
           <KPICard
             title="Total Revenue"
@@ -238,18 +248,19 @@ export const AdminDashboard = ({ summaries, onExport, onSync, syncing, onSendOve
               value: Math.abs(revenueTrend),
               isPositive: revenueTrend >= 0,
             }}
+            subtitle="All properties"
           />
           <KPICard
             title="Management Fees"
             value={`$${totalManagementFees.toLocaleString()}`}
             icon={TrendingUp}
-            subtitle="This period"
+            subtitle="From managed properties"
           />
           <KPICard
             title="Avg Occupancy"
             value={`${avgOccupancy.toFixed(1)}%`}
             icon={Building2}
-            subtitle="Across all properties"
+            subtitle="All properties"
           />
         </div>
 
