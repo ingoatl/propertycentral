@@ -33,16 +33,19 @@ export const AdminDashboard = ({ summaries, onExport, onSync, syncing, onSendOve
 
   // Calculate KPIs - separate managed vs owned
   const managedProperties = summaries.filter(s => s.isManaged);
-  const ownedProperties = summaries.filter(s => s.property?.propertyType === "Company-Owned");
+  const ownedProperties = summaries.filter(s => {
+    const propertyType = s.property?.propertyType;
+    return propertyType === "Company-Owned";
+  });
   const totalProperties = 14; // Fixed total count
   
-  const totalRevenue = summaries.reduce((sum, s) => sum + s.ownerrezRevenue, 0);
-  const ownedRevenue = ownedProperties.reduce((sum, s) => sum + s.ownerrezRevenue, 0);
-  const managedRevenue = managedProperties.reduce((sum, s) => sum + s.ownerrezRevenue, 0);
-  const totalManagementFees = managedProperties.reduce((sum, s) => sum + s.managementFees, 0);
-  const totalExpenses = managedProperties.reduce((sum, s) => sum + s.expenseTotal, 0);
+  const totalRevenue = summaries.reduce((sum, s) => sum + (s.ownerrezRevenue || 0), 0);
+  const ownedRevenue = ownedProperties.reduce((sum, s) => sum + (s.ownerrezRevenue || 0), 0);
+  const managedRevenue = managedProperties.reduce((sum, s) => sum + (s.ownerrezRevenue || 0), 0);
+  const totalManagementFees = managedProperties.reduce((sum, s) => sum + (s.managementFees || 0), 0);
+  const totalExpenses = managedProperties.reduce((sum, s) => sum + (s.expenseTotal || 0), 0);
   const avgOccupancy = summaries.length > 0 
-    ? summaries.reduce((sum, s) => sum + s.occupancyRate, 0) / summaries.length 
+    ? summaries.reduce((sum, s) => sum + (s.occupancyRate || 0), 0) / summaries.length 
     : 0;
 
   // Calculate trends (comparing this month vs last month)

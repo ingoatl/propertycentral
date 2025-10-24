@@ -199,15 +199,20 @@ const Dashboard = () => {
 
       // Get IDs of properties that already have bookings matched
       const localPropertyIds = (properties || []).map(p => p.id);
-      const matchedBookingIds = summaryData
-        .filter(s => s.bookingCount > 0)
-        .flatMap(s => {
+      const matchedBookingIds: string[] = [];
+      
+      summaryData.forEach(s => {
+        if (s.bookingCount > 0) {
           const prop = (properties || []).find(p => p.id === s.property.id);
-          if (!prop) return [];
-          return (bookings || [])
-            .filter(b => b.property_id === prop.id || matchPropertyToBooking(prop.name, b.ownerrez_listing_name))
-            .map(b => b.id);
-        });
+          if (prop) {
+            (bookings || []).forEach(b => {
+              if (b.property_id === prop.id || matchPropertyToBooking(prop.name, b.ownerrez_listing_name)) {
+                matchedBookingIds.push(b.id);
+              }
+            });
+          }
+        }
+      });
       
       const unmappedBookings = (bookings || []).filter(b => 
         !matchedBookingIds.includes(b.id) && (!b.property_id || !localPropertyIds.includes(b.property_id))
@@ -283,9 +288,14 @@ const Dashboard = () => {
       });
 
       setSummaries(allSummaries);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error loading data:", error);
-      toast.error("Failed to load dashboard data");
+      console.error("Error details:", {
+        message: error?.message,
+        stack: error?.stack,
+        name: error?.name
+      });
+      toast.error(`Failed to load dashboard data: ${error?.message || 'Unknown error'}`);
     } finally {
       setLoading(false);
     }
