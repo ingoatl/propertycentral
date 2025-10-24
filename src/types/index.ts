@@ -9,6 +9,20 @@ export interface Property {
   propertyType?: "Client-Managed" | "Company-Owned" | "Inactive";
 }
 
+export interface PropertyMetrics {
+  totalRevenue: number;
+  bookingCount: number;
+  avgBookingValue: number;
+  occupancyRate: number;
+  revPAR: number;
+  adr: number;
+  totalNights: number;
+  avgLengthOfStay: number;
+  thisMonthRevenue: number;
+  lastMonthRevenue: number;
+  growthRate: number;
+}
+
 export interface Visit {
   id: string;
   propertyId: string;

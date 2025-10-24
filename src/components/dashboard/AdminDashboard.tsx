@@ -4,7 +4,8 @@ import { PropertySummary } from "@/types";
 import { KPICard } from "./KPICard";
 import { PropertyPerformanceGrid } from "./PropertyPerformanceGrid";
 import { RecentActivityFeed } from "./RecentActivityFeed";
-import { TeamPerformanceCard } from "./TeamPerformanceCard";
+import { EnhancedTeamPerformance } from "./EnhancedTeamPerformance";
+import { OwnedPropertiesPerformance } from "./OwnedPropertiesPerformance";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Download, RefreshCw, Building2, DollarSign, TrendingUp, AlertCircle, MessageCircleQuestion, Bug } from "lucide-react";
@@ -30,9 +31,10 @@ export const AdminDashboard = ({ summaries, onExport, onSync, syncing, onSendOve
   const [activities, setActivities] = useState<any[]>([]);
   const [teamData, setTeamData] = useState<any>({ members: [], totalTasks: 0, completedTasks: 0 });
 
-  // Calculate KPIs
+  // Calculate KPIs - separate managed vs owned
   const managedProperties = summaries.filter(s => s.isManaged);
-  const totalProperties = managedProperties.length;
+  const ownedProperties = summaries.filter(s => !s.isManaged && s.property.propertyType === "Company-Owned");
+  const totalProperties = 14; // Fixed total count
   const totalRevenue = managedProperties.reduce((sum, s) => sum + s.ownerrezRevenue, 0);
   const totalManagementFees = managedProperties.reduce((sum, s) => sum + s.managementFees, 0);
   const totalExpenses = managedProperties.reduce((sum, s) => sum + s.expenseTotal, 0);
@@ -251,23 +253,39 @@ export const AdminDashboard = ({ summaries, onExport, onSync, syncing, onSendOve
           />
         </div>
 
-        {/* Property Performance Grid */}
+        {/* OWNED PROPERTIES PERFORMANCE - Prominent Section */}
+        {ownedProperties.length > 0 && (
+          <div>
+            <div className="mb-4">
+              <h2 className="text-2xl font-bold bg-gradient-primary bg-clip-text text-transparent">
+                PeachHaus Portfolio Performance
+              </h2>
+              <p className="text-sm text-muted-foreground mt-1">
+                Company-owned short-term rental properties
+              </p>
+            </div>
+            <OwnedPropertiesPerformance ownedProperties={ownedProperties} />
+          </div>
+        )}
+
+        {/* Managed Properties Performance Grid */}
         <Card className="border-border/50">
           <CardHeader>
-            <CardTitle className="text-xl">Property Performance</CardTitle>
+            <CardTitle className="text-xl">Client-Managed Properties</CardTitle>
+            <p className="text-sm text-muted-foreground mt-1">Properties under management for clients</p>
           </CardHeader>
           <CardContent>
             <PropertyPerformanceGrid
-              properties={summaries}
+              properties={managedProperties}
               onPropertyClick={handlePropertyClick}
             />
           </CardContent>
         </Card>
 
-        {/* Activity and Team */}
+        {/* Activity and Enhanced Team Performance */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <RecentActivityFeed activities={activities} />
-          <TeamPerformanceCard
+          <EnhancedTeamPerformance
             teamMembers={teamData.members}
             totalTasks={teamData.totalTasks}
             completedTasks={teamData.completedTasks}
