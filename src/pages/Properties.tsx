@@ -4,10 +4,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Trash2, MapPin, Building2, Edit, ClipboardList, FileText, Upload, Image as ImageIcon, Search } from "lucide-react";
+import { Plus, Trash2, MapPin, Building2, Edit, ClipboardList, FileText, Upload, Image as ImageIcon, Search, Database } from "lucide-react";
 import villa14Image from "@/assets/villa14.jpg";
 import { WorkflowDialog } from "@/components/onboarding/WorkflowDialog";
 import { PropertyDetailsModal } from "@/components/onboarding/PropertyDetailsModal";
+import { PropertyListingDataModal } from "@/components/onboarding/PropertyListingDataModal";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
@@ -34,6 +35,7 @@ const Properties = () => {
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [selectedPropertyForDetails, setSelectedPropertyForDetails] = useState<{ id: string; name: string; projectId: string | null } | null>(null);
   const [selectedPropertyForWorkflow, setSelectedPropertyForWorkflow] = useState<{ id: string; name: string; address: string; projectId: string | null; visitPrice: number; taskId?: string } | null>(null);
+  const [selectedPropertyForListingData, setSelectedPropertyForListingData] = useState<{ id: string; name: string } | null>(null);
   const [propertyProjects, setPropertyProjects] = useState<Record<string, string>>({});
   const [propertyProjectsProgress, setPropertyProjectsProgress] = useState<Record<string, number>>({});
   const [uploadingImage, setUploadingImage] = useState<string | null>(null);
@@ -524,6 +526,21 @@ const Properties = () => {
         </Button>
 
         <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => {
+            setSelectedPropertyForListingData({
+              id: property.id,
+              name: property.name
+            });
+          }}
+          className="w-full h-8 text-xs"
+        >
+          <Database className="w-3 h-3 mr-1.5" />
+          Show Listing Data
+        </Button>
+
+        <Button
           variant="default"
           size="sm"
           onClick={() => {
@@ -780,6 +797,17 @@ const Properties = () => {
             </p>
           </CardContent>
         </Card>
+      )}
+
+      {selectedPropertyForListingData && (
+        <PropertyListingDataModal
+          open={!!selectedPropertyForListingData}
+          onOpenChange={(open) => {
+            if (!open) setSelectedPropertyForListingData(null);
+          }}
+          propertyId={selectedPropertyForListingData.id}
+          propertyName={selectedPropertyForListingData.name}
+        />
       )}
 
       {selectedPropertyForWorkflow && (

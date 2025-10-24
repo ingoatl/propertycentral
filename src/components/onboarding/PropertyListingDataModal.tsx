@@ -1,0 +1,309 @@
+import { useState, useEffect } from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Copy, Check, Loader2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+
+interface PropertyListingDataModalProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  propertyId: string;
+  propertyName: string;
+}
+
+interface ListingData {
+  // Basic Info
+  propertyAddress: string;
+  brandName: string;
+  rentalType: string;
+  propertyTypeDetail: string;
+  stories: string;
+  parking: string;
+  schoolDistrict: string;
+  adaCompliant: string;
+  basement: string;
+  fencedYard: string;
+  bedrooms: string;
+  bathrooms: string;
+  sqft: string;
+  
+  // Pet Info
+  petsAllowed: string;
+  petRules: string;
+  maxPets: string;
+  maxPetWeight: string;
+  
+  // Financial
+  monthlyRent: string;
+  nightlyRate: string;
+  securityDeposit: string;
+  utilityCap: string;
+  cleaningFee: string;
+  adminFee: string;
+  petFee: string;
+  monthlyPetRent: string;
+  monthlyCleaningFee: string;
+  
+  // Lease Terms
+  leaseTerm: string;
+  noticeToVacate: string;
+  
+  // Contact & Web
+  contactEmail: string;
+  directBookingWebsite: string;
+  
+  // Assets
+  propertyPhotos: string;
+  listingDescriptions: string;
+}
+
+export const PropertyListingDataModal = ({
+  open,
+  onOpenChange,
+  propertyId,
+  propertyName
+}: PropertyListingDataModalProps) => {
+  const [loading, setLoading] = useState(false);
+  const [listingData, setListingData] = useState<ListingData | null>(null);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (open && propertyId) {
+      loadListingData();
+    }
+  }, [open, propertyId]);
+
+  const loadListingData = async () => {
+    setLoading(true);
+    try {
+      // Get the project ID for this property
+      const { data: projects } = await supabase
+        .from("onboarding_projects")
+        .select("id")
+        .eq("property_id", propertyId)
+        .single();
+
+      if (!projects) {
+        toast.error("No onboarding project found for this property");
+        return;
+      }
+
+      // Fetch all onboarding tasks
+      const { data: tasks } = await supabase
+        .from("onboarding_tasks")
+        .select("title, field_value")
+        .eq("project_id", projects.id);
+
+      // Fetch property data from comprehensive view
+      const { data: propertyData } = await supabase
+        .from("comprehensive_property_data")
+        .select("*")
+        .eq("id", propertyId)
+        .single();
+
+      // Helper function to get task value
+      const getTaskValue = (title: string) => {
+        const task = tasks?.find(t => t.title === title);
+        return task?.field_value || "";
+      };
+
+      // Build listing data object
+      const data: ListingData = {
+        propertyAddress: propertyData?.address || "",
+        brandName: propertyData?.brand_name || getTaskValue("Brand Name"),
+        rentalType: propertyData?.rental_type || "",
+        propertyTypeDetail: propertyData?.property_type_detail || getTaskValue("Property Type Detail"),
+        stories: propertyData?.stories || getTaskValue("Stories"),
+        parking: `${propertyData?.parking_type || getTaskValue("Parking Type")} - ${propertyData?.parking_spaces || getTaskValue("Parking Capacity")} spaces`,
+        schoolDistrict: propertyData?.school_district || getTaskValue("School District"),
+        adaCompliant: getTaskValue("ADA Compliant"),
+        basement: propertyData?.basement ? "Yes" : "No",
+        fencedYard: propertyData?.fenced_yard || getTaskValue("Fenced Yard"),
+        bedrooms: propertyData?.bedrooms?.toString() || getTaskValue("Bedrooms"),
+        bathrooms: propertyData?.bathrooms?.toString() || getTaskValue("Bathrooms"),
+        sqft: propertyData?.sqft?.toString() || getTaskValue("Square Footage"),
+        
+        petsAllowed: propertyData?.pets_allowed ? "Yes" : "No",
+        petRules: propertyData?.pet_rules || getTaskValue("Pet Rules"),
+        maxPets: propertyData?.max_pets?.toString() || getTaskValue("Maximum Number of Pets"),
+        maxPetWeight: propertyData?.max_pet_weight?.toString() || getTaskValue("Maximum Pet Weight (lbs)"),
+        
+        monthlyRent: propertyData?.monthly_rent ? `$${propertyData.monthly_rent}` : getTaskValue("Monthly Rent"),
+        nightlyRate: propertyData?.nightly_rate ? `$${propertyData.nightly_rate}` : getTaskValue("Nightly Rate"),
+        securityDeposit: propertyData?.security_deposit ? `$${propertyData.security_deposit}` : getTaskValue("Security Deposit"),
+        utilityCap: propertyData?.utility_cap ? `$${propertyData.utility_cap}` : getTaskValue("Utility Cap"),
+        cleaningFee: propertyData?.cleaning_fee ? `$${propertyData.cleaning_fee}` : getTaskValue("Cleaning Fee"),
+        adminFee: propertyData?.admin_fee ? `$${propertyData.admin_fee}` : getTaskValue("Admin Fee"),
+        petFee: propertyData?.pet_fee ? `$${propertyData.pet_fee}` : getTaskValue("Pet Fee"),
+        monthlyPetRent: propertyData?.monthly_pet_rent ? `$${propertyData.monthly_pet_rent}` : getTaskValue("Monthly Pet Rent"),
+        monthlyCleaningFee: propertyData?.monthly_cleaning_fee ? `$${propertyData.monthly_cleaning_fee}` : getTaskValue("Monthly Cleaning Fee"),
+        
+        leaseTerm: propertyData?.lease_term || getTaskValue("Lease Term"),
+        noticeToVacate: propertyData?.notice_to_vacate || getTaskValue("Notice to Vacate"),
+        
+        contactEmail: propertyData?.contact_email || getTaskValue("Contact Email"),
+        directBookingWebsite: propertyData?.website_url || getTaskValue("Direct Booking Website"),
+        
+        propertyPhotos: getTaskValue("Upload professional photos") || getTaskValue("Link to existing photos"),
+        listingDescriptions: getTaskValue("Digital guidebook published") || ""
+      };
+
+      setListingData(data);
+    } catch (error) {
+      console.error("Error loading listing data:", error);
+      toast.error("Failed to load listing data");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const copyToClipboard = async (text: string, fieldName: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedField(fieldName);
+      setTimeout(() => setCopiedField(null), 2000);
+      toast.success(`Copied ${fieldName}`);
+    } catch (error) {
+      toast.error("Failed to copy");
+    }
+  };
+
+  const DataRow = ({ label, value, note }: { label: string; value: string; note?: string }) => (
+    <div className="flex items-center justify-between py-2 border-b border-border/50 last:border-0">
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-foreground">{label}</p>
+        {note && <p className="text-xs text-muted-foreground mt-0.5">{note}</p>}
+      </div>
+      <div className="flex items-center gap-2 ml-4">
+        <p className="text-sm text-muted-foreground max-w-[200px] truncate">{value || "—"}</p>
+        {value && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 flex-shrink-0"
+            onClick={() => copyToClipboard(value, label)}
+          >
+            {copiedField === label ? (
+              <Check className="h-3.5 w-3.5 text-green-600" />
+            ) : (
+              <Copy className="h-3.5 w-3.5" />
+            )}
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-4xl max-h-[90vh]">
+        <DialogHeader>
+          <DialogTitle className="text-xl">Listing Data - {propertyName}</DialogTitle>
+        </DialogHeader>
+
+        {loading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </div>
+        ) : listingData ? (
+          <ScrollArea className="h-[70vh] pr-4">
+            <div className="space-y-6">
+              {/* Property Specifications */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">Property Specifications</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-0">
+                  <DataRow label="Property Address" value={listingData.propertyAddress} />
+                  <DataRow label="Brand Name" value={listingData.brandName} />
+                  <DataRow label="STR/MTR" value={listingData.rentalType} />
+                  <DataRow label="House Type" value={listingData.propertyTypeDetail} />
+                  <DataRow label="Stories" value={listingData.stories} />
+                  <DataRow label="Parking" value={listingData.parking} />
+                  <DataRow label="School District" value={listingData.schoolDistrict} />
+                  <DataRow label="ADA Compliant" value={listingData.adaCompliant} />
+                  <DataRow label="Basement" value={listingData.basement} />
+                  <DataRow label="Fenced Yard" value={listingData.fencedYard} />
+                  <DataRow label="Bedrooms" value={listingData.bedrooms} />
+                  <DataRow label="Bathrooms" value={listingData.bathrooms} />
+                  <DataRow label="Square Footage" value={listingData.sqft} />
+                </CardContent>
+              </Card>
+
+              {/* Pet Policies */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">Pet Policies</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-0">
+                  <DataRow label="Pets Allowed" value={listingData.petsAllowed} />
+                  <DataRow label="Pet Rules" value={listingData.petRules} />
+                  <DataRow label="Maximum Pets" value={listingData.maxPets} />
+                  <DataRow label="Max Pet Weight (lbs)" value={listingData.maxPetWeight} />
+                </CardContent>
+              </Card>
+
+              {/* Financial Terms */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">Financial Terms</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-0">
+                  <DataRow label="Monthly Rent" value={listingData.monthlyRent} />
+                  <DataRow label="Nightly Rate" value={listingData.nightlyRate} />
+                  <DataRow label="Security Deposit" value={listingData.securityDeposit} />
+                  <DataRow label="Utility Cap" value={listingData.utilityCap} />
+                  <DataRow label="Cleaning Fee" value={listingData.cleaningFee} note="Move-out - one time" />
+                  <DataRow label="Admin Fee" value={listingData.adminFee} note="One time" />
+                  <DataRow label="Pet Fee" value={listingData.petFee} note="Per pet" />
+                  <DataRow label="Monthly Pet Rent" value={listingData.monthlyPetRent} note="Per pet/negotiable" />
+                  <DataRow label="Monthly Cleaning Fee" value={listingData.monthlyCleaningFee} />
+                </CardContent>
+              </Card>
+
+              {/* Lease Terms */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">Lease Terms</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-0">
+                  <DataRow label="Lease Term" value={listingData.leaseTerm} />
+                  <DataRow label="Notice to Vacate" value={listingData.noticeToVacate} />
+                </CardContent>
+              </Card>
+
+              {/* Contact & Website */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">Contact & Website</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-0">
+                  <DataRow label="Contact Email" value={listingData.contactEmail} />
+                  <DataRow label="Direct Booking Website" value={listingData.directBookingWebsite} />
+                </CardContent>
+              </Card>
+
+              {/* Assets */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">Assets</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-0">
+                  <DataRow label="Property Photos" value={listingData.propertyPhotos} />
+                  <DataRow label="Listing Descriptions" value={listingData.listingDescriptions} />
+                </CardContent>
+              </Card>
+            </div>
+          </ScrollArea>
+        ) : (
+          <div className="flex items-center justify-center py-12 text-muted-foreground">
+            No listing data available
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+};
