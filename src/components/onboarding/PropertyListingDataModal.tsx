@@ -15,6 +15,11 @@ interface PropertyListingDataModalProps {
 }
 
 interface ListingData {
+  // Listing URLs - Priority
+  airbnbUrl: string;
+  vrboUrl: string;
+  directBookingWebsite: string;
+  
   // Basic Info
   propertyAddress: string;
   brandName: string;
@@ -55,7 +60,6 @@ interface ListingData {
   
   // Contact & Web
   contactEmail: string;
-  directBookingWebsite: string;
   
   // Assets
   propertyPhotos: string;
@@ -126,6 +130,11 @@ export const PropertyListingDataModal = ({
 
       // Build listing data object - PRIORITIZE task values over property data
       const data: ListingData = {
+        // Listing URLs first
+        airbnbUrl: getTaskValue("Airbnb") || "",
+        vrboUrl: getTaskValue("VRBO") || "",
+        directBookingWebsite: getTaskValue("Direct Booking Website") || propertyData?.website_url || "",
+        
         propertyAddress: propertyData?.address || "",
         brandName: getTaskValue("Brand Name") || propertyData?.brand_name || "",
         rentalType: propertyData?.rental_type || "",
@@ -161,7 +170,6 @@ export const PropertyListingDataModal = ({
         noticeToVacate: getTaskValue("Notice to Vacate") || propertyData?.notice_to_vacate || "",
         
         contactEmail: getTaskValue("Contact Email") || propertyData?.contact_email || "",
-        directBookingWebsite: getTaskValue("Direct Booking Website") || propertyData?.website_url || "",
         
         propertyPhotos: getTaskValue("Upload professional photos") || getTaskValue("Link to existing photos") || "",
         listingDescriptions: getTaskValue("Digital guidebook published") || ""
@@ -228,6 +236,18 @@ export const PropertyListingDataModal = ({
         ) : listingData ? (
           <ScrollArea className="h-[70vh] pr-4">
             <div className="space-y-6">
+              {/* Listing URLs - Priority Section */}
+              <Card className="border-primary/20">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">Listing URLs</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-0">
+                  <DataRow label="Airbnb URL" value={listingData.airbnbUrl} />
+                  <DataRow label="VRBO URL" value={listingData.vrboUrl} />
+                  <DataRow label="Direct Booking Website" value={listingData.directBookingWebsite} />
+                </CardContent>
+              </Card>
+
               {/* Property Specifications */}
               <Card>
                 <CardHeader className="pb-3">
@@ -302,14 +322,13 @@ export const PropertyListingDataModal = ({
                 </CardContent>
               </Card>
 
-              {/* Contact & Website */}
+              {/* Contact Information */}
               <Card>
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-base">Contact & Website</CardTitle>
+                  <CardTitle className="text-base">Contact Information</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-0">
                   <DataRow label="Contact Email" value={listingData.contactEmail} />
-                  <DataRow label="Direct Booking Website" value={listingData.directBookingWebsite} />
                 </CardContent>
               </Card>
 
