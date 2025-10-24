@@ -197,30 +197,52 @@ export const PropertyListingDataModal = ({
   };
 
   const DataRow = ({ label, value, note }: { label: string; value: string; note?: string }) => (
-    <div className="flex items-center justify-between py-2 border-b border-border/50 last:border-0">
+    <div className="flex items-start justify-between py-3 border-b border-border/50 last:border-0 gap-4">
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-foreground">{label}</p>
+        <p className="text-sm font-medium text-foreground mb-1">{label}</p>
         {note && <p className="text-xs text-muted-foreground mt-0.5">{note}</p>}
-      </div>
-      <div className="flex items-center gap-2 ml-4">
-        <p className="text-sm text-muted-foreground max-w-[200px] truncate">{value || "—"}</p>
-        {value && (
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7 flex-shrink-0"
-            onClick={() => copyToClipboard(value, label)}
-          >
-            {copiedField === label ? (
-              <Check className="h-3.5 w-3.5 text-green-600" />
-            ) : (
-              <Copy className="h-3.5 w-3.5" />
-            )}
-          </Button>
+        {value ? (
+          isUrl(value) ? (
+            <a 
+              href={value.startsWith('http') ? value : `https://${value}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm text-primary hover:underline break-all"
+            >
+              {value}
+            </a>
+          ) : (
+            <p className="text-sm text-muted-foreground break-words">{value}</p>
+          )
+        ) : (
+          <p className="text-sm text-muted-foreground">—</p>
         )}
       </div>
+      {value && (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7 flex-shrink-0 mt-0.5"
+          onClick={() => copyToClipboard(value, label)}
+        >
+          {copiedField === label ? (
+            <Check className="h-3.5 w-3.5 text-green-600" />
+          ) : (
+            <Copy className="h-3.5 w-3.5" />
+          )}
+        </Button>
+      )}
     </div>
   );
+
+  const isUrl = (text: string): boolean => {
+    try {
+      new URL(text);
+      return true;
+    } catch {
+      return text.startsWith('http://') || text.startsWith('https://') || text.startsWith('www.');
+    }
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

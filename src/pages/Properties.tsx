@@ -523,7 +523,7 @@ const Properties = () => {
           className="w-full h-8 text-xs"
         >
           <FileText className="w-3 h-3 mr-1.5" />
-          View Details
+          Property Details
         </Button>
 
         <Button
