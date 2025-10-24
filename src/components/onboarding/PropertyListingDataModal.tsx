@@ -23,6 +23,9 @@ interface ListingData {
   stories: string;
   parking: string;
   schoolDistrict: string;
+  elementarySchool: string;
+  middleSchool: string;
+  highSchool: string;
   adaCompliant: string;
   basement: string;
   fencedYard: string;
@@ -131,6 +134,9 @@ export const PropertyListingDataModal = ({
         stories: getTaskValue("Stories") || propertyData?.stories || "",
         parking: getTaskValue("Parking Type") ? `${getTaskValue("Parking Type")} - ${getTaskValue("Parking Capacity")} spaces` : (propertyData?.parking_type ? `${propertyData.parking_type} - ${propertyData.parking_spaces} spaces` : ""),
         schoolDistrict: getTaskValue("School District") || propertyData?.school_district || "",
+        elementarySchool: getTaskValue("Elementary School") || propertyData?.elementary_school || "",
+        middleSchool: getTaskValue("Middle School") || propertyData?.middle_school || "",
+        highSchool: getTaskValue("High School") || propertyData?.high_school || "",
         adaCompliant: getTaskValue("ADA Compliant") || "",
         basement: propertyData?.basement ? "Yes" : "No",
         fencedYard: getTaskValue("Fenced Yard") || propertyData?.fenced_yard || "",
@@ -252,6 +258,9 @@ export const PropertyListingDataModal = ({
                 </CardHeader>
                 <CardContent className="space-y-0">
                   <DataRow label="School District" value={listingData.schoolDistrict} />
+                  <DataRow label="Elementary School" value={listingData.elementarySchool} />
+                  <DataRow label="Middle School" value={listingData.middleSchool} />
+                  <DataRow label="High School" value={listingData.highSchool} />
                 </CardContent>
               </Card>
 
