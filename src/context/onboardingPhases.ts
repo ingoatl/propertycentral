@@ -184,7 +184,11 @@ export const ONBOARDING_PHASES: PhaseDefinition[] = [
       { title: "Parking Capacity", field_type: "text", description: "Number of vehicles" },
       { title: "Basement", field_type: "radio", options: ["Yes", "No"] },
       { title: "Fenced Yard", field_type: "radio", options: ["Yes", "No", "Partially"] },
-      { title: "ADA Compliant", field_type: "radio", options: ["Yes", "No"] }
+      { title: "ADA Compliant", field_type: "radio", options: ["Yes", "No"] },
+      { title: "Bedroom on Main", field_type: "radio", options: ["Yes", "No"] },
+      { title: "Walk-in Shower", field_type: "radio", options: ["Yes", "No"] },
+      { title: "Furnished", field_type: "radio", options: ["Yes", "No"] },
+      { title: "Pool", field_type: "text", description: "Pool type (e.g., inflatable hot tub, community pool) or 'No'" }
     ]
   },
   
