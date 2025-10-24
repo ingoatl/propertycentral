@@ -22,7 +22,6 @@ interface ListingData {
   propertyTypeDetail: string;
   stories: string;
   parking: string;
-  schoolDistrict: string;
   elementarySchool: string;
   middleSchool: string;
   highSchool: string;
@@ -133,7 +132,6 @@ export const PropertyListingDataModal = ({
         propertyTypeDetail: getTaskValue("Property Type Detail") || propertyData?.property_type_detail || "",
         stories: getTaskValue("Stories") || propertyData?.stories || "",
         parking: getTaskValue("Parking Type") ? `${getTaskValue("Parking Type")} - ${getTaskValue("Parking Capacity")} spaces` : (propertyData?.parking_type ? `${propertyData.parking_type} - ${propertyData.parking_spaces} spaces` : ""),
-        schoolDistrict: getTaskValue("School District") || propertyData?.school_district || "",
         elementarySchool: getTaskValue("Elementary School") || propertyData?.elementary_school || "",
         middleSchool: getTaskValue("Middle School") || propertyData?.middle_school || "",
         highSchool: getTaskValue("High School") || propertyData?.high_school || "",
@@ -257,7 +255,6 @@ export const PropertyListingDataModal = ({
                   <CardTitle className="text-base">Schools</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-0">
-                  <DataRow label="School District" value={listingData.schoolDistrict} />
                   <DataRow label="Elementary School" value={listingData.elementarySchool} />
                   <DataRow label="Middle School" value={listingData.middleSchool} />
                   <DataRow label="High School" value={listingData.highSchool} />
