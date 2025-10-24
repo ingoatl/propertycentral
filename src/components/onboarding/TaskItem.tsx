@@ -86,7 +86,7 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
   useEffect(() => {
     // Load assigned user's first name - either from direct assignment or phase assignment
     loadAssignedUserName();
-  }, [task.assigned_to_uuid, task.phase_number]);
+  }, [task.assigned_to_uuid, task.assigned_role_id, task.phase_number]);
 
   // Auto-correct status if task has data but is marked as pending
   useEffect(() => {
@@ -128,7 +128,7 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
   };
   
   const loadAssignedUserName = async () => {
-    // First, try to get directly assigned user
+    // Step 1: Check for direct user assignment
     if (task.assigned_to_uuid) {
       const { data } = await supabase
         .from("profiles")
@@ -142,7 +142,28 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
       }
     }
     
-    // If no direct assignment, get the phase-assigned user
+    // Step 2: Check for role-based assignment on the task
+    if (task.assigned_role_id) {
+      const { data: userRole } = await supabase
+        .from("user_team_roles")
+        .select(`
+          profiles (
+            first_name,
+            email
+          )
+        `)
+        .eq("role_id", task.assigned_role_id)
+        .limit(1)
+        .maybeSingle();
+      
+      if (userRole?.profiles) {
+        const profile = userRole.profiles as any;
+        setAssignedUserName(profile.first_name || profile.email?.split('@')[0] || 'Unknown');
+        return;
+      }
+    }
+    
+    // Step 3: Fall back to phase-level assignment
     const { data: phaseAssignment } = await supabase
       .from("phase_role_assignments")
       .select("role_id")
@@ -159,7 +180,7 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
           )
         `)
         .eq("role_id", phaseAssignment.role_id)
-        .eq("is_primary", true)
+        .limit(1)
         .maybeSingle();
       
       if (userRole?.profiles) {
@@ -1127,7 +1148,8 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
                   className="h-8 gap-2 text-xs"
                 >
                   <User className="w-3.5 h-3.5" />
-                  Assigned to: <span className="font-medium">{assignedUserName}</span>
+                  <span className="font-medium">{assignedUserName}</span>
+                  <span className="text-muted-foreground">• Reassign</span>
                 </Button>
               )}
             </div>
