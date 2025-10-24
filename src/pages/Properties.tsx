@@ -9,6 +9,7 @@ import villa14Image from "@/assets/villa14.jpg";
 import { WorkflowDialog } from "@/components/onboarding/WorkflowDialog";
 import { PropertyDetailsModal } from "@/components/onboarding/PropertyDetailsModal";
 import { PropertyListingDataModal } from "@/components/onboarding/PropertyListingDataModal";
+import { PopulateSchoolsButton } from "@/components/onboarding/PopulateSchoolsButton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { supabase } from "@/integrations/supabase/client";
@@ -600,6 +601,7 @@ const Properties = () => {
             <SelectItem value="Inactive">Inactive</SelectItem>
           </SelectContent>
         </Select>
+        {isAdmin && <PopulateSchoolsButton onComplete={loadProperties} />}
       </div>
 
       {showForm && (
