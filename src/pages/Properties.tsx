@@ -14,6 +14,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { Property } from "@/types";
 import { toast } from "sonner";
 import { z } from "zod";
+import { useAdminCheck } from "@/hooks/useAdminCheck";
+import { Badge } from "@/components/ui/badge";
 
 const propertySchema = z.object({
   name: z.string().trim().min(1, "Name is required").max(200, "Name must be less than 200 characters"),
@@ -23,6 +25,7 @@ const propertySchema = z.object({
 });
 
 const Properties = () => {
+  const { isAdmin } = useAdminCheck();
   const [searchParams, setSearchParams] = useSearchParams();
   const [properties, setProperties] = useState<Property[]>([]);
   const [showForm, setShowForm] = useState(false);
@@ -400,27 +403,29 @@ const Properties = () => {
           >
             <Edit className="w-3 h-3" />
           </Button>
-          <Button
-            variant="secondary"
-            size="icon"
-            className="h-7 w-7 shadow-lg backdrop-blur-sm bg-background/80 hover:bg-destructive hover:text-destructive-foreground"
-            onClick={() => handleDelete(property.id)}
-          >
-            <Trash2 className="w-3 h-3" />
-          </Button>
+          {isAdmin && (
+            <Button
+              variant="secondary"
+              size="icon"
+              className="h-7 w-7 shadow-lg backdrop-blur-sm bg-background/80 hover:bg-destructive hover:text-destructive-foreground"
+              onClick={() => handleDelete(property.id)}
+            >
+              <Trash2 className="w-3 h-3" />
+            </Button>
+          )}
         </div>
       </div>
 
       <CardHeader className="pb-2 pt-3 px-3">
-        <div className="flex items-start gap-2">
-          {property.propertyType && (
-            <span className={`inline-block px-2 py-0.5 text-[10px] font-bold rounded ${getPropertyTypeColor(property.propertyType)} flex-shrink-0`}>
-              {getPropertyTypeTag(property.propertyType)}
-            </span>
-          )}
+        <div className="flex items-start justify-between gap-2">
           <CardTitle className="text-base text-foreground group-hover:text-primary transition-colors line-clamp-2 flex-1">
             {property.name}
           </CardTitle>
+          {property.propertyType && (
+            <Badge variant={property.propertyType === "Client-Managed" ? "default" : "secondary"} className="flex-shrink-0 text-[10px] px-2 py-0.5">
+              {property.propertyType === "Client-Managed" ? "Managed" : property.propertyType === "Company-Owned" ? "Owned" : "Inactive"}
+            </Badge>
+          )}
         </div>
         <CardDescription className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
           <MapPin className="w-3 h-3 flex-shrink-0" />
