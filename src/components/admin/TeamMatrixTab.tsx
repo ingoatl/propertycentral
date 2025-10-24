@@ -20,7 +20,7 @@ interface UserWithRoles {
   id: string;
   email: string;
   first_name: string | null;
-  roles: { role_id: string; role_name: string; is_primary: boolean }[];
+  roles: { role_id: string; role_name: string }[];
 }
 
 interface PhaseAssignment {
@@ -69,10 +69,10 @@ export const TeamMatrixTab = () => {
 
     if (profilesError) throw profilesError;
 
-    // Get all user team role assignments with is_primary
+    // Get all user team role assignments
     const { data: teamRolesData } = await supabase
       .from("user_team_roles")
-      .select("user_id, role_id, is_primary, team_roles(role_name)");
+      .select("user_id, role_id, team_roles(role_name)");
 
     const usersWithRoles = profilesData?.map((profile) => {
       const userRoles = teamRolesData?.filter((tr) => tr.user_id === profile.id) || [];
@@ -81,7 +81,6 @@ export const TeamMatrixTab = () => {
         roles: userRoles.map((tr) => ({
           role_id: tr.role_id,
           role_name: tr.team_roles?.role_name || "",
-          is_primary: tr.is_primary || false,
         })),
       };
     }) || [];
@@ -153,28 +152,17 @@ export const TeamMatrixTab = () => {
 
   const handleAddRoleToUser = async (userId: string, roleId: string) => {
     try {
-      // Check if this role already has a primary user
-      const { data: existingPrimary } = await supabase
-        .from("user_team_roles")
-        .select("user_id")
-        .eq("role_id", roleId)
-        .eq("is_primary", true)
-        .single();
-
-      // If no primary exists, make this user primary
-      const isPrimary = !existingPrimary;
-
       const { error } = await supabase
         .from("user_team_roles")
         .insert({
           user_id: userId,
           role_id: roleId,
-          is_primary: isPrimary,
+          is_primary: false, // Keep for backwards compatibility but not used
         });
 
       if (error) throw error;
 
-      toast.success(isPrimary ? "Role assigned as primary" : "Role assigned");
+      toast.success("Role assigned");
       loadUsers();
     } catch (error: any) {
       toast.error("Failed to add role: " + error.message);
@@ -183,16 +171,6 @@ export const TeamMatrixTab = () => {
 
   const handleRemoveRoleFromUser = async (userId: string, roleId: string) => {
     try {
-      // Check if this was the primary user
-      const { data: roleAssignment } = await supabase
-        .from("user_team_roles")
-        .select("is_primary")
-        .eq("user_id", userId)
-        .eq("role_id", roleId)
-        .single();
-
-      const wasPrimary = roleAssignment?.is_primary;
-
       const { error } = await supabase
         .from("user_team_roles")
         .delete()
@@ -201,73 +179,10 @@ export const TeamMatrixTab = () => {
 
       if (error) throw error;
 
-      // If we removed the primary user, promote another user with this role to primary
-      if (wasPrimary) {
-        const { data: otherUsers } = await supabase
-          .from("user_team_roles")
-          .select("user_id")
-          .eq("role_id", roleId)
-          .limit(1);
-
-        if (otherUsers && otherUsers.length > 0) {
-          await supabase
-            .from("user_team_roles")
-            .update({ is_primary: true })
-            .eq("user_id", otherUsers[0].user_id)
-            .eq("role_id", roleId);
-        }
-      }
-
       toast.success("Role removed");
       loadUsers();
     } catch (error: any) {
       toast.error("Failed to remove role: " + error.message);
-    }
-  };
-
-  const handleSetPrimaryRole = async (userId: string, roleId: string) => {
-    try {
-      // Remove primary status from all users with this role
-      await supabase
-        .from("user_team_roles")
-        .update({ is_primary: false })
-        .eq("role_id", roleId);
-
-      // Set this user as primary
-      const { error } = await supabase
-        .from("user_team_roles")
-        .update({ is_primary: true })
-        .eq("user_id", userId)
-        .eq("role_id", roleId);
-
-      if (error) throw error;
-
-      toast.success("Primary user updated");
-      loadUsers();
-      
-      // Auto-assign tasks for this role
-      await autoAssignTasksForRole(roleId, userId);
-    } catch (error: any) {
-      toast.error("Failed to set primary: " + error.message);
-    }
-  };
-
-  const autoAssignTasksForRole = async (roleId: string, userId: string) => {
-    try {
-      const { data: tasks, error } = await supabase
-        .from("onboarding_tasks")
-        .update({ assigned_to_uuid: userId })
-        .eq("assigned_role_id", roleId)
-        .neq("status", "completed")
-        .select("id");
-
-      if (error) throw error;
-      
-      if (tasks && tasks.length > 0) {
-        toast.success(`Reassigned ${tasks.length} tasks to new primary user`);
-      }
-    } catch (error: any) {
-      console.error("Error reassigning tasks:", error);
     }
   };
 
@@ -328,7 +243,7 @@ export const TeamMatrixTab = () => {
 
   const autoAssignTasksForPhase = async (phaseNumber: number, roleId: string | null) => {
     try {
-      // Get all unassigned or role-only tasks for this phase
+      // Get all tasks for this phase
       const { data: tasks, error: tasksError } = await supabase
         .from("onboarding_tasks")
         .select("id, title")
@@ -338,35 +253,28 @@ export const TeamMatrixTab = () => {
       if (tasksError) throw tasksError;
       if (!tasks || tasks.length === 0) return;
 
-      // Find user with this role
-      let assignedToUuid = null;
-      if (roleId) {
-        const { data: userRole } = await supabase
-          .from("user_team_roles")
-          .select("user_id")
-          .eq("role_id", roleId)
-          .eq("is_primary", true)
-          .single();
-
-        assignedToUuid = userRole?.user_id || null;
-      }
-
-      // Update all tasks in this phase
+      // Update all tasks in this phase - assign to role only, not specific user
+      // This allows all users with the role to see the tasks
       const { error: updateError } = await supabase
         .from("onboarding_tasks")
         .update({
-          assigned_to_uuid: assignedToUuid,
-          assigned_role_id: roleId,
+          assigned_to_uuid: null, // Don't assign to specific user
+          assigned_role_id: roleId, // Assign to role so all users with role see it
         })
         .eq("phase_number", phaseNumber)
         .neq("status", "completed");
 
       if (updateError) throw updateError;
 
-      if (assignedToUuid) {
-        toast.success(`Assigned ${tasks.length} tasks from this phase to team member`);
-      } else if (roleId) {
-        toast.info(`Assigned ${tasks.length} tasks to role (no primary user assigned yet)`);
+      if (roleId) {
+        // Count how many users have this role
+        const { data: roleUsers } = await supabase
+          .from("user_team_roles")
+          .select("user_id")
+          .eq("role_id", roleId);
+
+        const userCount = roleUsers?.length || 0;
+        toast.success(`Assigned ${tasks.length} tasks to role (visible to ${userCount} team member${userCount !== 1 ? 's' : ''})`);
       } else {
         toast.info(`Unassigned ${tasks.length} tasks from this phase`);
       }
@@ -514,28 +422,13 @@ export const TeamMatrixTab = () => {
                         user.roles.map((role) => (
                           <div
                             key={role.role_id}
-                            className={`flex items-center gap-2 px-3 py-1.5 rounded-md text-sm ${
-                              role.is_primary 
-                                ? 'bg-primary text-primary-foreground font-medium' 
-                                : 'bg-muted text-muted-foreground'
-                            }`}
+                            className="flex items-center gap-2 bg-primary/10 text-primary px-3 py-1.5 rounded-md text-sm"
                           >
                             <span>{role.role_name}</span>
-                            {role.is_primary && <span className="text-xs">(Primary)</span>}
-                            {!role.is_primary && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-5 px-2 text-xs hover:bg-background/20"
-                                onClick={() => handleSetPrimaryRole(user.id, role.role_id)}
-                              >
-                                Set Primary
-                              </Button>
-                            )}
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-4 w-4 p-0 hover:bg-destructive/20 ml-1"
+                              className="h-4 w-4 p-0 hover:bg-destructive/20"
                               onClick={() => handleRemoveRoleFromUser(user.id, role.role_id)}
                             >
                               <Trash2 className="w-3 h-3" />
@@ -578,7 +471,7 @@ export const TeamMatrixTab = () => {
             Phase Assignment Matrix
           </CardTitle>
           <CardDescription>
-            Assign each onboarding phase to a team role. Tasks in each phase will be automatically assigned to the user with that role.
+            Assign each onboarding phase to a team role. Tasks in each phase will be visible to all team members with that role.
           </CardDescription>
         </CardHeader>
         <CardContent>

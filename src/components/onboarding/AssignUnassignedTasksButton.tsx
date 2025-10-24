@@ -57,7 +57,6 @@ export const AssignUnassignedTasksButton = () => {
 
       // Process each task and determine assignment
       const updates = unassignedTasks.map((task) => {
-        let assignedToUuid = null;
         let assignedRoleId = null;
 
         // Check for task-level template override (first priority)
@@ -79,20 +78,9 @@ export const AssignUnassignedTasksButton = () => {
           }
         }
 
-        // Find user with that role (third priority - map role to user)
-        if (assignedRoleId) {
-          const userRole = userTeamRoles.find((ur: any) => ur.role_id === assignedRoleId);
-          if (userRole) {
-            assignedToUuid = userRole.user_id;
-            console.log(`Task "${task.title}" assigned to user ${assignedToUuid}`);
-          } else {
-            console.log(`No primary user found for role ${assignedRoleId}`);
-          }
-        }
-
         return {
           id: task.id,
-          assigned_to_uuid: assignedToUuid,
+          assigned_to_uuid: null, // Don't assign to specific user, let role handle it
           assigned_role_id: assignedRoleId,
         };
       });
@@ -123,21 +111,16 @@ export const AssignUnassignedTasksButton = () => {
         }
       }
 
-      const assignedToUserCount = updates.filter(u => u.assigned_to_uuid).length;
-      const assignedToRoleCount = updates.filter(u => u.assigned_role_id && !u.assigned_to_uuid).length;
+      const assignedToRoleCount = updates.filter(u => u.assigned_role_id).length;
       
-      console.log(`Assignment complete: ${assignedToUserCount} assigned to users, ${assignedToRoleCount} assigned to roles only, ${errorCount} errors`);
+      console.log(`Assignment complete: ${assignedToRoleCount} assigned to roles, ${errorCount} errors`);
 
-      if (assignedToUserCount > 0) {
+      if (assignedToRoleCount > 0) {
         toast.success(
-          `Successfully assigned ${assignedToUserCount} tasks to team members! ${assignedToRoleCount > 0 ? `(${assignedToRoleCount} tasks assigned to roles but need team members)` : ''}`
-        );
-      } else if (assignedToRoleCount > 0) {
-        toast.warning(
-          `${assignedToRoleCount} tasks assigned to roles, but no primary team members found for those roles. Please assign team members in the Team Matrix.`
+          `Successfully assigned ${assignedToRoleCount} tasks to team roles!`
         );
       } else {
-        toast.warning("No tasks could be assigned. Please configure Team Matrix with role assignments and team members.");
+        toast.warning("No tasks could be assigned. Please configure Team Matrix with role assignments.");
       }
 
       // Reload the page to show updates
@@ -167,7 +150,7 @@ export const AssignUnassignedTasksButton = () => {
             <ul className="list-disc list-inside mt-2 space-y-1">
               <li>Task-specific role assignments (from task templates)</li>
               <li>Phase-level role assignments (from phase matrix)</li>
-              <li>Primary team member for each role</li>
+              <li>Tasks will be visible to all team members with the assigned role</li>
             </ul>
           </AlertDialogDescription>
         </AlertDialogHeader>
