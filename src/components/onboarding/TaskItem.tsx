@@ -1003,9 +1003,10 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
           taskStatus === "completed" && "bg-green-50/30 border-green-500"
         )}
       >
-        {/* HEADER SECTION */}
+        {/* HEADER SECTION - Click to collapse */}
         <div 
-          className="bg-muted/30 p-4 border-b"
+          className="bg-muted/30 p-4 border-b cursor-pointer hover:bg-muted/40 transition-colors"
+          onClick={() => setIsCollapsed(true)}
         >
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1">
@@ -1031,6 +1032,7 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
               <TaskStatusBadge status={taskStatus} dueDate={task.due_date} />
+              <ChevronDown className="w-4 h-4 text-muted-foreground rotate-180 transition-transform" />
             </div>
           </div>
         </div>
