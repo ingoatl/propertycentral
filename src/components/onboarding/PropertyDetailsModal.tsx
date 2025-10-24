@@ -195,6 +195,16 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
       const title = task.title.toLowerCase();
       const value = task.field_value || task.description || '';
 
+      // Skip listing URLs completely - they're shown in the top Property Information card
+      if (title === 'airbnb' || 
+          title === 'vrbo' || 
+          title === 'direct booking website' ||
+          title.includes('airbnb url') ||
+          title.includes('vrbo url') ||
+          title.includes('direct booking') && title.includes('website')) {
+        return;
+      }
+
       // Categorize based on title keywords
       if (title.includes('owner') || title.includes('contact')) {
         if (title.includes('email')) {
@@ -214,9 +224,6 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
         } else {
           categories['Property Details'].push({ label: task.title, value, icon: Home });
         }
-      } else if (title.includes('airbnb') || title.includes('vrbo') || title.includes('direct booking') || title.includes('direct website') || (title.includes('booking') && title.includes('website'))) {
-        // Skip listing URLs as they're shown in the top Property Information card
-        return;
       } else if (title.includes('listing') || title.includes('link') || title.includes('url')) {
         // Skip other listing-related items
         return;
