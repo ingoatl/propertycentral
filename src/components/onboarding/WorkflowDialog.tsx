@@ -9,7 +9,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { ONBOARDING_PHASES } from "@/context/onboardingPhases";
 import { InspectionCard } from "./InspectionCard";
 import { Input } from "@/components/ui/input";
-import { Search, Building2, DollarSign } from "lucide-react";
+import { Search, Building2, DollarSign, User, Users } from "lucide-react";
 
 interface WorkflowDialogProps {
   open: boolean;
@@ -29,6 +29,13 @@ export const WorkflowDialog = ({ open, onOpenChange, project, propertyId, proper
   const [searchQuery, setSearchQuery] = useState("");
   const [filteredTasks, setFilteredTasks] = useState<OnboardingTask[]>([]);
   const [creatingProject, setCreatingProject] = useState(false);
+  const [showMyTasksOnly, setShowMyTasksOnly] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [userRoleIds, setUserRoleIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    loadCurrentUser();
+  }, []);
 
   useEffect(() => {
     if (open) {
@@ -37,12 +44,28 @@ export const WorkflowDialog = ({ open, onOpenChange, project, propertyId, proper
   }, [open, project?.id]);
 
   useEffect(() => {
-    // Filter tasks based on search query
-    if (searchQuery.trim() === "") {
-      setFilteredTasks(tasks);
-    } else {
+    // Filter tasks based on search query and "my tasks" filter
+    let filtered = tasks;
+
+    // Apply "my tasks" filter
+    if (showMyTasksOnly && currentUserId) {
+      filtered = filtered.filter((task) => {
+        // Check if task is directly assigned to current user
+        if (task.assigned_to_uuid === currentUserId) {
+          return true;
+        }
+        // Check if task is assigned to a role that the current user has
+        if (task.assigned_role_id && userRoleIds.includes(task.assigned_role_id)) {
+          return true;
+        }
+        return false;
+      });
+    }
+
+    // Apply search filter
+    if (searchQuery.trim() !== "") {
       const query = searchQuery.toLowerCase();
-      const filtered = tasks.filter(
+      filtered = filtered.filter(
         (task) =>
           task.title.toLowerCase().includes(query) ||
           task.phase_title.toLowerCase().includes(query) ||
@@ -50,9 +73,10 @@ export const WorkflowDialog = ({ open, onOpenChange, project, propertyId, proper
           task.field_value?.toLowerCase().includes(query) ||
           task.notes?.toLowerCase().includes(query)
       );
-      setFilteredTasks(filtered);
     }
-  }, [searchQuery, tasks]);
+
+    setFilteredTasks(filtered);
+  }, [searchQuery, tasks, showMyTasksOnly, currentUserId, userRoleIds]);
 
   useEffect(() => {
     // When dialog closes, update parent to refresh progress
@@ -77,6 +101,27 @@ export const WorkflowDialog = ({ open, onOpenChange, project, propertyId, proper
       }, 500);
     }
   }, [taskId, tasks, loading]);
+
+  const loadCurrentUser = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      setCurrentUserId(user.id);
+
+      // Get user's role IDs
+      const { data: userRoles } = await supabase
+        .from("user_team_roles")
+        .select("role_id")
+        .eq("user_id", user.id);
+
+      if (userRoles) {
+        setUserRoleIds(userRoles.map(r => r.role_id));
+      }
+    } catch (error) {
+      console.error("Error loading current user:", error);
+    }
+  };
 
   const loadTasks = async () => {
     if (!project?.id) {
@@ -298,17 +343,28 @@ export const WorkflowDialog = ({ open, onOpenChange, project, propertyId, proper
               {creatingProject ? "Creating..." : "Start Onboarding"}
             </Button>
           </div>
-        ) : (
+          ) : (
           <>
-            {/* Search Field */}
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                placeholder="Search tasks, phases, values, notes..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9"
-              />
+            {/* Filters Row */}
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search tasks, phases, values, notes..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+              <Button
+                variant={showMyTasksOnly ? "default" : "outline"}
+                size="sm"
+                onClick={() => setShowMyTasksOnly(!showMyTasksOnly)}
+                className="gap-2 whitespace-nowrap"
+              >
+                {showMyTasksOnly ? <User className="w-4 h-4" /> : <Users className="w-4 h-4" />}
+                {showMyTasksOnly ? "My Tasks" : "All Tasks"}
+              </Button>
             </div>
 
             <ScrollArea className="h-[calc(90vh-280px)] pr-4">
@@ -319,11 +375,17 @@ export const WorkflowDialog = ({ open, onOpenChange, project, propertyId, proper
                   {/* Workflow Phases */}
                   <WorkflowPhases
                     projectId={project.id}
-                    tasks={searchQuery ? filteredTasks : tasks}
+                    tasks={filteredTasks}
                     onTaskUpdate={handleTaskUpdate}
                     searchQuery={searchQuery}
                     taskId={taskId}
                   />
+
+                  {showMyTasksOnly && filteredTasks.length === 0 && !searchQuery && (
+                    <div className="py-12 text-center text-muted-foreground">
+                      No tasks assigned to you
+                    </div>
+                  )}
 
                   {searchQuery && filteredTasks.length === 0 && (
                     <div className="py-12 text-center text-muted-foreground">
