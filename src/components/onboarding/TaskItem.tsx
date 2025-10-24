@@ -74,9 +74,12 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
   const isDueDateOverdue = task.due_date && isPast(new Date(task.due_date)) && task.status !== "completed";
 
   useEffect(() => {
-    loadSOP();
-    loadAnsweredFAQs();
-  }, [task.id]);
+    // Only load SOP and FAQs when the task is expanded
+    if (!isCollapsed) {
+      loadSOP();
+      loadAnsweredFAQs();
+    }
+  }, [task.id, isCollapsed]);
 
   // Auto-correct status if task has data but is marked as pending
   useEffect(() => {
