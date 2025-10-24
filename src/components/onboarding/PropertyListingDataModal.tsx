@@ -79,15 +79,18 @@ export const PropertyListingDataModal = ({
   const loadListingData = async () => {
     setLoading(true);
     try {
-      // Get the project ID for this property
+      // Get the project ID for this property (use maybeSingle to avoid errors)
       const { data: projects } = await supabase
         .from("onboarding_projects")
         .select("id")
         .eq("property_id", propertyId)
-        .single();
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
       if (!projects) {
         toast.error("No onboarding project found for this property");
+        setLoading(false);
         return;
       }
 
@@ -102,7 +105,7 @@ export const PropertyListingDataModal = ({
         .from("comprehensive_property_data")
         .select("*")
         .eq("id", propertyId)
-        .single();
+        .maybeSingle();
 
       // Helper function to get task value
       const getTaskValue = (title: string) => {
