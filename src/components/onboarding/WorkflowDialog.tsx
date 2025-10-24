@@ -32,9 +32,11 @@ export const WorkflowDialog = ({ open, onOpenChange, project, propertyId, proper
   const [showMyTasksOnly, setShowMyTasksOnly] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [userRoleIds, setUserRoleIds] = useState<string[]>([]);
+  const [phaseToRoleMap, setPhaseToRoleMap] = useState<Map<number, string>>(new Map());
 
   useEffect(() => {
     loadCurrentUser();
+    loadPhaseAssignments();
   }, []);
 
   useEffect(() => {
@@ -50,21 +52,22 @@ export const WorkflowDialog = ({ open, onOpenChange, project, propertyId, proper
     // Apply "my tasks" filter
     if (showMyTasksOnly && currentUserId) {
       filtered = filtered.filter((task) => {
-        // Check if task is directly assigned to current user
+        // Direct assignment to user
         if (task.assigned_to_uuid === currentUserId) {
           return true;
         }
-        // Check if task is assigned to a role that the current user has
+        
+        // Task-level role assignment
         if (task.assigned_role_id && userRoleIds.includes(task.assigned_role_id)) {
           return true;
         }
         
-        // Check phase-level role assignment
-        const taskPhase = ONBOARDING_PHASES.find(p => p.id === task.phase_number);
-        if (!task.assigned_role_id && !task.assigned_to_uuid && taskPhase) {
-          // If task has no specific assignment, check phase-level assignment via supabase
-          // We'll handle this in a separate useEffect to avoid async in filter
-          return false;
+        // Phase-level role assignment (when task has no specific assignment)
+        if (!task.assigned_role_id && !task.assigned_to_uuid) {
+          const phaseRoleId = phaseToRoleMap.get(task.phase_number);
+          if (phaseRoleId && userRoleIds.includes(phaseRoleId)) {
+            return true;
+          }
         }
         
         return false;
@@ -85,7 +88,7 @@ export const WorkflowDialog = ({ open, onOpenChange, project, propertyId, proper
     }
 
     setFilteredTasks(filtered);
-  }, [searchQuery, tasks, showMyTasksOnly, currentUserId, userRoleIds]);
+  }, [searchQuery, tasks, showMyTasksOnly, currentUserId, userRoleIds, phaseToRoleMap]);
 
   useEffect(() => {
     // When dialog closes, update parent to refresh progress
@@ -126,18 +129,24 @@ export const WorkflowDialog = ({ open, onOpenChange, project, propertyId, proper
 
       if (userRoles) {
         setUserRoleIds(userRoles.map(r => r.role_id));
-        console.log("User role IDs:", userRoles.map(r => r.role_id));
       }
-
-      // Also get phase-level role assignments
-      const { data: phaseRoles } = await supabase
-        .from("phase_role_assignments")
-        .select("role_id, phase_number");
-
-      console.log("Current user ID:", user.id);
-      console.log("Phase role assignments:", phaseRoles);
     } catch (error) {
       console.error("Error loading current user:", error);
+    }
+  };
+
+  const loadPhaseAssignments = async () => {
+    try {
+      const { data: phaseRoles } = await supabase
+        .from("phase_role_assignments")
+        .select("phase_number, role_id");
+      
+      if (phaseRoles) {
+        const map = new Map(phaseRoles.map(pr => [pr.phase_number, pr.role_id]));
+        setPhaseToRoleMap(map);
+      }
+    } catch (error) {
+      console.error("Error loading phase assignments:", error);
     }
   };
 

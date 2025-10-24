@@ -100,6 +100,22 @@ const handler = async (req: Request): Promise<Response> => {
         usersWithRole.forEach(uid => userIds.add(uid));
       }
       
+      // If no specific assignment, check phase-level role assignment
+      if (!task.assigned_to_uuid && !task.assigned_role_id) {
+        const { data: phaseAssignment } = await supabase
+          .from("phase_role_assignments")
+          .select("role_id")
+          .eq("phase_number", task.phase_number)
+          .maybeSingle();
+        
+        if (phaseAssignment?.role_id && userRoles) {
+          const usersWithRole = userRoles
+            .filter(ur => ur.role_id === phaseAssignment.role_id)
+            .map(ur => ur.user_id);
+          usersWithRole.forEach(uid => userIds.add(uid));
+        }
+      }
+      
       // Add task to each user's list
       for (const userId of userIds) {
         if (!tasksByUser.has(userId)) {
