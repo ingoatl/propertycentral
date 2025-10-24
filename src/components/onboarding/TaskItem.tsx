@@ -84,13 +84,9 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
   }, [task.id, isCollapsed]);
   
   useEffect(() => {
-    // Load assigned user's first name when task is assigned
-    if (task.assigned_to_uuid) {
-      loadAssignedUserName();
-    } else {
-      setAssignedUserName(null);
-    }
-  }, [task.assigned_to_uuid]);
+    // Load assigned user's first name - either from direct assignment or phase assignment
+    loadAssignedUserName();
+  }, [task.assigned_to_uuid, task.phase_number]);
 
   // Auto-correct status if task has data but is marked as pending
   useEffect(() => {
@@ -132,16 +128,44 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
   };
   
   const loadAssignedUserName = async () => {
-    if (!task.assigned_to_uuid) return;
+    // First, try to get directly assigned user
+    if (task.assigned_to_uuid) {
+      const { data } = await supabase
+        .from("profiles")
+        .select("first_name, email")
+        .eq("id", task.assigned_to_uuid)
+        .maybeSingle();
+      
+      if (data) {
+        setAssignedUserName(data.first_name || data.email?.split('@')[0] || 'Unknown');
+        return;
+      }
+    }
     
-    const { data } = await supabase
-      .from("profiles")
-      .select("first_name, email")
-      .eq("id", task.assigned_to_uuid)
+    // If no direct assignment, get the phase-assigned user
+    const { data: phaseAssignment } = await supabase
+      .from("phase_role_assignments")
+      .select("role_id")
+      .eq("phase_number", task.phase_number)
       .maybeSingle();
     
-    if (data) {
-      setAssignedUserName(data.first_name || data.email?.split('@')[0] || 'Unknown');
+    if (phaseAssignment?.role_id) {
+      const { data: userRole } = await supabase
+        .from("user_team_roles")
+        .select(`
+          profiles (
+            first_name,
+            email
+          )
+        `)
+        .eq("role_id", phaseAssignment.role_id)
+        .eq("is_primary", true)
+        .maybeSingle();
+      
+      if (userRole?.profiles) {
+        const profile = userRole.profiles as any;
+        setAssignedUserName(profile.first_name || profile.email?.split('@')[0] || 'Unknown');
+      }
     }
   };
 
@@ -1095,7 +1119,7 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
               )}
               
               {/* Show assigned user for admins */}
-              {isAdmin && task.assigned_to_uuid && assignedUserName && (
+              {isAdmin && assignedUserName && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -1104,19 +1128,6 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
                 >
                   <User className="w-3.5 h-3.5" />
                   Assigned to: <span className="font-medium">{assignedUserName}</span>
-                </Button>
-              )}
-              
-              {/* Show unassigned state for admins */}
-              {isAdmin && !task.assigned_to_uuid && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowAssignmentDialog(true)}
-                  className="h-8 gap-2 text-xs text-muted-foreground"
-                >
-                  <User className="w-3.5 h-3.5" />
-                  Unassigned - Click to assign
                 </Button>
               )}
             </div>
