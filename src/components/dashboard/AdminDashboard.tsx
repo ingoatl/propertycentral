@@ -261,56 +261,56 @@ export const AdminDashboard = ({ summaries, onExport, onSync, syncing, onSendOve
     <div className="min-h-screen bg-gradient-subtle">
       {/* Header */}
       <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-lg border-b border-border/50 shadow-sm">
-        <div className="container mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
+        <div className="container mx-auto px-6 max-md:px-3 py-4 max-md:py-3">
+          <div className="flex items-center justify-between max-md:flex-col max-md:items-start max-md:gap-3">
             <div>
-              <h1 className="text-3xl font-bold bg-gradient-primary bg-clip-text text-transparent">
+              <h1 className="text-3xl max-md:text-xl font-bold bg-gradient-primary bg-clip-text text-transparent">
                 PeachHaus Dashboard
               </h1>
-              <p className="text-sm text-muted-foreground mt-1">
+              <p className="text-sm max-md:text-xs text-muted-foreground mt-1">
                 Comprehensive property management overview
               </p>
             </div>
-            <div className="flex items-center gap-3">
-              <Button onClick={onSendOverdueEmails} variant="outline" size="sm">
-                <AlertCircle className="h-4 w-4 mr-2" />
-                Send Overdue Emails
+            <div className="flex items-center gap-3 max-md:gap-2 max-md:flex-wrap max-md:w-full">
+              <Button onClick={onSendOverdueEmails} variant="outline" size="sm" className="max-md:flex-1">
+                <AlertCircle className="h-4 w-4 max-md:mr-1" />
+                <span className="max-md:text-xs">Overdue</span>
               </Button>
-              <Button onClick={onExport} variant="outline" size="sm">
-                <Download className="h-4 w-4 mr-2" />
-                Export
+              <Button onClick={onExport} variant="outline" size="sm" className="max-md:flex-1">
+                <Download className="h-4 w-4 max-md:mr-1" />
+                <span className="max-md:text-xs">Export</span>
               </Button>
-              <Button onClick={onSync} disabled={syncing} size="sm">
-                <RefreshCw className={`h-4 w-4 mr-2 ${syncing ? "animate-spin" : ""}`} />
-                {syncing ? "Syncing..." : "Sync Data"}
+              <Button onClick={onSync} disabled={syncing} size="sm" className="max-md:w-full">
+                <RefreshCw className={`h-4 w-4 max-md:mr-1 ${syncing ? "animate-spin" : ""}`} />
+                <span className="max-md:text-xs">{syncing ? "Syncing..." : "Sync Data"}</span>
               </Button>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="container mx-auto px-6 py-8 space-y-8">
+      <div className="container mx-auto px-6 max-md:px-3 py-8 max-md:py-4 space-y-8 max-md:space-y-6">
         {/* Alert Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 max-md:gap-4">
           <div className="lg:col-span-2">
             <OverdueTasksCard />
           </div>
           <div>
             <Card className="border-border/50">
               <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <MessageCircleQuestion className="h-5 w-5 text-primary" />
+                <CardTitle className="text-lg max-md:text-base flex items-center gap-2">
+                  <MessageCircleQuestion className="h-5 w-5 max-md:h-4 max-md:w-4 text-primary" />
                   Quick Stats
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-                  <span className="text-sm text-muted-foreground">Pending Questions</span>
-                  <span className="text-lg font-bold text-foreground">--</span>
+              <CardContent className="space-y-4 max-md:space-y-3">
+                <div className="flex items-center justify-between p-3 max-md:p-2.5 rounded-lg bg-muted/50">
+                  <span className="text-sm max-md:text-base text-muted-foreground">Pending Questions</span>
+                  <span className="text-lg max-md:text-xl font-bold text-foreground">--</span>
                 </div>
-                <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-                  <span className="text-sm text-muted-foreground">Open Bug Reports</span>
-                  <span className="text-lg font-bold text-foreground">--</span>
+                <div className="flex items-center justify-between p-3 max-md:p-2.5 rounded-lg bg-muted/50">
+                  <span className="text-sm max-md:text-base text-muted-foreground">Open Bug Reports</span>
+                  <span className="text-lg max-md:text-xl font-bold text-foreground">--</span>
                 </div>
               </CardContent>
             </Card>
@@ -318,7 +318,7 @@ export const AdminDashboard = ({ summaries, onExport, onSync, syncing, onSendOve
         </div>
 
         {/* KPI Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6 max-md:gap-4">
           <KPICard
             title="Total Properties"
             value={totalProperties}
@@ -359,11 +359,11 @@ export const AdminDashboard = ({ summaries, onExport, onSync, syncing, onSendOve
         {/* OWNED PROPERTIES PERFORMANCE - Prominent Section */}
         {ownedProperties.length > 0 && (
           <div>
-            <div className="mb-4">
-              <h2 className="text-2xl font-bold bg-gradient-primary bg-clip-text text-transparent">
+            <div className="mb-4 max-md:mb-3">
+              <h2 className="text-2xl max-md:text-lg font-bold bg-gradient-primary bg-clip-text text-transparent">
                 PeachHaus Portfolio Performance
               </h2>
-              <p className="text-sm text-muted-foreground mt-1">
+              <p className="text-sm max-md:text-xs text-muted-foreground mt-1">
                 Company-owned short-term rental properties
               </p>
             </div>
@@ -374,10 +374,10 @@ export const AdminDashboard = ({ summaries, onExport, onSync, syncing, onSendOve
         {/* Managed Properties Performance Grid */}
         <Card className="border-border/50">
           <CardHeader>
-            <CardTitle className="text-xl">Client-Managed Properties</CardTitle>
-            <p className="text-sm text-muted-foreground mt-1">Properties under management for clients</p>
+            <CardTitle className="text-xl max-md:text-lg">Client-Managed Properties</CardTitle>
+            <p className="text-sm max-md:text-xs text-muted-foreground mt-1">Properties under management for clients</p>
           </CardHeader>
-          <CardContent>
+          <CardContent className="max-md:px-3">
             <PropertyPerformanceGrid
               properties={managedProperties}
               onPropertyClick={handlePropertyClick}
@@ -386,7 +386,7 @@ export const AdminDashboard = ({ summaries, onExport, onSync, syncing, onSendOve
         </Card>
 
         {/* Activity and Enhanced Team Performance */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 max-md:gap-4">
           <RecentActivityFeed activities={activities} />
           <EnhancedTeamPerformance
             teamMembers={teamData.members}
@@ -396,7 +396,7 @@ export const AdminDashboard = ({ summaries, onExport, onSync, syncing, onSendOve
         </div>
 
         {/* Admin Cards */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 max-md:gap-4">
           <PendingQuestionsCard />
           <DashboardBugReportsCard />
         </div>
@@ -404,29 +404,29 @@ export const AdminDashboard = ({ summaries, onExport, onSync, syncing, onSendOve
 
       {/* Property Detail Modal */}
       <Dialog open={!!selectedProperty} onOpenChange={() => setSelectedProperty(null)}>
-        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-4xl max-md:max-w-full max-md:h-screen max-h-[80vh] max-md:max-h-screen overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{selectedProperty?.property.name}</DialogTitle>
+            <DialogTitle className="max-md:text-xl">{selectedProperty?.property.name}</DialogTitle>
           </DialogHeader>
           
           {selectedProperty && (
-            <div className="space-y-6">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="space-y-6 max-md:space-y-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-md:gap-3">
                 <div className="space-y-1">
-                  <p className="text-sm text-muted-foreground">Total Revenue</p>
-                  <p className="text-xl font-bold">${selectedProperty.ownerrezRevenue.toLocaleString()}</p>
+                  <p className="text-sm max-md:text-xs text-muted-foreground">Total Revenue</p>
+                  <p className="text-xl max-md:text-lg font-bold">${selectedProperty.ownerrezRevenue.toLocaleString()}</p>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-sm text-muted-foreground">Occupancy</p>
-                  <p className="text-xl font-bold">{selectedProperty.occupancyRate.toFixed(1)}%</p>
+                  <p className="text-sm max-md:text-xs text-muted-foreground">Occupancy</p>
+                  <p className="text-xl max-md:text-lg font-bold">{selectedProperty.occupancyRate.toFixed(1)}%</p>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-sm text-muted-foreground">Expenses</p>
-                  <p className="text-xl font-bold">${selectedProperty.expenseTotal.toLocaleString()}</p>
+                  <p className="text-sm max-md:text-xs text-muted-foreground">Expenses</p>
+                  <p className="text-xl max-md:text-lg font-bold">${selectedProperty.expenseTotal.toLocaleString()}</p>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-sm text-muted-foreground">Net Balance</p>
-                  <p className="text-xl font-bold">${selectedProperty.netBalance.toLocaleString()}</p>
+                  <p className="text-sm max-md:text-xs text-muted-foreground">Net Balance</p>
+                  <p className="text-xl max-md:text-lg font-bold">${selectedProperty.netBalance.toLocaleString()}</p>
                 </div>
               </div>
 

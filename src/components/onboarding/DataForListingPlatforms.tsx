@@ -223,13 +223,13 @@ export const DataForListingPlatforms = ({
         <Button
           variant="ghost"
           size="icon"
-          className="h-7 w-7 max-md:h-11 max-md:w-11 flex-shrink-0 mt-0.5"
+          className="h-7 w-7 max-md:h-12 max-md:w-12 flex-shrink-0 mt-0.5 flex"
           onClick={() => copyToClipboard(value, label)}
         >
           {copiedField === label ? (
-            <Check className="h-3.5 w-3.5 max-md:h-5 max-md:w-5 text-green-600" />
+            <Check className="h-3.5 w-3.5 max-md:h-6 max-md:w-6 text-green-600" />
           ) : (
-            <Copy className="h-3.5 w-3.5 max-md:h-5 max-md:w-5" />
+            <Copy className="h-3.5 w-3.5 max-md:h-6 max-md:w-6" />
           )}
         </Button>
       )}

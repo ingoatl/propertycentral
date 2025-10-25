@@ -596,13 +596,13 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
                            <Button
                             variant="ghost"
                             size="icon"
-                            className="h-7 w-7 max-md:h-11 max-md:w-11 flex-shrink-0"
+                            className="h-7 w-7 max-md:h-12 max-md:w-12 flex-shrink-0 flex"
                             onClick={() => copyToClipboard(propertyInfo.address, "Address")}
                           >
                             {copiedField === "Address" ? (
-                              <Check className="h-3.5 w-3.5 max-md:h-5 max-md:w-5 text-green-600" />
+                              <Check className="h-3.5 w-3.5 max-md:h-6 max-md:w-6 text-green-600" />
                             ) : (
-                              <Copy className="h-3.5 w-3.5 max-md:h-5 max-md:w-5" />
+                              <Copy className="h-3.5 w-3.5 max-md:h-6 max-md:w-6" />
                             )}
                           </Button>
                         </div>
@@ -664,13 +664,13 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
                                 <Button
                                   variant="ghost"
                                   size="icon"
-                                  className="h-7 w-7 flex-shrink-0"
+                                  className="h-7 w-7 max-md:h-12 max-md:w-12 flex-shrink-0 flex"
                                   onClick={() => copyToClipboard(item.value, item.label)}
                                 >
                                   {copiedField === item.label ? (
-                                    <Check className="h-3.5 w-3.5 text-green-600" />
+                                    <Check className="h-3.5 w-3.5 max-md:h-6 max-md:w-6 text-green-600" />
                                   ) : (
-                                    <Copy className="h-3.5 w-3.5" />
+                                    <Copy className="h-3.5 w-3.5 max-md:h-6 max-md:w-6" />
                                   )}
                                 </Button>
                               </div>

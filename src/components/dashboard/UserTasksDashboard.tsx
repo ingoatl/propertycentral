@@ -311,49 +311,49 @@ export const UserTasksDashboard = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-md:space-y-4">
       {/* Overdue Tasks - Priority Section */}
       <OverdueTasksCard />
 
       {/* Task Statistics */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 max-md:gap-3 md:grid-cols-2 lg:grid-cols-3">
         <Card 
           className="cursor-pointer hover:shadow-md transition-shadow"
           onClick={() => setShowActiveTasksModal(true)}
         >
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Tasks</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 max-md:pb-3">
+            <CardTitle className="text-sm max-md:text-base font-medium">Active Tasks</CardTitle>
+            <Clock className="h-4 w-4 max-md:h-5 max-md:w-5 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.totalAssigned}</div>
-            <p className="text-xs text-muted-foreground">
+            <div className="text-2xl max-md:text-3xl font-bold">{stats.totalAssigned}</div>
+            <p className="text-xs max-md:text-sm text-muted-foreground">
               Click to view all active tasks
             </p>
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Completed This Week</CardTitle>
-            <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 max-md:pb-3">
+            <CardTitle className="text-sm max-md:text-base font-medium">Completed This Week</CardTitle>
+            <CheckCircle2 className="h-4 w-4 max-md:h-5 max-md:w-5 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.completedThisWeek}</div>
-            <p className="text-xs text-muted-foreground">
+            <div className="text-2xl max-md:text-3xl font-bold">{stats.completedThisWeek}</div>
+            <p className="text-xs max-md:text-sm text-muted-foreground">
               Tasks finished in last 7 days
             </p>
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Due This Week</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 max-md:pb-3">
+            <CardTitle className="text-sm max-md:text-base font-medium">Due This Week</CardTitle>
+            <TrendingUp className="h-4 w-4 max-md:h-5 max-md:w-5 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.upcomingTasks.length}</div>
-            <p className="text-xs text-muted-foreground">
+            <div className="text-2xl max-md:text-3xl font-bold">{stats.upcomingTasks.length}</div>
+            <p className="text-xs max-md:text-sm text-muted-foreground">
               Upcoming in next 7 days
             </p>
           </CardContent>
@@ -363,50 +363,50 @@ export const UserTasksDashboard = () => {
       {/* Upcoming Tasks */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Calendar className="h-5 w-5" />
+          <CardTitle className="flex items-center gap-2 max-md:text-lg">
+            <Calendar className="h-5 w-5 max-md:h-6 max-md:w-6" />
             Upcoming Tasks (Next 7 Days)
           </CardTitle>
-          <CardDescription>
+          <CardDescription className="max-md:text-sm">
             Tasks due in the coming week
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="max-md:px-3">
           {stats.upcomingTasks.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-4">
+            <p className="text-sm max-md:text-base text-muted-foreground text-center py-4">
               No tasks due in the next 7 days
             </p>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-3 max-md:space-y-4">
               {stats.upcomingTasks.map((task: any) => {
                 const daysUntil = getDaysUntilDue(task.due_date);
                 return (
                   <div
                     key={task.id}
-                    className="flex items-start justify-between p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors cursor-pointer"
+                    className="flex items-start justify-between p-3 max-md:p-4 rounded-lg border bg-card hover:bg-accent/50 transition-colors cursor-pointer"
                     onClick={() => {
                       // Navigate to properties page and open workflow at this specific task
                       navigate(`/properties?openWorkflow=${task.project_id}&taskId=${task.id}`);
                     }}
                   >
-                     <div className="space-y-1">
+                     <div className="space-y-1 max-md:space-y-2">
                       <div className="flex items-center gap-2">
-                        <p className="font-medium">{task.title}</p>
-                        <ExternalLink className="h-3 w-3 opacity-50" />
+                        <p className="font-medium max-md:text-lg">{task.title}</p>
+                        <ExternalLink className="h-3 w-3 max-md:h-4 max-md:w-4 opacity-50" />
                       </div>
-                      <p className="text-sm text-muted-foreground">
+                      <p className="text-sm max-md:text-base text-muted-foreground">
                         {task.onboarding_projects?.property_address}
                       </p>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <Badge variant="outline" className="text-xs">
+                      <div className="flex items-center gap-2 text-xs max-md:text-sm text-muted-foreground">
+                        <Badge variant="outline" className="text-xs max-md:text-sm">
                           {task.phase_title}
                         </Badge>
                         {task.assigned_to && (
                           <span>Assigned to: {task.assigned_to}</span>
                         )}
                       </div>
-                      <div className="flex items-center gap-2 text-sm">
-                        <Calendar className="h-3 w-3" />
+                      <div className="flex items-center gap-2 text-sm max-md:text-base">
+                        <Calendar className="h-3 w-3 max-md:h-4 max-md:w-4" />
                         <span>
                           Due: {task.due_date && format(new Date(task.due_date), "MMM d, yyyy")}
                         </span>
@@ -414,7 +414,7 @@ export const UserTasksDashboard = () => {
                     </div>
                     <Badge
                       variant={daysUntil <= 2 ? "destructive" : "secondary"}
-                      className="text-xs"
+                      className="text-xs max-md:text-sm max-md:px-3 max-md:py-1"
                     >
                       {daysUntil === 0 ? "Today" : daysUntil === 1 ? "Tomorrow" : `${daysUntil} days`}
                     </Badge>
@@ -429,38 +429,38 @@ export const UserTasksDashboard = () => {
       {/* Recently Completed */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400" />
+          <CardTitle className="flex items-center gap-2 max-md:text-lg">
+            <CheckCircle2 className="h-5 w-5 max-md:h-6 max-md:w-6 text-green-600 dark:text-green-400" />
             Recently Completed
           </CardTitle>
-          <CardDescription>
+          <CardDescription className="max-md:text-sm">
             Your latest accomplishments
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="max-md:px-3">
           {stats.recentlyCompleted.length === 0 ? (
-            <p className="text-sm text-muted-foreground text-center py-4">
+            <p className="text-sm max-md:text-base text-muted-foreground text-center py-4">
               No recently completed tasks
             </p>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-3 max-md:space-y-4">
               {stats.recentlyCompleted.map((task: any) => (
                 <div
                   key={task.id}
-                  className="flex items-start justify-between p-3 rounded-lg border bg-card opacity-80"
+                  className="flex items-start justify-between p-3 max-md:p-4 rounded-lg border bg-card opacity-80"
                 >
-                  <div className="space-y-1">
-                    <p className="font-medium">{task.title}</p>
-                    <p className="text-sm text-muted-foreground">
+                  <div className="space-y-1 max-md:space-y-2">
+                    <p className="font-medium max-md:text-lg">{task.title}</p>
+                    <p className="text-sm max-md:text-base text-muted-foreground">
                       {task.onboarding_projects?.property_address}
                     </p>
                     {task.completed_date && (
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-xs max-md:text-sm text-muted-foreground">
                         Completed: {format(new Date(task.completed_date), "MMM d, yyyy")}
                       </p>
                     )}
                   </div>
-                  <Badge variant="outline" className="text-xs bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/20">
+                  <Badge variant="outline" className="text-xs max-md:text-sm max-md:px-3 max-md:py-1 bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/20">
                     ✓ Done
                   </Badge>
                 </div>
