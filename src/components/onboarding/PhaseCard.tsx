@@ -78,42 +78,42 @@ export const PhaseCard = ({
 
   return (
     <Card className={cn(
-      "transition-all",
+      "transition-all max-md:shadow-lg",
       isComplete && "bg-green-50 border-green-500",
       highlighted && "ring-2 ring-blue-500 shadow-lg"
     )}>
       <Collapsible open={expanded} onOpenChange={onToggle}>
         <CollapsibleTrigger asChild>
           <div className="w-full cursor-pointer">
-            <CardHeader className="hover:bg-muted/50 transition-colors">
-              <div className="flex items-start justify-between">
-                <div className="flex-1 text-left">
-                  <div className="flex items-center gap-3 mb-2">
-                    <Badge variant="outline" className="font-mono text-sm px-3 py-1">
+            <CardHeader className="hover:bg-muted/50 transition-colors max-md:p-5">
+              <div className="flex items-start justify-between max-md:flex-col max-md:gap-4">
+                <div className="flex-1 text-left max-md:w-full">
+                  <div className="flex items-center gap-3 mb-2 max-md:flex-wrap">
+                    <Badge variant="outline" className="font-mono text-sm px-3 py-1 max-md:text-base max-md:px-4 max-md:py-1.5">
                       Phase {phase.id}
                     </Badge>
-                    {isComplete && <CheckCircle2 className="w-5 h-5 text-green-600" />}
+                    {isComplete && <CheckCircle2 className="w-5 h-5 text-green-600 max-md:w-6 max-md:h-6" />}
                     {sop && (
                       <button
                         type="button"
-                        className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-700 text-sm font-medium hover:underline"
+                        className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-700 text-sm font-medium hover:underline max-md:text-base"
                         onClick={(e) => {
                           e.stopPropagation();
                           setShowSOPDialog(true);
                         }}
                       >
-                        <BookOpen className="w-4 h-4" />
+                        <BookOpen className="w-4 h-4 max-md:w-5 max-md:h-5" />
                         View SOP
                       </button>
                     )}
                   </div>
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1">
-                      <CardTitle className="text-xl font-bold mb-2">{phase.title}</CardTitle>
-                      <CardDescription>{phase.description}</CardDescription>
+                  <div className="flex items-start justify-between gap-4 max-md:flex-col max-md:gap-3">
+                    <div className="flex-1 max-md:w-full">
+                      <CardTitle className="text-xl font-bold mb-2 max-md:text-2xl">{phase.title}</CardTitle>
+                      <CardDescription className="max-md:text-base max-md:leading-relaxed">{phase.description}</CardDescription>
                     </div>
                     {/* SOP Buttons - Right Side */}
-                    <div className="flex items-center gap-2 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex items-center gap-2 flex-shrink-0 max-md:hidden" onClick={(e) => e.stopPropagation()}>
                       {isAdmin && (
                         <Button
                           variant="ghost"
@@ -127,25 +127,25 @@ export const PhaseCard = ({
                     </div>
                   </div>
                 </div>
-                <div className="flex items-center gap-4 ml-4">
-                  <div className="text-right">
-                    <div className="text-lg font-semibold">{Math.round(completion)}%</div>
-                    <div className="text-xs text-muted-foreground">
+                <div className="flex items-center gap-4 max-md:w-full max-md:justify-between">
+                  <div className="text-right max-md:text-left">
+                    <div className="text-lg font-semibold max-md:text-2xl">{Math.round(completion)}%</div>
+                    <div className="text-xs text-muted-foreground max-md:text-sm">
                       {tasks.filter(t => t.status === "completed").length} of {tasks.length} tasks
                     </div>
                   </div>
                   <ChevronDown className={cn(
-                    "w-5 h-5 transition-transform",
+                    "w-5 h-5 transition-transform max-md:w-6 max-md:h-6",
                     expanded && "transform rotate-180"
                   )} />
                 </div>
               </div>
 
               {/* Progress Bar - Full Width */}
-              <div className="w-full bg-muted rounded-full h-2.5 mt-4">
+              <div className="w-full bg-muted rounded-full h-2.5 mt-4 max-md:h-3 max-md:mt-5">
                 <div
                   className={cn(
-                    "h-2.5 rounded-full transition-all duration-300",
+                    "h-2.5 rounded-full transition-all duration-300 max-md:h-3",
                     isComplete ? "bg-green-600" : "bg-primary"
                   )}
                   style={{ width: `${completion}%` }}
@@ -156,7 +156,7 @@ export const PhaseCard = ({
         </CollapsibleTrigger>
 
         <CollapsibleContent>
-          <CardContent className="space-y-2 pt-0">
+          <CardContent className="space-y-2 pt-0 max-md:space-y-3 max-md:p-5 max-md:pt-0">
             {tasks
               .filter((task) => {
                 // Admin-only tasks: hide from non-admins
@@ -201,9 +201,9 @@ export const PhaseCard = ({
               onClick={() => setShowAddTaskDialog(true)}
               variant="outline"
               size="sm"
-              className="w-full mt-4"
+              className="w-full mt-4 max-md:h-12 max-md:text-base"
             >
-              <Plus className="w-3 h-3 mr-2" />
+              <Plus className="w-3 h-3 mr-2 max-md:w-5 max-md:h-5" />
               Add Task to Phase {phase.id}
             </Button>
           </CardContent>

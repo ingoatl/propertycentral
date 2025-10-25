@@ -81,6 +81,7 @@ All colors MUST be HSL.
     --gradient-subtle: linear-gradient(180deg, hsl(0 0% 100%), hsl(25 100% 99%));
     --shadow-warm: 0 10px 30px -10px hsl(25 91% 60% / 0.2);
     --shadow-card: 0 4px 20px -4px hsl(25 40% 50% / 0.15);
+    --shadow-premium: 0 20px 60px -15px hsl(25 91% 60% / 0.3), 0 0 0 1px hsl(25 20% 88%);
 
     --sidebar-background: 0 0% 98%;
 

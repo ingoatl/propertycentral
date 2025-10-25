@@ -51,14 +51,14 @@ export const OnboardingTab = ({ propertyId, propertyName, propertyAddress }: Onb
   const latestProject = projects[0];
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-6 max-md:space-y-4">
+      <div className="flex items-center justify-between max-md:flex-col max-md:items-start max-md:gap-3">
         <div>
-          <h2 className="text-2xl font-bold">Onboarding Workflow</h2>
-          <p className="text-sm text-muted-foreground">9-phase STR property onboarding system</p>
+          <h2 className="text-2xl font-bold max-md:text-xl">Onboarding Workflow</h2>
+          <p className="text-sm text-muted-foreground max-md:text-base">9-phase STR property onboarding system</p>
         </div>
-        <Button onClick={() => setShowCreateDialog(true)} size="sm" className="gap-2">
-          <Plus className="w-4 h-4" />
+        <Button onClick={() => setShowCreateDialog(true)} size="sm" className="gap-2 max-md:w-full">
+          <Plus className="w-4 h-4 max-md:w-5 max-md:h-5" />
           New Project
         </Button>
       </div>
