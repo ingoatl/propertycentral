@@ -23,46 +23,46 @@ export const ExpenseDetailModal = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto max-md:max-w-full max-md:h-screen max-md:p-4">
         <DialogHeader>
-          <DialogTitle className="text-2xl">Expense Details</DialogTitle>
-          <DialogDescription>
+          <DialogTitle className="text-2xl max-md:text-xl">Expense Details</DialogTitle>
+          <DialogDescription className="max-md:text-base">
             Complete information about this expense
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-6">
+        <div className="space-y-6 max-md:space-y-4">
           {/* Property Info */}
           <div className="space-y-2">
-            <h3 className="font-semibold text-lg flex items-center gap-2">
-              <MapPin className="w-4 h-4" />
+            <h3 className="font-semibold text-lg flex items-center gap-2 max-md:text-xl">
+              <MapPin className="w-4 h-4 max-md:w-5 max-md:h-5" />
               Property
             </h3>
-            <div className="pl-6 space-y-1">
-              <p className="font-medium">{propertyName}</p>
-              <p className="text-sm text-muted-foreground">{propertyAddress}</p>
+            <div className="pl-6 space-y-1 max-md:pl-7">
+              <p className="font-medium max-md:text-lg">{propertyName}</p>
+              <p className="text-sm text-muted-foreground max-md:text-base">{propertyAddress}</p>
             </div>
           </div>
 
           <Separator />
 
           {/* Amount & Date */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-4 max-md:grid-cols-1 max-md:gap-6">
             <div className="space-y-2">
-              <h3 className="font-semibold flex items-center gap-2">
-                <DollarSign className="w-4 h-4" />
+              <h3 className="font-semibold flex items-center gap-2 max-md:text-lg">
+                <DollarSign className="w-4 h-4 max-md:w-5 max-md:h-5" />
                 Amount
               </h3>
-              <p className="text-3xl font-bold text-red-600 dark:text-red-500">
+              <p className="text-3xl font-bold text-red-600 dark:text-red-500 max-md:text-4xl">
                 ${expense.amount.toFixed(2)}
               </p>
             </div>
             <div className="space-y-2">
-              <h3 className="font-semibold flex items-center gap-2">
-                <Calendar className="w-4 h-4" />
+              <h3 className="font-semibold flex items-center gap-2 max-md:text-lg">
+                <Calendar className="w-4 h-4 max-md:w-5 max-md:h-5" />
                 Expense Date
               </h3>
-              <p className="text-lg">
+              <p className="text-lg max-md:text-xl">
                 {new Date(expense.date).toLocaleDateString('en-US', {
                   year: 'numeric',
                   month: 'long',
@@ -78,21 +78,21 @@ export const ExpenseDetailModal = ({
           {(expense.vendor || expense.orderNumber || expense.orderDate) && (
             <>
               <div className="space-y-4">
-                <h3 className="font-semibold text-lg flex items-center gap-2">
-                  <Package className="w-4 h-4" />
+                <h3 className="font-semibold text-lg flex items-center gap-2 max-md:text-xl">
+                  <Package className="w-4 h-4 max-md:w-5 max-md:h-5" />
                   Order Information
                 </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pl-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pl-6 max-md:pl-7 max-md:gap-6">
                   {expense.vendor && (
                     <div className="space-y-1">
-                      <p className="text-sm text-muted-foreground">Vendor</p>
-                      <p className="font-medium">{expense.vendor}</p>
+                      <p className="text-sm text-muted-foreground max-md:text-base">Vendor</p>
+                      <p className="font-medium max-md:text-lg">{expense.vendor}</p>
                     </div>
                   )}
                   {expense.orderNumber && (
                     <div className="space-y-1">
-                      <p className="text-sm text-muted-foreground">Order Number</p>
-                      <p className="font-medium font-mono text-sm">{expense.orderNumber}</p>
+                      <p className="text-sm text-muted-foreground max-md:text-base">Order Number</p>
+                      <p className="font-medium font-mono text-sm max-md:text-base">{expense.orderNumber}</p>
                     </div>
                   )}
                   {expense.orderDate && (

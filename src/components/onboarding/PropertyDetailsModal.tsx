@@ -343,29 +343,29 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl h-[85vh] flex flex-col">
+      <DialogContent className="max-w-3xl h-[85vh] flex flex-col max-md:h-screen max-md:max-w-full max-md:p-4">
         <DialogHeader className="flex-shrink-0">
-          <DialogTitle>{propertyName} - Details</DialogTitle>
+          <DialogTitle className="max-md:text-xl">{propertyName} - Details</DialogTitle>
         </DialogHeader>
         
-        <div className="space-y-4 flex-1 min-h-0 flex flex-col">
+        <div className="space-y-4 flex-1 min-h-0 flex flex-col max-md:space-y-3">
           <div className="relative flex-shrink-0">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground max-md:h-5 max-md:w-5" />
             <Input
               placeholder="Search property information..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9"
+              className="pl-9 max-md:h-12 max-md:text-base max-md:pl-10"
             />
           </div>
 
           {loading ? (
             <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+              <Loader2 className="h-6 w-6 animate-spin text-primary max-md:h-8 max-md:w-8" />
             </div>
            ) : (
             <ScrollArea className="flex-1 min-h-0">
-              <div className="space-y-4 pr-4">
+              <div className="space-y-4 pr-4 max-md:pr-2 max-md:space-y-3">
                 {/* Property Information - Always show at top */}
                 {propertyInfo && (
                   <Card className="border-2 border-primary/20">

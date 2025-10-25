@@ -6,6 +6,24 @@
 All colors MUST be HSL.
 */
 
+@layer utilities {
+  .mobile-modal-title {
+    @apply text-xl font-semibold leading-tight;
+  }
+  
+  .mobile-modal-text {
+    @apply text-base leading-relaxed;
+  }
+  
+  .mobile-touch-target {
+    @apply min-h-[44px] min-w-[44px];
+  }
+  
+  .mobile-input {
+    @apply h-12 text-base;
+  }
+}
+
 @layer base {
   :root {
     --background: 0 0% 100%;

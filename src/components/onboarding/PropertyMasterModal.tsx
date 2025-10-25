@@ -168,20 +168,20 @@ export function PropertyMasterModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl h-[85vh] flex flex-col">
+      <DialogContent className="max-w-5xl h-[85vh] flex flex-col max-md:h-screen max-md:max-w-full max-md:p-4">
         <DialogHeader className="flex-shrink-0">
-          <DialogTitle className="text-2xl">{propertyName}</DialogTitle>
-          <p className="text-sm text-muted-foreground">{propertyAddress}</p>
+          <DialogTitle className="text-2xl max-md:text-xl">{propertyName}</DialogTitle>
+          <p className="text-sm text-muted-foreground max-md:text-base">{propertyAddress}</p>
         </DialogHeader>
 
         {/* Search Bar */}
         <div className="relative flex-shrink-0">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground max-md:h-5 max-md:w-5" />
           <Input
             placeholder="Search all property information..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
+            className="pl-10 max-md:h-12 max-md:text-base"
           />
         </div>
 
@@ -189,20 +189,20 @@ export function PropertyMasterModal({
 
         {loading ? (
           <div className="flex items-center justify-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            <Loader2 className="h-8 w-8 animate-spin text-primary max-md:h-10 max-md:w-10" />
           </div>
         ) : (
           <ScrollArea className="flex-1 min-h-0">
-            <div className="space-y-6 pr-4">
+            <div className="space-y-6 pr-4 max-md:pr-2 max-md:space-y-4">
               {/* Categorized Information */}
               {Object.keys(filteredData).length > 0 && (
-                <div className="grid gap-6 md:grid-cols-2">
+                <div className="grid gap-6 md:grid-cols-2 max-md:grid-cols-1 max-md:gap-4">
                   {Object.entries(filteredData).map(([category, items]) => (
                     <Card key={category}>
                       <CardHeader>
-                        <CardTitle className="text-base">{category}</CardTitle>
+                        <CardTitle className="text-base max-md:text-lg">{category}</CardTitle>
                       </CardHeader>
-                      <CardContent className="space-y-3">
+                      <CardContent className="space-y-3 max-md:space-y-4">
                         {items.map((item, idx) => {
                           const Icon = item.icon;
                           const isMatch = searchQuery && (
@@ -210,14 +210,14 @@ export function PropertyMasterModal({
                             item.value.toLowerCase().includes(searchQuery.toLowerCase())
                           );
                           return (
-                            <div key={idx} className={`space-y-1 ${isMatch ? 'bg-primary/5 p-2 rounded-md' : ''}`}>
+                            <div key={idx} className={`space-y-1 max-md:space-y-2 ${isMatch ? 'bg-primary/5 p-2 rounded-md max-md:p-3' : ''}`}>
                               <div className="flex items-center gap-2">
-                                {Icon && <Icon className="h-4 w-4 text-muted-foreground" />}
-                                <p className="text-sm font-medium text-muted-foreground">
+                                {Icon && <Icon className="h-4 w-4 text-muted-foreground max-md:h-5 max-md:w-5" />}
+                                <p className="text-sm font-medium text-muted-foreground max-md:text-base">
                                   {item.label}
                                 </p>
                               </div>
-                              <p className="text-sm ml-6 break-words">{item.value}</p>
+                              <p className="text-sm ml-6 break-words max-md:text-base max-md:ml-7">{item.value}</p>
                             </div>
                           );
                         })}

@@ -342,18 +342,18 @@ export const WorkflowDialog = ({ open, onOpenChange, project, propertyId, proper
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-6xl max-h-[90vh]">
+      <DialogContent className="max-w-6xl max-h-[90vh] max-md:max-w-full max-md:h-screen max-md:p-4">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+          <DialogTitle className="flex items-center gap-2 max-md:text-xl">
             {propertyName} - Onboarding Workflow
           </DialogTitle>
-          <div className="flex flex-col gap-2 text-sm text-muted-foreground">
+          <div className="flex flex-col gap-2 text-sm text-muted-foreground max-md:text-base">
             <div className="flex items-center gap-2">
-              <Building2 className="h-4 w-4" />
+              <Building2 className="h-4 w-4 max-md:h-5 max-md:w-5" />
               {propertyAddress}
             </div>
             <div className="flex items-center gap-2">
-              <DollarSign className="h-4 w-4" />
+              <DollarSign className="h-4 w-4 max-md:h-5 max-md:w-5" />
               Visit Price: ${visitPrice}
             </div>
             {project && (
@@ -383,41 +383,41 @@ export const WorkflowDialog = ({ open, onOpenChange, project, propertyId, proper
           ) : (
           <>
             {/* Filters Row */}
-            <div className="flex items-center gap-2">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <div className="flex items-center gap-2 max-md:flex-col">
+              <div className="relative flex-1 max-md:w-full">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground max-md:h-5 max-md:w-5" />
                 <Input
                   placeholder="Search tasks, phases, values, notes..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-9"
+                  className="pl-9 max-md:h-12 max-md:text-base max-md:pl-10"
                 />
               </div>
               <Button
                 variant={showMyTasksOnly ? "default" : "outline"}
                 size="sm"
                 onClick={() => setShowMyTasksOnly(!showMyTasksOnly)}
-                className="gap-2 whitespace-nowrap min-w-[120px]"
+                className="gap-2 whitespace-nowrap min-w-[120px] max-md:w-full max-md:h-12"
               >
                 {showMyTasksOnly ? (
                   <>
-                    <User className="w-4 h-4" />
+                    <User className="w-4 h-4 max-md:h-5 max-md:w-5" />
                     My Tasks
                   </>
                 ) : (
                   <>
-                    <Users className="w-4 h-4" />
+                    <Users className="w-4 h-4 max-md:h-5 max-md:w-5" />
                     All Tasks
                   </>
                 )}
               </Button>
             </div>
 
-            <ScrollArea className="h-[calc(90vh-280px)] pr-4">
+            <ScrollArea className="h-[calc(90vh-280px)] pr-4 max-md:h-[calc(100vh-320px)] max-md:pr-2">
               {loading ? (
-                <div className="py-12 text-center text-muted-foreground">Loading workflow...</div>
+                <div className="py-12 text-center text-muted-foreground max-md:text-base">Loading workflow...</div>
               ) : (
-                <div className="space-y-4">
+                <div className="space-y-4 max-md:space-y-3">
                   {/* Workflow Phases */}
                   <WorkflowPhases
                     projectId={project.id}
