@@ -234,16 +234,5 @@ export const ONBOARDING_PHASES: PhaseDefinition[] = [
       { title: "Middle School", field_type: "text" },
       { title: "High School", field_type: "text" }
     ]
-  },
-  
-  {
-    id: 14,
-    title: "Contact & Website Information",
-    description: "Property contact details and direct booking website",
-    tasks: [
-      { title: "Contact Email", field_type: "text" },
-      { title: "Contact Phone", field_type: "phone" },
-      { title: "Direct Booking Website", field_type: "text", description: "Property-specific website URL" }
-    ]
   }
 ];
