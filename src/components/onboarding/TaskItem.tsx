@@ -35,6 +35,7 @@ import { AskQuestionDialog } from "@/components/faq/AskQuestionDialog";
 import { SubmitBugDialog } from "@/components/bugs/SubmitBugDialog";
 import { TaskFilePreview } from "./TaskFilePreview";
 import { TaskFileUpload } from "./TaskFileUpload";
+import { ProfessionalPhotosUpload } from "./ProfessionalPhotosUpload";
 
 interface TaskItemProps {
   task: OnboardingTask;
@@ -617,6 +618,32 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
         );
 
       case "file":
+        // Special handling for professional photos upload
+        if (task.title === "Upload professional photos") {
+          return (
+            <div className="space-y-3">
+              <TaskFilePreview 
+                key={attachmentsKey}
+                taskId={task.id} 
+                onFilesChange={() => {
+                  setAttachmentsKey(prev => prev + 1);
+                  onUpdate();
+                }} 
+              />
+              
+              <ProfessionalPhotosUpload 
+                taskId={task.id} 
+                onFilesUploaded={() => {
+                  setUploading(false);
+                  setAttachmentsKey(prev => prev + 1);
+                  onUpdate();
+                }} 
+              />
+            </div>
+          );
+        }
+        
+        // Standard file upload for other file tasks
         return (
           <div className="space-y-3">
             {/* Multiple file upload system */}

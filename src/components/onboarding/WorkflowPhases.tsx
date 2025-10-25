@@ -13,7 +13,10 @@ interface WorkflowPhasesProps {
 }
 
 export const WorkflowPhases = ({ projectId, tasks, onTaskUpdate, searchQuery = "", taskId, showMyTasksOnly = false }: WorkflowPhasesProps) => {
-  const [expandedPhases, setExpandedPhases] = useState<Set<number>>(new Set());
+  // Start with all phases expanded by default
+  const [expandedPhases, setExpandedPhases] = useState<Set<number>>(() => 
+    new Set(ONBOARDING_PHASES.map(phase => phase.id))
+  );
 
   // Auto-expand phase containing the target task
   useEffect(() => {
