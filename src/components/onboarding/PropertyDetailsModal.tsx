@@ -397,25 +397,26 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
                                 <div className="flex items-center justify-between gap-2">
                                   <div className="flex-1 min-w-0">
                                     <p className="text-xs text-muted-foreground">Airbnb</p>
-                                    <a 
+                                     <a 
                                       href={airbnbTask.field_value.startsWith('http') ? airbnbTask.field_value : `https://${airbnbTask.field_value}`}
                                       target="_blank"
                                       rel="noopener noreferrer"
-                                      className="text-xs text-primary hover:underline truncate block"
+                                      className="text-xs max-md:text-base text-primary hover:underline break-words overflow-wrap-anywhere block"
+                                      style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}
                                     >
                                       {airbnbTask.field_value}
                                     </a>
                                   </div>
-                                  <Button
+                                   <Button
                                     variant="ghost"
                                     size="icon"
-                                    className="h-7 w-7 flex-shrink-0"
+                                    className="h-7 w-7 max-md:h-11 max-md:w-11 flex-shrink-0"
                                     onClick={() => copyToClipboard(airbnbTask.field_value!, "Airbnb URL")}
                                   >
                                     {copiedField === "Airbnb URL" ? (
-                                      <Check className="h-3.5 w-3.5 text-green-600" />
+                                      <Check className="h-3.5 w-3.5 max-md:h-5 max-md:w-5 text-green-600" />
                                     ) : (
-                                      <Copy className="h-3.5 w-3.5" />
+                                      <Copy className="h-3.5 w-3.5 max-md:h-5 max-md:w-5" />
                                     )}
                                   </Button>
                                 </div>
@@ -424,25 +425,26 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
                                 <div className="flex items-center justify-between gap-2">
                                   <div className="flex-1 min-w-0">
                                     <p className="text-xs text-muted-foreground">VRBO</p>
-                                    <a 
+                                     <a 
                                       href={vrboTask.field_value.startsWith('http') ? vrboTask.field_value : `https://${vrboTask.field_value}`}
                                       target="_blank"
                                       rel="noopener noreferrer"
-                                      className="text-xs text-primary hover:underline truncate block"
+                                      className="text-xs max-md:text-base text-primary hover:underline break-words overflow-wrap-anywhere block"
+                                      style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}
                                     >
                                       {vrboTask.field_value}
                                     </a>
                                   </div>
-                                  <Button
+                                   <Button
                                     variant="ghost"
                                     size="icon"
-                                    className="h-7 w-7 flex-shrink-0"
+                                    className="h-7 w-7 max-md:h-11 max-md:w-11 flex-shrink-0"
                                     onClick={() => copyToClipboard(vrboTask.field_value!, "VRBO URL")}
                                   >
                                     {copiedField === "VRBO URL" ? (
-                                      <Check className="h-3.5 w-3.5 text-green-600" />
+                                      <Check className="h-3.5 w-3.5 max-md:h-5 max-md:w-5 text-green-600" />
                                     ) : (
-                                      <Copy className="h-3.5 w-3.5" />
+                                      <Copy className="h-3.5 w-3.5 max-md:h-5 max-md:w-5" />
                                     )}
                                   </Button>
                                 </div>
@@ -451,25 +453,26 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
                                 <div className="flex items-center justify-between gap-2">
                                   <div className="flex-1 min-w-0">
                                     <p className="text-xs text-muted-foreground">Direct Booking Website</p>
-                                    <a 
+                                     <a 
                                       href={directTask.field_value.startsWith('http') ? directTask.field_value : `https://${directTask.field_value}`}
                                       target="_blank"
                                       rel="noopener noreferrer"
-                                      className="text-xs text-primary hover:underline truncate block"
+                                      className="text-xs max-md:text-base text-primary hover:underline break-words overflow-wrap-anywhere block"
+                                      style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}
                                     >
                                       {directTask.field_value}
                                     </a>
                                   </div>
-                                  <Button
+                                   <Button
                                     variant="ghost"
                                     size="icon"
-                                    className="h-7 w-7 flex-shrink-0"
+                                    className="h-7 w-7 max-md:h-11 max-md:w-11 flex-shrink-0"
                                     onClick={() => copyToClipboard(directTask.field_value!, "Direct Booking Website")}
                                   >
                                     {copiedField === "Direct Booking Website" ? (
-                                      <Check className="h-3.5 w-3.5 text-green-600" />
+                                      <Check className="h-3.5 w-3.5 max-md:h-5 max-md:w-5 text-green-600" />
                                     ) : (
-                                      <Copy className="h-3.5 w-3.5" />
+                                      <Copy className="h-3.5 w-3.5 max-md:h-5 max-md:w-5" />
                                     )}
                                   </Button>
                                 </div>
@@ -478,25 +481,26 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
                                 <div className="flex items-center justify-between gap-2">
                                   <div className="flex-1 min-w-0">
                                     <p className="text-xs text-muted-foreground">Booking.com</p>
-                                    <a 
+                                     <a 
                                       href={bookingTask.field_value.startsWith('http') ? bookingTask.field_value : `https://${bookingTask.field_value}`}
                                       target="_blank"
                                       rel="noopener noreferrer"
-                                      className="text-xs text-primary hover:underline truncate block"
+                                      className="text-xs max-md:text-base text-primary hover:underline break-words overflow-wrap-anywhere block"
+                                      style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}
                                     >
                                       {bookingTask.field_value}
                                     </a>
                                   </div>
-                                  <Button
+                                   <Button
                                     variant="ghost"
                                     size="icon"
-                                    className="h-7 w-7 flex-shrink-0"
+                                    className="h-7 w-7 max-md:h-11 max-md:w-11 flex-shrink-0"
                                     onClick={() => copyToClipboard(bookingTask.field_value!, "Booking.com URL")}
                                   >
                                     {copiedField === "Booking.com URL" ? (
-                                      <Check className="h-3.5 w-3.5 text-green-600" />
+                                      <Check className="h-3.5 w-3.5 max-md:h-5 max-md:w-5 text-green-600" />
                                     ) : (
-                                      <Copy className="h-3.5 w-3.5" />
+                                      <Copy className="h-3.5 w-3.5 max-md:h-5 max-md:w-5" />
                                     )}
                                   </Button>
                                 </div>
@@ -505,25 +509,26 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
                                 <div className="flex items-center justify-between gap-2">
                                   <div className="flex-1 min-w-0">
                                     <p className="text-xs text-muted-foreground">Zillow</p>
-                                    <a 
+                                     <a 
                                       href={zillowTask.field_value.startsWith('http') ? zillowTask.field_value : `https://${zillowTask.field_value}`}
                                       target="_blank"
                                       rel="noopener noreferrer"
-                                      className="text-xs text-primary hover:underline truncate block"
+                                      className="text-xs max-md:text-base text-primary hover:underline break-words overflow-wrap-anywhere block"
+                                      style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}
                                     >
                                       {zillowTask.field_value}
                                     </a>
                                   </div>
-                                  <Button
+                                   <Button
                                     variant="ghost"
                                     size="icon"
-                                    className="h-7 w-7 flex-shrink-0"
+                                    className="h-7 w-7 max-md:h-11 max-md:w-11 flex-shrink-0"
                                     onClick={() => copyToClipboard(zillowTask.field_value!, "Zillow URL")}
                                   >
                                     {copiedField === "Zillow URL" ? (
-                                      <Check className="h-3.5 w-3.5 text-green-600" />
+                                      <Check className="h-3.5 w-3.5 max-md:h-5 max-md:w-5 text-green-600" />
                                     ) : (
-                                      <Copy className="h-3.5 w-3.5" />
+                                      <Copy className="h-3.5 w-3.5 max-md:h-5 max-md:w-5" />
                                     )}
                                   </Button>
                                 </div>
@@ -542,16 +547,16 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
                             </div>
                             <p className="text-sm ml-5 font-semibold text-primary">${propertyInfo.visit_price}</p>
                           </div>
-                          <Button
+                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-7 w-7 flex-shrink-0"
+                            className="h-7 w-7 max-md:h-11 max-md:w-11 flex-shrink-0"
                             onClick={() => copyToClipboard(`$${propertyInfo.visit_price}`, "Visit Price")}
                           >
                             {copiedField === "Visit Price" ? (
-                              <Check className="h-3.5 w-3.5 text-green-600" />
+                              <Check className="h-3.5 w-3.5 max-md:h-5 max-md:w-5 text-green-600" />
                             ) : (
-                              <Copy className="h-3.5 w-3.5" />
+                              <Copy className="h-3.5 w-3.5 max-md:h-5 max-md:w-5" />
                             )}
                           </Button>
                         </div>
@@ -565,16 +570,16 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
                             </div>
                             <p className="text-sm ml-5 capitalize">{propertyInfo.rental_type.replace('_', ' ')}</p>
                           </div>
-                          <Button
+                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-7 w-7 flex-shrink-0"
+                            className="h-7 w-7 max-md:h-11 max-md:w-11 flex-shrink-0"
                             onClick={() => copyToClipboard(propertyInfo.rental_type.replace('_', ' '), "Rental Type")}
                           >
                             {copiedField === "Rental Type" ? (
-                              <Check className="h-3.5 w-3.5 text-green-600" />
+                              <Check className="h-3.5 w-3.5 max-md:h-5 max-md:w-5 text-green-600" />
                             ) : (
-                              <Copy className="h-3.5 w-3.5" />
+                              <Copy className="h-3.5 w-3.5 max-md:h-5 max-md:w-5" />
                             )}
                           </Button>
                         </div>
@@ -588,16 +593,16 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
                             </div>
                             <p className="text-sm ml-5">{propertyInfo.address}</p>
                           </div>
-                          <Button
+                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-7 w-7 flex-shrink-0"
+                            className="h-7 w-7 max-md:h-11 max-md:w-11 flex-shrink-0"
                             onClick={() => copyToClipboard(propertyInfo.address, "Address")}
                           >
                             {copiedField === "Address" ? (
-                              <Check className="h-3.5 w-3.5 text-green-600" />
+                              <Check className="h-3.5 w-3.5 max-md:h-5 max-md:w-5 text-green-600" />
                             ) : (
-                              <Copy className="h-3.5 w-3.5" />
+                              <Copy className="h-3.5 w-3.5 max-md:h-5 max-md:w-5" />
                             )}
                           </Button>
                         </div>
@@ -633,20 +638,21 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
                                       )}
                                     </p>
                                   </div>
-                                  <div className="text-sm ml-5 break-words">
+                                   <div className="text-sm max-md:text-base ml-5 break-words">
                                     {isUrl(item.value) ? (
                                       <a 
                                         href={item.value.startsWith('http') ? item.value : `https://${item.value}`}
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        className="text-primary hover:underline inline-flex items-center gap-1"
+                                        className="text-primary hover:underline inline-flex items-center gap-1 break-words overflow-wrap-anywhere"
+                                        style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}
                                       >
                                         {valueMatch ? (
                                           <span className="bg-yellow-200 dark:bg-yellow-900">{item.value}</span>
                                         ) : (
                                           item.value
                                         )}
-                                        <LinkIcon className="h-3 w-3" />
+                                        <LinkIcon className="h-3 w-3 max-md:h-4 max-md:w-4 flex-shrink-0" />
                                       </a>
                                     ) : valueMatch ? (
                                       <span className="bg-yellow-200 dark:bg-yellow-900">{item.value}</span>

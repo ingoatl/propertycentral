@@ -8,19 +8,39 @@ All colors MUST be HSL.
 
 @layer utilities {
   .mobile-modal-title {
+    @apply text-2xl font-semibold leading-tight;
+  }
+  
+  .mobile-modal-subtitle {
     @apply text-xl font-semibold leading-tight;
   }
   
   .mobile-modal-text {
+    @apply text-lg leading-relaxed;
+  }
+  
+  .mobile-body-text {
     @apply text-base leading-relaxed;
   }
   
   .mobile-touch-target {
-    @apply min-h-[44px] min-w-[44px];
+    @apply min-h-[48px] min-w-[48px];
   }
   
   .mobile-input {
-    @apply h-12 text-base;
+    @apply h-14 text-lg;
+  }
+  
+  .mobile-button {
+    @apply h-12 text-base px-6;
+  }
+  
+  .mobile-copy-button {
+    @apply h-10 w-10;
+  }
+  
+  .mobile-link {
+    @apply text-base break-words overflow-wrap-anywhere;
   }
 }
 

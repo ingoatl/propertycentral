@@ -103,18 +103,18 @@ const Layout = ({ children }: LayoutProps) => {
   return (
     <div className="min-h-screen bg-gradient-subtle">
       <header className="bg-card border-b border-border shadow-sm">
-        <div className="container mx-auto px-4 py-4">
+        <div className="container mx-auto px-4 py-3 max-md:py-2">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-gradient-primary flex items-center justify-center shadow-warm">
-                <Building2 className="w-6 h-6 text-primary-foreground" />
+            <div className="flex items-center gap-3 max-md:gap-2">
+              <div className="w-10 h-10 max-md:w-8 max-md:h-8 rounded-lg bg-gradient-primary flex items-center justify-center shadow-warm">
+                <Building2 className="w-6 h-6 max-md:w-5 max-md:h-5 text-primary-foreground" />
               </div>
               <div>
-                <h1 className="text-xl font-bold text-foreground">PeachHaus</h1>
-                <p className="text-xs text-muted-foreground">Property Tracker</p>
+                <h1 className="text-xl max-md:text-base font-bold text-foreground">PeachHaus</h1>
+                <p className="text-xs max-md:text-[10px] text-muted-foreground">Property Tracker</p>
               </div>
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-4 max-md:gap-2">
               {user && (
                 <>
                   <span className="text-sm text-muted-foreground hidden sm:inline">{user.email}</span>
@@ -130,7 +130,7 @@ const Layout = ({ children }: LayoutProps) => {
       </header>
 
       <nav className="bg-card border-b border-border">
-        <div className="container mx-auto px-4">
+        <div className="container mx-auto px-4 max-md:px-2">
           <div className="flex gap-1 overflow-x-auto">
             {navItems.map((item) => {
               const Icon = item.icon;
@@ -139,13 +139,13 @@ const Layout = ({ children }: LayoutProps) => {
                 <Link
                   key={item.path}
                   to={item.path}
-                  className={`flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors whitespace-nowrap ${
+                  className={`flex items-center gap-2 px-4 py-3 max-md:px-3 max-md:py-2.5 text-sm max-md:text-xs font-medium transition-colors whitespace-nowrap ${
                     isActive
                       ? "text-primary border-b-2 border-primary"
                       : "text-muted-foreground hover:text-foreground hover:bg-accent"
                   }`}
                 >
-                  <Icon className="w-4 h-4" />
+                  <Icon className="w-4 h-4 max-md:w-3.5 max-md:h-3.5" />
                   {item.label}
                 </Link>
               );
@@ -154,7 +154,7 @@ const Layout = ({ children }: LayoutProps) => {
         </div>
       </nav>
 
-      <main className="container mx-auto px-4 py-8">{children}</main>
+      <main className="container mx-auto px-4 py-8 max-md:px-3 max-md:py-4 max-md:text-base">{children}</main>
       <FloatingChatButton />
     </div>
   );

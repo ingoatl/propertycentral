@@ -197,38 +197,39 @@ export const DataForListingPlatforms = ({
   };
 
   const DataRow = ({ label, value, note }: { label: string; value: string; note?: string }) => (
-    <div className="flex items-start justify-between py-3 border-b border-border/50 last:border-0 gap-4">
+    <div className="flex items-start justify-between py-3 max-md:py-4 border-b border-border/50 last:border-0 gap-4 max-md:gap-3">
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-foreground mb-1">{label}</p>
-        {note && <p className="text-xs text-muted-foreground mt-0.5">{note}</p>}
+        <p className="text-sm max-md:text-lg font-medium text-foreground mb-1">{label}</p>
+        {note && <p className="text-xs max-md:text-sm text-muted-foreground mt-0.5">{note}</p>}
         {value ? (
           isUrl(value) ? (
             <a 
               href={value.startsWith('http') ? value : `https://${value}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-sm text-primary hover:underline break-all"
+              className="text-sm max-md:text-base text-primary hover:underline break-words overflow-wrap-anywhere block"
+              style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}
             >
               {value}
             </a>
           ) : (
-            <p className="text-sm text-muted-foreground break-words">{value}</p>
+            <p className="text-sm max-md:text-base text-muted-foreground break-words">{value}</p>
           )
         ) : (
-          <p className="text-sm text-muted-foreground">—</p>
+          <p className="text-sm max-md:text-base text-muted-foreground">—</p>
         )}
       </div>
       {value && (
         <Button
           variant="ghost"
           size="icon"
-          className="h-7 w-7 flex-shrink-0 mt-0.5"
+          className="h-7 w-7 max-md:h-11 max-md:w-11 flex-shrink-0 mt-0.5"
           onClick={() => copyToClipboard(value, label)}
         >
           {copiedField === label ? (
-            <Check className="h-3.5 w-3.5 text-green-600" />
+            <Check className="h-3.5 w-3.5 max-md:h-5 max-md:w-5 text-green-600" />
           ) : (
-            <Copy className="h-3.5 w-3.5" />
+            <Copy className="h-3.5 w-3.5 max-md:h-5 max-md:w-5" />
           )}
         </Button>
       )}
@@ -246,9 +247,9 @@ export const DataForListingPlatforms = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh]">
+      <DialogContent className="max-w-4xl max-h-[90vh] max-md:max-h-screen">
         <DialogHeader>
-          <DialogTitle className="text-xl">Listing Data - {propertyName}</DialogTitle>
+          <DialogTitle className="text-xl max-md:text-2xl">Listing Data - {propertyName}</DialogTitle>
         </DialogHeader>
 
         {loading ? (
@@ -256,12 +257,12 @@ export const DataForListingPlatforms = ({
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
           </div>
         ) : listingData ? (
-          <ScrollArea className="h-[70vh] pr-4">
-            <div className="space-y-6">
+          <ScrollArea className="h-[70vh] max-md:h-[calc(100vh-120px)] pr-4 max-md:pr-2">
+            <div className="space-y-6 max-md:space-y-5">
               {/* Listing URLs - Priority Section */}
               <Card className="border-primary/20">
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base">Listing URLs</CardTitle>
+                <CardHeader className="pb-3 max-md:pb-4">
+                  <CardTitle className="text-base max-md:text-xl">Listing URLs</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-0">
                   <DataRow label="Airbnb URL" value={listingData.airbnbUrl} />
@@ -272,8 +273,8 @@ export const DataForListingPlatforms = ({
 
               {/* Property Specifications */}
               <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base">Property Specifications</CardTitle>
+                <CardHeader className="pb-3 max-md:pb-4">
+                  <CardTitle className="text-base max-md:text-xl">Property Specifications</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-0">
                   <DataRow label="Property Address" value={listingData.propertyAddress} />
