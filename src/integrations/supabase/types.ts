@@ -1043,6 +1043,7 @@ export type Database = {
         Row: {
           address: string
           created_at: string
+          ical_url: string | null
           id: string
           image_path: string | null
           name: string
@@ -1055,6 +1056,7 @@ export type Database = {
         Insert: {
           address: string
           created_at?: string
+          ical_url?: string | null
           id?: string
           image_path?: string | null
           name: string
@@ -1067,6 +1069,7 @@ export type Database = {
         Update: {
           address?: string
           created_at?: string
+          ical_url?: string | null
           id?: string
           image_path?: string | null
           name?: string

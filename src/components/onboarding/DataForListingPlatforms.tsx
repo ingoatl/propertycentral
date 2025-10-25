@@ -19,6 +19,7 @@ interface ListingData {
   airbnbUrl: string;
   vrboUrl: string;
   directBookingWebsite: string;
+  icalUrl: string;
   
   // Basic Info
   propertyAddress: string;
@@ -120,7 +121,14 @@ export const DataForListingPlatforms = ({
         .eq("id", propertyId)
         .maybeSingle();
 
-      console.log("Property data result:", { propertyData, propertyError });
+      // Fetch iCal URL from properties table
+      const { data: propertyInfo } = await supabase
+        .from("properties")
+        .select("ical_url")
+        .eq("id", propertyId)
+        .maybeSingle();
+
+      console.log("Property data result:", { propertyData, propertyError, icalUrl: propertyInfo?.ical_url });
 
       // Helper function to get task value
       const getTaskValue = (title: string) => {
@@ -134,6 +142,7 @@ export const DataForListingPlatforms = ({
         airbnbUrl: getTaskValue("Airbnb") || "",
         vrboUrl: getTaskValue("VRBO") || "",
         directBookingWebsite: getTaskValue("Direct Booking Website") || propertyData?.website_url || "",
+        icalUrl: getTaskValue("iCal Feed URL") || propertyInfo?.ical_url || "",
         
         propertyAddress: propertyData?.address || "",
         brandName: getTaskValue("Brand Name") || propertyData?.brand_name || "",
@@ -268,6 +277,7 @@ export const DataForListingPlatforms = ({
                   <DataRow label="Airbnb URL" value={listingData.airbnbUrl} />
                   <DataRow label="VRBO URL" value={listingData.vrboUrl} />
                   <DataRow label="Direct Booking Website" value={listingData.directBookingWebsite} />
+                  <DataRow label="iCal Feed URL" value={listingData.icalUrl} />
                 </CardContent>
               </Card>
 
