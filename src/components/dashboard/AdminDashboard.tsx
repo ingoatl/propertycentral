@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Download, RefreshCw, Building2, DollarSign, TrendingUp, AlertCircle, MessageCircleQuestion, Bug } from "lucide-react";
 import { toast } from "sonner";
 import { OverdueTasksCard } from "./OverdueTasksCard";
+import { AllTasksCard } from "./AllTasksCard";
 import { PendingQuestionsCard } from "@/components/admin/PendingQuestionsCard";
 import { DashboardBugReportsCard } from "@/components/admin/DashboardBugReportsCard";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -384,6 +385,9 @@ export const AdminDashboard = ({ summaries, onExport, onSync, syncing, onSendOve
             />
           </CardContent>
         </Card>
+
+        {/* All Tasks Section - Full Width */}
+        <AllTasksCard />
 
         {/* Activity and Enhanced Team Performance */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 max-md:gap-4">
