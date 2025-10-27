@@ -1,5 +1,8 @@
 project_id = "ijsxcaaqphaciaenlegl"
 
+[functions.send-team-performance-digest]
+verify_jwt = false
+
 [functions.send-bug-notification]
 verify_jwt = true
 
