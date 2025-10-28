@@ -81,6 +81,9 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
     if (!isCollapsed) {
       loadSOP();
       loadAnsweredFAQs();
+    } else {
+      // Reset editing state when task is collapsed
+      setIsEditing(false);
     }
   }, [task.id, isCollapsed]);
   
