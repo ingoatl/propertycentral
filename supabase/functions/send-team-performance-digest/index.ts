@@ -230,13 +230,13 @@ const handler = async (req: Request): Promise<Response> => {
     // Generate and send email
     const emailHtml = generateTeamPerformanceEmail(teamPerformance);
 
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
+    const reportDate = new Date();
+    reportDate.setDate(reportDate.getDate() - 1);
     
     const emailResponse = await resend.emails.send({
       from: "Property Central Team <admin@peachhausgroup.com>",
       to: ["ingo@peachhausgroup.com"],
-      subject: `Team Performance Summary - ${yesterday.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}`,
+      subject: `Team Performance Summary - ${reportDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}`,
       html: emailHtml,
     });
 
