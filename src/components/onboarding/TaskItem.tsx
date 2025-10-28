@@ -1387,19 +1387,17 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
             <InlineComments taskId={task.id} />
           </div>
 
-          {/* RIGHT: Admin Sidebar */}
-          {isAdmin && (
-            <AdminControlsSidebar
-              task={task}
-              sop={sop}
-              onEditTask={handleRequestEdit}
-              onDeleteTask={handleRequestDelete}
-              onViewSOP={() => setShowSOPDialog(true)}
-              onEditSOP={() => setShowSOPFormDialog(true)}
-              onUpdateDueDate={handleDueDateClick}
-              onAddFAQ={() => setShowFAQDialog(true)}
-            />
-          )}
+          {/* RIGHT: Task Controls Sidebar */}
+          <AdminControlsSidebar
+            task={task}
+            sop={sop}
+            onEditTask={handleRequestEdit}
+            onDeleteTask={handleRequestDelete}
+            onViewSOP={() => setShowSOPDialog(true)}
+            onEditSOP={() => setShowSOPFormDialog(true)}
+            onUpdateDueDate={handleDueDateClick}
+            onAddFAQ={() => setShowFAQDialog(true)}
+          />
         </div>
       </Card>
 
