@@ -1,11 +1,12 @@
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { Edit2, BookOpen, FileText, User, Calendar, Trash2, MessageCircleQuestion } from "lucide-react";
+import { Edit2, BookOpen, FileText, Trash2, MessageCircleQuestion } from "lucide-react";
 import { OnboardingTask, OnboardingSOP } from "@/types/onboarding";
 
-interface AdminControlsSidebarProps {
+interface TaskControlsSidebarProps {
   task: OnboardingTask;
   sop: OnboardingSOP | null;
+  isAdmin: boolean;
   onEditTask: () => void;
   onDeleteTask: () => void;
   onViewSOP: () => void;
@@ -14,43 +15,48 @@ interface AdminControlsSidebarProps {
   onAddFAQ: () => void;
 }
 
-export const AdminControlsSidebar = ({
+export const TaskControlsSidebar = ({
   task,
   sop,
+  isAdmin,
   onEditTask,
   onDeleteTask,
   onViewSOP,
   onEditSOP,
   onUpdateDueDate,
   onAddFAQ,
-}: AdminControlsSidebarProps) => {
+}: TaskControlsSidebarProps) => {
   return (
     <div className="w-48 border-l bg-muted/10 p-3 space-y-2 flex-shrink-0">
       <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
-        Admin Controls
+        Task Actions
       </div>
       
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={onEditTask}
-        className="w-full justify-start text-xs"
-      >
-        <Edit2 className="w-3 h-3 mr-2" />
-        Edit Task
-      </Button>
+      {isAdmin && (
+        <>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onEditTask}
+            className="w-full justify-start text-xs"
+          >
+            <Edit2 className="w-3 h-3 mr-2" />
+            Edit Task
+          </Button>
 
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={onDeleteTask}
-        className="w-full justify-start text-xs text-destructive hover:text-destructive"
-      >
-        <Trash2 className="w-3 h-3 mr-2" />
-        Delete Task
-      </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onDeleteTask}
+            className="w-full justify-start text-xs text-destructive hover:text-destructive"
+          >
+            <Trash2 className="w-3 h-3 mr-2" />
+            Delete Task
+          </Button>
 
-      <Separator className="my-2" />
+          <Separator className="my-2" />
+        </>
+      )}
 
       {sop ? (
         <>

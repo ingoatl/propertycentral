@@ -30,7 +30,7 @@ import { useAdminCheck } from "@/hooks/useAdminCheck";
 import { TaskStatusBadge } from "./TaskStatusBadge";
 import { TaskDueDateDisplay } from "./TaskDueDateDisplay";
 import { TaskRescheduleHistoryLog } from "./TaskRescheduleHistoryLog";
-import { AdminControlsSidebar } from "./AdminControlsSidebar";
+import { TaskControlsSidebar } from "./TaskControlsSidebar";
 import { AskQuestionDialog } from "@/components/faq/AskQuestionDialog";
 import { SubmitBugDialog } from "@/components/bugs/SubmitBugDialog";
 import { TaskFilePreview } from "./TaskFilePreview";
@@ -1223,16 +1223,6 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
                   )}
                 </div>
                 <div className="flex items-center gap-2">
-                  {/* Edit Task Button - Available to all users */}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowEditTaskDialog(true)}
-                    className="h-8 gap-2"
-                  >
-                    <Edit2 className="w-4 h-4" />
-                    Edit Task
-                  </Button>
                   {taskStatus !== 'completed' && (
                     <Button
                       variant="default"
@@ -1388,9 +1378,10 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
           </div>
 
           {/* RIGHT: Task Controls Sidebar */}
-          <AdminControlsSidebar
+          <TaskControlsSidebar
             task={task}
             sop={sop}
+            isAdmin={isAdmin}
             onEditTask={handleRequestEdit}
             onDeleteTask={handleRequestDelete}
             onViewSOP={() => setShowSOPDialog(true)}
