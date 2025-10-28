@@ -58,26 +58,6 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
-        peach: {
-          DEFAULT: "#FFD9C0",
-          light: "#FFD9C0",
-          dark: "#FFCAB2",
-        },
-        coral: {
-          light: "#FF8F75",
-          DEFAULT: "#FF7A5C",
-          dark: "#FF6643",
-        },
-        dark: {
-          light: "#2E2E2E",
-          DEFAULT: "#1E1E1E",
-          dark: "#0E0E0E",
-        },
-        blueprint: {
-          light: "#304f7d",
-          DEFAULT: "#1b325e",
-          dark: "#14254a",
-        },
       },
       borderRadius: {
         lg: "var(--radius)",
@@ -86,13 +66,10 @@ export default {
       },
       backgroundImage: {
         'gradient-primary': 'var(--gradient-primary)',
-        'gradient-peach': 'var(--gradient-peach)',
         'gradient-subtle': 'var(--gradient-subtle)',
       },
       boxShadow: {
-        'soft': 'var(--shadow-soft)',
-        'elegant': 'var(--shadow-elegant)',
-        'glow': 'var(--shadow-glow)',
+        'warm': 'var(--shadow-warm)',
         'card': 'var(--shadow-card)',
       },
       keyframes: {

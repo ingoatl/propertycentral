@@ -110,7 +110,7 @@ const Layout = ({ children }: LayoutProps) => {
                 <Building2 className="w-6 h-6 max-md:w-5 max-md:h-5 text-primary-foreground" />
               </div>
               <div>
-                <img src="/property-central-logo.png" alt="Property Central" className="h-8 max-md:h-6" />
+                <h1 className="text-xl max-md:text-base font-bold text-foreground">PeachHaus</h1>
                 <p className="text-xs max-md:text-[10px] text-muted-foreground">Property Tracker</p>
               </div>
             </div>
