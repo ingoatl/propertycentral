@@ -1219,6 +1219,17 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
                       >
                         {copied ? <><Check className="w-3 h-3 mr-1" /> Copied</> : <><Copy className="w-3 h-3 mr-1" /> Copy</>}
                       </Button>
+                      {!isEditing && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setIsEditing(true)}
+                          className="h-7 px-2 text-xs gap-1"
+                        >
+                          <Edit2 className="w-3 h-3" />
+                          Edit Value
+                        </Button>
+                      )}
                     </>
                   )}
                 </div>
