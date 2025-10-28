@@ -266,7 +266,7 @@ export const AdminDashboard = ({ summaries, onExport, onSync, syncing, onSendOve
           <div className="flex items-center justify-between max-md:flex-col max-md:items-start max-md:gap-3">
             <div>
               <h1 className="text-3xl max-md:text-xl font-bold bg-gradient-primary bg-clip-text text-transparent">
-                PeachHaus Dashboard
+                Property Central Dashboard
               </h1>
               <p className="text-sm max-md:text-xs text-muted-foreground mt-1">
                 Comprehensive property management overview
@@ -362,7 +362,7 @@ export const AdminDashboard = ({ summaries, onExport, onSync, syncing, onSendOve
           <div>
             <div className="mb-4 max-md:mb-3">
               <h2 className="text-2xl max-md:text-lg font-bold bg-gradient-primary bg-clip-text text-transparent">
-                PeachHaus Portfolio Performance
+                Property Central Portfolio Performance
               </h2>
               <p className="text-sm max-md:text-xs text-muted-foreground mt-1">
                 Company-owned short-term rental properties

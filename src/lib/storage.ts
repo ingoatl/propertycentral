@@ -1,9 +1,9 @@
 import { Property, Visit, Expense } from "@/types";
 
 const STORAGE_KEYS = {
-  PROPERTIES: "peachhaus_properties",
-  VISITS: "peachhaus_visits",
-  EXPENSES: "peachhaus_expenses",
+  PROPERTIES: "property_central_properties",
+  VISITS: "property_central_visits",
+  EXPENSES: "property_central_expenses",
 };
 
 export const storage = {
