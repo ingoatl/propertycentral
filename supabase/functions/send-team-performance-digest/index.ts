@@ -17,7 +17,9 @@ interface TeamMemberPerformance {
   completedTasks: Array<{
     title: string;
     property_address: string;
+    owner_name: string;
     completed_at: string;
+    field_value: string;
   }>;
   dataEntered: Array<{
     type: string;
@@ -38,10 +40,11 @@ const handler = async (req: Request): Promise<Response> => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Get today's date range
-    const today = new Date();
-    const startOfDay = new Date(today.setHours(0, 0, 0, 0)).toISOString();
-    const endOfDay = new Date(today.setHours(23, 59, 59, 999)).toISOString();
+    // Get yesterday's date range (since email is sent for previous day's activity)
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const startOfDay = new Date(yesterday.setHours(0, 0, 0, 0)).toISOString();
+    const endOfDay = new Date(yesterday.setHours(23, 59, 59, 999)).toISOString();
 
     console.log(`Fetching team performance for: ${startOfDay} to ${endOfDay}`);
 
@@ -63,7 +66,7 @@ const handler = async (req: Request): Promise<Response> => {
     // Process each user
     for (const user of users || []) {
       try {
-        // Get tasks completed today
+        // Get tasks completed yesterday
         const { data: completedTasks, error: tasksError } = await supabase
           .from("onboarding_tasks")
           .select(`
@@ -75,7 +78,8 @@ const handler = async (req: Request): Promise<Response> => {
             assigned_to_uuid,
             assigned_role_id,
             onboarding_projects (
-              property_address
+              property_address,
+              owner_name
             )
           `)
           .eq("status", "completed")
@@ -86,6 +90,8 @@ const handler = async (req: Request): Promise<Response> => {
           console.error(`Error fetching tasks for user ${user.email}:`, tasksError);
           continue;
         }
+
+        console.log(`User ${user.email}: Found ${completedTasks?.length || 0} completed tasks`);
 
         // Get user's role IDs
         const { data: userRoles } = await supabase
@@ -100,6 +106,8 @@ const handler = async (req: Request): Promise<Response> => {
           task.assigned_to_uuid === user.id || 
           (task.assigned_role_id && userRoleIds.includes(task.assigned_role_id))
         );
+
+        console.log(`User ${user.email}: ${userCompletedTasks.length} tasks assigned to them`);
 
         // Get tasks currently in progress
         const { data: inProgressTasks } = await supabase
@@ -119,10 +127,10 @@ const handler = async (req: Request): Promise<Response> => {
           timestamp: string;
         }> = [];
 
-        // Check for visits added today
+        // Check for visits added yesterday
         const { data: visits } = await supabase
           .from("visits")
-          .select("*, properties(name)")
+          .select("*, properties(name, address)")
           .eq("user_id", user.id)
           .gte("created_at", startOfDay)
           .lte("created_at", endOfDay);
@@ -130,15 +138,15 @@ const handler = async (req: Request): Promise<Response> => {
         (visits || []).forEach(visit => {
           dataEntered.push({
             type: "Visit",
-            description: `Visit logged for ${(visit.properties as any)?.name || 'property'}`,
+            description: `Visit logged for ${(visit.properties as any)?.name || 'property'} - $${visit.price}`,
             timestamp: visit.created_at
           });
         });
 
-        // Check for expenses added today
+        // Check for expenses added yesterday
         const { data: expenses } = await supabase
           .from("expenses")
-          .select("*, properties(name)")
+          .select("*, properties(name, address)")
           .eq("user_id", user.id)
           .gte("created_at", startOfDay)
           .lte("created_at", endOfDay);
@@ -146,12 +154,12 @@ const handler = async (req: Request): Promise<Response> => {
         (expenses || []).forEach(expense => {
           dataEntered.push({
             type: "Expense",
-            description: `Expense $${expense.amount} for ${(expense.properties as any)?.name || 'property'}`,
+            description: `$${expense.amount} - ${expense.category || 'Uncategorized'} for ${(expense.properties as any)?.name || 'property'}`,
             timestamp: expense.created_at
           });
         });
 
-        // Check for comments added today
+        // Check for comments added yesterday
         const { data: comments } = await supabase
           .from("onboarding_comments")
           .select("*, onboarding_tasks(title)")
@@ -162,12 +170,12 @@ const handler = async (req: Request): Promise<Response> => {
         (comments || []).forEach(comment => {
           dataEntered.push({
             type: "Comment",
-            description: `Comment on task: ${(comment.onboarding_tasks as any)?.title || 'task'}`,
+            description: `Comment on: ${(comment.onboarding_tasks as any)?.title || 'task'}`,
             timestamp: comment.created_at
           });
         });
 
-        // Check for FAQ questions asked today
+        // Check for FAQ questions asked yesterday
         const { data: questions } = await supabase
           .from("faq_questions")
           .select("question, created_at")
@@ -183,6 +191,8 @@ const handler = async (req: Request): Promise<Response> => {
           });
         });
 
+        console.log(`User ${user.email}: ${dataEntered.length} data entries found`);
+
         // Only include users who had activity today
         if (userCompletedTasks.length > 0 || dataEntered.length > 0) {
           teamPerformance.push({
@@ -193,7 +203,9 @@ const handler = async (req: Request): Promise<Response> => {
             completedTasks: userCompletedTasks.map(task => ({
               title: task.title,
               property_address: (task.onboarding_projects as any)?.property_address || "Unknown",
-              completed_at: task.updated_at
+              owner_name: (task.onboarding_projects as any)?.owner_name || "",
+              completed_at: task.updated_at,
+              field_value: task.field_value
             })),
             dataEntered: dataEntered.sort((a, b) => 
               new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
@@ -218,10 +230,13 @@ const handler = async (req: Request): Promise<Response> => {
     // Generate and send email
     const emailHtml = generateTeamPerformanceEmail(teamPerformance);
 
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    
     const emailResponse = await resend.emails.send({
-      from: "PeachHaus Team <admin@peachhausgroup.com>",
+      from: "Property Central Team <admin@peachhausgroup.com>",
       to: ["ingo@peachhausgroup.com"],
-      subject: `Team Performance Summary - ${new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}`,
+      subject: `Team Performance Summary - ${yesterday.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}`,
       html: emailHtml,
     });
 
@@ -265,37 +280,53 @@ function generateTeamPerformanceEmail(teamPerformance: TeamMemberPerformance[]):
   const totalDataEntries = teamPerformance.reduce((sum, m) => sum + m.dataEntered.length, 0);
 
   const teamMembersSection = teamPerformance.length > 0 ? teamPerformance.map(member => `
-    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 25px; background-color: #ffffff; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 30px; background-color: #ffffff; border: 2px solid #e5e7eb; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
       <tr>
-        <td style="background: linear-gradient(135deg, #f97316 0%, #fb923c 100%); padding: 15px 20px;">
-          <div style="display: flex; justify-content: space-between; align-items: center;">
-            <h3 style="margin: 0; color: #ffffff; font-size: 18px; font-weight: bold;">
-              👤 ${member.name}
-            </h3>
-            <div style="text-align: right;">
-              <span style="background-color: rgba(255,255,255,0.25); color: #ffffff; padding: 4px 12px; border-radius: 12px; font-size: 13px; font-weight: 600; margin-left: 8px;">
-                ${member.tasksCompleted} tasks completed
-              </span>
-              <span style="background-color: rgba(255,255,255,0.25); color: #ffffff; padding: 4px 12px; border-radius: 12px; font-size: 13px; font-weight: 600; margin-left: 8px;">
-                ${member.dataEntered.length} entries
-              </span>
-            </div>
-          </div>
+        <td style="background: linear-gradient(135deg, #FF7A00 0%, #C7A36E 100%); padding: 20px 25px;">
+          <table width="100%" cellpadding="0" cellspacing="0">
+            <tr>
+              <td style="width: 60%;">
+                <h3 style="margin: 0; color: #ffffff; font-size: 22px; font-weight: bold;">
+                  👤 ${member.name}
+                </h3>
+                <p style="margin: 5px 0 0 0; color: rgba(255,255,255,0.9); font-size: 13px;">${member.email}</p>
+              </td>
+              <td style="width: 40%; text-align: right;">
+                <div style="display: inline-block; background-color: rgba(255,255,255,0.95); padding: 8px 16px; border-radius: 20px; margin-left: 8px;">
+                  <span style="color: #FF7A00; font-size: 24px; font-weight: bold;">${member.tasksCompleted}</span>
+                  <span style="color: #666; font-size: 12px; display: block; margin-top: 2px;">Tasks Done</span>
+                </div>
+                <div style="display: inline-block; background-color: rgba(255,255,255,0.95); padding: 8px 16px; border-radius: 20px; margin-left: 8px;">
+                  <span style="color: #2563eb; font-size: 24px; font-weight: bold;">${member.dataEntered.length}</span>
+                  <span style="color: #666; font-size: 12px; display: block; margin-top: 2px;">Data Entries</span>
+                </div>
+              </td>
+            </tr>
+          </table>
         </td>
       </tr>
       
       ${member.completedTasks.length > 0 ? `
         <tr>
-          <td style="padding: 20px;">
-            <h4 style="margin: 0 0 12px 0; color: #059669; font-size: 15px; font-weight: 600;">
-              ✅ Tasks Completed Today
+          <td style="padding: 25px;">
+            <h4 style="margin: 0 0 15px 0; color: #059669; font-size: 17px; font-weight: 700; border-bottom: 2px solid #059669; padding-bottom: 8px;">
+              ✅ Tasks Completed
             </h4>
             ${member.completedTasks.map(task => `
-              <div style="padding: 10px; margin-bottom: 8px; background-color: #f0fdf4; border-left: 3px solid #059669; border-radius: 4px;">
-                <div style="font-weight: bold; color: #333; margin-bottom: 4px;">${task.title}</div>
-                <div style="font-size: 13px; color: #666;">📍 ${task.property_address}</div>
-                <div style="font-size: 12px; color: #059669; margin-top: 4px;">Completed at ${formatTime(task.completed_at)}</div>
-              </div>
+              <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 12px; background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border-left: 4px solid #059669; border-radius: 8px; padding: 15px;">
+                <tr>
+                  <td>
+                    <div style="font-weight: 700; color: #065f46; margin-bottom: 6px; font-size: 15px;">${task.title}</div>
+                    ${task.field_value ? `<div style="font-size: 13px; color: #047857; margin-bottom: 6px; background-color: rgba(255,255,255,0.6); padding: 6px 10px; border-radius: 4px; display: inline-block;"><strong>Value:</strong> ${task.field_value}</div>` : ''}
+                    <div style="font-size: 13px; color: #666; margin-top: 6px;">
+                      📍 ${task.property_address}${task.owner_name ? ` (Owner: ${task.owner_name})` : ''}
+                    </div>
+                    <div style="font-size: 12px; color: #059669; margin-top: 8px; font-weight: 600;">
+                      ⏰ Completed at ${formatTime(task.completed_at)}
+                    </div>
+                  </td>
+                </tr>
+              </table>
             `).join('')}
           </td>
         </tr>
@@ -303,24 +334,26 @@ function generateTeamPerformanceEmail(teamPerformance: TeamMemberPerformance[]):
       
       ${member.dataEntered.length > 0 ? `
         <tr>
-          <td style="padding: 0 20px 20px 20px;">
-            <h4 style="margin: 0 0 12px 0; color: #2563eb; font-size: 15px; font-weight: 600;">
-              📝 Data Entered Today
+          <td style="padding: 0 25px 25px 25px;">
+            <h4 style="margin: 0 0 15px 0; color: #2563eb; font-size: 17px; font-weight: 700; border-bottom: 2px solid #2563eb; padding-bottom: 8px;">
+              📝 Data Entries & Activities
             </h4>
             ${member.dataEntered.map(entry => `
-              <div style="padding: 10px; margin-bottom: 8px; background-color: #eff6ff; border-left: 3px solid #2563eb; border-radius: 4px;">
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                  <div>
-                    <span style="background-color: #2563eb; color: white; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; margin-right: 8px;">
+              <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 10px; background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); border-left: 4px solid #2563eb; border-radius: 8px; padding: 12px 15px;">
+                <tr>
+                  <td style="width: 80%;">
+                    <span style="background-color: #2563eb; color: white; padding: 4px 12px; border-radius: 6px; font-size: 11px; font-weight: 700; margin-right: 10px; display: inline-block;">
                       ${entry.type}
                     </span>
-                    <span style="font-size: 14px; color: #333;">${entry.description}</span>
-                  </div>
-                  <div style="font-size: 12px; color: #2563eb; white-space: nowrap; margin-left: 12px;">
-                    ${formatTime(entry.timestamp)}
-                  </div>
-                </div>
-              </div>
+                    <span style="font-size: 14px; color: #1e40af; font-weight: 500;">${entry.description}</span>
+                  </td>
+                  <td style="width: 20%; text-align: right;">
+                    <div style="font-size: 13px; color: #2563eb; font-weight: 600; white-space: nowrap;">
+                      ${formatTime(entry.timestamp)}
+                    </div>
+                  </td>
+                </tr>
+              </table>
             `).join('')}
           </td>
         </tr>
@@ -328,9 +361,9 @@ function generateTeamPerformanceEmail(teamPerformance: TeamMemberPerformance[]):
       
       ${member.tasksInProgress > 0 ? `
         <tr>
-          <td style="padding: 0 20px 20px 20px; border-top: 1px solid #f3f4f6;">
-            <div style="margin-top: 15px; padding: 12px; background-color: #fef3c7; border-radius: 6px; text-align: center;">
-              <span style="color: #92400e; font-size: 14px;">
+          <td style="padding: 0 25px 25px 25px;">
+            <div style="padding: 15px; background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border-radius: 8px; border-left: 4px solid #f59e0b;">
+              <span style="color: #92400e; font-size: 15px; font-weight: 600;">
                 📋 ${member.tasksInProgress} task${member.tasksInProgress !== 1 ? 's' : ''} currently in progress
               </span>
             </div>
@@ -341,8 +374,10 @@ function generateTeamPerformanceEmail(teamPerformance: TeamMemberPerformance[]):
   `).join('') : `
     <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 25px;">
       <tr>
-        <td style="padding: 40px; text-align: center; background-color: #f9fafb; border-radius: 8px;">
-          <p style="margin: 0; color: #6b7280; font-size: 16px;">No team activity recorded today.</p>
+        <td style="padding: 50px; text-align: center; background: linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%); border-radius: 12px; border: 2px dashed #d1d5db;">
+          <div style="font-size: 48px; margin-bottom: 15px;">📊</div>
+          <p style="margin: 0; color: #6b7280; font-size: 18px; font-weight: 500;">No team activity recorded yesterday.</p>
+          <p style="margin: 10px 0 0 0; color: #9ca3af; font-size: 14px;">Check back tomorrow for the latest updates!</p>
         </td>
       </tr>
     </table>
@@ -363,42 +398,46 @@ function generateTeamPerformanceEmail(teamPerformance: TeamMemberPerformance[]):
               
               <!-- Logo Header -->
               <tr>
-                <td style="padding: 40px; text-align: center; background: linear-gradient(135deg, #4a5568 0%, #2d3748 100%);">
-                  <img src="https://9ed06ecd-51b7-4166-a07a-107b37f1e8c1.lovableproject.com/peachhaus-logo.png" alt="PeachHaus Property Management" style="max-width: 400px; height: auto; margin-bottom: 20px;" />
-                  <h1 style="color: #ffffff; margin: 20px 0 0 0; font-size: 28px; font-weight: bold;">Daily Team Performance</h1>
-                  <p style="color: #e2e8f0; margin: 10px 0 0 0; font-size: 16px; opacity: 0.95;">
-                    ${new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+                <td style="padding: 50px 40px; text-align: center; background: linear-gradient(135deg, #FF7A00 0%, #C7A36E 100%);">
+                  <h1 style="color: #ffffff; margin: 0; font-size: 36px; font-weight: bold; text-shadow: 2px 2px 4px rgba(0,0,0,0.2);">📊 Property Central</h1>
+                  <h2 style="color: #ffffff; margin: 15px 0 0 0; font-size: 24px; font-weight: 600;">Team Performance Report</h2>
+                  <p style="color: rgba(255,255,255,0.95); margin: 15px 0 0 0; font-size: 16px; background-color: rgba(255,255,255,0.15); display: inline-block; padding: 8px 20px; border-radius: 20px;">
+                    ${(() => {
+                      const yesterday = new Date();
+                      yesterday.setDate(yesterday.getDate() - 1);
+                      return yesterday.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+                    })()}
                   </p>
                 </td>
               </tr>
               
               <!-- Summary Stats -->
               <tr>
-                <td style="padding: 30px 40px; background: linear-gradient(135deg, #f97316 0%, #fb923c 100%);">
+                <td style="padding: 35px 40px; background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);">
                   <table width="100%" cellpadding="0" cellspacing="0">
                     <tr>
                       <td width="33%" style="text-align: center; padding: 15px;">
-                        <div style="background-color: rgba(255,255,255,0.25); padding: 20px; border-radius: 8px;">
-                          <div style="font-size: 36px; font-weight: bold; color: #ffffff; margin-bottom: 5px;">
+                        <div style="background-color: rgba(255,255,255,0.95); padding: 25px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                          <div style="font-size: 42px; font-weight: bold; color: #FF7A00; margin-bottom: 8px;">
                             ${teamPerformance.length}
                           </div>
-                          <div style="font-size: 14px; color: #ffffff; opacity: 0.95;">Active Team Members</div>
+                          <div style="font-size: 14px; color: #1e40af; font-weight: 600;">Active Team Members</div>
                         </div>
                       </td>
                       <td width="33%" style="text-align: center; padding: 15px;">
-                        <div style="background-color: rgba(255,255,255,0.25); padding: 20px; border-radius: 8px;">
-                          <div style="font-size: 36px; font-weight: bold; color: #ffffff; margin-bottom: 5px;">
+                        <div style="background-color: rgba(255,255,255,0.95); padding: 25px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                          <div style="font-size: 42px; font-weight: bold; color: #059669; margin-bottom: 8px;">
                             ${totalTasksCompleted}
                           </div>
-                          <div style="font-size: 14px; color: #ffffff; opacity: 0.95;">Tasks Completed</div>
+                          <div style="font-size: 14px; color: #1e40af; font-weight: 600;">Tasks Completed</div>
                         </div>
                       </td>
                       <td width="33%" style="text-align: center; padding: 15px;">
-                        <div style="background-color: rgba(255,255,255,0.25); padding: 20px; border-radius: 8px;">
-                          <div style="font-size: 36px; font-weight: bold; color: #ffffff; margin-bottom: 5px;">
+                        <div style="background-color: rgba(255,255,255,0.95); padding: 25px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                          <div style="font-size: 42px; font-weight: bold; color: #2563eb; margin-bottom: 8px;">
                             ${totalDataEntries}
                           </div>
-                          <div style="font-size: 14px; color: #ffffff; opacity: 0.95;">Data Entries</div>
+                          <div style="font-size: 14px; color: #1e40af; font-weight: 600;">Data Entries</div>
                         </div>
                       </td>
                     </tr>
@@ -408,9 +447,9 @@ function generateTeamPerformanceEmail(teamPerformance: TeamMemberPerformance[]):
               
               <!-- Team Members Content -->
               <tr>
-                <td style="padding: 40px;">
-                  <h2 style="margin: 0 0 25px 0; color: #1f2937; font-size: 22px; font-weight: bold;">
-                    Team Member Activity
+                <td style="padding: 40px; background-color: #f9fafb;">
+                  <h2 style="margin: 0 0 30px 0; color: #1f2937; font-size: 26px; font-weight: bold; text-align: center; padding-bottom: 15px; border-bottom: 3px solid #FF7A00;">
+                    📋 Detailed Team Activity
                   </h2>
                   
                   ${teamMembersSection}
@@ -419,15 +458,15 @@ function generateTeamPerformanceEmail(teamPerformance: TeamMemberPerformance[]):
               
               <!-- Footer -->
               <tr>
-                <td style="padding: 30px 40px; background-color: #f9fafb; border-top: 1px solid #e5e7eb;">
+                <td style="padding: 30px 40px; background: linear-gradient(135deg, #1f2937 0%, #111827 100%); border-top: 3px solid #FF7A00;">
                   <table width="100%" cellpadding="0" cellspacing="0">
                     <tr>
                       <td style="text-align: center;">
-                        <p style="margin: 0 0 10px 0; color: #6b7280; font-size: 14px; line-height: 1.6;">
-                          This is an automated daily summary generated by the PeachHaus team management system.
+                        <p style="margin: 0 0 10px 0; color: #d1d5db; font-size: 14px; line-height: 1.6;">
+                          This is an automated daily summary generated by the Property Central team management system.
                         </p>
-                        <p style="margin: 0; color: #f97316; font-size: 14px; font-weight: 600;">
-                          © ${new Date().getFullYear()} PeachHaus Property Management
+                        <p style="margin: 10px 0 0 0; color: #FF7A00; font-size: 15px; font-weight: 700;">
+                          © ${new Date().getFullYear()} Property Central
                         </p>
                       </td>
                     </tr>
