@@ -1222,11 +1222,22 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
                     </>
                   )}
                 </div>
-                {taskStatus !== 'completed' && (
+                <div className="flex items-center gap-2">
+                  {/* Edit Task Button - Available to all users */}
                   <Button
-                    variant="default"
+                    variant="outline"
                     size="sm"
-                    onClick={async () => {
+                    onClick={() => setShowEditTaskDialog(true)}
+                    className="h-8 gap-2"
+                  >
+                    <Edit2 className="w-4 h-4" />
+                    Edit Task
+                  </Button>
+                  {taskStatus !== 'completed' && (
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={async () => {
                       try {
                         const { data: { user } } = await supabase.auth.getUser();
                         await supabase
@@ -1251,7 +1262,8 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
                     <CheckCircle2 className="w-4 h-4 mr-1" />
                     Mark Complete
                   </Button>
-                )}
+                  )}
+                </div>
               </div>
               {renderField()}
               
