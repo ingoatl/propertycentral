@@ -20,6 +20,22 @@ interface TeamMemberPerformance {
     owner_name: string;
     completed_at: string;
     field_value: string;
+    phase_number: number;
+  }>;
+  openTasks: Array<{
+    title: string;
+    property_address: string;
+    owner_name: string;
+    due_date: string | null;
+    phase_number: number;
+  }>;
+  overdueTasks: Array<{
+    title: string;
+    property_address: string;
+    owner_name: string;
+    due_date: string;
+    days_overdue: number;
+    phase_number: number;
   }>;
   dataEntered: Array<{
     type: string;
@@ -109,16 +125,65 @@ const handler = async (req: Request): Promise<Response> => {
 
         console.log(`User ${user.email}: ${userCompletedTasks.length} tasks assigned to them`);
 
-        // Get tasks currently in progress
+        // Get tasks currently in progress with full details
         const { data: inProgressTasks } = await supabase
           .from("onboarding_tasks")
-          .select("id, assigned_to_uuid, assigned_role_id")
-          .neq("status", "completed");
+          .select(`
+            id,
+            title,
+            due_date,
+            phase_number,
+            assigned_to_uuid,
+            assigned_role_id,
+            onboarding_projects (
+              property_address,
+              owner_name
+            )
+          `)
+          .eq("status", "in-progress");
 
         const userInProgressTasks = (inProgressTasks || []).filter(task => 
           task.assigned_to_uuid === user.id || 
           (task.assigned_role_id && userRoleIds.includes(task.assigned_role_id))
         );
+
+        // Get overdue tasks
+        const today = new Date().toISOString().split('T')[0];
+        const { data: overdueTasks } = await supabase
+          .from("onboarding_tasks")
+          .select(`
+            id,
+            title,
+            due_date,
+            phase_number,
+            assigned_to_uuid,
+            assigned_role_id,
+            onboarding_projects (
+              property_address,
+              owner_name
+            )
+          `)
+          .neq("status", "completed")
+          .not("due_date", "is", null)
+          .lt("due_date", today);
+
+        const userOverdueTasks = (overdueTasks || []).filter(task => 
+          task.assigned_to_uuid === user.id || 
+          (task.assigned_role_id && userRoleIds.includes(task.assigned_role_id))
+        ).map(task => {
+          const dueDate = new Date(task.due_date!);
+          const now = new Date();
+          const daysOverdue = Math.floor((now.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24));
+          
+          return {
+            title: task.title,
+            property_address: (task.onboarding_projects as any)?.property_address || "Unknown",
+            owner_name: (task.onboarding_projects as any)?.owner_name || "",
+            due_date: task.due_date!,
+            days_overdue: daysOverdue,
+            phase_number: task.phase_number
+          };
+        }).sort((a, b) => b.days_overdue - a.days_overdue);
 
         // Get data entries (visits, expenses added today)
         const dataEntered: Array<{
@@ -205,8 +270,17 @@ const handler = async (req: Request): Promise<Response> => {
               property_address: (task.onboarding_projects as any)?.property_address || "Unknown",
               owner_name: (task.onboarding_projects as any)?.owner_name || "",
               completed_at: task.updated_at,
-              field_value: task.field_value
+              field_value: task.field_value,
+              phase_number: task.phase_number
             })),
+            openTasks: userInProgressTasks.map(task => ({
+              title: task.title,
+              property_address: (task.onboarding_projects as any)?.property_address || "Unknown",
+              owner_name: (task.onboarding_projects as any)?.owner_name || "",
+              due_date: task.due_date,
+              phase_number: task.phase_number
+            })),
+            overdueTasks: userOverdueTasks,
             dataEntered: dataEntered.sort((a, b) => 
               new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
             )
@@ -235,7 +309,7 @@ const handler = async (req: Request): Promise<Response> => {
     
     const emailResponse = await resend.emails.send({
       from: "Property Central Team <admin@peachhausgroup.com>",
-      to: ["ingo@peachhausgroup.com"],
+      to: ["anja@peachhausgroup.com", "ingo@peachhausgroup.com"],
       subject: `Team Performance Summary - ${reportDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}`,
       html: emailHtml,
     });
@@ -278,6 +352,8 @@ function generateTeamPerformanceEmail(teamPerformance: TeamMemberPerformance[]):
 
   const totalTasksCompleted = teamPerformance.reduce((sum, m) => sum + m.tasksCompleted, 0);
   const totalDataEntries = teamPerformance.reduce((sum, m) => sum + m.dataEntered.length, 0);
+  const totalOverdue = teamPerformance.reduce((sum, m) => sum + m.overdueTasks.length, 0);
+  const totalOpen = teamPerformance.reduce((sum, m) => sum + m.openTasks.length, 0);
 
   const teamMembersSection = teamPerformance.length > 0 ? teamPerformance.map(member => `
     <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 30px; background-color: #ffffff; border: 2px solid #e5e7eb; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
@@ -306,6 +382,39 @@ function generateTeamPerformanceEmail(teamPerformance: TeamMemberPerformance[]):
         </td>
       </tr>
       
+      ${member.overdueTasks.length > 0 ? `
+        <tr>
+          <td style="padding: 25px;">
+            <h4 style="margin: 0 0 15px 0; color: #dc2626; font-size: 17px; font-weight: 700; border-bottom: 2px solid #dc2626; padding-bottom: 8px;">
+              ⚠️ Overdue Tasks (${member.overdueTasks.length})
+            </h4>
+            ${member.overdueTasks.map(task => `
+              <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 12px; background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%); border-left: 4px solid #dc2626; border-radius: 8px; padding: 15px;">
+                <tr>
+                  <td>
+                    <div style="font-weight: 700; color: #991b1b; margin-bottom: 6px; font-size: 15px;">${task.title}</div>
+                    <div style="font-size: 13px; color: #666; margin-bottom: 6px;">
+                      📍 ${task.property_address}${task.owner_name ? ` (Owner: ${task.owner_name})` : ''}
+                    </div>
+                    <div style="font-size: 12px; color: #666; margin-bottom: 6px;">
+                      📋 Phase ${task.phase_number}
+                    </div>
+                    <div style="display: inline-block;">
+                      <div style="background-color: #dc2626; color: white; padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: 700; margin-right: 8px; display: inline-block;">
+                        ${task.days_overdue} day${task.days_overdue !== 1 ? 's' : ''} overdue
+                      </div>
+                      <span style="font-size: 12px; color: #991b1b; font-weight: 600;">
+                        📅 Due: ${new Date(task.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                      </span>
+                    </div>
+                  </td>
+                </tr>
+              </table>
+            `).join('')}
+          </td>
+        </tr>
+      ` : ''}
+      
       ${member.completedTasks.length > 0 ? `
         <tr>
           <td style="padding: 25px;">
@@ -320,6 +429,9 @@ function generateTeamPerformanceEmail(teamPerformance: TeamMemberPerformance[]):
                     ${task.field_value ? `<div style="font-size: 13px; color: #047857; margin-bottom: 6px; background-color: rgba(255,255,255,0.6); padding: 6px 10px; border-radius: 4px; display: inline-block;"><strong>Value:</strong> ${task.field_value}</div>` : ''}
                     <div style="font-size: 13px; color: #666; margin-top: 6px;">
                       📍 ${task.property_address}${task.owner_name ? ` (Owner: ${task.owner_name})` : ''}
+                    </div>
+                    <div style="font-size: 12px; color: #666; margin-top: 4px;">
+                      📋 Phase ${task.phase_number}
                     </div>
                     <div style="font-size: 12px; color: #059669; margin-top: 8px; font-weight: 600;">
                       ⏰ Completed at ${formatTime(task.completed_at)}
@@ -355,6 +467,39 @@ function generateTeamPerformanceEmail(teamPerformance: TeamMemberPerformance[]):
                 </tr>
               </table>
             `).join('')}
+          </td>
+        </tr>
+      ` : ''}
+      
+      ${member.openTasks.length > 0 ? `
+        <tr>
+          <td style="padding: 0 25px 25px 25px;">
+            <h4 style="margin: 0 0 15px 0; color: #2563eb; font-size: 17px; font-weight: 700; border-bottom: 2px solid #2563eb; padding-bottom: 8px;">
+              📋 Open Tasks (${member.openTasks.length})
+            </h4>
+            ${member.openTasks.map(task => {
+              const isUpcoming = task.due_date && new Date(task.due_date).getTime() - new Date().getTime() < 3 * 24 * 60 * 60 * 1000 && new Date(task.due_date) > new Date();
+              return `
+              <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 12px; background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); border-left: 4px solid #2563eb; border-radius: 8px; padding: 15px;">
+                <tr>
+                  <td>
+                    <div style="font-weight: 700; color: #1e40af; margin-bottom: 6px; font-size: 15px;">${task.title}</div>
+                    <div style="font-size: 13px; color: #666; margin-bottom: 6px;">
+                      📍 ${task.property_address}${task.owner_name ? ` (Owner: ${task.owner_name})` : ''}
+                    </div>
+                    <div style="font-size: 12px; color: #666; margin-bottom: 6px;">
+                      📋 Phase ${task.phase_number}
+                    </div>
+                    ${task.due_date ? `
+                      <div style="font-size: 12px; color: #1e40af; font-weight: 600;">
+                        ${isUpcoming ? '⏰' : '📅'} Due: ${new Date(task.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        ${isUpcoming ? '<span style="background-color: #f59e0b; color: white; padding: 2px 8px; border-radius: 4px; margin-left: 8px; font-size: 11px;">DUE SOON</span>' : ''}
+                      </div>
+                    ` : ''}
+                  </td>
+                </tr>
+              </table>
+            `}).join('')}
           </td>
         </tr>
       ` : ''}
@@ -416,28 +561,28 @@ function generateTeamPerformanceEmail(teamPerformance: TeamMemberPerformance[]):
                 <td style="padding: 35px 40px; background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);">
                   <table width="100%" cellpadding="0" cellspacing="0">
                     <tr>
-                      <td width="33%" style="text-align: center; padding: 15px;">
-                        <div style="background-color: rgba(255,255,255,0.95); padding: 25px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-                          <div style="font-size: 42px; font-weight: bold; color: #FF7A00; margin-bottom: 8px;">
-                            ${teamPerformance.length}
-                          </div>
-                          <div style="font-size: 14px; color: #1e40af; font-weight: 600;">Active Team Members</div>
+                      <td width="25%" style="text-align: center; padding: 15px;">
+                        <div style="background-color: rgba(255,255,255,0.95); padding: 25px 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                          <div style="font-size: 42px; font-weight: bold; color: #059669; margin-bottom: 8px;">${totalTasksCompleted}</div>
+                          <div style="font-size: 14px; color: #666; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Tasks Completed</div>
                         </div>
                       </td>
-                      <td width="33%" style="text-align: center; padding: 15px;">
-                        <div style="background-color: rgba(255,255,255,0.95); padding: 25px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-                          <div style="font-size: 42px; font-weight: bold; color: #059669; margin-bottom: 8px;">
-                            ${totalTasksCompleted}
-                          </div>
-                          <div style="font-size: 14px; color: #1e40af; font-weight: 600;">Tasks Completed</div>
+                      <td width="25%" style="text-align: center; padding: 15px;">
+                        <div style="background-color: rgba(255,255,255,0.95); padding: 25px 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                          <div style="font-size: 42px; font-weight: bold; color: #2563eb; margin-bottom: 8px;">${totalDataEntries}</div>
+                          <div style="font-size: 14px; color: #666; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Data Entries</div>
                         </div>
                       </td>
-                      <td width="33%" style="text-align: center; padding: 15px;">
-                        <div style="background-color: rgba(255,255,255,0.95); padding: 25px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-                          <div style="font-size: 42px; font-weight: bold; color: #2563eb; margin-bottom: 8px;">
-                            ${totalDataEntries}
-                          </div>
-                          <div style="font-size: 14px; color: #1e40af; font-weight: 600;">Data Entries</div>
+                      <td width="25%" style="text-align: center; padding: 15px;">
+                        <div style="background-color: rgba(255,255,255,0.95); padding: 25px 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                          <div style="font-size: 42px; font-weight: bold; color: #dc2626; margin-bottom: 8px;">${totalOverdue}</div>
+                          <div style="font-size: 14px; color: #666; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Overdue Tasks</div>
+                        </div>
+                      </td>
+                      <td width="25%" style="text-align: center; padding: 15px;">
+                        <div style="background-color: rgba(255,255,255,0.95); padding: 25px 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                          <div style="font-size: 42px; font-weight: bold; color: #2563eb; margin-bottom: 8px;">${totalOpen}</div>
+                          <div style="font-size: 14px; color: #666; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Open Tasks</div>
                         </div>
                       </td>
                     </tr>
