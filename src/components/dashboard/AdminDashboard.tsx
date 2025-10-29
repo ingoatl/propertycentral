@@ -123,9 +123,16 @@ export const AdminDashboard = ({ summaries, onExport, onSync, syncing, onSendOve
           status,
           phase_number,
           assigned_role_id,
+          assigned_to_uuid,
           project_id,
           onboarding_projects!inner(property_address)
         `);
+
+      // Fetch all approved users
+      const { data: users } = await supabase
+        .from("profiles")
+        .select("id, first_name, email")
+        .eq("status", "approved");
 
       // Fetch user-role mappings
       const { data: userRoles } = await supabase
@@ -137,7 +144,13 @@ export const AdminDashboard = ({ summaries, onExport, onSync, syncing, onSendOve
           team_roles!inner(role_name)
         `);
 
-      if (!tasks || !userRoles) return;
+      if (!tasks || !userRoles || !users) return;
+
+      // Create user ID to name mapping
+      const userIdToName = users.reduce((acc, user: any) => {
+        acc[user.id] = user.first_name || user.email.split('@')[0];
+        return acc;
+      }, {} as Record<string, string>);
 
       // Create role->users mapping
       const roleToUsers = userRoles.reduce((acc, ur: any) => {
@@ -158,6 +171,36 @@ export const AdminDashboard = ({ summaries, onExport, onSync, syncing, onSendOve
 
       tasks.forEach((task: any) => {
         const roleId = task.assigned_role_id;
+        const assignedUserId = task.assigned_to_uuid;
+        
+        // Handle tasks assigned directly to a user (not through a role)
+        if (assignedUserId && !roleId) {
+          const userName = userIdToName[assignedUserId] || "Unknown User";
+          const key = `${userName}-direct`;
+          
+          if (!memberStats[key]) {
+            memberStats[key] = {
+              name: userName,
+              roleName: "Direct Assignment",
+              tasksCompleted: 0,
+              tasksTotal: 0,
+              properties: new Set<string>(),
+              phases: new Set<number>()
+            };
+          }
+          
+          memberStats[key].tasksTotal++;
+          if (task.status === "completed") {
+            memberStats[key].tasksCompleted++;
+          }
+          if (task.onboarding_projects?.property_address) {
+            memberStats[key].properties.add(task.onboarding_projects.property_address);
+          }
+          if (task.phase_number) {
+            memberStats[key].phases.add(task.phase_number);
+          }
+          return;
+        }
         
         if (!roleId) {
           // Handle unassigned tasks

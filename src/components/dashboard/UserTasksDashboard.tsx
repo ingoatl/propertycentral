@@ -215,9 +215,16 @@ export const UserTasksDashboard = () => {
           status,
           phase_number,
           assigned_role_id,
+          assigned_to_uuid,
           project_id,
           onboarding_projects!inner(property_address)
         `);
+
+      // Fetch all approved users
+      const { data: users } = await supabase
+        .from("profiles")
+        .select("id, first_name, email")
+        .eq("status", "approved");
 
       const { data: userRoles } = await supabase
         .from("user_team_roles")
@@ -232,7 +239,13 @@ export const UserTasksDashboard = () => {
         .from("phase_role_assignments")
         .select("phase_number, role_id");
 
-      if (!tasks || !userRoles) return;
+      if (!tasks || !userRoles || !users) return;
+
+      // Create user ID to name mapping
+      const userIdToName = users.reduce((acc, user: any) => {
+        acc[user.id] = user.first_name || user.email.split('@')[0];
+        return acc;
+      }, {} as Record<string, string>);
 
       const roleMap = new Map<string, { name: string; roleName: string; phases: Set<number>; properties: Set<string> }>();
 
@@ -251,16 +264,55 @@ export const UserTasksDashboard = () => {
       const memberStats = new Map<string, { completed: number; total: number }>();
 
       tasks.forEach((task: any) => {
+        const propertyAddress = task.onboarding_projects?.property_address;
+        
+        // Handle tasks assigned directly to a user
+        if (task.assigned_to_uuid && !task.assigned_role_id) {
+          const userName = userIdToName[task.assigned_to_uuid];
+          if (userName) {
+            const directKey = `${task.assigned_to_uuid}-direct`;
+            
+            if (!roleMap.has(directKey)) {
+              roleMap.set(directKey, {
+                name: userName,
+                roleName: "Direct Assignment",
+                phases: new Set(),
+                properties: new Set()
+              });
+            }
+            
+            const member = roleMap.get(directKey)!;
+            if (propertyAddress) {
+              member.properties.add(propertyAddress);
+            }
+            if (task.phase_number) {
+              member.phases.add(task.phase_number);
+            }
+            
+            if (!memberStats.has(directKey)) {
+              memberStats.set(directKey, { completed: 0, total: 0 });
+            }
+            const stats = memberStats.get(directKey)!;
+            stats.total += 1;
+            if (task.status === "completed") {
+              stats.completed += 1;
+            }
+          }
+          return;
+        }
+        
         if (!task.assigned_role_id) return;
 
         const matchingRoles = userRoles.filter((ur: any) => ur.role_id === task.assigned_role_id);
-        const propertyAddress = task.onboarding_projects?.property_address;
 
         matchingRoles.forEach((ur: any) => {
           const key = `${ur.user_id}-${ur.role_id}`;
           const member = roleMap.get(key);
           if (member && propertyAddress) {
             member.properties.add(propertyAddress);
+          }
+          if (member && task.phase_number) {
+            member.phases.add(task.phase_number);
           }
 
           if (!memberStats.has(key)) {
