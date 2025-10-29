@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Copy, Check, Loader2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Copy, Check, Loader2, Search } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -76,6 +77,7 @@ export const DataForListingPlatforms = ({
   const [loading, setLoading] = useState(false);
   const [listingData, setListingData] = useState<ListingData | null>(null);
   const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     if (open && propertyId) {
@@ -205,45 +207,54 @@ export const DataForListingPlatforms = ({
     }
   };
 
-  const DataRow = ({ label, value, note }: { label: string; value: string; note?: string }) => (
-    <div className="flex items-start justify-between py-3 max-md:py-4 border-b border-border/50 last:border-0 gap-4 max-md:gap-3">
-      <div className="flex-1 min-w-0">
-        <p className="text-sm max-md:text-lg font-medium text-foreground mb-1">{label}</p>
-        {note && <p className="text-xs max-md:text-sm text-muted-foreground mt-0.5">{note}</p>}
-        {value ? (
-          isUrl(value) ? (
-            <a 
-              href={value.startsWith('http') ? value : `https://${value}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-sm max-md:text-base text-primary hover:underline break-words overflow-wrap-anywhere block"
-              style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}
-            >
-              {value}
-            </a>
+  const DataRow = ({ label, value, note }: { label: string; value: string; note?: string }) => {
+    const query = searchQuery.toLowerCase();
+    const isMatch = searchQuery && (
+      label.toLowerCase().includes(query) ||
+      value.toLowerCase().includes(query) ||
+      (note && note.toLowerCase().includes(query))
+    );
+
+    return (
+      <div className={`flex items-start justify-between py-3 max-md:py-4 border-b border-border/50 last:border-0 gap-4 max-md:gap-3 ${isMatch ? 'bg-primary/5 px-2 rounded-md' : ''}`}>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm max-md:text-lg font-medium text-foreground mb-1">{label}</p>
+          {note && <p className="text-xs max-md:text-sm text-muted-foreground mt-0.5">{note}</p>}
+          {value ? (
+            isUrl(value) ? (
+              <a 
+                href={value.startsWith('http') ? value : `https://${value}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm max-md:text-base text-primary hover:underline break-words overflow-wrap-anywhere block"
+                style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}
+              >
+                {value}
+              </a>
+            ) : (
+              <p className="text-sm max-md:text-base text-muted-foreground break-words">{value}</p>
+            )
           ) : (
-            <p className="text-sm max-md:text-base text-muted-foreground break-words">{value}</p>
-          )
-        ) : (
-          <p className="text-sm max-md:text-base text-muted-foreground">—</p>
+            <p className="text-sm max-md:text-base text-muted-foreground">—</p>
+          )}
+        </div>
+        {value && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 max-md:h-12 max-md:w-12 flex-shrink-0 mt-0.5 flex"
+            onClick={() => copyToClipboard(value, label)}
+          >
+            {copiedField === label ? (
+              <Check className="h-3.5 w-3.5 max-md:h-6 max-md:w-6 text-green-600" />
+            ) : (
+              <Copy className="h-3.5 w-3.5 max-md:h-6 max-md:w-6" />
+            )}
+          </Button>
         )}
       </div>
-      {value && (
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7 max-md:h-12 max-md:w-12 flex-shrink-0 mt-0.5 flex"
-          onClick={() => copyToClipboard(value, label)}
-        >
-          {copiedField === label ? (
-            <Check className="h-3.5 w-3.5 max-md:h-6 max-md:w-6 text-green-600" />
-          ) : (
-            <Copy className="h-3.5 w-3.5 max-md:h-6 max-md:w-6" />
-          )}
-        </Button>
-      )}
-    </div>
-  );
+    );
+  };
 
   const isUrl = (text: string): boolean => {
     try {
@@ -256,10 +267,20 @@ export const DataForListingPlatforms = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] max-md:max-h-screen">
-        <DialogHeader>
+      <DialogContent className="max-w-4xl max-h-[90vh] max-md:max-h-screen flex flex-col">
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle className="text-xl max-md:text-2xl">Listing Data - {propertyName}</DialogTitle>
         </DialogHeader>
+
+        <div className="relative flex-shrink-0 mb-4">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground max-md:h-5 max-md:w-5" />
+          <Input
+            placeholder="Search listing data..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9 max-md:h-12 max-md:text-base max-md:pl-10"
+          />
+        </div>
 
         {loading ? (
           <div className="flex items-center justify-center py-12">
