@@ -91,6 +91,7 @@ const handler = async (req: Request): Promise<Response> => {
             updated_at,
             status,
             field_value,
+            phase_number,
             assigned_to_uuid,
             assigned_role_id,
             onboarding_projects (
@@ -478,7 +479,11 @@ function generateTeamPerformanceEmail(teamPerformance: TeamMemberPerformance[]):
               📋 Open Tasks (${member.openTasks.length})
             </h4>
             ${member.openTasks.map(task => {
-              const isUpcoming = task.due_date && new Date(task.due_date).getTime() - new Date().getTime() < 3 * 24 * 60 * 60 * 1000 && new Date(task.due_date) > new Date();
+              const dueDate = task.due_date ? new Date(task.due_date) : null;
+              const now = new Date();
+              const isUpcoming = dueDate && (dueDate.getTime() - now.getTime() < 3 * 24 * 60 * 60 * 1000) && (dueDate > now);
+              const dueDateStr = dueDate ? dueDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+              
               return `
               <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 12px; background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); border-left: 4px solid #2563eb; border-radius: 8px; padding: 15px;">
                 <tr>
@@ -492,7 +497,7 @@ function generateTeamPerformanceEmail(teamPerformance: TeamMemberPerformance[]):
                     </div>
                     ${task.due_date ? `
                       <div style="font-size: 12px; color: #1e40af; font-weight: 600;">
-                        ${isUpcoming ? '⏰' : '📅'} Due: ${new Date(task.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        ${isUpcoming ? '⏰' : '📅'} Due: ${dueDateStr}
                         ${isUpcoming ? '<span style="background-color: #f59e0b; color: white; padding: 2px 8px; border-radius: 4px; margin-left: 8px; font-size: 11px;">DUE SOON</span>' : ''}
                       </div>
                     ` : ''}
