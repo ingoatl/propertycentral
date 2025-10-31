@@ -67,6 +67,18 @@ ${propertyList}
 **CRITICAL INSTRUCTIONS FOR EXPENSE EXTRACTION:**
 You MUST extract ALL details accurately. Missing fields cause problems.
 
+**CRITICAL - BOOKING vs EXPENSE DISTINCTION:**
+- Booking confirmations (Airbnb, VRBO, Booking.com, direct bookings) are INCOME, not expenses
+- Set category to "booking" for reservation confirmations
+- Set expenseDetected to FALSE for bookings/reservations/income
+- Only set expenseDetected to TRUE for actual expenses like:
+  * Amazon orders for property supplies
+  * Maintenance invoices
+  * Utility bills
+  * Insurance payments
+  * Contractor services
+  * Property improvements
+
 Analyze the email comprehensively and extract:
 
 1. **Relevance**: Is this email relevant to any property or owner? (yes/no)
@@ -80,7 +92,7 @@ Analyze the email comprehensively and extract:
 9. **Priority**: low, normal, high, urgent
 10. **Due Date**: If action required, when is it due? (YYYY-MM-DD or null)
 
-11. **EXPENSE DETECTION - READ EVERY WORD CAREFULLY**: 
+11. **EXPENSE DETECTION - READ EVERY WORD CAREFULLY**:
    
    **CRITICAL - FOR AMAZON EMAILS:**
    - Amazon emails have VERY specific patterns you MUST recognize
@@ -368,7 +380,12 @@ ANALYZE CAREFULLY - Extract ALL order details including order number and deliver
     console.log('Insight saved successfully');
 
     // If expense detected and we have a property, check for duplicates before creating
-    if (analysis.expenseDetected && analysis.expenseAmount && property?.id) {
+    // CRITICAL: Only create expenses for actual expense categories, NOT for bookings (which are income)
+    const expenseCategories = ['expense', 'order', 'maintenance', 'utilities', 'insurance'];
+    if (analysis.expenseDetected && 
+        analysis.expenseAmount && 
+        property?.id && 
+        expenseCategories.includes(analysis.category)) {
       console.log('Checking for duplicate expenses with order number:', analysis.orderNumber);
       
       // First check: If order_number exists, check if it's already logged
