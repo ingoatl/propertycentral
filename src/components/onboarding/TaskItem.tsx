@@ -36,6 +36,7 @@ import { SubmitBugDialog } from "@/components/bugs/SubmitBugDialog";
 import { TaskFilePreview } from "./TaskFilePreview";
 import { TaskFileUpload } from "./TaskFileUpload";
 import { ProfessionalPhotosUpload } from "./ProfessionalPhotosUpload";
+import { StableFieldWrapper } from "@/components/ui/stable-form";
 
 interface TaskItemProps {
   task: OnboardingTask;
@@ -1039,7 +1040,7 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
         <Card 
           id={`task-${task.id}`}
           className={cn(
-            "hover:bg-accent/50 transition-colors cursor-pointer",
+            "hover:bg-accent/50 transition-colors cursor-pointer touch-manipulation",
             taskStatus === "completed" && "bg-green-50 border-green-500"
           )}
           onClick={() => setIsCollapsed(false)}
@@ -1142,8 +1143,13 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
       >
         {/* HEADER SECTION - Click to collapse */}
         <div 
-          className="bg-muted/30 p-4 border-b cursor-pointer hover:bg-muted/40 transition-colors"
-          onClick={() => setIsCollapsed(true)}
+          className="bg-muted/30 p-4 border-b cursor-pointer hover:bg-muted/40 transition-colors max-md:cursor-default max-md:hover:bg-muted/30"
+          onClick={() => {
+            // Only collapse on desktop, prevent accidental collapse on mobile
+            if (window.innerWidth >= 768) {
+              setIsCollapsed(true);
+            }
+          }}
         >
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1">
@@ -1169,7 +1175,18 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
               <TaskStatusBadge status={taskStatus} dueDate={task.due_date} />
-              <ChevronDown className="w-4 h-4 text-muted-foreground rotate-180 transition-transform" />
+              <Button
+                variant="ghost"
+                size="icon"
+                className="md:hidden h-10 w-10"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsCollapsed(true);
+                }}
+              >
+                <ChevronDown className="w-5 h-5" />
+              </Button>
+              <ChevronDown className="w-4 h-4 text-muted-foreground rotate-180 transition-transform max-md:hidden" />
             </div>
           </div>
         </div>

@@ -342,18 +342,19 @@ export const WorkflowDialog = ({ open, onOpenChange, project, propertyId, proper
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-6xl max-h-[90vh] max-md:max-w-full max-md:h-screen max-md:p-4">
+      <DialogContent className="max-w-6xl max-h-[90vh] max-md:max-w-full max-md:h-screen max-md:p-4" onPointerDownOutside={(e) => e.preventDefault()}>
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 max-md:text-xl">
-            {propertyName} - Onboarding Workflow
+          <DialogTitle className="flex items-center gap-2 max-md:text-base md:text-xl">
+            <span className="max-md:hidden">{propertyName} - Onboarding Workflow</span>
+            <span className="md:hidden truncate">{propertyAddress}</span>
           </DialogTitle>
-          <div className="flex flex-col gap-2 text-sm text-muted-foreground max-md:text-base">
+          <div className="flex flex-col gap-2 text-sm text-muted-foreground max-md:hidden">
             <div className="flex items-center gap-2">
-              <Building2 className="h-4 w-4 max-md:h-5 max-md:w-5" />
+              <Building2 className="h-4 w-4" />
               {propertyAddress}
             </div>
             <div className="flex items-center gap-2">
-              <DollarSign className="h-4 w-4 max-md:h-5 max-md:w-5" />
+              <DollarSign className="h-4 w-4" />
               Visit Price: ${visitPrice}
             </div>
             {project && (
