@@ -304,8 +304,15 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
         .update(updateData)
         .eq("id", task.id);
 
+      // Only update local status, don't trigger parent update to prevent card from closing
+      const statusChanged = taskStatus !== newStatus;
       setTaskStatus(newStatus);
-      onUpdate();
+      
+      // Only call onUpdate if status changed (to update progress bar)
+      // Don't call it during typing to prevent card from closing
+      if (statusChanged) {
+        onUpdate();
+      }
     } catch (error) {
       console.error("Failed to auto-save task:", error);
     }
