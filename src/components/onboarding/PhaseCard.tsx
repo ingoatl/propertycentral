@@ -131,7 +131,12 @@ export const PhaseCard = ({
                   <div className="text-right max-md:text-left">
                     <div className="text-lg font-semibold max-md:text-2xl">{Math.round(completion)}%</div>
                     <div className="text-xs text-muted-foreground max-md:text-sm">
-                      {tasks.filter(t => t.status === "completed").length} of {tasks.length} tasks
+                      {(() => {
+                        // Exclude section headers from task count
+                        const completableTasks = tasks.filter(t => t.field_type !== 'section_header');
+                        const completedCount = completableTasks.filter(t => t.status === "completed").length;
+                        return `${completedCount} of ${completableTasks.length} tasks`;
+                      })()}
                     </div>
                   </div>
                   <ChevronDown className={cn(

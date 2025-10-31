@@ -130,6 +130,24 @@ const handler = async (req: Request): Promise<Response> => {
         `;
       }
 
+      let screenshotHtml = "";
+      if (bug.screenshot_path) {
+        const { data: urlData } = await supabase.storage
+          .from('bug-screenshots')
+          .createSignedUrl(bug.screenshot_path, 604800); // 7 days
+        
+        if (urlData?.signedUrl) {
+          screenshotHtml = `
+            <div style="margin: 20px 0;">
+              <p style="margin-bottom: 8px;"><strong>📸 Screenshot:</strong></p>
+              <a href="${urlData.signedUrl}" style="display: block; margin-top: 8px;">
+                <img src="${urlData.signedUrl}" alt="Bug screenshot" style="max-width: 100%; border-radius: 6px; border: 1px solid #e5e7eb;" />
+              </a>
+            </div>
+          `;
+        }
+      }
+
       const emailHtml = `
         <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif; max-width: 600px; margin: 0 auto; background-color: #ffffff;">
           <div style="padding: 40px 40px 20px;">
@@ -168,6 +186,8 @@ const handler = async (req: Request): Promise<Response> => {
           </div>
 
           ${loomHtml}
+
+          ${screenshotHtml}
 
           <div style="padding: 32px 40px;">
             <a href="https://ijsxcaaqphaciaenlegl.lovableproject.com" 

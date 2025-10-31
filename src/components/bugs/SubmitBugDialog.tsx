@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
+import { Loader2, X, Upload, Image as ImageIcon } from "lucide-react";
 
 const bugSchema = z.object({
   title: z.string().min(1, "Title is required").max(200, "Title must be less than 200 characters"),
@@ -31,6 +31,8 @@ interface SubmitBugDialogProps {
 
 export function SubmitBugDialog({ open, onOpenChange, propertyId, projectId, taskId }: SubmitBugDialogProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [screenshotFile, setScreenshotFile] = useState<File | null>(null);
+  const [screenshotPreview, setScreenshotPreview] = useState<string | null>(null);
 
   const form = useForm<BugFormData>({
     resolver: zodResolver(bugSchema),
@@ -42,6 +44,37 @@ export function SubmitBugDialog({ open, onOpenChange, propertyId, projectId, tas
     },
   });
 
+  const handleScreenshotChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast.error("Please upload an image file");
+      return;
+    }
+
+    // Validate file size (5MB max)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Screenshot must be less than 5MB");
+      return;
+    }
+
+    setScreenshotFile(file);
+    
+    // Create preview
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setScreenshotPreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const removeScreenshot = () => {
+    setScreenshotFile(null);
+    setScreenshotPreview(null);
+  };
+
   const onSubmit = async (data: BugFormData) => {
     setIsSubmitting(true);
     try {
@@ -49,6 +82,27 @@ export function SubmitBugDialog({ open, onOpenChange, propertyId, projectId, tas
       if (!user) {
         toast.error("You must be logged in to submit a bug report");
         return;
+      }
+
+      let screenshotPath = null;
+
+      // Upload screenshot if provided
+      if (screenshotFile) {
+        const fileExt = screenshotFile.name.split('.').pop();
+        const fileName = `${user.id}-${Date.now()}.${fileExt}`;
+        const filePath = `${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('bug-screenshots')
+          .upload(filePath, screenshotFile);
+
+        if (uploadError) {
+          console.error("Screenshot upload error:", uploadError);
+          toast.error("Failed to upload screenshot");
+          return;
+        }
+
+        screenshotPath = filePath;
       }
 
       const { data: bugReport, error: insertError } = await supabase
@@ -62,6 +116,7 @@ export function SubmitBugDialog({ open, onOpenChange, propertyId, projectId, tas
           property_id: propertyId || null,
           project_id: projectId || null,
           task_id: taskId || null,
+          screenshot_path: screenshotPath,
         })
         .select()
         .single();
@@ -78,6 +133,7 @@ export function SubmitBugDialog({ open, onOpenChange, propertyId, projectId, tas
 
       onOpenChange(false);
       form.reset();
+      removeScreenshot();
       toast.success("Bug report submitted successfully!");
       
       if (emailError) {
@@ -157,6 +213,54 @@ export function SubmitBugDialog({ open, onOpenChange, propertyId, projectId, tas
                 </FormItem>
               )}
             />
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Screenshot (Optional)</label>
+              <p className="text-xs text-muted-foreground mb-2">
+                Upload a screenshot to help visualize the issue (PNG, JPG, WEBP, GIF - max 5MB)
+              </p>
+              
+              {screenshotPreview ? (
+                <div className="relative border rounded-lg p-4 bg-muted/50">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute top-2 right-2"
+                    onClick={removeScreenshot}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                  <div className="flex items-center gap-3">
+                    <ImageIcon className="h-5 w-5 text-muted-foreground" />
+                    <span className="text-sm font-medium truncate flex-1">{screenshotFile?.name}</span>
+                  </div>
+                  <img
+                    src={screenshotPreview}
+                    alt="Screenshot preview"
+                    className="mt-3 max-h-48 rounded border"
+                  />
+                </div>
+              ) : (
+                <div className="border-2 border-dashed rounded-lg p-6 text-center hover:border-primary/50 transition-colors">
+                  <input
+                    type="file"
+                    id="screenshot-upload"
+                    accept="image/png,image/jpeg,image/jpg,image/webp,image/gif"
+                    onChange={handleScreenshotChange}
+                    className="hidden"
+                  />
+                  <label
+                    htmlFor="screenshot-upload"
+                    className="cursor-pointer flex flex-col items-center gap-2"
+                  >
+                    <Upload className="h-8 w-8 text-muted-foreground" />
+                    <span className="text-sm font-medium">Click to upload screenshot</span>
+                    <span className="text-xs text-muted-foreground">PNG, JPG, WEBP, GIF (max 5MB)</span>
+                  </label>
+                </div>
+              )}
+            </div>
 
             <FormField
               control={form.control}

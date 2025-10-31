@@ -29,7 +29,10 @@ export const WorkflowPhases = ({ projectId, tasks, onTaskUpdate, searchQuery = "
   }, [taskId, tasks]);
 
   const getPhaseCompletion = (phaseNumber: number) => {
-    const phaseTasks = tasks.filter(t => t.phase_number === phaseNumber);
+    // Exclude section headers from completion calculation
+    const phaseTasks = tasks.filter(t => 
+      t.phase_number === phaseNumber && t.field_type !== 'section_header'
+    );
     if (phaseTasks.length === 0) return 0;
     const completed = phaseTasks.filter(t => t.status === "completed").length;
     return (completed / phaseTasks.length) * 100;

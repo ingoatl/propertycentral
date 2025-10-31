@@ -25,6 +25,7 @@ export type Database = {
           resolution_notes: string | null
           resolved_at: string | null
           resolved_by: string | null
+          screenshot_path: string | null
           status: string
           submitted_at: string
           submitted_by: string
@@ -42,6 +43,7 @@ export type Database = {
           resolution_notes?: string | null
           resolved_at?: string | null
           resolved_by?: string | null
+          screenshot_path?: string | null
           status?: string
           submitted_at?: string
           submitted_by: string
@@ -59,6 +61,7 @@ export type Database = {
           resolution_notes?: string | null
           resolved_at?: string | null
           resolved_by?: string | null
+          screenshot_path?: string | null
           status?: string
           submitted_at?: string
           submitted_by?: string
