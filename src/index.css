@@ -7,40 +7,70 @@ All colors MUST be HSL.
 */
 
 @layer utilities {
+  /* Mobile-First Typography - Scales UP for desktop */
   .mobile-modal-title {
-    @apply text-2xl font-semibold leading-tight;
+    @apply text-2xl font-semibold leading-tight md:text-3xl;
   }
   
   .mobile-modal-subtitle {
-    @apply text-xl font-semibold leading-tight;
+    @apply text-xl font-semibold leading-tight md:text-2xl;
   }
   
   .mobile-modal-text {
-    @apply text-lg leading-relaxed;
+    @apply text-lg leading-relaxed md:text-xl;
   }
   
   .mobile-body-text {
-    @apply text-base leading-relaxed;
+    @apply text-base leading-relaxed md:text-lg;
   }
   
+  /* Touch Targets - WCAG compliant minimum 44x44px */
   .mobile-touch-target {
-    @apply min-h-[48px] min-w-[48px];
+    @apply min-h-[44px] min-w-[44px] md:min-h-[40px] md:min-w-[40px];
   }
   
   .mobile-input {
-    @apply h-14 text-lg;
+    @apply h-14 text-base md:h-10 md:text-sm;
   }
   
   .mobile-button {
-    @apply h-12 text-base px-6;
+    @apply h-12 text-base px-6 md:h-10 md:text-sm;
   }
   
   .mobile-copy-button {
-    @apply h-10 w-10;
+    @apply h-12 w-12 md:h-10 md:w-10;
   }
   
   .mobile-link {
-    @apply text-base break-words overflow-wrap-anywhere;
+    @apply text-base break-words overflow-wrap-anywhere md:text-sm;
+  }
+  
+  /* Prevent layout shift and re-renders */
+  .stable-input {
+    @apply transition-none;
+  }
+  
+  .no-flash {
+    @apply transform-gpu will-change-auto;
+  }
+  
+  /* Mobile-optimized spacing */
+  .mobile-spacing {
+    @apply p-4 md:p-6 lg:p-8;
+  }
+  
+  .mobile-gap {
+    @apply gap-4 md:gap-6;
+  }
+  
+  /* Hide scrollbar but keep functionality */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
   }
 }
 
@@ -146,6 +176,36 @@ All colors MUST be HSL.
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased;
+    /* Prevent text size adjustment on mobile */
+    -webkit-text-size-adjust: 100%;
+    -moz-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    /* Improve touch scrolling */
+    -webkit-overflow-scrolling: touch;
+    /* Prevent tap highlight flash */
+    -webkit-tap-highlight-color: transparent;
+  }
+  
+  /* Optimize inputs for mobile - prevent zoom on focus */
+  input, textarea, select {
+    font-size: 16px;
+  }
+  
+  @media (min-width: 768px) {
+    input, textarea, select {
+      font-size: 14px;
+    }
+  }
+  
+  /* Smooth scrolling for better UX */
+  html {
+    scroll-behavior: smooth;
+  }
+  
+  /* Prevent layout shifts */
+  img, video {
+    max-width: 100%;
+    height: auto;
   }
 }

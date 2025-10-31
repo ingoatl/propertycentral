@@ -102,25 +102,25 @@ const Layout = ({ children }: LayoutProps) => {
 
   return (
     <div className="min-h-screen bg-gradient-subtle">
-      <header className="bg-card border-b border-border shadow-sm">
-        <div className="container mx-auto px-4 py-3 max-md:py-2">
+      <header className="bg-card border-b border-border shadow-sm sticky top-0 z-40">
+        <div className="container mx-auto px-4 py-4 md:py-3">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3 max-md:gap-2">
-              <div className="w-10 h-10 max-md:w-8 max-md:h-8 rounded-lg bg-gradient-primary flex items-center justify-center shadow-warm">
-                <Building2 className="w-6 h-6 max-md:w-5 max-md:h-5 text-primary-foreground" />
+            <div className="flex items-center gap-3 md:gap-2">
+              <div className="w-12 h-12 md:w-10 md:h-10 rounded-lg bg-gradient-primary flex items-center justify-center shadow-warm">
+                <Building2 className="w-7 h-7 md:w-6 md:h-6 text-primary-foreground" />
               </div>
               <div>
-                <h1 className="text-xl max-md:text-base font-bold text-foreground">PeachHaus</h1>
-                <p className="text-xs max-md:text-[10px] text-muted-foreground">Property Tracker</p>
+                <h1 className="text-lg md:text-xl font-bold text-foreground">PeachHaus</h1>
+                <p className="text-xs text-muted-foreground">Property Tracker</p>
               </div>
             </div>
-            <div className="flex items-center gap-4 max-md:gap-2">
+            <div className="flex items-center gap-3 md:gap-4">
               {user && (
                 <>
-                  <span className="text-sm text-muted-foreground hidden sm:inline">{user.email}</span>
-                  <Button variant="outline" size="sm" onClick={handleLogout}>
-                    <LogOut className="h-4 w-4 sm:mr-2" />
-                    <span className="hidden sm:inline">Logout</span>
+                  <span className="text-sm text-muted-foreground hidden sm:inline truncate max-w-[150px]">{user.email}</span>
+                  <Button variant="outline" size="sm" onClick={handleLogout} className="shrink-0">
+                    <LogOut className="h-5 w-5 md:h-4 md:w-4 md:mr-2" />
+                    <span className="hidden md:inline">Logout</span>
                   </Button>
                 </>
               )}
@@ -129,9 +129,9 @@ const Layout = ({ children }: LayoutProps) => {
         </div>
       </header>
 
-      <nav className="bg-card border-b border-border">
-        <div className="container mx-auto px-4 max-md:px-2">
-          <div className="flex gap-1 overflow-x-auto">
+      <nav className="bg-card border-b border-border sticky top-[72px] md:top-[64px] z-30 overflow-x-auto scrollbar-hide">
+        <div className="container mx-auto px-4 md:px-2">
+          <div className="flex gap-1 min-w-max md:min-w-0">
             {navItems.map((item) => {
               const Icon = item.icon;
               const isActive = location.pathname === item.path;
@@ -139,14 +139,14 @@ const Layout = ({ children }: LayoutProps) => {
                 <Link
                   key={item.path}
                   to={item.path}
-                  className={`flex items-center gap-2 px-4 py-3 max-md:px-3 max-md:py-2.5 text-sm max-md:text-xs font-medium transition-colors whitespace-nowrap ${
+                  className={`flex items-center gap-2 px-4 py-3.5 md:px-3 md:py-3 text-base md:text-sm font-medium transition-colors whitespace-nowrap min-h-[44px] touch-manipulation ${
                     isActive
-                      ? "text-primary border-b-2 border-primary"
-                      : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                      ? "text-primary border-b-2 border-primary bg-accent/50"
+                      : "text-muted-foreground hover:text-foreground hover:bg-accent active:bg-accent/80"
                   }`}
                 >
-                  <Icon className="w-4 h-4 max-md:w-3.5 max-md:h-3.5" />
-                  {item.label}
+                  <Icon className="w-5 h-5 md:w-4 md:h-4 shrink-0" />
+                  <span className="truncate">{item.label}</span>
                 </Link>
               );
             })}
@@ -154,7 +154,7 @@ const Layout = ({ children }: LayoutProps) => {
         </div>
       </nav>
 
-      <main className="container mx-auto px-4 py-8 max-md:px-3 max-md:py-4 max-md:text-base">{children}</main>
+      <main className="container mx-auto px-4 py-6 md:py-8 text-base">{children}</main>
       <FloatingChatButton />
     </div>
   );
