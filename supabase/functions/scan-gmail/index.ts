@@ -122,14 +122,22 @@ serve(async (req) => {
         const dateStr = headers.find((h: any) => h.name === 'Date')?.value || '';
         const emailDate = new Date(dateStr);
 
-        // Get email body
+        // Get email body (text and HTML)
         let body = '';
+        let rawHtml = '';
+        
         if (emailData.payload.body?.data) {
           body = atob(emailData.payload.body.data.replace(/-/g, '+').replace(/_/g, '/'));
         } else if (emailData.payload.parts) {
           const textPart = emailData.payload.parts.find((p: any) => p.mimeType === 'text/plain');
+          const htmlPart = emailData.payload.parts.find((p: any) => p.mimeType === 'text/html');
+          
           if (textPart?.body?.data) {
             body = atob(textPart.body.data.replace(/-/g, '+').replace(/_/g, '/'));
+          }
+          
+          if (htmlPart?.body?.data) {
+            rawHtml = atob(htmlPart.body.data.replace(/-/g, '+').replace(/_/g, '/'));
           }
         }
 
@@ -141,6 +149,7 @@ serve(async (req) => {
           body: {
             subject,
             body: body.substring(0, 2000), // Limit body size
+            rawHtml: rawHtml ? rawHtml.substring(0, 50000) : null, // Include HTML for receipt
             senderEmail,
             emailDate: emailDate.toISOString(),
             gmailMessageId: message.id,

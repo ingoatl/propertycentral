@@ -20,6 +20,7 @@ serve(async (req) => {
       gmailMessageId,
       properties,
       owners,
+      rawHtml,
     } = await req.json();
 
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
@@ -426,6 +427,56 @@ ANALYZE CAREFULLY - Extract ALL order details including order number and deliver
         .select('user_id')
         .maybeSingle();
 
+      // Save email content as HTML file for receipt viewing
+      let emailScreenshotPath = null;
+      if (rawHtml || body) {
+        try {
+          const emailContent = rawHtml || `
+            <html>
+              <head>
+                <meta charset="utf-8">
+                <title>${subject}</title>
+                <style>
+                  body { font-family: Arial, sans-serif; padding: 20px; max-width: 800px; margin: 0 auto; }
+                  .header { border-bottom: 2px solid #333; padding-bottom: 10px; margin-bottom: 20px; }
+                  .meta { color: #666; font-size: 14px; margin-bottom: 10px; }
+                  .content { line-height: 1.6; }
+                </style>
+              </head>
+              <body>
+                <div class="header">
+                  <h2>${subject}</h2>
+                  <div class="meta">From: ${senderEmail}</div>
+                  <div class="meta">Date: ${new Date(emailDate).toLocaleString()}</div>
+                </div>
+                <div class="content">
+                  ${body.replace(/\n/g, '<br>')}
+                </div>
+              </body>
+            </html>
+          `;
+          
+          const fileName = `expense-receipt-${Date.now()}-${Math.random().toString(36).substring(7)}.html`;
+          const filePath = `${property.id}/${fileName}`;
+          
+          const { error: uploadError } = await supabase.storage
+            .from('expense-documents')
+            .upload(filePath, emailContent, {
+              contentType: 'text/html',
+              upsert: false
+            });
+          
+          if (!uploadError) {
+            emailScreenshotPath = filePath;
+            console.log('Email receipt saved:', filePath);
+          } else {
+            console.error('Failed to upload email receipt:', uploadError);
+          }
+        } catch (uploadErr) {
+          console.error('Error saving email receipt:', uploadErr);
+        }
+      }
+
       // Prepare line items data
       const lineItemsData = analysis.lineItems && Array.isArray(analysis.lineItems) && analysis.lineItems.length > 0
         ? { items: analysis.lineItems }
@@ -446,6 +497,7 @@ ANALYZE CAREFULLY - Extract ALL order details including order number and deliver
           items_detail: analysis.expenseDescription || null,
           delivery_address: analysis.deliveryAddress || null,
           line_items: lineItemsData,
+          email_screenshot_path: emailScreenshotPath,
           user_id: userData?.user_id || null,
         });
 
