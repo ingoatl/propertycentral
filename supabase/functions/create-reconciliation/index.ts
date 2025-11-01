@@ -61,11 +61,12 @@ serve(async (req) => {
       .gte("start_date", firstDayOfMonth.toISOString().split("T")[0])
       .lte("start_date", lastDayOfMonth.toISOString().split("T")[0]);
 
-    // Fetch all expenses for the month
+    // Fetch all UNBILLED expenses for the month
     const { data: expenses } = await supabaseClient
       .from("expenses")
       .select("*")
       .eq("property_id", property_id)
+      .eq("exported", false)
       .gte("date", firstDayOfMonth.toISOString().split("T")[0])
       .lte("date", lastDayOfMonth.toISOString().split("T")[0]);
 

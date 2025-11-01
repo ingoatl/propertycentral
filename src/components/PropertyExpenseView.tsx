@@ -30,9 +30,15 @@ export const PropertyExpenseView = ({
   const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [billedFilter, setBilledFilter] = useState<"all" | "billed" | "unbilled">("all");
 
-  // Filter expenses based on search term
+  // Filter expenses based on search term and billed status
   const filteredExpenses = expenses.filter((expense) => {
+    // Billed filter
+    if (billedFilter === "billed" && !expense.exported) return false;
+    if (billedFilter === "unbilled" && expense.exported) return false;
+    
+    // Search filter
     if (!searchTerm) return true;
     const search = searchTerm.toLowerCase();
     return (
@@ -124,7 +130,30 @@ export const PropertyExpenseView = ({
           <CardTitle className="text-2xl">{propertyName}</CardTitle>
           <p className="text-sm text-muted-foreground">{propertyAddress}</p>
         </CardHeader>
-        <CardContent className="pt-6">
+        <CardContent className="pt-6 space-y-4">
+          <div className="flex gap-2 flex-wrap">
+            <Button
+              variant={billedFilter === "all" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setBilledFilter("all")}
+            >
+              All Expenses
+            </Button>
+            <Button
+              variant={billedFilter === "billed" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setBilledFilter("billed")}
+            >
+              Billed Only
+            </Button>
+            <Button
+              variant={billedFilter === "unbilled" ? "default" : "outline"}
+              size="sm"
+              onClick={() => setBilledFilter("unbilled")}
+            >
+              Unbilled Only
+            </Button>
+          </div>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
@@ -167,15 +196,22 @@ export const PropertyExpenseView = ({
                     >
                       <div className="flex items-start justify-between gap-4">
                         <div className="flex-1 space-y-1.5">
-                          <p className="text-sm text-muted-foreground flex items-center gap-1.5">
-                            <CalendarIcon className="w-3.5 h-3.5" />
-                            {new Date(expense.date).toLocaleDateString('en-US', {
-                              weekday: 'short',
-                              year: 'numeric',
-                              month: 'short',
-                              day: 'numeric'
-                            })}
-                          </p>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="text-sm text-muted-foreground flex items-center gap-1.5">
+                              <CalendarIcon className="w-3.5 h-3.5" />
+                              {new Date(expense.date).toLocaleDateString('en-US', {
+                                weekday: 'short',
+                                year: 'numeric',
+                                month: 'short',
+                                day: 'numeric'
+                              })}
+                            </p>
+                            {expense.exported && (
+                              <Badge variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100">
+                                Billed
+                              </Badge>
+                            )}
+                          </div>
                           {expense.vendor && (
                             <p className="text-sm font-semibold text-foreground max-md:text-base">
                               {expense.vendor}

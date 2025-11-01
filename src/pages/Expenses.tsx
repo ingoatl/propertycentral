@@ -76,6 +76,7 @@ const Expenses = () => {
         vendor: e.vendor,
         itemsDetail: e.items_detail,
         deliveryAddress: e.delivery_address,
+        exported: e.exported,
       })));
     } catch (error: any) {
       if (import.meta.env.DEV) {
@@ -215,14 +216,106 @@ const Expenses = () => {
   }
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      <div className="pb-4 border-b border-border/50 flex items-center justify-between">
+    <div className="container mx-auto p-6 space-y-6">
+      <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-4xl font-bold bg-gradient-primary bg-clip-text text-transparent">Expenses</h1>
-          <p className="text-muted-foreground mt-1">Track property-related expenses</p>
+          <h1 className="text-3xl font-bold">Expenses</h1>
+          <p className="text-muted-foreground mt-1">Record and track property expenses</p>
         </div>
         <BackfillReceiptsButton />
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Record New Expense</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="property">Property *</Label>
+                <Select
+                  value={formData.propertyId}
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, propertyId: value })
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a property" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {properties.map((property) => (
+                      <SelectItem key={property.id} value={property.id}>
+                        {property.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="amount">Amount *</Label>
+                <Input
+                  id="amount"
+                  type="number"
+                  step="0.01"
+                  placeholder="0.00"
+                  value={formData.amount}
+                  onChange={(e) =>
+                    setFormData({ ...formData, amount: e.target.value })
+                  }
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="date">Date *</Label>
+                <Input
+                  id="date"
+                  type="date"
+                  value={formData.date}
+                  onChange={(e) =>
+                    setFormData({ ...formData, date: e.target.value })
+                  }
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="purpose">Purpose *</Label>
+                <Input
+                  id="purpose"
+                  placeholder="e.g., Maintenance, Supplies"
+                  value={formData.purpose}
+                  onChange={(e) =>
+                    setFormData({ ...formData, purpose: e.target.value })
+                  }
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="receipt">Receipt (optional)</Label>
+              <Input
+                id="receipt"
+                type="file"
+                onChange={handleFileChange}
+                accept="image/*,.pdf"
+              />
+              {selectedFile && (
+                <p className="text-sm text-muted-foreground">
+                  Selected: {selectedFile.name}
+                </p>
+              )}
+            </div>
+
+            <Button type="submit" disabled={loading}>
+              {loading ? "Saving..." : "Save Expense"}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
 
       <Card className="shadow-card border-border/50">
         <CardHeader className="bg-gradient-subtle rounded-t-lg">

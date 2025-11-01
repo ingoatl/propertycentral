@@ -434,9 +434,8 @@ export default function MonthlyCharges() {
       </div>
 
       <Tabs defaultValue="reconciliations" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="reconciliations">Reconciliations</TabsTrigger>
-          <TabsTrigger value="expenses">Record Expense</TabsTrigger>
           <TabsTrigger value="charges">Charge Owner</TabsTrigger>
           <TabsTrigger value="history">Transaction History</TabsTrigger>
         </TabsList>
@@ -533,98 +532,6 @@ export default function MonthlyCharges() {
                   Save as Pending
                 </Button>
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="expenses" className="mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Receipt className="w-5 h-5" />
-                Record Expense
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="property">Property *</Label>
-                <Select value={selectedProperty} onValueChange={setSelectedProperty}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select property..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {properties.map(prop => (
-                      <SelectItem key={prop.id} value={prop.id}>
-                        {prop.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="expense-date">Date *</Label>
-                <Input
-                  id="expense-date"
-                  type="date"
-                  value={expenseDate}
-                  onChange={(e) => setExpenseDate(e.target.value)}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="expense-amount">Amount *</Label>
-                <Input
-                  id="expense-amount"
-                  type="number"
-                  step="0.01"
-                  placeholder="0.00"
-                  value={expenseAmount}
-                  onChange={(e) => setExpenseAmount(e.target.value)}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="expense-category">Category</Label>
-                <Select value={expenseCategory} onValueChange={setExpenseCategory}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {EXPENSE_CATEGORIES.map(cat => (
-                      <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="expense-description">Description</Label>
-                <Textarea
-                  id="expense-description"
-                  placeholder="Purpose of expense..."
-                  value={expenseDescription}
-                  onChange={(e) => setExpenseDescription(e.target.value)}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="receipt-upload">Receipt</Label>
-                <Input
-                  id="receipt-upload"
-                  type="file"
-                  accept=".pdf,.jpg,.jpeg,.png"
-                  onChange={(e) => setExpenseFile(e.target.files?.[0] || null)}
-                />
-              </div>
-
-              <Button 
-                onClick={handleSaveExpense} 
-                disabled={savingExpense}
-                className="w-full"
-              >
-                {savingExpense ? <Loader2 className="w-4 h-4 animate-spin" /> : "Save Expense"}
-              </Button>
             </CardContent>
           </Card>
         </TabsContent>

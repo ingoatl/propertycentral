@@ -59,6 +59,7 @@ export interface Expense {
   parentExpenseId?: string;
   returnReason?: string;
   refundAmount?: number;
+  exported?: boolean;
 }
 
 export interface OwnerRezBooking {

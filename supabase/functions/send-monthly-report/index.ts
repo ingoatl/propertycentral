@@ -657,7 +657,44 @@ Keep it CONCISE and SCANNABLE. Each section should be 2-4 lines maximum. DO NOT 
       throw emailResponse.error;
     }
 
-    console.log("Test email sent successfully!");
+    // If in reconciliation mode, mark expenses as billed and update reconciliation status
+    if (isReconciliationMode) {
+      // Mark all expense line items as exported/billed
+      const { data: expenseLineItems } = await supabase
+        .from("reconciliation_line_items")
+        .select("item_id")
+        .eq("reconciliation_id", reconciliation_id)
+        .eq("item_type", "expense")
+        .eq("verified", true);
+
+      if (expenseLineItems && expenseLineItems.length > 0) {
+        const expenseIds = expenseLineItems.map((item: any) => item.item_id);
+        await supabase
+          .from("expenses")
+          .update({ exported: true })
+          .in("id", expenseIds);
+        
+        console.log(`Marked ${expenseIds.length} expenses as billed`);
+      }
+
+      // Calculate next month's 5th for deadline
+      const recMonth = new Date(reportDate);
+      const nextMonth = new Date(recMonth.getFullYear(), recMonth.getMonth() + 2, 5);
+
+      // Update reconciliation status to "statement_sent"
+      await supabase
+        .from("monthly_reconciliations")
+        .update({
+          status: "statement_sent",
+          statement_sent_at: new Date().toISOString(),
+          owner_response_deadline: nextMonth.toISOString().split("T")[0],
+        })
+        .eq("id", reconciliation_id);
+
+      console.log("Statement sent successfully to owner in reconciliation mode");
+    } else {
+      console.log("Test email sent successfully!");
+    }
 
     return new Response(
       JSON.stringify({ 
