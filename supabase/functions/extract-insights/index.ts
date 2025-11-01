@@ -123,10 +123,14 @@ Analyze the email comprehensively and extract:
    - Remove company/owner prefixes but keep the actual address
    - Format: "Street Address, City, State ZIP" (e.g., "14 Villa Ct, Marietta, GA 30062-2075")
    
-   Step 3: Find ALL items and prices
-   - Look for item names followed by prices like "$339.99"
-   - Sum ALL prices across ALL orders in the email
-   - List ALL items purchased
+    Step 3: Find ALL items and prices - EXTRACT STRUCTURED DATA
+    - Look for item names followed by prices like "$339.99"
+    - For EACH item, extract:
+      * Item name (clean, no extra formatting)
+      * Individual item price (numeric value)
+    - Create a structured list of items with prices
+    - Sum ALL prices across ALL orders in the email
+    - CRITICAL: Return lineItems as array of objects: [{"name": "Item Name", "price": 12.99}]
    
    Step 4: Find dates - CRITICAL YEAR DETECTION
    - Look for "Delivery estimate:" or "arriving:" or "Guaranteed delivery:"
@@ -167,7 +171,8 @@ Return ONLY a JSON object:
   "orderDate": string or null (YYYY-MM-DD),
   "trackingNumber": string or null,
   "vendor": string or null,
-  "deliveryAddress": string or null (REQUIRED if address in email)
+  "deliveryAddress": string or null (REQUIRED if address in email),
+  "lineItems": array of objects or null (e.g., [{"name": "Sugar In The Raw", "price": 5.99}, {"name": "Throw Pillows", "price": 15.99}])
 }`;
 
     const userPrompt = `Email from: ${senderEmail}
@@ -421,6 +426,11 @@ ANALYZE CAREFULLY - Extract ALL order details including order number and deliver
         .select('user_id')
         .maybeSingle();
 
+      // Prepare line items data
+      const lineItemsData = analysis.lineItems && Array.isArray(analysis.lineItems) && analysis.lineItems.length > 0
+        ? { items: analysis.lineItems }
+        : null;
+
       const { error: expenseError } = await supabase
         .from('expenses')
         .insert({
@@ -435,6 +445,7 @@ ANALYZE CAREFULLY - Extract ALL order details including order number and deliver
           vendor: analysis.vendor || null,
           items_detail: analysis.expenseDescription || null,
           delivery_address: analysis.deliveryAddress || null,
+          line_items: lineItemsData,
           user_id: userData?.user_id || null,
         });
 

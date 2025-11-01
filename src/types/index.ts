@@ -48,6 +48,13 @@ export interface Expense {
   vendor?: string;
   itemsDetail?: string;
   deliveryAddress?: string;
+  lineItems?: {
+    items: Array<{
+      name: string;
+      price: number;
+    }>;
+  };
+  emailScreenshotPath?: string;
 }
 
 export interface OwnerRezBooking {

@@ -125,17 +125,68 @@ export const PropertyExpenseView = ({
                         })}
                       </p>
                       {expense.vendor && (
-                        <p className="text-sm font-semibold text-foreground">
+                        <p className="text-sm font-semibold text-foreground max-md:text-base">
                           {expense.vendor}
                         </p>
                       )}
-                      {expense.purpose && (
-                        <p className="text-sm text-muted-foreground line-clamp-2">
-                          {expense.purpose}
-                        </p>
-                      )}
+                      
+                      {/* Line Items Display */}
+                      {expense.lineItems?.items && expense.lineItems.items.length > 0 ? (
+                        <div className="mt-2 space-y-1 max-md:mt-3 max-md:space-y-2">
+                          <p className="text-xs font-medium text-muted-foreground max-md:text-sm">Items:</p>
+                          <div className="space-y-0.5 max-md:space-y-1">
+                            {expense.lineItems.items.map((item, idx) => (
+                              <div key={idx} className="flex justify-between items-start gap-2 text-xs max-md:text-base">
+                                <span className="flex-1 text-foreground">{item.name}</span>
+                                <span className="font-semibold text-foreground whitespace-nowrap">
+                                  ${item.price.toFixed(2)}
+                                </span>
+                              </div>
+                            ))}
+                            <div className="flex justify-between items-center gap-2 pt-1 mt-1 border-t text-xs max-md:text-base max-md:pt-2 max-md:mt-2">
+                              <span className="font-semibold text-foreground">Total</span>
+                              <span className="font-bold text-red-600 dark:text-red-500 max-md:text-lg">
+                                ${expense.amount.toFixed(2)}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      ) : expense.itemsDetail ? (
+                        <div className="mt-2 space-y-1 max-md:mt-3 max-md:space-y-2">
+                          <p className="text-xs font-medium text-muted-foreground max-md:text-sm">Items:</p>
+                          <div className="space-y-0.5 max-md:space-y-1">
+                            {expense.itemsDetail.split(',').map((item, idx) => (
+                              <div key={idx} className="flex items-start gap-2 text-xs max-md:text-base">
+                                <span className="text-muted-foreground">•</span>
+                                <span className="flex-1 text-foreground">{item.trim()}</span>
+                              </div>
+                            ))}
+                          </div>
+                          <div className="flex justify-between items-center gap-2 pt-1 mt-1 border-t text-xs max-md:text-base max-md:pt-2 max-md:mt-2">
+                            <span className="font-semibold text-foreground">Total</span>
+                            <span className="font-bold text-red-600 dark:text-red-500 max-md:text-lg">
+                              ${expense.amount.toFixed(2)}
+                            </span>
+                          </div>
+                        </div>
+                      ) : expense.purpose ? (
+                        <div className="mt-2 max-md:mt-3">
+                          <p className="text-xs text-muted-foreground line-clamp-2 max-md:text-sm max-md:line-clamp-3">
+                            {expense.purpose}
+                          </p>
+                          <div className="flex justify-between items-center gap-2 pt-1 mt-1 border-t text-xs max-md:text-base max-md:pt-2 max-md:mt-2">
+                            <span className="font-semibold text-foreground">Total</span>
+                            <span className="font-bold text-red-600 dark:text-red-500 max-md:text-lg">
+                              ${expense.amount.toFixed(2)}
+                            </span>
+                          </div>
+                        </div>
+                      ) : null}
+                      
                       {expense.filePath && (
-                        <ExpenseDocumentLink filePath={expense.filePath} />
+                        <div className="mt-2 max-md:mt-3">
+                          <ExpenseDocumentLink filePath={expense.filePath} />
+                        </div>
                       )}
                     </div>
                     <div className="flex flex-col items-end gap-3">

@@ -225,10 +225,12 @@ export type Database = {
           created_at: string
           date: string
           delivery_address: string | null
+          email_screenshot_path: string | null
           exported: boolean | null
           file_path: string | null
           id: string
           items_detail: string | null
+          line_items: Json | null
           order_date: string | null
           order_number: string | null
           property_id: string
@@ -243,10 +245,12 @@ export type Database = {
           created_at?: string
           date: string
           delivery_address?: string | null
+          email_screenshot_path?: string | null
           exported?: boolean | null
           file_path?: string | null
           id?: string
           items_detail?: string | null
+          line_items?: Json | null
           order_date?: string | null
           order_number?: string | null
           property_id: string
@@ -261,10 +265,12 @@ export type Database = {
           created_at?: string
           date?: string
           delivery_address?: string | null
+          email_screenshot_path?: string | null
           exported?: boolean | null
           file_path?: string | null
           id?: string
           items_detail?: string | null
+          line_items?: Json | null
           order_date?: string | null
           order_number?: string | null
           property_id?: string

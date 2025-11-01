@@ -136,18 +136,51 @@ export const ExpenseDetailModal = ({
           )}
 
           {/* Items Detail */}
-          {expense.itemsDetail && (
+          {expense.lineItems?.items && expense.lineItems.items.length > 0 ? (
             <>
-              <div className="space-y-2">
-                <h3 className="font-semibold flex items-center gap-2">
-                  <FileText className="w-4 h-4" />
+              <div className="space-y-3 max-md:space-y-4">
+                <h3 className="font-semibold text-lg flex items-center gap-2 max-md:text-xl">
+                  <FileText className="w-4 h-4 max-md:w-5 max-md:h-5" />
                   Items Purchased
                 </h3>
-                <p className="pl-6 text-sm leading-relaxed">{expense.itemsDetail}</p>
+                <div className="pl-6 space-y-2 max-md:pl-7 max-md:space-y-3">
+                  {expense.lineItems.items.map((item, idx) => (
+                    <div key={idx} className="flex justify-between items-start gap-4 max-md:gap-6">
+                      <span className="flex-1 text-sm leading-relaxed max-md:text-lg">{item.name}</span>
+                      <span className="font-semibold text-sm whitespace-nowrap max-md:text-lg">
+                        ${item.price.toFixed(2)}
+                      </span>
+                    </div>
+                  ))}
+                  <div className="flex justify-between items-center gap-4 pt-3 mt-3 border-t max-md:gap-6 max-md:pt-4 max-md:mt-4">
+                    <span className="font-bold text-base max-md:text-xl">Subtotal</span>
+                    <span className="font-bold text-base max-md:text-xl">
+                      ${expense.lineItems.items.reduce((sum, item) => sum + item.price, 0).toFixed(2)}
+                    </span>
+                  </div>
+                </div>
               </div>
               <Separator />
             </>
-          )}
+          ) : expense.itemsDetail ? (
+            <>
+              <div className="space-y-3 max-md:space-y-4">
+                <h3 className="font-semibold text-lg flex items-center gap-2 max-md:text-xl">
+                  <FileText className="w-4 h-4 max-md:w-5 max-md:h-5" />
+                  Items Purchased
+                </h3>
+                <div className="pl-6 space-y-2 max-md:pl-7 max-md:space-y-3">
+                  {expense.itemsDetail.split(',').map((item, idx) => (
+                    <div key={idx} className="flex items-start gap-2">
+                      <span className="text-muted-foreground max-md:text-lg">•</span>
+                      <span className="flex-1 text-sm leading-relaxed max-md:text-lg">{item.trim()}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <Separator />
+            </>
+          ) : null}
 
           {/* Purpose/Description */}
           {expense.purpose && (
@@ -160,13 +193,29 @@ export const ExpenseDetailModal = ({
             </div>
           )}
 
+          {/* Email Receipt/Screenshot */}
+          {expense.emailScreenshotPath && (
+            <>
+              <Separator />
+              <div className="space-y-2 max-md:space-y-3">
+                <h3 className="font-semibold text-lg flex items-center gap-2 max-md:text-xl">
+                  <FileText className="w-4 h-4 max-md:w-5 max-md:h-5" />
+                  Email Receipt
+                </h3>
+                <div className="pl-6 max-md:pl-7">
+                  <ExpenseDocumentLink filePath={expense.emailScreenshotPath} />
+                </div>
+              </div>
+            </>
+          )}
+
           {/* Document Link */}
           {expense.filePath && (
             <>
               <Separator />
-              <div className="space-y-2">
-                <h3 className="font-semibold">Attached Document</h3>
-                <div className="pl-6">
+              <div className="space-y-2 max-md:space-y-3">
+                <h3 className="font-semibold text-lg max-md:text-xl">Attached Document</h3>
+                <div className="pl-6 max-md:pl-7">
                   <ExpenseDocumentLink filePath={expense.filePath} />
                 </div>
               </div>
