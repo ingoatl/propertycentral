@@ -82,6 +82,7 @@ export default function MonthlyCharges() {
   const [expenseDescription, setExpenseDescription] = useState<string>("");
   const [expenseFile, setExpenseFile] = useState<File | null>(null);
   const [savingExpense, setSavingExpense] = useState(false);
+  const [receipt, setReceipt] = useState<File | null>(null);
   
   // Filter State
   const [filterType, setFilterType] = useState<string>("all");
@@ -432,11 +433,12 @@ export default function MonthlyCharges() {
         </div>
       </div>
 
-      <Tabs defaultValue="charges" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="charges">Charge Owner</TabsTrigger>
-          <TabsTrigger value="expenses">Record Expense</TabsTrigger>
+      <Tabs defaultValue="reconciliations" className="w-full">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="reconciliations">Reconciliations</TabsTrigger>
+          <TabsTrigger value="expenses">Record Expense</TabsTrigger>
+          <TabsTrigger value="charges">Charge Owner</TabsTrigger>
+          <TabsTrigger value="history">Transaction History</TabsTrigger>
         </TabsList>
 
         <TabsContent value="reconciliations" className="mt-6">
@@ -626,10 +628,9 @@ export default function MonthlyCharges() {
             </CardContent>
           </Card>
         </TabsContent>
-      </Tabs>
 
-      {/* Transaction History - shown below all tabs */}
-      <Card className="mt-6">
+        <TabsContent value="history" className="mt-6">
+          <Card>
         <CardHeader>
           <CardTitle>Transaction History</CardTitle>
           <div className="flex gap-4 mt-4">
@@ -747,6 +748,8 @@ export default function MonthlyCharges() {
           )}
         </CardContent>
       </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

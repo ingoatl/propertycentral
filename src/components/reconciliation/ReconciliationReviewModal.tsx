@@ -27,6 +27,7 @@ export const ReconciliationReviewModal = ({
 }: ReconciliationReviewModalProps) => {
   const [notes, setNotes] = useState("");
   const [isApproving, setIsApproving] = useState(false);
+  const [isSendingStatement, setIsSendingStatement] = useState(false);
 
   const { data, refetch } = useQuery({
     queryKey: ["reconciliation", reconciliationId],
@@ -87,13 +88,52 @@ export const ReconciliationReviewModal = ({
 
       if (error) throw error;
 
-      toast.success("Reconciliation approved! You can now send the statement to the owner.");
-      onSuccess();
-      onOpenChange(false);
+      toast.success("Reconciliation approved! Click 'Send Statement to Owner' to email the report.");
+      refetch();
+      setNotes("");
     } catch (error: any) {
       toast.error(error.message || "Failed to approve reconciliation");
     } finally {
       setIsApproving(false);
+    }
+  };
+
+  const handleSendStatement = async () => {
+    if (!reconciliation.property_owners?.email) {
+      toast.error("Owner email not found");
+      return;
+    }
+
+    const nextMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 5);
+    const deadlineDate = nextMonth.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+    
+    const confirmed = window.confirm(
+      `This will send the monthly statement to:\n\n` +
+      `Owner: ${reconciliation.property_owners?.name}\n` +
+      `Email: ${reconciliation.property_owners?.email}\n\n` +
+      `Review Deadline: ${deadlineDate}\n` +
+      `Net Amount: $${Number(reconciliation.net_to_owner || 0).toFixed(2)}\n\n` +
+      `The owner will be charged automatically on ${deadlineDate} unless they respond.\n\n` +
+      `Send statement now?`
+    );
+
+    if (!confirmed) return;
+
+    setIsSendingStatement(true);
+    try {
+      const { error } = await supabase.functions.invoke("send-monthly-report", {
+        body: { reconciliation_id: reconciliationId },
+      });
+
+      if (error) throw error;
+
+      toast.success(`Statement sent successfully to ${reconciliation.property_owners?.email}`);
+      onSuccess();
+      onOpenChange(false);
+    } catch (error: any) {
+      toast.error(error.message || "Failed to send statement");
+    } finally {
+      setIsSendingStatement(false);
     }
   };
 
@@ -184,14 +224,23 @@ export const ReconciliationReviewModal = ({
           />
         </div>
 
-        <div className="flex justify-between pt-4 border-t">
+        <div className="flex justify-between pt-4 border-t gap-2">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Close
           </Button>
-          <Button onClick={handleApprove} disabled={isApproving || reconciliation.status !== "draft"}>
-            <Check className="w-4 h-4 mr-2" />
-            {isApproving ? "Approving..." : "Approve & Continue"}
-          </Button>
+          <div className="flex gap-2">
+            {reconciliation.status === "draft" && (
+              <Button onClick={handleApprove} disabled={isApproving}>
+                <Check className="w-4 h-4 mr-2" />
+                {isApproving ? "Approving..." : "Approve Reconciliation"}
+              </Button>
+            )}
+            {reconciliation.status === "approved" && (
+              <Button onClick={handleSendStatement} disabled={isSendingStatement}>
+                {isSendingStatement ? "Sending..." : "Send Statement to Owner"}
+              </Button>
+            )}
+          </div>
         </div>
       </DialogContent>
     </Dialog>

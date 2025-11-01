@@ -17,85 +17,193 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    console.log("Starting test monthly statement generation for Smoke Hollow...");
-    
     const supabase = createClient(supabaseUrl, supabaseKey);
+    const { reconciliation_id } = await req.json();
+
+    // Reconciliation mode vs test mode
+    const isReconciliationMode = !!reconciliation_id;
+    
+    if (isReconciliationMode) {
+      console.log(`Sending owner statement for reconciliation: ${reconciliation_id}`);
+    } else {
+      console.log("Starting test monthly statement generation for Smoke Hollow...");
+    }
     const lovableApiKey = Deno.env.get("LOVABLE_API_KEY");
 
-    // Get current and previous month dates
+    let property: any;
+    let ownerEmail: string;
+    let totalRevenue: number;
+    let bookingRevenue: number;
+    let midTermRevenue: number;
+    let expenseTotal: number;
+    let managementFees: number;
+    let netIncome: number;
+    let visits: any[] = [];
+    let expenses: any[] = [];
+    let bookings: any[] = [];
+    let midTermBookings: any[] = [];
+    let expenseDocuments: { [key: string]: string } = {};
+    let reportDate: string = "";
+    let previousMonthName: string;
+
+    if (isReconciliationMode) {
+      // RECONCILIATION MODE: Fetch approved reconciliation data
+      const { data: reconciliation, error: recError } = await supabase
+        .from("monthly_reconciliations")
+        .select(`
+          *,
+          properties(*),
+          property_owners(email, name)
+        `)
+        .eq("id", reconciliation_id)
+        .eq("status", "approved")
+        .single();
+
+      if (recError || !reconciliation) {
+        throw new Error("Reconciliation not found or not approved");
+      }
+
+      property = reconciliation.properties;
+      ownerEmail = reconciliation.property_owners?.email;
+      
+      if (!ownerEmail) {
+        throw new Error("Owner email not found");
+      }
+
+      // Use reconciliation data instead of live queries
+      totalRevenue = Number(reconciliation.total_revenue || 0);
+      bookingRevenue = Number(reconciliation.short_term_revenue || 0);
+      midTermRevenue = Number(reconciliation.mid_term_revenue || 0);
+      expenseTotal = Number(reconciliation.total_expenses || 0);
+      managementFees = Number(reconciliation.management_fee || 0);
+      netIncome = Number(reconciliation.net_to_owner || 0);
+
+      // Fetch line items for details
+      const { data: lineItems, error: itemsError } = await supabase
+        .from("reconciliation_line_items")
+        .select("*")
+        .eq("reconciliation_id", reconciliation_id)
+        .eq("verified", true)
+        .order("date", { ascending: false });
+
+      if (itemsError) throw itemsError;
+
+      // Map line items back to their original types for email display
+      visits = (lineItems || [])
+        .filter((item: any) => item.item_type === "visit")
+        .map((item: any) => ({
+          date: item.date,
+          price: item.amount,
+        }));
+
+      expenses = (lineItems || [])
+        .filter((item: any) => item.item_type === "expense")
+        .map((item: any) => ({
+          date: item.date,
+          amount: Math.abs(item.amount),
+          purpose: item.description,
+          category: item.category,
+        }));
+
+      bookings = (lineItems || [])
+        .filter((item: any) => item.item_type === "booking")
+        .map((item: any) => ({
+          guest_name: item.description,
+          check_in: item.date,
+          total_amount: item.amount,
+        }));
+
+      midTermBookings = (lineItems || [])
+        .filter((item: any) => item.item_type === "mid_term_booking")
+        .map((item: any) => ({
+          tenant_name: item.description,
+          monthly_rent: item.amount,
+        }));
+
+      previousMonthName = new Date(reconciliation.reconciliation_month).toLocaleDateString('en-US', {
+        month: 'long',
+        year: 'numeric'
+      });
+
+    } else {
+      // TEST MODE: Use existing logic
+      ownerEmail = "test@peachhaus.com"; // Test email
+
+      // Get current and previous month dates
     const now = new Date();
-    const firstDayOfCurrentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const lastDayOfPreviousMonth = new Date(firstDayOfCurrentMonth.getTime() - 1);
-    const firstDayOfPreviousMonth = new Date(lastDayOfPreviousMonth.getFullYear(), lastDayOfPreviousMonth.getMonth(), 1);
-    
-    const previousMonthName = firstDayOfPreviousMonth.toLocaleDateString('en-US', { 
-      month: 'long',
-      year: 'numeric'
-    });
+      const firstDayOfCurrentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const lastDayOfPreviousMonth = new Date(firstDayOfCurrentMonth.getTime() - 1);
+      const firstDayOfPreviousMonth = new Date(lastDayOfPreviousMonth.getFullYear(), lastDayOfPreviousMonth.getMonth(), 1);
+      
+      previousMonthName = firstDayOfPreviousMonth.toLocaleDateString('en-US', { 
+        month: 'long',
+        year: 'numeric'
+      });
 
-    const reportDate = now.toLocaleDateString('en-US', { 
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric' 
-    });
+      reportDate = now.toLocaleDateString('en-US', { 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+      });
 
-    // Fetch Smoke Hollow property
-    const { data: properties, error: propertiesError } = await supabase
-      .from("properties")
-      .select("*, rental_type")
-      .ilike("name", "%smoke%hollow%");
+      // Fetch Smoke Hollow property
+      const { data: properties, error: propertiesError } = await supabase
+        .from("properties")
+        .select("*, rental_type")
+        .ilike("name", "%smoke%hollow%");
 
-    if (propertiesError) throw propertiesError;
-    
-    if (!properties || properties.length === 0) {
-      throw new Error("Smoke Hollow not found");
-    }
+      if (propertiesError) throw propertiesError;
+      
+      if (!properties || properties.length === 0) {
+        throw new Error("Smoke Hollow not found");
+      }
 
-    const property = properties[0];
-    console.log("Found property:", property);
+      property = properties[0];
+      console.log("Found property:", property);
 
-    // Fetch visits and expenses for this property (all time for demo)
-    const { data: visits, error: visitsError } = await supabase
-      .from("visits")
-      .select("*")
-      .eq("property_id", property.id)
-      .order("date", { ascending: false });
+      // Fetch visits and expenses for this property (all time for demo)
+      const { data: visitsData, error: visitsError } = await supabase
+        .from("visits")
+        .select("*")
+        .eq("property_id", property.id)
+        .order("date", { ascending: false });
 
-    if (visitsError) throw visitsError;
+      if (visitsError) throw visitsError;
+      visits = visitsData || [];
 
-    const { data: expenses, error: expensesError } = await supabase
-      .from("expenses")
-      .select("*")
-      .eq("property_id", property.id)
-      .order("date", { ascending: false });
+      const { data: expensesData, error: expensesError } = await supabase
+        .from("expenses")
+        .select("*")
+        .eq("property_id", property.id)
+        .order("date", { ascending: false });
 
-    if (expensesError) throw expensesError;
+      if (expensesError) throw expensesError;
+      expenses = expensesData || [];
 
-    const { data: bookings, error: bookingsError } = await supabase
-      .from("ownerrez_bookings")
-      .select("*")
-      .eq("property_id", property.id);
+      const { data: bookingsData, error: bookingsError } = await supabase
+        .from("ownerrez_bookings")
+        .select("*")
+        .eq("property_id", property.id);
 
-    if (bookingsError) throw bookingsError;
+      if (bookingsError) throw bookingsError;
+      bookings = bookingsData || [];
 
-    // Check for active mid-term bookings
-    const { data: midTermBookings, error: midTermError } = await supabase
-      .from("mid_term_bookings")
-      .select("*")
-      .eq("property_id", property.id)
-      .eq("status", "active")
-      .gte("end_date", firstDayOfPreviousMonth.toISOString().split('T')[0])
-      .lte("start_date", lastDayOfPreviousMonth.toISOString().split('T')[0]);
+      // Check for active mid-term bookings
+      const { data: midTermBookingsData, error: midTermError } = await supabase
+        .from("mid_term_bookings")
+        .select("*")
+        .eq("property_id", property.id)
+        .eq("status", "active")
+        .gte("end_date", firstDayOfPreviousMonth.toISOString().split('T')[0])
+        .lte("start_date", lastDayOfPreviousMonth.toISOString().split('T')[0]);
 
-    if (midTermError) throw midTermError;
+      if (midTermError) throw midTermError;
+      midTermBookings = midTermBookingsData || [];
 
-    const hasMidTermBooking = midTermBookings && midTermBookings.length > 0;
+      console.log(`Found ${visits.length} visits, ${expenses.length} expenses, ${bookings.length} bookings, ${midTermBookings.length} mid-term bookings`);
 
-    console.log(`Found ${visits?.length || 0} visits, ${expenses?.length || 0} expenses, ${bookings?.length || 0} bookings, ${midTermBookings?.length || 0} mid-term bookings`);
-
-    // Generate signed URLs for expense documents
-    const expenseDocuments: { [key: string]: string } = {};
-    for (const expense of expenses || []) {
+      // Generate signed URLs for expense documents
+      for (const expense of expenses) {
       if (expense.file_path) {
         try {
           const { data, error } = await supabase.storage
@@ -109,19 +217,22 @@ const handler = async (req: Request): Promise<Response> => {
           console.error(`Error generating signed URL for expense ${expense.id}:`, err);
         }
       }
-    }
+      }
 
-    // Calculate totals including mid-term revenue
-    const visitTotal = (visits || []).reduce((sum, v) => sum + Number(v.price), 0);
-    const expenseTotal = (expenses || []).reduce((sum, e) => sum + Number(e.amount), 0);
-    const bookingRevenue = (bookings || []).reduce((sum, b) => sum + Number(b.total_amount), 0);
-    const managementFees = (bookings || []).reduce((sum, b) => sum + Number(b.management_fee), 0);
-    
-    // Calculate mid-term revenue for the month
-    const midTermRevenue = (midTermBookings || []).reduce((sum, b) => sum + Number(b.monthly_rent), 0);
-    const totalRevenue = bookingRevenue + midTermRevenue;
-    
-    const netIncome = totalRevenue - managementFees - expenseTotal;
+      // Calculate totals including mid-term revenue
+      const visitTotal = visits.reduce((sum, v) => sum + Number(v.price), 0);
+      expenseTotal = expenses.reduce((sum, e) => sum + Number(e.amount), 0);
+      bookingRevenue = bookings.reduce((sum, b) => sum + Number(b.total_amount), 0);
+      managementFees = bookings.reduce((sum, b) => sum + Number(b.management_fee), 0);
+      
+      // Calculate mid-term revenue for the month
+      midTermRevenue = midTermBookings.reduce((sum, b) => sum + Number(b.monthly_rent), 0);
+      totalRevenue = bookingRevenue + midTermRevenue;
+      
+      netIncome = totalRevenue - managementFees - expenseTotal;
+    } // End of test mode
+
+    const hasMidTermBooking = midTermBookings.length > 0;
 
     // Parse location from address
     const addressParts = property.address.split(',').map((p: string) => p.trim());
@@ -280,6 +391,23 @@ Keep it CONCISE and SCANNABLE. Each section should be 2-4 lines maximum. DO NOT 
               <p style="font-size: 18px; line-height: 1.7; color: #2c3e50; margin: 0 0 20px 0; font-weight: 500;">
                 Hello! 👋
               </p>
+              
+              ${isReconciliationMode ? `
+              <!-- Review Deadline Notice -->
+              <div style="background: linear-gradient(135deg, #fff3cd 0%, #ffe69c 100%); border-left: 4px solid #ffc107; padding: 20px; margin: 0 0 30px 0; border-radius: 12px; box-shadow: 0 2px 8px rgba(255, 193, 7, 0.2);">
+                <p style="margin: 0 0 10px 0; font-weight: 600; color: #856404; font-size: 16px; display: flex; align-items: center; gap: 8px;">
+                  ⏰ Action Required: Review Deadline
+                </p>
+                <p style="margin: 0; color: #856404; font-size: 14px; line-height: 1.6;">
+                  Please review this statement carefully by <strong>${new Date(new Date().getFullYear(), new Date().getMonth() + 1, 5).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</strong>. 
+                  If we don't hear from you with any questions or concerns by this date, 
+                  we will proceed to charge your payment method on file for the net amount of <strong>$${netIncome.toFixed(2)}</strong>.
+                </p>
+                <p style="margin: 10px 0 0 0; color: #856404; font-size: 14px;">
+                  <strong>Questions?</strong> Reply to this email before the deadline to discuss.
+                </p>
+              </div>
+              ` : ''}
               
               <p style="font-size: 16px; line-height: 1.8; color: #34495e; margin: 0 0 30px 0;">
                 We hope this message finds you well! We're excited to share your property's performance for <strong style="color: #8B5CF6;">${previousMonthName}</strong>. 
