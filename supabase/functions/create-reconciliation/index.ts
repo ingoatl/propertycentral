@@ -53,13 +53,14 @@ serve(async (req) => {
       .gte("check_in", firstDayOfMonth.toISOString().split("T")[0])
       .lte("check_in", lastDayOfMonth.toISOString().split("T")[0]);
 
-    // Fetch mid-term bookings
+    // Fetch mid-term bookings that are active during the month
+    // Include bookings that: start during month OR are ongoing (started before and end after/during)
     const { data: midTermBookings } = await supabaseClient
       .from("mid_term_bookings")
       .select("*")
       .eq("property_id", property_id)
-      .gte("start_date", firstDayOfMonth.toISOString().split("T")[0])
-      .lte("start_date", lastDayOfMonth.toISOString().split("T")[0]);
+      .lte("start_date", lastDayOfMonth.toISOString().split("T")[0])
+      .gte("end_date", firstDayOfMonth.toISOString().split("T")[0]);
 
     // Fetch all UNBILLED expenses for the month
     const { data: expenses } = await supabaseClient
@@ -78,9 +79,26 @@ serve(async (req) => {
       .gte("date", firstDayOfMonth.toISOString().split("T")[0])
       .lte("date", lastDayOfMonth.toISOString().split("T")[0]);
 
-    // Calculate totals
+    // Calculate totals with prorated mid-term revenue
     const shortTermRevenue = (bookings || []).reduce((sum, b) => sum + (b.total_amount || 0), 0);
-    const midTermRevenue = (midTermBookings || []).reduce((sum, b) => sum + (b.monthly_rent || 0), 0);
+    
+    // Calculate prorated mid-term revenue
+    let midTermRevenue = 0;
+    for (const booking of midTermBookings || []) {
+      const bookingStart = new Date(booking.start_date);
+      const bookingEnd = new Date(booking.end_date);
+      const monthStart = new Date(firstDayOfMonth);
+      const monthEnd = new Date(lastDayOfMonth);
+      
+      const effectiveStart = bookingStart > monthStart ? bookingStart : monthStart;
+      const effectiveEnd = bookingEnd < monthEnd ? bookingEnd : monthEnd;
+      const daysInBooking = Math.ceil((effectiveEnd.getTime() - effectiveStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+      const daysInMonth = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0).getDate();
+      const proratedAmount = (booking.monthly_rent / daysInMonth) * daysInBooking;
+      
+      midTermRevenue += proratedAmount;
+    }
+    
     const totalRevenue = shortTermRevenue + midTermRevenue;
     const totalExpenses = (expenses || []).reduce((sum, e) => sum + (e.amount || 0), 0);
     const visitRevenue = (visits || []).reduce((sum, v) => sum + (v.price || 0), 0);
@@ -88,6 +106,8 @@ serve(async (req) => {
     // Management fee is 15% of booking revenue (not visits)
     const managementFee = totalRevenue * 0.15;
     const netToOwner = totalRevenue + visitRevenue - totalExpenses - managementFee;
+
+    console.log(`Reconciliation calculation: Short-term: $${shortTermRevenue}, Mid-term: $${midTermRevenue}, Total Revenue: $${totalRevenue}, Management Fee: $${managementFee}, Net to Owner: $${netToOwner}`);
 
     // Create reconciliation
     const { data: reconciliation, error: recError } = await supabaseClient
@@ -125,15 +145,27 @@ serve(async (req) => {
       });
     }
 
-    // Add mid-term bookings
+    // Add mid-term bookings (prorated if needed)
     for (const booking of midTermBookings || []) {
+      const bookingStart = new Date(booking.start_date);
+      const bookingEnd = new Date(booking.end_date);
+      const monthStart = new Date(firstDayOfMonth);
+      const monthEnd = new Date(lastDayOfMonth);
+      
+      // Calculate prorated amount for this month
+      const effectiveStart = bookingStart > monthStart ? bookingStart : monthStart;
+      const effectiveEnd = bookingEnd < monthEnd ? bookingEnd : monthEnd;
+      const daysInBooking = Math.ceil((effectiveEnd.getTime() - effectiveStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+      const daysInMonth = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0).getDate();
+      const proratedAmount = (booking.monthly_rent / daysInMonth) * daysInBooking;
+      
       lineItems.push({
         reconciliation_id: reconciliation.id,
         item_type: "mid_term_booking",
         item_id: booking.id,
-        description: `${booking.tenant_name} - Mid-term Rental`,
-        amount: booking.monthly_rent,
-        date: booking.start_date,
+        description: `${booking.tenant_name} - Mid-term Rental (${daysInBooking}/${daysInMonth} days)`,
+        amount: proratedAmount,
+        date: effectiveStart.toISOString().split("T")[0],
         category: "Mid-term Rental",
       });
     }
