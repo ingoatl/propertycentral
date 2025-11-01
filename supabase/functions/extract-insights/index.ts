@@ -498,6 +498,7 @@ ANALYZE CAREFULLY - Extract ALL order details including order number and deliver
           delivery_address: analysis.deliveryAddress || null,
           line_items: lineItemsData,
           email_screenshot_path: emailScreenshotPath,
+          email_insight_id: insertedInsight.id,
           user_id: userData?.user_id || null,
         });
 

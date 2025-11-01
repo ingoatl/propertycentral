@@ -22,9 +22,9 @@ serve(async (req) => {
     // Find all expenses without email screenshots
     const { data: expenses, error: expensesError } = await supabase
       .from('expenses')
-      .select('*, email_insights!inner(subject, sender_email, email_date, summary, category)')
+      .select('*, email_insights!email_insight_id(subject, sender_email, email_date, summary, category)')
       .is('email_screenshot_path', null)
-      .not('email_insights', 'is', null);
+      .not('email_insight_id', 'is', null);
 
     if (expensesError) {
       console.error('Error fetching expenses:', expensesError);

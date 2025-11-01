@@ -225,6 +225,7 @@ export type Database = {
           created_at: string
           date: string
           delivery_address: string | null
+          email_insight_id: string | null
           email_screenshot_path: string | null
           exported: boolean | null
           file_path: string | null
@@ -245,6 +246,7 @@ export type Database = {
           created_at?: string
           date: string
           delivery_address?: string | null
+          email_insight_id?: string | null
           email_screenshot_path?: string | null
           exported?: boolean | null
           file_path?: string | null
@@ -265,6 +267,7 @@ export type Database = {
           created_at?: string
           date?: string
           delivery_address?: string | null
+          email_insight_id?: string | null
           email_screenshot_path?: string | null
           exported?: boolean | null
           file_path?: string | null
@@ -280,6 +283,13 @@ export type Database = {
           vendor?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "expenses_email_insight_id_fkey"
+            columns: ["email_insight_id"]
+            isOneToOne: false
+            referencedRelation: "email_insights"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "expenses_property_id_fkey"
             columns: ["property_id"]
