@@ -627,11 +627,12 @@ export default function MonthlyCharges() {
               {savingExpense ? <Loader2 className="w-4 h-4 animate-spin" /> : "Save Expense"}
             </Button>
           </CardContent>
-        </Card>
-      </div>
+          </Card>
+        </TabsContent>
+      </Tabs>
 
-      {/* Transaction History */}
-      <Card>
+      {/* Transaction History - shown below all tabs */}
+      <Card className="mt-6">
         <CardHeader>
           <CardTitle>Transaction History</CardTitle>
           <div className="flex gap-4 mt-4">
@@ -749,12 +750,6 @@ export default function MonthlyCharges() {
           )}
         </CardContent>
       </Card>
-        </TabsContent>
-
-        <TabsContent value="expenses" className="mt-6">
-          {/* Expense recording form moved into tabs */}
-        </TabsContent>
-      </Tabs>
     </div>
   );
 }
