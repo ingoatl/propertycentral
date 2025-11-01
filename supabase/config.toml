@@ -1,5 +1,9 @@
 project_id = "ijsxcaaqphaciaenlegl"
 
+[functions.backfill-expense-receipts]
+verify_jwt = false
+
+
 [functions.send-team-performance-digest]
 verify_jwt = false
 

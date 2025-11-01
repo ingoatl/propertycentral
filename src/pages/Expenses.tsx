@@ -11,6 +11,7 @@ import { Property, Expense } from "@/types";
 import { toast } from "sonner";
 import { z } from "zod";
 import { PropertyExpenseView } from "@/components/PropertyExpenseView";
+import { BackfillReceiptsButton } from "@/components/BackfillReceiptsButton";
 
 const expenseSchema = z.object({
   propertyId: z.string().uuid("Please select a property"),
@@ -215,9 +216,12 @@ const Expenses = () => {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="pb-4 border-b border-border/50">
-        <h1 className="text-4xl font-bold bg-gradient-primary bg-clip-text text-transparent">Expenses</h1>
-        <p className="text-muted-foreground mt-1">Track property-related expenses</p>
+      <div className="pb-4 border-b border-border/50 flex items-center justify-between">
+        <div>
+          <h1 className="text-4xl font-bold bg-gradient-primary bg-clip-text text-transparent">Expenses</h1>
+          <p className="text-muted-foreground mt-1">Track property-related expenses</p>
+        </div>
+        <BackfillReceiptsButton />
       </div>
 
       <Card className="shadow-card border-border/50">
