@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Expense } from "@/types";
-import { Calendar as CalendarIcon, Trash2, Eye, ChevronLeft } from "lucide-react";
+import { Calendar as CalendarIcon, Trash2, Eye, ChevronLeft, Search } from "lucide-react";
 import { ExpenseDetailModal } from "@/components/ExpenseDetailModal";
 import { ExpenseDocumentLink } from "@/components/ExpenseDocumentLink";
 import { supabase } from "@/integrations/supabase/client";
@@ -27,9 +28,26 @@ export const PropertyExpenseView = ({
 }: PropertyExpenseViewProps) => {
   const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+
+  // Filter expenses based on search term
+  const filteredExpenses = expenses.filter((expense) => {
+    if (!searchTerm) return true;
+    const search = searchTerm.toLowerCase();
+    return (
+      expense.vendor?.toLowerCase().includes(search) ||
+      expense.purpose?.toLowerCase().includes(search) ||
+      expense.itemsDetail?.toLowerCase().includes(search) ||
+      expense.category?.toLowerCase().includes(search) ||
+      expense.orderNumber?.toLowerCase().includes(search) ||
+      expense.amount.toString().includes(search) ||
+      new Date(expense.date).toLocaleDateString().toLowerCase().includes(search) ||
+      expense.lineItems?.items?.some(item => item.name.toLowerCase().includes(search))
+    );
+  });
 
   // Group expenses by month
-  const expensesByMonth = expenses.reduce((acc, expense) => {
+  const expensesByMonth = filteredExpenses.reduce((acc, expense) => {
     const date = new Date(expense.date);
     const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
     if (!acc[monthKey]) {
@@ -89,6 +107,18 @@ export const PropertyExpenseView = ({
           <CardTitle className="text-2xl">{propertyName}</CardTitle>
           <p className="text-sm text-muted-foreground">{propertyAddress}</p>
         </CardHeader>
+        <CardContent className="pt-6">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              type="text"
+              placeholder="Search expenses by vendor, purpose, items, amount..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+        </CardContent>
       </Card>
 
       {sortedMonths.map((monthKey) => (
