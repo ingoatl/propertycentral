@@ -6,6 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ReconciliationList } from "@/components/reconciliation/ReconciliationList";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
@@ -430,6 +432,19 @@ export default function MonthlyCharges() {
         </div>
       </div>
 
+      <Tabs defaultValue="charges" className="w-full">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="charges">Charge Owner</TabsTrigger>
+          <TabsTrigger value="expenses">Record Expense</TabsTrigger>
+          <TabsTrigger value="reconciliations">Reconciliations</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="reconciliations" className="mt-6">
+          <ReconciliationList />
+        </TabsContent>
+
+        <TabsContent value="charges" className="mt-6">
+
       {/* Two Forms Side by Side */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Charge Owner Form */}
@@ -734,6 +749,12 @@ export default function MonthlyCharges() {
           )}
         </CardContent>
       </Card>
+        </TabsContent>
+
+        <TabsContent value="expenses" className="mt-6">
+          {/* Expense recording form moved into tabs */}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

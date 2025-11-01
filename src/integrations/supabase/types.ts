@@ -658,6 +658,122 @@ export type Database = {
           },
         ]
       }
+      monthly_reconciliations: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          charge_id: string | null
+          charged_at: string | null
+          created_at: string
+          dispute_detected_at: string | null
+          dispute_reason: string | null
+          id: string
+          management_fee: number
+          mid_term_revenue: number | null
+          net_to_owner: number
+          notes: string | null
+          owner_acknowledged: boolean | null
+          owner_disputed: boolean | null
+          owner_id: string
+          owner_response_deadline: string | null
+          property_id: string
+          reconciliation_month: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          short_term_revenue: number | null
+          statement_sent_at: string | null
+          status: string
+          total_expenses: number
+          total_revenue: number
+          updated_at: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          charge_id?: string | null
+          charged_at?: string | null
+          created_at?: string
+          dispute_detected_at?: string | null
+          dispute_reason?: string | null
+          id?: string
+          management_fee?: number
+          mid_term_revenue?: number | null
+          net_to_owner?: number
+          notes?: string | null
+          owner_acknowledged?: boolean | null
+          owner_disputed?: boolean | null
+          owner_id: string
+          owner_response_deadline?: string | null
+          property_id: string
+          reconciliation_month: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          short_term_revenue?: number | null
+          statement_sent_at?: string | null
+          status?: string
+          total_expenses?: number
+          total_revenue?: number
+          updated_at?: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          charge_id?: string | null
+          charged_at?: string | null
+          created_at?: string
+          dispute_detected_at?: string | null
+          dispute_reason?: string | null
+          id?: string
+          management_fee?: number
+          mid_term_revenue?: number | null
+          net_to_owner?: number
+          notes?: string | null
+          owner_acknowledged?: boolean | null
+          owner_disputed?: boolean | null
+          owner_id?: string
+          owner_response_deadline?: string | null
+          property_id?: string
+          reconciliation_month?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          short_term_revenue?: number | null
+          statement_sent_at?: string | null
+          status?: string
+          total_expenses?: number
+          total_revenue?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "monthly_reconciliations_charge_id_fkey"
+            columns: ["charge_id"]
+            isOneToOne: false
+            referencedRelation: "monthly_charges"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "monthly_reconciliations_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "property_owners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "monthly_reconciliations_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "comprehensive_property_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "monthly_reconciliations_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       onboarding_comments: {
         Row: {
           comment: string
@@ -1444,6 +1560,59 @@ export type Database = {
             columns: ["property_id"]
             isOneToOne: true
             referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      reconciliation_line_items: {
+        Row: {
+          amount: number
+          category: string | null
+          created_at: string
+          date: string
+          description: string
+          excluded: boolean | null
+          exclusion_reason: string | null
+          id: string
+          item_id: string
+          item_type: string
+          reconciliation_id: string
+          verified: boolean | null
+        }
+        Insert: {
+          amount: number
+          category?: string | null
+          created_at?: string
+          date: string
+          description: string
+          excluded?: boolean | null
+          exclusion_reason?: string | null
+          id?: string
+          item_id: string
+          item_type: string
+          reconciliation_id: string
+          verified?: boolean | null
+        }
+        Update: {
+          amount?: number
+          category?: string | null
+          created_at?: string
+          date?: string
+          description?: string
+          excluded?: boolean | null
+          exclusion_reason?: string | null
+          id?: string
+          item_id?: string
+          item_type?: string
+          reconciliation_id?: string
+          verified?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reconciliation_line_items_reconciliation_id_fkey"
+            columns: ["reconciliation_id"]
+            isOneToOne: false
+            referencedRelation: "monthly_reconciliations"
             referencedColumns: ["id"]
           },
         ]
