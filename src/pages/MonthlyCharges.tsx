@@ -444,189 +444,186 @@ export default function MonthlyCharges() {
         </TabsContent>
 
         <TabsContent value="charges" className="mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <DollarSign className="w-5 h-5" />
+                Charge Owner
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="owner">Owner *</Label>
+                <Select value={selectedOwner} onValueChange={setSelectedOwner}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select owner..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {owners.map(owner => (
+                      <SelectItem key={owner.id} value={owner.id}>
+                        {owner.name} ({owner.email})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-      {/* Two Forms Side by Side */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Charge Owner Form */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <DollarSign className="w-5 h-5" />
-              Charge Owner
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="owner">Owner *</Label>
-              <Select value={selectedOwner} onValueChange={setSelectedOwner}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select owner..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {owners.map(owner => (
-                    <SelectItem key={owner.id} value={owner.id}>
-                      {owner.name} ({owner.email})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+              <div className="space-y-2">
+                <Label htmlFor="charge-month">Month *</Label>
+                <Input
+                  id="charge-month"
+                  type="month"
+                  value={chargeMonth}
+                  onChange={(e) => setChargeMonth(e.target.value)}
+                />
+              </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="charge-month">Month *</Label>
-              <Input
-                id="charge-month"
-                type="month"
-                value={chargeMonth}
-                onChange={(e) => setChargeMonth(e.target.value)}
-              />
-            </div>
+              <div className="space-y-2">
+                <Label htmlFor="charge-amount">Amount *</Label>
+                <Input
+                  id="charge-amount"
+                  type="number"
+                  step="0.01"
+                  placeholder="0.00"
+                  value={chargeAmount}
+                  onChange={(e) => setChargeAmount(e.target.value)}
+                />
+              </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="charge-amount">Amount *</Label>
-              <Input
-                id="charge-amount"
-                type="number"
-                step="0.01"
-                placeholder="0.00"
-                value={chargeAmount}
-                onChange={(e) => setChargeAmount(e.target.value)}
-              />
-            </div>
+              <div className="space-y-2">
+                <Label htmlFor="charge-category">Category</Label>
+                <Select value={chargeCategory} onValueChange={setChargeCategory}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {CHARGE_CATEGORIES.map(cat => (
+                      <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="charge-category">Category</Label>
-              <Select value={chargeCategory} onValueChange={setChargeCategory}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {CHARGE_CATEGORIES.map(cat => (
-                    <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+              <div className="space-y-2">
+                <Label htmlFor="charge-description">Description</Label>
+                <Textarea
+                  id="charge-description"
+                  placeholder="Optional notes..."
+                  value={chargeDescription}
+                  onChange={(e) => setChargeDescription(e.target.value)}
+                />
+              </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="charge-description">Description</Label>
-              <Textarea
-                id="charge-description"
-                placeholder="Optional notes..."
-                value={chargeDescription}
-                onChange={(e) => setChargeDescription(e.target.value)}
-              />
-            </div>
+              <div className="flex gap-2">
+                <Button 
+                  onClick={() => handleChargeOwner(false)} 
+                  disabled={chargingOwner}
+                  className="flex-1"
+                >
+                  {chargingOwner ? <Loader2 className="w-4 h-4 animate-spin" /> : "Charge via Stripe"}
+                </Button>
+                <Button 
+                  onClick={() => handleChargeOwner(true)} 
+                  disabled={chargingOwner}
+                  variant="outline"
+                  className="flex-1"
+                >
+                  Save as Pending
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-            <div className="flex gap-2">
+        <TabsContent value="expenses" className="mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Receipt className="w-5 h-5" />
+                Record Expense
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="property">Property *</Label>
+                <Select value={selectedProperty} onValueChange={setSelectedProperty}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select property..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {properties.map(prop => (
+                      <SelectItem key={prop.id} value={prop.id}>
+                        {prop.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="expense-date">Date *</Label>
+                <Input
+                  id="expense-date"
+                  type="date"
+                  value={expenseDate}
+                  onChange={(e) => setExpenseDate(e.target.value)}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="expense-amount">Amount *</Label>
+                <Input
+                  id="expense-amount"
+                  type="number"
+                  step="0.01"
+                  placeholder="0.00"
+                  value={expenseAmount}
+                  onChange={(e) => setExpenseAmount(e.target.value)}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="expense-category">Category</Label>
+                <Select value={expenseCategory} onValueChange={setExpenseCategory}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {EXPENSE_CATEGORIES.map(cat => (
+                      <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="expense-description">Description</Label>
+                <Textarea
+                  id="expense-description"
+                  placeholder="Purpose of expense..."
+                  value={expenseDescription}
+                  onChange={(e) => setExpenseDescription(e.target.value)}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="receipt-upload">Receipt</Label>
+                <Input
+                  id="receipt-upload"
+                  type="file"
+                  accept=".pdf,.jpg,.jpeg,.png"
+                  onChange={(e) => setExpenseFile(e.target.files?.[0] || null)}
+                />
+              </div>
+
               <Button 
-                onClick={() => handleChargeOwner(false)} 
-                disabled={chargingOwner}
-                className="flex-1"
+                onClick={handleSaveExpense} 
+                disabled={savingExpense}
+                className="w-full"
               >
-                {chargingOwner ? <Loader2 className="w-4 h-4 animate-spin" /> : "Charge via Stripe"}
+                {savingExpense ? <Loader2 className="w-4 h-4 animate-spin" /> : "Save Expense"}
               </Button>
-              <Button 
-                onClick={() => handleChargeOwner(true)} 
-                disabled={chargingOwner}
-                variant="outline"
-                className="flex-1"
-              >
-                Save as Pending
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Record Expense Form */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Receipt className="w-5 h-5" />
-              Record Expense
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="property">Property *</Label>
-              <Select value={selectedProperty} onValueChange={setSelectedProperty}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select property..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {properties.map(prop => (
-                    <SelectItem key={prop.id} value={prop.id}>
-                      {prop.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="expense-date">Date *</Label>
-              <Input
-                id="expense-date"
-                type="date"
-                value={expenseDate}
-                onChange={(e) => setExpenseDate(e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="expense-amount">Amount *</Label>
-              <Input
-                id="expense-amount"
-                type="number"
-                step="0.01"
-                placeholder="0.00"
-                value={expenseAmount}
-                onChange={(e) => setExpenseAmount(e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="expense-category">Category</Label>
-              <Select value={expenseCategory} onValueChange={setExpenseCategory}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {EXPENSE_CATEGORIES.map(cat => (
-                    <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="expense-description">Description</Label>
-              <Textarea
-                id="expense-description"
-                placeholder="Purpose of expense..."
-                value={expenseDescription}
-                onChange={(e) => setExpenseDescription(e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="receipt-upload">Receipt</Label>
-              <Input
-                id="receipt-upload"
-                type="file"
-                accept=".pdf,.jpg,.jpeg,.png"
-                onChange={(e) => setExpenseFile(e.target.files?.[0] || null)}
-              />
-            </div>
-
-            <Button 
-              onClick={handleSaveExpense} 
-              disabled={savingExpense}
-              className="w-full"
-            >
-              {savingExpense ? <Loader2 className="w-4 h-4 animate-spin" /> : "Save Expense"}
-            </Button>
-          </CardContent>
+            </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
