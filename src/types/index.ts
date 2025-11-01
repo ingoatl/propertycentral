@@ -55,6 +55,10 @@ export interface Expense {
     }>;
   };
   emailScreenshotPath?: string;
+  isReturn?: boolean;
+  parentExpenseId?: string;
+  returnReason?: string;
+  refundAmount?: number;
 }
 
 export interface OwnerRezBooking {

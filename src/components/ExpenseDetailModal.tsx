@@ -1,7 +1,8 @@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
 import { Expense } from "@/types";
-import { Calendar, DollarSign, FileText, MapPin, Package } from "lucide-react";
+import { Calendar, DollarSign, FileText, MapPin, Package, RotateCcw, AlertCircle } from "lucide-react";
 import { ExpenseDocumentLink } from "./ExpenseDocumentLink";
 
 interface ExpenseDetailModalProps {
@@ -25,13 +26,40 @@ export const ExpenseDetailModal = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto max-md:max-w-full max-md:h-screen max-md:p-4">
         <DialogHeader>
-          <DialogTitle className="text-2xl max-md:text-xl">Expense Details</DialogTitle>
+          <DialogTitle className="text-2xl max-md:text-xl flex items-center gap-2">
+            {expense.isReturn && (
+              <RotateCcw className="w-5 h-5 text-orange-600 dark:text-orange-500" />
+            )}
+            {expense.isReturn ? "Return/Refund Details" : "Expense Details"}
+          </DialogTitle>
           <DialogDescription className="max-md:text-base">
-            Complete information about this expense
+            {expense.isReturn 
+              ? "Details about this return or refund"
+              : "Complete information about this expense"
+            }
           </DialogDescription>
+          {expense.isReturn && (
+            <Badge variant="outline" className="w-fit border-orange-400 text-orange-700 dark:text-orange-400">
+              <AlertCircle className="w-3 h-3 mr-1" />
+              This is a return/refund
+            </Badge>
+          )}
         </DialogHeader>
 
         <div className="space-y-6 max-md:space-y-4">
+          {/* Return Reason */}
+          {expense.isReturn && expense.returnReason && (
+            <>
+              <div className="space-y-2 p-4 bg-orange-50 dark:bg-orange-950/20 rounded-lg border border-orange-200 dark:border-orange-900">
+                <h3 className="font-semibold text-lg flex items-center gap-2 text-orange-800 dark:text-orange-400">
+                  <AlertCircle className="w-4 h-4" />
+                  Return Reason
+                </h3>
+                <p className="pl-6 text-sm">{expense.returnReason}</p>
+              </div>
+              <Separator />
+            </>
+          )}
           {/* Property Info */}
           <div className="space-y-2">
             <h3 className="font-semibold text-lg flex items-center gap-2 max-md:text-xl">
@@ -51,10 +79,14 @@ export const ExpenseDetailModal = ({
             <div className="space-y-2">
               <h3 className="font-semibold flex items-center gap-2 max-md:text-lg">
                 <DollarSign className="w-4 h-4 max-md:w-5 max-md:h-5" />
-                Amount
+                {expense.isReturn ? "Refund Amount" : "Amount"}
               </h3>
-              <p className="text-3xl font-bold text-red-600 dark:text-red-500 max-md:text-4xl">
-                ${expense.amount.toFixed(2)}
+              <p className={`text-3xl font-bold max-md:text-4xl ${
+                expense.isReturn 
+                  ? "text-orange-600 dark:text-orange-500" 
+                  : "text-red-600 dark:text-red-500"
+              }`}>
+                {expense.isReturn && "-"}${Math.abs(expense.amount).toFixed(2)}
               </p>
             </div>
             <div className="space-y-2">

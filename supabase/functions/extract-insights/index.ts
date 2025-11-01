@@ -68,10 +68,18 @@ ${propertyList}
 **CRITICAL INSTRUCTIONS FOR EXPENSE EXTRACTION:**
 You MUST extract ALL details accurately. Missing fields cause problems.
 
-**CRITICAL - BOOKING vs EXPENSE DISTINCTION:**
+**CRITICAL - BOOKING vs EXPENSE vs RETURN DISTINCTION:**
 - Booking confirmations (Airbnb, VRBO, Booking.com, direct bookings) are INCOME, not expenses
 - Set category to "booking" for reservation confirmations
 - Set expenseDetected to FALSE for bookings/reservations/income
+- **RETURN DETECTION - NEW CRITICAL FEATURE:**
+  * Amazon return confirmations show "Return approved", "Refund issued", "Your refund"
+  * Look for subject patterns: "Refund issued", "Return processed", "Your Amazon.com Refund"
+  * Body contains: "refund", "return", "credit", "money back"
+  * Set isReturn to TRUE and expenseDetected to TRUE for returns
+  * Extract: originalOrderNumber, refundAmount, returnedItems (with prices), returnReason, returnDate
+  * Common return reasons: "Damaged on arrival", "Wrong item received", "No longer needed", "Defective"
+  * Returns are expenses with NEGATIVE amounts (we deduct from property costs)
 - Only set expenseDetected to TRUE for actual expenses like:
   * Amazon orders for property supplies
   * Maintenance invoices
@@ -79,6 +87,7 @@ You MUST extract ALL details accurately. Missing fields cause problems.
   * Insurance payments
   * Contractor services
   * Property improvements
+  * **Returns/Refunds (new - these reduce expenses)**
 
 Analyze the email comprehensively and extract:
 
@@ -392,6 +401,123 @@ ANALYZE CAREFULLY - Extract ALL order details including order number and deliver
         analysis.expenseAmount && 
         property?.id && 
         expenseCategories.includes(analysis.category)) {
+      
+      // NEW: Handle returns/refunds separately
+      if (analysis.isReturn && analysis.originalOrderNumber && analysis.refundAmount) {
+        console.log('Processing return/refund for order:', analysis.originalOrderNumber);
+        
+        // Find the original expense
+        const { data: originalExpense, error: findError } = await supabase
+          .from('expenses')
+          .select('*')
+          .eq('property_id', property.id)
+          .eq('order_number', analysis.originalOrderNumber)
+          .eq('is_return', false)
+          .maybeSingle();
+        
+        if (!originalExpense) {
+          console.log('Original expense not found for return, creating standalone return record');
+        } else {
+          console.log('Found original expense for return:', originalExpense.id);
+        }
+        
+        const { data: userData } = await supabase
+          .from('gmail_oauth_tokens')
+          .select('user_id')
+          .maybeSingle();
+        
+        // Save email content as HTML receipt
+        let emailScreenshotPath = null;
+        if (rawHtml || body) {
+          try {
+            const emailContent = rawHtml || `
+              <html>
+                <head>
+                  <meta charset="utf-8">
+                  <title>${subject}</title>
+                  <style>
+                    body { font-family: Arial, sans-serif; padding: 20px; max-width: 800px; margin: 0 auto; }
+                    .header { border-bottom: 2px solid #333; padding-bottom: 10px; margin-bottom: 20px; }
+                    .meta { color: #666; font-size: 14px; margin-bottom: 10px; }
+                    .content { line-height: 1.6; }
+                  </style>
+                </head>
+                <body>
+                  <div class="header">
+                    <h2>${subject}</h2>
+                    <div class="meta">From: ${senderEmail}</div>
+                    <div class="meta">Date: ${new Date(emailDate).toLocaleString()}</div>
+                  </div>
+                  <div class="content">
+                    ${body.replace(/\n/g, '<br>')}
+                  </div>
+                </body>
+              </html>
+            `;
+            
+            const fileName = `return-receipt-${Date.now()}-${Math.random().toString(36).substring(7)}.html`;
+            const filePath = `${property.id}/${fileName}`;
+            
+            const { error: uploadError } = await supabase.storage
+              .from('expense-documents')
+              .upload(filePath, emailContent, {
+                contentType: 'text/html',
+                upsert: false
+              });
+            
+            if (!uploadError) {
+              emailScreenshotPath = filePath;
+              console.log('Return receipt saved:', filePath);
+            }
+          } catch (uploadErr) {
+            console.error('Error saving return receipt:', uploadErr);
+          }
+        }
+        
+        // Create return expense record with negative amount
+        const returnLineItems = analysis.returnedItems && Array.isArray(analysis.returnedItems) && analysis.returnedItems.length > 0
+          ? { items: analysis.returnedItems }
+          : null;
+        
+        const { error: returnError } = await supabase
+          .from('expenses')
+          .insert({
+            property_id: property.id,
+            amount: -Math.abs(analysis.refundAmount), // Negative amount for return
+            date: analysis.returnDate || new Date(emailDate).toISOString().split('T')[0],
+            purpose: `Return/Refund: ${analysis.returnReason || 'Items returned'}`,
+            category: 'return',
+            order_number: analysis.originalOrderNumber,
+            vendor: originalExpense?.vendor || analysis.vendor || 'Amazon',
+            items_detail: analysis.returnReason || null,
+            delivery_address: originalExpense?.delivery_address || analysis.deliveryAddress || null,
+            line_items: returnLineItems,
+            email_screenshot_path: emailScreenshotPath,
+            email_insight_id: insertedInsight.id,
+            user_id: userData?.user_id || null,
+            is_return: true,
+            parent_expense_id: originalExpense?.id || null,
+            return_reason: analysis.returnReason || null,
+            refund_amount: analysis.refundAmount,
+          });
+        
+        if (returnError) {
+          console.error('Failed to create return expense:', returnError);
+        } else {
+          await supabase
+            .from('email_insights')
+            .update({ expense_created: true })
+            .eq('id', insertedInsight.id);
+          
+          console.log('Return expense created successfully');
+        }
+        
+        return new Response(
+          JSON.stringify({ shouldSave: true, analysis, isReturn: true }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      
       console.log('Checking for duplicate expenses with order number:', analysis.orderNumber);
       
       // First check: If order_number exists, check if it's already logged

@@ -230,12 +230,16 @@ export type Database = {
           exported: boolean | null
           file_path: string | null
           id: string
+          is_return: boolean | null
           items_detail: string | null
           line_items: Json | null
           order_date: string | null
           order_number: string | null
+          parent_expense_id: string | null
           property_id: string
           purpose: string | null
+          refund_amount: number | null
+          return_reason: string | null
           tracking_number: string | null
           user_id: string | null
           vendor: string | null
@@ -251,12 +255,16 @@ export type Database = {
           exported?: boolean | null
           file_path?: string | null
           id?: string
+          is_return?: boolean | null
           items_detail?: string | null
           line_items?: Json | null
           order_date?: string | null
           order_number?: string | null
+          parent_expense_id?: string | null
           property_id: string
           purpose?: string | null
+          refund_amount?: number | null
+          return_reason?: string | null
           tracking_number?: string | null
           user_id?: string | null
           vendor?: string | null
@@ -272,12 +280,16 @@ export type Database = {
           exported?: boolean | null
           file_path?: string | null
           id?: string
+          is_return?: boolean | null
           items_detail?: string | null
           line_items?: Json | null
           order_date?: string | null
           order_number?: string | null
+          parent_expense_id?: string | null
           property_id?: string
           purpose?: string | null
+          refund_amount?: number | null
+          return_reason?: string | null
           tracking_number?: string | null
           user_id?: string | null
           vendor?: string | null
@@ -288,6 +300,13 @@ export type Database = {
             columns: ["email_insight_id"]
             isOneToOne: false
             referencedRelation: "email_insights"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expenses_parent_expense_id_fkey"
+            columns: ["parent_expense_id"]
+            isOneToOne: false
+            referencedRelation: "expenses"
             referencedColumns: ["id"]
           },
           {
