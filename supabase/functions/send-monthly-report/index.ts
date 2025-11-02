@@ -514,95 +514,66 @@ Keep it CONCISE and SCANNABLE. Each section should be 2-4 lines maximum. DO NOT 
               </div>`;
     }
 
-    // Add Visits Section if there are any
+    // Add Property Visits as Expenses in Statement
     if (visits && visits.length > 0) {
-      const isHybrid = property.rental_type === 'hybrid';
-      const isMidTerm = property.rental_type === 'mid_term';
       emailBody += `
-              <div style="margin-bottom: 35px;">
-                <h3 style="color: #2c3e50; margin: 0 0 20px 0; font-size: 22px; font-weight: 600; display: flex; align-items: center; gap: 10px;">
-                  <span style="background: linear-gradient(135deg, #667eea, #764ba2); width: 38px; height: 38px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 18px;">🏃</span>
-                  ${isHybrid ? 'Property Visits & Inspections' : isMidTerm ? 'Property Inspections & Visits' : 'Property Visits'}
-                </h3>
-                <p style="color: #6c757d; margin: 0 0 20px 0; font-size: 15px;">
-                  ${isHybrid
-                    ? `Our team made ${visits.length} visit${visits.length > 1 ? 's' : ''} to ensure your property is in perfect condition for both short-term guests and potential mid-term tenants.`
-                    : isMidTerm 
-                    ? `We conducted ${visits.length} professional inspection${visits.length > 1 ? 's' : ''} and visit${visits.length > 1 ? 's' : ''} to maintain your property and ensure tenant satisfaction.`
-                    : `Our team made ${visits.length} visit${visits.length > 1 ? 's' : ''} to ensure your property is in perfect condition.`
-                  }
-                </p>
-                <div style="background: #f8f9fa; border-radius: 12px; overflow: hidden; border: 1px solid #e9ecef;">`;
+              <h3 style="color: #2c3e50; margin: 0 0 20px 0; font-size: 18px; font-weight: 600;">
+                Property Management Visits
+              </h3>
+              <table style="width: 100%; border-collapse: collapse; background-color: #ffffff; margin-bottom: 24px;">`;
       
       visits.forEach((visit, idx) => {
-        const bgColor = idx % 2 === 0 ? '#ffffff' : '#f8f9fa';
+        const bgColor = idx % 2 === 0 ? '#fafafa' : '#ffffff';
         emailBody += `
-                  <div style="padding: 18px 22px; background: ${bgColor}; border-bottom: 1px solid #e9ecef; display: flex; justify-content: space-between; align-items: center;">
-                    <div style="flex: 1;">
-                      <p style="margin: 0 0 5px 0; font-size: 15px; color: #2c3e50; font-weight: 500;">
-                        📅 ${new Date(visit.date).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
-                      </p>
-                      ${visit.description ? `<p style="margin: 0; font-size: 14px; color: #6c757d;">${visit.description}</p>` : ''}
+                <tr style="background-color: ${bgColor};">
+                  <td style="padding: 12px 16px; border-bottom: 1px solid #e1e8ed;">
+                    <div style="font-size: 14px; color: #2c3e50; font-weight: 500;">
+                      ${new Date(visit.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                     </div>
-                    <div style="text-align: right; margin-left: 20px;">
-                      <span style="background: linear-gradient(135deg, #10b981, #059669); color: white; padding: 8px 16px; border-radius: 20px; font-size: 15px; font-weight: 600; box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);">
-                        $${Number(visit.price).toFixed(2)}
-                      </span>
-                    </div>
-                  </div>`;
+                    ${visit.description ? `<div style="font-size: 13px; color: #6c757d; margin-top: 4px;">${visit.description}</div>` : ''}
+                  </td>
+                  <td style="padding: 12px 16px; text-align: right; border-bottom: 1px solid #e1e8ed; color: #e74c3c; font-weight: 600; font-size: 15px;">
+                    $${Number(visit.price).toFixed(2)}
+                  </td>
+                </tr>`;
       });
       
       emailBody += `
-                </div>
-              </div>`;
+              </table>`;
     }
 
-    // Add Expenses Section if there are any
+    // Add Other Expenses
     if (expenses && expenses.length > 0) {
       emailBody += `
-              <div style="margin-bottom: 35px;">
-                <h3 style="color: #2c3e50; margin: 0 0 20px 0; font-size: 22px; font-weight: 600; display: flex; align-items: center; gap: 10px;">
-                  <span style="background: linear-gradient(135deg, #f59e0b, #d97706); width: 38px; height: 38px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 18px;">💳</span>
-                  Property Expenses
-                </h3>
-                <p style="color: #6c757d; margin: 0 0 20px 0; font-size: 15px;">
-                  We've handled ${expenses.length} expense${expenses.length > 1 ? 's' : ''} to keep your property running smoothly. All receipts are attached below.
-                </p>
-                <div style="background: #f8f9fa; border-radius: 12px; overflow: hidden; border: 1px solid #e9ecef;">`;
+              <h3 style="color: #2c3e50; margin: 0 0 20px 0; font-size: 18px; font-weight: 600;">
+                Property Maintenance & Expenses
+              </h3>
+              <table style="width: 100%; border-collapse: collapse; background-color: #ffffff;">`;
       
       expenses.forEach((expense, idx) => {
-        const bgColor = idx % 2 === 0 ? '#ffffff' : '#f8f9fa';
-        const hasReceipt = expenseDocuments[expense.id];
-        
+        const bgColor = idx % 2 === 0 ? '#fafafa' : '#ffffff';
         emailBody += `
-                  <div style="padding: 18px 22px; background: ${bgColor}; border-bottom: 1px solid #e9ecef;">
-                    <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: ${hasReceipt ? '12px' : '0'};">
-                      <div style="flex: 1;">
-                        <p style="margin: 0 0 5px 0; font-size: 15px; color: #2c3e50; font-weight: 500;">
-                          📅 ${new Date(expense.date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
-                        </p>
-                        <p style="margin: 0; font-size: 14px; color: #6c757d;">
-                          ${expense.purpose || 'General maintenance'}
-                        </p>
-                      </div>
-                      <div style="text-align: right; margin-left: 20px;">
-                        <span style="color: #dc2626; font-size: 18px; font-weight: 700;">
-                          $${Number(expense.amount).toFixed(2)}
-                        </span>
-                      </div>
+                <tr style="background-color: ${bgColor};">
+                  <td style="padding: 12px 16px; border-bottom: 1px solid #e1e8ed;">
+                    <div style="font-size: 14px; color: #2c3e50; font-weight: 500;">
+                      ${new Date(expense.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                     </div>
-                    ${hasReceipt ? `
-                    <a href="${expenseDocuments[expense.id]}" 
-                       style="display: inline-flex; align-items: center; gap: 8px; background: linear-gradient(135deg, #667eea, #764ba2); color: white; text-decoration: none; padding: 10px 18px; border-radius: 8px; font-size: 14px; font-weight: 500; box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3); transition: all 0.3s;">
-                      📄 View Receipt
-                    </a>` : ''}
-                  </div>`;
+                    <div style="font-size: 13px; color: #6c757d; margin-top: 4px;">
+                      ${expense.purpose || 'General maintenance'}
+                    </div>
+                  </td>
+                  <td style="padding: 12px 16px; text-align: right; border-bottom: 1px solid #e1e8ed; color: #e74c3c; font-weight: 600; font-size: 15px;">
+                    $${Number(expense.amount).toFixed(2)}
+                  </td>
+                </tr>`;
       });
       
       emailBody += `
-                </div>
-              </div>`;
+              </table>`;
     }
+
+    emailBody += `
+            </div>`;
 
     // Closing Message & Footer
     emailBody += `
@@ -650,6 +621,127 @@ Keep it CONCISE and SCANNABLE. Each section should be 2-4 lines maximum. DO NOT 
       throw statementResponse.error;
     }
 
+    // EMAIL 2: Property Performance Report (No Legal Language)
+    const performanceEmailBody = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Property Performance Report - ${previousMonthName}</title>
+          <style>
+            @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+            body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+          </style>
+        </head>
+        <body style="margin: 0; padding: 0; background: #f4f4f4;">
+          <div style="max-width: 650px; margin: 0 auto; background: white; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+            
+            <!-- Logo Header -->
+            <div style="background-color: #ffffff; padding: 30px 40px; text-align: center; border-bottom: 3px solid #FF8C42;">
+              <img src="${supabaseUrl}/storage/v1/object/public/property-images/peachhaus-logo.png" alt="PeachHaus Property Management" style="max-width: 280px; height: auto;" />
+            </div>
+            
+            <!-- Title Section -->
+            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 25px 40px; text-align: center;">
+              <h1 style="color: #ffffff; margin: 0; font-size: 26px; font-weight: 600; letter-spacing: 0.5px;">Property Performance Report</h1>
+              <p style="color: rgba(255,255,255,0.95); margin: 8px 0 0 0; font-size: 18px; font-weight: 400;">
+                ${property.name}
+              </p>
+              <p style="color: rgba(255,255,255,0.85); margin: 5px 0 0 0; font-size: 15px;">
+                ${previousMonthName}
+              </p>
+            </div>
+
+            <!-- Welcome Message -->
+            <div style="padding: 35px 40px; background-color: #fafafa;">
+              <p style="color: #2c3e50; font-size: 16px; line-height: 1.8; margin: 0 0 20px 0;">
+                Hello! We're excited to share your property's performance insights for ${previousMonthName}. 
+                Our team has been working hard to maximize your investment and keep you informed every step of the way.
+              </p>
+            </div>
+
+            ${aiInsights ? `
+            <!-- Performance Insights -->
+            <div style="padding: 35px 40px; background-color: #ffffff; border-top: 1px solid #e1e8ed;">
+              <h2 style="color: #2c3e50; margin: 0 0 20px 0; font-size: 20px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center;">
+                <span style="font-size: 24px; margin-right: 10px;">📊</span> Performance Insights
+              </h2>
+              <div style="color: #4a5568; line-height: 1.9; font-size: 15px; background-color: #f8fbfd; padding: 24px; border-radius: 6px; border-left: 4px solid #FF8C42;">
+                ${aiInsights}
+              </div>
+            </div>` : ''}
+
+            <!-- Property Activity Summary -->
+            <div style="padding: 35px 40px; background-color: #fafafa; border-top: 1px solid #e1e8ed;">
+              <h2 style="color: #2c3e50; margin: 0 0 20px 0; font-size: 20px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">
+                Property Activity This Month
+              </h2>
+              <div style="background-color: #ffffff; padding: 20px; border-radius: 6px;">
+                <div style="margin-bottom: 16px;">
+                  <span style="color: #6c757d; font-size: 14px;">Property Visits:</span>
+                  <span style="color: #2c3e50; font-size: 18px; font-weight: 600; margin-left: 8px;">${visits?.length || 0}</span>
+                </div>
+                <div style="margin-bottom: 16px;">
+                  <span style="color: #6c757d; font-size: 14px;">Maintenance Items:</span>
+                  <span style="color: #2c3e50; font-size: 18px; font-weight: 600; margin-left: 8px;">${expenses?.length || 0}</span>
+                </div>
+                <div>
+                  <span style="color: #6c757d; font-size: 14px;">Total Revenue:</span>
+                  <span style="color: #27ae60; font-size: 18px; font-weight: 600; margin-left: 8px;">$${totalRevenue.toFixed(2)}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Closing Message -->
+            <div style="padding: 35px 40px; background-color: #ffffff; border-top: 1px solid #e1e8ed;">
+              <p style="color: #2c3e50; font-size: 15px; line-height: 1.8; margin: 0 0 20px 0;">
+                We're honored to manage your property and remain dedicated to providing exceptional service. 
+                Your property is in great hands, and we're always working to maximize your returns while maintaining the highest standards of care.
+              </p>
+              <p style="color: #2c3e50; font-size: 15px; line-height: 1.8; margin: 0;">
+                Have questions about this report? We're just a message away!
+              </p>
+            </div>
+            
+            <!-- Footer -->
+            <div style="background-color: #2c3e50; color: #ffffff; padding: 32px 40px; text-align: center; border-top: 3px solid #FF8C42;">
+              <p style="margin: 0; font-size: 16px; font-weight: 600; letter-spacing: 0.5px;">
+                PeachHaus Property Management
+              </p>
+              <p style="margin: 12px 0 0 0; font-size: 14px; color: #bdc3c7;">
+                Questions or feedback? Contact us at <a href="mailto:info@peachhausgroup.com" style="color: #FF8C42; text-decoration: none; font-weight: 600;">info@peachhausgroup.com</a>
+              </p>
+              <p style="margin: 16px 0 0 0; font-size: 12px; color: #95a5a6; line-height: 1.6;">
+                Thank you for trusting PeachHaus with your investment property.
+              </p>
+            </div>
+          </div>
+        </body>
+      </html>
+    `;
+
+    const performanceSubject = isTestEmail 
+      ? `[TEST] Property Performance Report - ${property.name} - ${previousMonthName}`
+      : `Property Performance Report - ${property.name} - ${previousMonthName}`;
+
+    console.log("Sending performance report email...");
+
+    const performanceResponse = await resend.emails.send({
+      from: fromEmail,
+      to: [recipientEmail],
+      subject: performanceSubject,
+      html: performanceEmailBody,
+    });
+
+    console.log("Performance email sent:", performanceResponse);
+
+    if (performanceResponse.error) {
+      console.error("Performance email error:", performanceResponse.error);
+      // Don't throw - we still want to complete if statement sent successfully
+    }
+
+
     // If in reconciliation mode and NOT a test email, mark expenses as billed and update reconciliation status
     if (isReconciliationMode && !isTestEmail) {
       // Mark all expense line items as exported/billed
@@ -693,16 +785,17 @@ Keep it CONCISE and SCANNABLE. Each section should be 2-4 lines maximum. DO NOT 
 
     // Success log
     if (isTestEmail) {
-      console.log(`Test email sent successfully to ${test_email}`);
+      console.log(`Both emails sent successfully to ${test_email}`);
     } else {
-      console.log(`Email sent successfully to ${ownerEmail}`);
+      console.log(`Both emails sent successfully to ${ownerEmail}`);
     }
 
     return new Response(
       JSON.stringify({ 
         success: true, 
-        message: isTestEmail ? `Test email sent to ${test_email}` : `Email sent to ${ownerEmail}`,
-        emailId: statementResponse.data?.id,
+        message: isTestEmail ? `Both emails sent to ${test_email}` : `Both emails sent to ${ownerEmail}`,
+        statementEmailId: statementResponse.data?.id,
+        performanceEmailId: performanceResponse.data?.id,
         property: property.name,
         stats: {
           visits: visits?.length || 0,
