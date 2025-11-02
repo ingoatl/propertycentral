@@ -209,11 +209,11 @@ serve(async (req) => {
     
     const totalRevenue = shortTermRevenue + midTermRevenue;
     const totalExpenses = (expenses || []).reduce((sum, e) => sum + (e.amount || 0), 0);
-    const visitRevenue = (visits || []).reduce((sum, v) => sum + (v.price || 0), 0);
+    const visitExpenses = (visits || []).reduce((sum, v) => sum + (v.price || 0), 0);
     
     // Management fee uses property-specific percentage
     const managementFee = totalRevenue * (managementFeePercentage / 100);
-    const netToOwner = totalRevenue + visitRevenue - totalExpenses - managementFee - orderMinimumFee;
+    const netToOwner = totalRevenue - totalExpenses - visitExpenses - managementFee - orderMinimumFee;
 
     console.log(`Reconciliation calculation: Short-term: $${shortTermRevenue}, Mid-term: $${midTermRevenue}, Total Revenue: $${totalRevenue}, Management Fee (${managementFeePercentage}%): $${managementFee}, Order Minimum: $${orderMinimumFee}, Net to Owner: $${netToOwner}`);
 
@@ -297,14 +297,14 @@ serve(async (req) => {
       }
     }
 
-    // Add visits
+    // Add visits as expenses (negative amounts)
     for (const visit of visits || []) {
       lineItems.push({
         reconciliation_id: reconciliation.id,
         item_type: "visit",
         item_id: visit.id,
         description: `Property visit - ${visit.visited_by || "Staff"}`,
-        amount: visit.price,
+        amount: -Math.abs(visit.price), // Negative for expenses
         date: visit.date,
         category: "Visit Fee",
       });

@@ -141,8 +141,7 @@ export const ReconciliationReviewModal = ({
 
   const { reconciliation, lineItems } = data;
   const bookings = lineItems.filter((i: any) => i.item_type === "booking" || i.item_type === "mid_term_booking");
-  const expenses = lineItems.filter((i: any) => i.item_type === "expense");
-  const visits = lineItems.filter((i: any) => i.item_type === "visit");
+  const expenses = lineItems.filter((i: any) => i.item_type === "expense" || i.item_type === "visit");
   const orderMinimums = lineItems.filter((i: any) => i.item_type === "order_minimum");
 
   const getItemIcon = (type: string) => {
@@ -179,7 +178,6 @@ export const ReconciliationReviewModal = ({
               <p className="text-sm">Expenses: ${Number(reconciliation.total_expenses || 0).toFixed(2)}</p>
               <p className="text-sm">Management Fee ({reconciliation.properties?.management_fee_percentage || 15}%): ${Number(reconciliation.management_fee || 0).toFixed(2)}</p>
               <p className="text-sm">Order Minimum: ${Number(reconciliation.order_minimum_fee || 0).toFixed(2)}</p>
-              <p className="font-semibold mt-1 text-primary">Net to Owner: ${Number(reconciliation.net_to_owner || 0).toFixed(2)}</p>
             </div>
           </div>
         </Card>
@@ -189,7 +187,6 @@ export const ReconciliationReviewModal = ({
             <TabsTrigger value="all">All ({lineItems.length})</TabsTrigger>
             <TabsTrigger value="bookings">Bookings ({bookings.length})</TabsTrigger>
             <TabsTrigger value="expenses">Expenses ({expenses.length})</TabsTrigger>
-            <TabsTrigger value="visits">Visits ({visits.length})</TabsTrigger>
           </TabsList>
 
           <TabsContent value="all" className="space-y-2">
@@ -206,12 +203,6 @@ export const ReconciliationReviewModal = ({
 
           <TabsContent value="expenses" className="space-y-2">
             {expenses.map((item: any) => (
-              <LineItemRow key={item.id} item={item} onToggleVerified={handleToggleVerified} getIcon={getItemIcon} />
-            ))}
-          </TabsContent>
-
-          <TabsContent value="visits" className="space-y-2">
-            {visits.map((item: any) => (
               <LineItemRow key={item.id} item={item} onToggleVerified={handleToggleVerified} getIcon={getItemIcon} />
             ))}
           </TabsContent>
