@@ -61,70 +61,88 @@ export const CreateReconciliationDialog = ({
         },
       });
 
-      console.log("Response from edge function:", response);
+      // Check for successful creation
+      if (response.data?.success) {
+        toast.success("Reconciliation created successfully");
+        onSuccess();
+        onOpenChange(false);
+        setSelectedProperty("");
+        setSelectedMonth("");
+        setIsCreating(false);
+        return;
+      }
 
-      // The 409 response comes back in response.data, not response.error
-      if (response.data?.existing_reconciliation_id) {
-        const canDelete = response.data.can_delete;
-        
-        if (canDelete) {
-          const shouldReplace = window.confirm(
-            `A draft reconciliation already exists for this property and month. Do you want to delete it and create a new one?`
-          );
+      // If we get here, something went wrong
+      throw new Error(response.data?.error || response.error?.message || "Failed to create reconciliation");
+    } catch (error: any) {
+      console.error("Error creating reconciliation:", error);
+      
+      // Try to parse the error response
+      const errorMessage = error.message || "Failed to create reconciliation";
+      
+      // Check if this is a duplicate reconciliation error by making a direct query
+      if (errorMessage.includes("non-2xx") || errorMessage.includes("409")) {
+        try {
+          // Query to check if there's an existing reconciliation
+          const firstDay = new Date(selectedMonth);
+          const monthString = firstDay.toISOString().split("T")[0];
           
-          if (shouldReplace) {
-            // Delete the existing reconciliation and line items
-            await supabase
-              .from("reconciliation_line_items")
-              .delete()
-              .eq("reconciliation_id", response.data.existing_reconciliation_id);
+          const { data: existingRec } = await supabase
+            .from("monthly_reconciliations")
+            .select("id, status")
+            .eq("property_id", selectedProperty)
+            .eq("reconciliation_month", monthString)
+            .maybeSingle();
+
+          if (existingRec && existingRec.status === "draft") {
+            const shouldReplace = window.confirm(
+              `A draft reconciliation already exists for this property and month. Do you want to delete it and create a new one?`
+            );
             
-            await supabase
-              .from("monthly_reconciliations")
-              .delete()
-              .eq("id", response.data.existing_reconciliation_id);
-            
-            // Retry creation
-            const retryResponse = await supabase.functions.invoke("create-reconciliation", {
-              body: {
-                property_id: selectedProperty,
-                month: selectedMonth,
-              },
-            });
-            
-            if (retryResponse.error || retryResponse.data?.error) {
-              throw new Error(retryResponse.data?.error || retryResponse.error?.message || "Failed to create reconciliation");
+            if (shouldReplace) {
+              // Delete the existing reconciliation and line items
+              await supabase
+                .from("reconciliation_line_items")
+                .delete()
+                .eq("reconciliation_id", existingRec.id);
+              
+              await supabase
+                .from("monthly_reconciliations")
+                .delete()
+                .eq("id", existingRec.id);
+              
+              // Retry creation
+              const retryResponse = await supabase.functions.invoke("create-reconciliation", {
+                body: {
+                  property_id: selectedProperty,
+                  month: selectedMonth,
+                },
+              });
+              
+              if (retryResponse.data?.success) {
+                toast.success("Reconciliation created successfully!");
+                onSuccess();
+                onOpenChange(false);
+                setSelectedProperty("");
+                setSelectedMonth("");
+                setIsCreating(false);
+                return;
+              }
+            } else {
+              setIsCreating(false);
+              return;
             }
-            
-            toast.success("Reconciliation created successfully!");
-            onSuccess();
-            onOpenChange(false);
-            setSelectedProperty("");
-            setSelectedMonth("");
-            setIsCreating(false);
-            return;
-          } else {
+          } else if (existingRec) {
+            toast.error("A reconciliation already exists for this property and month (already approved or sent)");
             setIsCreating(false);
             return;
           }
-        } else {
-          toast.error("A reconciliation already exists for this property and month (already approved or sent)");
-          setIsCreating(false);
-          return;
+        } catch (queryError) {
+          console.error("Error checking for existing reconciliation:", queryError);
         }
       }
-
-      if (response.error) throw response.error;
-      if (response.data?.error) throw new Error(response.data.error);
-
-      toast.success("Reconciliation created successfully");
-      onSuccess();
-      onOpenChange(false);
-      setSelectedProperty("");
-      setSelectedMonth("");
-    } catch (error: any) {
-      console.error("Error creating reconciliation:", error);
-      toast.error(error.message || "Failed to create reconciliation");
+      
+      toast.error(errorMessage);
     } finally {
       setIsCreating(false);
     }
