@@ -621,34 +621,50 @@ State: ${state}
                       </td>
                       <td style="padding: 10px 0; color: #4a4a4a; font-size: 14px; text-align: right; border-bottom: 1px solid #f5f5f5;">$${Number(visit.price).toFixed(2)}</td>
                     </tr>`).join('') : ''}
-                    ${expenses && expenses.length > 0 ? expenses.map((expense: any) => `
-                    <tr>
-                      <td style="padding: 10px 0; color: #6b7280; font-size: 14px; padding-left: 20px; border-bottom: 1px solid #f5f5f5;">
-                        ${new Date(expense.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}: ${expense.purpose || 'Maintenance'}${expense.vendor ? ' - ' + expense.vendor : ''}${expense.category ? ' (' + expense.category + ')' : ''}
-                      </td>
-                      <td style="padding: 10px 0; color: #4a4a4a; font-size: 14px; text-align: right; border-bottom: 1px solid #f5f5f5;">$${Number(expense.amount).toFixed(2)}</td>
-                    </tr>`).join('') : ''}
+                    ${expenses && expenses.length > 0 ? expenses.map((expense: any) => {
+                      // Split description into lines if it contains newlines or "Items Ordered"
+                      const description = expense.purpose || expense.description || 'Maintenance';
+                      const hasItemsList = description.includes('Items Ordered') || description.includes('\n');
+                      
+                      if (hasItemsList) {
+                        // Extract individual items from the description
+                        const lines = description.split('\n').filter((line: string) => line.trim());
+                        const dateStr = new Date(expense.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                        
+                        // Return individual rows for each item
+                        return lines.map((line: string, idx: number) => {
+                          // Skip "Items Ordered Price" header
+                          if (line.includes('Items Ordered Price')) return '';
+                          
+                          const cleanLine = line.trim();
+                          if (!cleanLine) return '';
+                          
+                          // Show date only on first item
+                          return `
+                          <tr>
+                            <td style="padding: 8px 0; color: #6b7280; font-size: 13px; padding-left: 20px; border-bottom: 1px solid #f9f9f9; line-height: 1.4;">
+                              ${idx === 0 ? dateStr + ': ' : ''}${cleanLine}
+                            </td>
+                            <td style="padding: 8px 0; color: #4a4a4a; font-size: 13px; text-align: right; border-bottom: 1px solid #f9f9f9;">
+                              ${idx === 0 ? '$' + Number(expense.amount).toFixed(2) : ''}
+                            </td>
+                          </tr>`;
+                        }).join('');
+                      } else {
+                        // Single line item
+                        return `
+                        <tr>
+                          <td style="padding: 10px 0; color: #6b7280; font-size: 14px; padding-left: 20px; border-bottom: 1px solid #f5f5f5;">
+                            ${new Date(expense.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}: ${description}${expense.vendor ? ' - ' + expense.vendor : ''}${expense.category ? ' (' + expense.category + ')' : ''}
+                          </td>
+                          <td style="padding: 10px 0; color: #4a4a4a; font-size: 14px; text-align: right; border-bottom: 1px solid #f5f5f5;">$${Number(expense.amount).toFixed(2)}</td>
+                        </tr>`;
+                      }
+                    }).join('') : ''}
                     <tr style="background-color: #fef3e2;">
-                      <td style="padding: 16px 12px; color: #92400e; font-size: 16px; font-weight: 700;">Subtotal: Services Provided</td>
+                      <td style="padding: 16px 12px; color: #92400e; font-size: 16px; font-weight: 700;">Total: Services Provided</td>
                       <td style="padding: 16px 12px; color: #92400e; font-size: 16px; text-align: right; font-weight: 800;">$${totalExpensesWithVisits.toFixed(2)}</td>
                     </tr>
-                  </table>
-                </div>
-
-                <!-- Balance Summary Section -->
-                <div style="background-color: ${netIncome >= 0 ? '#f0fdf4' : '#fff7ed'}; border: 2px solid ${netIncome >= 0 ? '#22c55e' : '#FF7F00'}; border-radius: 12px; padding: 25px;">
-                  <h3 style="color: ${netIncome >= 0 ? '#166534' : '#92400e'}; margin: 0 0 20px 0; font-size: 18px; font-weight: 700; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', 'Helvetica', 'Arial', sans-serif;">
-                    💼 Balance Summary
-                  </h3>
-                  <table style="width: 100%; border-collapse: collapse; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', 'Helvetica', 'Arial', sans-serif;">
-                     <tr>
-                       <td style="padding: 16px 0; color: ${netIncome >= 0 ? '#166534' : '#92400e'}; font-size: 18px; font-weight: 700;">
-                         ${netIncome >= 0 ? 'Amount Due to Owner' : 'Amount Due from Owner'}
-                       </td>
-                       <td style="padding: 16px 0; color: ${netIncome >= 0 ? '#166534' : '#FF7F00'}; font-size: 24px; text-align: right; font-weight: 800;">
-                         $${Math.abs(netIncome).toFixed(2)}
-                       </td>
-                     </tr>
                   </table>
                 </div>
 

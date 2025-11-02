@@ -244,26 +244,11 @@ export const MonthlyEmailPreviewModal = ({
                     </span>
                   </div>
                   <div className="flex justify-between pt-4 bg-orange-50 dark:bg-orange-950/20 -mx-6 px-6 py-4 rounded-lg">
-                    <span className="text-sm font-bold text-orange-800 dark:text-orange-200">Subtotal: Services Provided</span>
+                    <span className="text-sm font-bold text-orange-800 dark:text-orange-200">Total: Services Provided</span>
                     <span className="text-sm font-bold text-orange-800 dark:text-orange-200">
                       ${(Number(reconciliation.total_expenses || 0) + Number(reconciliation.management_fee || 0) + Number(reconciliation.order_minimum_fee || 0)).toFixed(2)}
                     </span>
                   </div>
-                </div>
-              </div>
-
-              {/* Balance Summary Section */}
-              <div className={`rounded-xl p-6 shadow-md ${Number(reconciliation.net_to_owner || 0) >= 0 ? 'bg-green-50 dark:bg-green-950/20 border-2 border-green-500' : 'bg-orange-50 dark:bg-orange-950/20 border-2 border-[#FF7F00]'}`}>
-                <h3 className={`text-lg font-bold mb-4 ${Number(reconciliation.net_to_owner || 0) >= 0 ? 'text-green-800 dark:text-green-200' : 'text-orange-800 dark:text-orange-200'}`}>
-                  💼 Balance Summary
-                </h3>
-                <div className="flex justify-between items-center">
-                  <span className={`text-lg font-bold ${Number(reconciliation.net_to_owner || 0) >= 0 ? 'text-green-800 dark:text-green-200' : 'text-orange-800 dark:text-orange-200'}`}>
-                    Amount Due {Number(reconciliation.net_to_owner || 0) >= 0 ? 'to' : 'from'} Owner
-                  </span>
-                  <span className={`text-2xl font-black ${Number(reconciliation.net_to_owner || 0) >= 0 ? 'text-green-600' : 'text-[#FF7F00]'}`}>
-                    ${Math.abs(Number(reconciliation.net_to_owner || 0)).toFixed(2)}
-                  </span>
                 </div>
               </div>
 
