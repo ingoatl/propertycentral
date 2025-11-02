@@ -150,16 +150,16 @@ const handler = async (req: Request): Promise<Response> => {
         day: 'numeric' 
       });
 
-      // Fetch Smoke Hollow property
+      // Fetch Villa 14 property for test
       const { data: properties, error: propertiesError } = await supabase
         .from("properties")
         .select("*, rental_type")
-        .ilike("name", "%smoke%hollow%");
+        .ilike("name", "%villa%14%");
 
       if (propertiesError) throw propertiesError;
       
       if (!properties || properties.length === 0) {
-        throw new Error("Smoke Hollow not found");
+        throw new Error("Villa 14 not found");
       }
 
       property = properties[0];
@@ -659,19 +659,44 @@ State: ${state}
               </p>
             </div>
 
-            <!-- Welcome Message -->
-            <div style="padding: 35px 40px; background-color: #fafafa;">
-              <p style="color: #2c3e50; font-size: 16px; line-height: 1.8; margin: 0 0 20px 0;">
-                Hello! We're excited to share your property's performance insights and strategic recommendations for ${previousMonthName}. 
-                Our team continuously monitors market trends, upcoming events, and opportunities to maximize your investment returns.
-              </p>
+            <!-- Performance Highlights at Top -->
+            <div style="padding: 35px 40px; background-color: #fafafa; border-top: 1px solid #e1e8ed;">
+              <h2 style="color: #2c3e50; margin: 0 0 20px 0; font-size: 20px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">
+                Performance Highlights
+              </h2>
+              <div style="background-color: #ffffff; padding: 20px; border-radius: 6px;">
+                <div style="margin-bottom: 16px;">
+                  <span style="color: #6c757d; font-size: 14px;">Property Visits:</span>
+                  <span style="color: #2c3e50; font-size: 18px; font-weight: 600; margin-left: 8px;">${visits?.length || 0}</span>
+                </div>
+                <div style="margin-bottom: 16px;">
+                  <span style="color: #6c757d; font-size: 14px;">Maintenance Tasks Completed:</span>
+                  <span style="color: #2c3e50; font-size: 18px; font-weight: 600; margin-left: 8px;">${visits?.length || 0}</span>
+                </div>
+                <div style="margin-bottom: 16px;">
+                  <span style="color: #6c757d; font-size: 14px;">Bookings This Month:</span>
+                  <span style="color: #2c3e50; font-size: 18px; font-weight: 600; margin-left: 8px;">${bookings?.length || 0}</span>
+                </div>
+                <div style="margin-bottom: 16px;">
+                  <span style="color: #6c757d; font-size: 14px;">Short-term Revenue:</span>
+                  <span style="color: #27ae60; font-size: 18px; font-weight: 600; margin-left: 8px;">$${bookingRevenue.toFixed(2)}</span>
+                </div>
+                <div style="margin-bottom: 16px;">
+                  <span style="color: #6c757d; font-size: 14px;">Mid-term Revenue:</span>
+                  <span style="color: #27ae60; font-size: 18px; font-weight: 600; margin-left: 8px;">$${midTermRevenue.toFixed(2)}</span>
+                </div>
+                <div>
+                  <span style="color: #6c757d; font-size: 14px;">Total Revenue:</span>
+                  <span style="color: #27ae60; font-size: 20px; font-weight: 700; margin-left: 8px;">$${totalRevenue.toFixed(2)}</span>
+                </div>
+              </div>
             </div>
 
             ${aiInsights ? `
-            <!-- AI-Powered Performance Analysis -->
+            <!-- Performance Analysis -->
             <div style="padding: 35px 40px; background-color: #ffffff; border-top: 1px solid #e1e8ed;">
-              <h2 style="color: #2c3e50; margin: 0 0 20px 0; font-size: 20px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center;">
-                <span style="font-size: 24px; margin-right: 10px;">🤖</span> AI-Powered Market Analysis
+              <h2 style="color: #2c3e50; margin: 0 0 20px 0; font-size: 20px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">
+                Market Analysis & Strategy
               </h2>
               <div style="color: #4a5568; line-height: 1.9; font-size: 15px; background-color: #f8fbfd; padding: 24px; border-radius: 6px; border-left: 4px solid #667eea;">
                 ${aiInsights}
@@ -759,27 +784,6 @@ State: ${state}
                   <li>Continue proactive property maintenance to prevent issues</li>
                   <li>Update market analysis and revenue projections</li>
                 </ul>
-              </div>
-            </div>
-
-            <!-- Property Activity Summary -->
-            <div style="padding: 35px 40px; background-color: #fafafa; border-top: 1px solid #e1e8ed;">
-              <h2 style="color: #2c3e50; margin: 0 0 20px 0; font-size: 20px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">
-                Property Activity This Month
-              </h2>
-              <div style="background-color: #ffffff; padding: 20px; border-radius: 6px;">
-                <div style="margin-bottom: 16px;">
-                  <span style="color: #6c757d; font-size: 14px;">Property Visits:</span>
-                  <span style="color: #2c3e50; font-size: 18px; font-weight: 600; margin-left: 8px;">${visits?.length || 0}</span>
-                </div>
-                <div style="margin-bottom: 16px;">
-                  <span style="color: #6c757d; font-size: 14px;">Maintenance Items:</span>
-                  <span style="color: #2c3e50; font-size: 18px; font-weight: 600; margin-left: 8px;">${expenses?.length || 0}</span>
-                </div>
-                <div>
-                  <span style="color: #6c757d; font-size: 14px;">Total Revenue:</span>
-                  <span style="color: #27ae60; font-size: 18px; font-weight: 600; margin-left: 8px;">$${totalRevenue.toFixed(2)}</span>
-                </div>
               </div>
             </div>
 
