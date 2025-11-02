@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { Check, Home, DollarSign, Eye, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
+import { MonthlyEmailPreviewModal } from "./MonthlyEmailPreviewModal";
 
 interface ReconciliationReviewModalProps {
   reconciliationId: string;
@@ -27,7 +28,7 @@ export const ReconciliationReviewModal = ({
 }: ReconciliationReviewModalProps) => {
   const [notes, setNotes] = useState("");
   const [isApproving, setIsApproving] = useState(false);
-  const [isSendingStatement, setIsSendingStatement] = useState(false);
+  const [showEmailPreview, setShowEmailPreview] = useState(false);
 
   const { data, refetch } = useQuery({
     queryKey: ["reconciliation", reconciliationId],
@@ -88,9 +89,10 @@ export const ReconciliationReviewModal = ({
 
       if (error) throw error;
 
-      toast.success("Reconciliation approved! Click 'Send Statement to Owner' to email the report.");
-      refetch();
+      toast.success("Reconciliation approved!");
+      await refetch();
       setNotes("");
+      setShowEmailPreview(true);
     } catch (error: any) {
       toast.error(error.message || "Failed to approve reconciliation");
     } finally {
@@ -98,44 +100,6 @@ export const ReconciliationReviewModal = ({
     }
   };
 
-  const handleSendStatement = async () => {
-    if (!reconciliation.property_owners?.email) {
-      toast.error("Owner email not found");
-      return;
-    }
-
-    const nextMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 5);
-    const deadlineDate = nextMonth.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-    
-    const confirmed = window.confirm(
-      `This will send the monthly statement to:\n\n` +
-      `Owner: ${reconciliation.property_owners?.name}\n` +
-      `Email: ${reconciliation.property_owners?.email}\n\n` +
-      `Review Deadline: ${deadlineDate}\n` +
-      `Net Amount: $${Number(reconciliation.net_to_owner || 0).toFixed(2)}\n\n` +
-      `The owner will be charged automatically on ${deadlineDate} unless they respond.\n\n` +
-      `Send statement now?`
-    );
-
-    if (!confirmed) return;
-
-    setIsSendingStatement(true);
-    try {
-      const { error } = await supabase.functions.invoke("send-monthly-report", {
-        body: { reconciliation_id: reconciliationId },
-      });
-
-      if (error) throw error;
-
-      toast.success(`Statement sent successfully to ${reconciliation.property_owners?.email}`);
-      onSuccess();
-      onOpenChange(false);
-    } catch (error: any) {
-      toast.error(error.message || "Failed to send statement");
-    } finally {
-      setIsSendingStatement(false);
-    }
-  };
 
   if (!data) return null;
 
@@ -249,13 +213,20 @@ export const ReconciliationReviewModal = ({
               </Button>
             )}
             {reconciliation.status === "approved" && (
-              <Button onClick={handleSendStatement} disabled={isSendingStatement}>
-                {isSendingStatement ? "Sending..." : "Send Statement to Owner"}
+              <Button onClick={() => setShowEmailPreview(true)}>
+                Preview & Send Email
               </Button>
             )}
           </div>
         </div>
       </DialogContent>
+
+      <MonthlyEmailPreviewModal
+        open={showEmailPreview}
+        onOpenChange={setShowEmailPreview}
+        reconciliation={reconciliation}
+        onSuccess={onSuccess}
+      />
     </Dialog>
   );
 };

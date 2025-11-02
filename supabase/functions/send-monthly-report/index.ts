@@ -18,13 +18,14 @@ const handler = async (req: Request): Promise<Response> => {
 
   try {
     const supabase = createClient(supabaseUrl, supabaseKey);
-    const { reconciliation_id } = await req.json();
+    const { reconciliation_id, test_email } = await req.json();
 
     // Reconciliation mode vs test mode
     const isReconciliationMode = !!reconciliation_id;
+    const isTestEmail = !!test_email;
     
     if (isReconciliationMode) {
-      console.log(`Sending owner statement for reconciliation: ${reconciliation_id}`);
+      console.log(`Sending owner statement for reconciliation: ${reconciliation_id}${isTestEmail ? ' (TEST to ' + test_email + ')' : ''}`);
     } else {
       console.log("Starting test monthly statement generation for Smoke Hollow...");
     }
@@ -658,8 +659,8 @@ Keep it CONCISE and SCANNABLE. Each section should be 2-4 lines maximum. DO NOT 
       throw emailResponse.error;
     }
 
-    // If in reconciliation mode, mark expenses as billed and update reconciliation status
-    if (isReconciliationMode) {
+    // If in reconciliation mode and NOT a test email, mark expenses as billed and update reconciliation status
+    if (isReconciliationMode && !isTestEmail) {
       // Mark all expense line items as exported/billed
       const { data: expenseLineItems } = await supabase
         .from("reconciliation_line_items")
@@ -693,6 +694,8 @@ Keep it CONCISE and SCANNABLE. Each section should be 2-4 lines maximum. DO NOT 
         .eq("id", reconciliation_id);
 
       console.log("Statement sent successfully to owner in reconciliation mode");
+    } else if (isTestEmail) {
+      console.log(`Test email sent successfully to ${test_email}`);
     } else {
       console.log("Test email sent successfully!");
     }
