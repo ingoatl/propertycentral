@@ -20,7 +20,7 @@ export const ReconciliationList = () => {
         .from("monthly_reconciliations")
         .select(`
           *,
-          properties(name, address),
+          properties(name, address, management_fee_percentage),
           property_owners(name, email)
         `)
         .order("reconciliation_month", { ascending: false });
@@ -76,7 +76,7 @@ export const ReconciliationList = () => {
                     <p>Owner: {rec.property_owners?.name}</p>
                     <p>Month: {format(new Date(rec.reconciliation_month + "T00:00:00"), "MMMM yyyy")}</p>
                   </div>
-                  <div className="grid grid-cols-4 gap-4 mt-4 pt-4 border-t">
+                  <div className="grid grid-cols-5 gap-4 mt-4 pt-4 border-t">
                     <div>
                       <p className="text-xs text-muted-foreground">Revenue</p>
                       <p className="font-semibold text-green-600">
@@ -91,8 +91,14 @@ export const ReconciliationList = () => {
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground">Mgmt Fee</p>
-                      <p className="font-semibold">
+                      <p className="font-semibold text-amber-600">
                         ${Number(rec.management_fee || 0).toFixed(2)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Order Min</p>
+                      <p className="font-semibold text-amber-600">
+                        ${Number(rec.order_minimum_fee || 0).toFixed(2)}
                       </p>
                     </div>
                     <div>

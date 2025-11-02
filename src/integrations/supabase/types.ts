@@ -672,6 +672,7 @@ export type Database = {
           mid_term_revenue: number | null
           net_to_owner: number
           notes: string | null
+          order_minimum_fee: number | null
           owner_acknowledged: boolean | null
           owner_disputed: boolean | null
           owner_id: string
@@ -700,6 +701,7 @@ export type Database = {
           mid_term_revenue?: number | null
           net_to_owner?: number
           notes?: string | null
+          order_minimum_fee?: number | null
           owner_acknowledged?: boolean | null
           owner_disputed?: boolean | null
           owner_id: string
@@ -728,6 +730,7 @@ export type Database = {
           mid_term_revenue?: number | null
           net_to_owner?: number
           notes?: string | null
+          order_minimum_fee?: number | null
           owner_acknowledged?: boolean | null
           owner_disputed?: boolean | null
           owner_id?: string
@@ -1202,6 +1205,8 @@ export type Database = {
           image_path: string | null
           management_fee_percentage: number
           name: string
+          nightly_rate: number | null
+          order_minimum_fee: number | null
           owner_id: string | null
           property_type: Database["public"]["Enums"]["property_type"] | null
           rental_type: string | null
@@ -1216,6 +1221,8 @@ export type Database = {
           image_path?: string | null
           management_fee_percentage?: number
           name: string
+          nightly_rate?: number | null
+          order_minimum_fee?: number | null
           owner_id?: string | null
           property_type?: Database["public"]["Enums"]["property_type"] | null
           rental_type?: string | null
@@ -1230,6 +1237,8 @@ export type Database = {
           image_path?: string | null
           management_fee_percentage?: number
           name?: string
+          nightly_rate?: number | null
+          order_minimum_fee?: number | null
           owner_id?: string | null
           property_type?: Database["public"]["Enums"]["property_type"] | null
           rental_type?: string | null

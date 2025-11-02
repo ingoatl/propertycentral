@@ -36,7 +36,7 @@ export const ReconciliationReviewModal = ({
         .from("monthly_reconciliations")
         .select(`
           *,
-          properties(name, address),
+          properties(name, address, management_fee_percentage),
           property_owners(name, email)
         `)
         .eq("id", reconciliationId)
@@ -143,11 +143,13 @@ export const ReconciliationReviewModal = ({
   const bookings = lineItems.filter((i: any) => i.item_type === "booking" || i.item_type === "mid_term_booking");
   const expenses = lineItems.filter((i: any) => i.item_type === "expense");
   const visits = lineItems.filter((i: any) => i.item_type === "visit");
+  const orderMinimums = lineItems.filter((i: any) => i.item_type === "order_minimum");
 
   const getItemIcon = (type: string) => {
     if (type === "booking" || type === "mid_term_booking") return <Home className="w-4 h-4" />;
     if (type === "visit") return <Eye className="w-4 h-4" />;
     if (type === "expense") return <RotateCcw className="w-4 h-4" />;
+    if (type === "order_minimum") return <DollarSign className="w-4 h-4 text-amber-500" />;
     return <DollarSign className="w-4 h-4" />;
   };
 
@@ -175,7 +177,8 @@ export const ReconciliationReviewModal = ({
             <div>
               <p className="text-sm text-muted-foreground">Deductions</p>
               <p className="text-sm">Expenses: ${Number(reconciliation.total_expenses || 0).toFixed(2)}</p>
-              <p className="text-sm">Management Fee (15%): ${Number(reconciliation.management_fee || 0).toFixed(2)}</p>
+              <p className="text-sm">Management Fee ({reconciliation.properties?.management_fee_percentage || 15}%): ${Number(reconciliation.management_fee || 0).toFixed(2)}</p>
+              <p className="text-sm">Order Minimum: ${Number(reconciliation.order_minimum_fee || 0).toFixed(2)}</p>
               <p className="font-semibold mt-1 text-primary">Net to Owner: ${Number(reconciliation.net_to_owner || 0).toFixed(2)}</p>
             </div>
           </div>
@@ -249,7 +252,7 @@ export const ReconciliationReviewModal = ({
 
 const LineItemRow = ({ item, onToggleVerified, getIcon }: any) => {
   return (
-    <div className="flex items-center gap-3 p-3 border rounded-lg hover:bg-muted/50">
+    <div className="flex items-start gap-3 p-3 border rounded-lg hover:bg-muted/50">
       <Checkbox
         checked={item.verified}
         onCheckedChange={() => onToggleVerified(item.id, item.verified)}
@@ -258,7 +261,7 @@ const LineItemRow = ({ item, onToggleVerified, getIcon }: any) => {
         {getIcon(item.item_type)}
       </div>
       <div className="flex-1 min-w-0">
-        <p className="font-medium truncate">{item.description}</p>
+        <p className="font-medium break-words">{item.description}</p>
         <p className="text-xs text-muted-foreground">
           {format(new Date(item.date), "MMM dd, yyyy")} • {item.category}
         </p>

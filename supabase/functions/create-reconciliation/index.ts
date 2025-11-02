@@ -56,6 +56,55 @@ serve(async (req) => {
       .gte("check_in", firstDayOfMonth.toISOString().split("T")[0])
       .lte("check_in", lastDayOfMonth.toISOString().split("T")[0]);
 
+    // Calculate average nightly rate from bookings for this property
+    let calculatedNightlyRate = 0;
+    if (bookings && bookings.length > 0) {
+      let totalRevenue = 0;
+      let totalNights = 0;
+      
+      for (const booking of bookings) {
+        const checkIn = new Date(booking.check_in);
+        const checkOut = new Date(booking.check_out);
+        const nights = Math.ceil((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24));
+        
+        totalRevenue += booking.total_amount || 0;
+        totalNights += nights;
+      }
+      
+      if (totalNights > 0) {
+        calculatedNightlyRate = totalRevenue / totalNights;
+      }
+    }
+
+    console.log(`Calculated nightly rate from ${bookings?.length || 0} bookings: $${calculatedNightlyRate.toFixed(2)}`);
+
+    // Determine order minimum based on nightly rate tier
+    let orderMinimumFee = 250; // Default minimum
+
+    if (calculatedNightlyRate > 0) {
+      if (calculatedNightlyRate < 200) {
+        orderMinimumFee = 250;
+      } else if (calculatedNightlyRate >= 200 && calculatedNightlyRate <= 400) {
+        orderMinimumFee = 400;
+      } else {
+        orderMinimumFee = 750;
+      }
+      
+      console.log(`Nightly rate $${calculatedNightlyRate.toFixed(2)} → Order minimum: $${orderMinimumFee}`);
+    } else {
+      // No bookings this month → charge minimum
+      console.log(`No bookings found for property ${property.name} → Charging minimum order fee: $${orderMinimumFee}`);
+    }
+
+    // Update property with calculated nightly rate and order minimum
+    await supabaseClient
+      .from("properties")
+      .update({
+        nightly_rate: calculatedNightlyRate > 0 ? calculatedNightlyRate : null,
+        order_minimum_fee: orderMinimumFee
+      })
+      .eq("id", property_id);
+
     // Fetch mid-term bookings that are active during the month
     // Include bookings that: start during month OR are ongoing (started before and end after/during)
     const { data: midTermBookings, error: midTermError } = await supabaseClient
@@ -111,9 +160,9 @@ serve(async (req) => {
     
     // Management fee uses property-specific percentage
     const managementFee = totalRevenue * (managementFeePercentage / 100);
-    const netToOwner = totalRevenue + visitRevenue - totalExpenses - managementFee;
+    const netToOwner = totalRevenue + visitRevenue - totalExpenses - managementFee - orderMinimumFee;
 
-    console.log(`Reconciliation calculation: Short-term: $${shortTermRevenue}, Mid-term: $${midTermRevenue}, Total Revenue: $${totalRevenue}, Management Fee (${managementFeePercentage}%): $${managementFee}, Net to Owner: $${netToOwner}`);
+    console.log(`Reconciliation calculation: Short-term: $${shortTermRevenue}, Mid-term: $${midTermRevenue}, Total Revenue: $${totalRevenue}, Management Fee (${managementFeePercentage}%): $${managementFee}, Order Minimum: $${orderMinimumFee}, Net to Owner: $${netToOwner}`);
 
     // Create reconciliation
     const { data: reconciliation, error: recError } = await supabaseClient
@@ -127,6 +176,7 @@ serve(async (req) => {
         mid_term_revenue: midTermRevenue,
         total_expenses: totalExpenses,
         management_fee: managementFee,
+        order_minimum_fee: orderMinimumFee,
         net_to_owner: netToOwner,
         status: "draft",
       })
@@ -201,6 +251,17 @@ serve(async (req) => {
         category: expense.category || "General Expense",
       });
     }
+
+    // Add order minimum fee as a line item
+    lineItems.push({
+      reconciliation_id: reconciliation.id,
+      item_type: "order_minimum",
+      item_id: reconciliation.id,
+      description: `Monthly Order Minimum Fee (Rate Tier: ${calculatedNightlyRate > 0 ? `$${calculatedNightlyRate.toFixed(2)}/night` : 'No Bookings'})`,
+      amount: -Math.abs(orderMinimumFee), // Negative because it's a deduction
+      date: firstDayOfMonth.toISOString().split("T")[0],
+      category: "Order Minimum Fee",
+    });
 
     if (lineItems.length > 0) {
       const { error: lineItemError } = await supabaseClient

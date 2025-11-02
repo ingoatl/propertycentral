@@ -76,6 +76,7 @@ const handler = async (req: Request): Promise<Response> => {
       midTermRevenue = Number(reconciliation.mid_term_revenue || 0);
       expenseTotal = Number(reconciliation.total_expenses || 0);
       managementFees = Number(reconciliation.management_fee || 0);
+      const orderMinimumFee = Number(reconciliation.order_minimum_fee || 0);
       netIncome = Number(reconciliation.net_to_owner || 0);
 
       // Fetch line items for details

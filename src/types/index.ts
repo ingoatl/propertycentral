@@ -8,6 +8,8 @@ export interface Property {
   image_path?: string;
   propertyType?: "Client-Managed" | "Company-Owned" | "Inactive";
   managementFeePercentage?: number;
+  nightlyRate?: number;
+  orderMinimumFee?: number;
 }
 
 export interface PropertyMetrics {
