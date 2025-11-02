@@ -421,12 +421,31 @@ Keep it CONCISE and SCANNABLE. Each section should be 2-4 lines maximum. DO NOT 
               </p>
             </div>
             
-            <!-- Welcome Message -->
-            <div style="padding: 35px 40px; background-color: #fafafa;">
-              <p style="font-size: 16px; line-height: 1.8; color: #34495e; margin: 0 0 30px 0;">
-                We hope this message finds you well! We're excited to share your property's performance for <strong style="color: #8B5CF6;">${previousMonthName}</strong>. 
-                Your trust means everything to us, and we're committed to maximizing your investment while keeping you informed every step of the way.
+            <!-- Institutional Header -->
+            <div style="padding: 35px 40px; background-color: #f8f9fa; border-bottom: 2px solid #dee2e6;">
+              <p style="font-size: 15px; line-height: 1.8; color: #2c3e50; margin: 0 0 12px 0;">
+                <strong>To:</strong> Property Owner<br>
+                <strong>From:</strong> PeachHaus Property Management, LLC<br>
+                <strong>Re:</strong> Monthly Financial Statement - ${previousMonthName}<br>
+                <strong>Date:</strong> ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
               </p>
+            </div>
+
+            <!-- Professional Summary -->
+            <div style="padding: 35px 40px; background-color: #ffffff;">
+              <p style="font-size: 15px; line-height: 1.8; color: #2c3e50; margin: 0 0 20px 0;">
+                Dear Property Owner,
+              </p>
+              <p style="font-size: 15px; line-height: 1.8; color: #2c3e50; margin: 0 0 20px 0;">
+                Please find enclosed your official monthly financial statement for the period ending ${previousMonthName}. 
+                This statement provides a comprehensive breakdown of all revenue collected and expenses incurred on your behalf 
+                during the reporting period. All amounts reflected herein have been verified and reconciled with our accounting records.
+              </p>
+              <p style="font-size: 15px; line-height: 1.8; color: #2c3e50; margin: 0;">
+                In accordance with our management agreement, payment processing will occur automatically on the deadline date specified above 
+                unless we receive written notification of discrepancies prior to that date.
+              </p>
+            </div>
 
               <!-- Property Info Card -->
               <div style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border-radius: 16px; padding: 25px; margin-bottom: 35px; border: 1px solid #dee2e6; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
@@ -525,11 +544,26 @@ Keep it CONCISE and SCANNABLE. Each section should be 2-4 lines maximum. DO NOT 
                 <!-- NET SECTION -->
                 <div>
                   <table style="width: 100%; border-collapse: collapse;">
-                    <tr style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
-                      <td style="padding: 20px 20px; color: white; font-weight: 800; font-size: 18px; border-radius: 8px 0 0 8px;">NET AMOUNT TO OWNER</td>
-                      <td style="padding: 20px 20px; color: white; font-weight: 900; font-size: 22px; text-align: right; border-radius: 0 8px 8px 0;">$${netIncome.toFixed(2)}</td>
+                    <tr style="background: linear-gradient(135deg, ${netIncome >= 0 ? '#667eea 0%, #764ba2 100%' : '#dc3545 0%, #c82333 100%'});">
+                      <td style="padding: 20px 20px; color: white; font-weight: 800; font-size: 18px; border-radius: 8px 0 0 8px;">NET AMOUNT ${netIncome >= 0 ? 'DUE TO' : 'DUE FROM'} OWNER</td>
+                      <td style="padding: 20px 20px; color: white; font-weight: 900; font-size: 22px; text-align: right; border-radius: 0 8px 8px 0;">${netIncome >= 0 ? '$' : '-$'}${Math.abs(netIncome).toFixed(2)}</td>
                     </tr>
                   </table>
+                  ${netIncome < 0 ? `
+                  <div style="margin-top: 20px; padding: 16px; background-color: #fff3cd; border-left: 4px solid #ffc107; border-radius: 4px;">
+                    <p style="color: #856404; margin: 0; font-size: 14px; line-height: 1.6;">
+                      <strong>Payment Due:</strong> This statement reflects a net amount due from the owner to PeachHaus Property Management. 
+                      The indicated amount will be automatically charged to your payment method on file on ${new Date(new Date().getFullYear(), new Date().getMonth() + 1, 5).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} 
+                      unless alternative arrangements are made in writing prior to the deadline.
+                    </p>
+                  </div>` : `
+                  <div style="margin-top: 20px; padding: 16px; background-color: #d4edda; border-left: 4px solid #28a745; border-radius: 4px;">
+                    <p style="color: #155724; margin: 0; font-size: 14px; line-height: 1.6;">
+                      <strong>Payment Processing:</strong> The net amount due to you will be processed and disbursed to your designated account 
+                      on ${new Date(new Date().getFullYear(), new Date().getMonth() + 1, 5).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} 
+                      in accordance with our standard disbursement schedule.
+                    </p>
+                  </div>`}
                 </div>
               </div>
             </div>`;
@@ -628,21 +662,105 @@ Keep it CONCISE and SCANNABLE. Each section should be 2-4 lines maximum. DO NOT 
             <!-- Welcome Message -->
             <div style="padding: 35px 40px; background-color: #fafafa;">
               <p style="color: #2c3e50; font-size: 16px; line-height: 1.8; margin: 0 0 20px 0;">
-                Hello! We're excited to share your property's performance insights for ${previousMonthName}. 
-                Our team has been working hard to maximize your investment and keep you informed every step of the way.
+                Hello! We're excited to share your property's performance insights and strategic recommendations for ${previousMonthName}. 
+                Our team continuously monitors market trends, upcoming events, and opportunities to maximize your investment returns.
               </p>
             </div>
 
             ${aiInsights ? `
-            <!-- Performance Insights -->
+            <!-- AI-Powered Performance Analysis -->
             <div style="padding: 35px 40px; background-color: #ffffff; border-top: 1px solid #e1e8ed;">
               <h2 style="color: #2c3e50; margin: 0 0 20px 0; font-size: 20px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center;">
-                <span style="font-size: 24px; margin-right: 10px;">📊</span> Performance Insights
+                <span style="font-size: 24px; margin-right: 10px;">🤖</span> AI-Powered Market Analysis
               </h2>
-              <div style="color: #4a5568; line-height: 1.9; font-size: 15px; background-color: #f8fbfd; padding: 24px; border-radius: 6px; border-left: 4px solid #FF8C42;">
+              <div style="color: #4a5568; line-height: 1.9; font-size: 15px; background-color: #f8fbfd; padding: 24px; border-radius: 6px; border-left: 4px solid #667eea;">
                 ${aiInsights}
               </div>
             </div>` : ''}
+
+            <!-- Property Type Specific Insights -->
+            <div style="padding: 35px 40px; background-color: #fafafa; border-top: 1px solid #e1e8ed;">
+              <h2 style="color: #2c3e50; margin: 0 0 20px 0; font-size: 20px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center;">
+                <span style="font-size: 24px; margin-right: 10px;">📊</span> ${property.rental_type === 'hybrid' ? 'Hybrid Rental Strategy' : property.rental_type === 'mid_term' ? 'Mid-Term Rental Performance' : 'Rental Performance'}
+              </h2>
+              
+              ${property.rental_type === 'hybrid' ? `
+              <div style="background-color: #ffffff; padding: 24px; border-radius: 6px; margin-bottom: 20px; border-left: 4px solid #667eea;">
+                <h3 style="color: #667eea; margin: 0 0 12px 0; font-size: 16px; font-weight: 600;">
+                  🔄 Dual-Channel Revenue Optimization
+                </h3>
+                <p style="color: #4a5568; line-height: 1.8; margin: 0 0 12px 0; font-size: 14px;">
+                  Your property is strategically positioned in both short-term and mid-term markets, maximizing occupancy and revenue potential. 
+                  This month: <strong>${bookingRevenue > 0 && midTermRevenue > 0 ? 'Both channels generated revenue' : bookingRevenue > 0 ? 'Short-term bookings dominated' : 'Mid-term rental in effect'}</strong>.
+                </p>
+                ${midTermRevenue > 0 ? `
+                <p style="color: #4a5568; line-height: 1.8; margin: 0; font-size: 14px;">
+                  <strong>Current Status:</strong> Active mid-term tenant providing stable monthly income of $${midTermRevenue.toFixed(2)}. 
+                  We continue to monitor the market for optimal transition timing to maximize your annual returns.
+                </p>` : `
+                <p style="color: #4a5568; line-height: 1.8; margin: 0; font-size: 14px;">
+                  <strong>Current Status:</strong> Operating in short-term mode with ${bookings?.length || 0} booking(s) this month. 
+                  We're actively evaluating mid-term opportunities to reduce vacancy gaps and optimize revenue.
+                </p>`}
+              </div>` : property.rental_type === 'mid_term' ? `
+              <div style="background-color: #ffffff; padding: 24px; border-radius: 6px; margin-bottom: 20px; border-left: 4px solid #f59e0b;">
+                <h3 style="color: #f59e0b; margin: 0 0 12px 0; font-size: 16px; font-weight: 600;">
+                  🏠 Stable Mid-Term Occupancy
+                </h3>
+                <p style="color: #4a5568; line-height: 1.8; margin: 0 0 12px 0; font-size: 14px;">
+                  Your property is currently generating consistent monthly revenue through our mid-term rental program. 
+                  This strategy provides reliable cash flow while minimizing turnover costs and maintenance wear.
+                </p>
+                <p style="color: #4a5568; line-height: 1.8; margin: 0; font-size: 14px;">
+                  <strong>Monthly Revenue:</strong> $${midTermRevenue.toFixed(2)} | 
+                  <strong>Lease Status:</strong> ${hasMidTermBooking ? 'Active tenant in residence' : 'Marketing for next tenant'}
+                </p>
+              </div>` : ''}
+
+              <!-- Marketing & Events -->
+              <div style="background-color: #ffffff; padding: 24px; border-radius: 6px; margin-bottom: 20px; border-left: 4px solid #FF8C42;">
+                <h3 style="color: #FF8C42; margin: 0 0 12px 0; font-size: 16px; font-weight: 600;">
+                  📢 Marketing Activities & Local Events
+                </h3>
+                <p style="color: #4a5568; line-height: 1.8; margin: 0 0 12px 0; font-size: 14px;">
+                  <strong>Active Listings:</strong> Your property is currently listed on ${property.rental_type === 'mid_term' ? 'specialized mid-term rental platforms including Furnished Finder and corporate housing networks' : 'Airbnb, VRBO, and Booking.com with optimized pricing and professional photography'}.
+                </p>
+                <p style="color: #4a5568; line-height: 1.8; margin: 0 0 12px 0; font-size: 14px;">
+                  <strong>Upcoming Area Events:</strong> We monitor local events in ${metroArea} that drive demand, including conferences, festivals, and seasonal attractions. 
+                  ${property.rental_type !== 'mid_term' ? 'Our dynamic pricing algorithm automatically adjusts rates during high-demand periods.' : 'These events help maintain strong tenant interest.'}
+                </p>
+                <p style="color: #4a5568; line-height: 1.8; margin: 0; font-size: 14px;">
+                  <strong>SEO & Visibility:</strong> Your listing maintains strong search visibility with ${property.rental_type === 'mid_term' ? 'targeted keywords for traveling professionals and corporate relocations' : 'optimized descriptions, 5-star reviews, and instant booking enabled'}.
+                </p>
+              </div>
+
+              <!-- Strategic Action Plan -->
+              <div style="background-color: #ffffff; padding: 24px; border-radius: 6px; border-left: 4px solid #10b981;">
+                <h3 style="color: #10b981; margin: 0 0 12px 0; font-size: 16px; font-weight: 600;">
+                  ✅ Action Plan for Next Period
+                </h3>
+                <ul style="color: #4a5568; line-height: 1.8; margin: 0; padding-left: 20px; font-size: 14px;">
+                  ${property.rental_type === 'hybrid' ? `
+                  <li>Continue monitoring market conditions to optimize channel mix</li>
+                  <li>Refresh listing photos and descriptions to maintain competitive edge</li>
+                  <li>Evaluate upcoming events to adjust pricing strategy</li>
+                  ${midTermRevenue > 0 ? '<li>Plan transition strategy for end of current mid-term lease</li>' : '<li>Identify opportunities for mid-term tenant placement</li>'}
+                  ` : property.rental_type === 'mid_term' ? `
+                  <li>Maintain regular communication with current tenant</li>
+                  <li>Schedule property inspection to ensure condition standards</li>
+                  <li>Begin pre-marketing for next lease cycle (if applicable)</li>
+                  <li>Review competitive rental rates in the area</li>
+                  ` : `
+                  <li>Optimize pricing based on local event calendar</li>
+                  <li>Refresh listing content and photos quarterly</li>
+                  <li>Monitor competitor listings and adjust strategy</li>
+                  <li>Maintain 5-star guest experience standards</li>
+                  `}
+                  <li>Continue proactive property maintenance to prevent issues</li>
+                  <li>Update market analysis and revenue projections</li>
+                </ul>
+              </div>
+            </div>
 
             <!-- Property Activity Summary -->
             <div style="padding: 35px 40px; background-color: #fafafa; border-top: 1px solid #e1e8ed;">

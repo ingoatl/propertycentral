@@ -220,11 +220,13 @@ export const MonthlyEmailPreviewModal = ({
               </div>
 
               {/* Net Section */}
-              <div className="bg-gradient-to-r from-purple-600 to-blue-600 rounded-lg p-5 text-white shadow-lg">
+              <div className={`rounded-lg p-5 text-white shadow-lg ${Number(reconciliation.net_to_owner || 0) >= 0 ? 'bg-gradient-to-r from-purple-600 to-blue-600' : 'bg-gradient-to-r from-red-600 to-red-700'}`}>
                 <div className="flex justify-between items-center">
-                  <span className="text-base font-bold uppercase tracking-wide">Net Amount to Owner</span>
+                  <span className="text-base font-bold uppercase tracking-wide">
+                    Net Amount {Number(reconciliation.net_to_owner || 0) >= 0 ? 'Due To' : 'Due From'} Owner
+                  </span>
                   <span className="text-2xl font-black">
-                    ${Number(reconciliation.net_to_owner || 0).toFixed(2)}
+                    {Number(reconciliation.net_to_owner || 0) >= 0 ? '$' : '-$'}{Math.abs(Number(reconciliation.net_to_owner || 0)).toFixed(2)}
                   </span>
                 </div>
               </div>
