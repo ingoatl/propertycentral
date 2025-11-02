@@ -391,6 +391,9 @@ Keep it CONCISE and SCANNABLE. Each section should be 2-4 lines maximum. DO NOT 
               <p style="color: #e8eef3; margin: 8px 0 0 0; font-size: 18px; font-weight: 400;">
                 ${property.name}
               </p>
+              <p style="color: #c8d4dd; margin: 5px 0 0 0; font-size: 14px;">
+                ${property.address || ''}
+              </p>
               <p style="color: #c8d4dd; margin: 5px 0 0 0; font-size: 15px;">
                 ${previousMonthName}
               </p>
