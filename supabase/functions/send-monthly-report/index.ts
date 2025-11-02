@@ -282,8 +282,8 @@ ${property.rental_type === 'mid_term' ? '- MTR-Only model: Focus exclusively on 
 
 1. **Performance Highlights**
    - Bookings: ${bookings?.length || 0}
-   - ${property.rental_type === 'hybrid' ? `Short-term revenue: $${shortTermRevenue.toFixed(2)}` : ''}
-   - ${hasMidTermBooking ? `Mid-term revenue: $${midTermRevenue.toFixed(2)}` : ''}
+   - Short-term revenue: $${bookingRevenue.toFixed(2)}
+   - Mid-term revenue: $${midTermRevenue.toFixed(2)}
    - Total revenue: $${totalRevenue.toFixed(2)}
    - Property visits: ${visits?.length || 0}
    - Maintenance tasks: ${visits?.length || 0}
@@ -294,7 +294,7 @@ ${property.rental_type === 'mid_term' ? '- MTR-Only model: Focus exclusively on 
    ${property.rental_type === 'mid_term' ? '- Focus on MTR tenant acquisition/retention' : ''}
 
 3. **Local Demand Drivers & Upcoming Events**
-   Location: ${metroArea}, ${property.city}, ${property.state}
+   Location: ${metroArea}, ${city}, ${state}
    ${property.rental_type === 'hybrid' ? '- Include both leisure/tourist events AND corporate/relocation drivers' : ''}
    ${property.rental_type === 'mid_term' ? '- Focus on corporate/insurance/relocation demand, infrastructure projects, NOT tourist events' : ''}
    - For each event: name, date, distance from property, how it drives demand
@@ -325,14 +325,14 @@ Type: ${property.rental_type === 'hybrid' ? 'Hybrid (Short-term & Mid-term)' : p
 Has Active Mid-term Booking: ${hasMidTermBooking ? 'Yes' : 'No'}
 Previous Month: ${previousMonthName}
 Bookings: ${bookings?.length || 0}
-Short-term Revenue: $${shortTermRevenue.toFixed(2)}
+Short-term Revenue: $${bookingRevenue.toFixed(2)}
 Mid-term Revenue: $${midTermRevenue.toFixed(2)}
 Total Revenue: $${totalRevenue.toFixed(2)}
 Visits: ${visits?.length || 0}
 Expenses: $${expenseTotal.toFixed(2)}
 Metro Area: ${metroArea}
-City: ${property.city}
-State: ${property.state}
+City: ${city}
+State: ${state}
       `.trim();
 
       let aiPrompt = systemPrompt + "\n\nProperty Details:\n" + propertyContext;
