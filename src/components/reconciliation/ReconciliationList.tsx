@@ -74,7 +74,7 @@ export const ReconciliationList = () => {
                   </div>
                   <div className="text-sm text-muted-foreground space-y-1">
                     <p>Owner: {rec.property_owners?.name}</p>
-                    <p>Month: {format(new Date(rec.reconciliation_month), "MMMM yyyy")}</p>
+                    <p>Month: {format(new Date(rec.reconciliation_month + "T00:00:00"), "MMMM yyyy")}</p>
                   </div>
                   <div className="grid grid-cols-4 gap-4 mt-4 pt-4 border-t">
                     <div>
