@@ -164,7 +164,7 @@ export const ReconciliationReviewModal = ({
             <span>
               Review Reconciliation - {reconciliation.properties?.name}
             </span>
-            <Badge>{format(new Date(reconciliation.reconciliation_month), "MMMM yyyy")}</Badge>
+            <Badge>{format(new Date(reconciliation.reconciliation_month + 'T00:00:00'), "MMMM yyyy")}</Badge>
           </DialogTitle>
         </DialogHeader>
 
@@ -273,7 +273,7 @@ const LineItemRow = ({ item, onToggleVerified, getIcon }: any) => {
       <div className="flex-1 min-w-0">
         <p className="font-medium break-words">{item.description}</p>
         <p className="text-xs text-muted-foreground">
-          {format(new Date(item.date), "MMM dd, yyyy")} • {item.category}
+          {format(new Date(item.date + 'T00:00:00'), "MMM dd, yyyy")} • {item.category}
         </p>
       </div>
       <p className={`font-semibold ${item.amount >= 0 ? "text-green-600" : "text-red-600"}`}>
