@@ -131,7 +131,7 @@ const handler = async (req: Request): Promise<Response> => {
 
     } else {
       // TEST MODE: Use existing logic
-      ownerEmail = "test@peachhaus.com"; // Test email
+      ownerEmail = "info@peachhausgroup.com"; // Test email
 
       // Get current and previous month dates
       const now = new Date();
