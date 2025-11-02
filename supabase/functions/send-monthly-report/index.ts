@@ -27,7 +27,7 @@ const handler = async (req: Request): Promise<Response> => {
     if (isReconciliationMode) {
       console.log(`Sending owner statement for reconciliation: ${reconciliation_id}${isTestEmail ? ' (TEST to ' + test_email + ')' : ''}`);
     } else {
-      console.log("Starting test monthly statement generation for Smoke Hollow...");
+      console.log("Starting test performance email generation for Villa 14...");
     }
     const lovableApiKey = Deno.env.get("LOVABLE_API_KEY");
 
@@ -609,25 +609,29 @@ State: ${state}
 
     console.log(`Sending email to ${recipientEmail} from ${fromEmail}...`);
 
-    // EMAIL 1: Official Statement with Legal Language
-    const statementSubject = isTestEmail 
-      ? `[TEST] Monthly Owner Statement - ${property.name} - ${previousMonthName}`
-      : `Monthly Owner Statement - ${property.name} - ${previousMonthName}`;
+    let statementResponse: any = null;
 
-    const statementResponse = await resend.emails.send({
-      from: fromEmail,
-      to: [recipientEmail],
-      subject: statementSubject,
-      html: emailBody,
-    });
+    // EMAIL 1: Official Statement with Legal Language (ONLY in reconciliation mode)
+    if (isReconciliationMode) {
+      const statementSubject = isTestEmail 
+        ? `[TEST] Monthly Owner Statement - ${property.name} - ${previousMonthName}`
+        : `Monthly Owner Statement - ${property.name} - ${previousMonthName}`;
 
-    console.log("Statement email sent:", statementResponse);
+      statementResponse = await resend.emails.send({
+        from: fromEmail,
+        to: [recipientEmail],
+        subject: statementSubject,
+        html: emailBody,
+      });
 
-    if (statementResponse.error) {
-      throw statementResponse.error;
+      console.log("Statement email sent:", statementResponse);
+
+      if (statementResponse.error) {
+        throw statementResponse.error;
+      }
     }
 
-    // EMAIL 2: Property Performance Report (No Legal Language)
+    // EMAIL 2: Property Performance Report (Always sent)
     const performanceEmailBody = `
       <!DOCTYPE html>
       <html>
@@ -878,17 +882,27 @@ State: ${state}
     }
 
     // Success log
-    if (isTestEmail) {
-      console.log(`Both emails sent successfully to ${test_email}`);
+    if (isReconciliationMode) {
+      if (isTestEmail) {
+        console.log(`Both statement and performance emails sent successfully to ${test_email}`);
+      } else {
+        console.log(`Both statement and performance emails sent successfully to ${ownerEmail}`);
+      }
     } else {
-      console.log(`Both emails sent successfully to ${ownerEmail}`);
+      if (isTestEmail) {
+        console.log(`Performance email sent successfully to ${test_email}`);
+      } else {
+        console.log(`Performance email sent successfully to ${ownerEmail}`);
+      }
     }
 
     return new Response(
       JSON.stringify({ 
         success: true, 
-        message: isTestEmail ? `Both emails sent to ${test_email}` : `Both emails sent to ${ownerEmail}`,
-        statementEmailId: statementResponse.data?.id,
+        message: isReconciliationMode 
+          ? (isTestEmail ? `Both emails sent to ${test_email}` : `Both emails sent to ${ownerEmail}`)
+          : (isTestEmail ? `Performance email sent to ${test_email}` : `Performance email sent to ${ownerEmail}`),
+        statementEmailId: statementResponse?.data?.id,
         performanceEmailId: performanceResponse.data?.id,
         property: property.name,
         stats: {
