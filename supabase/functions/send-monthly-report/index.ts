@@ -636,16 +636,16 @@ State: ${state}
                 </div>
 
                 <!-- Balance Summary Section -->
-                <div style="background-color: ${netIncome >= 0 ? '#fff7ed' : '#f0fdf4'}; border: 2px solid ${netIncome >= 0 ? '#FF7F00' : '#22c55e'}; border-radius: 12px; padding: 25px;">
-                  <h3 style="color: ${netIncome >= 0 ? '#92400e' : '#166534'}; margin: 0 0 20px 0; font-size: 18px; font-weight: 700; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', 'Helvetica', 'Arial', sans-serif;">
+                <div style="background-color: ${netIncome >= 0 ? '#f0fdf4' : '#fff7ed'}; border: 2px solid ${netIncome >= 0 ? '#22c55e' : '#FF7F00'}; border-radius: 12px; padding: 25px;">
+                  <h3 style="color: ${netIncome >= 0 ? '#166534' : '#92400e'}; margin: 0 0 20px 0; font-size: 18px; font-weight: 700; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', 'Helvetica', 'Arial', sans-serif;">
                     💼 Balance Summary
                   </h3>
                   <table style="width: 100%; border-collapse: collapse; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', 'Helvetica', 'Arial', sans-serif;">
                      <tr>
-                       <td style="padding: 16px 0; color: ${netIncome >= 0 ? '#92400e' : '#166534'}; font-size: 18px; font-weight: 700;">
-                         ${netIncome >= 0 ? 'Amount Due from Owner' : 'Amount Due to Owner'}
+                       <td style="padding: 16px 0; color: ${netIncome >= 0 ? '#166534' : '#92400e'}; font-size: 18px; font-weight: 700;">
+                         ${netIncome >= 0 ? 'Amount Due to Owner' : 'Amount Due from Owner'}
                        </td>
-                       <td style="padding: 16px 0; color: ${netIncome >= 0 ? '#FF7F00' : '#166534'}; font-size: 24px; text-align: right; font-weight: 800;">
+                       <td style="padding: 16px 0; color: ${netIncome >= 0 ? '#166534' : '#FF7F00'}; font-size: 24px; text-align: right; font-weight: 800;">
                          $${Math.abs(netIncome).toFixed(2)}
                        </td>
                      </tr>
