@@ -79,7 +79,30 @@ const handler = async (req: Request): Promise<Response> => {
       expenseTotal = Number(reconciliation.total_expenses || 0);
       managementFees = Number(reconciliation.management_fee || 0);
       orderMinimumFee = Number(reconciliation.order_minimum_fee || 0);
-      netIncome = Number(reconciliation.net_to_owner || 0);
+      
+      // Fetch line items to calculate visit total
+      const { data: lineItemsForCalc, error: itemsCalcError } = await supabase
+        .from("reconciliation_line_items")
+        .select("*")
+        .eq("reconciliation_id", reconciliation_id)
+        .eq("verified", true)
+        .eq("item_type", "visit");
+
+      if (itemsCalcError) throw itemsCalcError;
+      
+      const visitTotal = (lineItemsForCalc || []).reduce((sum: number, item: any) => sum + Math.abs(item.amount), 0);
+      
+      // CORRECT CALCULATION: Include visits as expenses
+      netIncome = totalRevenue - managementFees - orderMinimumFee - expenseTotal - visitTotal;
+      
+      console.log("Reconciliation mode net calculation:", {
+        totalRevenue,
+        managementFees,
+        orderMinimumFee,
+        expenseTotal,
+        visitTotal,
+        netIncome
+      });
 
       // Fetch line items for details
       const { data: lineItems, error: itemsError } = await supabase
@@ -437,6 +460,33 @@ State: ${state}
       mode: isReconciliationMode ? 'reconciliation' : 'test'
     });
 
+    // Get owner names - fetch owner for this property
+    let ownerNames = "Property Owner";
+    try {
+      const { data: ownerData, error: ownerError } = await supabase
+        .from("property_owners")
+        .select("name")
+        .eq("id", property.owner_id)
+        .single();
+
+      if (!ownerError && ownerData?.name) {
+        // Extract first name(s) from owner name
+        const fullName = ownerData.name;
+        // If multiple owners separated by "&" or "and", extract all first names
+        if (fullName.includes('&')) {
+          const owners = fullName.split('&').map((name: string) => name.trim().split(' ')[0]);
+          ownerNames = owners.join(' & ');
+        } else if (fullName.toLowerCase().includes(' and ')) {
+          const owners = fullName.split(/\sand\s/i).map((name: string) => name.trim().split(' ')[0]);
+          ownerNames = owners.join(' & ');
+        } else {
+          ownerNames = fullName.split(' ')[0];
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching owner names:", error);
+    }
+
     // Generate owner statement email body (only used in reconciliation mode)
     let emailBody = "";
     
@@ -480,7 +530,7 @@ State: ${state}
             <!-- Institutional Header -->
             <div style="padding: 35px 40px; background-color: #f8f9fa; border-bottom: 2px solid #dee2e6;">
               <p style="font-size: 15px; line-height: 1.8; color: #2c3e50; margin: 0 0 12px 0;">
-                <strong>To:</strong> Property Owner<br>
+                <strong>To:</strong> ${ownerNames}<br>
                 <strong>From:</strong> PeachHaus Property Management, LLC<br>
                 <strong>Re:</strong> Monthly Financial Statement - ${previousMonthName}<br>
                 <strong>Date:</strong> ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
@@ -490,7 +540,7 @@ State: ${state}
             <!-- Professional Summary -->
             <div style="padding: 35px 40px; background-color: #ffffff;">
               <p style="font-size: 15px; line-height: 1.8; color: #2c3e50; margin: 0 0 20px 0;">
-                Dear Property Owner,
+                Dear ${ownerNames},
               </p>
               <p style="font-size: 15px; line-height: 1.8; color: #2c3e50; margin: 0 0 20px 0;">
                 Please find enclosed your official monthly financial statement for the period ending ${previousMonthName}. 
