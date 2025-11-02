@@ -263,7 +263,7 @@ const handler = async (req: Request): Promise<Response> => {
       }
       }
 
-      // Calculate totals including mid-term revenue
+      // Calculate totals including mid-term revenue AND visits as expenses
       const visitTotal = visits.reduce((sum, v) => sum + Number(v.price), 0);
       expenseTotal = expenses.reduce((sum, e) => sum + Number(e.amount), 0);
       bookingRevenue = bookings.reduce((sum, b) => sum + Number(b.total_amount), 0);
@@ -273,7 +273,17 @@ const handler = async (req: Request): Promise<Response> => {
       midTermRevenue = midTermBookings.reduce((sum, b) => sum + Number(b.monthly_rent), 0);
       totalRevenue = bookingRevenue + midTermRevenue;
       
-      netIncome = totalRevenue - managementFees - expenseTotal;
+      // Calculate net income: Revenue - ALL expenses (management fees, visits, other expenses, order minimum fee)
+      netIncome = totalRevenue - managementFees - visitTotal - expenseTotal - orderMinimumFee;
+      
+      console.log("Test mode calculation:", {
+        totalRevenue,
+        managementFees,
+        visitTotal,
+        expenseTotal,
+        orderMinimumFee,
+        netIncome
+      });
     } // End of test mode
 
     const hasMidTermBooking = midTermBookings.length > 0;
