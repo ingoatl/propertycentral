@@ -528,16 +528,6 @@ State: ${state}
               </p>
             </div>
 
-            <!-- Institutional Header -->
-            <div style="padding: 35px 40px; background-color: #f8f9fa; border-bottom: 2px solid #dee2e6;">
-              <p style="font-size: 15px; line-height: 1.8; color: #2c3e50; margin: 0 0 12px 0;">
-                <strong>To:</strong> ${ownerNames}<br>
-                <strong>From:</strong> PeachHaus Property Management, LLC<br>
-                <strong>Re:</strong> Monthly Financial Statement - ${previousMonthName}<br>
-                <strong>Date:</strong> ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
-              </p>
-            </div>
-
             <!-- Professional Summary -->
             <div style="padding: 35px 40px; background-color: #ffffff;">
               <p style="font-size: 15px; line-height: 1.8; color: #2c3e50; margin: 0 0 20px 0;">
@@ -549,17 +539,20 @@ State: ${state}
                 during the reporting period. All amounts reflected herein have been verified and reconciled with our accounting records.
               </p>
               <p style="font-size: 15px; line-height: 1.8; color: #2c3e50; margin: 0;">
-                In accordance with our management agreement, payment processing will occur automatically on the deadline date specified above 
-                unless we receive written notification of discrepancies prior to that date.
+                In accordance with our management agreement, payment processing will occur automatically unless we receive written notification of discrepancies prior to the deadline.
               </p>
             </div>
 
               <!-- Property Info Card -->
-              <div style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border-radius: 16px; padding: 25px; margin-bottom: 35px; border: 1px solid #dee2e6; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
-                <div style="display: flex; align-items: start; gap: 15px;">
+              <div style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border-radius: 16px; padding: 25px; margin: 0 40px 35px 40px; border: 1px solid #dee2e6; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
+                <div style="display: flex; align-items: start; gap: 20px;">
+                  ${property.image_path ? `
+                  <div style="flex-shrink: 0;">
+                    <img src="${property.image_path}" alt="${property.name}" style="width: 180px; height: 120px; object-fit: cover; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);" />
+                  </div>` : `
                   <div style="background: linear-gradient(135deg, #FF6B9D, #C86DD7); width: 50px; height: 50px; border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 4px 12px rgba(255, 107, 157, 0.3);">
                     <span style="font-size: 24px;">${property.rental_type === 'hybrid' ? '🔄' : property.rental_type === 'mid_term' ? '🏠' : '🏢'}</span>
-                  </div>
+                  </div>`}
                   <div style="flex: 1;">
                     <h2 style="margin: 0 0 8px 0; font-size: 22px; color: #2c3e50; font-weight: 600;">
                       ${property.name}

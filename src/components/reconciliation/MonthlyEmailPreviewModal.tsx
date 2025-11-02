@@ -132,6 +132,45 @@ export const MonthlyEmailPreviewModal = ({
               <p className="text-sm text-gray-200">{monthLabel}</p>
             </div>
 
+            {/* Professional Summary */}
+            <div className="p-8 bg-white dark:bg-gray-900">
+              <p className="text-sm leading-relaxed text-gray-700 dark:text-gray-300 mb-4">
+                Dear Property Owner,
+              </p>
+              <p className="text-sm leading-relaxed text-gray-700 dark:text-gray-300 mb-4">
+                Please find enclosed your official monthly financial statement for the period ending {monthLabel}. 
+                This statement provides a comprehensive breakdown of all revenue collected and expenses incurred on your behalf 
+                during the reporting period.
+              </p>
+            </div>
+
+            {/* Property Info Card */}
+            <div className="mx-8 mb-8 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 rounded-2xl p-6 border border-gray-200 dark:border-gray-700 shadow-sm">
+              <div className="flex items-start gap-5">
+                {reconciliation.properties?.image_path ? (
+                  <div className="flex-shrink-0">
+                    <img 
+                      src={reconciliation.properties.image_path} 
+                      alt={reconciliation.properties.name}
+                      className="w-44 h-28 object-cover rounded-xl shadow-md"
+                    />
+                  </div>
+                ) : (
+                  <div className="w-12 h-12 bg-gradient-to-br from-pink-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg flex-shrink-0">
+                    <span className="text-2xl">🏠</span>
+                  </div>
+                )}
+                <div className="flex-1">
+                  <h3 className="text-xl font-semibold text-gray-800 dark:text-gray-200 mb-2">
+                    {reconciliation.properties?.name}
+                  </h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+                    📍 {reconciliation.properties?.address}
+                  </p>
+                </div>
+              </div>
+            </div>
+
             {/* Itemized Financial Statement */}
             <div className="p-8 bg-gray-50 dark:bg-gray-800/50">
               <h2 className="text-xl font-bold text-gray-800 dark:text-gray-200 mb-6 uppercase tracking-wide border-b-4 border-[#FF8C42] pb-3">
