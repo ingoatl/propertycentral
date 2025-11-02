@@ -561,6 +561,29 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
                           </Button>
                         </div>
                       )}
+                      {propertyInfo.management_fee_percentage && (
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <DollarSign className="h-3.5 w-3.5 text-muted-foreground" />
+                              <p className="text-xs font-medium text-muted-foreground">Management Fee</p>
+                            </div>
+                            <p className="text-sm ml-5 font-semibold">{propertyInfo.management_fee_percentage}%</p>
+                          </div>
+                           <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 max-md:h-11 max-md:w-11 flex-shrink-0"
+                            onClick={() => copyToClipboard(`${propertyInfo.management_fee_percentage}%`, "Management Fee")}
+                          >
+                            {copiedField === "Management Fee" ? (
+                              <Check className="h-3.5 w-3.5 max-md:h-5 max-md:w-5 text-green-600" />
+                            ) : (
+                              <Copy className="h-3.5 w-3.5 max-md:h-5 max-md:w-5" />
+                            )}
+                          </Button>
+                        </div>
+                      )}
                       {propertyInfo.rental_type && (
                         <div className="flex items-center justify-between gap-2">
                           <div className="flex-1 min-w-0">

@@ -24,6 +24,7 @@ const propertySchema = z.object({
   address: z.string().trim().min(1, "Address is required").max(500, "Address must be less than 500 characters"),
   visitPrice: z.number().positive("Visit price must be positive").max(10000, "Visit price cannot exceed $10,000"),
   rentalType: z.enum(["hybrid", "mid_term", "long_term"], { required_error: "Please select a rental type" }),
+  managementFeePercentage: z.number().min(0, "Management fee cannot be negative").max(100, "Management fee cannot exceed 100%"),
 });
 
 const Properties = () => {
@@ -47,12 +48,14 @@ const Properties = () => {
     address: "",
     visitPrice: "",
     rentalType: "" as "hybrid" | "mid_term" | "long_term" | "",
+    managementFeePercentage: "",
   });
   const [editFormData, setEditFormData] = useState({
     name: "",
     address: "",
     visitPrice: "",
     rentalType: "" as "hybrid" | "mid_term" | "long_term" | "",
+    managementFeePercentage: "",
   });
 
   useEffect(() => {
@@ -107,6 +110,7 @@ const Properties = () => {
         createdAt: p.created_at,
         image_path: p.image_path || (p.name.includes("Villa") && p.name.includes("14") ? villa14Image : undefined),
         propertyType: p.property_type as "Client-Managed" | "Company-Owned" | "Inactive" | undefined,
+        managementFeePercentage: Number(p.management_fee_percentage),
       })));
     } catch (error: any) {
       if (import.meta.env.DEV) {
@@ -211,12 +215,14 @@ const Properties = () => {
     e.preventDefault();
 
     const visitPrice = parseFloat(formData.visitPrice);
+    const managementFeePercentage = parseFloat(formData.managementFeePercentage);
     
     const validation = propertySchema.safeParse({
       name: formData.name,
       address: formData.address,
       visitPrice,
       rentalType: formData.rentalType,
+      managementFeePercentage,
     });
 
     if (!validation.success) {
@@ -237,12 +243,13 @@ const Properties = () => {
           address: formData.address.trim(),
           visit_price: visitPrice,
           rental_type: formData.rentalType,
+          management_fee_percentage: managementFeePercentage,
           user_id: user.id,
         });
 
       if (error) throw error;
 
-      setFormData({ name: "", address: "", visitPrice: "", rentalType: "" });
+      setFormData({ name: "", address: "", visitPrice: "", rentalType: "", managementFeePercentage: "" });
       setShowForm(false);
       await loadProperties();
       toast.success("Property added successfully!");
@@ -286,6 +293,7 @@ const Properties = () => {
       address: property.address,
       visitPrice: property.visitPrice.toString(),
       rentalType: property.rentalType || "",
+      managementFeePercentage: property.managementFeePercentage?.toString() || "15.00",
     });
     setEditDialogOpen(true);
   };
@@ -295,12 +303,14 @@ const Properties = () => {
     if (!editingProperty) return;
 
     const visitPrice = parseFloat(editFormData.visitPrice);
+    const managementFeePercentage = parseFloat(editFormData.managementFeePercentage);
     
     const validation = propertySchema.safeParse({
       name: editFormData.name,
       address: editFormData.address,
       visitPrice,
       rentalType: editFormData.rentalType,
+      managementFeePercentage,
     });
 
     if (!validation.success) {
@@ -318,6 +328,7 @@ const Properties = () => {
           address: editFormData.address.trim(),
           visit_price: visitPrice,
           rental_type: editFormData.rentalType,
+          management_fee_percentage: managementFeePercentage,
         })
         .eq("id", editingProperty.id);
 
@@ -671,6 +682,24 @@ const Properties = () => {
                   </SelectContent>
                 </Select>
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="managementFeePercentage">Management Fee (%)</Label>
+                <Input
+                  id="managementFeePercentage"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  max="100"
+                  placeholder="15.00"
+                  value={formData.managementFeePercentage}
+                  onChange={(e) => setFormData({ ...formData, managementFeePercentage: e.target.value })}
+                  className="text-base"
+                  required
+                />
+                <p className="text-xs text-muted-foreground">
+                  Percentage charged on gross rental revenue (e.g., 15 for 15%)
+                </p>
+              </div>
               <div className="flex gap-2">
                 <Button type="submit" disabled={loading} className="shadow-warm">
                   {loading ? "Adding..." : "Add Property"}
@@ -747,6 +776,24 @@ const Properties = () => {
                   <SelectItem value="long_term">Long-term Rental</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-managementFeePercentage">Management Fee (%)</Label>
+              <Input
+                id="edit-managementFeePercentage"
+                type="number"
+                step="0.01"
+                min="0"
+                max="100"
+                placeholder="15.00"
+                value={editFormData.managementFeePercentage}
+                onChange={(e) => setEditFormData({ ...editFormData, managementFeePercentage: e.target.value })}
+                className="text-base"
+                required
+              />
+              <p className="text-xs text-muted-foreground">
+                Percentage charged on gross rental revenue (e.g., 15 for 15%)
+              </p>
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setEditDialogOpen(false)}>

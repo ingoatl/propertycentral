@@ -7,6 +7,7 @@ export interface Property {
   createdAt: string;
   image_path?: string;
   propertyType?: "Client-Managed" | "Company-Owned" | "Inactive";
+  managementFeePercentage?: number;
 }
 
 export interface PropertyMetrics {
