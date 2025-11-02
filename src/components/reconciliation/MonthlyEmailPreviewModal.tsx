@@ -301,22 +301,9 @@ export const MonthlyEmailPreviewModal = ({
                       </span>
                     </div>
                   )}
-                  {visitTotal > 0 && (
-                    <div className="flex justify-between pb-3 border-b dark:border-gray-700">
-                      <span className="text-sm text-gray-700 dark:text-gray-300">Property Visit / Field Check</span>
-                      <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-                        ${visitTotal.toFixed(2)}
-                      </span>
-                    </div>
-                  )}
-                  {expenseTotal > 0 && (
-                    <div className="flex justify-between pb-3 border-b dark:border-gray-700">
-                      <span className="text-sm text-gray-700 dark:text-gray-300">Safety & Readiness Items</span>
-                      <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-                        ${expenseTotal.toFixed(2)}
-                      </span>
-                    </div>
-                  )}
+                  <div className="text-sm text-gray-600 dark:text-gray-400 italic">
+                    Individual line items (visits & expenses) - {visitTotal > 0 ? `$${visitTotal.toFixed(2)} visits` : 'No visits'}, {expenseTotal > 0 ? `$${expenseTotal.toFixed(2)} expenses` : 'No expenses'}
+                  </div>
                   <div className="flex justify-between pt-4 -mx-6 px-6 py-4 rounded-lg" style={{ backgroundColor: '#FFF3EC' }}>
                     <span className="text-sm font-bold" style={{ color: '#E86800' }}>Total: Services Provided</span>
                     <span className="text-sm font-bold" style={{ color: '#E86800' }}>
