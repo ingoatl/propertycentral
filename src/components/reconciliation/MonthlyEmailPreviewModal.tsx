@@ -25,6 +25,7 @@ export const MonthlyEmailPreviewModal = ({
 
   const handleSendTestEmail = async () => {
     setIsSendingTest(true);
+    const toastId = toast.loading("Sending test email...");
     try {
       const { error } = await supabase.functions.invoke("send-monthly-report", {
         body: { 
@@ -34,9 +35,9 @@ export const MonthlyEmailPreviewModal = ({
       });
 
       if (error) throw error;
-      toast.success("Test email sent to info@peachhausgroup.com");
+      toast.success("Test email sent successfully to info@peachhausgroup.com", { id: toastId });
     } catch (error: any) {
-      toast.error(error.message || "Failed to send test email");
+      toast.error(error.message || "Failed to send test email", { id: toastId });
     } finally {
       setIsSendingTest(false);
     }
@@ -96,88 +97,112 @@ export const MonthlyEmailPreviewModal = ({
         </DialogHeader>
 
         <div className="space-y-4">
-          <Card className="p-6 bg-muted/50">
-            <div className="space-y-2 text-sm">
-              <p><strong>To:</strong> {reconciliation.property_owners?.name} ({reconciliation.property_owners?.email})</p>
-              <p><strong>Subject:</strong> Monthly Statement for {reconciliation.properties?.name} - {monthLabel}</p>
+          {/* Email Metadata */}
+          <Card className="p-4 bg-muted/30">
+            <div className="space-y-1 text-sm">
+              <div className="flex items-start gap-2">
+                <span className="font-semibold text-muted-foreground min-w-16">To:</span>
+                <span>{reconciliation.property_owners?.email}</span>
+              </div>
+              <div className="flex items-start gap-2">
+                <span className="font-semibold text-muted-foreground min-w-16">Subject:</span>
+                <span>Monthly Owner Statement - {reconciliation.properties?.name} - {monthLabel}</span>
+              </div>
             </div>
           </Card>
 
-          <Card className="p-6">
-            <div className="space-y-4">
-              <div>
-                <h3 className="text-lg font-semibold mb-2">Monthly Property Statement</h3>
-                <p className="text-sm text-muted-foreground">
-                  Dear {reconciliation.property_owners?.name},
-                </p>
-              </div>
+          {/* Email Preview - Professional Format */}
+          <div className="border rounded-lg overflow-hidden shadow-sm bg-white dark:bg-gray-900">
+            {/* Logo Header */}
+            <div className="bg-white dark:bg-gray-900 border-b-4 border-[#FF8C42] p-8 text-center">
+              <img 
+                src="/peachhaus-logo.png" 
+                alt="PeachHaus Property Management" 
+                className="max-w-[280px] h-auto mx-auto"
+              />
+            </div>
 
-              <p className="text-sm">
-                Please find attached your monthly property statement for <strong>{reconciliation.properties?.name}</strong> for the month of <strong>{monthLabel}</strong>.
+            {/* Title Section */}
+            <div className="bg-[#5a6c7d] p-6 text-center text-white">
+              <h1 className="text-2xl font-semibold tracking-wide mb-2">Monthly Owner Statement</h1>
+              <p className="text-lg mb-1">{reconciliation.properties?.name}</p>
+              <p className="text-sm text-gray-200">{monthLabel}</p>
+            </div>
+
+            {/* Legal Notice */}
+            <div className="bg-yellow-50 dark:bg-yellow-950/30 border-2 border-yellow-400 dark:border-yellow-700 p-6 m-6 rounded">
+              <h3 className="text-yellow-800 dark:text-yellow-200 font-bold text-lg mb-3 flex items-center">
+                <span className="text-xl mr-2">⚠️</span> Action Required
+              </h3>
+              <p className="text-yellow-900 dark:text-yellow-100 text-sm leading-relaxed mb-3">
+                Please carefully review this financial statement. If you have any questions or discrepancies, 
+                you must notify PeachHaus Property Management in writing by{' '}
+                <strong className="text-yellow-800 dark:text-yellow-200">{deadlineDate}</strong>.
               </p>
-
-              <div className="border rounded-lg p-4 space-y-3">
-                <h4 className="font-semibold">Financial Summary</h4>
-                
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Total Revenue:</span>
-                    <span className="font-semibold text-green-600">${Number(reconciliation.total_revenue || 0).toFixed(2)}</span>
-                  </div>
-                  
-                  <div className="border-t pt-2 space-y-1">
-                    <div className="flex justify-between text-muted-foreground">
-                      <span className="ml-4">• Short-term Bookings:</span>
-                      <span>${Number(reconciliation.short_term_revenue || 0).toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between text-muted-foreground">
-                      <span className="ml-4">• Mid-term Rental:</span>
-                      <span>${Number(reconciliation.mid_term_revenue || 0).toFixed(2)}</span>
-                    </div>
-                  </div>
-
-                  <div className="border-t pt-2 space-y-1">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Total Expenses:</span>
-                      <span className="font-semibold text-red-600">${Number(reconciliation.total_expenses || 0).toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between text-muted-foreground">
-                      <span>Management Fee ({reconciliation.properties?.management_fee_percentage || 15}%):</span>
-                      <span>${Number(reconciliation.management_fee || 0).toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between text-muted-foreground">
-                      <span>Order Minimum Fee:</span>
-                      <span>${Number(reconciliation.order_minimum_fee || 0).toFixed(2)}</span>
-                    </div>
-                  </div>
-
-                  <div className="border-t pt-2">
-                    <div className="flex justify-between text-lg">
-                      <span className="font-bold">Net Amount Due:</span>
-                      <span className="font-bold text-primary">${Number(reconciliation.net_to_owner || 0).toFixed(2)}</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
-                <p className="text-sm font-semibold mb-2">⚠️ Important Notice</p>
-                <p className="text-sm">
-                  Please review this statement carefully. If you have any questions or disputes, respond by <strong>{deadlineDate}</strong>. 
-                  The amount will be automatically charged to your payment method on file on that date unless we hear from you.
-                </p>
-              </div>
-
-              <p className="text-sm">
-                If you have any questions about this statement, please don't hesitate to contact us.
-              </p>
-
-              <p className="text-sm">
-                Best regards,<br />
-                <strong>Peach Haus Property Management</strong>
+              <p className="text-yellow-800 dark:text-yellow-200 text-xs leading-relaxed italic">
+                Failure to respond by the deadline will constitute acceptance of this statement as accurate and complete.
               </p>
             </div>
-          </Card>
+
+            {/* Financial Summary */}
+            <div className="p-8 bg-gray-50 dark:bg-gray-800/50">
+              <h2 className="text-xl font-bold text-gray-800 dark:text-gray-200 mb-6 uppercase tracking-wide">
+                Financial Summary
+              </h2>
+              <div className="bg-white dark:bg-gray-900 shadow-sm rounded overflow-hidden">
+                <table className="w-full">
+                  <tbody>
+                    <tr className="border-b dark:border-gray-700">
+                      <td className="p-4 font-semibold text-gray-700 dark:text-gray-300">Total Revenue</td>
+                      <td className="p-4 text-right font-bold text-green-600 dark:text-green-400">
+                        ${Number(reconciliation.total_revenue || 0).toFixed(2)}
+                      </td>
+                    </tr>
+                    <tr className="border-b dark:border-gray-700">
+                      <td className="p-4 font-semibold text-gray-700 dark:text-gray-300">Total Expenses</td>
+                      <td className="p-4 text-right font-bold text-red-600 dark:text-red-400">
+                        ${Number(reconciliation.total_expenses || 0).toFixed(2)}
+                      </td>
+                    </tr>
+                    <tr className="bg-[#5a6c7d] text-white">
+                      <td className="p-5 font-bold text-base">Net Amount Due to Owner</td>
+                      <td className="p-5 text-right font-bold text-xl">
+                        ${Number(reconciliation.net_to_owner || 0).toFixed(2)}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Performance Insights Section Preview */}
+            <div className="p-8 bg-blue-50 dark:bg-blue-950/20 border-t dark:border-gray-700">
+              <h2 className="text-xl font-bold text-gray-800 dark:text-gray-200 mb-4 uppercase tracking-wide flex items-center">
+                <span className="text-2xl mr-2">📊</span> Property Performance & Insights
+              </h2>
+              <div className="bg-white dark:bg-gray-900 p-6 rounded border-l-4 border-[#FF8C42]">
+                <p className="text-gray-600 dark:text-gray-400 text-sm leading-relaxed italic">
+                  AI-powered insights and performance analysis will be included here...
+                </p>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="bg-[#2c3e50] text-white p-8 text-center border-t-4 border-[#FF8C42]">
+              <p className="font-semibold text-base tracking-wide mb-3">
+                PeachHaus Property Management
+              </p>
+              <p className="text-sm text-gray-300 mb-4">
+                Questions or concerns? Contact us at{' '}
+                <a href="mailto:info@peachhausgroup.com" className="text-[#FF8C42] font-semibold">
+                  info@peachhausgroup.com
+                </a>
+              </p>
+              <p className="text-xs text-gray-400 leading-relaxed">
+                This is an official financial statement. Please retain for your records.
+              </p>
+            </div>
+          </div>
 
           <div className="flex justify-between pt-4 border-t gap-2">
             <Button variant="outline" onClick={() => onOpenChange(false)}>

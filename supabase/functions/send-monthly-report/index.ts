@@ -363,53 +363,52 @@ Keep it CONCISE and SCANNABLE. Each section should be 2-4 lines maximum. DO NOT 
       console.error("Error generating AI insights:", error);
     }
 
-    // Generate beautiful, friendly email with visual elements
+    // Generate professional email with PeachHaus branding
     let emailBody = `
       <!DOCTYPE html>
       <html>
         <head>
           <meta charset="utf-8">
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Monthly Owner Statement - ${previousMonthName}</title>
           <style>
             @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
             body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
           </style>
         </head>
-        <body style="margin: 0; padding: 0; background: #f8f9fa;">
-          <div style="max-width: 680px; margin: 0 auto; background: white;">
+        <body style="margin: 0; padding: 0; background: #f4f4f4;">
+          <div style="max-width: 650px; margin: 0 auto; background: white; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
             
-            <!-- Hero Header -->
-            <div style="background: linear-gradient(135deg, #FF6B9D 0%, #C86DD7 50%, #8B5CF6 100%); padding: 50px 40px; text-align: center;">
-              <h1 style="margin: 0 0 12px 0; font-size: 36px; color: white; font-weight: 700; letter-spacing: -0.5px;">
-                Your Property Update
-              </h1>
-              <p style="margin: 0; font-size: 20px; color: rgba(255,255,255,0.95); font-weight: 300;">
+            <!-- Logo Header -->
+            <div style="background-color: #ffffff; padding: 30px 40px; text-align: center; border-bottom: 3px solid #FF8C42;">
+              <img src="${supabaseUrl}/storage/v1/object/public/property-images/peachhaus-logo.png" alt="PeachHaus Property Management" style="max-width: 280px; height: auto;" />
+            </div>
+            
+            <!-- Title Section -->
+            <div style="background-color: #5a6c7d; padding: 25px 40px; text-align: center;">
+              <h1 style="color: #ffffff; margin: 0; font-size: 26px; font-weight: 600; letter-spacing: 0.5px;">Monthly Owner Statement</h1>
+              <p style="color: #e8eef3; margin: 8px 0 0 0; font-size: 18px; font-weight: 400;">
+                ${property.name}
+              </p>
+              <p style="color: #c8d4dd; margin: 5px 0 0 0; font-size: 15px;">
                 ${previousMonthName}
               </p>
             </div>
 
-            <!-- Welcome Message -->
-            <div style="padding: 45px 40px 35px;">
-              <p style="font-size: 18px; line-height: 1.7; color: #2c3e50; margin: 0 0 20px 0; font-weight: 500;">
-                Hello! 👋
+            <!-- Legal Notice -->
+            <div style="background-color: #fef8e7; border: 2px solid #f39c12; padding: 24px 40px; margin: 0;">
+              <h3 style="color: #d68910; margin: 0 0 12px 0; font-size: 17px; font-weight: 700; display: flex; align-items: center;">
+                <span style="font-size: 20px; margin-right: 8px;">⚠️</span> Action Required
+              </h3>
+              <p style="color: #7d6608; margin: 0; font-size: 15px; line-height: 1.7;">
+                Please carefully review this financial statement. If you have any questions or discrepancies, 
+                you must notify PeachHaus Property Management in writing by 
+                <strong style="color: #d68910;">${new Date(new Date().getFullYear(), new Date().getMonth() + 1, 5).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</strong>.
               </p>
-              
-              ${isReconciliationMode ? `
-              <!-- Review Deadline Notice -->
-              <div style="background: linear-gradient(135deg, #fff3cd 0%, #ffe69c 100%); border-left: 4px solid #ffc107; padding: 20px; margin: 0 0 30px 0; border-radius: 12px; box-shadow: 0 2px 8px rgba(255, 193, 7, 0.2);">
-                <p style="margin: 0 0 10px 0; font-weight: 600; color: #856404; font-size: 16px; display: flex; align-items: center; gap: 8px;">
-                  ⏰ Action Required: Review Deadline
-                </p>
-                <p style="margin: 0; color: #856404; font-size: 14px; line-height: 1.6;">
-                  Please review this statement carefully by <strong>${new Date(new Date().getFullYear(), new Date().getMonth() + 1, 5).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</strong>. 
-                  If we don't hear from you with any questions or concerns by this date, 
-                  we will proceed to charge your payment method on file for the net amount of <strong>$${netIncome.toFixed(2)}</strong>.
-                </p>
-                <p style="margin: 10px 0 0 0; color: #856404; font-size: 14px;">
-                  <strong>Questions?</strong> Reply to this email before the deadline to discuss.
-                </p>
-              </div>
-              ` : ''}
+              <p style="color: #7d6608; margin: 12px 0 0 0; font-size: 14px; line-height: 1.7;">
+                <em>Failure to respond by the deadline will constitute acceptance of this statement as accurate and complete.</em>
+              </p>
+            </div>
               
               <p style="font-size: 16px; line-height: 1.8; color: #34495e; margin: 0 0 30px 0;">
                 We hope this message finds you well! We're excited to share your property's performance for <strong style="color: #8B5CF6;">${previousMonthName}</strong>. 
@@ -500,20 +499,15 @@ Keep it CONCISE and SCANNABLE. Each section should be 2-4 lines maximum. DO NOT 
                 </div>
               </div>`;
 
-    // Add AI Insights Section with visual enhancements
+    // Add AI Insights Section
     if (aiInsights) {
       emailBody += `
-              <!-- Visual Divider -->
-              <div style="text-align: center; margin: 40px 0 35px;">
-                <div style="display: inline-block; width: 60px; height: 3px; background: linear-gradient(90deg, #FF6B9D, #C86DD7, #8B5CF6); border-radius: 2px;"></div>
-              </div>
-
-              <div style="margin-bottom: 35px;">
-                <h3 style="color: #2c3e50; margin: 0 0 20px 0; font-size: 22px; font-weight: 600; display: flex; align-items: center; gap: 10px;">
-                  <span style="background: linear-gradient(135deg, #8B5CF6, #7C3AED); width: 38px; height: 38px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 18px; box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);">🎯</span>
-                  Property Insights & PeachHaus Strategy
-                </h3>
-                <div style="background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%); border-radius: 12px; padding: 25px; border-left: 4px solid #8B5CF6; box-shadow: 0 2px 8px rgba(0,0,0,0.05); color: #34495e; font-size: 15px; line-height: 1.8;">
+              <!-- Performance Insights Section -->
+              <div style="padding: 35px 40px; background-color: #f8fbfd; border-top: 1px solid #e1e8ed;">
+                <h2 style="color: #2c3e50; margin: 0 0 20px 0; font-size: 20px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center;">
+                  <span style="font-size: 24px; margin-right: 10px;">📊</span> Property Performance & Insights
+                </h2>
+                <div style="color: #4a5568; line-height: 1.9; font-size: 15px; background-color: #ffffff; padding: 24px; border-radius: 6px; border-left: 4px solid #FF8C42;">
                   ${aiInsights}
                 </div>
               </div>`;
@@ -609,47 +603,39 @@ Keep it CONCISE and SCANNABLE. Each section should be 2-4 lines maximum. DO NOT 
               </div>`;
     }
 
-    // Closing Message
+    // Closing Message & Footer
     emailBody += `
-              <div style="background: linear-gradient(to right, #f8f9fa, #e9ecef); border-radius: 16px; padding: 30px; margin-top: 40px; border-left: 5px solid #8B5CF6;">
-                <h3 style="margin: 0 0 15px 0; color: #2c3e50; font-size: 20px; font-weight: 600;">
-                  Thank You for Your Trust! 🙏
-                </h3>
-                <p style="margin: 0 0 15px 0; color: #34495e; font-size: 15px; line-height: 1.7;">
-                  We're honored to manage your property and remain dedicated to providing exceptional service. 
-                  Your property is in great hands, and we're always working to maximize your returns while maintaining the highest standards of care.
-                </p>
-                <p style="margin: 0 0 20px 0; color: #34495e; font-size: 15px; line-height: 1.7;">
-                  Have questions or want to discuss anything? We're just a message away! Feel free to reach out anytime.
-                </p>
-                <p style="margin: 0; color: #2c3e50; font-size: 15px; line-height: 1.5;">
-                  <strong style="color: #8B5CF6; font-size: 16px;">Warm regards,</strong><br>
-                  <strong>The PeachHaus Team</strong> 🍑<br>
-                  <span style="color: #6c757d; font-size: 14px;">Your Partner in Property Excellence</span>
-                </p>
-              </div>
             </div>
             
             <!-- Footer -->
-            <div style="background: linear-gradient(135deg, #2c3e50, #34495e); padding: 30px 40px; text-align: center; color: #ecf0f1;">
-              <p style="margin: 0 0 8px 0; font-size: 14px; font-weight: 500;">
-                📊 Statement Generated: ${reportDate}
+            <div style="background-color: #2c3e50; color: #ffffff; padding: 32px 40px; text-align: center; border-top: 3px solid #FF8C42;">
+              <p style="margin: 0; font-size: 16px; font-weight: 600; letter-spacing: 0.5px;">
+                PeachHaus Property Management
               </p>
-              <p style="margin: 0; color: #95a5a6; font-size: 13px;">
-                © ${new Date().getFullYear()} PeachHaus Property Management | Excellence in Every Detail
+              <p style="margin: 12px 0 0 0; font-size: 14px; color: #bdc3c7;">
+                Questions or concerns? Contact us at <a href="mailto:info@peachhausgroup.com" style="color: #FF8C42; text-decoration: none; font-weight: 600;">info@peachhausgroup.com</a>
+              </p>
+              <p style="margin: 16px 0 0 0; font-size: 12px; color: #95a5a6; line-height: 1.6;">
+                This is an official financial statement. Please retain for your records.
               </p>
             </div>
           </div>
         </body>
       </html>`;
 
-    console.log("Sending beautiful test email to ingo@peachhausgroup.com...");
+    // Determine recipient and subject based on mode
+    const recipientEmail = isTestEmail ? test_email : ownerEmail;
+    const emailSubject = isTestEmail 
+      ? `[TEST] Monthly Owner Statement - ${property.name} - ${previousMonthName}`
+      : `Monthly Owner Statement - ${property.name} - ${previousMonthName}`;
+
+    console.log(`Sending email to ${recipientEmail}...`);
 
     // Send email via Resend
     const emailResponse = await resend.emails.send({
-      from: "PeachHaus Property Management <reports@peachhausgroup.com>",
-      to: ["ingo@peachhausgroup.com"],
-      subject: `🏡 Your ${property.name} Update for ${previousMonthName}`,
+      from: "PeachHaus Property Management <onboarding@resend.dev>",
+      to: [recipientEmail],
+      subject: emailSubject,
       html: emailBody,
     });
 
@@ -700,10 +686,17 @@ Keep it CONCISE and SCANNABLE. Each section should be 2-4 lines maximum. DO NOT 
       console.log("Test email sent successfully!");
     }
 
+    // Success log
+    if (isTestEmail) {
+      console.log(`Test email sent successfully to ${test_email}`);
+    } else {
+      console.log(`Email sent successfully to ${ownerEmail}`);
+    }
+
     return new Response(
       JSON.stringify({ 
         success: true, 
-        message: "Test email sent successfully to ingo@peachhausgroup.com",
+        message: isTestEmail ? `Test email sent to ${test_email}` : `Email sent to ${ownerEmail}`,
         emailId: emailResponse.data?.id,
         property: property.name,
         stats: {
