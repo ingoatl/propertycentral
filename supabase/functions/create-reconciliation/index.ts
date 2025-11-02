@@ -32,6 +32,28 @@ serve(async (req) => {
 
     console.log(`Creating reconciliation for property ${property_id}, month ${month}`);
 
+    const firstDayOfMonth = new Date(month);
+    const lastDayOfMonth = new Date(firstDayOfMonth.getFullYear(), firstDayOfMonth.getMonth() + 1, 0);
+
+    // Check if reconciliation already exists for this property and month
+    const { data: existingRec } = await supabaseClient
+      .from("monthly_reconciliations")
+      .select("id, status")
+      .eq("property_id", property_id)
+      .eq("reconciliation_month", firstDayOfMonth.toISOString().split("T")[0])
+      .maybeSingle();
+
+    if (existingRec) {
+      return new Response(
+        JSON.stringify({ 
+          error: `A reconciliation for this property and month already exists (Status: ${existingRec.status})`,
+          existing_reconciliation_id: existingRec.id,
+          can_delete: existingRec.status === "draft"
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 409 }
+      );
+    }
+
     // Get property and owner info
     const { data: property, error: propError } = await supabaseClient
       .from("properties")
@@ -44,9 +66,6 @@ serve(async (req) => {
 
     const managementFeePercentage = property.management_fee_percentage || 15.00;
     console.log(`Using management fee: ${managementFeePercentage}% for property ${property.name}`);
-
-    const firstDayOfMonth = new Date(month);
-    const lastDayOfMonth = new Date(firstDayOfMonth.getFullYear(), firstDayOfMonth.getMonth() + 1, 0);
 
     // Fetch all bookings for the month
     const { data: bookings } = await supabaseClient
