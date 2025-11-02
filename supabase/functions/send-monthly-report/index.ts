@@ -415,7 +415,7 @@ State: ${state}
       console.error("Error generating AI insights:", error);
     }
 
-    // Calculate total expenses including visits
+    // Calculate total expenses including visits for display
     const visitExpenses = visits.reduce((sum, v) => sum + Number(v.price), 0);
     const otherExpenses = expenses.reduce((sum, e) => sum + Number(e.amount), 0);
     const totalExpensesWithVisits = otherExpenses + visitExpenses + managementFees + orderMinimumFee;
@@ -430,8 +430,11 @@ State: ${state}
       visitExpenses: visitExpenses,
       otherExpenses: otherExpenses,
       managementFees: managementFees,
+      orderMinimumFee: orderMinimumFee,
       totalRevenue: totalRevenue,
-      netIncome: netIncome
+      totalExpensesWithVisits: totalExpensesWithVisits,
+      netIncome: netIncome,
+      mode: isReconciliationMode ? 'reconciliation' : 'test'
     });
 
     // Generate owner statement email body (only used in reconciliation mode)
@@ -700,8 +703,11 @@ State: ${state}
       }
     }
 
-    // EMAIL 2: Property Performance Report (Always sent)
-    const performanceEmailBody = `
+    // EMAIL 2: Property Performance Report (ONLY in test mode, NOT in reconciliation mode)
+    let performanceResponse: any = null;
+    
+    if (!isReconciliationMode) {
+      const performanceEmailBody = `
       <!DOCTYPE html>
       <html>
         <head>
@@ -894,7 +900,7 @@ State: ${state}
 
     console.log("Sending performance report email...");
 
-    const performanceResponse = await resend.emails.send({
+    performanceResponse = await resend.emails.send({
       from: fromEmail,
       to: [recipientEmail],
       subject: performanceSubject,
@@ -905,8 +911,9 @@ State: ${state}
 
     if (performanceResponse.error) {
       console.error("Performance email error:", performanceResponse.error);
-      // Don't throw - we still want to complete if statement sent successfully
+      throw performanceResponse.error;
     }
+    } // End of performance email (test mode only)
 
 
     // If in reconciliation mode and NOT a test email, mark expenses as billed and update reconciliation status
@@ -953,9 +960,9 @@ State: ${state}
     // Success log
     if (isReconciliationMode) {
       if (isTestEmail) {
-        console.log(`Both statement and performance emails sent successfully to ${test_email}`);
+        console.log(`Owner statement sent successfully to ${test_email}`);
       } else {
-        console.log(`Both statement and performance emails sent successfully to ${ownerEmail}`);
+        console.log(`Owner statement sent successfully to ${ownerEmail}`);
       }
     } else {
       if (isTestEmail) {
@@ -969,10 +976,10 @@ State: ${state}
       JSON.stringify({ 
         success: true, 
         message: isReconciliationMode 
-          ? (isTestEmail ? `Both emails sent to ${test_email}` : `Both emails sent to ${ownerEmail}`)
+          ? (isTestEmail ? `Owner statement sent to ${test_email}` : `Owner statement sent to ${ownerEmail}`)
           : (isTestEmail ? `Performance email sent to ${test_email}` : `Performance email sent to ${ownerEmail}`),
         statementEmailId: statementResponse?.data?.id,
-        performanceEmailId: performanceResponse.data?.id,
+        performanceEmailId: performanceResponse?.data?.id,
         property: property.name,
         stats: {
           visits: visits?.length || 0,
