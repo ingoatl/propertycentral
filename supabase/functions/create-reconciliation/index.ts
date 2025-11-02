@@ -58,25 +58,53 @@ serve(async (req) => {
 
     // Calculate average nightly rate from bookings for this property
     let calculatedNightlyRate = 0;
+    let bookingRevenueForRate = 0;
+    let totalNights = 0;
+    
     if (bookings && bookings.length > 0) {
-      let totalRevenue = 0;
-      let totalNights = 0;
-      
       for (const booking of bookings) {
-        const checkIn = new Date(booking.check_in);
-        const checkOut = new Date(booking.check_out);
-        const nights = Math.ceil((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24));
-        
-        totalRevenue += booking.total_amount || 0;
-        totalNights += nights;
+        // Skip bookings with no revenue or invalid dates
+        if (!booking.total_amount || booking.total_amount <= 0) {
+          console.log(`Skipping booking ${booking.id} - no revenue ($${booking.total_amount || 0})`);
+          continue;
+        }
+
+        if (!booking.check_in || !booking.check_out) {
+          console.log(`Skipping booking ${booking.id} - missing check-in or check-out dates`);
+          continue;
+        }
+
+        try {
+          const checkIn = new Date(booking.check_in);
+          const checkOut = new Date(booking.check_out);
+          
+          // Validate dates
+          if (isNaN(checkIn.getTime()) || isNaN(checkOut.getTime())) {
+            console.log(`Skipping booking ${booking.id} - invalid dates`);
+            continue;
+          }
+
+          const nights = Math.ceil((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24));
+          
+          if (nights <= 0) {
+            console.log(`Skipping booking ${booking.id} - invalid night count: ${nights}`);
+            continue;
+          }
+
+          bookingRevenueForRate += booking.total_amount;
+          totalNights += nights;
+        } catch (err) {
+          console.error(`Error processing booking ${booking.id}:`, err);
+          continue;
+        }
       }
       
       if (totalNights > 0) {
-        calculatedNightlyRate = totalRevenue / totalNights;
+        calculatedNightlyRate = bookingRevenueForRate / totalNights;
       }
     }
 
-    console.log(`Calculated nightly rate from ${bookings?.length || 0} bookings: $${calculatedNightlyRate.toFixed(2)}`);
+    console.log(`Calculated nightly rate from ${bookings?.length || 0} bookings: $${calculatedNightlyRate.toFixed(2)} (${totalNights} total nights, $${bookingRevenueForRate} total revenue)`);
 
     // Determine order minimum based on nightly rate tier
     let orderMinimumFee = 250; // Default minimum
@@ -135,7 +163,7 @@ serve(async (req) => {
       .lte("date", lastDayOfMonth.toISOString().split("T")[0]);
 
     // Calculate totals with prorated mid-term revenue
-    const shortTermRevenue = (bookings || []).reduce((sum, b) => sum + (b.total_amount || 0), 0);
+    const shortTermRevenue = (bookings || []).reduce((sum, b) => sum + (b.total_amount && b.total_amount > 0 ? b.total_amount : 0), 0);
     
     // Calculate prorated mid-term revenue
     let midTermRevenue = 0;
@@ -289,8 +317,10 @@ serve(async (req) => {
   } catch (error) {
     console.error("Error creating reconciliation:", error);
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    const errorStack = error instanceof Error ? error.stack : "";
+    console.error("Error stack:", errorStack);
     return new Response(
-      JSON.stringify({ error: errorMessage }),
+      JSON.stringify({ error: errorMessage, details: errorStack }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
     );
   }
