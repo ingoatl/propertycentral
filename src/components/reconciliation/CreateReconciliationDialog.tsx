@@ -61,57 +61,59 @@ export const CreateReconciliationDialog = ({
         },
       });
 
-      if (error) {
-        // Check if it's a 409 Conflict (duplicate)
-        const errorBody = error.context?.body;
-        if (errorBody?.existing_reconciliation_id) {
-          const canDelete = errorBody.can_delete;
+      // Check the response data for error instead of error object
+      if (data?.error && data?.existing_reconciliation_id) {
+        const canDelete = data.can_delete;
+        
+        if (canDelete) {
+          const shouldReplace = window.confirm(
+            `A draft reconciliation already exists for this property and month. Do you want to delete it and create a new one?`
+          );
           
-          if (canDelete) {
-            const shouldReplace = window.confirm(
-              `A draft reconciliation already exists for this property and month. Do you want to delete it and create a new one?`
-            );
+          if (shouldReplace) {
+            // Delete the existing reconciliation and line items
+            await supabase
+              .from("reconciliation_line_items")
+              .delete()
+              .eq("reconciliation_id", data.existing_reconciliation_id);
             
-            if (shouldReplace) {
-              // Delete the existing reconciliation and line items
-              await supabase
-                .from("reconciliation_line_items")
-                .delete()
-                .eq("reconciliation_id", errorBody.existing_reconciliation_id);
-              
-              await supabase
-                .from("monthly_reconciliations")
-                .delete()
-                .eq("id", errorBody.existing_reconciliation_id);
-              
-              // Retry creation
-              const { data: retryData, error: retryError } = await supabase.functions.invoke("create-reconciliation", {
-                body: {
-                  property_id: selectedProperty,
-                  month: selectedMonth,
-                },
-              });
-              
-              if (retryError) throw retryError;
-              
-              toast.success("Reconciliation created successfully!");
-              onSuccess();
-              onOpenChange(false);
-              setSelectedProperty("");
-              setSelectedMonth("");
-              return;
-            } else {
-              setIsCreating(false);
-              return;
+            await supabase
+              .from("monthly_reconciliations")
+              .delete()
+              .eq("id", data.existing_reconciliation_id);
+            
+            // Retry creation
+            const { data: retryData, error: retryError } = await supabase.functions.invoke("create-reconciliation", {
+              body: {
+                property_id: selectedProperty,
+                month: selectedMonth,
+              },
+            });
+            
+            if (retryError || retryData?.error) {
+              throw new Error(retryData?.error || retryError?.message || "Failed to create reconciliation");
             }
+            
+            toast.success("Reconciliation created successfully!");
+            onSuccess();
+            onOpenChange(false);
+            setSelectedProperty("");
+            setSelectedMonth("");
+            setIsCreating(false);
+            return;
           } else {
-            toast.error("A reconciliation already exists for this property and month (already approved or sent)");
             setIsCreating(false);
             return;
           }
+        } else {
+          toast.error("A reconciliation already exists for this property and month (already approved or sent)");
+          setIsCreating(false);
+          return;
         }
-        throw error;
       }
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
 
       toast.success("Reconciliation created successfully");
       onSuccess();
