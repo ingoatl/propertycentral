@@ -1200,6 +1200,7 @@ export type Database = {
           ical_url: string | null
           id: string
           image_path: string | null
+          management_fee_percentage: number
           name: string
           owner_id: string | null
           property_type: Database["public"]["Enums"]["property_type"] | null
@@ -1213,6 +1214,7 @@ export type Database = {
           ical_url?: string | null
           id?: string
           image_path?: string | null
+          management_fee_percentage?: number
           name: string
           owner_id?: string | null
           property_type?: Database["public"]["Enums"]["property_type"] | null
@@ -1226,6 +1228,7 @@ export type Database = {
           ical_url?: string | null
           id?: string
           image_path?: string | null
+          management_fee_percentage?: number
           name?: string
           owner_id?: string | null
           property_type?: Database["public"]["Enums"]["property_type"] | null

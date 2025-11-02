@@ -42,6 +42,9 @@ serve(async (req) => {
     if (propError || !property) throw new Error("Property not found");
     if (!property.owner_id) throw new Error("Property has no owner assigned");
 
+    const managementFeePercentage = property.management_fee_percentage || 15.00;
+    console.log(`Using management fee: ${managementFeePercentage}% for property ${property.name}`);
+
     const firstDayOfMonth = new Date(month);
     const lastDayOfMonth = new Date(firstDayOfMonth.getFullYear(), firstDayOfMonth.getMonth() + 1, 0);
 
@@ -103,11 +106,11 @@ serve(async (req) => {
     const totalExpenses = (expenses || []).reduce((sum, e) => sum + (e.amount || 0), 0);
     const visitRevenue = (visits || []).reduce((sum, v) => sum + (v.price || 0), 0);
     
-    // Management fee is 15% of booking revenue (not visits)
-    const managementFee = totalRevenue * 0.15;
+    // Management fee uses property-specific percentage
+    const managementFee = totalRevenue * (managementFeePercentage / 100);
     const netToOwner = totalRevenue + visitRevenue - totalExpenses - managementFee;
 
-    console.log(`Reconciliation calculation: Short-term: $${shortTermRevenue}, Mid-term: $${midTermRevenue}, Total Revenue: $${totalRevenue}, Management Fee: $${managementFee}, Net to Owner: $${netToOwner}`);
+    console.log(`Reconciliation calculation: Short-term: $${shortTermRevenue}, Mid-term: $${midTermRevenue}, Total Revenue: $${totalRevenue}, Management Fee (${managementFeePercentage}%): $${managementFee}, Net to Owner: $${netToOwner}`);
 
     // Create reconciliation
     const { data: reconciliation, error: recError } = await supabaseClient
