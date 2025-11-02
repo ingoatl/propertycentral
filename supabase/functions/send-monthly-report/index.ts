@@ -95,7 +95,8 @@ const handler = async (req: Request): Promise<Response> => {
         .filter((item: any) => item.item_type === "visit")
         .map((item: any) => ({
           date: item.date,
-          price: item.amount,
+          description: item.description,
+          price: Math.abs(item.amount),
         }));
 
       expenses = (lineItems || [])
@@ -541,7 +542,7 @@ Keep it CONCISE and SCANNABLE. Each section should be 2-4 lines maximum. DO NOT 
                       <p style="margin: 0 0 5px 0; font-size: 15px; color: #2c3e50; font-weight: 500;">
                         📅 ${new Date(visit.date).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
                       </p>
-                      ${visit.notes ? `<p style="margin: 0; font-size: 14px; color: #6c757d; font-style: italic;">${visit.notes}</p>` : ''}
+                      ${visit.description ? `<p style="margin: 0; font-size: 14px; color: #6c757d;">${visit.description}</p>` : ''}
                     </div>
                     <div style="text-align: right; margin-left: 20px;">
                       <span style="background: linear-gradient(135deg, #10b981, #059669); color: white; padding: 8px 16px; border-radius: 20px; font-size: 15px; font-weight: 600; box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);">
@@ -625,24 +626,28 @@ Keep it CONCISE and SCANNABLE. Each section should be 2-4 lines maximum. DO NOT 
 
     // Determine recipient and subject based on mode
     const recipientEmail = isTestEmail ? test_email : ownerEmail;
-    const emailSubject = isTestEmail 
+    
+    // Send from admin@peachhausgroup.com (verified domain)
+    const fromEmail = "PeachHaus Property Management <admin@peachhausgroup.com>";
+
+    console.log(`Sending email to ${recipientEmail} from ${fromEmail}...`);
+
+    // EMAIL 1: Official Statement with Legal Language
+    const statementSubject = isTestEmail 
       ? `[TEST] Monthly Owner Statement - ${property.name} - ${previousMonthName}`
       : `Monthly Owner Statement - ${property.name} - ${previousMonthName}`;
 
-    console.log(`Sending email to ${recipientEmail}...`);
-
-    // Send email via Resend
-    const emailResponse = await resend.emails.send({
-      from: "PeachHaus Property Management <onboarding@resend.dev>",
+    const statementResponse = await resend.emails.send({
+      from: fromEmail,
       to: [recipientEmail],
-      subject: emailSubject,
+      subject: statementSubject,
       html: emailBody,
     });
 
-    console.log("Email sent:", emailResponse);
+    console.log("Statement email sent:", statementResponse);
 
-    if (emailResponse.error) {
-      throw emailResponse.error;
+    if (statementResponse.error) {
+      throw statementResponse.error;
     }
 
     // If in reconciliation mode and NOT a test email, mark expenses as billed and update reconciliation status
@@ -697,7 +702,7 @@ Keep it CONCISE and SCANNABLE. Each section should be 2-4 lines maximum. DO NOT 
       JSON.stringify({ 
         success: true, 
         message: isTestEmail ? `Test email sent to ${test_email}` : `Email sent to ${ownerEmail}`,
-        emailId: emailResponse.data?.id,
+        emailId: statementResponse.data?.id,
         property: property.name,
         stats: {
           visits: visits?.length || 0,
