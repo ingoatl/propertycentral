@@ -260,82 +260,82 @@ const handler = async (req: Request): Promise<Response> => {
     
     try {
 
+      // System Prompt for PeachHaus Monthly Owner Performance Report
+      const systemPrompt = `You are generating a monthly owner email for a property managed by PeachHaus Group LLC. Follow these rules exactly:
+
+**A. Determine Rental Model**
+Current property rental model: ${property.rental_type}
+${property.rental_type === 'hybrid' ? '- Hybrid model: Primary focus is mid-term (MTR) placements + fill the gaps with short-term (STR) bookings. This model benefits from both corporate/insurance stays and tourist/short-stay demand.' : ''}
+${property.rental_type === 'mid_term' ? '- MTR-Only model: Focus exclusively on mid-term placements (insurance, corporate, healthcare) with minimal short-term activity.' : ''}
+
+**B. Layout & Style**
+- Single-column layout (mobile optimized)
+- Use web-safe sans-serif fonts (Arial or Helvetica)
+- Body font size: 14-16px for readability
+- Headings: 22-26px or bold weight
+- Brand color: PeachHaus orange (#FF8C42) for headings/accents
+- Body text: dark neutral
+- Background: white or light offset
+- White space: generous between sections
+
+**C. Content Structure to Generate**
+
+1. **Performance Highlights**
+   - Bookings: ${bookings?.length || 0}
+   - ${property.rental_type === 'hybrid' ? `Short-term revenue: $${shortTermRevenue.toFixed(2)}` : ''}
+   - ${hasMidTermBooking ? `Mid-term revenue: $${midTermRevenue.toFixed(2)}` : ''}
+   - Total revenue: $${totalRevenue.toFixed(2)}
+   - Property visits: ${visits?.length || 0}
+   - Maintenance tasks: ${visits?.length || 0}
+
+2. **What PeachHaus Did This Period**
+   - Generate 3-5 high-impact actions taken (listing refresh, dynamic pricing, partner engagement, maintenance audit)
+   ${property.rental_type === 'hybrid' ? '- Include both STR and MTR tactics' : ''}
+   ${property.rental_type === 'mid_term' ? '- Focus on MTR tenant acquisition/retention' : ''}
+
+3. **Local Demand Drivers & Upcoming Events**
+   Location: ${metroArea}, ${property.city}, ${property.state}
+   ${property.rental_type === 'hybrid' ? '- Include both leisure/tourist events AND corporate/relocation drivers' : ''}
+   ${property.rental_type === 'mid_term' ? '- Focus on corporate/insurance/relocation demand, infrastructure projects, NOT tourist events' : ''}
+   - For each event: name, date, distance from property, how it drives demand
+   - Generate 2-4 realistic upcoming events/drivers for this location
+
+4. **Strategic Action Plan**
+   - Generate 2-4 specific planned actions for next period
+   ${property.rental_type === 'hybrid' ? '- Include: "Pivot to short-stay around [event]" + "Secure mid-term partner for longer stays"' : ''}
+   ${property.rental_type === 'mid_term' ? '- Focus: Corporate outreach, insurance partnerships, longer-term placement strategy' : ''}
+
+**D. Tone & Format Requirements**
+- Professional, confident, owner-focused
+- Short paragraphs, bullet lists preferred
+- Use HTML <p>, <strong>, <ul>, <li> tags
+- Each section 2-4 lines maximum
+- CONCISE and SCANNABLE
+
+**E. Exclusions**
+- DO NOT include financial line items, expenses, or cost breakdowns
+- Focus purely on bookings, revenue potential, demand drivers, and strategy
+
+Generate the performance report content now in HTML format.`;
+
       const propertyContext = `
 Property: ${property.name}
 Location: ${locationDescription}
-Type: ${property.rental_type === 'hybrid' ? 'Hybrid (Short-term & Mid-term)' : property.rental_type === 'mid_term' ? 'Mid-term' : 'Long-term'}
+Type: ${property.rental_type === 'hybrid' ? 'Hybrid (Short-term & Mid-term)' : property.rental_type === 'mid_term' ? 'Mid-term Only' : 'Long-term'}
 Has Active Mid-term Booking: ${hasMidTermBooking ? 'Yes' : 'No'}
 Previous Month: ${previousMonthName}
 Bookings: ${bookings?.length || 0}
-Revenue: $${totalRevenue.toFixed(2)}
+Short-term Revenue: $${shortTermRevenue.toFixed(2)}
+Mid-term Revenue: $${midTermRevenue.toFixed(2)}
+Total Revenue: $${totalRevenue.toFixed(2)}
 Visits: ${visits?.length || 0}
 Expenses: $${expenseTotal.toFixed(2)}
+Metro Area: ${metroArea}
+City: ${property.city}
+State: ${property.state}
       `.trim();
 
-      // Customize prompt based on property type and booking status
-      let aiPrompt = "";
-      
-      if (property.rental_type === 'hybrid' && !hasMidTermBooking) {
-        // Hybrid property without mid-term tenant - focus on dual marketing strategy
-        aiPrompt = `You are a professional property management expert for PeachHaus Property Management. Analyze this hybrid rental property:
-
-${propertyContext}
-
-Provide a CONCISE professional analysis in HTML format (use <p>, <strong>, <ul>, <li> tags). Keep each section brief and actionable:
-
-**1. Performance Snapshot** (1-2 sentences max)
-Quick assessment of current performance.
-
-**2. PeachHaus's Active Marketing Strategy**
-List our key initiatives (use bullet points, keep each to 5-7 words):
-- Short-term: Premium platform listings, dynamic pricing
-- Mid-term: Corporate partnerships, healthcare outreach
-- Property maintenance and optimization
-
-**3. Key Local Opportunities** (Maximum 2-3 items)
-Only the most significant upcoming events or trends in ${metroArea} that could drive bookings. Keep very brief.
-
-**4. This Month's Action Plan** (3-4 bullet points max, 5-8 words each)
-Specific actions we're taking now.
-
-Keep it CONCISE and SCANNABLE. Each section should be 2-4 lines maximum.`;
-
-      } else if (property.rental_type === 'mid_term' || (property.rental_type === 'hybrid' && hasMidTermBooking)) {
-        // Mid-term property OR hybrid with active tenant
-        aiPrompt = `You are a professional property management expert for PeachHaus Property Management. Analyze this ${hasMidTermBooking ? 'occupied' : ''} mid-term rental:
-
-${propertyContext}
-
-Provide a CONCISE professional analysis in HTML format (use <p>, <strong>, <ul>, <li> tags). Keep each section brief:
-
-**1. Performance Snapshot** (1-2 sentences max)
-Quick ${hasMidTermBooking ? 'tenant satisfaction' : 'property status'} overview.
-
-${hasMidTermBooking ? `**2. PeachHaus's Tenant Retention Strategy**
-List key initiatives (bullet points, 5-7 words each):
-- Weekly tenant check-ins and support
-- 24-hour maintenance response guarantee
-- Early renewal discussions (60 days out)
-- Amenity optimization based on feedback
-
-**3. Renewal Action Plan** (3-4 bullet points max, 5-8 words each)
-Specific steps to secure lease extension.` : 
-`**2. PeachHaus's Contract Acquisition Strategy**
-List key initiatives (bullet points, 5-7 words each):
-- Corporate outreach: Fortune 500 relocations
-- Insurance partnerships: Displaced homeowner programs
-- Healthcare network: Travel nurse placements
-- Premium mid-term platform listings
-
-**3. This Month's Action Plan** (3-4 bullet points max, 5-8 words each)
-Specific steps to secure qualified tenant.`}
-
-Keep it CONCISE and SCANNABLE. Each section should be 2-4 lines maximum. DO NOT mention local events for mid-term rentals.`;
-
-      } else {
-        // Long-term or other
-        aiPrompt = `Provide a brief 3-section analysis: Performance, PeachHaus Actions, Recommendations. Use HTML <p>, <strong>, <ul>, <li> tags. Keep very concise - 2-3 sentences per section max.`;
-      }
+      let aiPrompt = systemPrompt + "\n\nProperty Details:\n" + propertyContext;
 
       const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
