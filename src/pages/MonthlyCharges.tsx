@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ReconciliationList } from "@/components/reconciliation/ReconciliationList";
+import { UploadLogoButton } from "@/components/reconciliation/UploadLogoButton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
@@ -426,6 +427,7 @@ export default function MonthlyCharges() {
           <p className="text-muted-foreground">Manage charges, expenses, and export to QuickBooks</p>
         </div>
         <div className="flex gap-2">
+          <UploadLogoButton />
           <Button onClick={exportToCSV} variant="outline" className="gap-2">
             <Download className="w-4 h-4" />
             Export to QuickBooks
