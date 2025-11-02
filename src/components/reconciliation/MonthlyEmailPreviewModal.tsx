@@ -113,7 +113,7 @@ export const MonthlyEmailPreviewModal = ({
               </div>
             </Card>
 
-          {/* Email Preview - Professional Format */}
+            {/* Email Preview - New PeachHaus Design */}
           <div className="border rounded-lg overflow-hidden shadow-sm bg-white dark:bg-gray-900">
             {/* Logo Header */}
             <div className="bg-white dark:bg-gray-900 border-b-4 border-[#FF8C42] p-8 text-center">
@@ -124,12 +124,14 @@ export const MonthlyEmailPreviewModal = ({
               />
             </div>
 
-            {/* Title Section */}
-            <div className="bg-[#5a6c7d] p-6 text-center text-white">
-              <h1 className="text-2xl font-semibold tracking-wide mb-2">Monthly Owner Statement</h1>
-              <p className="text-lg mb-1">{reconciliation.properties?.name}</p>
-              <p className="text-sm text-gray-200 mb-1">{reconciliation.properties?.address}</p>
-              <p className="text-sm text-gray-200">{monthLabel}</p>
+            {/* Orange Header with Title */}
+            <div className="bg-[#FF7F00] p-8 text-center text-white">
+              <h1 className="text-3xl font-bold tracking-wide mb-3">
+                🏡 PeachHaus Monthly Summary
+              </h1>
+              <p className="text-lg opacity-95">
+                Property: {reconciliation.properties?.name} | Period: {monthLabel}
+              </p>
             </div>
 
             {/* Professional Summary */}
@@ -140,7 +142,10 @@ export const MonthlyEmailPreviewModal = ({
               <p className="text-sm leading-relaxed text-gray-700 dark:text-gray-300 mb-4">
                 Please find enclosed your official monthly financial statement for the period ending {monthLabel}. 
                 This statement provides a comprehensive breakdown of all revenue collected and expenses incurred on your behalf 
-                during the reporting period.
+                during the reporting period. All amounts reflected herein have been verified and reconciled with our accounting records.
+              </p>
+              <p className="text-sm leading-relaxed text-gray-700 dark:text-gray-300">
+                In accordance with our management agreement, payment processing will occur automatically unless we receive written notification of discrepancies prior to the deadline.
               </p>
             </div>
 
@@ -171,18 +176,20 @@ export const MonthlyEmailPreviewModal = ({
               </div>
             </div>
 
-            {/* Itemized Financial Statement */}
-            <div className="p-8 bg-gray-50 dark:bg-gray-800/50">
-              <h2 className="text-xl font-bold text-gray-800 dark:text-gray-200 mb-6 uppercase tracking-wide border-b-4 border-[#FF8C42] pb-3">
-                Itemized Financial Statement
+            {/* Performance Summary */}
+            <div className="p-8 bg-white dark:bg-gray-900">
+              <h2 className="text-xl font-bold text-[#FF7F00] mb-6 uppercase tracking-wide">
+                📊 Performance Summary
               </h2>
               
-              {/* Revenue Section */}
-              <div className="mb-6">
-                <h3 className="text-sm font-bold text-green-600 dark:text-green-400 uppercase mb-3">Revenue</h3>
-                <div className="bg-white dark:bg-gray-900 rounded-lg overflow-hidden shadow-sm">
+              {/* Income & Activity Section */}
+              <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl p-6 mb-6 shadow-sm">
+                <h3 className="text-lg font-bold text-gray-800 dark:text-gray-200 mb-4">
+                  Income & Activity
+                </h3>
+                <div className="space-y-3">
                   {Number(reconciliation.short_term_revenue || 0) > 0 && (
-                    <div className="flex justify-between p-3 border-b dark:border-gray-700">
+                    <div className="flex justify-between pb-3 border-b dark:border-gray-700">
                       <span className="text-sm text-gray-700 dark:text-gray-300">Short-term Booking Revenue</span>
                       <span className="text-sm font-semibold text-green-600 dark:text-green-400">
                         ${Number(reconciliation.short_term_revenue || 0).toFixed(2)}
@@ -190,14 +197,14 @@ export const MonthlyEmailPreviewModal = ({
                     </div>
                   )}
                   {Number(reconciliation.mid_term_revenue || 0) > 0 && (
-                    <div className="flex justify-between p-3 border-b dark:border-gray-700">
+                    <div className="flex justify-between pb-3 border-b dark:border-gray-700">
                       <span className="text-sm text-gray-700 dark:text-gray-300">Mid-term Rental Revenue</span>
                       <span className="text-sm font-semibold text-green-600 dark:text-green-400">
                         ${Number(reconciliation.mid_term_revenue || 0).toFixed(2)}
                       </span>
                     </div>
                   )}
-                  <div className="flex justify-between p-4 bg-green-50 dark:bg-green-950/20">
+                  <div className="flex justify-between pt-4 bg-green-50 dark:bg-green-950/20 -mx-6 px-6 py-4 rounded-lg">
                     <span className="text-sm font-bold text-green-800 dark:text-green-200">Subtotal: Gross Revenue</span>
                     <span className="text-sm font-bold text-green-800 dark:text-green-200">
                       ${Number(reconciliation.total_revenue || 0).toFixed(2)}
@@ -206,95 +213,111 @@ export const MonthlyEmailPreviewModal = ({
                 </div>
               </div>
 
-              {/* Expenses Section */}
-              <div className="mb-6">
-                <h3 className="text-sm font-bold text-red-600 dark:text-red-400 uppercase mb-3">Expenses</h3>
-                <div className="bg-white dark:bg-gray-900 rounded-lg overflow-hidden shadow-sm">
-                  <div className="flex justify-between p-3 border-b dark:border-gray-700">
+              {/* PeachHaus Services Rendered Section */}
+              <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl p-6 mb-6 shadow-sm">
+                <h3 className="text-lg font-bold text-gray-800 dark:text-gray-200 mb-4">
+                  🧰 PeachHaus Services Rendered
+                </h3>
+                <div className="space-y-3">
+                  <div className="flex justify-between pb-3 border-b dark:border-gray-700">
                     <span className="text-sm text-gray-700 dark:text-gray-300">
-                      Management Fee ({reconciliation.properties?.management_fee_percentage || 15}%)
+                      Management & Oversight ({reconciliation.properties?.management_fee_percentage || 15}%)
                     </span>
-                    <span className="text-sm font-semibold text-red-600 dark:text-red-400">
-                      -${Number(reconciliation.management_fee || 0).toFixed(2)}
+                    <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                      ${Number(reconciliation.management_fee || 0).toFixed(2)}
                     </span>
                   </div>
                   {Number(reconciliation.order_minimum_fee || 0) > 0 && (
-                    <div className="flex justify-between p-3 border-b dark:border-gray-700">
-                      <span className="text-sm text-gray-700 dark:text-gray-300">Order Minimum Fee</span>
-                      <span className="text-sm font-semibold text-red-600 dark:text-red-400">
-                        -${Number(reconciliation.order_minimum_fee || 0).toFixed(2)}
+                    <div className="flex justify-between pb-3 border-b dark:border-gray-700">
+                      <span className="text-sm text-gray-700 dark:text-gray-300">Operational Minimum Fee</span>
+                      <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                        ${Number(reconciliation.order_minimum_fee || 0).toFixed(2)}
                       </span>
                     </div>
                   )}
-                  <div className="flex justify-between p-3 border-b dark:border-gray-700">
+                  <div className="flex justify-between pb-3 border-b dark:border-gray-700">
                     <span className="text-sm text-gray-600 dark:text-gray-400 pl-4">
                       • Property Visits & Other Expenses
                     </span>
                     <span className="text-sm text-gray-600 dark:text-gray-400">
-                      -${Number(reconciliation.total_expenses || 0).toFixed(2)}
+                      ${Number(reconciliation.total_expenses || 0).toFixed(2)}
                     </span>
                   </div>
-                  <div className="flex justify-between p-4 bg-red-50 dark:bg-red-950/20">
-                    <span className="text-sm font-bold text-red-800 dark:text-red-200">Subtotal: Total Expenses</span>
-                    <span className="text-sm font-bold text-red-800 dark:text-red-200">
-                      -${(Number(reconciliation.total_expenses || 0) + Number(reconciliation.management_fee || 0) + Number(reconciliation.order_minimum_fee || 0)).toFixed(2)}
+                  <div className="flex justify-between pt-4 bg-orange-50 dark:bg-orange-950/20 -mx-6 px-6 py-4 rounded-lg">
+                    <span className="text-sm font-bold text-orange-800 dark:text-orange-200">Subtotal: Services Provided</span>
+                    <span className="text-sm font-bold text-orange-800 dark:text-orange-200">
+                      ${(Number(reconciliation.total_expenses || 0) + Number(reconciliation.management_fee || 0) + Number(reconciliation.order_minimum_fee || 0)).toFixed(2)}
                     </span>
                   </div>
                 </div>
               </div>
 
-              {/* Net Section */}
-              <div className={`rounded-lg p-5 text-white shadow-lg ${Number(reconciliation.net_to_owner || 0) >= 0 ? 'bg-gradient-to-r from-purple-600 to-blue-600' : 'bg-gradient-to-r from-red-600 to-red-700'}`}>
+              {/* Balance Summary Section */}
+              <div className={`rounded-xl p-6 shadow-md ${Number(reconciliation.net_to_owner || 0) >= 0 ? 'bg-green-50 dark:bg-green-950/20 border-2 border-green-500' : 'bg-orange-50 dark:bg-orange-950/20 border-2 border-[#FF7F00]'}`}>
+                <h3 className={`text-lg font-bold mb-4 ${Number(reconciliation.net_to_owner || 0) >= 0 ? 'text-green-800 dark:text-green-200' : 'text-orange-800 dark:text-orange-200'}`}>
+                  💼 Balance Summary
+                </h3>
                 <div className="flex justify-between items-center">
-                  <span className="text-base font-bold uppercase tracking-wide">
-                    Net Amount {Number(reconciliation.net_to_owner || 0) >= 0 ? 'Due To' : 'Due From'} Owner
+                  <span className={`text-lg font-bold ${Number(reconciliation.net_to_owner || 0) >= 0 ? 'text-green-800 dark:text-green-200' : 'text-orange-800 dark:text-orange-200'}`}>
+                    Amount Due {Number(reconciliation.net_to_owner || 0) >= 0 ? 'to' : 'from'} Owner
                   </span>
-                  <span className="text-2xl font-black">
-                    {Number(reconciliation.net_to_owner || 0) >= 0 ? '$' : '-$'}{Math.abs(Number(reconciliation.net_to_owner || 0)).toFixed(2)}
+                  <span className={`text-2xl font-black ${Number(reconciliation.net_to_owner || 0) >= 0 ? 'text-green-600' : 'text-[#FF7F00]'}`}>
+                    ${Math.abs(Number(reconciliation.net_to_owner || 0)).toFixed(2)}
                   </span>
                 </div>
+              </div>
+
+              {/* Thank You Message */}
+              <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-5 mt-6 text-center">
+                <p className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-2">
+                  Thank you for partnering with PeachHaus.
+                </p>
+                <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
+                  All charges reflect completed services that maintain your property's quality and performance readiness.
+                </p>
               </div>
             </div>
-          </div>
 
-          {/* Footer */}
-          <div className="bg-[#2c3e50] text-white p-8 text-center border-t-4 border-[#FF8C42]">
-            <p className="font-semibold text-base tracking-wide mb-3">
-              PeachHaus Property Management
-            </p>
-            <p className="text-sm text-gray-300 mb-4">
-              Questions or concerns? Contact us at{' '}
-              <a href="mailto:info@peachhausgroup.com" className="text-[#FF8C42] font-semibold">
-                info@peachhausgroup.com
-              </a>
-            </p>
-            <p className="text-xs text-gray-400 leading-relaxed">
-              This is an official financial statement. Please retain for your records.
-            </p>
+            {/* Footer */}
+            <div className="bg-[#2c3e50] text-white p-8 text-center border-t-4 border-[#FF8C42]">
+              <p className="font-semibold text-base tracking-wide mb-3">
+                PeachHaus Property Management
+              </p>
+              <p className="text-sm text-gray-300 mb-4">
+                Questions or concerns? Contact us at{' '}
+                <a href="mailto:info@peachhausgroup.com" className="text-[#FF8C42] font-semibold">
+                  info@peachhausgroup.com
+                </a>
+              </p>
+              <p className="text-xs text-gray-400 leading-relaxed">
+                This is an official financial statement. Please retain for your records.<br />
+                Thank you for trusting PeachHaus with your investment property.
+              </p>
             </div>
           </div>
           </div>
 
           <div className="flex justify-between pt-4 border-t gap-2">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Close
-          </Button>
-          <div className="flex gap-2">
-            <Button
-              variant="secondary"
-              onClick={handleSendTestEmail}
-              disabled={isSendingTest || isSendingOwner}
-            >
-              <TestTube className="w-4 h-4 mr-2" />
-              {isSendingTest ? "Sending..." : "Send Test Email"}
+            <Button variant="outline" onClick={() => onOpenChange(false)}>
+              Close
             </Button>
-            <Button
-              onClick={handleSendOwnerEmail}
-              disabled={isSendingTest || isSendingOwner}
-            >
-              <Send className="w-4 h-4 mr-2" />
-              {isSendingOwner ? "Sending..." : "Send Owner Statement"}
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                variant="secondary"
+                onClick={handleSendTestEmail}
+                disabled={isSendingTest || isSendingOwner}
+              >
+                <TestTube className="w-4 h-4 mr-2" />
+                {isSendingTest ? "Sending..." : "Send Test Email"}
+              </Button>
+              <Button
+                onClick={handleSendOwnerEmail}
+                disabled={isSendingTest || isSendingOwner}
+              >
+                <Send className="w-4 h-4 mr-2" />
+                {isSendingOwner ? "Sending..." : "Send Owner Statement"}
+              </Button>
+            </div>
           </div>
         </div>
       </DialogContent>
