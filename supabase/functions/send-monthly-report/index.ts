@@ -512,19 +512,13 @@ State: ${state}
             <div style="background-color: #ffffff; padding: 30px 40px; text-align: center; border-bottom: 3px solid #FF8C42;">
               <img src="${supabaseUrl}/storage/v1/object/public/property-images/peachhaus-logo.png" alt="PeachHaus Property Management" style="max-width: 280px; height: auto;" />
             </div>
-            
-            <!-- Title Section -->
-            <div style="background-color: #5a6c7d; padding: 25px 40px; text-align: center;">
-              <h1 style="color: #ffffff; margin: 0; font-size: 26px; font-weight: 600; letter-spacing: 0.5px;">
-                Monthly Owner Statement</h1>
-              <p style="color: #e8eef3; margin: 8px 0 0 0; font-size: 18px; font-weight: 400;">
-                ${property.name}
-              </p>
-              <p style="color: #c8d4dd; margin: 5px 0 0 0; font-size: 14px;">
-                ${property.address || ''}
-              </p>
-              <p style="color: #c8d4dd; margin: 5px 0 0 0; font-size: 15px;">
-                ${previousMonthName}
+            <!-- Header with PeachHaus Orange -->
+            <div style="background-color: #FF7F00; padding: 30px 40px; text-align: center;">
+              <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: 700; letter-spacing: 0.5px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', 'Helvetica', 'Arial', sans-serif;">
+                🏡 PeachHaus Monthly Summary
+              </h1>
+              <p style="color: #ffffff; margin: 12px 0 0 0; font-size: 16px; font-weight: 400; opacity: 0.95;">
+                Property: ${property.name} | Period: ${previousMonthName}
               </p>
             </div>
 
@@ -576,98 +570,100 @@ State: ${state}
                 </div>
               </div>
 
-              <!-- Itemized Financial Statement -->
-              <div style="background-color: #ffffff; border-radius: 12px; padding: 30px; box-shadow: 0 2px 10px rgba(0,0,0,0.08); margin-bottom: 35px;">
-                <h2 style="color: #2c3e50; margin: 0 0 25px 0; font-size: 20px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 3px solid #FF8C42; padding-bottom: 10px;">
-                  Itemized Financial Statement
+              <!-- Performance Summary -->
+              <div style="background-color: #ffffff; padding: 40px; margin: 0;">
+                <h2 style="color: #FF7F00; margin: 0 0 30px 0; font-size: 22px; font-weight: 700; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', 'Helvetica', 'Arial', sans-serif;">
+                  📊 Performance Summary
                 </h2>
                 
-                <!-- REVENUE SECTION -->
-                <div style="margin-bottom: 30px;">
-                  <h3 style="color: #27ae60; margin: 0 0 15px 0; font-size: 16px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">
-                    REVENUE
+                <!-- Income & Activity Section -->
+                <div style="background-color: #ffffff; border: 1px solid #EAEAEA; border-radius: 12px; padding: 25px; margin-bottom: 25px;">
+                  <h3 style="color: #2c3e50; margin: 0 0 20px 0; font-size: 18px; font-weight: 700; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', 'Helvetica', 'Arial', sans-serif;">
+                    Income & Activity
                   </h3>
-                  <table style="width: 100%; border-collapse: collapse;">
+                  <table style="width: 100%; border-collapse: collapse; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', 'Helvetica', 'Arial', sans-serif;">
                     ${bookingRevenue > 0 ? `
                     <tr>
-                      <td style="padding: 10px 15px; color: #2c3e50; font-size: 14px; border-bottom: 1px solid #e9ecef;">Short-term Booking Revenue</td>
-                      <td style="padding: 10px 15px; color: #27ae60; font-size: 14px; text-align: right; font-weight: 600; border-bottom: 1px solid #e9ecef;">$${bookingRevenue.toFixed(2)}</td>
+                      <td style="padding: 12px 0; color: #2c3e50; font-size: 15px; border-bottom: 1px solid #f5f5f5;">Short-term Booking Revenue</td>
+                      <td style="padding: 12px 0; color: #22c55e; font-size: 15px; text-align: right; font-weight: 600; border-bottom: 1px solid #f5f5f5;">$${bookingRevenue.toFixed(2)}</td>
                     </tr>` : ''}
                     ${midTermRevenue > 0 ? `
                     <tr>
-                      <td style="padding: 10px 15px; color: #2c3e50; font-size: 14px; border-bottom: 1px solid #e9ecef;">Mid-term Rental Revenue</td>
-                      <td style="padding: 10px 15px; color: #27ae60; font-size: 14px; text-align: right; font-weight: 600; border-bottom: 1px solid #e9ecef;">$${midTermRevenue.toFixed(2)}</td>
+                      <td style="padding: 12px 0; color: #2c3e50; font-size: 15px; border-bottom: 1px solid #f5f5f5;">Mid-term Rental Revenue</td>
+                      <td style="padding: 12px 0; color: #22c55e; font-size: 15px; text-align: right; font-weight: 600; border-bottom: 1px solid #f5f5f5;">$${midTermRevenue.toFixed(2)}</td>
                     </tr>` : ''}
-                    <tr style="background-color: #d5f4e6;">
-                      <td style="padding: 14px 15px; color: #1e7e34; font-size: 15px; font-weight: 700;">Subtotal: Gross Revenue</td>
-                      <td style="padding: 14px 15px; color: #1e7e34; font-size: 15px; text-align: right; font-weight: 800;">$${totalRevenue.toFixed(2)}</td>
+                    <tr style="background-color: #f0fdf4;">
+                      <td style="padding: 16px 12px; color: #166534; font-size: 16px; font-weight: 700;">Subtotal: Gross Revenue</td>
+                      <td style="padding: 16px 12px; color: #166534; font-size: 16px; text-align: right; font-weight: 800;">$${totalRevenue.toFixed(2)}</td>
                     </tr>
                   </table>
                 </div>
 
-                <!-- EXPENSES SECTION -->
-                <div style="margin-bottom: 30px;">
-                  <h3 style="color: #e74c3c; margin: 0 0 15px 0; font-size: 16px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">
-                    EXPENSES
+                <!-- PeachHaus Services Rendered Section -->
+                <div style="background-color: #ffffff; border: 1px solid #EAEAEA; border-radius: 12px; padding: 25px; margin-bottom: 25px;">
+                  <h3 style="color: #2c3e50; margin: 0 0 20px 0; font-size: 18px; font-weight: 700; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', 'Helvetica', 'Arial', sans-serif;">
+                    🧰 PeachHaus Services Rendered
                   </h3>
-                  <table style="width: 100%; border-collapse: collapse;">
+                  <table style="width: 100%; border-collapse: collapse; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', 'Helvetica', 'Arial', sans-serif;">
                     <tr>
-                      <td style="padding: 10px 15px; color: #2c3e50; font-size: 14px; border-bottom: 1px solid #e9ecef;">Management Fee (${property.management_fee_percentage || 15}%)</td>
-                      <td style="padding: 10px 15px; color: #c0392b; font-size: 14px; text-align: right; font-weight: 600; border-bottom: 1px solid #e9ecef;">-$${managementFees.toFixed(2)}</td>
+                      <td style="padding: 12px 0; color: #2c3e50; font-size: 15px; border-bottom: 1px solid #f5f5f5;">Management & Oversight (${property.management_fee_percentage || 15}%)</td>
+                      <td style="padding: 12px 0; color: #4a4a4a; font-size: 15px; text-align: right; font-weight: 600; border-bottom: 1px solid #f5f5f5;">$${managementFees.toFixed(2)}</td>
                     </tr>
                     ${orderMinimumFee > 0 ? `
                     <tr>
-                      <td style="padding: 10px 15px; color: #2c3e50; font-size: 14px; border-bottom: 1px solid #e9ecef;">Order Minimum Fee</td>
-                      <td style="padding: 10px 15px; color: #c0392b; font-size: 14px; text-align: right; font-weight: 600; border-bottom: 1px solid #e9ecef;">-$${orderMinimumFee.toFixed(2)}</td>
+                      <td style="padding: 12px 0; color: #2c3e50; font-size: 15px; border-bottom: 1px solid #f5f5f5;">Operational Minimum Fee</td>
+                      <td style="padding: 12px 0; color: #4a4a4a; font-size: 15px; text-align: right; font-weight: 600; border-bottom: 1px solid #f5f5f5;">$${orderMinimumFee.toFixed(2)}</td>
                     </tr>` : ''}
                     ${visits && visits.length > 0 ? visits.map((visit: any) => `
                     <tr>
-                      <td style="padding: 8px 15px; color: #6c757d; font-size: 13px; padding-left: 30px; border-bottom: 1px solid #f1f3f5;">
-                        • Property Visit - ${new Date(visit.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}${visit.description ? ': ' + visit.description : ''}
+                      <td style="padding: 10px 0; color: #6b7280; font-size: 14px; padding-left: 20px; border-bottom: 1px solid #f5f5f5;">
+                        Property Visit - ${new Date(visit.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}${visit.description ? ': ' + visit.description : ''}
                       </td>
-                      <td style="padding: 8px 15px; color: #6c757d; font-size: 13px; text-align: right; border-bottom: 1px solid #f1f3f5;">-$${Number(visit.price).toFixed(2)}</td>
+                      <td style="padding: 10px 0; color: #4a4a4a; font-size: 14px; text-align: right; border-bottom: 1px solid #f5f5f5;">$${Number(visit.price).toFixed(2)}</td>
                     </tr>`).join('') : ''}
                     ${expenses && expenses.length > 0 ? expenses.map((expense: any) => `
                     <tr>
-                      <td style="padding: 8px 15px; color: #6c757d; font-size: 13px; padding-left: 30px; border-bottom: 1px solid #f1f3f5;">
-                        • ${new Date(expense.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}: ${expense.purpose || 'Maintenance'}${expense.vendor ? ' - ' + expense.vendor : ''}${expense.category ? ' (' + expense.category + ')' : ''}
+                      <td style="padding: 10px 0; color: #6b7280; font-size: 14px; padding-left: 20px; border-bottom: 1px solid #f5f5f5;">
+                        ${new Date(expense.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}: ${expense.purpose || 'Maintenance'}${expense.vendor ? ' - ' + expense.vendor : ''}${expense.category ? ' (' + expense.category + ')' : ''}
                       </td>
-                      <td style="padding: 8px 15px; color: #6c757d; font-size: 13px; text-align: right; border-bottom: 1px solid #f1f3f5;">-$${Number(expense.amount).toFixed(2)}</td>
+                      <td style="padding: 10px 0; color: #4a4a4a; font-size: 14px; text-align: right; border-bottom: 1px solid #f5f5f5;">$${Number(expense.amount).toFixed(2)}</td>
                     </tr>`).join('') : ''}
-                    <tr style="background-color: #f8d7da;">
-                      <td style="padding: 14px 15px; color: #721c24; font-size: 15px; font-weight: 700;">Subtotal: Total Expenses</td>
-                      <td style="padding: 14px 15px; color: #721c24; font-size: 15px; text-align: right; font-weight: 800;">-$${totalExpensesWithVisits.toFixed(2)}</td>
+                    <tr style="background-color: #fef3e2;">
+                      <td style="padding: 16px 12px; color: #92400e; font-size: 16px; font-weight: 700;">Subtotal: Services Provided</td>
+                      <td style="padding: 16px 12px; color: #92400e; font-size: 16px; text-align: right; font-weight: 800;">$${totalExpensesWithVisits.toFixed(2)}</td>
                     </tr>
                   </table>
                 </div>
 
-                <!-- NET SECTION -->
-                <div>
-                  <table style="width: 100%; border-collapse: collapse;">
-                    <tr style="background: linear-gradient(135deg, ${netIncome >= 0 ? '#667eea 0%, #764ba2 100%' : '#dc3545 0%, #c82333 100%'});">
-                      <td style="padding: 20px 20px; color: white; font-weight: 800; font-size: 18px; border-radius: 8px 0 0 8px;">NET AMOUNT ${netIncome >= 0 ? 'DUE TO' : 'DUE FROM'} OWNER</td>
-                      <td style="padding: 20px 20px; color: white; font-weight: 900; font-size: 22px; text-align: right; border-radius: 0 8px 8px 0;">${netIncome >= 0 ? '$' : '-$'}${Math.abs(netIncome).toFixed(2)}</td>
+                <!-- Balance Summary Section -->
+                <div style="background-color: ${netIncome >= 0 ? '#f0fdf4' : '#fff7ed'}; border: 2px solid ${netIncome >= 0 ? '#22c55e' : '#FF7F00'}; border-radius: 12px; padding: 25px;">
+                  <h3 style="color: ${netIncome >= 0 ? '#166534' : '#92400e'}; margin: 0 0 20px 0; font-size: 18px; font-weight: 700; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', 'Helvetica', 'Arial', sans-serif;">
+                    💼 Balance Summary
+                  </h3>
+                  <table style="width: 100%; border-collapse: collapse; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', 'Helvetica', 'Arial', sans-serif;">
+                    <tr>
+                      <td style="padding: 16px 0; color: ${netIncome >= 0 ? '#166534' : '#92400e'}; font-size: 18px; font-weight: 700;">
+                        ${netIncome >= 0 ? 'Amount Due to Owner' : 'Amount Due from Owner'}
+                      </td>
+                      <td style="padding: 16px 0; color: ${netIncome >= 0 ? '#166534' : '#FF7F00'}; font-size: 24px; text-align: right; font-weight: 800;">
+                        $${Math.abs(netIncome).toFixed(2)}
+                      </td>
                     </tr>
                   </table>
-                  ${netIncome < 0 ? `
-                  <div style="margin-top: 20px; padding: 16px; background-color: #fff3cd; border-left: 4px solid #ffc107; border-radius: 4px;">
-                    <p style="color: #856404; margin: 0; font-size: 14px; line-height: 1.6;">
-                      <strong>Payment Due:</strong> This statement reflects a net amount due from the owner to PeachHaus Property Management. 
-                      The indicated amount will be automatically charged to your payment method on file on ${new Date(new Date().getFullYear(), new Date().getMonth() + 1, 5).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} 
-                      unless alternative arrangements are made in writing prior to the deadline.
-                    </p>
-                  </div>` : `
-                  <div style="margin-top: 20px; padding: 16px; background-color: #d4edda; border-left: 4px solid #28a745; border-radius: 4px;">
-                    <p style="color: #155724; margin: 0; font-size: 14px; line-height: 1.6;">
-                      <strong>Payment Processing:</strong> The net amount due to you will be processed and disbursed to your designated account 
-                      on ${new Date(new Date().getFullYear(), new Date().getMonth() + 1, 5).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} 
-                      in accordance with our standard disbursement schedule.
-                    </p>
-                  </div>`}
+                </div>
+
+                <!-- Thank You Message -->
+                <div style="background-color: #fafafa; border-radius: 8px; padding: 20px; margin-top: 30px; text-align: center;">
+                  <p style="color: #2c3e50; margin: 0 0 8px 0; font-size: 15px; font-weight: 600; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', 'Helvetica', 'Arial', sans-serif;">
+                    Thank you for partnering with PeachHaus.
+                  </p>
+                  <p style="color: #6b7280; margin: 0; font-size: 14px; line-height: 1.6; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', 'Helvetica', 'Arial', sans-serif;">
+                    All charges reflect completed services that maintain your property's quality and performance readiness.
+                  </p>
                 </div>
               </div>
 
-              <!-- Action Required Notice -->
+              <!-- End of Performance Summary -->
             </div>`;
 
     // AI Insights removed from owner statement - only for performance email
