@@ -54,16 +54,18 @@ export const CreateReconciliationDialog = ({
 
     setIsCreating(true);
     try {
-      const { data, error } = await supabase.functions.invoke("create-reconciliation", {
+      const response = await supabase.functions.invoke("create-reconciliation", {
         body: {
           property_id: selectedProperty,
           month: selectedMonth,
         },
       });
 
-      // Check the response data for error instead of error object
-      if (data?.error && data?.existing_reconciliation_id) {
-        const canDelete = data.can_delete;
+      console.log("Response from edge function:", response);
+
+      // The 409 response comes back in response.data, not response.error
+      if (response.data?.existing_reconciliation_id) {
+        const canDelete = response.data.can_delete;
         
         if (canDelete) {
           const shouldReplace = window.confirm(
@@ -75,23 +77,23 @@ export const CreateReconciliationDialog = ({
             await supabase
               .from("reconciliation_line_items")
               .delete()
-              .eq("reconciliation_id", data.existing_reconciliation_id);
+              .eq("reconciliation_id", response.data.existing_reconciliation_id);
             
             await supabase
               .from("monthly_reconciliations")
               .delete()
-              .eq("id", data.existing_reconciliation_id);
+              .eq("id", response.data.existing_reconciliation_id);
             
             // Retry creation
-            const { data: retryData, error: retryError } = await supabase.functions.invoke("create-reconciliation", {
+            const retryResponse = await supabase.functions.invoke("create-reconciliation", {
               body: {
                 property_id: selectedProperty,
                 month: selectedMonth,
               },
             });
             
-            if (retryError || retryData?.error) {
-              throw new Error(retryData?.error || retryError?.message || "Failed to create reconciliation");
+            if (retryResponse.error || retryResponse.data?.error) {
+              throw new Error(retryResponse.data?.error || retryResponse.error?.message || "Failed to create reconciliation");
             }
             
             toast.success("Reconciliation created successfully!");
@@ -112,8 +114,8 @@ export const CreateReconciliationDialog = ({
         }
       }
 
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
+      if (response.error) throw response.error;
+      if (response.data?.error) throw new Error(response.data.error);
 
       toast.success("Reconciliation created successfully");
       onSuccess();
