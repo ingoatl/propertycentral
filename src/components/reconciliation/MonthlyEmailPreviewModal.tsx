@@ -132,21 +132,6 @@ export const MonthlyEmailPreviewModal = ({
               <p className="text-sm text-gray-200">{monthLabel}</p>
             </div>
 
-            {/* Legal Notice */}
-            <div className="bg-yellow-50 dark:bg-yellow-950/30 border-2 border-yellow-400 dark:border-yellow-700 p-6 m-6 rounded">
-              <h3 className="text-yellow-800 dark:text-yellow-200 font-bold text-lg mb-3 flex items-center">
-                <span className="text-xl mr-2">⚠️</span> Action Required
-              </h3>
-              <p className="text-yellow-900 dark:text-yellow-100 text-sm leading-relaxed mb-3">
-                Please carefully review this financial statement. If you have any questions or discrepancies, 
-                you must notify PeachHaus Property Management in writing by{' '}
-                <strong className="text-yellow-800 dark:text-yellow-200">{deadlineDate}</strong>.
-              </p>
-              <p className="text-yellow-800 dark:text-yellow-200 text-xs leading-relaxed italic">
-                Failure to respond by the deadline will constitute acceptance of this statement as accurate and complete.
-              </p>
-            </div>
-
             {/* Itemized Financial Statement */}
             <div className="p-8 bg-gray-50 dark:bg-gray-800/50">
               <h2 className="text-xl font-bold text-gray-800 dark:text-gray-200 mb-6 uppercase tracking-wide border-b-4 border-[#FF8C42] pb-3">
