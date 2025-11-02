@@ -34,22 +34,30 @@ export const MonthlyEmailPreviewModal = ({
       try {
         const { data: ownerData, error: ownerError } = await supabase
           .from("property_owners")
-          .select("name")
+          .select("name, second_owner_name")
           .eq("id", reconciliation.owner_id)
-          .single();
+          .maybeSingle();
 
-        if (!ownerError && ownerData?.name) {
-          const fullName = ownerData.name;
-          // Extract first names
-          if (fullName.includes('&')) {
-            const owners = fullName.split('&').map((name: string) => name.trim().split(' ')[0]);
-            setOwnerName(owners.join(' & '));
-          } else if (fullName.toLowerCase().includes(' and ')) {
-            const owners = fullName.split(/\sand\s/i).map((name: string) => name.trim().split(' ')[0]);
-            setOwnerName(owners.join(' & '));
+        if (!ownerError && ownerData) {
+          const primaryName = ownerData.name;
+          let firstNames: string[] = [];
+          
+          // Extract first names from primary owner
+          if (primaryName.includes('&')) {
+            firstNames = primaryName.split('&').map((name: string) => name.trim().split(' ')[0]);
+          } else if (primaryName.toLowerCase().includes(' and ')) {
+            firstNames = primaryName.split(/\sand\s/i).map((name: string) => name.trim().split(' ')[0]);
           } else {
-            setOwnerName(fullName.split(' ')[0]);
+            firstNames.push(primaryName.split(' ')[0]);
           }
+          
+          // Add second owner's first name if exists
+          if (ownerData.second_owner_name) {
+            const secondName = ownerData.second_owner_name.trim().split(' ')[0];
+            firstNames.push(secondName);
+          }
+          
+          setOwnerName(firstNames.join(' & '));
         }
       } catch (error) {
         console.error("Error fetching owner name:", error);

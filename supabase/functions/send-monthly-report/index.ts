@@ -55,7 +55,7 @@ const handler = async (req: Request): Promise<Response> => {
         .select(`
           *,
           properties(*),
-          property_owners(email, name)
+          property_owners(email, name, second_owner_name, second_owner_email)
         `)
         .eq("id", reconciliation_id)
         .eq("status", "approved")
@@ -294,7 +294,15 @@ const handler = async (req: Request): Promise<Response> => {
       managementFees = bookings.reduce((sum, b) => sum + Number(b.management_fee), 0);
       
       // Calculate mid-term revenue for the month
-      midTermRevenue = midTermBookings.reduce((sum, b) => sum + Number(b.monthly_rent), 0);
+      // Use nightly_rate if available, otherwise use monthly_rent
+      midTermRevenue = midTermBookings.reduce((sum, b) => {
+        if (b.nightly_rate) {
+          // Calculate days in the previous month
+          const daysInMonth = new Date(lastDayOfPreviousMonth.getFullYear(), lastDayOfPreviousMonth.getMonth() + 1, 0).getDate();
+          return sum + (Number(b.nightly_rate) * daysInMonth);
+        }
+        return sum + Number(b.monthly_rent);
+      }, 0);
       totalRevenue = bookingRevenue + midTermRevenue;
       
       // Calculate net income: Revenue - ALL expenses (management fees, visits, other expenses, order minimum fee)
@@ -466,23 +474,30 @@ State: ${state}
     try {
       const { data: ownerData, error: ownerError } = await supabase
         .from("property_owners")
-        .select("name")
+        .select("name, second_owner_name")
         .eq("id", property.owner_id)
-        .single();
+        .maybeSingle();
 
-      if (!ownerError && ownerData?.name) {
-        // Extract first name(s) from owner name
-        const fullName = ownerData.name;
-        // If multiple owners separated by "&" or "and", extract all first names
-        if (fullName.includes('&')) {
-          const owners = fullName.split('&').map((name: string) => name.trim().split(' ')[0]);
-          ownerNames = owners.join(' & ');
-        } else if (fullName.toLowerCase().includes(' and ')) {
-          const owners = fullName.split(/\sand\s/i).map((name: string) => name.trim().split(' ')[0]);
-          ownerNames = owners.join(' & ');
+      if (!ownerError && ownerData) {
+        // Extract first name(s) from primary owner
+        const primaryName = ownerData.name;
+        let firstNames: string[] = [];
+        
+        if (primaryName.includes('&')) {
+          firstNames = primaryName.split('&').map((name: string) => name.trim().split(' ')[0]);
+        } else if (primaryName.toLowerCase().includes(' and ')) {
+          firstNames = primaryName.split(/\sand\s/i).map((name: string) => name.trim().split(' ')[0]);
         } else {
-          ownerNames = fullName.split(' ')[0];
+          firstNames.push(primaryName.split(' ')[0]);
         }
+        
+        // Add second owner's first name if exists
+        if (ownerData.second_owner_name) {
+          const secondName = ownerData.second_owner_name.trim().split(' ')[0];
+          firstNames.push(secondName);
+        }
+        
+        ownerNames = firstNames.join(' & ');
       }
     } catch (error) {
       console.error("Error fetching owner names:", error);

@@ -546,6 +546,7 @@ export type Database = {
           end_date: string
           id: string
           monthly_rent: number
+          nightly_rate: number | null
           notes: string | null
           property_id: string
           start_date: string
@@ -562,6 +563,7 @@ export type Database = {
           end_date: string
           id?: string
           monthly_rent: number
+          nightly_rate?: number | null
           notes?: string | null
           property_id: string
           start_date: string
@@ -578,6 +580,7 @@ export type Database = {
           end_date?: string
           id?: string
           monthly_rent?: number
+          nightly_rate?: number | null
           notes?: string | null
           property_id?: string
           start_date?: string
@@ -1377,6 +1380,8 @@ export type Database = {
           name: string
           payment_method: string
           phone: string | null
+          second_owner_email: string | null
+          second_owner_name: string | null
           stripe_customer_id: string | null
           updated_at: string
         }
@@ -1387,6 +1392,8 @@ export type Database = {
           name: string
           payment_method: string
           phone?: string | null
+          second_owner_email?: string | null
+          second_owner_name?: string | null
           stripe_customer_id?: string | null
           updated_at?: string
         }
@@ -1397,6 +1404,8 @@ export type Database = {
           name?: string
           payment_method?: string
           phone?: string | null
+          second_owner_email?: string | null
+          second_owner_name?: string | null
           stripe_customer_id?: string | null
           updated_at?: string
         }
