@@ -188,20 +188,22 @@ serve(async (req) => {
     // Create line items
     const lineItems = [];
 
-    // Add bookings
+    // Add bookings (only those with revenue)
     for (const booking of bookings || []) {
-      lineItems.push({
-        reconciliation_id: reconciliation.id,
-        item_type: "booking",
-        item_id: booking.id,
-        description: `${booking.guest_name || "Guest"} - ${booking.ownerrez_listing_name}`,
-        amount: booking.total_amount,
-        date: booking.check_in,
-        category: "Short-term Booking",
-      });
+      if ((booking.total_amount || 0) > 0) {
+        lineItems.push({
+          reconciliation_id: reconciliation.id,
+          item_type: "booking",
+          item_id: booking.id,
+          description: `${booking.guest_name || "Guest"} - ${booking.ownerrez_listing_name}`,
+          amount: booking.total_amount,
+          date: booking.check_in,
+          category: "Short-term Booking",
+        });
+      }
     }
 
-    // Add mid-term bookings (prorated if needed)
+    // Add mid-term bookings (prorated if needed, only with revenue)
     for (const booking of midTermBookings || []) {
       const bookingStart = new Date(booking.start_date);
       const bookingEnd = new Date(booking.end_date);
@@ -215,15 +217,18 @@ serve(async (req) => {
       const daysInMonth = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0).getDate();
       const proratedAmount = (booking.monthly_rent / daysInMonth) * daysInBooking;
       
-      lineItems.push({
-        reconciliation_id: reconciliation.id,
-        item_type: "mid_term_booking",
-        item_id: booking.id,
-        description: `${booking.tenant_name} - Mid-term Rental (${daysInBooking}/${daysInMonth} days)`,
-        amount: proratedAmount,
-        date: effectiveStart.toISOString().split("T")[0],
-        category: "Mid-term Rental",
-      });
+      // Only add if there's revenue
+      if (proratedAmount > 0) {
+        lineItems.push({
+          reconciliation_id: reconciliation.id,
+          item_type: "mid_term_booking",
+          item_id: booking.id,
+          description: `${booking.tenant_name} - Mid-term Rental (${daysInBooking}/${daysInMonth} days)`,
+          amount: proratedAmount,
+          date: effectiveStart.toISOString().split("T")[0],
+          category: "Mid-term Rental",
+        });
+      }
     }
 
     // Add visits
