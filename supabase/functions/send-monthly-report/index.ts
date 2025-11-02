@@ -163,36 +163,56 @@ const handler = async (req: Request): Promise<Response> => {
       }
 
       property = properties[0];
-      console.log("Found property:", property);
+      console.log("Found property:", property.name, property.id);
 
-      // Fetch visits and expenses for this property (all time for demo)
+      // Fetch visits for THIS property ONLY in the previous month
       const { data: visitsData, error: visitsError } = await supabase
         .from("visits")
         .select("*")
         .eq("property_id", property.id)
+        .gte("date", firstDayOfPreviousMonth.toISOString().split('T')[0])
+        .lte("date", lastDayOfPreviousMonth.toISOString().split('T')[0])
         .order("date", { ascending: false });
 
-      if (visitsError) throw visitsError;
+      if (visitsError) {
+        console.error("Error fetching visits:", visitsError);
+        throw visitsError;
+      }
       visits = visitsData || [];
+      console.log(`Found ${visits.length} visits for ${property.name} in ${previousMonthName}`);
 
+      // Fetch expenses for THIS property ONLY in the previous month
       const { data: expensesData, error: expensesError } = await supabase
         .from("expenses")
         .select("*")
         .eq("property_id", property.id)
+        .gte("date", firstDayOfPreviousMonth.toISOString().split('T')[0])
+        .lte("date", lastDayOfPreviousMonth.toISOString().split('T')[0])
         .order("date", { ascending: false });
 
-      if (expensesError) throw expensesError;
+      if (expensesError) {
+        console.error("Error fetching expenses:", expensesError);
+        throw expensesError;
+      }
       expenses = expensesData || [];
+      console.log(`Found ${expenses.length} expenses for ${property.name} in ${previousMonthName}`);
 
+      // Fetch bookings for THIS property ONLY in the previous month
       const { data: bookingsData, error: bookingsError } = await supabase
         .from("ownerrez_bookings")
         .select("*")
-        .eq("property_id", property.id);
+        .eq("property_id", property.id)
+        .gte("check_in", firstDayOfPreviousMonth.toISOString().split('T')[0])
+        .lte("check_in", lastDayOfPreviousMonth.toISOString().split('T')[0]);
 
-      if (bookingsError) throw bookingsError;
+      if (bookingsError) {
+        console.error("Error fetching bookings:", bookingsError);
+        throw bookingsError;
+      }
       bookings = bookingsData || [];
+      console.log(`Found ${bookings.length} bookings for ${property.name} in ${previousMonthName}`);
 
-      // Check for active mid-term bookings
+      // Check for active mid-term bookings for THIS property in the previous month
       const { data: midTermBookingsData, error: midTermError } = await supabase
         .from("mid_term_bookings")
         .select("*")
@@ -201,10 +221,30 @@ const handler = async (req: Request): Promise<Response> => {
         .gte("end_date", firstDayOfPreviousMonth.toISOString().split('T')[0])
         .lte("start_date", lastDayOfPreviousMonth.toISOString().split('T')[0]);
 
-      if (midTermError) throw midTermError;
+      if (midTermError) {
+        console.error("Error fetching mid-term bookings:", midTermError);
+        throw midTermError;
+      }
       midTermBookings = midTermBookingsData || [];
+      console.log(`Found ${midTermBookings.length} mid-term bookings for ${property.name} in ${previousMonthName}`);
 
-      console.log(`Found ${visits.length} visits, ${expenses.length} expenses, ${bookings.length} bookings, ${midTermBookings.length} mid-term bookings`);
+      // Verify all data belongs to the correct property
+      const invalidVisits = visits.filter(v => v.property_id !== property.id);
+      const invalidExpenses = expenses.filter(e => e.property_id !== property.id);
+      const invalidBookings = bookings.filter(b => b.property_id !== property.id);
+      const invalidMidTerm = midTermBookings.filter(m => m.property_id !== property.id);
+      
+      if (invalidVisits.length > 0 || invalidExpenses.length > 0 || invalidBookings.length > 0 || invalidMidTerm.length > 0) {
+        console.error("CRITICAL ERROR: Data from other properties detected!", {
+          invalidVisits: invalidVisits.length,
+          invalidExpenses: invalidExpenses.length,
+          invalidBookings: invalidBookings.length,
+          invalidMidTerm: invalidMidTerm.length
+        });
+        throw new Error("Data integrity error: Found data belonging to other properties");
+      }
+
+      console.log(`All data verified for property ${property.name} (${property.id})`);
 
       // Generate signed URLs for expense documents
       for (const expense of expenses) {
@@ -370,8 +410,26 @@ State: ${state}
     const otherExpenses = expenses.reduce((sum, e) => sum + Number(e.amount), 0);
     const totalExpensesWithVisits = otherExpenses + visitExpenses + managementFees + orderMinimumFee;
 
-    // Generate professional email with PeachHaus branding and itemized financial statement
-    let emailBody = `
+    console.log("Financial Summary:", {
+      propertyId: property.id,
+      propertyName: property.name,
+      visits: visits.length,
+      expenses: expenses.length,
+      bookings: bookings.length,
+      midTermBookings: midTermBookings.length,
+      visitExpenses: visitExpenses,
+      otherExpenses: otherExpenses,
+      managementFees: managementFees,
+      totalRevenue: totalRevenue,
+      netIncome: netIncome
+    });
+
+    // Generate owner statement email body (only used in reconciliation mode)
+    let emailBody = "";
+    
+    if (isReconciliationMode) {
+      // Generate professional email with PeachHaus branding and itemized financial statement
+      emailBody = `
       <!DOCTYPE html>
       <html>
         <head>
@@ -600,6 +658,7 @@ State: ${state}
         </body>
       </html>
     `;
+    } // End of owner statement email generation
 
     // Determine recipient and subject based on mode
     const recipientEmail = isTestEmail ? test_email : ownerEmail;
