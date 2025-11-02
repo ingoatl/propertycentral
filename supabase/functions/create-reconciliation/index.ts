@@ -58,12 +58,15 @@ serve(async (req) => {
 
     // Fetch mid-term bookings that are active during the month
     // Include bookings that: start during month OR are ongoing (started before and end after/during)
-    const { data: midTermBookings } = await supabaseClient
+    const { data: midTermBookings, error: midTermError } = await supabaseClient
       .from("mid_term_bookings")
       .select("*")
       .eq("property_id", property_id)
+      .eq("status", "active")
       .lte("start_date", lastDayOfMonth.toISOString().split("T")[0])
       .gte("end_date", firstDayOfMonth.toISOString().split("T")[0]);
+
+    console.log(`Found ${midTermBookings?.length || 0} mid-term bookings for the period`);
 
     // Fetch all UNBILLED expenses for the month
     const { data: expenses } = await supabaseClient
