@@ -208,8 +208,9 @@ serve(async (req) => {
     }
     
     const totalRevenue = shortTermRevenue + midTermRevenue;
-    const totalExpenses = (expenses || []).reduce((sum, e) => sum + (e.amount || 0), 0);
     const visitExpenses = (visits || []).reduce((sum, v) => sum + (v.price || 0), 0);
+    // FIXED: Include visit expenses in total expenses
+    const totalExpenses = (expenses || []).reduce((sum, e) => sum + (e.amount || 0), 0) + visitExpenses;
     
     // Management fee uses property-specific percentage
     const managementFee = totalRevenue * (managementFeePercentage / 100);

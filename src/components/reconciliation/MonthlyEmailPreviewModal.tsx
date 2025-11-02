@@ -147,34 +147,86 @@ export const MonthlyEmailPreviewModal = ({
               </p>
             </div>
 
-            {/* Financial Summary */}
+            {/* Itemized Financial Statement */}
             <div className="p-8 bg-gray-50 dark:bg-gray-800/50">
-              <h2 className="text-xl font-bold text-gray-800 dark:text-gray-200 mb-6 uppercase tracking-wide">
-                Financial Summary
+              <h2 className="text-xl font-bold text-gray-800 dark:text-gray-200 mb-6 uppercase tracking-wide border-b-4 border-[#FF8C42] pb-3">
+                Itemized Financial Statement
               </h2>
-              <div className="bg-white dark:bg-gray-900 shadow-sm rounded overflow-hidden">
-                <table className="w-full">
-                  <tbody>
-                    <tr className="border-b dark:border-gray-700">
-                      <td className="p-4 font-semibold text-gray-700 dark:text-gray-300">Total Revenue</td>
-                      <td className="p-4 text-right font-bold text-green-600 dark:text-green-400">
-                        ${Number(reconciliation.total_revenue || 0).toFixed(2)}
-                      </td>
-                    </tr>
-                    <tr className="border-b dark:border-gray-700">
-                      <td className="p-4 font-semibold text-gray-700 dark:text-gray-300">Total Expenses</td>
-                      <td className="p-4 text-right font-bold text-red-600 dark:text-red-400">
-                        ${Number(reconciliation.total_expenses || 0).toFixed(2)}
-                      </td>
-                    </tr>
-                    <tr className="bg-[#5a6c7d] text-white">
-                      <td className="p-5 font-bold text-base">Net Amount Due to Owner</td>
-                      <td className="p-5 text-right font-bold text-xl">
-                        ${Number(reconciliation.net_to_owner || 0).toFixed(2)}
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
+              
+              {/* Revenue Section */}
+              <div className="mb-6">
+                <h3 className="text-sm font-bold text-green-600 dark:text-green-400 uppercase mb-3">Revenue</h3>
+                <div className="bg-white dark:bg-gray-900 rounded-lg overflow-hidden shadow-sm">
+                  {Number(reconciliation.short_term_revenue || 0) > 0 && (
+                    <div className="flex justify-between p-3 border-b dark:border-gray-700">
+                      <span className="text-sm text-gray-700 dark:text-gray-300">Short-term Booking Revenue</span>
+                      <span className="text-sm font-semibold text-green-600 dark:text-green-400">
+                        ${Number(reconciliation.short_term_revenue || 0).toFixed(2)}
+                      </span>
+                    </div>
+                  )}
+                  {Number(reconciliation.mid_term_revenue || 0) > 0 && (
+                    <div className="flex justify-between p-3 border-b dark:border-gray-700">
+                      <span className="text-sm text-gray-700 dark:text-gray-300">Mid-term Rental Revenue</span>
+                      <span className="text-sm font-semibold text-green-600 dark:text-green-400">
+                        ${Number(reconciliation.mid_term_revenue || 0).toFixed(2)}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex justify-between p-4 bg-green-50 dark:bg-green-950/20">
+                    <span className="text-sm font-bold text-green-800 dark:text-green-200">Subtotal: Gross Revenue</span>
+                    <span className="text-sm font-bold text-green-800 dark:text-green-200">
+                      ${Number(reconciliation.total_revenue || 0).toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Expenses Section */}
+              <div className="mb-6">
+                <h3 className="text-sm font-bold text-red-600 dark:text-red-400 uppercase mb-3">Expenses</h3>
+                <div className="bg-white dark:bg-gray-900 rounded-lg overflow-hidden shadow-sm">
+                  <div className="flex justify-between p-3 border-b dark:border-gray-700">
+                    <span className="text-sm text-gray-700 dark:text-gray-300">
+                      Management Fee ({reconciliation.properties?.management_fee_percentage || 15}%)
+                    </span>
+                    <span className="text-sm font-semibold text-red-600 dark:text-red-400">
+                      -${Number(reconciliation.management_fee || 0).toFixed(2)}
+                    </span>
+                  </div>
+                  {Number(reconciliation.order_minimum_fee || 0) > 0 && (
+                    <div className="flex justify-between p-3 border-b dark:border-gray-700">
+                      <span className="text-sm text-gray-700 dark:text-gray-300">Order Minimum Fee</span>
+                      <span className="text-sm font-semibold text-red-600 dark:text-red-400">
+                        -${Number(reconciliation.order_minimum_fee || 0).toFixed(2)}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex justify-between p-3 border-b dark:border-gray-700">
+                    <span className="text-sm text-gray-600 dark:text-gray-400 pl-4">
+                      • Property Visits & Other Expenses
+                    </span>
+                    <span className="text-sm text-gray-600 dark:text-gray-400">
+                      -${Number(reconciliation.total_expenses || 0).toFixed(2)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between p-4 bg-red-50 dark:bg-red-950/20">
+                    <span className="text-sm font-bold text-red-800 dark:text-red-200">Subtotal: Total Expenses</span>
+                    <span className="text-sm font-bold text-red-800 dark:text-red-200">
+                      -${(Number(reconciliation.total_expenses || 0) + Number(reconciliation.management_fee || 0) + Number(reconciliation.order_minimum_fee || 0)).toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Net Section */}
+              <div className="bg-gradient-to-r from-purple-600 to-blue-600 rounded-lg p-5 text-white shadow-lg">
+                <div className="flex justify-between items-center">
+                  <span className="text-base font-bold uppercase tracking-wide">Net Amount to Owner</span>
+                  <span className="text-2xl font-black">
+                    ${Number(reconciliation.net_to_owner || 0).toFixed(2)}
+                  </span>
+                </div>
               </div>
             </div>
 

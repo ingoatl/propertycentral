@@ -46,6 +46,7 @@ const handler = async (req: Request): Promise<Response> => {
     let expenseDocuments: { [key: string]: string } = {};
     let reportDate: string = "";
     let previousMonthName: string;
+    let orderMinimumFee: number = 0;
 
     if (isReconciliationMode) {
       // RECONCILIATION MODE: Fetch approved reconciliation data
@@ -77,7 +78,7 @@ const handler = async (req: Request): Promise<Response> => {
       midTermRevenue = Number(reconciliation.mid_term_revenue || 0);
       expenseTotal = Number(reconciliation.total_expenses || 0);
       managementFees = Number(reconciliation.management_fee || 0);
-      const orderMinimumFee = Number(reconciliation.order_minimum_fee || 0);
+      orderMinimumFee = Number(reconciliation.order_minimum_fee || 0);
       netIncome = Number(reconciliation.net_to_owner || 0);
 
       // Fetch line items for details
@@ -133,7 +134,7 @@ const handler = async (req: Request): Promise<Response> => {
       ownerEmail = "test@peachhaus.com"; // Test email
 
       // Get current and previous month dates
-    const now = new Date();
+      const now = new Date();
       const firstDayOfCurrentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
       const lastDayOfPreviousMonth = new Date(firstDayOfCurrentMonth.getTime() - 1);
       const firstDayOfPreviousMonth = new Date(lastDayOfPreviousMonth.getFullYear(), lastDayOfPreviousMonth.getMonth(), 1);
@@ -212,7 +213,7 @@ const handler = async (req: Request): Promise<Response> => {
           const { data, error } = await supabase.storage
             .from('expense-documents')
             .createSignedUrl(expense.file_path, 604800); // 7 days expiry
-          
+            
           if (!error && data) {
             expenseDocuments[expense.id] = data.signedUrl;
           }
@@ -364,7 +365,12 @@ Keep it CONCISE and SCANNABLE. Each section should be 2-4 lines maximum. DO NOT 
       console.error("Error generating AI insights:", error);
     }
 
-    // Generate professional email with PeachHaus branding
+    // Calculate total expenses including visits
+    const visitExpenses = visits.reduce((sum, v) => sum + Number(v.price), 0);
+    const otherExpenses = expenses.reduce((sum, e) => sum + Number(e.amount), 0);
+    const totalExpensesWithVisits = otherExpenses + visitExpenses + managementFees + orderMinimumFee;
+
+    // Generate professional email with PeachHaus branding and itemized financial statement
     let emailBody = `
       <!DOCTYPE html>
       <html>
@@ -387,7 +393,8 @@ Keep it CONCISE and SCANNABLE. Each section should be 2-4 lines maximum. DO NOT 
             
             <!-- Title Section -->
             <div style="background-color: #5a6c7d; padding: 25px 40px; text-align: center;">
-              <h1 style="color: #ffffff; margin: 0; font-size: 26px; font-weight: 600; letter-spacing: 0.5px;">Monthly Owner Statement</h1>
+              <h1 style="color: #ffffff; margin: 0; font-size: 26px; font-weight: 600; letter-spacing: 0.5px;">
+                Monthly Owner Statement</h1>
               <p style="color: #e8eef3; margin: 8px 0 0 0; font-size: 18px; font-weight: 400;">
                 ${property.name}
               </p>
@@ -413,13 +420,15 @@ Keep it CONCISE and SCANNABLE. Each section should be 2-4 lines maximum. DO NOT 
                 <em>Failure to respond by the deadline will constitute acceptance of this statement as accurate and complete.</em>
               </p>
             </div>
-              
+            
+            <!-- Welcome Message -->
+            <div style="padding: 35px 40px; background-color: #fafafa;">
               <p style="font-size: 16px; line-height: 1.8; color: #34495e; margin: 0 0 30px 0;">
                 We hope this message finds you well! We're excited to share your property's performance for <strong style="color: #8B5CF6;">${previousMonthName}</strong>. 
                 Your trust means everything to us, and we're committed to maximizing your investment while keeping you informed every step of the way.
               </p>
 
-              <!-- Property Info Card with Location -->
+              <!-- Property Info Card -->
               <div style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border-radius: 16px; padding: 25px; margin-bottom: 35px; border: 1px solid #dee2e6; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
                 <div style="display: flex; align-items: start; gap: 15px;">
                   <div style="background: linear-gradient(135deg, #FF6B9D, #C86DD7); width: 50px; height: 50px; border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 4px 12px rgba(255, 107, 157, 0.3);">
@@ -448,60 +457,82 @@ Keep it CONCISE and SCANNABLE. Each section should be 2-4 lines maximum. DO NOT 
                 </div>
               </div>
 
-              <!-- Financial Summary -->
-              <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 35px; border-radius: 16px; margin-bottom: 35px; box-shadow: 0 10px 30px rgba(102, 126, 234, 0.25);">
-                <h2 style="color: white; margin: 0 0 15px 0; font-size: 24px; font-weight: 600; text-align: center;">
-                  💰 Financial Summary
+              <!-- Itemized Financial Statement -->
+              <div style="background-color: #ffffff; border-radius: 12px; padding: 30px; box-shadow: 0 2px 10px rgba(0,0,0,0.08); margin-bottom: 35px;">
+                <h2 style="color: #2c3e50; margin: 0 0 25px 0; font-size: 20px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 3px solid #FF8C42; padding-bottom: 10px;">
+                  Itemized Financial Statement
                 </h2>
-                <p style="text-align: center; color: rgba(255,255,255,0.95); margin: 0 0 25px 0; font-size: 15px;">
-                  ${property.rental_type === 'hybrid' 
-                    ? (hasMidTermBooking 
-                      ? 'Your hybrid property generated revenue from both short-term bookings and mid-term rental this month.' 
-                      : 'Your hybrid property revenue from short-term bookings. We are actively marketing for mid-term opportunities.')
-                    : property.rental_type === 'mid_term'
-                    ? 'Your mid-term rental property performance including tenant revenue and maintenance.'
-                    : 'Your long-term rental property performance this month.'}
-                </p>
-                <table style="width: 100%; border-collapse: separate; border-spacing: 0 12px;">
-                  ${bookingRevenue > 0 ? `
-                  <tr>
-                    <td style="background: rgba(255,255,255,0.15); padding: 18px 22px; border-radius: 10px; backdrop-filter: blur(10px);">
-                      <p style="margin: 0 0 8px 0; color: rgba(255,255,255,0.9); font-size: 13px; text-transform: uppercase; letter-spacing: 1.2px; font-weight: 500;">Short-term Booking Revenue</p>
-                      <p style="margin: 0; color: white; font-size: 32px; font-weight: 700;">$${bookingRevenue.toFixed(2)}</p>
-                    </td>
-                  </tr>` : ''}
-                  ${midTermRevenue > 0 ? `
-                  <tr>
-                    <td style="background: rgba(255,255,255,0.15); padding: 18px 22px; border-radius: 10px; backdrop-filter: blur(10px);">
-                      <p style="margin: 0 0 8px 0; color: rgba(255,255,255,0.9); font-size: 13px; text-transform: uppercase; letter-spacing: 1.2px; font-weight: 500;">Mid-term Rental Revenue</p>
-                      <p style="margin: 0; color: white; font-size: 32px; font-weight: 700;">$${midTermRevenue.toFixed(2)}</p>
-                    </td>
-                  </tr>` : ''}
-                  <tr>
-                    <td style="background: rgba(255,255,255,0.15); padding: 18px 22px; border-radius: 10px; backdrop-filter: blur(10px);">
-                      <p style="margin: 0 0 8px 0; color: rgba(255,255,255,0.9); font-size: 13px; text-transform: uppercase; letter-spacing: 1.2px; font-weight: 500;">Management Fees</p>
-                      <p style="margin: 0; color: white; font-size: 32px; font-weight: 700;">${managementFees > 0 ? '$' + managementFees.toFixed(2) : '$0.00'}</p>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td style="background: rgba(255,255,255,0.15); padding: 18px 22px; border-radius: 10px; backdrop-filter: blur(10px);">
-                      <p style="margin: 0 0 8px 0; color: rgba(255,255,255,0.9); font-size: 13px; text-transform: uppercase; letter-spacing: 1.2px; font-weight: 500;">Property Expenses</p>
-                      <p style="margin: 0; color: white; font-size: 32px; font-weight: 700;">$${expenseTotal.toFixed(2)}</p>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td style="background: linear-gradient(135deg, rgba(255,255,255,0.25), rgba(255,255,255,0.15)); padding: 20px 22px; border-radius: 10px; backdrop-filter: blur(10px); border: 2px solid rgba(255,255,255,0.3);">
-                      <p style="margin: 0 0 8px 0; color: white; font-size: 14px; text-transform: uppercase; letter-spacing: 1.2px; font-weight: 600;">Your Net Income</p>
-                      <p style="margin: 0; color: ${netIncome >= 0 ? '#4ade80' : '#f87171'}; font-size: 38px; font-weight: 800; text-shadow: 0 2px 4px rgba(0,0,0,0.1);">$${netIncome.toFixed(2)}</p>
-                    </td>
-                  </tr>
-                </table>
-                <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid rgba(255,255,255,0.2); text-align: center;">
-                  <p style="margin: 0; color: rgba(255,255,255,0.95); font-size: 15px;">
-                    <strong>Property Visits:</strong> ${visits?.length || 0} professional check-ins 🏃
-                  </p>
+                
+                <!-- REVENUE SECTION -->
+                <div style="margin-bottom: 30px;">
+                  <h3 style="color: #27ae60; margin: 0 0 15px 0; font-size: 16px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">
+                    REVENUE
+                  </h3>
+                  <table style="width: 100%; border-collapse: collapse;">
+                    ${bookingRevenue > 0 ? `
+                    <tr>
+                      <td style="padding: 10px 15px; color: #2c3e50; font-size: 14px; border-bottom: 1px solid #e9ecef;">Short-term Booking Revenue</td>
+                      <td style="padding: 10px 15px; color: #27ae60; font-size: 14px; text-align: right; font-weight: 600; border-bottom: 1px solid #e9ecef;">$${bookingRevenue.toFixed(2)}</td>
+                    </tr>` : ''}
+                    ${midTermRevenue > 0 ? `
+                    <tr>
+                      <td style="padding: 10px 15px; color: #2c3e50; font-size: 14px; border-bottom: 1px solid #e9ecef;">Mid-term Rental Revenue</td>
+                      <td style="padding: 10px 15px; color: #27ae60; font-size: 14px; text-align: right; font-weight: 600; border-bottom: 1px solid #e9ecef;">$${midTermRevenue.toFixed(2)}</td>
+                    </tr>` : ''}
+                    <tr style="background-color: #d5f4e6;">
+                      <td style="padding: 14px 15px; color: #1e7e34; font-size: 15px; font-weight: 700;">Subtotal: Gross Revenue</td>
+                      <td style="padding: 14px 15px; color: #1e7e34; font-size: 15px; text-align: right; font-weight: 800;">$${totalRevenue.toFixed(2)}</td>
+                    </tr>
+                  </table>
                 </div>
-              </div>`;
+
+                <!-- EXPENSES SECTION -->
+                <div style="margin-bottom: 30px;">
+                  <h3 style="color: #e74c3c; margin: 0 0 15px 0; font-size: 16px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">
+                    EXPENSES
+                  </h3>
+                  <table style="width: 100%; border-collapse: collapse;">
+                    <tr>
+                      <td style="padding: 10px 15px; color: #2c3e50; font-size: 14px; border-bottom: 1px solid #e9ecef;">Management Fee (${property.management_fee_percentage || 15}%)</td>
+                      <td style="padding: 10px 15px; color: #c0392b; font-size: 14px; text-align: right; font-weight: 600; border-bottom: 1px solid #e9ecef;">-$${managementFees.toFixed(2)}</td>
+                    </tr>
+                    ${orderMinimumFee > 0 ? `
+                    <tr>
+                      <td style="padding: 10px 15px; color: #2c3e50; font-size: 14px; border-bottom: 1px solid #e9ecef;">Order Minimum Fee</td>
+                      <td style="padding: 10px 15px; color: #c0392b; font-size: 14px; text-align: right; font-weight: 600; border-bottom: 1px solid #e9ecef;">-$${orderMinimumFee.toFixed(2)}</td>
+                    </tr>` : ''}
+                    ${visits && visits.length > 0 ? visits.map((visit: any) => `
+                    <tr>
+                      <td style="padding: 8px 15px; color: #6c757d; font-size: 13px; padding-left: 30px; border-bottom: 1px solid #f1f3f5;">
+                        • Property Visit - ${new Date(visit.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}${visit.description ? ': ' + visit.description : ''}
+                      </td>
+                      <td style="padding: 8px 15px; color: #6c757d; font-size: 13px; text-align: right; border-bottom: 1px solid #f1f3f5;">-$${Number(visit.price).toFixed(2)}</td>
+                    </tr>`).join('') : ''}
+                    ${expenses && expenses.length > 0 ? expenses.map((expense: any) => `
+                    <tr>
+                      <td style="padding: 8px 15px; color: #6c757d; font-size: 13px; padding-left: 30px; border-bottom: 1px solid #f1f3f5;">
+                        • ${new Date(expense.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}: ${expense.purpose || 'Maintenance'}
+                      </td>
+                      <td style="padding: 8px 15px; color: #6c757d; font-size: 13px; text-align: right; border-bottom: 1px solid #f1f3f5;">-$${Number(expense.amount).toFixed(2)}</td>
+                    </tr>`).join('') : ''}
+                    <tr style="background-color: #f8d7da;">
+                      <td style="padding: 14px 15px; color: #721c24; font-size: 15px; font-weight: 700;">Subtotal: Total Expenses</td>
+                      <td style="padding: 14px 15px; color: #721c24; font-size: 15px; text-align: right; font-weight: 800;">-$${totalExpensesWithVisits.toFixed(2)}</td>
+                    </tr>
+                  </table>
+                </div>
+
+                <!-- NET SECTION -->
+                <div>
+                  <table style="width: 100%; border-collapse: collapse;">
+                    <tr style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                      <td style="padding: 20px 20px; color: white; font-weight: 800; font-size: 18px; border-radius: 8px 0 0 8px;">NET AMOUNT TO OWNER</td>
+                      <td style="padding: 20px 20px; color: white; font-weight: 900; font-size: 22px; text-align: right; border-radius: 0 8px 8px 0;">$${netIncome.toFixed(2)}</td>
+                    </tr>
+                  </table>
+                </div>
+              </div>
+            </div>`;
 
     // Add AI Insights Section
     if (aiInsights) {
@@ -517,71 +548,7 @@ Keep it CONCISE and SCANNABLE. Each section should be 2-4 lines maximum. DO NOT 
               </div>`;
     }
 
-    // Add Property Visits as Expenses in Statement
-    if (visits && visits.length > 0) {
-      emailBody += `
-              <h3 style="color: #2c3e50; margin: 0 0 20px 0; font-size: 18px; font-weight: 600;">
-                Property Management Visits
-              </h3>
-              <table style="width: 100%; border-collapse: collapse; background-color: #ffffff; margin-bottom: 24px;">`;
-      
-      visits.forEach((visit, idx) => {
-        const bgColor = idx % 2 === 0 ? '#fafafa' : '#ffffff';
-        emailBody += `
-                <tr style="background-color: ${bgColor};">
-                  <td style="padding: 12px 16px; border-bottom: 1px solid #e1e8ed;">
-                    <div style="font-size: 14px; color: #2c3e50; font-weight: 500;">
-                      ${new Date(visit.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                    </div>
-                    ${visit.description ? `<div style="font-size: 13px; color: #6c757d; margin-top: 4px;">${visit.description}</div>` : ''}
-                  </td>
-                  <td style="padding: 12px 16px; text-align: right; border-bottom: 1px solid #e1e8ed; color: #e74c3c; font-weight: 600; font-size: 15px;">
-                    $${Number(visit.price).toFixed(2)}
-                  </td>
-                </tr>`;
-      });
-      
-      emailBody += `
-              </table>`;
-    }
-
-    // Add Other Expenses
-    if (expenses && expenses.length > 0) {
-      emailBody += `
-              <h3 style="color: #2c3e50; margin: 0 0 20px 0; font-size: 18px; font-weight: 600;">
-                Property Maintenance & Expenses
-              </h3>
-              <table style="width: 100%; border-collapse: collapse; background-color: #ffffff;">`;
-      
-      expenses.forEach((expense, idx) => {
-        const bgColor = idx % 2 === 0 ? '#fafafa' : '#ffffff';
-        emailBody += `
-                <tr style="background-color: ${bgColor};">
-                  <td style="padding: 12px 16px; border-bottom: 1px solid #e1e8ed;">
-                    <div style="font-size: 14px; color: #2c3e50; font-weight: 500;">
-                      ${new Date(expense.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                    </div>
-                    <div style="font-size: 13px; color: #6c757d; margin-top: 4px;">
-                      ${expense.purpose || 'General maintenance'}
-                    </div>
-                  </td>
-                  <td style="padding: 12px 16px; text-align: right; border-bottom: 1px solid #e1e8ed; color: #e74c3c; font-weight: 600; font-size: 15px;">
-                    $${Number(expense.amount).toFixed(2)}
-                  </td>
-                </tr>`;
-      });
-      
-      emailBody += `
-              </table>`;
-    }
-
     emailBody += `
-            </div>`;
-
-    // Closing Message & Footer
-    emailBody += `
-            </div>
-            
             <!-- Footer -->
             <div style="background-color: #2c3e50; color: #ffffff; padding: 32px 40px; text-align: center; border-top: 3px solid #FF8C42;">
               <p style="margin: 0; font-size: 16px; font-weight: 600; letter-spacing: 0.5px;">
@@ -591,12 +558,14 @@ Keep it CONCISE and SCANNABLE. Each section should be 2-4 lines maximum. DO NOT 
                 Questions or concerns? Contact us at <a href="mailto:info@peachhausgroup.com" style="color: #FF8C42; text-decoration: none; font-weight: 600;">info@peachhausgroup.com</a>
               </p>
               <p style="margin: 16px 0 0 0; font-size: 12px; color: #95a5a6; line-height: 1.6;">
-                This is an official financial statement. Please retain for your records.
+                This is an official financial statement. Please retain for your records.<br>
+                Thank you for trusting PeachHaus with your investment property.
               </p>
             </div>
           </div>
         </body>
-      </html>`;
+      </html>
+    `;
 
     // Determine recipient and subject based on mode
     const recipientEmail = isTestEmail ? test_email : ownerEmail;
