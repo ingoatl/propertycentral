@@ -30,12 +30,12 @@ export const MonthlyEmailPreviewModal = ({
       const { error } = await supabase.functions.invoke("send-monthly-report", {
         body: { 
           reconciliation_id: reconciliation.id,
-          test_email: "info@peachhausgroup.com"
+          test_email: "admin@peachhausgroup.com"  // Resend verified email
         },
       });
 
       if (error) throw error;
-      toast.success("Test email sent successfully to info@peachhausgroup.com", { id: toastId });
+      toast.success("Test email sent successfully to admin@peachhausgroup.com", { id: toastId });
     } catch (error: any) {
       toast.error(error.message || "Failed to send test email", { id: toastId });
     } finally {
