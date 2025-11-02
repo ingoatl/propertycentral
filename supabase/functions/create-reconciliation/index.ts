@@ -34,16 +34,22 @@ serve(async (req) => {
 
     const firstDayOfMonth = new Date(month);
     const lastDayOfMonth = new Date(firstDayOfMonth.getFullYear(), firstDayOfMonth.getMonth() + 1, 0);
+    const monthString = firstDayOfMonth.toISOString().split("T")[0];
+
+    console.log(`Checking for existing reconciliation: property=${property_id}, month=${monthString}`);
 
     // Check if reconciliation already exists for this property and month
-    const { data: existingRec } = await supabaseClient
+    const { data: existingRec, error: checkError } = await supabaseClient
       .from("monthly_reconciliations")
       .select("id, status")
       .eq("property_id", property_id)
-      .eq("reconciliation_month", firstDayOfMonth.toISOString().split("T")[0])
+      .eq("reconciliation_month", monthString)
       .maybeSingle();
 
+    console.log(`Existing reconciliation check result:`, { existingRec, checkError });
+
     if (existingRec) {
+      console.log(`Found existing reconciliation ${existingRec.id} with status ${existingRec.status}`);
       return new Response(
         JSON.stringify({ 
           error: `A reconciliation for this property and month already exists (Status: ${existingRec.status})`,
@@ -217,7 +223,7 @@ serve(async (req) => {
       .insert({
         property_id,
         owner_id: property.owner_id,
-        reconciliation_month: firstDayOfMonth.toISOString().split("T")[0],
+        reconciliation_month: monthString,
         total_revenue: totalRevenue,
         short_term_revenue: shortTermRevenue,
         mid_term_revenue: midTermRevenue,
@@ -230,7 +236,20 @@ serve(async (req) => {
       .select()
       .single();
 
-    if (recError) throw recError;
+    if (recError) {
+      // Handle duplicate key error specifically
+      if (recError.code === "23505") {
+        console.error("Duplicate key error - reconciliation already exists");
+        return new Response(
+          JSON.stringify({ 
+            error: "A reconciliation for this property and month already exists",
+            can_delete: false
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 409 }
+        );
+      }
+      throw recError;
+    }
 
     // Create line items
     const lineItems = [];
