@@ -477,21 +477,6 @@ State: ${state}
               </p>
             </div>
 
-            <!-- Legal Notice -->
-            <div style="background-color: #fef8e7; border: 2px solid #f39c12; padding: 24px 40px; margin: 0;">
-              <h3 style="color: #d68910; margin: 0 0 12px 0; font-size: 17px; font-weight: 700; display: flex; align-items: center;">
-                <span style="font-size: 20px; margin-right: 8px;">⚠️</span> Action Required
-              </h3>
-              <p style="color: #7d6608; margin: 0; font-size: 15px; line-height: 1.7;">
-                Please carefully review this financial statement. If you have any questions or discrepancies, 
-                you must notify PeachHaus Property Management in writing by 
-                <strong style="color: #d68910;">${new Date(new Date().getFullYear(), new Date().getMonth() + 1, 5).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</strong>.
-              </p>
-              <p style="color: #7d6608; margin: 12px 0 0 0; font-size: 14px; line-height: 1.7;">
-                <em>Failure to respond by the deadline will constitute acceptance of this statement as accurate and complete.</em>
-              </p>
-            </div>
-            
             <!-- Institutional Header -->
             <div style="padding: 35px 40px; background-color: #f8f9fa; border-bottom: 2px solid #dee2e6;">
               <p style="font-size: 15px; line-height: 1.8; color: #2c3e50; margin: 0 0 12px 0;">
@@ -637,21 +622,26 @@ State: ${state}
                   </div>`}
                 </div>
               </div>
+
+              <!-- Action Required Notice -->
+              <div style="padding: 35px 40px; background-color: #fffbf0;">
+                <div style="background-color: #fef8e7; border: 2px solid #f39c12; padding: 24px; border-radius: 8px;">
+                  <h3 style="color: #d68910; margin: 0 0 12px 0; font-size: 17px; font-weight: 700; display: flex; align-items: center;">
+                    <span style="font-size: 20px; margin-right: 8px;">⚠️</span> Action Required
+                  </h3>
+                  <p style="color: #7d6608; margin: 0; font-size: 15px; line-height: 1.7;">
+                    Please carefully review this financial statement. If you have any questions or discrepancies, 
+                    you must notify PeachHaus Property Management in writing by 
+                    <strong style="color: #d68910;">${new Date(new Date().getFullYear(), new Date().getMonth() + 1, 5).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</strong>.
+                  </p>
+                  <p style="color: #7d6608; margin: 12px 0 0 0; font-size: 14px; line-height: 1.7;">
+                    <em>Failure to respond by the deadline will constitute acceptance of this statement as accurate and complete.</em>
+                  </p>
+                </div>
+              </div>
             </div>`;
 
-    // Add AI Insights Section
-    if (aiInsights) {
-      emailBody += `
-              <!-- Performance Insights Section -->
-              <div style="padding: 35px 40px; background-color: #f8fbfd; border-top: 1px solid #e1e8ed;">
-                <h2 style="color: #2c3e50; margin: 0 0 20px 0; font-size: 20px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center;">
-                  <span style="font-size: 24px; margin-right: 10px;">📊</span> Property Performance & Insights
-                </h2>
-                <div style="color: #4a5568; line-height: 1.9; font-size: 15px; background-color: #ffffff; padding: 24px; border-radius: 6px; border-left: 4px solid #FF8C42;">
-                  ${aiInsights}
-                </div>
-              </div>`;
-    }
+    // AI Insights removed from owner statement - only for performance email
 
     emailBody += `
             <!-- Footer -->

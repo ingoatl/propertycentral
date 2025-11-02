@@ -232,6 +232,12 @@ export const ReconciliationReviewModal = ({
 };
 
 const LineItemRow = ({ item, onToggleVerified, getIcon }: any) => {
+  // Visits should always show as expenses (red) even though stored as positive amounts
+  const isExpense = item.item_type === 'visit' || item.item_type === 'expense' || item.amount < 0;
+  const displayAmount = item.item_type === 'visit' || item.item_type === 'expense' 
+    ? Math.abs(item.amount) 
+    : item.amount;
+  
   return (
     <div className="flex items-start gap-3 p-3 border rounded-lg hover:bg-muted/50">
       <Checkbox
@@ -247,8 +253,8 @@ const LineItemRow = ({ item, onToggleVerified, getIcon }: any) => {
           {format(new Date(item.date + 'T00:00:00'), "MMM dd, yyyy")} • {item.category}
         </p>
       </div>
-      <p className={`font-semibold ${item.amount >= 0 ? "text-green-600" : "text-red-600"}`}>
-        {item.amount >= 0 ? "+" : ""}${Number(item.amount || 0).toFixed(2)}
+      <p className={`font-semibold ${isExpense ? "text-red-600" : "text-green-600"}`}>
+        {isExpense ? "-" : "+"}${displayAmount.toFixed(2)}
       </p>
     </div>
   );
