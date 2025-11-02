@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -22,6 +22,64 @@ export const MonthlyEmailPreviewModal = ({
 }: MonthlyEmailPreviewModalProps) => {
   const [isSendingTest, setIsSendingTest] = useState(false);
   const [isSendingOwner, setIsSendingOwner] = useState(false);
+  const [ownerName, setOwnerName] = useState("Property Owner");
+  const [visitTotal, setVisitTotal] = useState(0);
+  const [expenseTotal, setExpenseTotal] = useState(0);
+
+  useEffect(() => {
+    const fetchOwnerAndLineItems = async () => {
+      if (!reconciliation?.owner_id || !reconciliation?.id) return;
+
+      // Fetch owner name
+      try {
+        const { data: ownerData, error: ownerError } = await supabase
+          .from("property_owners")
+          .select("name")
+          .eq("id", reconciliation.owner_id)
+          .single();
+
+        if (!ownerError && ownerData?.name) {
+          const fullName = ownerData.name;
+          // Extract first names
+          if (fullName.includes('&')) {
+            const owners = fullName.split('&').map((name: string) => name.trim().split(' ')[0]);
+            setOwnerName(owners.join(' & '));
+          } else if (fullName.toLowerCase().includes(' and ')) {
+            const owners = fullName.split(/\sand\s/i).map((name: string) => name.trim().split(' ')[0]);
+            setOwnerName(owners.join(' & '));
+          } else {
+            setOwnerName(fullName.split(' ')[0]);
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching owner name:", error);
+      }
+
+      // Fetch line items to calculate category totals
+      try {
+        const { data: lineItems, error: itemsError } = await supabase
+          .from("reconciliation_line_items")
+          .select("*")
+          .eq("reconciliation_id", reconciliation.id)
+          .eq("verified", true);
+
+        if (!itemsError && lineItems) {
+          const visits = lineItems.filter((item: any) => item.item_type === "visit");
+          const expenses = lineItems.filter((item: any) => item.item_type === "expense");
+          
+          const visitSum = visits.reduce((sum: number, item: any) => sum + Math.abs(item.amount), 0);
+          const expenseSum = expenses.reduce((sum: number, item: any) => sum + Math.abs(item.amount), 0);
+          
+          setVisitTotal(visitSum);
+          setExpenseTotal(expenseSum);
+        }
+      } catch (error) {
+        console.error("Error fetching line items:", error);
+      }
+    };
+
+    fetchOwnerAndLineItems();
+  }, [reconciliation?.owner_id, reconciliation?.id]);
 
   const handleSendTestEmail = async () => {
     setIsSendingTest(true);
@@ -137,7 +195,7 @@ export const MonthlyEmailPreviewModal = ({
             {/* Professional Summary */}
             <div className="p-8 bg-white dark:bg-gray-900">
               <p className="text-sm leading-relaxed text-gray-700 dark:text-gray-300 mb-4">
-                Dear Property Owner,
+                Dear {ownerName},
               </p>
               <p className="text-sm leading-relaxed text-gray-700 dark:text-gray-300 mb-4">
                 Please find enclosed your official monthly financial statement for the period ending {monthLabel}. 
@@ -204,9 +262,9 @@ export const MonthlyEmailPreviewModal = ({
                       </span>
                     </div>
                   )}
-                  <div className="flex justify-between pt-4 bg-green-50 dark:bg-green-950/20 -mx-6 px-6 py-4 rounded-lg">
-                    <span className="text-sm font-bold text-green-800 dark:text-green-200">Subtotal: Gross Revenue</span>
-                    <span className="text-sm font-bold text-green-800 dark:text-green-200">
+                  <div className="flex justify-between pt-4 -mx-6 px-6 py-4 rounded-lg" style={{ backgroundColor: '#E9F8EF' }}>
+                    <span className="text-sm font-bold" style={{ color: '#166534' }}>Subtotal: Gross Revenue</span>
+                    <span className="text-sm font-bold" style={{ color: '#166534' }}>
                       ${Number(reconciliation.total_revenue || 0).toFixed(2)}
                     </span>
                   </div>
@@ -235,19 +293,33 @@ export const MonthlyEmailPreviewModal = ({
                       </span>
                     </div>
                   )}
-                  <div className="flex justify-between pb-3 border-b dark:border-gray-700">
-                    <span className="text-sm text-gray-600 dark:text-gray-400 pl-4">
-                      • Property Visits & Other Expenses
-                    </span>
-                    <span className="text-sm text-gray-600 dark:text-gray-400">
-                      ${Number(reconciliation.total_expenses || 0).toFixed(2)}
+                  {visitTotal > 0 && (
+                    <div className="flex justify-between pb-3 border-b dark:border-gray-700">
+                      <span className="text-sm text-gray-700 dark:text-gray-300">Property Visit / Field Check</span>
+                      <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                        ${visitTotal.toFixed(2)}
+                      </span>
+                    </div>
+                  )}
+                  {expenseTotal > 0 && (
+                    <div className="flex justify-between pb-3 border-b dark:border-gray-700">
+                      <span className="text-sm text-gray-700 dark:text-gray-300">Safety & Readiness Items</span>
+                      <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                        ${expenseTotal.toFixed(2)}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex justify-between pt-4 -mx-6 px-6 py-4 rounded-lg" style={{ backgroundColor: '#FFF3EC' }}>
+                    <span className="text-sm font-bold" style={{ color: '#E86800' }}>Total: Services Provided</span>
+                    <span className="text-sm font-bold" style={{ color: '#E86800' }}>
+                      ${(visitTotal + expenseTotal + Number(reconciliation.management_fee || 0) + Number(reconciliation.order_minimum_fee || 0)).toFixed(2)}
                     </span>
                   </div>
-                  <div className="flex justify-between pt-4 bg-orange-50 dark:bg-orange-950/20 -mx-6 px-6 py-4 rounded-lg">
-                    <span className="text-sm font-bold text-orange-800 dark:text-orange-200">Total: Services Provided</span>
-                    <span className="text-sm font-bold text-orange-800 dark:text-orange-200">
-                      ${(Number(reconciliation.total_expenses || 0) + Number(reconciliation.management_fee || 0) + Number(reconciliation.order_minimum_fee || 0)).toFixed(2)}
-                    </span>
+                  <div className="pt-4 -mx-6 px-6">
+                    <p className="text-xs text-gray-600 dark:text-gray-400 italic leading-relaxed">
+                      Reflects PeachHaus management and service charges for this period.<br />
+                      All services are part of PeachHaus' proactive management to protect property value and guest experience.
+                    </p>
                   </div>
                 </div>
               </div>

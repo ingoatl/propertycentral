@@ -592,7 +592,7 @@ State: ${state}
                       <td style="padding: 12px 0; color: #2c3e50; font-size: 15px; border-bottom: 1px solid #f5f5f5;">Mid-term Rental Revenue</td>
                       <td style="padding: 12px 0; color: #22c55e; font-size: 15px; text-align: right; font-weight: 600; border-bottom: 1px solid #f5f5f5;">$${midTermRevenue.toFixed(2)}</td>
                     </tr>` : ''}
-                    <tr style="background-color: #f0fdf4;">
+                    <tr style="background-color: #E9F8EF;">
                       <td style="padding: 16px 12px; color: #166534; font-size: 16px; font-weight: 700;">Subtotal: Gross Revenue</td>
                       <td style="padding: 16px 12px; color: #166534; font-size: 16px; text-align: right; font-weight: 800;">$${totalRevenue.toFixed(2)}</td>
                     </tr>
@@ -614,56 +614,25 @@ State: ${state}
                       <td style="padding: 12px 0; color: #2c3e50; font-size: 15px; border-bottom: 1px solid #f5f5f5;">Operational Minimum Fee</td>
                       <td style="padding: 12px 0; color: #4a4a4a; font-size: 15px; text-align: right; font-weight: 600; border-bottom: 1px solid #f5f5f5;">$${orderMinimumFee.toFixed(2)}</td>
                     </tr>` : ''}
-                    ${visits && visits.length > 0 ? visits.map((visit: any) => `
+                    ${visitExpenses > 0 ? `
                     <tr>
-                      <td style="padding: 10px 0; color: #6b7280; font-size: 14px; padding-left: 20px; border-bottom: 1px solid #f5f5f5;">
-                        Property Visit - ${new Date(visit.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}${visit.description ? ': ' + visit.description : ''}
+                      <td style="padding: 12px 0; color: #2c3e50; font-size: 15px; border-bottom: 1px solid #f5f5f5;">Property Visit / Field Check</td>
+                      <td style="padding: 12px 0; color: #4a4a4a; font-size: 15px; text-align: right; font-weight: 600; border-bottom: 1px solid #f5f5f5;">$${visitExpenses.toFixed(2)}</td>
+                    </tr>` : ''}
+                    ${otherExpenses > 0 ? `
+                    <tr>
+                      <td style="padding: 12px 0; color: #2c3e50; font-size: 15px; border-bottom: 1px solid #f5f5f5;">Safety & Readiness Items</td>
+                      <td style="padding: 12px 0; color: #4a4a4a; font-size: 15px; text-align: right; font-weight: 600; border-bottom: 1px solid #f5f5f5;">$${otherExpenses.toFixed(2)}</td>
+                    </tr>` : ''}
+                    <tr style="background-color: #FFF3EC;">
+                      <td style="padding: 16px 12px; color: #E86800; font-size: 16px; font-weight: 700;">Total: Services Provided</td>
+                      <td style="padding: 16px 12px; color: #E86800; font-size: 16px; text-align: right; font-weight: 800;">$${totalExpensesWithVisits.toFixed(2)}</td>
+                    </tr>
+                    <tr>
+                      <td colspan="2" style="padding: 16px 0; color: #6b7280; font-size: 13px; line-height: 1.6; font-style: italic;">
+                        Reflects PeachHaus management and service charges for this period.<br>
+                        All services are part of PeachHaus' proactive management to protect property value and guest experience.
                       </td>
-                      <td style="padding: 10px 0; color: #4a4a4a; font-size: 14px; text-align: right; border-bottom: 1px solid #f5f5f5;">$${Number(visit.price).toFixed(2)}</td>
-                    </tr>`).join('') : ''}
-                    ${expenses && expenses.length > 0 ? expenses.map((expense: any) => {
-                      // Split description into lines if it contains newlines or "Items Ordered"
-                      const description = expense.purpose || expense.description || 'Maintenance';
-                      const hasItemsList = description.includes('Items Ordered') || description.includes('\n');
-                      
-                      if (hasItemsList) {
-                        // Extract individual items from the description
-                        const lines = description.split('\n').filter((line: string) => line.trim());
-                        const dateStr = new Date(expense.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-                        
-                        // Return individual rows for each item
-                        return lines.map((line: string, idx: number) => {
-                          // Skip "Items Ordered Price" header
-                          if (line.includes('Items Ordered Price')) return '';
-                          
-                          const cleanLine = line.trim();
-                          if (!cleanLine) return '';
-                          
-                          // Show date only on first item
-                          return `
-                          <tr>
-                            <td style="padding: 8px 0; color: #6b7280; font-size: 13px; padding-left: 20px; border-bottom: 1px solid #f9f9f9; line-height: 1.4;">
-                              ${idx === 0 ? dateStr + ': ' : ''}${cleanLine}
-                            </td>
-                            <td style="padding: 8px 0; color: #4a4a4a; font-size: 13px; text-align: right; border-bottom: 1px solid #f9f9f9;">
-                              ${idx === 0 ? '$' + Number(expense.amount).toFixed(2) : ''}
-                            </td>
-                          </tr>`;
-                        }).join('');
-                      } else {
-                        // Single line item
-                        return `
-                        <tr>
-                          <td style="padding: 10px 0; color: #6b7280; font-size: 14px; padding-left: 20px; border-bottom: 1px solid #f5f5f5;">
-                            ${new Date(expense.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}: ${description}${expense.vendor ? ' - ' + expense.vendor : ''}${expense.category ? ' (' + expense.category + ')' : ''}
-                          </td>
-                          <td style="padding: 10px 0; color: #4a4a4a; font-size: 14px; text-align: right; border-bottom: 1px solid #f5f5f5;">$${Number(expense.amount).toFixed(2)}</td>
-                        </tr>`;
-                      }
-                    }).join('') : ''}
-                    <tr style="background-color: #fef3e2;">
-                      <td style="padding: 16px 12px; color: #92400e; font-size: 16px; font-weight: 700;">Total: Services Provided</td>
-                      <td style="padding: 16px 12px; color: #92400e; font-size: 16px; text-align: right; font-weight: 800;">$${totalExpensesWithVisits.toFixed(2)}</td>
                     </tr>
                   </table>
                 </div>
