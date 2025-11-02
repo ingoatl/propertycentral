@@ -130,6 +130,7 @@ const handler = async (req: Request): Promise<Response> => {
           amount: Math.abs(item.amount),
           purpose: item.description,
           category: item.category,
+          vendor: item.description.includes(' - ') ? item.description.split(' - ')[1] : null,
         }));
 
       bookings = (lineItems || [])
@@ -636,7 +637,7 @@ State: ${state}
                     ${expenses && expenses.length > 0 ? expenses.map((expense: any) => `
                     <tr>
                       <td style="padding: 8px 15px; color: #6c757d; font-size: 13px; padding-left: 30px; border-bottom: 1px solid #f1f3f5;">
-                        • ${new Date(expense.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}: ${expense.purpose || 'Maintenance'}
+                        • ${new Date(expense.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}: ${expense.purpose || 'Maintenance'}${expense.vendor ? ' - ' + expense.vendor : ''}${expense.category ? ' (' + expense.category + ')' : ''}
                       </td>
                       <td style="padding: 8px 15px; color: #6c757d; font-size: 13px; text-align: right; border-bottom: 1px solid #f1f3f5;">-$${Number(expense.amount).toFixed(2)}</td>
                     </tr>`).join('') : ''}
