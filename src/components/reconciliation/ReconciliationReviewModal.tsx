@@ -325,7 +325,7 @@ export const ReconciliationReviewModal = ({
                 </Button>
                 <Button 
                   onClick={() => handleUpdateAndResend(false)}
-                  disabled={isApproving || isSendingTestRevision || (safeUnbilledExpenses.length === 0 && safeUnbilledVisits.length === 0)}
+                  disabled={isApproving || isSendingTestRevision}
                   variant="secondary"
                 >
                   <RotateCcw className="w-4 h-4 mr-2" />
