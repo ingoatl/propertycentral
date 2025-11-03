@@ -175,7 +175,7 @@ export const ReconciliationList = () => {
                     <Eye className="w-4 h-4 mr-2" />
                     Review
                   </Button>
-                  {rec.status === "approved" && (
+                  {(rec.status === "approved" || rec.status === "statement_sent") && (
                     <>
                       <Button 
                         size="sm" 
@@ -209,7 +209,7 @@ export const ReconciliationList = () => {
                         ) : (
                           <>
                             <Send className="w-4 h-4 mr-2" />
-                            Send Owner Statement
+                            {rec.status === "statement_sent" ? "Resend" : "Send"} Owner Statement
                           </>
                         )}
                       </Button>
