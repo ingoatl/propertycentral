@@ -557,10 +557,10 @@ State: ${state}
                 <div style="display: flex; align-items: start; gap: 20px;">
                   ${property.image_path ? `
                   <div style="flex-shrink: 0;">
-                    <img src="${property.image_path.startsWith('http') ? property.image_path : supabaseUrl + '/storage/v1/object/public/property-images/' + property.image_path}" alt="${property.name}" style="width: 180px; height: 120px; object-fit: cover; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);" />
+                    <img src="${property.image_path}" alt="${property.name}" style="width: 180px; height: 120px; object-fit: cover; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);" />
                   </div>` : `
                   <div style="background: linear-gradient(135deg, #FF6B9D, #C86DD7); width: 50px; height: 50px; border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 4px 12px rgba(255, 107, 157, 0.3);">
-                    <span style="font-size: 24px;">${property.rental_type === 'hybrid' ? '🔄' : property.rental_type === 'mid_term' ? '🏠' : '🏢'}</span>
+                    <span style="font-size: 24px;">🏠</span>
                   </div>`}
                   <div style="flex: 1;">
                     <h2 style="margin: 0 0 8px 0; font-size: 22px; color: #2c3e50; font-weight: 600;">
@@ -767,10 +767,10 @@ State: ${state}
               <div style="display: flex; align-items: start; gap: 20px;">
                 ${property.image_path ? `
                 <div style="flex-shrink: 0;">
-                  <img src="${property.image_path.startsWith('http') ? property.image_path : supabaseUrl + '/storage/v1/object/public/property-images/' + property.image_path}" alt="${property.name}" style="width: 180px; height: 120px; object-fit: cover; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);" />
+                  <img src="${property.image_path}" alt="${property.name}" style="width: 180px; height: 120px; object-fit: cover; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);" />
                 </div>` : `
                 <div style="background: linear-gradient(135deg, #667eea, #764ba2); width: 50px; height: 50px; border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);">
-                  <span style="font-size: 24px;">${property.rental_type === 'hybrid' ? '🔄' : property.rental_type === 'mid_term' ? '🏠' : '🏢'}</span>
+                  <span style="font-size: 24px;">🏠</span>
                 </div>`}
                 <div style="flex: 1;">
                   <h2 style="margin: 0 0 8px 0; font-size: 22px; color: #2c3e50; font-weight: 600;">

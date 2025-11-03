@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Mail, Send, TestTube } from "lucide-react";
+import { Mail, Send, TestTube, BarChart3 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -104,6 +104,25 @@ export const MonthlyEmailPreviewModal = ({
       toast.success("Test emails sent successfully to info@peachhausgroup.com", { id: toastId });
     } catch (error: any) {
       toast.error(error.message || "Failed to send test emails", { id: toastId });
+    } finally {
+      setIsSendingTest(false);
+    }
+  };
+
+  const handleSendPerformanceTest = async () => {
+    setIsSendingTest(true);
+    const toastId = toast.loading("Sending test performance report...");
+    try {
+      const { error } = await supabase.functions.invoke("send-monthly-report", {
+        body: { 
+          test_email: "info@peachhausgroup.com"
+        },
+      });
+
+      if (error) throw error;
+      toast.success("Test performance report sent successfully to info@peachhausgroup.com", { id: toastId });
+    } catch (error: any) {
+      toast.error(error.message || "Failed to send test performance report", { id: toastId });
     } finally {
       setIsSendingTest(false);
     }
@@ -360,7 +379,15 @@ export const MonthlyEmailPreviewModal = ({
                 disabled={isSendingTest || isSendingOwner}
               >
                 <TestTube className="w-4 h-4 mr-2" />
-                {isSendingTest ? "Sending..." : "Send Test Email"}
+                {isSendingTest ? "Sending..." : "Test Owner Statement"}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={handleSendPerformanceTest}
+                disabled={isSendingTest || isSendingOwner}
+              >
+                <BarChart3 className="w-4 h-4 mr-2" />
+                Test Performance Report
               </Button>
               <Button
                 onClick={handleSendOwnerEmail}
