@@ -62,6 +62,12 @@ const handler = async (req: Request): Promise<Response> => {
     let orderMinimumFee: number = 0;
     let visitCount: number = 0;
     let expenseCount: number = 0;
+    
+    // Initialize date variables that will be used throughout
+    const now = new Date();
+    const firstDayOfCurrentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const lastDayOfPreviousMonth = new Date(firstDayOfCurrentMonth.getTime() - 1);
+    const firstDayOfPreviousMonth = new Date(lastDayOfPreviousMonth.getFullYear(), lastDayOfPreviousMonth.getMonth(), 1);
 
     if (isReconciliationMode) {
       // RECONCILIATION MODE: Fetch approved reconciliation data
@@ -173,12 +179,6 @@ const handler = async (req: Request): Promise<Response> => {
 
     } else {
       // TEST MODE or MANUAL SEND MODE: Use existing logic
-      
-      // Get current and previous month dates
-      const now = new Date();
-      const firstDayOfCurrentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-      const lastDayOfPreviousMonth = new Date(firstDayOfCurrentMonth.getTime() - 1);
-      const firstDayOfPreviousMonth = new Date(lastDayOfPreviousMonth.getFullYear(), lastDayOfPreviousMonth.getMonth(), 1);
       
       previousMonthName = firstDayOfPreviousMonth.toLocaleDateString('en-US', { 
         month: 'long',
