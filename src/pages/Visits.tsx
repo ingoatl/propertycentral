@@ -35,50 +35,65 @@ const visitSchema = z.object({
 });
 
 // Memoized visit item component for performance
-const VisitItem = memo(({ visit, getPropertyName, getPropertyAddress }: any) => (
-  <div 
-    className="p-4 sm:p-5 border border-border/50 rounded-xl hover:shadow-card transition-all duration-300 bg-gradient-subtle animate-fade-in"
-  >
-    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
-      <div className="flex-1 space-y-2">
-        <h3 className="font-semibold text-base sm:text-lg text-foreground">
-          {getPropertyName(visit.propertyId)}
-        </h3>
-        <p className="text-sm text-muted-foreground flex items-center gap-1.5">
-          <MapPin className="w-3.5 h-3.5 flex-shrink-0" />
-          <span className="line-clamp-1">{getPropertyAddress(visit.propertyId)}</span>
-        </p>
-        <div className="flex flex-wrap items-center gap-3 text-xs sm:text-sm text-muted-foreground">
-          <span className="flex items-center gap-1.5">
-            <CalendarIcon className="w-3.5 h-3.5" />
-            {new Date(visit.date).toLocaleDateString('en-US', { 
-              month: 'short', 
-              day: 'numeric',
-              year: 'numeric'
-            })}
-          </span>
-          <span className="flex items-center gap-1.5">
-            <Clock className="w-3.5 h-3.5" />
-            {visit.time}
-          </span>
+const VisitItem = memo(({ visit, getPropertyName, getPropertyAddress }: any) => {
+  const billingStatus = (visit as any).billed;
+  
+  return (
+    <div 
+      className="p-4 sm:p-5 border border-border/50 rounded-xl hover:shadow-card transition-all duration-300 bg-gradient-subtle animate-fade-in"
+    >
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+        <div className="flex-1 space-y-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h3 className="font-semibold text-base sm:text-lg text-foreground">
+              {getPropertyName(visit.propertyId)}
+            </h3>
+            {billingStatus ? (
+              <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+                Billed
+              </span>
+            ) : (
+              <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                Unbilled
+              </span>
+            )}
+          </div>
+          <p className="text-sm text-muted-foreground flex items-center gap-1.5">
+            <MapPin className="w-3.5 h-3.5 flex-shrink-0" />
+            <span className="line-clamp-1">{getPropertyAddress(visit.propertyId)}</span>
+          </p>
+          <div className="flex flex-wrap items-center gap-3 text-xs sm:text-sm text-muted-foreground">
+            <span className="flex items-center gap-1.5">
+              <CalendarIcon className="w-3.5 h-3.5" />
+              {new Date(visit.date).toLocaleDateString('en-US', { 
+                month: 'short', 
+                day: 'numeric',
+                year: 'numeric'
+              })}
+            </span>
+            <span className="flex items-center gap-1.5">
+              <Clock className="w-3.5 h-3.5" />
+              {visit.time}
+            </span>
+          </div>
+          {(visit as any).visited_by && (
+            <p className="text-sm font-medium text-foreground">
+              👤 {(visit as any).visited_by}
+            </p>
+          )}
+          {visit.notes && (
+            <p className="text-sm text-muted-foreground mt-2 italic border-l-2 border-primary/30 pl-3">
+              {visit.notes}
+            </p>
+          )}
         </div>
-        {(visit as any).visited_by && (
-          <p className="text-sm font-medium text-foreground">
-            👤 {(visit as any).visited_by}
-          </p>
-        )}
-        {visit.notes && (
-          <p className="text-sm text-muted-foreground mt-2 italic border-l-2 border-primary/30 pl-3">
-            {visit.notes}
-          </p>
-        )}
-      </div>
-      <div className="text-left sm:text-right">
-        <p className="text-2xl font-bold text-primary">${visit.price.toFixed(2)}</p>
+        <div className="text-left sm:text-right">
+          <p className="text-2xl font-bold text-primary">${visit.price.toFixed(2)}</p>
+        </div>
       </div>
     </div>
-  </div>
-));
+  );
+});
 
 VisitItem.displayName = "VisitItem";
 

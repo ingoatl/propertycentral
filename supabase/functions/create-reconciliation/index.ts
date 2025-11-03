@@ -179,13 +179,12 @@ serve(async (req) => {
       .gte("date", firstDayOfMonth.toISOString().split("T")[0])
       .lte("date", lastDayOfMonth.toISOString().split("T")[0]);
 
-    // Fetch visits
+    // Fetch ALL UNBILLED visits for this property (not just current month)
     const { data: visits } = await supabaseClient
       .from("visits")
       .select("*")
       .eq("property_id", property_id)
-      .gte("date", firstDayOfMonth.toISOString().split("T")[0])
-      .lte("date", lastDayOfMonth.toISOString().split("T")[0]);
+      .eq("billed", false);
 
     // Calculate totals with prorated mid-term revenue
     const shortTermRevenue = (bookings || []).reduce((sum, b) => sum + (b.total_amount && b.total_amount > 0 ? b.total_amount : 0), 0);
@@ -299,7 +298,7 @@ serve(async (req) => {
       }
     }
 
-    // Add visits as expenses (negative amounts)
+    // Add visits as expenses (negative amounts) and mark as billed
     for (const visit of visits || []) {
       lineItems.push({
         reconciliation_id: reconciliation.id,
@@ -310,6 +309,18 @@ serve(async (req) => {
         date: visit.date,
         category: "Visit Fee",
       });
+    }
+
+    // Mark all included visits as billed
+    if (visits && visits.length > 0) {
+      const visitIds = visits.map(v => v.id);
+      await supabaseClient
+        .from("visits")
+        .update({ 
+          billed: true,
+          reconciliation_id: reconciliation.id 
+        })
+        .in("id", visitIds);
     }
 
     // Add expenses

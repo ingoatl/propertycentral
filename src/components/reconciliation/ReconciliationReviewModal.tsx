@@ -37,7 +37,7 @@ export const ReconciliationReviewModal = ({
         .from("monthly_reconciliations")
         .select(`
           *,
-          properties(name, address, management_fee_percentage),
+          properties(id, name, address, management_fee_percentage),
           property_owners(name, email)
         `)
         .eq("id", reconciliationId)
@@ -53,7 +53,17 @@ export const ReconciliationReviewModal = ({
 
       if (itemsError) throw itemsError;
 
-      return { reconciliation: rec, lineItems: items };
+      // Fetch unbilled visits for this property
+      const { data: unbilledVisits, error: visitsError } = await supabase
+        .from("visits")
+        .select("*")
+        .eq("property_id", rec.properties.id)
+        .eq("billed", false)
+        .order("date", { ascending: false });
+
+      if (visitsError) throw visitsError;
+
+      return { reconciliation: rec, lineItems: items, unbilledVisits: unbilledVisits || [] };
     },
     enabled: open,
   });
@@ -103,7 +113,7 @@ export const ReconciliationReviewModal = ({
 
   if (!data) return null;
 
-  const { reconciliation, lineItems } = data;
+  const { reconciliation, lineItems, unbilledVisits } = data;
   const bookings = lineItems.filter((i: any) => i.item_type === "booking" || i.item_type === "mid_term_booking");
   const expenses = lineItems.filter((i: any) => i.item_type === "expense");
   const visits = lineItems.filter((i: any) => i.item_type === "visit");
@@ -131,6 +141,29 @@ export const ReconciliationReviewModal = ({
             <Badge>{format(new Date(reconciliation.reconciliation_month + 'T00:00:00'), "MMMM yyyy")}</Badge>
           </DialogTitle>
         </DialogHeader>
+
+        {unbilledVisits.length > 0 && (
+          <Card className="p-4 mb-4 border-amber-200 bg-amber-50 dark:bg-amber-950/20">
+            <h3 className="font-semibold mb-2 text-amber-900 dark:text-amber-200 flex items-center gap-2">
+              <Eye className="w-4 h-4" />
+              ⚠️ Unbilled Visits Available ({unbilledVisits.length})
+            </h3>
+            <p className="text-sm text-amber-800 dark:text-amber-300 mb-3">
+              These visits haven't been billed yet. They were automatically included when this reconciliation was created.
+            </p>
+            <div className="space-y-2 max-h-40 overflow-y-auto">
+              {unbilledVisits.map((visit: any) => (
+                <div key={visit.id} className="flex items-center justify-between p-2 bg-white dark:bg-gray-900 rounded border">
+                  <div>
+                    <p className="text-sm font-medium">{visit.visited_by || "Staff"} - {format(new Date(visit.date + 'T00:00:00'), "MMM dd, yyyy")}</p>
+                    <p className="text-xs text-muted-foreground">{visit.notes || "No notes"}</p>
+                  </div>
+                  <Badge variant="outline" className="text-amber-700">${visit.price}</Badge>
+                </div>
+              ))}
+            </div>
+          </Card>
+        )}
 
         <Card className="p-6 bg-muted/50">
           <h3 className="font-semibold mb-4">📊 Financial Summary</h3>

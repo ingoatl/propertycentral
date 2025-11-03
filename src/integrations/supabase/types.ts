@@ -1867,6 +1867,7 @@ export type Database = {
       }
       visits: {
         Row: {
+          billed: boolean | null
           created_at: string
           date: string
           hours: number | null
@@ -1874,11 +1875,13 @@ export type Database = {
           notes: string | null
           price: number
           property_id: string
+          reconciliation_id: string | null
           time: string
           user_id: string | null
           visited_by: string | null
         }
         Insert: {
+          billed?: boolean | null
           created_at?: string
           date: string
           hours?: number | null
@@ -1886,11 +1889,13 @@ export type Database = {
           notes?: string | null
           price: number
           property_id: string
+          reconciliation_id?: string | null
           time: string
           user_id?: string | null
           visited_by?: string | null
         }
         Update: {
+          billed?: boolean | null
           created_at?: string
           date?: string
           hours?: number | null
@@ -1898,6 +1903,7 @@ export type Database = {
           notes?: string | null
           price?: number
           property_id?: string
+          reconciliation_id?: string | null
           time?: string
           user_id?: string | null
           visited_by?: string | null
@@ -1915,6 +1921,13 @@ export type Database = {
             columns: ["property_id"]
             isOneToOne: false
             referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visits_reconciliation_id_fkey"
+            columns: ["reconciliation_id"]
+            isOneToOne: false
+            referencedRelation: "monthly_reconciliations"
             referencedColumns: ["id"]
           },
         ]
