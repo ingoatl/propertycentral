@@ -816,13 +816,40 @@ State: ${state}
 
     // EMAIL 1: Official Statement with Legal Language (ONLY in reconciliation mode)
     if (isReconciliationMode) {
+      // Get owner data with both emails for reconciliation
+      const { data: ownerData } = await supabase
+        .from("property_owners")
+        .select("email, second_owner_email")
+        .eq("id", property.owner_id)
+        .maybeSingle();
+      
+      let statementRecipients: string[] = [];
+      
+      if (ownerData) {
+        // Add primary owner email
+        if (ownerData.email) {
+          statementRecipients.push(ownerData.email);
+        }
+        // Add second owner email if exists
+        if (ownerData.second_owner_email) {
+          statementRecipients.push(ownerData.second_owner_email);
+        }
+      }
+      
+      // Always add info@ for reconciliation statements
+      if (!statementRecipients.includes("info@peachhausgroup.com")) {
+        statementRecipients.push("info@peachhausgroup.com");
+      }
+      
       const statementSubject = isTestEmail 
         ? `[TEST] Monthly Owner Statement - ${property.name} - ${previousMonthName}`
         : `Monthly Owner Statement - ${property.name} - ${previousMonthName}`;
 
+      console.log(`Sending statement to: ${statementRecipients.join(', ')} from ${fromEmail}...`);
+
       statementResponse = await resend.emails.send({
         from: fromEmail,
-        to: [recipientEmail],
+        to: statementRecipients,
         subject: statementSubject,
         html: emailBody,
       });
