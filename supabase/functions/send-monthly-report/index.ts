@@ -47,6 +47,8 @@ const handler = async (req: Request): Promise<Response> => {
     let reportDate: string = "";
     let previousMonthName: string;
     let orderMinimumFee: number = 0;
+    let visitCount: number = 0;
+    let expenseCount: number = 0;
 
     if (isReconciliationMode) {
       // RECONCILIATION MODE: Fetch approved reconciliation data
@@ -91,6 +93,7 @@ const handler = async (req: Request): Promise<Response> => {
       if (itemsCalcError) throw itemsCalcError;
       
       const visitTotal = (lineItemsForCalc || []).reduce((sum: number, item: any) => sum + Math.abs(item.amount), 0);
+      visitCount = lineItemsForCalc?.length || 0;
       
       // CORRECT CALCULATION: Include visits as expenses
       netIncome = totalRevenue - managementFees - orderMinimumFee - expenseTotal - visitTotal;
@@ -132,6 +135,8 @@ const handler = async (req: Request): Promise<Response> => {
           category: item.category,
           vendor: item.description.includes(' - ') ? item.description.split(' - ')[1] : null,
         }));
+      
+      expenseCount = expenses.length;
 
       bookings = (lineItems || [])
         .filter((item: any) => item.item_type === "booking")
@@ -362,13 +367,13 @@ ${property.rental_type === 'mid_term' ? '- MTR-Only model: Focus exclusively on 
 
 **C. Content Structure to Generate**
 
-1. **Performance Highlights**
+ 1. **Performance Highlights**
    - Bookings: ${bookings?.length || 0}
    - Short-term revenue: $${bookingRevenue.toFixed(2)}
    - Mid-term revenue: $${midTermRevenue.toFixed(2)}
    - Total revenue: $${totalRevenue.toFixed(2)}
-   - Property visits: ${visits?.length || 0}
-   - Maintenance tasks: ${visits?.length || 0}
+   - Property visits: ${isReconciliationMode ? visitCount : visits?.length || 0}
+   - Maintenance tasks: ${isReconciliationMode ? expenseCount : expenses?.length || 0}
 
 2. **What PeachHaus Did This Period**
    - Generate 3-5 high-impact actions taken (listing refresh, dynamic pricing, partner engagement, maintenance audit)

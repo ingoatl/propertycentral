@@ -193,7 +193,8 @@ export const ReconciliationReviewModal = ({
               <p className="text-sm">Management Fee ({reconciliation.properties?.management_fee_percentage || 15}%): ${Number(reconciliation.management_fee || 0).toFixed(2)}</p>
               <p className="text-sm">Visit Fees: ${Number(reconciliation.visit_fees || 0).toFixed(2)}</p>
               <p className="text-sm">Expenses: ${Number(reconciliation.total_expenses || 0).toFixed(2)}</p>
-              <p className="font-semibold mt-2 pt-2 border-t text-primary text-lg">Total Due: ${Number(reconciliation.net_to_owner || 0).toFixed(2)}</p>
+              <p className="text-sm">Order Minimum: ${Number(reconciliation.order_minimum_fee || 0).toFixed(2)}</p>
+              <p className="font-semibold mt-2 pt-2 border-t text-primary text-lg">Total Due: ${(Number(reconciliation.management_fee || 0) + Number(reconciliation.visit_fees || 0) + Number(reconciliation.total_expenses || 0) + Number(reconciliation.order_minimum_fee || 0)).toFixed(2)}</p>
             </div>
           </div>
         </Card>
