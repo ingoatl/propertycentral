@@ -137,16 +137,16 @@ serve(async (req) => {
     console.log(`Added ${lineItemsToAdd.length} line items`);
 
     // Update reconciliation totals
-    const newExpenseTotal = (reconciliation.expense_total || 0) + additionalExpenseTotal;
-    const newVisitTotal = (reconciliation.visit_total || 0) + additionalVisitTotal;
-    const newDueFromOwner = reconciliation.total_revenue - reconciliation.management_fees - reconciliation.order_minimum_fee - newExpenseTotal - newVisitTotal;
+    const newExpenseTotal = (reconciliation.total_expenses || 0) + additionalExpenseTotal;
+    const newVisitTotal = (reconciliation.visit_fees || 0) + additionalVisitTotal;
+    const newDueFromOwner = reconciliation.total_revenue - reconciliation.management_fee - reconciliation.order_minimum_fee - newExpenseTotal - newVisitTotal;
 
     const { error: updateError } = await supabase
       .from('monthly_reconciliations')
       .update({
-        expense_total: newExpenseTotal,
-        visit_total: newVisitTotal,
-        due_from_owner: newDueFromOwner
+        total_expenses: newExpenseTotal,
+        visit_fees: newVisitTotal,
+        net_to_owner: newDueFromOwner
       })
       .eq('id', reconciliation_id);
 
