@@ -197,33 +197,59 @@ const handler = async (req: Request): Promise<Response> => {
         // MANUAL MODE: Fetch specific property
         const { data: manualProperty, error: manualError } = await supabase
           .from("properties")
-          .select("*, rental_type")
+          .select("*")
           .eq("id", propertyId)
-          .single();
+          .maybeSingle();
 
-        if (manualError) throw manualError;
+        if (manualError) {
+          console.error("Error fetching property:", manualError);
+          throw manualError;
+        }
         if (!manualProperty) throw new Error("Property not found");
         
         fetchedProperty = manualProperty;
         console.log("Manual send - Found property:", fetchedProperty.name, fetchedProperty.id);
+        console.log("Property owner_id:", fetchedProperty.owner_id);
+        console.log("Property user_id:", fetchedProperty.user_id);
         
-        // Get owner email from property_owners table using owner_id
-        if (!fetchedProperty.owner_id) {
-          throw new Error("Property does not have an owner assigned");
+        let foundEmail = "";
+        
+        // Try to get owner email from property_owners table first using owner_id
+        if (fetchedProperty.owner_id) {
+          const { data: ownerData, error: ownerError } = await supabase
+            .from("property_owners")
+            .select("email")
+            .eq("id", fetchedProperty.owner_id)
+            .maybeSingle();
+          
+          if (!ownerError && ownerData?.email) {
+            foundEmail = ownerData.email;
+            console.log("Found owner email from property_owners:", foundEmail);
+          } else {
+            console.log("Could not find owner in property_owners table, trying profiles...");
+          }
         }
         
-        const { data: ownerData, error: ownerError } = await supabase
-          .from("property_owners")
-          .select("email")
-          .eq("id", fetchedProperty.owner_id)
-          .single();
-        
-        if (ownerError || !ownerData) {
-          throw new Error("Owner not found for property");
+        // Fallback to profiles table using user_id if no owner email found
+        if (!foundEmail && fetchedProperty.user_id) {
+          const { data: profileData, error: profileError } = await supabase
+            .from("profiles")
+            .select("email")
+            .eq("id", fetchedProperty.user_id)
+            .maybeSingle();
+          
+          if (!profileError && profileData?.email) {
+            foundEmail = profileData.email;
+            console.log("Found owner email from profiles:", foundEmail);
+          }
         }
         
-        ownerEmail = ownerData.email;
-        console.log("Found owner email:", ownerEmail);
+        // If still no email found, throw error
+        if (!foundEmail) {
+          throw new Error(`No owner email found for property ${fetchedProperty.name}. Please assign an owner to this property.`);
+        }
+        
+        ownerEmail = foundEmail;
       } else {
         // TEST MODE: Default to info@peachhausgroup.com
         ownerEmail = "info@peachhausgroup.com"; // Test email
