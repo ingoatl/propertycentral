@@ -561,7 +561,12 @@ State: ${state}
               <div style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border-radius: 16px; padding: 25px; margin: 0 40px 35px 40px; border: 1px solid #dee2e6; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
                 <div style="display: flex; align-items: start; gap: 20px;">
                   <div style="flex-shrink: 0;">
-                    <img src="${supabaseUrl}/storage/v1/object/public/property-images/${property.image_path ? property.image_path.split('/').pop() : 'villa14.jpg'}" alt="${property.name}" style="width: 180px; height: 120px; object-fit: cover; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);" onerror="this.src='${supabaseUrl}/storage/v1/object/public/property-images/peachhaus-logo.png'; this.style.width='120px'; this.style.height='auto'; this.style.objectFit='contain';" />
+                    <img 
+                      src="${property.image_path ? `${supabaseUrl}/storage/v1/object/public/property-images/${property.image_path.split('/').pop()}` : `${supabaseUrl}/storage/v1/object/public/property-images/peachhaus-logo.png`}" 
+                      alt="${property.name}" 
+                      style="width: 180px; height: 120px; object-fit: cover; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);" 
+                      onerror="this.onerror=null; this.src='${supabaseUrl}/storage/v1/object/public/property-images/peachhaus-logo.png'; this.style.objectFit='contain'; this.style.padding='20px';" 
+                    />
                   </div>
                   <div style="flex: 1;">
                     <h2 style="margin: 0 0 8px 0; font-size: 22px; color: #2c3e50; font-weight: 600;">
@@ -749,7 +754,41 @@ State: ${state}
             
             <!-- Logo Header -->
             <div style="background-color: #ffffff; padding: 30px 40px; text-align: center; border-bottom: 3px solid #FF8C42;">
-              <img src="${supabaseUrl}/storage/v1/object/public/property-images/peachhaus-logo.png" alt="PeachHaus Property Management" style="max-width: 280px; height: auto;" />
+              <img src="${supabaseUrl}/storage/v1/object/public/property-images/peachhaus-logo.png" alt="PeachHaus Property Management" style="max-width: 280px; height: auto;" onerror="this.style.display='none';" />
+            </div>
+
+            <!-- Property Card with Image -->
+            <div style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border-radius: 16px; padding: 25px; margin: 20px 40px 35px 40px; border: 1px solid #dee2e6; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
+              <div style="display: flex; align-items: start; gap: 20px;">
+                <div style="flex-shrink: 0;">
+                  <img 
+                    src="${property.image_path ? `${supabaseUrl}/storage/v1/object/public/property-images/${property.image_path.split('/').pop()}` : `${supabaseUrl}/storage/v1/object/public/property-images/peachhaus-logo.png`}" 
+                    alt="${property.name}" 
+                    style="width: 180px; height: 120px; object-fit: cover; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);" 
+                    onerror="this.onerror=null; this.src='${supabaseUrl}/storage/v1/object/public/property-images/peachhaus-logo.png'; this.style.objectFit='contain'; this.style.padding='20px';" 
+                  />
+                </div>
+                <div style="flex: 1;">
+                  <h2 style="margin: 0 0 8px 0; font-size: 22px; color: #2c3e50; font-weight: 600;">
+                    ${property.name}
+                  </h2>
+                  <p style="margin: 0 0 8px 0; color: #6c757d; font-size: 15px; line-height: 1.5;">
+                    📍 ${city}, ${state}
+                  </p>
+                  <p style="margin: 0 0 12px 0; color: #8B5CF6; font-size: 14px; font-weight: 500;">
+                    ${metroArea} Area
+                  </p>
+                  <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                    <span style="display: inline-block; background: ${property.rental_type === 'hybrid' ? 'linear-gradient(135deg, #667eea, #764ba2)' : property.rental_type === 'mid_term' ? 'linear-gradient(135deg, #f59e0b, #d97706)' : 'linear-gradient(135deg, #10b981, #059669)'}; color: white; padding: 6px 14px; border-radius: 12px; font-size: 12px; font-weight: 600; letter-spacing: 0.5px; box-shadow: 0 2px 8px rgba(0,0,0,0.15);">
+                      ${property.rental_type === 'hybrid' ? '🔄 HYBRID RENTAL' : property.rental_type === 'mid_term' ? '🏠 MID-TERM RENTAL' : '🏢 LONG-TERM RENTAL'}
+                    </span>
+                    ${hasMidTermBooking ? `
+                    <span style="display: inline-block; background: linear-gradient(135deg, #10b981, #059669); color: white; padding: 6px 14px; border-radius: 12px; font-size: 12px; font-weight: 600; letter-spacing: 0.5px; box-shadow: 0 2px 8px rgba(0,0,0,0.15);">
+                      ✓ ACTIVE TENANT
+                    </span>` : ''}
+                  </div>
+                </div>
+              </div>
             </div>
 
             <!-- Performance Highlights -->
