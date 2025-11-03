@@ -1089,7 +1089,7 @@ State: ${state}
       console.error("Performance email error:", performanceResponse.error);
       throw performanceResponse.error;
     }
-    } // End of performance email (test mode only)
+    } // End of performance email (NOT reconciliation mode)
 
 
     // If in reconciliation mode and NOT a test email, mark expenses as billed and update reconciliation status
