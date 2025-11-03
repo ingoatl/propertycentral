@@ -10,7 +10,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ReconciliationList } from "@/components/reconciliation/ReconciliationList";
 import { UploadLogoButton } from "@/components/reconciliation/UploadLogoButton";
 import { SendTestPerformanceEmailButton } from "@/components/reconciliation/SendTestPerformanceEmailButton";
-import { SendManualEmailsDialog } from "@/components/reconciliation/SendManualEmailsDialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
@@ -431,7 +430,6 @@ export default function MonthlyCharges() {
         <div className="flex gap-2">
           <UploadLogoButton />
           <SendTestPerformanceEmailButton />
-          <SendManualEmailsDialog />
           <Button onClick={exportToCSV} variant="outline" className="gap-2">
             <Download className="w-4 h-4" />
             Export to QuickBooks

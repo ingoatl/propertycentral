@@ -4,14 +4,17 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Eye, Send } from "lucide-react";
+import { Calendar, Eye, Send, Mail, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { CreateReconciliationDialog } from "./CreateReconciliationDialog";
 import { ReconciliationReviewModal } from "./ReconciliationReviewModal";
+import { toast } from "sonner";
 
 export const ReconciliationList = () => {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [selectedReconciliation, setSelectedReconciliation] = useState<string | null>(null);
+  const [sendingTest, setSendingTest] = useState<string | null>(null);
+  const [sendingReal, setSendingReal] = useState<string | null>(null);
 
   const { data: reconciliations, isLoading, refetch } = useQuery({
     queryKey: ["reconciliations"],
@@ -41,6 +44,46 @@ export const ReconciliationList = () => {
     };
     const config = variants[status] || { variant: "outline" as const, label: status };
     return <Badge variant={config.variant}>{config.label}</Badge>;
+  };
+
+  const handleSendTestEmail = async (reconciliationId: string) => {
+    try {
+      setSendingTest(reconciliationId);
+      const { error } = await supabase.functions.invoke('send-monthly-report', {
+        body: { 
+          reconciliation_id: reconciliationId,
+          test_email: "info@peachhausgroup.com"
+        }
+      });
+
+      if (error) throw error;
+      toast.success("Test email sent to info@peachhausgroup.com");
+    } catch (error: any) {
+      console.error('Error sending test email:', error);
+      toast.error(error.message || "Failed to send test email");
+    } finally {
+      setSendingTest(null);
+    }
+  };
+
+  const handleSendRealEmail = async (reconciliationId: string) => {
+    try {
+      setSendingReal(reconciliationId);
+      const { error } = await supabase.functions.invoke('send-monthly-report', {
+        body: { 
+          reconciliation_id: reconciliationId
+        }
+      });
+
+      if (error) throw error;
+      toast.success("Statement sent to owner successfully!");
+      await refetch();
+    } catch (error: any) {
+      console.error('Error sending email to owner:', error);
+      toast.error(error.message || "Failed to send email to owner");
+    } finally {
+      setSendingReal(null);
+    }
   };
 
   return (
@@ -128,10 +171,44 @@ export const ReconciliationList = () => {
                     Review
                   </Button>
                   {rec.status === "approved" && (
-                    <Button size="sm" variant="default">
-                      <Send className="w-4 h-4 mr-2" />
-                      Send Statement
-                    </Button>
+                    <>
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={() => handleSendTestEmail(rec.id)}
+                        disabled={sendingTest === rec.id || sendingReal === rec.id}
+                      >
+                        {sendingTest === rec.id ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Sending Test...
+                          </>
+                        ) : (
+                          <>
+                            <Send className="w-4 h-4 mr-2" />
+                            Send Test
+                          </>
+                        )}
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="default"
+                        onClick={() => handleSendRealEmail(rec.id)}
+                        disabled={sendingTest === rec.id || sendingReal === rec.id}
+                      >
+                        {sendingReal === rec.id ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Sending...
+                          </>
+                        ) : (
+                          <>
+                            <Mail className="w-4 h-4 mr-2" />
+                            Send to Owner
+                          </>
+                        )}
+                      </Button>
+                    </>
                   )}
                 </div>
               </div>
