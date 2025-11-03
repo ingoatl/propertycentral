@@ -70,7 +70,7 @@ const handler = async (req: Request): Promise<Response> => {
     const firstDayOfPreviousMonth = new Date(lastDayOfPreviousMonth.getFullYear(), lastDayOfPreviousMonth.getMonth(), 1);
 
     if (isReconciliationMode) {
-      // RECONCILIATION MODE: Fetch approved reconciliation data
+      // RECONCILIATION MODE: Fetch approved reconciliation data (or already sent statements)
       const { data: reconciliation, error: recError } = await supabase
         .from("monthly_reconciliations")
         .select(`
@@ -79,7 +79,7 @@ const handler = async (req: Request): Promise<Response> => {
           property_owners(email, name, second_owner_name, second_owner_email)
         `)
         .eq("id", reconciliation_id)
-        .eq("status", "approved")
+        .in("status", ["approved", "statement_sent"])
         .single();
 
       if (recError || !reconciliation) {
