@@ -46,28 +46,38 @@ serve(async (req) => {
     const firstDay = new Date(year, month - 1, 1);
     const lastDay = new Date(year, month, 0);
 
-    console.log(`Date range: ${firstDay.toISOString()} to ${lastDay.toISOString()}`);
+    // Format dates as YYYY-MM-DD for date column comparison
+    const firstDayStr = `${year}-${String(month).padStart(2, '0')}-01`;
+    const lastDayStr = `${year}-${String(month).padStart(2, '0')}-${String(lastDay.getDate()).padStart(2, '0')}`;
+
+    console.log(`Date range: ${firstDayStr} to ${lastDayStr}`);
 
     // Find unbilled expenses
     const { data: unbilledExpenses, error: expensesError } = await supabase
       .from('expenses')
       .select('*')
       .eq('property_id', propertyId)
-      .gte('date', firstDay.toISOString())
-      .lte('date', lastDay.toISOString())
+      .gte('date', firstDayStr)
+      .lte('date', lastDayStr)
       .eq('exported', false);
+
+    if (expensesError) {
+      console.error('Error fetching expenses:', expensesError);
+      throw new Error(`Error fetching unbilled expenses: ${expensesError.message}`);
+    }
 
     // Find unbilled visits
     const { data: unbilledVisits, error: visitsError } = await supabase
       .from('visits')
       .select('*')
       .eq('property_id', propertyId)
-      .gte('visit_date', firstDay.toISOString())
-      .lte('visit_date', lastDay.toISOString())
+      .gte('date', firstDayStr)
+      .lte('date', lastDayStr)
       .is('billed', false);
 
-    if (expensesError || visitsError) {
-      throw new Error('Error fetching unbilled items');
+    if (visitsError) {
+      console.error('Error fetching visits:', visitsError);
+      throw new Error(`Error fetching unbilled visits: ${visitsError.message}`);
     }
 
     console.log(`Found ${unbilledExpenses?.length || 0} unbilled expenses, ${unbilledVisits?.length || 0} unbilled visits`);
@@ -98,13 +108,13 @@ serve(async (req) => {
         lineItemsToAdd.push({
           reconciliation_id,
           type: 'visit',
-          description: `Visit - ${visit.visit_type || 'Standard'}`,
-          amount: visit.visit_fee || 30,
-          date: visit.visit_date,
+          description: `Visit - ${visit.visited_by || 'Standard'}`,
+          amount: visit.price || 30,
+          date: visit.date,
           reference_id: visit.id,
           verified: true
         });
-        additionalVisitTotal += visit.visit_fee || 30;
+        additionalVisitTotal += visit.price || 30;
       }
     }
 
