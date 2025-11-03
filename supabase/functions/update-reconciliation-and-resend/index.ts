@@ -119,7 +119,7 @@ serve(async (req) => {
         lineItemsToAdd.push({
           reconciliation_id,
           item_type: 'expense',
-          description: expense.description || 'Expense',
+          description: expense.purpose || expense.description || 'Expense',
           amount: expense.amount,
           date: expense.date,
           item_id: expense.id,
