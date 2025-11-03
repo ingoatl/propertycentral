@@ -94,6 +94,16 @@ export const ReconciliationReviewModal = ({
         (visit: any) => !lineItemVisitIds.includes(visit.id)
       );
 
+      console.log('Reconciliation Review Modal Data:', {
+        reconciliationId,
+        propertyId: rec.properties.id,
+        status: rec.status,
+        unbilledVisitsCount: filteredUnbilledVisits.length,
+        unbilledExpensesCount: filteredUnbilledExpenses.length,
+        unbilledVisits: filteredUnbilledVisits,
+        unbilledExpenses: filteredUnbilledExpenses
+      });
+
       return { 
         reconciliation: rec, 
         lineItems: items, 
