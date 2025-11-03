@@ -161,16 +161,22 @@ export const BillingCalculator = ({
     }
   };
 
-  const hasChanges = additionalVisitFees > 0 || additionalExpenses > 0;
+  // Only show comparison if items are actually checked
+  const hasCheckedItems = selectedVisits.length > 0 || selectedExpenses.length > 0;
 
   return (
     <div className="space-y-4">
-      {/* Current vs New Totals */}
-      {hasChanges && (
-        <Card className="p-4 bg-muted/50">
+      {/* Current vs New Totals - ONLY show when items are checked */}
+      {hasCheckedItems && (
+        <Card className="p-4 bg-muted/50 border-primary">
+          <div className="mb-3">
+            <p className="text-sm font-semibold text-primary">
+              Preview: Adding {selectedVisits.length + selectedExpenses.length} Checked Item(s)
+            </p>
+          </div>
           <div className="grid grid-cols-2 gap-4 mb-4">
             <div>
-              <p className="text-sm text-muted-foreground mb-2">Current Totals</p>
+              <p className="text-sm text-muted-foreground mb-2">Current Reconciliation</p>
               <div className="space-y-1 text-sm">
                 <div className="flex justify-between">
                   <span>Booking Revenue:</span>
@@ -195,7 +201,7 @@ export const BillingCalculator = ({
               </div>
             </div>
             <div>
-              <p className="text-sm text-muted-foreground mb-2">New Totals</p>
+              <p className="text-sm text-muted-foreground mb-2">After Adding Checked Items</p>
               <div className="space-y-1 text-sm">
                 <div className="flex justify-between">
                   <span>Booking Revenue:</span>
@@ -207,15 +213,24 @@ export const BillingCalculator = ({
                 </div>
                 <div className="flex justify-between">
                   <span>Visit Fees:</span>
-                  <span className="font-semibold text-primary">${newVisitFees.toFixed(2)}</span>
+                  <span className={`font-semibold ${additionalVisitFees > 0 ? 'text-primary' : ''}`}>
+                    ${newVisitFees.toFixed(2)}
+                    {additionalVisitFees > 0 && <span className="text-xs ml-1">(+${additionalVisitFees.toFixed(2)})</span>}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span>Expenses:</span>
-                  <span className="font-semibold text-primary">${newExpenses.toFixed(2)}</span>
+                  <span className={`font-semibold ${additionalExpenses > 0 ? 'text-primary' : ''}`}>
+                    ${newExpenses.toFixed(2)}
+                    {additionalExpenses > 0 && <span className="text-xs ml-1">(+${additionalExpenses.toFixed(2)})</span>}
+                  </span>
                 </div>
                 <div className="flex justify-between pt-2 border-t">
                   <span className="font-medium">Due from Owner:</span>
-                  <span className="font-bold text-primary">${newDueFromOwner.toFixed(2)}</span>
+                  <span className="font-bold text-primary">
+                    ${newDueFromOwner.toFixed(2)}
+                    <span className="text-xs ml-1">(+${(additionalVisitFees + additionalExpenses).toFixed(2)})</span>
+                  </span>
                 </div>
               </div>
             </div>

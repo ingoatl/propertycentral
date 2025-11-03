@@ -65,6 +65,7 @@ export const ReconciliationReviewModal = ({
       if (visitsError) throw visitsError;
 
       // Fetch unbilled expenses for this property (from ANY month)
+      // Exclude expenses that are already in this reconciliation's line items
       const { data: unbilledExpenses, error: expensesError } = await supabase
         .from("expenses")
         .select("*")
@@ -74,11 +75,29 @@ export const ReconciliationReviewModal = ({
 
       if (expensesError) throw expensesError;
 
+      // Filter out expenses that are already in line items
+      const lineItemExpenseIds = items
+        ?.filter((item: any) => item.item_type === 'expense')
+        .map((item: any) => item.item_id) || [];
+      
+      const filteredUnbilledExpenses = (unbilledExpenses || []).filter(
+        (expense: any) => !lineItemExpenseIds.includes(expense.id)
+      );
+
+      // Filter out visits that are already in line items
+      const lineItemVisitIds = items
+        ?.filter((item: any) => item.item_type === 'visit')
+        .map((item: any) => item.item_id) || [];
+      
+      const filteredUnbilledVisits = (unbilledVisits || []).filter(
+        (visit: any) => !lineItemVisitIds.includes(visit.id)
+      );
+
       return { 
         reconciliation: rec, 
         lineItems: items, 
-        unbilledVisits: unbilledVisits || [],
-        unbilledExpenses: unbilledExpenses || []
+        unbilledVisits: filteredUnbilledVisits,
+        unbilledExpenses: filteredUnbilledExpenses
       };
     },
     enabled: open,
