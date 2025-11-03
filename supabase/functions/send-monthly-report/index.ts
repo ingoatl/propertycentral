@@ -797,37 +797,21 @@ State: ${state}
                 Performance Highlights
               </h2>
               <div style="background-color: #ffffff; padding: 24px; border-radius: 8px; border-left: 4px solid #FF8C42;">
-                <ul style="list-style: none; padding: 0; margin: 0;">
-                  <li style="padding: 10px 0; border-bottom: 1px solid #f0f0f0; display: flex; justify-content: space-between; align-items: center;">
-                    <span style="color: #6c757d; font-size: 15px;">Bookings:</span>
-                    <span style="color: #2c3e50; font-size: 18px; font-weight: 600;">${bookings?.length || 0}</span>
-                  </li>
-                  <li style="padding: 10px 0; border-bottom: 1px solid #f0f0f0; display: flex; justify-content: space-between; align-items: center;">
-                    <span style="color: #6c757d; font-size: 15px;">Short-term Revenue:</span>
-                    <span style="color: #27ae60; font-size: 18px; font-weight: 600;">$${bookingRevenue.toFixed(2)}</span>
-                  </li>
-                  <li style="padding: 10px 0; border-bottom: 1px solid #f0f0f0; display: flex; justify-content: space-between; align-items: center;">
-                    <span style="color: #6c757d; font-size: 15px;">Mid-term Revenue:</span>
-                    <span style="color: #27ae60; font-size: 18px; font-weight: 600;">$${midTermRevenue.toFixed(2)}</span>
-                  </li>
-                  ${midTermBookings && midTermBookings.length > 0 ? `
-                  <li style="padding: 10px 0; border-bottom: 1px solid #f0f0f0; display: flex; justify-content: space-between; align-items: center;">
-                    <span style="color: #6c757d; font-size: 15px;">Active Tenant:</span>
-                    <span style="color: #8B5CF6; font-size: 16px; font-weight: 600;">${midTermBookings[0].tenant_name}</span>
-                  </li>` : ''}
-                  <li style="padding: 10px 0; border-bottom: 1px solid #f0f0f0; display: flex; justify-content: space-between; align-items: center;">
-                    <span style="color: #6c757d; font-size: 15px;">Total Revenue:</span>
-                    <span style="color: #27ae60; font-size: 20px; font-weight: 700;">$${totalRevenue.toFixed(2)}</span>
-                  </li>
-                  <li style="padding: 10px 0; display: flex; justify-content: space-between; align-items: center;">
-                    <span style="color: #6c757d; font-size: 15px;">Property Visits:</span>
-                    <span style="color: #2c3e50; font-size: 18px; font-weight: 600;">${visits?.length || 0}</span>
-                  </li>
-                  <li style="padding: 10px 0; display: flex; justify-content: space-between; align-items: center;">
-                    <span style="color: #6c757d; font-size: 15px;">Maintenance Tasks:</span>
-                    <span style="color: #2c3e50; font-size: 18px; font-weight: 600;">${visits?.length || 0}</span>
-                  </li>
-                </ul>
+                ${bookingRevenue > 0 ? `
+                <p style="color: #6c757d; font-size: 15px; margin: 0 0 12px 0;">
+                  Short-term Revenue: <span style="color: #27ae60; font-weight: 600; font-size: 18px;">$${bookingRevenue.toFixed(2)}</span>
+                </p>` : ''}
+                ${midTermRevenue > 0 ? `
+                <p style="color: #6c757d; font-size: 15px; margin: 0 0 12px 0;">
+                  Mid-term Revenue: <span style="color: #27ae60; font-weight: 600; font-size: 18px;">$${midTermRevenue.toFixed(2)}</span>
+                </p>` : ''}
+                ${midTermBookings && midTermBookings.length > 0 ? `
+                <p style="color: #6c757d; font-size: 15px; margin: 0 0 12px 0;">
+                  Active Tenant: <span style="color: #8B5CF6; font-weight: 600; font-size: 16px;">${midTermBookings[0].tenant_name}</span>
+                </p>` : ''}
+                <p style="color: #6c757d; font-size: 15px; margin: 0;">
+                  Total Revenue: <span style="color: #27ae60; font-weight: 700; font-size: 20px;">$${totalRevenue.toFixed(2)}</span>
+                </p>
               </div>
             </div>
 
