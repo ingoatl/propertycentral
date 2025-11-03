@@ -1026,26 +1026,41 @@ State: ${state}
     const isPerformanceEmail = emailTypeToSend === 'performance';
     const isOwnerStatement = emailTypeToSend === 'owner_statement';
     
-    const performanceSubject = (isTestEmail || isManualMode) 
-      ? `[${isTestEmail ? 'TEST' : 'MANUAL'}] Property Performance Report - ${property.name} - ${previousMonthName}`
+    const performanceSubject = isTestEmail
+      ? `[TEST] Property Performance Report - ${property.name} - ${previousMonthName}`
       : `Property Performance Report - ${property.name} - ${previousMonthName}`;
 
-    const statementSubject = (isTestEmail || isManualMode)
-      ? `[${isTestEmail ? 'TEST' : 'MANUAL'}] Monthly Owner Statement - ${property.name} - ${previousMonthName}`
+    const statementSubject = isTestEmail
+      ? `[TEST] Monthly Owner Statement - ${property.name} - ${previousMonthName}`
       : `Monthly Owner Statement - ${property.name} - ${previousMonthName}`;
     
-    // Determine recipients for manual send
+    // Determine recipients - include both primary and secondary owner emails
     let emailRecipients: string[] = [];
-    if (isManualMode) {
-      if (sendToOwner && ownerEmail) {
-        emailRecipients.push(ownerEmail);
+    
+    if (isManualMode || isReconciliationMode) {
+      // Get owner data with both emails
+      const { data: ownerData } = await supabase
+        .from("property_owners")
+        .select("email, second_owner_email")
+        .eq("id", property.owner_id)
+        .maybeSingle();
+      
+      if (ownerData) {
+        // Add primary owner email
+        if (ownerData.email) {
+          emailRecipients.push(ownerData.email);
+        }
+        // Add second owner email if exists
+        if (ownerData.second_owner_email) {
+          emailRecipients.push(ownerData.second_owner_email);
+        }
       }
-      if (sendCopyToInfo) {
+      
+      // Add info@ if requested in manual mode
+      if (isManualMode && sendCopyToInfo) {
         emailRecipients.push("info@peachhausgroup.com");
       }
     } else if (isTestEmail) {
-      emailRecipients = [ownerEmail];
-    } else if (isReconciliationMode) {
       emailRecipients = [ownerEmail];
     } else {
       emailRecipients = [ownerEmail];
