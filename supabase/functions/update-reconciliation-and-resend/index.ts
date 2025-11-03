@@ -91,11 +91,11 @@ serve(async (req) => {
       for (const expense of unbilledExpenses) {
         lineItemsToAdd.push({
           reconciliation_id,
-          type: 'expense',
+          item_type: 'expense',
           description: expense.description || 'Expense',
           amount: expense.amount,
           date: expense.date,
-          reference_id: expense.id,
+          item_id: expense.id,
           verified: true
         });
         additionalExpenseTotal += expense.amount;
@@ -107,11 +107,11 @@ serve(async (req) => {
       for (const visit of unbilledVisits) {
         lineItemsToAdd.push({
           reconciliation_id,
-          type: 'visit',
+          item_type: 'visit',
           description: `Visit - ${visit.visited_by || 'Standard'}`,
           amount: visit.price || 30,
           date: visit.date,
-          reference_id: visit.id,
+          item_id: visit.id,
           verified: true
         });
         additionalVisitTotal += visit.price || 30;
@@ -182,7 +182,7 @@ serve(async (req) => {
           description: item.description,
           amount: item.amount,
           date: item.date,
-          type: item.type
+          type: item.item_type
         }))
       }
     });
