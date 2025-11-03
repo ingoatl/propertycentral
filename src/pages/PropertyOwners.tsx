@@ -32,6 +32,8 @@ interface PropertyOwner {
   name: string;
   email: string;
   phone: string | null;
+  second_owner_name: string | null;
+  second_owner_email: string | null;
   stripe_customer_id: string | null;
   payment_method: "card" | "ach";
   created_at: string;
@@ -82,6 +84,8 @@ const PropertyOwners = () => {
     name: "",
     email: "",
     phone: "",
+    second_owner_name: "",
+    second_owner_email: "",
   });
 
   useEffect(() => {
@@ -255,6 +259,8 @@ const PropertyOwners = () => {
       name: owner.name,
       email: owner.email,
       phone: owner.phone || "",
+      second_owner_name: owner.second_owner_name || "",
+      second_owner_email: owner.second_owner_email || "",
     });
     setEditDialogOpen(true);
   };
@@ -268,6 +274,8 @@ const PropertyOwners = () => {
       name: z.string().min(1, "Name is required").max(255),
       email: z.string().email("Invalid email address").max(255),
       phone: z.string().optional(),
+      second_owner_name: z.string().optional(),
+      second_owner_email: z.string().email("Invalid email address").optional().or(z.literal("")),
     }).safeParse(editForm);
 
     if (!validation.success) {
@@ -283,6 +291,8 @@ const PropertyOwners = () => {
           name: editForm.name,
           email: editForm.email,
           phone: editForm.phone || null,
+          second_owner_name: editForm.second_owner_name || null,
+          second_owner_email: editForm.second_owner_email || null,
         })
         .eq("id", editingOwner.id);
 
@@ -428,7 +438,7 @@ const PropertyOwners = () => {
           </DialogHeader>
           <form onSubmit={handleUpdateOwner} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="edit-name">Owner Name</Label>
+              <Label htmlFor="edit-name">Primary Owner Name</Label>
               <Input
                 id="edit-name"
                 value={editForm.name}
@@ -438,7 +448,7 @@ const PropertyOwners = () => {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="edit-email">Email</Label>
+              <Label htmlFor="edit-email">Primary Owner Email</Label>
               <Input
                 id="edit-email"
                 type="email"
@@ -449,7 +459,26 @@ const PropertyOwners = () => {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="edit-phone">Phone</Label>
+              <Label htmlFor="edit-second-name">Second Owner Name (Optional)</Label>
+              <Input
+                id="edit-second-name"
+                value={editForm.second_owner_name}
+                onChange={(e) => setEditForm({ ...editForm, second_owner_name: e.target.value })}
+                placeholder="Jane Doe"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-second-email">Second Owner Email (Optional)</Label>
+              <Input
+                id="edit-second-email"
+                type="email"
+                value={editForm.second_owner_email}
+                onChange={(e) => setEditForm({ ...editForm, second_owner_email: e.target.value })}
+                placeholder="owner2@example.com"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-phone">Phone (Shared)</Label>
               <Input
                 id="edit-phone"
                 type="tel"
