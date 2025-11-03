@@ -176,7 +176,14 @@ export const ReconciliationReviewModal = ({
       if (isTest) {
         toast.success('Test revised statement sent to info@peachhausgroup.com');
       } else {
-        toast.success(`Added ${data.added.expenses} expense(s) and ${data.added.visits} visit(s). Revised statement sent to owner.`);
+        const expensesAdded = data?.added?.expenses || 0;
+        const visitsAdded = data?.added?.visits || 0;
+        
+        if (expensesAdded > 0 || visitsAdded > 0) {
+          toast.success(`Added ${expensesAdded} expense(s) and ${visitsAdded} visit(s). Revised statement sent to owner.`);
+        } else {
+          toast.success('Statement sent to owner successfully.');
+        }
         refetch();
         onSuccess?.();
         onOpenChange(false);
