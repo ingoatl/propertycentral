@@ -158,10 +158,10 @@ export const ReconciliationList = () => {
                     <div className="col-span-2">
                       <p className="text-xs text-muted-foreground">Due from Owner</p>
                       <p className="font-bold text-primary text-lg">
-                        ${(Number(rec.management_fee || 0) + Number(rec.visit_fees || 0) + Number(rec.total_expenses || 0) + Number(rec.order_minimum_fee || 0)).toFixed(2)}
+                        ${(Number(rec.management_fee || 0) + Number(rec.visit_fees || 0) + Number(rec.total_expenses || 0)).toFixed(2)}
                       </p>
                       <p className="text-xs text-muted-foreground mt-1">
-                        Mgmt Fee + Order Min + Visits + Expenses
+                        Mgmt Fee + Visits + Expenses
                       </p>
                     </div>
                   </div>

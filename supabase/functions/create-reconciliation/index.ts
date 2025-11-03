@@ -213,7 +213,7 @@ serve(async (req) => {
     // Management fee calculated from booking revenue (property-specific percentage)
     const managementFee = totalRevenue * (managementFeePercentage / 100);
     
-    // Due from Owner = Management Fee + Visit Fees + Expenses (what owner owes us)
+    // Due from Owner = Management Fee + Visit Fees + Expenses (NOT including order_minimum_fee)
     const dueFromOwner = managementFee + visitFees + totalExpenses;
 
     console.log(`Reconciliation calculation: Short-term: $${shortTermRevenue}, Mid-term: $${midTermRevenue}, Total Revenue: $${totalRevenue}, Visit Fees: $${visitFees}, Expenses: $${totalExpenses}, Management Fee (${managementFeePercentage}%): $${managementFee}, Due from Owner: $${dueFromOwner}`);
