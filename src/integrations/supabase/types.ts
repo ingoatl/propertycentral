@@ -1612,9 +1612,56 @@ export type Database = {
           },
         ]
       }
+      reconciliation_audit_log: {
+        Row: {
+          action: string
+          created_at: string
+          id: string
+          item_id: string | null
+          new_values: Json | null
+          notes: string | null
+          previous_values: Json | null
+          reconciliation_id: string
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          id?: string
+          item_id?: string | null
+          new_values?: Json | null
+          notes?: string | null
+          previous_values?: Json | null
+          reconciliation_id: string
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          id?: string
+          item_id?: string | null
+          new_values?: Json | null
+          notes?: string | null
+          previous_values?: Json | null
+          reconciliation_id?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reconciliation_audit_log_reconciliation_id_fkey"
+            columns: ["reconciliation_id"]
+            isOneToOne: false
+            referencedRelation: "monthly_reconciliations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       reconciliation_line_items: {
         Row: {
+          added_by: string | null
           amount: number
+          approved_at: string | null
+          approved_by: string | null
           category: string | null
           created_at: string
           date: string
@@ -1624,11 +1671,16 @@ export type Database = {
           id: string
           item_id: string
           item_type: string
+          notes: string | null
           reconciliation_id: string
+          source: string | null
           verified: boolean | null
         }
         Insert: {
+          added_by?: string | null
           amount: number
+          approved_at?: string | null
+          approved_by?: string | null
           category?: string | null
           created_at?: string
           date: string
@@ -1638,11 +1690,16 @@ export type Database = {
           id?: string
           item_id: string
           item_type: string
+          notes?: string | null
           reconciliation_id: string
+          source?: string | null
           verified?: boolean | null
         }
         Update: {
+          added_by?: string | null
           amount?: number
+          approved_at?: string | null
+          approved_by?: string | null
           category?: string | null
           created_at?: string
           date?: string
@@ -1652,7 +1709,9 @@ export type Database = {
           id?: string
           item_id?: string
           item_type?: string
+          notes?: string | null
           reconciliation_id?: string
+          source?: string | null
           verified?: boolean | null
         }
         Relationships: [

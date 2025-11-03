@@ -113,7 +113,16 @@ serve(async (req) => {
     let additionalExpenseTotal = 0;
     let additionalVisitTotal = 0;
 
-    // Create line items for new unbilled expenses
+    // Get current user for audit trail
+    const authHeader = req.headers.get("Authorization");
+    let currentUserId = null;
+    if (authHeader) {
+      const token = authHeader.replace("Bearer ", "");
+      const { data: { user } } = await supabase.auth.getUser(token);
+      currentUserId = user?.id;
+    }
+
+    // Create line items for new unbilled expenses - ALL START AS UNCHECKED
     if (newExpenses && newExpenses.length > 0) {
       for (const expense of newExpenses) {
         lineItemsToAdd.push({
@@ -123,13 +132,16 @@ serve(async (req) => {
           amount: expense.amount,
           date: expense.date,
           item_id: expense.id,
-          verified: true
+          category: expense.category,
+          verified: false, // Manual approval required
+          source: 'unbilled_expense',
+          added_by: currentUserId
         });
         additionalExpenseTotal += expense.amount;
       }
     }
 
-    // Create line items for new unbilled visits
+    // Create line items for new unbilled visits - ALL START AS UNCHECKED
     if (newVisits && newVisits.length > 0) {
       for (const visit of newVisits) {
         lineItemsToAdd.push({
@@ -139,7 +151,10 @@ serve(async (req) => {
           amount: visit.price || 30,
           date: visit.date,
           item_id: visit.id,
-          verified: true
+          category: 'Visit Fee',
+          verified: false, // Manual approval required
+          source: 'unbilled_visit',
+          added_by: currentUserId
         });
         additionalVisitTotal += visit.price || 30;
       }

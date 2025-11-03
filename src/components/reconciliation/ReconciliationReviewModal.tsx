@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -9,10 +9,10 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
-import { Check, Home, DollarSign, Eye, RotateCcw, Package } from "lucide-react";
-import { BillingCalculator } from "./BillingCalculator";
+import { Check, Home, DollarSign, Eye, RotateCcw, AlertTriangle, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { MonthlyEmailPreviewModal } from "./MonthlyEmailPreviewModal";
+import { calculateDueFromOwnerFromLineItems } from "@/lib/reconciliationCalculations";
 
 interface ReconciliationReviewModalProps {
   reconciliationId: string;
@@ -30,7 +30,7 @@ export const ReconciliationReviewModal = ({
   const [notes, setNotes] = useState("");
   const [isApproving, setIsApproving] = useState(false);
   const [showEmailPreview, setShowEmailPreview] = useState(false);
-  const [isSendingTestRevision, setIsSendingTestRevision] = useState(false);
+  const queryClient = useQueryClient();
 
   const { data, refetch } = useQuery({
     queryKey: ["reconciliation", reconciliationId],
@@ -55,7 +55,7 @@ export const ReconciliationReviewModal = ({
 
       if (itemsError) throw itemsError;
 
-      // Fetch unbilled visits for this property (from ANY month)
+      // Fetch unbilled visits for this property
       const { data: unbilledVisits, error: visitsError } = await supabase
         .from("visits")
         .select("*")
@@ -65,8 +65,7 @@ export const ReconciliationReviewModal = ({
 
       if (visitsError) throw visitsError;
 
-      // Fetch unbilled expenses for this property (from ANY month)
-      // Exclude expenses that are already in this reconciliation's line items
+      // Fetch unbilled expenses for this property
       const { data: unbilledExpenses, error: expensesError } = await supabase
         .from("expenses")
         .select("*")
@@ -76,7 +75,7 @@ export const ReconciliationReviewModal = ({
 
       if (expensesError) throw expensesError;
 
-      // Filter out expenses that are already in line items
+      // Filter out already included items
       const lineItemExpenseIds = items
         ?.filter((item: any) => item.item_type === 'expense')
         .map((item: any) => item.item_id) || [];
@@ -85,7 +84,6 @@ export const ReconciliationReviewModal = ({
         (expense: any) => !lineItemExpenseIds.includes(expense.id)
       );
 
-      // Filter out visits that are already in line items
       const lineItemVisitIds = items
         ?.filter((item: any) => item.item_type === 'visit')
         .map((item: any) => item.item_id) || [];
@@ -93,16 +91,6 @@ export const ReconciliationReviewModal = ({
       const filteredUnbilledVisits = (unbilledVisits || []).filter(
         (visit: any) => !lineItemVisitIds.includes(visit.id)
       );
-
-      console.log('Reconciliation Review Modal Data:', {
-        reconciliationId,
-        propertyId: rec.properties.id,
-        status: rec.status,
-        unbilledVisitsCount: filteredUnbilledVisits.length,
-        unbilledExpensesCount: filteredUnbilledExpenses.length,
-        unbilledVisits: filteredUnbilledVisits,
-        unbilledExpenses: filteredUnbilledExpenses
-      });
 
       return { 
         reconciliation: rec, 
@@ -114,19 +102,102 @@ export const ReconciliationReviewModal = ({
     enabled: open,
   });
 
-  const handleToggleVerified = async (itemId: string, currentValue: boolean) => {
-    const { error } = await supabase
-      .from("reconciliation_line_items")
-      .update({ verified: !currentValue })
-      .eq("id", itemId);
+  const toggleVerifiedMutation = useMutation({
+    mutationFn: async ({ itemId, currentValue }: { itemId: string; currentValue: boolean }) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      const updates: any = { verified: !currentValue };
+      
+      // Record approval metadata when checking an item
+      if (!currentValue) {
+        updates.approved_by = user?.id;
+        updates.approved_at = new Date().toISOString();
+      } else {
+        // Clear approval when unchecking
+        updates.approved_by = null;
+        updates.approved_at = null;
+      }
 
-    if (error) {
+      const { error } = await supabase
+        .from("reconciliation_line_items")
+        .update(updates)
+        .eq("id", itemId);
+
+      if (error) throw error;
+
+      // Log the action in audit trail
+      await supabase.from("reconciliation_audit_log").insert({
+        reconciliation_id: reconciliationId,
+        action: !currentValue ? 'item_approved' : 'item_rejected',
+        user_id: user?.id,
+        item_id: itemId,
+        notes: `Item ${!currentValue ? 'approved' : 'unapproved'} by user`
+      });
+
+      return { itemId, newValue: !currentValue };
+    },
+    onSuccess: () => {
+      refetch();
+      toast.success("Item status updated");
+    },
+    onError: () => {
       toast.error("Failed to update verification status");
-      return;
     }
+  });
 
-    refetch();
-  };
+  const fixTotalsMutation = useMutation({
+    mutationFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!data?.lineItems || !data?.reconciliation) {
+        throw new Error("Missing data");
+      }
+
+      // Calculate correct totals from line items
+      const calculated = calculateDueFromOwnerFromLineItems(
+        data.lineItems,
+        data.reconciliation.management_fee,
+        data.reconciliation.order_minimum_fee
+      );
+
+      // Update reconciliation with corrected values
+      const { error } = await supabase
+        .from("monthly_reconciliations")
+        .update({
+          visit_fees: calculated.visitFees,
+          total_expenses: calculated.totalExpenses,
+          net_to_owner: data.reconciliation.total_revenue - calculated.dueFromOwner
+        })
+        .eq("id", reconciliationId);
+
+      if (error) throw error;
+
+      // Log the correction in audit trail
+      await supabase.from("reconciliation_audit_log").insert({
+        reconciliation_id: reconciliationId,
+        action: 'total_recalculated',
+        user_id: user?.id,
+        previous_values: {
+          visit_fees: data.reconciliation.visit_fees,
+          total_expenses: data.reconciliation.total_expenses
+        },
+        new_values: {
+          visit_fees: calculated.visitFees,
+          total_expenses: calculated.totalExpenses
+        },
+        notes: 'Totals recalculated from line items'
+      });
+
+      return calculated;
+    },
+    onSuccess: () => {
+      refetch();
+      toast.success("Totals fixed successfully");
+    },
+    onError: () => {
+      toast.error("Failed to fix totals");
+    }
+  });
 
   const handleApprove = async () => {
     setIsApproving(true);
@@ -156,60 +227,31 @@ export const ReconciliationReviewModal = ({
     }
   };
 
-  const handleUpdateAndResend = async (isTest = false) => {
-    if (isTest) {
-      setIsSendingTestRevision(true);
-    } else {
-      setIsApproving(true);
-    }
-    
-    try {
-      const { data, error } = await supabase.functions.invoke('update-reconciliation-and-resend', {
-        body: { 
-          reconciliation_id: reconciliationId,
-          test_email: isTest ? 'info@peachhausgroup.com' : undefined
-        }
-      });
-
-      if (error) throw error;
-
-      if (isTest) {
-        toast.success('Test revised statement sent to info@peachhausgroup.com');
-      } else {
-        const expensesAdded = data?.added?.expenses || 0;
-        const visitsAdded = data?.added?.visits || 0;
-        
-        if (expensesAdded > 0 || visitsAdded > 0) {
-          toast.success(`Added ${expensesAdded} expense(s) and ${visitsAdded} visit(s). Revised statement sent to owner.`);
-        } else {
-          toast.success('Statement sent to owner successfully.');
-        }
-        refetch();
-        onSuccess?.();
-        onOpenChange(false);
-      }
-    } catch (error: any) {
-      console.error('Error updating and resending:', error);
-      toast.error(error.message || "Failed to update and resend");
-    } finally {
-      if (isTest) {
-        setIsSendingTestRevision(false);
-      } else {
-        setIsApproving(false);
-      }
-    }
-  };
-
-
   if (!data) return null;
 
   const { reconciliation, lineItems, unbilledVisits, unbilledExpenses } = data;
-  const bookings = lineItems.filter((i: any) => i.item_type === "booking" || i.item_type === "mid_term_booking");
-  const expenses = lineItems.filter((i: any) => i.item_type === "expense");
-  const visits = lineItems.filter((i: any) => i.item_type === "visit");
-  const orderMinimums = lineItems.filter((i: any) => i.item_type === "order_minimum");
   
-  // Ensure arrays are defined with fallbacks
+  // Calculate actual totals from verified line items
+  const calculated = calculateDueFromOwnerFromLineItems(
+    lineItems,
+    reconciliation.management_fee,
+    reconciliation.order_minimum_fee
+  );
+
+  // Check for discrepancies
+  const hasDiscrepancy = 
+    Math.abs(reconciliation.visit_fees - calculated.visitFees) > 0.01 ||
+    Math.abs(reconciliation.total_expenses - calculated.totalExpenses) > 0.01;
+
+  // Split items by verification status and type
+  const verifiedItems = lineItems.filter((i: any) => i.verified);
+  const unverifiedItems = lineItems.filter((i: any) => !i.verified);
+  
+  const bookings = verifiedItems.filter((i: any) => i.item_type === "booking" || i.item_type === "mid_term_booking");
+  const expenses = verifiedItems.filter((i: any) => i.item_type === "expense");
+  const visits = verifiedItems.filter((i: any) => i.item_type === "visit");
+  const orderMinimums = verifiedItems.filter((i: any) => i.item_type === "order_minimum");
+  
   const safeUnbilledVisits = unbilledVisits || [];
   const safeUnbilledExpenses = unbilledExpenses || [];
 
@@ -233,9 +275,40 @@ export const ReconciliationReviewModal = ({
           </DialogTitle>
         </DialogHeader>
 
+        {hasDiscrepancy && (
+          <Card className="p-4 bg-amber-50 dark:bg-amber-950 border-amber-200 dark:border-amber-800">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5" />
+              <div className="flex-1">
+                <h4 className="font-semibold text-amber-900 dark:text-amber-100 mb-1">Totals Mismatch Detected</h4>
+                <p className="text-sm text-amber-800 dark:text-amber-200 mb-3">
+                  Stored totals don't match line items. Click "Fix Totals" to recalculate from verified items.
+                </p>
+                <div className="grid grid-cols-2 gap-2 text-xs mb-3">
+                  <div>
+                    <p className="text-amber-700 dark:text-amber-300">Stored: ${reconciliation.visit_fees.toFixed(2)} visits, ${reconciliation.total_expenses.toFixed(2)} expenses</p>
+                  </div>
+                  <div>
+                    <p className="text-amber-700 dark:text-amber-300">Calculated: ${calculated.visitFees.toFixed(2)} visits, ${calculated.totalExpenses.toFixed(2)} expenses</p>
+                  </div>
+                </div>
+                <Button 
+                  size="sm" 
+                  onClick={() => fixTotalsMutation.mutate()}
+                  disabled={fixTotalsMutation.isPending}
+                  variant="outline"
+                  className="bg-white dark:bg-gray-900"
+                >
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  {fixTotalsMutation.isPending ? "Fixing..." : "Fix Totals"}
+                </Button>
+              </div>
+            </div>
+          </Card>
+        )}
 
         <Card className="p-6 bg-muted/50">
-          <h3 className="font-semibold mb-4">📊 Financial Summary</h3>
+          <h3 className="font-semibold mb-4">📊 Financial Summary (From Verified Items)</h3>
           <div className="grid grid-cols-2 gap-6">
             <div>
               <p className="text-sm text-muted-foreground mb-2">Booking Revenue (Owner Keeps)</p>
@@ -246,62 +319,89 @@ export const ReconciliationReviewModal = ({
             <div>
               <p className="text-sm text-muted-foreground mb-2">Amount Due from Owner</p>
               <p className="text-sm">Management Fee ({reconciliation.properties?.management_fee_percentage || 15}%): ${Number(reconciliation.management_fee || 0).toFixed(2)}</p>
-              <p className="text-sm">Visit Fees: ${Number(reconciliation.visit_fees || 0).toFixed(2)}</p>
-              <p className="text-sm">Expenses: ${Number(reconciliation.total_expenses || 0).toFixed(2)}</p>
+              <p className="text-sm">Visit Fees: ${calculated.visitFees.toFixed(2)}</p>
+              <p className="text-sm">Expenses: ${calculated.totalExpenses.toFixed(2)}</p>
               <p className="text-sm">Order Minimum: ${Number(reconciliation.order_minimum_fee || 0).toFixed(2)}</p>
-              <p className="font-semibold mt-2 pt-2 border-t text-primary text-lg">Total Due: ${(Number(reconciliation.management_fee || 0) + Number(reconciliation.visit_fees || 0) + Number(reconciliation.total_expenses || 0) + Number(reconciliation.order_minimum_fee || 0)).toFixed(2)}</p>
+              <p className="font-semibold mt-2 pt-2 border-t text-primary text-lg">Total Due: ${calculated.dueFromOwner.toFixed(2)}</p>
             </div>
           </div>
         </Card>
 
-        <Tabs defaultValue="all" className="mt-4">
+        <Tabs defaultValue="unapproved" className="mt-4">
           <TabsList>
-            <TabsTrigger value="all">All ({lineItems.length})</TabsTrigger>
+            <TabsTrigger value="unapproved" className="relative">
+              Needs Approval ({unverifiedItems.length})
+              {unverifiedItems.length > 0 && (
+                <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full" />
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="all">Approved ({verifiedItems.length})</TabsTrigger>
             <TabsTrigger value="bookings">Bookings ({bookings.length})</TabsTrigger>
             <TabsTrigger value="expenses">Expenses ({expenses.length})</TabsTrigger>
             <TabsTrigger value="visits">Visits ({visits.length})</TabsTrigger>
-            <TabsTrigger value="unbilled">
-              Unbilled Items ({safeUnbilledVisits.length + safeUnbilledExpenses.length})
-            </TabsTrigger>
           </TabsList>
 
+          <TabsContent value="unapproved" className="space-y-2">
+            {unverifiedItems.length === 0 ? (
+              <Card className="p-6 text-center text-muted-foreground">
+                <Check className="w-8 h-8 mx-auto mb-2 text-green-500" />
+                <p>All items have been approved</p>
+              </Card>
+            ) : (
+              unverifiedItems.map((item: any) => (
+                <LineItemRow 
+                  key={item.id} 
+                  item={item} 
+                  onToggleVerified={(id, val) => toggleVerifiedMutation.mutate({ itemId: id, currentValue: val })} 
+                  getIcon={getItemIcon}
+                  showWarnings 
+                />
+              ))
+            )}
+          </TabsContent>
+
           <TabsContent value="all" className="space-y-2">
-            {lineItems.map((item: any) => (
-              <LineItemRow key={item.id} item={item} onToggleVerified={handleToggleVerified} getIcon={getItemIcon} />
+            {verifiedItems.map((item: any) => (
+              <LineItemRow 
+                key={item.id} 
+                item={item} 
+                onToggleVerified={(id, val) => toggleVerifiedMutation.mutate({ itemId: id, currentValue: val })} 
+                getIcon={getItemIcon} 
+              />
             ))}
           </TabsContent>
 
           <TabsContent value="bookings" className="space-y-2">
             {bookings.map((item: any) => (
-              <LineItemRow key={item.id} item={item} onToggleVerified={handleToggleVerified} getIcon={getItemIcon} />
+              <LineItemRow 
+                key={item.id} 
+                item={item} 
+                onToggleVerified={(id, val) => toggleVerifiedMutation.mutate({ itemId: id, currentValue: val })} 
+                getIcon={getItemIcon} 
+              />
             ))}
           </TabsContent>
 
           <TabsContent value="expenses" className="space-y-2">
             {expenses.map((item: any) => (
-              <LineItemRow key={item.id} item={item} onToggleVerified={handleToggleVerified} getIcon={getItemIcon} />
+              <LineItemRow 
+                key={item.id} 
+                item={item} 
+                onToggleVerified={(id, val) => toggleVerifiedMutation.mutate({ itemId: id, currentValue: val })} 
+                getIcon={getItemIcon} 
+              />
             ))}
           </TabsContent>
 
           <TabsContent value="visits" className="space-y-2">
             {visits.map((item: any) => (
-              <LineItemRow key={item.id} item={item} onToggleVerified={handleToggleVerified} getIcon={getItemIcon} />
+              <LineItemRow 
+                key={item.id} 
+                item={item} 
+                onToggleVerified={(id, val) => toggleVerifiedMutation.mutate({ itemId: id, currentValue: val })} 
+                getIcon={getItemIcon} 
+              />
             ))}
-          </TabsContent>
-
-          <TabsContent value="unbilled">
-            <BillingCalculator
-              reconciliationId={reconciliationId}
-              propertyId={reconciliation.properties.id}
-              currentRevenue={Number(reconciliation.total_revenue || 0)}
-              currentVisitFees={Number(reconciliation.visit_fees || 0)}
-              currentExpenses={Number(reconciliation.total_expenses || 0)}
-              currentManagementFee={Number(reconciliation.management_fee || 0)}
-              managementFeePercentage={Number(reconciliation.properties?.management_fee_percentage || 15)}
-              unbilledVisits={safeUnbilledVisits}
-              unbilledExpenses={safeUnbilledExpenses}
-              onRecalculate={refetch}
-            />
           </TabsContent>
         </Tabs>
 
@@ -320,28 +420,8 @@ export const ReconciliationReviewModal = ({
             Close
           </Button>
           <div className="flex gap-2">
-            {(reconciliation.status === "approved" || reconciliation.status === "statement_sent") && (
-              <>
-                <Button 
-                  onClick={() => handleUpdateAndResend(true)}
-                  disabled={isSendingTestRevision || isApproving}
-                  variant="outline"
-                >
-                  <Eye className="w-4 h-4 mr-2" />
-                  {isSendingTestRevision ? "Sending Test..." : "Send Test Revision"}
-                </Button>
-                <Button 
-                  onClick={() => handleUpdateAndResend(false)}
-                  disabled={isApproving || isSendingTestRevision}
-                  variant="secondary"
-                >
-                  <RotateCcw className="w-4 h-4 mr-2" />
-                  {isApproving ? "Processing..." : "Add Items & Send to Owner"}
-                </Button>
-              </>
-            )}
             {reconciliation.status === "draft" && (
-              <Button onClick={handleApprove} disabled={isApproving}>
+              <Button onClick={handleApprove} disabled={isApproving || unverifiedItems.length > 0}>
                 <Check className="w-4 h-4 mr-2" />
                 {isApproving ? "Approving..." : "Approve Reconciliation"}
               </Button>
@@ -365,15 +445,18 @@ export const ReconciliationReviewModal = ({
   );
 };
 
-const LineItemRow = ({ item, onToggleVerified, getIcon }: any) => {
-  // Visits should always show as expenses (red) even though stored as positive amounts
+const LineItemRow = ({ item, onToggleVerified, getIcon, showWarnings = false }: any) => {
   const isExpense = item.item_type === 'visit' || item.item_type === 'expense' || item.amount < 0;
   const displayAmount = item.item_type === 'visit' || item.item_type === 'expense' 
     ? Math.abs(item.amount) 
     : item.amount;
   
+  const missingSource = !item.source;
+  const missingAddedBy = !item.added_by;
+  const hasWarning = showWarnings && (missingSource || missingAddedBy);
+  
   return (
-    <div className="flex items-start gap-3 p-3 border rounded-lg hover:bg-muted/50">
+    <div className={`flex items-start gap-3 p-3 border rounded-lg hover:bg-muted/50 ${hasWarning ? 'border-amber-300 bg-amber-50/50 dark:bg-amber-950/20' : ''}`}>
       <Checkbox
         checked={item.verified}
         onCheckedChange={() => onToggleVerified(item.id, item.verified)}
@@ -382,10 +465,25 @@ const LineItemRow = ({ item, onToggleVerified, getIcon }: any) => {
         {getIcon(item.item_type)}
       </div>
       <div className="flex-1 min-w-0">
-        <p className="font-medium break-words">{item.description}</p>
-        <p className="text-xs text-muted-foreground">
-          {format(new Date(item.date + 'T00:00:00'), "MMM dd, yyyy")} • {item.category}
-        </p>
+        <div className="flex items-center gap-2 mb-1">
+          <p className="font-medium break-words">{item.description}</p>
+          {hasWarning && (
+            <span title="Missing source or added_by metadata">
+              <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0" />
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
+          <span>{format(new Date(item.date + 'T00:00:00'), "MMM dd, yyyy")}</span>
+          {item.category && <span>• {item.category}</span>}
+          {item.source && <span>• Source: {item.source}</span>}
+          {showWarnings && missingSource && (
+            <Badge variant="destructive" className="text-xs">Missing Source</Badge>
+          )}
+          {showWarnings && missingAddedBy && (
+            <Badge variant="destructive" className="text-xs">Missing Added By</Badge>
+          )}
+        </div>
       </div>
       <p className={`font-semibold ${isExpense ? "text-red-600" : "text-green-600"}`}>
         {isExpense ? "-" : "+"}${displayAmount.toFixed(2)}

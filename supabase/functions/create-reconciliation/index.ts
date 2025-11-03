@@ -348,10 +348,19 @@ serve(async (req) => {
       category: "Order Minimum Fee",
     });
 
-    if (lineItems.length > 0) {
+    // Create line items with verified: false (manual approval required)
+    // Add source tracking and creation metadata
+    const lineItemsWithMetadata = lineItems.map(item => ({
+      ...item,
+      verified: false, // All items start unchecked for manual approval
+      source: 'auto_generated',
+      added_by: user.id
+    }));
+
+    if (lineItemsWithMetadata.length > 0) {
       const { error: lineItemError } = await supabaseClient
         .from("reconciliation_line_items")
-        .insert(lineItems);
+        .insert(lineItemsWithMetadata);
 
       if (lineItemError) throw lineItemError;
     }
