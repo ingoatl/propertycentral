@@ -76,11 +76,17 @@ export const ReconciliationList = () => {
                     <p>Owner: {rec.property_owners?.name}</p>
                     <p>Month: {format(new Date(rec.reconciliation_month + "T00:00:00"), "MMMM yyyy")}</p>
                   </div>
-                  <div className="grid grid-cols-5 gap-4 mt-4 pt-4 border-t">
+                  <div className="grid grid-cols-6 gap-4 mt-4 pt-4 border-t">
                     <div>
                       <p className="text-xs text-muted-foreground">Revenue</p>
                       <p className="font-semibold text-green-600">
                         ${Number(rec.total_revenue || 0).toFixed(2)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Visit Fees</p>
+                      <p className="font-semibold text-red-600">
+                        ${Number(rec.visit_fees || 0).toFixed(2)}
                       </p>
                     </div>
                     <div>
@@ -102,7 +108,7 @@ export const ReconciliationList = () => {
                       </p>
                     </div>
                     <div>
-                      <p className="text-xs text-muted-foreground">Net to Owner</p>
+                      <p className="text-xs text-muted-foreground">Due from Owner</p>
                       <p className="font-semibold text-primary">
                         ${Number(rec.net_to_owner || 0).toFixed(2)}
                       </p>
