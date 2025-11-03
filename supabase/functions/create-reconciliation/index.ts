@@ -209,14 +209,14 @@ serve(async (req) => {
     
     const totalRevenue = shortTermRevenue + midTermRevenue;
     const visitExpenses = (visits || []).reduce((sum, v) => sum + (v.price || 0), 0);
-    // FIXED: Include visit expenses in total expenses
-    const totalExpenses = (expenses || []).reduce((sum, e) => sum + (e.amount || 0), 0) + visitExpenses;
+    const otherExpenses = (expenses || []).reduce((sum, e) => sum + (e.amount || 0), 0);
+    const totalExpenses = otherExpenses + visitExpenses;
     
     // Management fee uses property-specific percentage
     const managementFee = totalRevenue * (managementFeePercentage / 100);
-    const netToOwner = totalRevenue - totalExpenses - visitExpenses - managementFee - orderMinimumFee;
+    const netToOwner = totalRevenue - totalExpenses - managementFee - orderMinimumFee;
 
-    console.log(`Reconciliation calculation: Short-term: $${shortTermRevenue}, Mid-term: $${midTermRevenue}, Total Revenue: $${totalRevenue}, Management Fee (${managementFeePercentage}%): $${managementFee}, Order Minimum: $${orderMinimumFee}, Net to Owner: $${netToOwner}`);
+    console.log(`Reconciliation calculation: Short-term: $${shortTermRevenue}, Mid-term: $${midTermRevenue}, Total Revenue: $${totalRevenue}, Visit Fees: $${visitExpenses}, Other Expenses: $${otherExpenses}, Management Fee (${managementFeePercentage}%): $${managementFee}, Order Minimum: $${orderMinimumFee}, Net to Owner: $${netToOwner}`);
 
     // Create reconciliation
     const { data: reconciliation, error: recError } = await supabaseClient
@@ -228,7 +228,8 @@ serve(async (req) => {
         total_revenue: totalRevenue,
         short_term_revenue: shortTermRevenue,
         mid_term_revenue: midTermRevenue,
-        total_expenses: totalExpenses,
+        visit_fees: visitExpenses,
+        total_expenses: otherExpenses,
         management_fee: managementFee,
         order_minimum_fee: orderMinimumFee,
         net_to_owner: netToOwner,

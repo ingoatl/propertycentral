@@ -690,6 +690,7 @@ export type Database = {
           total_expenses: number
           total_revenue: number
           updated_at: string
+          visit_fees: number
         }
         Insert: {
           approved_at?: string | null
@@ -719,6 +720,7 @@ export type Database = {
           total_expenses?: number
           total_revenue?: number
           updated_at?: string
+          visit_fees?: number
         }
         Update: {
           approved_at?: string | null
@@ -748,6 +750,7 @@ export type Database = {
           total_expenses?: number
           total_revenue?: number
           updated_at?: string
+          visit_fees?: number
         }
         Relationships: [
           {
