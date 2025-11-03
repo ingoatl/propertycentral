@@ -37,13 +37,16 @@ serve(async (req) => {
     }
 
     const propertyId = reconciliation.properties.id;
-    const reconciliationMonth = new Date(reconciliation.month);
+    const reconciliationMonthStr = reconciliation.reconciliation_month;
 
-    console.log(`Property: ${propertyId}, Month: ${reconciliation.month}`);
+    console.log(`Property: ${propertyId}, Month: ${reconciliationMonthStr}`);
 
-    // Calculate date range for the month
-    const firstDay = new Date(reconciliationMonth.getFullYear(), reconciliationMonth.getMonth(), 1);
-    const lastDay = new Date(reconciliationMonth.getFullYear(), reconciliationMonth.getMonth() + 1, 0);
+    // Parse the date string properly (it's stored as YYYY-MM-DD)
+    const [year, month] = reconciliationMonthStr.split('-').map(Number);
+    const firstDay = new Date(year, month - 1, 1);
+    const lastDay = new Date(year, month, 0);
+
+    console.log(`Date range: ${firstDay.toISOString()} to ${lastDay.toISOString()}`);
 
     // Find unbilled expenses
     const { data: unbilledExpenses, error: expensesError } = await supabase
