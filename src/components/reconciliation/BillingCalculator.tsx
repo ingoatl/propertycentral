@@ -52,6 +52,7 @@ export const BillingCalculator = ({
   const [selectedExpenses, setSelectedExpenses] = useState<string[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
 
+  // Only calculate totals for CHECKED items
   const additionalVisitFees = unbilledVisits
     .filter((v) => selectedVisits.includes(v.id))
     .reduce((sum, v) => sum + v.price, 0);
@@ -65,8 +66,9 @@ export const BillingCalculator = ({
   const newDueFromOwner = currentManagementFee + newVisitFees + newExpenses;
 
   const handleIncludeItems = async () => {
+    // Validate that at least one item is checked
     if (selectedVisits.length === 0 && selectedExpenses.length === 0) {
-      toast.error("Please select at least one item to include");
+      toast.error("Please check at least one item to include");
       return;
     }
 
@@ -223,7 +225,7 @@ export const BillingCalculator = ({
             disabled={isProcessing}
             className="w-full"
           >
-            {isProcessing ? "Processing..." : `Include ${selectedVisits.length + selectedExpenses.length} Items`}
+            {isProcessing ? "Processing..." : `Include ${selectedVisits.length + selectedExpenses.length} Checked Items`}
           </Button>
         </Card>
       )}
@@ -240,8 +242,14 @@ export const BillingCalculator = ({
               <Card key={visit.id} className="p-3">
                 <div className="flex items-start gap-3">
                   <Checkbox
+                    id={`visit-${visit.id}`}
                     checked={selectedVisits.includes(visit.id)}
                     onCheckedChange={(checked) => {
+                      // Validate checked is a boolean
+                      if (typeof checked !== 'boolean') {
+                        console.error('Invalid checked state for visit:', visit.id);
+                        return;
+                      }
                       if (checked) {
                         setSelectedVisits([...selectedVisits, visit.id]);
                       } else {
@@ -287,8 +295,14 @@ export const BillingCalculator = ({
               <Card key={expense.id} className="p-3">
                 <div className="flex items-start gap-3">
                   <Checkbox
+                    id={`expense-${expense.id}`}
                     checked={selectedExpenses.includes(expense.id)}
                     onCheckedChange={(checked) => {
+                      // Validate checked is a boolean
+                      if (typeof checked !== 'boolean') {
+                        console.error('Invalid checked state for expense:', expense.id);
+                        return;
+                      }
                       if (checked) {
                         setSelectedExpenses([...selectedExpenses, expense.id]);
                       } else {
