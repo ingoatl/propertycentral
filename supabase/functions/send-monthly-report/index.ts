@@ -762,6 +762,39 @@ State: ${state}
               </p>
             </div>
 
+            <!-- Property Info Card -->
+            <div style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border-radius: 16px; padding: 25px; margin: 35px 40px; border: 1px solid #dee2e6; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
+              <div style="display: flex; align-items: start; gap: 20px;">
+                ${property.image_path ? `
+                <div style="flex-shrink: 0;">
+                  <img src="${property.image_path.startsWith('http') ? property.image_path : supabaseUrl + '/storage/v1/object/public/property-images/' + property.image_path}" alt="${property.name}" style="width: 180px; height: 120px; object-fit: cover; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);" />
+                </div>` : `
+                <div style="background: linear-gradient(135deg, #667eea, #764ba2); width: 50px; height: 50px; border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);">
+                  <span style="font-size: 24px;">${property.rental_type === 'hybrid' ? '🔄' : property.rental_type === 'mid_term' ? '🏠' : '🏢'}</span>
+                </div>`}
+                <div style="flex: 1;">
+                  <h2 style="margin: 0 0 8px 0; font-size: 22px; color: #2c3e50; font-weight: 600;">
+                    ${property.name}
+                  </h2>
+                  <p style="margin: 0 0 8px 0; color: #6c757d; font-size: 15px; line-height: 1.5;">
+                    📍 ${city}, ${state}
+                  </p>
+                  <p style="margin: 0 0 12px 0; color: #8B5CF6; font-size: 14px; font-weight: 500;">
+                    ${metroArea} Area
+                  </p>
+                  <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                    <span style="display: inline-block; background: ${property.rental_type === 'hybrid' ? 'linear-gradient(135deg, #667eea, #764ba2)' : property.rental_type === 'mid_term' ? 'linear-gradient(135deg, #f59e0b, #d97706)' : 'linear-gradient(135deg, #10b981, #059669)'}; color: white; padding: 6px 14px; border-radius: 12px; font-size: 12px; font-weight: 600; letter-spacing: 0.5px; box-shadow: 0 2px 8px rgba(0,0,0,0.15);">
+                      ${property.rental_type === 'hybrid' ? '🔄 HYBRID RENTAL' : property.rental_type === 'mid_term' ? '🏠 MID-TERM RENTAL' : '🏢 LONG-TERM RENTAL'}
+                    </span>
+                    ${hasMidTermBooking ? `
+                    <span style="display: inline-block; background: linear-gradient(135deg, #10b981, #059669); color: white; padding: 6px 14px; border-radius: 12px; font-size: 12px; font-weight: 600; letter-spacing: 0.5px; box-shadow: 0 2px 8px rgba(0,0,0,0.15);">
+                      ✓ ACTIVE TENANT
+                    </span>` : ''}
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <!-- Performance Highlights at Top -->
             <div style="padding: 35px 40px; background-color: #fafafa; border-top: 1px solid #e1e8ed;">
               <h2 style="color: #2c3e50; margin: 0 0 20px 0; font-size: 20px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">
