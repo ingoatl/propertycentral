@@ -145,6 +145,28 @@ export const ReconciliationReviewModal = ({
     }
   };
 
+  const handleUpdateAndResend = async () => {
+    setIsApproving(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('update-reconciliation-and-resend', {
+        body: { reconciliation_id: reconciliationId }
+      });
+
+      if (error) throw error;
+
+      toast.success(`Added ${data.added.expenses} expense(s) and ${data.added.visits} visit(s). Revised statement sent.`);
+
+      refetch();
+      onSuccess?.();
+      onOpenChange(false);
+    } catch (error: any) {
+      console.error('Error updating and resending:', error);
+      toast.error(error.message || "Failed to update and resend");
+    } finally {
+      setIsApproving(false);
+    }
+  };
+
 
   if (!data) return null;
 
@@ -265,6 +287,17 @@ export const ReconciliationReviewModal = ({
             Close
           </Button>
           <div className="flex gap-2">
+            {(reconciliation.status === "approved" || reconciliation.status === "statement_sent") && 
+             (safeUnbilledExpenses.length > 0 || safeUnbilledVisits.length > 0) && (
+              <Button 
+                onClick={handleUpdateAndResend}
+                disabled={isApproving}
+                variant="secondary"
+              >
+                <RotateCcw className="w-4 h-4 mr-2" />
+                {isApproving ? "Processing..." : "Add New Items & Resend"}
+              </Button>
+            )}
             {reconciliation.status === "draft" && (
               <Button onClick={handleApprove} disabled={isApproving}>
                 <Check className="w-4 h-4 mr-2" />
