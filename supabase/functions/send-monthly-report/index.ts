@@ -207,18 +207,23 @@ const handler = async (req: Request): Promise<Response> => {
         fetchedProperty = manualProperty;
         console.log("Manual send - Found property:", fetchedProperty.name, fetchedProperty.id);
         
-        // Get owner email from profiles
-        const { data: ownerProfile, error: ownerError } = await supabase
-          .from("profiles")
+        // Get owner email from property_owners table using owner_id
+        if (!fetchedProperty.owner_id) {
+          throw new Error("Property does not have an owner assigned");
+        }
+        
+        const { data: ownerData, error: ownerError } = await supabase
+          .from("property_owners")
           .select("email")
-          .eq("id", fetchedProperty.user_id)
+          .eq("id", fetchedProperty.owner_id)
           .single();
         
-        if (ownerError || !ownerProfile) {
+        if (ownerError || !ownerData) {
           throw new Error("Owner not found for property");
         }
         
-        ownerEmail = ownerProfile.email;
+        ownerEmail = ownerData.email;
+        console.log("Found owner email:", ownerEmail);
       } else {
         // TEST MODE: Default to info@peachhausgroup.com
         ownerEmail = "info@peachhausgroup.com"; // Test email
