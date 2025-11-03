@@ -135,8 +135,9 @@ export const ReconciliationReviewModal = ({
   const visits = lineItems.filter((i: any) => i.item_type === "visit");
   const orderMinimums = lineItems.filter((i: any) => i.item_type === "order_minimum");
   
-  // Calculate total visit revenue (company income)
-  const totalVisitRevenue = visits.reduce((sum: number, v: any) => sum + Math.abs(v.amount || 0), 0);
+  // Ensure arrays are defined with fallbacks
+  const safeUnbilledVisits = unbilledVisits || [];
+  const safeUnbilledExpenses = unbilledExpenses || [];
 
   const getItemIcon = (type: string) => {
     if (type === "booking" || type === "mid_term_booking") return <Home className="w-4 h-4" />;
@@ -185,7 +186,7 @@ export const ReconciliationReviewModal = ({
             <TabsTrigger value="expenses">Expenses ({expenses.length})</TabsTrigger>
             <TabsTrigger value="visits">Visits ({visits.length})</TabsTrigger>
             <TabsTrigger value="unbilled">
-              Unbilled Items ({unbilledVisits.length + unbilledExpenses.length})
+              Unbilled Items ({safeUnbilledVisits.length + safeUnbilledExpenses.length})
             </TabsTrigger>
           </TabsList>
 
@@ -222,8 +223,8 @@ export const ReconciliationReviewModal = ({
               currentExpenses={Number(reconciliation.total_expenses || 0)}
               currentManagementFee={Number(reconciliation.management_fee || 0)}
               managementFeePercentage={Number(reconciliation.properties?.management_fee_percentage || 15)}
-              unbilledVisits={unbilledVisits}
-              unbilledExpenses={unbilledExpenses}
+              unbilledVisits={safeUnbilledVisits}
+              unbilledExpenses={safeUnbilledExpenses}
               onRecalculate={refetch}
             />
           </TabsContent>
