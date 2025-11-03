@@ -9,7 +9,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
-import { Check, Home, DollarSign, Eye, RotateCcw } from "lucide-react";
+import { Check, Home, DollarSign, Eye, RotateCcw, Package } from "lucide-react";
+import { BillingCalculator } from "./BillingCalculator";
 import { toast } from "sonner";
 import { MonthlyEmailPreviewModal } from "./MonthlyEmailPreviewModal";
 
@@ -53,7 +54,7 @@ export const ReconciliationReviewModal = ({
 
       if (itemsError) throw itemsError;
 
-      // Fetch unbilled visits for this property
+      // Fetch unbilled visits for this property (from ANY month)
       const { data: unbilledVisits, error: visitsError } = await supabase
         .from("visits")
         .select("*")
@@ -63,7 +64,22 @@ export const ReconciliationReviewModal = ({
 
       if (visitsError) throw visitsError;
 
-      return { reconciliation: rec, lineItems: items, unbilledVisits: unbilledVisits || [] };
+      // Fetch unbilled expenses for this property (from ANY month)
+      const { data: unbilledExpenses, error: expensesError } = await supabase
+        .from("expenses")
+        .select("*")
+        .eq("property_id", rec.properties.id)
+        .eq("exported", false)
+        .order("date", { ascending: false });
+
+      if (expensesError) throw expensesError;
+
+      return { 
+        reconciliation: rec, 
+        lineItems: items, 
+        unbilledVisits: unbilledVisits || [],
+        unbilledExpenses: unbilledExpenses || []
+      };
     },
     enabled: open,
   });
@@ -113,7 +129,7 @@ export const ReconciliationReviewModal = ({
 
   if (!data) return null;
 
-  const { reconciliation, lineItems, unbilledVisits } = data;
+  const { reconciliation, lineItems, unbilledVisits, unbilledExpenses } = data;
   const bookings = lineItems.filter((i: any) => i.item_type === "booking" || i.item_type === "mid_term_booking");
   const expenses = lineItems.filter((i: any) => i.item_type === "expense");
   const visits = lineItems.filter((i: any) => i.item_type === "visit");
@@ -142,51 +158,22 @@ export const ReconciliationReviewModal = ({
           </DialogTitle>
         </DialogHeader>
 
-        {unbilledVisits.length > 0 && (
-          <Card className="p-4 mb-4 border-amber-200 bg-amber-50 dark:bg-amber-950/20">
-            <h3 className="font-semibold mb-2 text-amber-900 dark:text-amber-200 flex items-center gap-2">
-              <Eye className="w-4 h-4" />
-              ⚠️ Unbilled Visits Available ({unbilledVisits.length})
-            </h3>
-            <p className="text-sm text-amber-800 dark:text-amber-300 mb-3">
-              These visits haven't been billed yet. They were automatically included when this reconciliation was created.
-            </p>
-            <div className="space-y-2 max-h-40 overflow-y-auto">
-              {unbilledVisits.map((visit: any) => (
-                <div key={visit.id} className="flex items-center justify-between p-2 bg-white dark:bg-gray-900 rounded border">
-                  <div>
-                    <p className="text-sm font-medium">{visit.visited_by || "Staff"} - {format(new Date(visit.date + 'T00:00:00'), "MMM dd, yyyy")}</p>
-                    <p className="text-xs text-muted-foreground">{visit.notes || "No notes"}</p>
-                  </div>
-                  <Badge variant="outline" className="text-amber-700">${visit.price}</Badge>
-                </div>
-              ))}
-            </div>
-          </Card>
-        )}
 
         <Card className="p-6 bg-muted/50">
           <h3 className="font-semibold mb-4">📊 Financial Summary</h3>
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 gap-6">
             <div>
-              <p className="text-sm text-muted-foreground">Owner Revenue</p>
-              <p className="text-sm">Short-term Bookings: ${Number(reconciliation.short_term_revenue || 0).toFixed(2)}</p>
-              <p className="text-sm">Mid-term Rental: ${Number(reconciliation.mid_term_revenue || 0).toFixed(2)}</p>
-              <p className="font-semibold mt-1 text-green-600">Total Revenue: ${Number(reconciliation.total_revenue || 0).toFixed(2)}</p>
+              <p className="text-sm text-muted-foreground mb-2">Booking Revenue (Owner Keeps)</p>
+              <p className="text-sm">Short-term: ${Number(reconciliation.short_term_revenue || 0).toFixed(2)}</p>
+              <p className="text-sm">Mid-term: ${Number(reconciliation.mid_term_revenue || 0).toFixed(2)}</p>
+              <p className="font-semibold mt-1 text-green-600">Total: ${Number(reconciliation.total_revenue || 0).toFixed(2)}</p>
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">Owner Deductions</p>
-              <p className="text-sm">Expenses: ${Number(reconciliation.total_expenses || 0).toFixed(2)}</p>
-              <p className="text-sm">Visit Charges: ${totalVisitRevenue.toFixed(2)}</p>
+              <p className="text-sm text-muted-foreground mb-2">Amount Due from Owner</p>
               <p className="text-sm">Management Fee ({reconciliation.properties?.management_fee_percentage || 15}%): ${Number(reconciliation.management_fee || 0).toFixed(2)}</p>
-              <p className="text-sm">Order Minimum: ${Number(reconciliation.order_minimum_fee || 0).toFixed(2)}</p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Company Income</p>
-              <p className="text-sm">Visit Revenue: <span className="text-blue-600 font-semibold">${totalVisitRevenue.toFixed(2)}</span></p>
-              <p className="text-sm">Management Fee: <span className="text-blue-600 font-semibold">${Number(reconciliation.management_fee || 0).toFixed(2)}</span></p>
-              <p className="text-sm">Order Minimum: <span className="text-blue-600 font-semibold">${Number(reconciliation.order_minimum_fee || 0).toFixed(2)}</span></p>
-              <p className="font-semibold mt-1 text-blue-600">Total Company Income: ${(totalVisitRevenue + Number(reconciliation.management_fee || 0) + Number(reconciliation.order_minimum_fee || 0)).toFixed(2)}</p>
+              <p className="text-sm">Visit Fees: ${Number(reconciliation.visit_fees || 0).toFixed(2)}</p>
+              <p className="text-sm">Expenses: ${Number(reconciliation.total_expenses || 0).toFixed(2)}</p>
+              <p className="font-semibold mt-2 pt-2 border-t text-primary text-lg">Total Due: ${Number(reconciliation.net_to_owner || 0).toFixed(2)}</p>
             </div>
           </div>
         </Card>
@@ -197,6 +184,9 @@ export const ReconciliationReviewModal = ({
             <TabsTrigger value="bookings">Bookings ({bookings.length})</TabsTrigger>
             <TabsTrigger value="expenses">Expenses ({expenses.length})</TabsTrigger>
             <TabsTrigger value="visits">Visits ({visits.length})</TabsTrigger>
+            <TabsTrigger value="unbilled">
+              Unbilled Items ({unbilledVisits.length + unbilledExpenses.length})
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="all" className="space-y-2">
@@ -221,6 +211,21 @@ export const ReconciliationReviewModal = ({
             {visits.map((item: any) => (
               <LineItemRow key={item.id} item={item} onToggleVerified={handleToggleVerified} getIcon={getItemIcon} />
             ))}
+          </TabsContent>
+
+          <TabsContent value="unbilled">
+            <BillingCalculator
+              reconciliationId={reconciliationId}
+              propertyId={reconciliation.properties.id}
+              currentRevenue={Number(reconciliation.total_revenue || 0)}
+              currentVisitFees={Number(reconciliation.visit_fees || 0)}
+              currentExpenses={Number(reconciliation.total_expenses || 0)}
+              currentManagementFee={Number(reconciliation.management_fee || 0)}
+              managementFeePercentage={Number(reconciliation.properties?.management_fee_percentage || 15)}
+              unbilledVisits={unbilledVisits}
+              unbilledExpenses={unbilledExpenses}
+              onRecalculate={refetch}
+            />
           </TabsContent>
         </Tabs>
 

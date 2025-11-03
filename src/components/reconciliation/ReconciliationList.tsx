@@ -107,10 +107,13 @@ export const ReconciliationList = () => {
                         ${Number(rec.order_minimum_fee || 0).toFixed(2)}
                       </p>
                     </div>
-                    <div>
+                    <div className="col-span-2">
                       <p className="text-xs text-muted-foreground">Due from Owner</p>
-                      <p className="font-semibold text-primary">
+                      <p className="font-bold text-primary text-lg">
                         ${Number(rec.net_to_owner || 0).toFixed(2)}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Mgmt Fee + Visits + Expenses
                       </p>
                     </div>
                   </div>

@@ -207,15 +207,16 @@ serve(async (req) => {
     }
     
     const totalRevenue = shortTermRevenue + midTermRevenue;
-    const visitExpenses = (visits || []).reduce((sum, v) => sum + (v.price || 0), 0);
-    const otherExpenses = (expenses || []).reduce((sum, e) => sum + (e.amount || 0), 0);
-    const totalExpenses = otherExpenses + visitExpenses;
+    const visitFees = (visits || []).reduce((sum, v) => sum + (v.price || 0), 0);
+    const totalExpenses = (expenses || []).reduce((sum, e) => sum + (e.amount || 0), 0);
     
-    // Management fee uses property-specific percentage
+    // Management fee calculated from booking revenue (property-specific percentage)
     const managementFee = totalRevenue * (managementFeePercentage / 100);
-    const netToOwner = totalRevenue - totalExpenses - managementFee - orderMinimumFee;
+    
+    // Due from Owner = Management Fee + Visit Fees + Expenses (what owner owes us)
+    const dueFromOwner = managementFee + visitFees + totalExpenses;
 
-    console.log(`Reconciliation calculation: Short-term: $${shortTermRevenue}, Mid-term: $${midTermRevenue}, Total Revenue: $${totalRevenue}, Visit Fees: $${visitExpenses}, Other Expenses: $${otherExpenses}, Management Fee (${managementFeePercentage}%): $${managementFee}, Order Minimum: $${orderMinimumFee}, Net to Owner: $${netToOwner}`);
+    console.log(`Reconciliation calculation: Short-term: $${shortTermRevenue}, Mid-term: $${midTermRevenue}, Total Revenue: $${totalRevenue}, Visit Fees: $${visitFees}, Expenses: $${totalExpenses}, Management Fee (${managementFeePercentage}%): $${managementFee}, Due from Owner: $${dueFromOwner}`);
 
     // Create reconciliation
     const { data: reconciliation, error: recError } = await supabaseClient
@@ -227,11 +228,11 @@ serve(async (req) => {
         total_revenue: totalRevenue,
         short_term_revenue: shortTermRevenue,
         mid_term_revenue: midTermRevenue,
-        visit_fees: visitExpenses,
-        total_expenses: otherExpenses,
+        visit_fees: visitFees,
+        total_expenses: totalExpenses,
         management_fee: managementFee,
         order_minimum_fee: orderMinimumFee,
-        net_to_owner: netToOwner,
+        net_to_owner: dueFromOwner,
         status: "draft",
       })
       .select()
