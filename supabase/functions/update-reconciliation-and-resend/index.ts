@@ -17,7 +17,7 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const { reconciliation_id } = await req.json();
+    const { reconciliation_id, test_email } = await req.json();
 
     if (!reconciliation_id) {
       throw new Error('Reconciliation ID is required');
@@ -146,6 +146,29 @@ serve(async (req) => {
     }
 
     if (lineItemsToAdd.length === 0) {
+      // If this is a test email request, still send it even with no new items
+      if (test_email) {
+        console.log('No new items but sending test email anyway...');
+        const { data: emailData, error: emailError } = await supabase.functions.invoke('send-monthly-report', {
+          body: {
+            reconciliation_id,
+            is_revised: true,
+            test_email,
+            added_items: []
+          }
+        });
+
+        if (emailError) {
+          console.error('Error sending test email:', emailError);
+          throw new Error(`Error sending test email: ${emailError.message}`);
+        }
+
+        return new Response(
+          JSON.stringify({ success: true, message: 'Test email sent (no new items)' }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+        );
+      }
+
       return new Response(
         JSON.stringify({ message: 'No unbilled items found to add' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
@@ -205,6 +228,7 @@ serve(async (req) => {
       body: {
         reconciliation_id,
         is_revised: true,
+        test_email: test_email || undefined,
         added_items: lineItemsToAdd.map(item => ({
           description: item.description,
           amount: item.amount,
