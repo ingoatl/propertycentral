@@ -555,13 +555,9 @@ State: ${state}
               <!-- Property Info Card -->
               <div style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border-radius: 16px; padding: 25px; margin: 0 40px 35px 40px; border: 1px solid #dee2e6; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
                 <div style="display: flex; align-items: start; gap: 20px;">
-                  ${property.image_path ? `
                   <div style="flex-shrink: 0;">
-                    <img src="${supabaseUrl}/storage/v1/object/public/property-images/${property.image_path.split('/').pop()}" alt="${property.name}" style="width: 180px; height: 120px; object-fit: cover; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);" onerror="this.style.display='none'" />
-                  </div>` : `
-                  <div style="background: linear-gradient(135deg, #FF6B9D, #C86DD7); width: 50px; height: 50px; border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 4px 12px rgba(255, 107, 157, 0.3);">
-                    <span style="font-size: 24px;">🏠</span>
-                  </div>`}
+                    <img src="${supabaseUrl}/storage/v1/object/public/property-images/${property.image_path ? property.image_path.split('/').pop() : 'villa14.jpg'}" alt="${property.name}" style="width: 180px; height: 120px; object-fit: cover; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);" onerror="this.src='${supabaseUrl}/storage/v1/object/public/property-images/peachhaus-logo.png'; this.style.width='120px'; this.style.height='auto'; this.style.objectFit='contain';" />
+                  </div>
                   <div style="flex: 1;">
                     <h2 style="margin: 0 0 8px 0; font-size: 22px; color: #2c3e50; font-weight: 600;">
                       ${property.name}
