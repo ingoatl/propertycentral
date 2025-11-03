@@ -13,8 +13,8 @@ import { toast } from "sonner";
 export const ReconciliationList = () => {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [selectedReconciliation, setSelectedReconciliation] = useState<string | null>(null);
-  const [sendingTest, setSendingTest] = useState<string | null>(null);
-  const [sendingReal, setSendingReal] = useState<string | null>(null);
+  const [sendingPerformance, setSendingPerformance] = useState<string | null>(null);
+  const [sendingStatement, setSendingStatement] = useState<string | null>(null);
 
   const { data: reconciliations, isLoading, refetch } = useQuery({
     queryKey: ["reconciliations"],
@@ -46,29 +46,34 @@ export const ReconciliationList = () => {
     return <Badge variant={config.variant}>{config.label}</Badge>;
   };
 
-  const handleSendTestEmail = async (reconciliationId: string) => {
+  const handleSendPerformanceEmail = async (rec: any) => {
     try {
-      setSendingTest(reconciliationId);
+      setSendingPerformance(rec.id);
+      
+      // Get the property_id from the reconciliation
       const { error } = await supabase.functions.invoke('send-monthly-report', {
         body: { 
-          reconciliation_id: reconciliationId,
-          test_email: "info@peachhausgroup.com"
+          isManualSend: true,
+          propertyId: rec.property_id,
+          emailType: 'performance',
+          sendToOwner: true,
+          sendCopyToInfo: true
         }
       });
 
       if (error) throw error;
-      toast.success("Test email sent to info@peachhausgroup.com");
+      toast.success("Performance email sent to owner and info@peachhausgroup.com");
     } catch (error: any) {
-      console.error('Error sending test email:', error);
-      toast.error(error.message || "Failed to send test email");
+      console.error('Error sending performance email:', error);
+      toast.error(error.message || "Failed to send performance email");
     } finally {
-      setSendingTest(null);
+      setSendingPerformance(null);
     }
   };
 
-  const handleSendRealEmail = async (reconciliationId: string) => {
+  const handleSendOwnerStatement = async (reconciliationId: string) => {
     try {
-      setSendingReal(reconciliationId);
+      setSendingStatement(reconciliationId);
       const { error } = await supabase.functions.invoke('send-monthly-report', {
         body: { 
           reconciliation_id: reconciliationId
@@ -76,13 +81,13 @@ export const ReconciliationList = () => {
       });
 
       if (error) throw error;
-      toast.success("Statement sent to owner successfully!");
+      toast.success("Owner statement sent successfully!");
       await refetch();
     } catch (error: any) {
-      console.error('Error sending email to owner:', error);
-      toast.error(error.message || "Failed to send email to owner");
+      console.error('Error sending owner statement:', error);
+      toast.error(error.message || "Failed to send owner statement");
     } finally {
-      setSendingReal(null);
+      setSendingStatement(null);
     }
   };
 
@@ -175,28 +180,10 @@ export const ReconciliationList = () => {
                       <Button 
                         size="sm" 
                         variant="outline"
-                        onClick={() => handleSendTestEmail(rec.id)}
-                        disabled={sendingTest === rec.id || sendingReal === rec.id}
+                        onClick={() => handleSendPerformanceEmail(rec)}
+                        disabled={sendingPerformance === rec.id || sendingStatement === rec.id}
                       >
-                        {sendingTest === rec.id ? (
-                          <>
-                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                            Sending Test...
-                          </>
-                        ) : (
-                          <>
-                            <Send className="w-4 h-4 mr-2" />
-                            Send Test
-                          </>
-                        )}
-                      </Button>
-                      <Button 
-                        size="sm" 
-                        variant="default"
-                        onClick={() => handleSendRealEmail(rec.id)}
-                        disabled={sendingTest === rec.id || sendingReal === rec.id}
-                      >
-                        {sendingReal === rec.id ? (
+                        {sendingPerformance === rec.id ? (
                           <>
                             <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                             Sending...
@@ -204,7 +191,25 @@ export const ReconciliationList = () => {
                         ) : (
                           <>
                             <Mail className="w-4 h-4 mr-2" />
-                            Send to Owner
+                            Send Performance Email
+                          </>
+                        )}
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        variant="default"
+                        onClick={() => handleSendOwnerStatement(rec.id)}
+                        disabled={sendingPerformance === rec.id || sendingStatement === rec.id}
+                      >
+                        {sendingStatement === rec.id ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Sending...
+                          </>
+                        ) : (
+                          <>
+                            <Send className="w-4 h-4 mr-2" />
+                            Send Owner Statement
                           </>
                         )}
                       </Button>
