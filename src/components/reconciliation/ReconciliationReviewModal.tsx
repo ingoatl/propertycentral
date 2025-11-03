@@ -313,8 +313,7 @@ export const ReconciliationReviewModal = ({
             Close
           </Button>
           <div className="flex gap-2">
-            {(reconciliation.status === "approved" || reconciliation.status === "statement_sent") && 
-             (safeUnbilledExpenses.length > 0 || safeUnbilledVisits.length > 0) && (
+            {(reconciliation.status === "approved" || reconciliation.status === "statement_sent") && (
               <>
                 <Button 
                   onClick={() => handleUpdateAndResend(true)}
@@ -326,7 +325,7 @@ export const ReconciliationReviewModal = ({
                 </Button>
                 <Button 
                   onClick={() => handleUpdateAndResend(false)}
-                  disabled={isApproving || isSendingTestRevision}
+                  disabled={isApproving || isSendingTestRevision || (safeUnbilledExpenses.length === 0 && safeUnbilledVisits.length === 0)}
                   variant="secondary"
                 >
                   <RotateCcw className="w-4 h-4 mr-2" />
