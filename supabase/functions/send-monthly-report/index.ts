@@ -846,20 +846,26 @@ State: ${state}
       
       let statementRecipients: string[] = [];
       
-      if (ownerData) {
-        // Add primary owner email
-        if (ownerData.email) {
-          statementRecipients.push(ownerData.email);
+      // If this is a test email, ONLY send to the test address
+      if (isTestEmail && test_email) {
+        statementRecipients = [test_email];
+      } else {
+        // Normal mode: send to owners and info@
+        if (ownerData) {
+          // Add primary owner email
+          if (ownerData.email) {
+            statementRecipients.push(ownerData.email);
+          }
+          // Add second owner email if exists
+          if (ownerData.second_owner_email) {
+            statementRecipients.push(ownerData.second_owner_email);
+          }
         }
-        // Add second owner email if exists
-        if (ownerData.second_owner_email) {
-          statementRecipients.push(ownerData.second_owner_email);
+        
+        // Always add info@ for reconciliation statements in normal mode
+        if (!statementRecipients.includes("info@peachhausgroup.com")) {
+          statementRecipients.push("info@peachhausgroup.com");
         }
-      }
-      
-      // Always add info@ for reconciliation statements
-      if (!statementRecipients.includes("info@peachhausgroup.com")) {
-        statementRecipients.push("info@peachhausgroup.com");
       }
       
       const subjectPrefix = is_revised ? "REVISED " : "";
