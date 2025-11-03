@@ -100,6 +100,30 @@ export type Database = {
           },
         ]
       }
+      email_ai_prompts: {
+        Row: {
+          created_at: string | null
+          email_type: string
+          id: string
+          prompt_content: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          email_type: string
+          id?: string
+          prompt_content: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          email_type?: string
+          id?: string
+          prompt_content?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       email_insights: {
         Row: {
           action_required: boolean | null

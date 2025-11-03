@@ -8,13 +8,14 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { CheckCircle, XCircle, Clock, Shield, UserPlus, Key, Users, MessageCircleQuestion, UserCog, Bug } from "lucide-react";
+import { CheckCircle, XCircle, Clock, Shield, UserPlus, Key, Users, MessageCircleQuestion, UserCog, Bug, Mail } from "lucide-react";
 import { RescheduleLogsTab } from "@/components/admin/RescheduleLogsTab";
 import { z } from "zod";
 import { TeamMatrixTab } from "@/components/admin/TeamMatrixTab";
 import { AllFAQsManagement } from "@/components/admin/AllFAQsManagement";
 import { AssignUnassignedTasksButton } from "@/components/onboarding/AssignUnassignedTasksButton";
 import { BugTrackerCard } from "@/components/admin/BugTrackerCard";
+import { EmailAIPromptsManager } from "@/components/admin/EmailAIPromptsManager";
 
 const createUserSchema = z.object({
   email: z.string().email("Invalid email address").max(255),
@@ -385,7 +386,7 @@ const Admin = () => {
       </div>
 
       <Tabs defaultValue="users" className="w-full">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="users">User Management</TabsTrigger>
           <TabsTrigger value="team-matrix">
             <Users className="w-4 h-4 mr-2" />
@@ -394,6 +395,10 @@ const Admin = () => {
           <TabsTrigger value="faqs">
             <MessageCircleQuestion className="w-4 h-4 mr-2" />
             FAQs
+          </TabsTrigger>
+          <TabsTrigger value="email-prompts">
+            <Mail className="w-4 h-4 mr-2" />
+            Email Prompts
           </TabsTrigger>
           <TabsTrigger value="bugs">
             <Bug className="w-4 h-4 mr-2" />
@@ -717,6 +722,10 @@ const Admin = () => {
 
         <TabsContent value="faqs" className="mt-8">
           <AllFAQsManagement />
+        </TabsContent>
+
+        <TabsContent value="email-prompts" className="mt-8">
+          <EmailAIPromptsManager />
         </TabsContent>
 
         <TabsContent value="bugs" className="mt-8">

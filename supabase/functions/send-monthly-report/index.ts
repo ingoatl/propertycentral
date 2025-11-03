@@ -18,14 +18,27 @@ const handler = async (req: Request): Promise<Response> => {
 
   try {
     const supabase = createClient(supabaseUrl, supabaseKey);
-    const { reconciliation_id, test_email } = await req.json();
+    const { 
+      reconciliation_id, 
+      test_email, 
+      isManualSend, 
+      propertyId, 
+      emailType, 
+      sendToOwner = true, 
+      sendCopyToInfo = true,
+      isTestEmail: testEmailFlag 
+    } = await req.json();
 
-    // Reconciliation mode vs test mode
+    // Reconciliation mode vs test mode vs manual send
     const isReconciliationMode = !!reconciliation_id;
-    const isTestEmail = !!test_email;
+    const isTestEmail = !!test_email || !!testEmailFlag;
+    const isManualMode = !!isManualSend;
+    const emailTypeToSend = emailType || (isReconciliationMode ? 'owner_statement' : 'performance');
     
     if (isReconciliationMode) {
       console.log(`Sending owner statement for reconciliation: ${reconciliation_id}${isTestEmail ? ' (TEST to ' + test_email + ')' : ''}`);
+    } else if (isManualMode) {
+      console.log(`Sending manual ${emailTypeToSend} email for property: ${propertyId}`);
     } else {
       console.log("Starting test performance email generation for Villa 14...");
     }
@@ -159,9 +172,8 @@ const handler = async (req: Request): Promise<Response> => {
       });
 
     } else {
-      // TEST MODE: Use existing logic
-      ownerEmail = "info@peachhausgroup.com"; // Test email
-
+      // TEST MODE or MANUAL SEND MODE: Use existing logic
+      
       // Get current and previous month dates
       const now = new Date();
       const firstDayOfCurrentMonth = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -179,20 +191,55 @@ const handler = async (req: Request): Promise<Response> => {
         day: 'numeric' 
       });
 
-      // Fetch Villa 14 property for test
-      const { data: properties, error: propertiesError } = await supabase
-        .from("properties")
-        .select("*, rental_type")
-        .ilike("name", "%villa%14%");
+      let fetchedProperty;
 
-      if (propertiesError) throw propertiesError;
-      
-      if (!properties || properties.length === 0) {
-        throw new Error("Villa 14 not found");
+      if (isManualMode && propertyId) {
+        // MANUAL MODE: Fetch specific property
+        const { data: manualProperty, error: manualError } = await supabase
+          .from("properties")
+          .select("*, rental_type")
+          .eq("id", propertyId)
+          .single();
+
+        if (manualError) throw manualError;
+        if (!manualProperty) throw new Error("Property not found");
+        
+        fetchedProperty = manualProperty;
+        console.log("Manual send - Found property:", fetchedProperty.name, fetchedProperty.id);
+        
+        // Get owner email from profiles
+        const { data: ownerProfile, error: ownerError } = await supabase
+          .from("profiles")
+          .select("email")
+          .eq("id", fetchedProperty.user_id)
+          .single();
+        
+        if (ownerError || !ownerProfile) {
+          throw new Error("Owner not found for property");
+        }
+        
+        ownerEmail = ownerProfile.email;
+      } else {
+        // TEST MODE: Default to info@peachhausgroup.com
+        ownerEmail = "info@peachhausgroup.com"; // Test email
+        
+        // Fetch Villa 14 property for test
+        const { data: properties, error: propertiesError } = await supabase
+          .from("properties")
+          .select("*, rental_type")
+          .ilike("name", "%villa%14%");
+
+        if (propertiesError) throw propertiesError;
+        
+        if (!properties || properties.length === 0) {
+          throw new Error("Villa 14 not found");
+        }
+
+        fetchedProperty = properties[0];
+        console.log("Test mode - Found property:", fetchedProperty.name, fetchedProperty.id);
       }
 
-      property = properties[0];
-      console.log("Found property:", property.name, property.id);
+      property = fetchedProperty;
 
       // Fetch visits for THIS property ONLY in the previous month
       const { data: visitsData, error: visitsError } = await supabase
@@ -341,14 +388,47 @@ const handler = async (req: Request): Promise<Response> => {
     
     const locationDescription = `${city}, ${state} (${metroArea})`;
 
+    // Fetch AI prompt from database
+    console.log(`Fetching AI prompt for email type: ${emailTypeToSend}...`);
+    const { data: promptData, error: promptError } = await supabase
+      .from("email_ai_prompts")
+      .select("prompt_content")
+      .eq("email_type", emailTypeToSend)
+      .single();
+    
+    if (promptError) {
+      console.error("Error fetching AI prompt, using default:", promptError);
+    }
+    
+    // Use fetched prompt or fallback to default
+    const basePrompt = promptData?.prompt_content || `You are generating a monthly owner email for a property managed by PeachHaus Group LLC. Follow these rules exactly:`;
+
     // Generate AI insights
     console.log("Generating AI insights...");
     let aiInsights = "";
     
     try {
 
-      // System Prompt for PeachHaus Monthly Owner Performance Report
-      const systemPrompt = `You are generating a monthly owner email for a property managed by PeachHaus Group LLC. Follow these rules exactly:
+      // System Prompt with location and property context
+      const systemPrompt = basePrompt + `
+
+**Property Context**
+Current property rental model: ${property.rental_type}
+${property.rental_type === 'hybrid' ? '- Hybrid model: Primary focus is mid-term (MTR) placements + fill the gaps with short-term (STR) bookings. This model benefits from both corporate/insurance stays and tourist/short-stay demand.' : ''}
+${property.rental_type === 'mid_term' ? '- MTR-Only model: Focus exclusively on mid-term placements (insurance, corporate, healthcare) with minimal short-term activity.' : ''}
+
+**Location Context**
+Location: ${metroArea}, ${city}, ${state}
+
+**Revenue Data (for context only, not to be shown in output)**
+- Short-term revenue: $${bookingRevenue.toFixed(2)}
+- Mid-term revenue: $${midTermRevenue.toFixed(2)}
+- Total revenue: $${totalRevenue.toFixed(2)}
+- Active bookings: ${bookings?.length || 0}
+- Active mid-term tenants: ${midTermBookings?.length || 0}
+
+**Existing Content to Replace**
+You are REPLACING the system-generated default content. Focus on strategy, demand drivers, and action plans:
 
 **A. Determine Rental Model**
 Current property rental model: ${property.rental_type}
@@ -911,15 +991,41 @@ State: ${state}
       </html>
     `;
 
-    const performanceSubject = isTestEmail 
-      ? `[TEST] Property Performance Report - ${property.name} - ${previousMonthName}`
+    // Determine subject and recipients based on email type and mode
+    const isPerformanceEmail = emailTypeToSend === 'performance';
+    const isOwnerStatement = emailTypeToSend === 'owner_statement';
+    
+    const performanceSubject = (isTestEmail || isManualMode) 
+      ? `[${isTestEmail ? 'TEST' : 'MANUAL'}] Property Performance Report - ${property.name} - ${previousMonthName}`
       : `Property Performance Report - ${property.name} - ${previousMonthName}`;
 
-    console.log("Sending performance report email...");
+    const statementSubject = (isTestEmail || isManualMode)
+      ? `[${isTestEmail ? 'TEST' : 'MANUAL'}] Monthly Owner Statement - ${property.name} - ${previousMonthName}`
+      : `Monthly Owner Statement - ${property.name} - ${previousMonthName}`;
+    
+    // Determine recipients for manual send
+    let emailRecipients: string[] = [];
+    if (isManualMode) {
+      if (sendToOwner && ownerEmail) {
+        emailRecipients.push(ownerEmail);
+      }
+      if (sendCopyToInfo) {
+        emailRecipients.push("info@peachhausgroup.com");
+      }
+    } else if (isTestEmail) {
+      emailRecipients = [ownerEmail];
+    } else if (isReconciliationMode) {
+      emailRecipients = [ownerEmail];
+    } else {
+      emailRecipients = [ownerEmail];
+    }
 
+    console.log(`Sending ${isPerformanceEmail ? 'performance' : 'owner statement'} email to: ${emailRecipients.join(', ')}...`);
+
+    // Send performance email (test mode or manual send mode uses performanceEmailBody)
     performanceResponse = await resend.emails.send({
       from: fromEmail,
-      to: [recipientEmail],
+      to: emailRecipients,
       subject: performanceSubject,
       html: performanceEmailBody,
     });
