@@ -8,11 +8,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Calendar as CalendarIcon, Clock, MapPin, CheckCircle2, ChevronDown, ChevronUp } from "lucide-react";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { supabase } from "@/integrations/supabase/client";
 import { Property, Visit } from "@/types";
 import { toast } from "sonner";
 import { z } from "zod";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 
 const HOURLY_RATE = 50;
 
@@ -91,6 +95,7 @@ const Visits = () => {
     visitedBy: "",
     hours: "0",
     notes: "",
+    date: new Date(),
   });
 
   // Load initial data
@@ -223,10 +228,9 @@ const Visits = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
       
-      // Capture current date and time automatically
-      const now = new Date();
-      const currentDate = now.toISOString().split("T")[0];
-      const currentTime = now.toTimeString().slice(0, 5);
+      // Use selected date and current time
+      const visitDate = formData.date.toISOString().split("T")[0];
+      const currentTime = new Date().toTimeString().slice(0, 5);
 
       // Get the property to get visit price
       const property = properties.find(p => p.id === formData.propertyId);
@@ -236,7 +240,7 @@ const Visits = () => {
       const optimisticVisit: Visit = {
         id: `temp-${Date.now()}`,
         propertyId: formData.propertyId,
-        date: currentDate,
+        date: visitDate,
         time: currentTime,
         price: calculatedPrice,
         notes: formData.notes,
@@ -253,6 +257,7 @@ const Visits = () => {
         visitedBy: "",
         hours: "0",
         notes: "",
+        date: new Date(),
       });
 
       // Collapse form on mobile after submit
@@ -265,12 +270,15 @@ const Visits = () => {
         navigator.vibrate(50);
       }
 
+      // Use the selected date from the form
+      const selectedDate = previousFormData.date.toISOString().split("T")[0];
+      
       // Insert visit in background
       const { error: visitError } = await supabase
         .from("visits")
         .insert({
           property_id: previousFormData.propertyId,
-          date: currentDate,
+          date: selectedDate,
           time: currentTime,
           price: calculatedPrice,
           hours,
@@ -291,7 +299,7 @@ const Visits = () => {
       expenses.push({
         property_id: previousFormData.propertyId,
         amount: property.visitPrice,
-        date: currentDate,
+        date: selectedDate,
         purpose: `Visit fee (${previousFormData.visitedBy})${notesAddition}`,
         category: "Visit Charges",
         vendor: "PeachHaus",
@@ -304,7 +312,7 @@ const Visits = () => {
         expenses.push({
           property_id: previousFormData.propertyId,
           amount: hourlyCharges,
-          date: currentDate,
+          date: selectedDate,
           purpose: `Hourly charges - ${hours} hour${hours !== 1 ? 's' : ''} @ $${HOURLY_RATE}/hr (${previousFormData.visitedBy})${notesAddition}`,
           category: "Visit Charges",
           vendor: "PeachHaus",
@@ -390,6 +398,38 @@ const Visits = () => {
                   </Select>
                 </div>
 
+                {/* Date Picker */}
+                <div className="space-y-2">
+                  <Label className="text-sm sm:text-base font-semibold">Visit Date *</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-full h-12 sm:h-14 text-base sm:text-lg border-2 justify-start text-left font-normal",
+                          !formData.date && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4 sm:h-5 sm:w-5" />
+                        {formData.date ? format(formData.date, "PPP") : <span>Pick a date</span>}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={formData.date}
+                        onSelect={(date) => date && setFormData({ ...formData, date })}
+                        initialFocus
+                        className={cn("p-3 pointer-events-auto")}
+                        disabled={(date) => date > new Date()}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  <p className="text-xs sm:text-sm text-muted-foreground">
+                    Select the date of the visit (past dates allowed)
+                  </p>
+                </div>
+
                 {/* Visited By Selection */}
                 <div className="space-y-2">
                   <Label htmlFor="visitedBy" className="text-sm sm:text-base font-semibold">Visited By *</Label>
@@ -442,8 +482,8 @@ const Visits = () => {
                 <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 flex items-start gap-2">
                   <Clock className="w-4 h-4 sm:w-5 sm:h-5 text-primary mt-0.5 flex-shrink-0" />
                   <div className="text-xs sm:text-sm text-muted-foreground">
-                    <p className="font-semibold text-foreground mb-0.5">Auto-tracked</p>
-                    <p>Date and time recorded automatically</p>
+                    <p className="font-semibold text-foreground mb-0.5">Time Auto-tracked</p>
+                    <p>Current time recorded, date can be set above</p>
                   </div>
                 </div>
 
