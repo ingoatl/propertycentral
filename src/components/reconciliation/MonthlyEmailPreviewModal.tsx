@@ -2,10 +2,11 @@ import { useState, useEffect, useMemo } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Mail, Send, TestTube, BarChart3 } from "lucide-react";
+import { Mail, Send, TestTube, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format } from "date-fns";
+import { calculateDueFromOwnerFromLineItems } from "@/lib/reconciliationCalculations";
 
 interface MonthlyEmailPreviewModalProps {
   open: boolean;
@@ -25,6 +26,9 @@ export const MonthlyEmailPreviewModal = ({
   const [ownerName, setOwnerName] = useState("Property Owner");
   const [visitTotal, setVisitTotal] = useState(0);
   const [expenseTotal, setExpenseTotal] = useState(0);
+  const [dueFromOwner, setDueFromOwner] = useState(0);
+  const [shortTermRevenue, setShortTermRevenue] = useState(0);
+  const [midTermRevenue, setMidTermRevenue] = useState(0);
 
   useEffect(() => {
     const fetchOwnerAndLineItems = async () => {
@@ -63,24 +67,28 @@ export const MonthlyEmailPreviewModal = ({
         console.error("Error fetching owner name:", error);
       }
 
-      // Fetch line items to calculate category totals
+      // Fetch line items to calculate category totals using shared utility
       try {
         const { data: lineItems, error: itemsError } = await supabase
           .from("reconciliation_line_items")
           .select("*")
-          .eq("reconciliation_id", reconciliation.id)
-          .eq("verified", true);
+          .eq("reconciliation_id", reconciliation.id);
 
         if (!itemsError && lineItems) {
-          const visits = lineItems.filter((item: any) => item.item_type === "visit");
-          const expenses = lineItems.filter((item: any) => item.item_type === "expense");
+          const calculated = calculateDueFromOwnerFromLineItems(
+            lineItems,
+            reconciliation.management_fee || 0,
+            reconciliation.order_minimum_fee || 0
+          );
           
-          const visitSum = visits.reduce((sum: number, item: any) => sum + Math.abs(item.amount), 0);
-          const expenseSum = expenses.reduce((sum: number, item: any) => sum + Math.abs(item.amount), 0);
-          
-          setVisitTotal(visitSum);
-          setExpenseTotal(expenseSum);
+          setVisitTotal(calculated.visitFees);
+          setExpenseTotal(calculated.totalExpenses);
+          setDueFromOwner(calculated.dueFromOwner);
         }
+        
+        // Set revenue split
+        setShortTermRevenue(reconciliation.short_term_revenue || 0);
+        setMidTermRevenue(reconciliation.mid_term_revenue || 0);
       } catch (error) {
         console.error("Error fetching line items:", error);
       }
@@ -118,24 +126,6 @@ export const MonthlyEmailPreviewModal = ({
     }
   };
 
-  const handleSendPerformanceTest = async () => {
-    setIsSendingTest(true);
-    const toastId = toast.loading("Sending test performance report...");
-    try {
-      const { error } = await supabase.functions.invoke("send-monthly-report", {
-        body: { 
-          test_email: "info@peachhausgroup.com"
-        },
-      });
-
-      if (error) throw error;
-      toast.success("Test performance report sent successfully to info@peachhausgroup.com", { id: toastId });
-    } catch (error: any) {
-      toast.error(error.message || "Failed to send test performance report", { id: toastId });
-    } finally {
-      setIsSendingTest(false);
-    }
-  };
 
   const handleSendOwnerEmail = async () => {
     if (!reconciliation.property_owners?.email) {
@@ -243,23 +233,12 @@ export const MonthlyEmailPreviewModal = ({
               </p>
             </div>
 
-            {/* Property Info Card */}
+            {/* Property Info Card - NO IMAGE as per spec */}
             <div className="mx-8 mb-8 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 rounded-2xl p-6 border border-gray-200 dark:border-gray-700 shadow-sm">
               <div className="flex items-start gap-5">
-                {propertyImageUrl ? (
-                  <div className="flex-shrink-0">
-                    <img 
-                      src={propertyImageUrl} 
-                      alt={reconciliation.properties.name}
-                      className="w-44 h-28 object-cover rounded-xl shadow-md"
-                      onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                    />
-                  </div>
-                ) : (
-                  <div className="w-12 h-12 bg-gradient-to-br from-pink-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg flex-shrink-0">
-                    <span className="text-2xl">🏠</span>
-                  </div>
-                )}
+                <div className="w-12 h-12 bg-gradient-to-br from-pink-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg flex-shrink-0">
+                  <span className="text-2xl">🏠</span>
+                </div>
                 <div className="flex-1">
                   <h3 className="text-xl font-semibold text-gray-800 dark:text-gray-200 mb-2">
                     {reconciliation.properties?.name}
@@ -283,19 +262,19 @@ export const MonthlyEmailPreviewModal = ({
                   Income & Activity
                 </h3>
                 <div className="space-y-3">
-                  {Number(reconciliation.short_term_revenue || 0) > 0 && (
+                  {shortTermRevenue > 0 && (
                     <div className="flex justify-between pb-3 border-b dark:border-gray-700">
                       <span className="text-sm text-gray-700 dark:text-gray-300">Short-term Booking Revenue</span>
                       <span className="text-sm font-semibold text-green-600 dark:text-green-400">
-                        ${Number(reconciliation.short_term_revenue || 0).toFixed(2)}
+                        ${shortTermRevenue.toFixed(2)}
                       </span>
                     </div>
                   )}
-                  {Number(reconciliation.mid_term_revenue || 0) > 0 && (
+                  {midTermRevenue > 0 && (
                     <div className="flex justify-between pb-3 border-b dark:border-gray-700">
                       <span className="text-sm text-gray-700 dark:text-gray-300">Mid-term Rental Revenue</span>
                       <span className="text-sm font-semibold text-green-600 dark:text-green-400">
-                        ${Number(reconciliation.mid_term_revenue || 0).toFixed(2)}
+                        ${midTermRevenue.toFixed(2)}
                       </span>
                     </div>
                   )}
@@ -390,14 +369,6 @@ export const MonthlyEmailPreviewModal = ({
               >
                 <TestTube className="w-4 h-4 mr-2" />
                 {isSendingTest ? "Sending..." : "Test Owner Statement"}
-              </Button>
-              <Button
-                variant="outline"
-                onClick={handleSendPerformanceTest}
-                disabled={isSendingTest || isSendingOwner}
-              >
-                <BarChart3 className="w-4 h-4 mr-2" />
-                Test Performance Report
               </Button>
               <Button
                 onClick={handleSendOwnerEmail}

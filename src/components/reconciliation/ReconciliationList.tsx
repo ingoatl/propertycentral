@@ -4,11 +4,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Eye, Send, Mail, Loader2 } from "lucide-react";
+import { Calendar, Eye, Send, Mail, Loader2, AlertTriangle } from "lucide-react";
 import { format } from "date-fns";
 import { CreateReconciliationDialog } from "./CreateReconciliationDialog";
 import { ReconciliationReviewModal } from "./ReconciliationReviewModal";
 import { toast } from "sonner";
+import { validateReconciliationTotals, formatCurrency } from "@/lib/reconciliationCalculations";
 
 export const ReconciliationList = () => {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
@@ -29,7 +30,30 @@ export const ReconciliationList = () => {
         .order("reconciliation_month", { ascending: false });
 
       if (error) throw error;
-      return data;
+
+      // Fetch line items for each reconciliation to validate totals
+      const reconciliationsWithValidation = await Promise.all(
+        (data || []).map(async (rec) => {
+          const { data: lineItems, error: lineItemsError } = await supabase
+            .from("reconciliation_line_items")
+            .select("*")
+            .eq("reconciliation_id", rec.id);
+
+          if (lineItemsError) {
+            console.error("Error fetching line items:", lineItemsError);
+            return rec;
+          }
+
+          const validation = validateReconciliationTotals(rec, lineItems || []);
+
+          return {
+            ...rec,
+            _validation: validation,
+          };
+        })
+      );
+
+      return reconciliationsWithValidation;
     },
   });
 
@@ -133,15 +157,29 @@ export const ReconciliationList = () => {
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground">Visit Fees</p>
-                      <p className="font-semibold text-red-600">
-                        ${Number(rec.visit_fees || 0).toFixed(2)}
-                      </p>
+                      <div className="flex items-center gap-1">
+                        <p className="font-semibold text-red-600">
+                          ${Number(rec._validation?.calculatedValues.visitFees || rec.visit_fees || 0).toFixed(2)}
+                        </p>
+                        {rec._validation?.visitFeesMismatch && (
+                          <Badge variant="destructive" className="h-4 text-[10px] px-1">
+                            <AlertTriangle className="w-2 h-2" />
+                          </Badge>
+                        )}
+                      </div>
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground">Expenses</p>
-                      <p className="font-semibold text-red-600">
-                        ${Number(rec.total_expenses || 0).toFixed(2)}
-                      </p>
+                      <div className="flex items-center gap-1">
+                        <p className="font-semibold text-red-600">
+                          ${Number(rec._validation?.calculatedValues.totalExpenses || rec.total_expenses || 0).toFixed(2)}
+                        </p>
+                        {rec._validation?.expensesMismatch && (
+                          <Badge variant="destructive" className="h-4 text-[10px] px-1">
+                            <AlertTriangle className="w-2 h-2" />
+                          </Badge>
+                        )}
+                      </div>
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground">Mgmt Fee</p>
@@ -156,13 +194,47 @@ export const ReconciliationList = () => {
                       </p>
                     </div>
                     <div className="col-span-2">
-                      <p className="text-xs text-muted-foreground">Due from Owner</p>
-                      <p className="font-bold text-primary text-lg">
-                        ${(Number(rec.management_fee || 0) + Number(rec.visit_fees || 0) + Number(rec.total_expenses || 0)).toFixed(2)}
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Mgmt Fee + Visits + Expenses
-                      </p>
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1">
+                          <p className="text-xs text-muted-foreground">Due from Owner</p>
+                          <p className="font-bold text-primary text-lg">
+                            {formatCurrency(rec._validation?.calculatedValues.dueFromOwner || (Number(rec.management_fee || 0) + Number(rec.order_minimum_fee || 0) + Number(rec.visit_fees || 0) + Number(rec.total_expenses || 0)))}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Mgmt + Order Min + Visits + Expenses
+                          </p>
+                        </div>
+                        {!rec._validation?.isValid && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-destructive border-destructive hover:bg-destructive/10"
+                            onClick={async () => {
+                              const confirmed = confirm("Recalculate totals from line items?");
+                              if (!confirmed) return;
+
+                              try {
+                                const { error } = await supabase
+                                  .from("monthly_reconciliations")
+                                  .update({
+                                    visit_fees: rec._validation.calculatedValues.visitFees,
+                                    total_expenses: rec._validation.calculatedValues.totalExpenses,
+                                  })
+                                  .eq("id", rec.id);
+
+                                if (error) throw error;
+                                toast.success("Totals recalculated successfully");
+                                refetch();
+                              } catch (error: any) {
+                                toast.error(error.message || "Failed to recalculate");
+                              }
+                            }}
+                          >
+                            <AlertTriangle className="w-3 h-3 mr-1" />
+                            Fix
+                          </Button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
