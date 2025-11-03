@@ -367,27 +367,19 @@ ${property.rental_type === 'mid_term' ? '- MTR-Only model: Focus exclusively on 
 
 **C. Content Structure to Generate**
 
- 1. **Performance Highlights**
-   - Bookings: ${bookings?.length || 0}
-   - Short-term revenue: $${bookingRevenue.toFixed(2)}
-   - Mid-term revenue: $${midTermRevenue.toFixed(2)}
-   - Total revenue: $${totalRevenue.toFixed(2)}
-   - Property visits: ${isReconciliationMode ? visitCount : visits?.length || 0}
-   - Maintenance tasks: ${isReconciliationMode ? expenseCount : expenses?.length || 0}
-
-2. **What PeachHaus Did This Period**
+1. **What PeachHaus Did This Period**
    - Generate 3-5 high-impact actions taken (listing refresh, dynamic pricing, partner engagement, maintenance audit)
    ${property.rental_type === 'hybrid' ? '- Include both STR and MTR tactics' : ''}
    ${property.rental_type === 'mid_term' ? '- Focus on MTR tenant acquisition/retention' : ''}
 
-3. **Local Demand Drivers & Upcoming Events**
+2. **Local Demand Drivers & Upcoming Events**
    Location: ${metroArea}, ${city}, ${state}
    ${property.rental_type === 'hybrid' ? '- Include both leisure/tourist events AND corporate/relocation drivers' : ''}
    ${property.rental_type === 'mid_term' ? '- Focus on corporate/insurance/relocation demand, infrastructure projects, NOT tourist events' : ''}
    - For each event: name, date, distance from property, how it drives demand
    - Generate 2-4 realistic upcoming events/drivers for this location
 
-4. **Strategic Action Plan**
+3. **Strategic Action Plan**
    - Generate 2-4 specific planned actions for next period
    ${property.rental_type === 'hybrid' ? '- Include: "Pivot to short-stay around [event]" + "Secure mid-term partner for longer stays"' : ''}
    ${property.rental_type === 'mid_term' ? '- Focus: Corporate outreach, insurance partnerships, longer-term placement strategy' : ''}
@@ -401,7 +393,8 @@ ${property.rental_type === 'mid_term' ? '- MTR-Only model: Focus exclusively on 
 
 **E. Exclusions**
 - DO NOT include financial line items, expenses, or cost breakdowns
-- Focus purely on bookings, revenue potential, demand drivers, and strategy
+- DO NOT generate a "Performance Highlights" section with bookings, visits, or maintenance tasks
+- Focus purely on strategy, demand drivers, and action plans
 
 Generate the performance report content now in HTML format.`;
 
