@@ -55,7 +55,7 @@ serve(async (req) => {
       .eq('property_id', propertyId)
       .gte('date', firstDay.toISOString())
       .lte('date', lastDay.toISOString())
-      .is('billed', false);
+      .eq('exported', false);
 
     // Find unbilled visits
     const { data: unbilledVisits, error: visitsError } = await supabase
@@ -144,11 +144,11 @@ serve(async (req) => {
       throw new Error(`Error updating reconciliation: ${updateError.message}`);
     }
 
-    // Mark expenses as billed
+    // Mark expenses as exported
     if (unbilledExpenses && unbilledExpenses.length > 0) {
       await supabase
         .from('expenses')
-        .update({ billed: true })
+        .update({ exported: true })
         .in('id', unbilledExpenses.map(e => e.id));
     }
 
@@ -166,8 +166,14 @@ serve(async (req) => {
     console.log('Sending revised statement...');
     const { data: emailData, error: emailError } = await supabase.functions.invoke('send-monthly-report', {
       body: {
-        mode: 'reconciliation',
-        reconciliation_id
+        reconciliation_id,
+        is_revised: true,
+        added_items: lineItemsToAdd.map(item => ({
+          description: item.description,
+          amount: item.amount,
+          date: item.date,
+          type: item.type
+        }))
       }
     });
 

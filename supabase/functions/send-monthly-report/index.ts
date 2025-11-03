@@ -26,7 +26,9 @@ const handler = async (req: Request): Promise<Response> => {
       emailType, 
       sendToOwner = true, 
       sendCopyToInfo = true,
-      isTestEmail: testEmailFlag 
+      isTestEmail: testEmailFlag,
+      is_revised = false,
+      added_items = []
     } = await req.json();
 
     // Reconciliation mode vs test mode vs manual send
@@ -658,8 +660,27 @@ State: ${state}
               <p style="font-size: 15px; line-height: 1.8; color: #2c3e50; margin: 0 0 20px 0;">
                 Dear ${ownerNames},
               </p>
+              ${is_revised ? `
+              <!-- REVISED STATEMENT NOTICE -->
+              <div style="background: linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%); border-left: 4px solid #F59E0B; border-radius: 8px; padding: 20px; margin: 0 0 25px 0;">
+                <h3 style="color: #92400E; margin: 0 0 12px 0; font-size: 16px; font-weight: 700; display: flex; align-items: center;">
+                  ⚠️ REVISED STATEMENT
+                </h3>
+                <p style="color: #78350F; margin: 0 0 12px 0; font-size: 14px; line-height: 1.6;">
+                  We sincerely apologize for the oversight. This revised statement includes the following additional items that were not included in the original statement sent earlier:
+                </p>
+                <ul style="margin: 12px 0 12px 20px; padding: 0; color: #78350F; font-size: 14px; line-height: 1.8;">
+                  ${added_items.map((item: any) => `
+                    <li><strong>${item.description}</strong> - $${Number(item.amount).toFixed(2)} (${new Date(item.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })})</li>
+                  `).join('')}
+                </ul>
+                <p style="color: #78350F; margin: 12px 0 0 0; font-size: 14px; font-weight: 600;">
+                  Please disregard the previous statement and use this revised version for your records.
+                </p>
+              </div>
+              ` : ''}
               <p style="font-size: 15px; line-height: 1.8; color: #2c3e50; margin: 0 0 20px 0;">
-                Please find enclosed your official monthly financial statement for the period ending ${previousMonthName}. 
+                Please find enclosed your ${is_revised ? 'revised ' : ''}monthly financial statement for the period ending ${previousMonthName}. 
                 This statement provides a comprehensive breakdown of all revenue collected and expenses incurred on your behalf 
                 during the reporting period. All amounts reflected herein have been verified and reconciled with our accounting records.
               </p>
@@ -841,9 +862,10 @@ State: ${state}
         statementRecipients.push("info@peachhausgroup.com");
       }
       
+      const subjectPrefix = is_revised ? "REVISED " : "";
       const statementSubject = isTestEmail 
-        ? `[TEST] Monthly Owner Statement - ${property.name} - ${previousMonthName}`
-        : `Monthly Owner Statement - ${property.name} - ${previousMonthName}`;
+        ? `[TEST] ${subjectPrefix}Monthly Owner Statement - ${property.name} - ${previousMonthName}`
+        : `${subjectPrefix}Monthly Owner Statement - ${property.name} - ${previousMonthName}`;
 
       console.log(`Sending statement to: ${statementRecipients.join(', ')} from ${fromEmail}...`);
 
