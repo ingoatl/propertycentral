@@ -146,31 +146,16 @@ serve(async (req) => {
     }
 
     if (lineItemsToAdd.length === 0) {
-      // If this is a test email request, create mock items to show what would be added
+      // If this is a test email request, create mock items to show format
       if (test_email) {
-        console.log('No new items - creating test preview of current reconciliation...');
-        
-        // For test purposes, show some recent line items as "would be added"
-        const { data: recentLineItems } = await supabase
-          .from('reconciliation_line_items')
-          .select('*')
-          .eq('reconciliation_id', reconciliation_id)
-          .order('created_at', { ascending: false })
-          .limit(3);
-        
-        const testItems = recentLineItems?.map((item: any) => ({
-          description: item.description,
-          amount: item.amount,
-          date: item.date,
-          type: item.item_type
-        })) || [];
+        console.log('No new items - sending test preview with sample format...');
         
         const { data: emailData, error: emailError } = await supabase.functions.invoke('send-monthly-report', {
           body: {
             reconciliation_id,
-            is_revised: true,
+            is_revised: false, // Don't show revised box if no items to add
             test_email,
-            added_items: testItems
+            added_items: []
           }
         });
 
@@ -180,13 +165,27 @@ serve(async (req) => {
         }
 
         return new Response(
-          JSON.stringify({ success: true, message: 'Test email sent with preview of existing items' }),
+          JSON.stringify({ success: true, message: 'Test email sent (no unbilled items to add)' }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
         );
       }
 
+      // For non-test, just send normal statement without revised flag
+      const { data: emailData, error: emailError } = await supabase.functions.invoke('send-monthly-report', {
+        body: {
+          reconciliation_id,
+          is_revised: false,
+          added_items: []
+        }
+      });
+
+      if (emailError) {
+        console.error('Error sending statement:', emailError);
+        throw new Error(`Error sending statement: ${emailError.message}`);
+      }
+
       return new Response(
-        JSON.stringify({ message: 'No unbilled items found to add' }),
+        JSON.stringify({ success: true, message: 'Statement sent (no new items added)' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
       );
     }
