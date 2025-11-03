@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -88,6 +88,15 @@ export const MonthlyEmailPreviewModal = ({
 
     fetchOwnerAndLineItems();
   }, [reconciliation?.owner_id, reconciliation?.id]);
+
+  // Get proper image URL from Supabase storage
+  const propertyImageUrl = useMemo(() => {
+    if (!reconciliation?.properties?.image_path) return null;
+    const imagePath = reconciliation.properties.image_path;
+    const filename = imagePath.split('/').pop();
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    return `${supabaseUrl}/storage/v1/object/public/property-images/${filename}`;
+  }, [reconciliation?.properties?.image_path]);
 
   const handleSendTestEmail = async () => {
     setIsSendingTest(true);
@@ -237,12 +246,13 @@ export const MonthlyEmailPreviewModal = ({
             {/* Property Info Card */}
             <div className="mx-8 mb-8 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 rounded-2xl p-6 border border-gray-200 dark:border-gray-700 shadow-sm">
               <div className="flex items-start gap-5">
-                {reconciliation.properties?.image_path ? (
+                {propertyImageUrl ? (
                   <div className="flex-shrink-0">
                     <img 
-                      src={reconciliation.properties.image_path} 
+                      src={propertyImageUrl} 
                       alt={reconciliation.properties.name}
                       className="w-44 h-28 object-cover rounded-xl shadow-md"
+                      onError={(e) => { e.currentTarget.style.display = 'none'; }}
                     />
                   </div>
                 ) : (

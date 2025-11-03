@@ -557,7 +557,7 @@ State: ${state}
                 <div style="display: flex; align-items: start; gap: 20px;">
                   ${property.image_path ? `
                   <div style="flex-shrink: 0;">
-                    <img src="${property.image_path}" alt="${property.name}" style="width: 180px; height: 120px; object-fit: cover; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);" />
+                    <img src="${supabaseUrl}/storage/v1/object/public/property-images/${property.image_path.split('/').pop()}" alt="${property.name}" style="width: 180px; height: 120px; object-fit: cover; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);" onerror="this.style.display='none'" />
                   </div>` : `
                   <div style="background: linear-gradient(135deg, #FF6B9D, #C86DD7); width: 50px; height: 50px; border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 4px 12px rgba(255, 107, 157, 0.3);">
                     <span style="font-size: 24px;">🏠</span>
@@ -767,7 +767,7 @@ State: ${state}
               <div style="display: flex; align-items: start; gap: 20px;">
                 ${property.image_path ? `
                 <div style="flex-shrink: 0;">
-                  <img src="${property.image_path}" alt="${property.name}" style="width: 180px; height: 120px; object-fit: cover; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);" />
+                  <img src="${supabaseUrl}/storage/v1/object/public/property-images/${property.image_path.split('/').pop()}" alt="${property.name}" style="width: 180px; height: 120px; object-fit: cover; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);" onerror="this.style.display='none'" />
                 </div>` : `
                 <div style="background: linear-gradient(135deg, #667eea, #764ba2); width: 50px; height: 50px; border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);">
                   <span style="font-size: 24px;">🏠</span>
