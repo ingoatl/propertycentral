@@ -52,6 +52,23 @@ serve(async (req) => {
 
     console.log(`Date range: ${firstDayStr} to ${lastDayStr}`);
 
+    // Get existing line items to avoid duplicates
+    const { data: existingLineItems, error: lineItemsError } = await supabase
+      .from('reconciliation_line_items')
+      .select('item_id')
+      .eq('reconciliation_id', reconciliation_id);
+
+    if (lineItemsError) {
+      console.error('Error fetching existing line items:', lineItemsError);
+      throw new Error(`Error fetching existing line items: ${lineItemsError.message}`);
+    }
+
+    const existingExpenseIds = existingLineItems
+      ?.filter(item => item.item_id)
+      .map(item => item.item_id) || [];
+
+    console.log(`Found ${existingExpenseIds.length} existing line items`);
+
     // Find unbilled expenses
     const { data: unbilledExpenses, error: expensesError } = await supabase
       .from('expenses')
@@ -65,6 +82,11 @@ serve(async (req) => {
       console.error('Error fetching expenses:', expensesError);
       throw new Error(`Error fetching unbilled expenses: ${expensesError.message}`);
     }
+
+    // Filter out expenses that are already in line items
+    const newExpenses = unbilledExpenses?.filter(
+      expense => !existingExpenseIds.includes(expense.id)
+    ) || [];
 
     // Find unbilled visits
     const { data: unbilledVisits, error: visitsError } = await supabase
@@ -80,15 +102,20 @@ serve(async (req) => {
       throw new Error(`Error fetching unbilled visits: ${visitsError.message}`);
     }
 
-    console.log(`Found ${unbilledExpenses?.length || 0} unbilled expenses, ${unbilledVisits?.length || 0} unbilled visits`);
+    // Filter out visits that are already in line items
+    const newVisits = unbilledVisits?.filter(
+      visit => !existingExpenseIds.includes(visit.id)
+    ) || [];
+
+    console.log(`Found ${newExpenses.length} new unbilled expenses, ${newVisits.length} new unbilled visits`);
 
     const lineItemsToAdd = [];
     let additionalExpenseTotal = 0;
     let additionalVisitTotal = 0;
 
-    // Create line items for unbilled expenses
-    if (unbilledExpenses && unbilledExpenses.length > 0) {
-      for (const expense of unbilledExpenses) {
+    // Create line items for new unbilled expenses
+    if (newExpenses && newExpenses.length > 0) {
+      for (const expense of newExpenses) {
         lineItemsToAdd.push({
           reconciliation_id,
           item_type: 'expense',
@@ -102,9 +129,9 @@ serve(async (req) => {
       }
     }
 
-    // Create line items for unbilled visits
-    if (unbilledVisits && unbilledVisits.length > 0) {
-      for (const visit of unbilledVisits) {
+    // Create line items for new unbilled visits
+    if (newVisits && newVisits.length > 0) {
+      for (const visit of newVisits) {
         lineItemsToAdd.push({
           reconciliation_id,
           item_type: 'visit',
@@ -154,20 +181,20 @@ serve(async (req) => {
       throw new Error(`Error updating reconciliation: ${updateError.message}`);
     }
 
-    // Mark expenses as exported
-    if (unbilledExpenses && unbilledExpenses.length > 0) {
+    // Mark new expenses as exported
+    if (newExpenses && newExpenses.length > 0) {
       await supabase
         .from('expenses')
         .update({ exported: true })
-        .in('id', unbilledExpenses.map(e => e.id));
+        .in('id', newExpenses.map(e => e.id));
     }
 
-    // Mark visits as billed
-    if (unbilledVisits && unbilledVisits.length > 0) {
+    // Mark new visits as billed
+    if (newVisits && newVisits.length > 0) {
       await supabase
         .from('visits')
         .update({ billed: true })
-        .in('id', unbilledVisits.map(v => v.id));
+        .in('id', newVisits.map(v => v.id));
     }
 
     console.log(`Updated reconciliation totals. New expense total: ${newExpenseTotal}, New visit total: ${newVisitTotal}, New due from owner: ${newDueFromOwner}`);
@@ -199,8 +226,8 @@ serve(async (req) => {
         success: true,
         message: `Added ${lineItemsToAdd.length} items and sent revised statement`,
         added: {
-          expenses: unbilledExpenses?.length || 0,
-          visits: unbilledVisits?.length || 0
+          expenses: newExpenses?.length || 0,
+          visits: newVisits?.length || 0
         },
         newTotals: {
           expense_total: newExpenseTotal,
