@@ -176,6 +176,13 @@ const handler = async (req: Request): Promise<Response> => {
         month: 'long',
         year: 'numeric'
       });
+      
+      // Set reportDate for reconciliation mode
+      reportDate = new Date(reconciliation.reconciliation_month).toLocaleDateString('en-US', { 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+      });
 
     } else {
       // TEST MODE or MANUAL SEND MODE: Use existing logic
@@ -1105,7 +1112,7 @@ State: ${state}
         console.log(`Marked ${expenseIds.length} expenses as billed`);
       }
 
-      // Calculate next month's 5th for deadline
+      // Calculate next month's 5th for deadline using reportDate
       const recMonth = new Date(reportDate);
       const nextMonth = new Date(recMonth.getFullYear(), recMonth.getMonth() + 2, 5);
 
