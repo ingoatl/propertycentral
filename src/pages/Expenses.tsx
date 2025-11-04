@@ -17,7 +17,25 @@ const expenseSchema = z.object({
   propertyId: z.string().uuid("Please select a property"),
   amount: z.number().positive("Amount must be positive").max(1000000, "Amount cannot exceed $1,000,000"),
   date: z.string().min(1, "Date is required"),
-  purpose: z.string().max(2000, "Purpose must be less than 2000 characters").optional(),
+  purpose: z.string().max(2000, "Purpose must be less than 2000 characters").optional()
+    .refine((val) => {
+      if (!val) return true;
+      const normalized = val.toLowerCase().trim();
+      const visitKeywords = [
+        'visit fee',
+        'visit charge',
+        'hourly charge',
+        'property visit',
+        'visit -',
+        'hours @',
+        'hour @',
+        '@/hr',
+        '/hr',
+      ];
+      return !visitKeywords.some(keyword => normalized.includes(keyword));
+    }, {
+      message: "Visit charges should be logged on the Visits page, not as expenses. Please use the Visits tab to record property visits and associated charges."
+    }),
 });
 
 const Expenses = () => {
@@ -232,6 +250,9 @@ const Expenses = () => {
       <Card>
         <CardHeader>
           <CardTitle>Record New Expense</CardTitle>
+          <CardDescription>
+            <span className="text-amber-600 dark:text-amber-500 font-medium">⚠️ Note:</span> Visit charges should be recorded on the <span className="font-semibold">Visits</span> page, not here. This form is for property expenses like maintenance, supplies, and utilities only.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
