@@ -802,32 +802,61 @@ State: ${state}
                       const dateStr = new Date(expense.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
                       
                       // Check if there are line items (individual products from Amazon orders, etc.)
-                      if (expense.line_items?.items && Array.isArray(expense.line_items.items) && expense.line_items.items.length > 0) {
-                        // For Amazon orders with line items, show each item as a separate row
-                        return expense.line_items.items.map((item: any, index: number) => {
+                      if (expense.line_items?.items && Array.isArray(expense.line_items.items) && expense.line_items.items.length > 1) {
+                        // For multi-item orders, show header and each item
+                        const actualTotal = Number(expense.amount);
+                        let lineItemsSum = 0;
+                        
+                        // Calculate sum of line item prices
+                        expense.line_items.items.forEach((item: any) => {
+                          lineItemsSum += item.price ? Number(item.price) : 0;
+                        });
+                        
+                        // If line items don't match the actual total, we need to adjust
+                        const priceDifference = Math.abs(actualTotal - lineItemsSum);
+                        const shouldAdjust = priceDifference > 0.01; // More than 1 cent difference
+                        
+                        let result = '';
+                        
+                        // Show header row with order info
+                        let headerText = `${dateStr}: ${expense.vendor || 'Online Order'}`;
+                        if (expense.order_number) headerText += ` [Order #${expense.order_number}]`;
+                        
+                        result += `
+                        <tr>
+                          <td style="padding: 10px 0 2px 0; color: #2c3e50; font-size: 14px; font-weight: 600; border-bottom: none;">
+                            ${headerText}
+                          </td>
+                          <td style="padding: 10px 0 2px 0; color: #4a4a4a; font-size: 14px; text-align: right; font-weight: 600; border-bottom: none;"></td>
+                        </tr>`;
+                        
+                        // Show each line item
+                        expense.line_items.items.forEach((item: any, index: number) => {
                           const itemPrice = item.price ? Number(item.price) : 0;
                           const itemName = item.name || 'Item';
+                          const isLast = index === expense.line_items.items.length - 1;
                           
-                          // Build header for first item with order info
-                          let detailText = '';
-                          if (index === 0) {
-                            detailText = `${dateStr}: ${expense.vendor || 'Online Order'}`;
-                            if (expense.order_number) detailText += ` [Order #${expense.order_number}]`;
-                            detailText += `<br><span style="font-size: 13px; color: #6b7280; font-weight: normal;">├─ ${itemName}</span>`;
-                          } else {
-                            detailText = `<span style="font-size: 13px; color: #6b7280; margin-left: 8px;">${index === expense.line_items.items.length - 1 ? '└─' : '├─'} ${itemName}</span>`;
-                          }
-                          
-                          return `
+                          result += `
                           <tr>
-                            <td style="padding: ${index === 0 ? '10px' : '6px'} 0; color: #2c3e50; font-size: 14px; border-bottom: ${index === expense.line_items.items.length - 1 ? '1px solid #f5f5f5' : 'none'};">
-                              <div>${detailText}</div>
+                            <td style="padding: 4px 0 4px 20px; color: #6b7280; font-size: 13px; border-bottom: none;">
+                              ${isLast ? '└─' : '├─'} ${itemName}
                             </td>
-                            <td style="padding: ${index === 0 ? '10px' : '6px'} 0; color: #4a4a4a; font-size: 14px; text-align: right; font-weight: 600; border-bottom: ${index === expense.line_items.items.length - 1 ? '1px solid #f5f5f5' : 'none'}; vertical-align: top;">$${itemPrice.toFixed(2)}</td>
+                            <td style="padding: 4px 0; color: #6b7280; font-size: 13px; text-align: right; border-bottom: none;">$${itemPrice.toFixed(2)}</td>
                           </tr>`;
-                        }).join('');
+                        });
+                        
+                        // Show total row (use actual expense amount, not sum of line items)
+                        result += `
+                        <tr>
+                          <td style="padding: 4px 0 10px 20px; color: #2c3e50; font-size: 13px; font-weight: 600; border-bottom: 1px solid #f5f5f5;">
+                            Order Total:
+                          </td>
+                          <td style="padding: 4px 0 10px 0; color: #2c3e50; font-size: 14px; text-align: right; font-weight: 700; border-bottom: 1px solid #f5f5f5;">$${actualTotal.toFixed(2)}</td>
+                        </tr>`;
+                        
+                        return result;
                       } else {
-                        // For regular expenses without line items, show as single row
+                        // For regular expenses or single-item orders, show as single row
                         let detailText = `${dateStr}: ${description}`;
                         if (expense.vendor) detailText += ` - ${expense.vendor}`;
                         if (expense.category) detailText += ` (${expense.category})`;
