@@ -344,14 +344,16 @@ export const ReconciliationReviewModal = ({
     Math.abs(reconciliation.visit_fees - calculated.visitFees) > 0.01 ||
     Math.abs(reconciliation.total_expenses - calculated.totalExpenses) > 0.01;
 
-  // Split items by verification status and type
-  const verifiedItems = lineItems.filter((i: any) => i.verified);
+  // Split items by verification status
   const unverifiedItems = lineItems.filter((i: any) => !i.verified);
   
-  const bookings = verifiedItems.filter((i: any) => i.item_type === "booking" || i.item_type === "mid_term_booking");
-  const expenses = verifiedItems.filter((i: any) => i.item_type === "expense");
-  const visits = verifiedItems.filter((i: any) => i.item_type === "visit");
-  const orderMinimums = verifiedItems.filter((i: any) => i.item_type === "order_minimum");
+  // Type-specific tabs show ALL items of that type (both verified and unverified)
+  const allBookings = lineItems.filter((i: any) => i.item_type === "booking" || i.item_type === "mid_term_booking");
+  const allExpenses = lineItems.filter((i: any) => i.item_type === "expense");
+  const allVisits = lineItems.filter((i: any) => i.item_type === "visit");
+  
+  // Count verified items for display
+  const verifiedCount = lineItems.filter((i: any) => i.verified && !i.excluded).length;
   
   const safeUnbilledVisits = unbilledVisits || [];
   const safeUnbilledExpenses = unbilledExpenses || [];
@@ -448,17 +450,16 @@ export const ReconciliationReviewModal = ({
                 <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full" />
               )}
             </TabsTrigger>
-            <TabsTrigger value="all">Approved ({verifiedItems.length})</TabsTrigger>
-            <TabsTrigger value="bookings">Bookings ({bookings.length})</TabsTrigger>
-            <TabsTrigger value="expenses">Expenses ({expenses.length})</TabsTrigger>
-            <TabsTrigger value="visits">Visits ({visits.length})</TabsTrigger>
+            <TabsTrigger value="bookings">Bookings ({allBookings.length})</TabsTrigger>
+            <TabsTrigger value="expenses">Expenses ({allExpenses.length})</TabsTrigger>
+            <TabsTrigger value="visits">Visits ({allVisits.length})</TabsTrigger>
           </TabsList>
 
           <TabsContent value="unapproved" className="space-y-2">
             {unverifiedItems.length === 0 ? (
               <Card className="p-6 text-center text-muted-foreground">
                 <Check className="w-8 h-8 mx-auto mb-2 text-green-500" />
-                <p>All items have been approved</p>
+                <p>All items have been approved ({verifiedCount} verified)</p>
               </Card>
             ) : (
               unverifiedItems.map((item: any) => (
@@ -473,48 +474,55 @@ export const ReconciliationReviewModal = ({
             )}
           </TabsContent>
 
-          <TabsContent value="all" className="space-y-2">
-            {verifiedItems.map((item: any) => (
-              <LineItemRow 
-                key={item.id} 
-                item={item} 
-                onToggleVerified={(id, val) => toggleVerifiedMutation.mutate({ itemId: id, currentValue: val })} 
-                getIcon={getItemIcon} 
-              />
-            ))}
-          </TabsContent>
-
           <TabsContent value="bookings" className="space-y-2">
-            {bookings.map((item: any) => (
-              <LineItemRow 
-                key={item.id} 
-                item={item} 
-                onToggleVerified={(id, val) => toggleVerifiedMutation.mutate({ itemId: id, currentValue: val })} 
-                getIcon={getItemIcon} 
-              />
-            ))}
+            {allBookings.length === 0 ? (
+              <Card className="p-6 text-center text-muted-foreground">
+                <p>No bookings found</p>
+              </Card>
+            ) : (
+              allBookings.map((item: any) => (
+                <LineItemRow 
+                  key={item.id} 
+                  item={item} 
+                  onToggleVerified={(id, val) => toggleVerifiedMutation.mutate({ itemId: id, currentValue: val })} 
+                  getIcon={getItemIcon} 
+                />
+              ))
+            )}
           </TabsContent>
 
           <TabsContent value="expenses" className="space-y-2">
-            {expenses.map((item: any) => (
-              <LineItemRow 
-                key={item.id} 
-                item={item} 
-                onToggleVerified={(id, val) => toggleVerifiedMutation.mutate({ itemId: id, currentValue: val })} 
-                getIcon={getItemIcon} 
-              />
-            ))}
+            {allExpenses.length === 0 ? (
+              <Card className="p-6 text-center text-muted-foreground">
+                <p>No expenses found</p>
+              </Card>
+            ) : (
+              allExpenses.map((item: any) => (
+                <LineItemRow 
+                  key={item.id} 
+                  item={item} 
+                  onToggleVerified={(id, val) => toggleVerifiedMutation.mutate({ itemId: id, currentValue: val })} 
+                  getIcon={getItemIcon} 
+                />
+              ))
+            )}
           </TabsContent>
 
           <TabsContent value="visits" className="space-y-2">
-            {visits.map((item: any) => (
-              <LineItemRow 
-                key={item.id} 
-                item={item} 
-                onToggleVerified={(id, val) => toggleVerifiedMutation.mutate({ itemId: id, currentValue: val })} 
-                getIcon={getItemIcon} 
-              />
-            ))}
+            {allVisits.length === 0 ? (
+              <Card className="p-6 text-center text-muted-foreground">
+                <p>No visits found</p>
+              </Card>
+            ) : (
+              allVisits.map((item: any) => (
+                <LineItemRow 
+                  key={item.id} 
+                  item={item} 
+                  onToggleVerified={(id, val) => toggleVerifiedMutation.mutate({ itemId: id, currentValue: val })} 
+                  getIcon={getItemIcon} 
+                />
+              ))
+            )}
           </TabsContent>
         </Tabs>
 
