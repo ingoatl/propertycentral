@@ -1,5 +1,7 @@
 import { Button } from "@/components/ui/button";
-import { RefreshCw } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { RefreshCw, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useState } from "react";
@@ -35,14 +37,31 @@ export function RescanEmailsButton() {
   };
 
   return (
-    <Button
-      onClick={handleRescan}
-      disabled={scanning}
-      variant="outline"
-      className="gap-2"
-    >
-      <RefreshCw className={`w-4 h-4 ${scanning ? 'animate-spin' : ''}`} />
-      {scanning ? 'Rescanning...' : 'Rescan All Emails'}
-    </Button>
+    <div className="space-y-4">
+      {scanning && (
+        <Alert>
+          <Loader2 className="h-4 w-4 animate-spin" />
+          <AlertDescription className="ml-2">
+            <div className="space-y-2">
+              <p className="font-medium">Scanning emails from the last 6 weeks...</p>
+              <Progress value={100} className="w-full animate-pulse" />
+              <p className="text-sm text-muted-foreground">
+                Processing emails and extracting insights. This may take a few moments.
+              </p>
+            </div>
+          </AlertDescription>
+        </Alert>
+      )}
+      
+      <Button
+        onClick={handleRescan}
+        disabled={scanning}
+        variant="outline"
+        className="gap-2"
+      >
+        <RefreshCw className={`w-4 h-4 ${scanning ? 'animate-spin' : ''}`} />
+        {scanning ? 'Rescanning...' : 'Rescan All Emails'}
+      </Button>
+    </div>
   );
 }
