@@ -415,13 +415,29 @@ export const ReconciliationReviewModal = ({
           />
         </div>
 
+        {unverifiedItems.length > 0 && reconciliation.status === "draft" && (
+          <Card className="p-4 bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-blue-600 mt-0.5" />
+              <div className="flex-1">
+                <h4 className="font-semibold text-blue-900 dark:text-blue-100 mb-1">
+                  {unverifiedItems.length} Unchecked Items
+                </h4>
+                <p className="text-sm text-blue-800 dark:text-blue-200">
+                  These items will NOT be included in the statement or marked as billed. They will remain available for future reconciliations.
+                </p>
+              </div>
+            </div>
+          </Card>
+        )}
+
         <div className="flex justify-between pt-4 border-t gap-2">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Close
           </Button>
           <div className="flex gap-2">
             {reconciliation.status === "draft" && (
-              <Button onClick={handleApprove} disabled={isApproving || unverifiedItems.length > 0}>
+              <Button onClick={handleApprove} disabled={isApproving}>
                 <Check className="w-4 h-4 mr-2" />
                 {isApproving ? "Approving..." : "Approve Reconciliation"}
               </Button>
