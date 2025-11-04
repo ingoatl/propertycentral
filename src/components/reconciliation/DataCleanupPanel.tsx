@@ -193,7 +193,7 @@ export function DataCleanupPanel() {
                   <Loader2 className="h-4 w-4 animate-spin" />
                   <AlertDescription className="ml-2">
                     <div className="space-y-2">
-                      <p className="font-medium">Scanning emails from the last 60 days...</p>
+                      <p className="font-medium">Scanning emails from the last 35 days...</p>
                       <Progress value={scanProgress} className="w-full" />
                       <p className="text-sm text-muted-foreground">
                         {emailsProcessed > 0 
@@ -207,7 +207,7 @@ export function DataCleanupPanel() {
               )}
               
               <p className="text-sm text-muted-foreground mb-3">
-                After cleanup, rescan all emails from the last 60 days with improved filtering:
+                After cleanup, rescan all emails from the last 35 days with improved filtering:
               </p>
               <ul className="list-disc list-inside space-y-1 text-xs text-muted-foreground mb-3">
                 <li>Filters out internal PeachHaus emails</li>

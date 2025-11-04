@@ -293,7 +293,7 @@ export function EmailInsightsCard({ propertyId, showHeader = true }: EmailInsigh
               </div>
             </div>
             <CardDescription>
-              AI-powered insights from your emails (last 60 days) • Scans daily at 6 AM
+              AI-powered insights from your emails (last 35 days) • Scans daily at 6 AM
             </CardDescription>
           </CardHeader>
         </CollapsibleTrigger>
