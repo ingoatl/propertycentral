@@ -101,7 +101,17 @@ const handler = async (req: Request): Promise<Response> => {
       midTermRevenue = Number(reconciliation.mid_term_revenue || 0);
       expenseTotal = Number(reconciliation.total_expenses || 0);
       managementFees = Number(reconciliation.management_fee || 0);
-      orderMinimumFee = Number(reconciliation.order_minimum_fee || 0);
+      
+      // Check if order minimum fee is verified before including it
+      const { data: orderMinLineItem } = await supabase
+        .from("reconciliation_line_items")
+        .select("verified, amount")
+        .eq("reconciliation_id", reconciliation_id)
+        .eq("item_type", "order_minimum")
+        .eq("verified", true)
+        .maybeSingle();
+      
+      orderMinimumFee = orderMinLineItem ? Math.abs(Number(orderMinLineItem.amount)) : 0;
       
       // Fetch line items to calculate visit total
       const { data: lineItemsForCalc, error: itemsCalcError } = await supabase
@@ -147,15 +157,36 @@ const handler = async (req: Request): Promise<Response> => {
           price: Math.abs(item.amount),
         }));
 
+      // Fetch detailed expense data with line items for better descriptions
+      const expenseIds = (lineItems || [])
+        .filter((item: any) => item.item_type === "expense")
+        .map((item: any) => item.item_id);
+      
+      let detailedExpenses: any[] = [];
+      if (expenseIds.length > 0) {
+        const { data: expenseData } = await supabase
+          .from("expenses")
+          .select("id, date, amount, purpose, category, vendor, order_number, items_detail, line_items")
+          .in("id", expenseIds);
+        
+        detailedExpenses = expenseData || [];
+      }
+      
       expenses = (lineItems || [])
         .filter((item: any) => item.item_type === "expense")
-        .map((item: any) => ({
-          date: item.date,
-          amount: Math.abs(item.amount),
-          purpose: item.description,
-          category: item.category,
-          vendor: item.description.includes(' - ') ? item.description.split(' - ')[1] : null,
-        }));
+        .map((item: any) => {
+          const detailedExpense = detailedExpenses.find((e: any) => e.id === item.item_id);
+          return {
+            date: item.date,
+            amount: Math.abs(item.amount),
+            purpose: item.description,
+            category: item.category,
+            vendor: detailedExpense?.vendor || (item.description.includes(' - ') ? item.description.split(' - ')[1] : null),
+            order_number: detailedExpense?.order_number,
+            items_detail: detailedExpense?.items_detail,
+            line_items: detailedExpense?.line_items,
+          };
+        });
       
       expenseCount = expenses.length;
 
@@ -768,12 +799,37 @@ State: ${state}
                       const description = expense.purpose || 'Maintenance & Supplies';
                       const dateStr = new Date(expense.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
                       
+                      // Build detailed description with order number, vendor, category
+                      let detailText = `${dateStr}: ${description}`;
+                      if (expense.vendor) detailText += ` - ${expense.vendor}`;
+                      if (expense.category) detailText += ` (${expense.category})`;
+                      if (expense.order_number) detailText += ` [Order #${expense.order_number}]`;
+                      
+                      // Check if there are line items (individual products)
+                      let lineItemsHtml = '';
+                      if (expense.line_items?.items && Array.isArray(expense.line_items.items) && expense.line_items.items.length > 0) {
+                        lineItemsHtml = `
+                          <div style="margin-top: 6px; padding-left: 12px; font-size: 12px; color: #6b7280;">
+                            ${expense.line_items.items.map((item: any) => {
+                              const itemPrice = item.price ? ` - $${Number(item.price).toFixed(2)}` : '';
+                              return `<div style="margin: 2px 0;">• ${item.name}${itemPrice}</div>`;
+                            }).join('')}
+                          </div>`;
+                      } else if (expense.items_detail) {
+                        // Fallback to items_detail if available
+                        lineItemsHtml = `
+                          <div style="margin-top: 6px; padding-left: 12px; font-size: 12px; color: #6b7280;">
+                            ${expense.items_detail}
+                          </div>`;
+                      }
+                      
                       return `
                       <tr>
                         <td style="padding: 10px 0; color: #2c3e50; font-size: 14px; border-bottom: 1px solid #f5f5f5;">
-                          ${dateStr}: ${description}${expense.vendor ? ' - ' + expense.vendor : ''}${expense.category ? ' (' + expense.category + ')' : ''}
+                          <div>${detailText}</div>
+                          ${lineItemsHtml}
                         </td>
-                        <td style="padding: 10px 0; color: #4a4a4a; font-size: 14px; text-align: right; font-weight: 600; border-bottom: 1px solid #f5f5f5;">$${Number(expense.amount).toFixed(2)}</td>
+                        <td style="padding: 10px 0; color: #4a4a4a; font-size: 14px; text-align: right; font-weight: 600; border-bottom: 1px solid #f5f5f5; vertical-align: top;">$${Number(expense.amount).toFixed(2)}</td>
                       </tr>`;
                     }).join('') : ''}
                     <tr style="background-color: #FFF3EC;">
