@@ -16,8 +16,10 @@ export function RescanEmailsButton() {
       setScanning(true);
       toast.loading("Rescanning emails from the last 6 weeks...");
 
-      // Trigger new scan (scan-gmail will automatically scan last 6 weeks)
-      const { data, error } = await supabase.functions.invoke('scan-gmail');
+      // Trigger new scan with forceRescan flag
+      const { data, error } = await supabase.functions.invoke('scan-gmail', {
+        body: { forceRescan: true }
+      });
 
       if (error) throw error;
 
