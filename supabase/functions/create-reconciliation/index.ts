@@ -324,8 +324,22 @@ serve(async (req) => {
         .in("id", visitIds);
     }
 
-    // Add expenses
+    // Add expenses (excluding visit-related expenses to avoid double counting)
     for (const expense of expenses || []) {
+      const description = (expense.purpose || "").toLowerCase();
+      
+      // Skip visit-related expenses - these are already counted in visit fees
+      const isVisitRelated = 
+        description.includes('visit fee') ||
+        description.includes('visit charge') ||
+        description.includes('hourly charge') ||
+        description.includes('property visit');
+      
+      if (isVisitRelated) {
+        console.log(`Skipping visit-related expense: ${expense.purpose} ($${expense.amount})`);
+        continue;
+      }
+      
       lineItems.push({
         reconciliation_id: reconciliation.id,
         item_type: "expense",

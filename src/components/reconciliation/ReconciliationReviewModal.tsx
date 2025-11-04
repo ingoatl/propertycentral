@@ -134,7 +134,23 @@ export const ReconciliationReviewModal = ({
         
         const { data: { user } } = await supabase.auth.getUser();
         
-        const newLineItems = newExpenses.map((expense: any) => ({
+      const newLineItems = newExpenses
+        .filter((expense: any) => {
+          // Filter out visit-related expenses to avoid double counting
+          const description = (expense.purpose || "").toLowerCase();
+          const isVisitRelated = 
+            description.includes('visit fee') ||
+            description.includes('visit charge') ||
+            description.includes('hourly charge') ||
+            description.includes('property visit');
+          
+          if (isVisitRelated) {
+            console.log(`Skipping visit-related expense during auto-add: ${expense.purpose} ($${expense.amount})`);
+          }
+          
+          return !isVisitRelated;
+        })
+        .map((expense: any) => ({
           reconciliation_id: reconciliationId,
           item_type: 'expense',
           item_id: expense.id,
@@ -672,23 +688,54 @@ const LineItemRow = ({ item, onToggleVerified, getIcon, showWarnings = false }: 
     ? Math.abs(item.amount) 
     : item.amount;
   
+  // Check if this is a visit-related expense that should be excluded
+  const description = (item.description || '').toLowerCase();
+  const isVisitRelatedExpense = item.item_type === 'expense' && (
+    description.includes('visit fee') ||
+    description.includes('visit charge') ||
+    description.includes('hourly charge') ||
+    description.includes('property visit')
+  );
+  
+  // Extract visitor name from visit line items
+  let visitorName = '';
+  if (item.item_type === 'visit') {
+    const match = item.description?.match(/Property visit - (.+)/i);
+    if (match) {
+      visitorName = match[1];
+    }
+  }
+  
   const missingSource = !item.source;
   const missingAddedBy = !item.added_by;
-  const hasWarning = showWarnings && (missingSource || missingAddedBy);
+  const hasWarning = showWarnings && (missingSource || missingAddedBy || isVisitRelatedExpense);
   
   return (
-    <div className={`flex items-start gap-3 p-3 border rounded-lg hover:bg-muted/50 ${hasWarning ? 'border-amber-300 bg-amber-50/50 dark:bg-amber-950/20' : ''}`}>
+    <div className={`flex items-start gap-3 p-3 border rounded-lg hover:bg-muted/50 ${
+      isVisitRelatedExpense ? 'border-red-300 bg-red-50/50 dark:bg-red-950/20' : 
+      hasWarning ? 'border-amber-300 bg-amber-50/50 dark:bg-amber-950/20' : ''
+    } ${item.excluded ? 'opacity-50' : ''}`}>
       <Checkbox
         checked={item.verified}
         onCheckedChange={() => onToggleVerified(item.id, item.verified)}
+        disabled={item.excluded}
       />
       <div className="flex items-center gap-2 text-muted-foreground">
         {getIcon(item.item_type)}
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-1">
-          <p className="font-medium break-words">{item.description}</p>
-          {hasWarning && (
+          <p className="font-medium break-words">
+            {item.description}
+            {visitorName && <span className="text-muted-foreground ml-1">({visitorName})</span>}
+          </p>
+          {isVisitRelatedExpense && (
+            <Badge variant="destructive" className="text-xs">⚠️ Visit Double-Count</Badge>
+          )}
+          {item.excluded && (
+            <Badge variant="outline" className="text-xs">Excluded</Badge>
+          )}
+          {hasWarning && !isVisitRelatedExpense && (
             <span title="Missing source or added_by metadata">
               <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0" />
             </span>
@@ -698,7 +745,13 @@ const LineItemRow = ({ item, onToggleVerified, getIcon, showWarnings = false }: 
           <span>{format(new Date(item.date + 'T00:00:00'), "MMM dd, yyyy")}</span>
           {item.category && <span>• {item.category}</span>}
           {item.source && <span>• Source: {item.source}</span>}
-          {showWarnings && missingSource && (
+          {item.exclusion_reason && (
+            <span className="text-red-600 dark:text-red-400">• {item.exclusion_reason}</span>
+          )}
+          {isVisitRelatedExpense && !item.excluded && (
+            <span className="text-red-600 dark:text-red-400 font-medium">• Should be excluded (counted in visits)</span>
+          )}
+          {showWarnings && missingSource && !isVisitRelatedExpense && (
             <Badge variant="destructive" className="text-xs">Missing Source</Badge>
           )}
           {showWarnings && missingAddedBy && (
