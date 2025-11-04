@@ -118,70 +118,88 @@ serve(async (req) => {
     const { data: properties } = await supabase.from('properties').select('*');
     const { data: owners } = await supabase.from('property_owners').select('*');
 
-    // Process emails in batches
-    for (const message of messages) {
-      try {
-        const messageResponse = await fetch(
-          `https://gmail.googleapis.com/gmail/v1/users/me/messages/${message.id}`,
-          {
-            headers: { Authorization: `Bearer ${accessToken}` },
+    // Process emails in batches with timeout protection
+    const BATCH_SIZE = 20;
+    const MAX_EXECUTION_TIME = 50000; // 50 seconds (leave buffer before 60s timeout)
+    const startTime = Date.now();
+    
+    for (let i = 0; i < messages.length; i += BATCH_SIZE) {
+      // Check if approaching timeout
+      if (Date.now() - startTime > MAX_EXECUTION_TIME) {
+        console.log(`Timeout approaching. Processed ${emailsProcessed}/${messages.length} emails.`);
+        break;
+      }
+
+      const batch = messages.slice(i, i + BATCH_SIZE);
+      console.log(`Processing batch ${Math.floor(i/BATCH_SIZE) + 1} (${batch.length} emails)`);
+
+      for (const message of batch) {
+        try {
+          const messageResponse = await fetch(
+            `https://gmail.googleapis.com/gmail/v1/users/me/messages/${message.id}`,
+            {
+              headers: { Authorization: `Bearer ${accessToken}` },
+            }
+          );
+
+          if (!messageResponse.ok) {
+            emailsProcessed++;
+            continue;
           }
-        );
 
-        if (!messageResponse.ok) continue;
+          const emailData = await messageResponse.json();
+          emailsProcessed++;
 
-        const emailData = await messageResponse.json();
-        emailsProcessed++;
+          const headers = emailData.payload.headers;
+          const subject = headers.find((h: any) => h.name === 'Subject')?.value || '';
+          const from = headers.find((h: any) => h.name === 'From')?.value || '';
+          const dateStr = headers.find((h: any) => h.name === 'Date')?.value || '';
+          const emailDate = new Date(dateStr);
 
-        const headers = emailData.payload.headers;
-        const subject = headers.find((h: any) => h.name === 'Subject')?.value || '';
-        const from = headers.find((h: any) => h.name === 'From')?.value || '';
-        const dateStr = headers.find((h: any) => h.name === 'Date')?.value || '';
-        const emailDate = new Date(dateStr);
-
-        // Get email body (text and HTML)
-        let body = '';
-        let rawHtml = '';
-        
-        if (emailData.payload.body?.data) {
-          body = atob(emailData.payload.body.data.replace(/-/g, '+').replace(/_/g, '/'));
-        } else if (emailData.payload.parts) {
-          const textPart = emailData.payload.parts.find((p: any) => p.mimeType === 'text/plain');
-          const htmlPart = emailData.payload.parts.find((p: any) => p.mimeType === 'text/html');
+          // Get email body (text and HTML)
+          let body = '';
+          let rawHtml = '';
           
-          if (textPart?.body?.data) {
-            body = atob(textPart.body.data.replace(/-/g, '+').replace(/_/g, '/'));
+          if (emailData.payload.body?.data) {
+            body = atob(emailData.payload.body.data.replace(/-/g, '+').replace(/_/g, '/'));
+          } else if (emailData.payload.parts) {
+            const textPart = emailData.payload.parts.find((p: any) => p.mimeType === 'text/plain');
+            const htmlPart = emailData.payload.parts.find((p: any) => p.mimeType === 'text/html');
+            
+            if (textPart?.body?.data) {
+              body = atob(textPart.body.data.replace(/-/g, '+').replace(/_/g, '/'));
+            }
+            
+            if (htmlPart?.body?.data) {
+              rawHtml = atob(htmlPart.body.data.replace(/-/g, '+').replace(/_/g, '/'));
+            }
           }
-          
-          if (htmlPart?.body?.data) {
-            rawHtml = atob(htmlPart.body.data.replace(/-/g, '+').replace(/_/g, '/'));
+
+          // Extract sender email
+          const senderEmail = from.match(/<(.+?)>/)?.[1] || from;
+
+          // Call extract-insights function
+          const { data: insight } = await supabase.functions.invoke('extract-insights', {
+            body: {
+              subject,
+              body: body.substring(0, 2000), // Limit body size
+              rawHtml: rawHtml ? rawHtml.substring(0, 50000) : null, // Include HTML for receipt
+              senderEmail,
+              emailDate: emailDate.toISOString(),
+              gmailMessageId: message.id,
+              properties,
+              owners,
+            },
+          });
+
+          if (insight?.shouldSave) {
+            insightsGenerated++;
           }
+
+          console.log(`Processed email ${emailsProcessed}/${messages.length}: ${subject.substring(0, 50)}...`);
+        } catch (emailError) {
+          console.error('Error processing email:', emailError);
         }
-
-        // Extract sender email
-        const senderEmail = from.match(/<(.+?)>/)?.[1] || from;
-
-        // Call extract-insights function
-        const { data: insight } = await supabase.functions.invoke('extract-insights', {
-          body: {
-            subject,
-            body: body.substring(0, 2000), // Limit body size
-            rawHtml: rawHtml ? rawHtml.substring(0, 50000) : null, // Include HTML for receipt
-            senderEmail,
-            emailDate: emailDate.toISOString(),
-            gmailMessageId: message.id,
-            properties,
-            owners,
-          },
-        });
-
-        if (insight?.shouldSave) {
-          insightsGenerated++;
-        }
-
-        console.log(`Processed email: ${subject.substring(0, 50)}...`);
-      } catch (emailError) {
-        console.error('Error processing email:', emailError);
       }
     }
 

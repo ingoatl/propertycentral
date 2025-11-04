@@ -11,6 +11,8 @@ export function DataCleanupPanel() {
   const [isCleaningUp, setIsCleaningUp] = useState(false);
   const [isRescanning, setIsRescanning] = useState(false);
   const [cleanupResults, setCleanupResults] = useState<any>(null);
+  const [scanProgress, setScanProgress] = useState(0);
+  const [emailsProcessed, setEmailsProcessed] = useState(0);
 
   const handleCleanup = async () => {
     if (!confirm('This will delete all contaminated expenses (from internal emails, duplicates, suspicious descriptions). Continue?')) {
@@ -41,6 +43,9 @@ export function DataCleanupPanel() {
     }
 
     setIsRescanning(true);
+    setScanProgress(10); // Initial progress
+    setEmailsProcessed(0);
+    toast.info("Starting email rescan...");
 
     try {
       const { data, error } = await supabase.functions.invoke('scan-gmail', {
@@ -49,12 +54,24 @@ export function DataCleanupPanel() {
 
       if (error) throw error;
 
+      setScanProgress(100);
+      setEmailsProcessed(data.emailsProcessed || 0);
       toast.success(`Email rescan completed: ${data.emailsProcessed} emails processed, ${data.insightsGenerated} insights generated`);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Rescan error:', error);
-      toast.error('Failed to rescan emails: ' + (error as Error).message);
+      // Try to extract partial progress from error response
+      const partialData = error.context?.body;
+      const processedCount = partialData?.emailsProcessed || 0;
+      
+      if (processedCount > 0) {
+        setEmailsProcessed(processedCount);
+        toast.warning(`Scan interrupted after processing ${processedCount} emails. Partial results saved.`);
+      } else {
+        toast.error('Failed to rescan emails: ' + error.message);
+      }
     } finally {
       setIsRescanning(false);
+      setScanProgress(0);
     }
   };
 
@@ -136,9 +153,12 @@ export function DataCleanupPanel() {
                   <AlertDescription className="ml-2">
                     <div className="space-y-2">
                       <p className="font-medium">Scanning emails from the last 60 days...</p>
-                      <Progress value={100} className="w-full animate-pulse" />
+                      <Progress value={scanProgress} className="w-full" />
                       <p className="text-sm text-muted-foreground">
-                        Processing emails and extracting insights. This may take a few minutes.
+                        {emailsProcessed > 0 
+                          ? `Processed ${emailsProcessed} emails so far...` 
+                          : 'Initializing scan...'}
+                        {' '}This may take several minutes. Please don't close this page.
                       </p>
                     </div>
                   </AlertDescription>
