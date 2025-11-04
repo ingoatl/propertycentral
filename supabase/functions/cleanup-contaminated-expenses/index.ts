@@ -43,15 +43,17 @@ serve(async (req) => {
         
         // Check for contamination patterns
         const isContaminated = 
-          purpose.includes('multiple expenses logged') ||
+          purpose.includes('multiple expenses') ||
           purpose.includes('multiple properties') ||
-          items.includes('multiple expenses logged') ||
+          purpose.includes('various properties') ||
+          items.includes('multiple expenses') ||
           items.includes('multiple properties') ||
-          vendor === 'property central' ||
+          vendor.includes('property central') ||
+          vendor.includes('peachhausgroup') ||
           vendor === 'peachhausgroup';
         
         if (isContaminated) {
-          console.log(`Found contaminated expense: ${exp.id} - ${exp.purpose?.substring(0, 50)}`);
+          console.log(`Found contaminated expense: ${exp.id} - ${exp.purpose?.substring(0, 50)} - vendor: ${exp.vendor}`);
           expenseIdsToDelete.push(exp.id);
         }
       }

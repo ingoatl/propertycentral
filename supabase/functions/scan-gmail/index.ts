@@ -34,6 +34,9 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  let emailsProcessed = 0;
+  let insightsGenerated = 0;
+
   try {
     const { forceRescan } = req.method === 'POST' ? await req.json() : { forceRescan: false };
     
@@ -115,9 +118,6 @@ serve(async (req) => {
     const { data: properties } = await supabase.from('properties').select('*');
     const { data: owners } = await supabase.from('property_owners').select('*');
 
-    let emailsProcessed = 0;
-    let insightsGenerated = 0;
-
     // Process emails in batches
     for (const message of messages) {
       try {
@@ -194,6 +194,8 @@ serve(async (req) => {
 
     console.log(`Scan completed: ${emailsProcessed} emails processed, ${insightsGenerated} insights generated`);
 
+    console.log(`Scan complete: ${emailsProcessed} emails processed, ${insightsGenerated} insights generated`);
+    
     return new Response(
       JSON.stringify({
         success: true,
@@ -205,21 +207,34 @@ serve(async (req) => {
   } catch (error) {
     console.error('Error in scan-gmail:', error);
 
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    );
+    try {
+      const supabase = createClient(
+        Deno.env.get('SUPABASE_URL')!,
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+      );
 
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    
-    await supabase.from('email_scan_log').insert({
-      scan_status: 'failed',
-      error_message: errorMessage,
-    });
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      
+      await supabase.from('email_scan_log').insert({
+        scan_status: 'failed',
+        error_message: errorMessage,
+        emails_processed: emailsProcessed || 0,
+      });
 
-    return new Response(
-      JSON.stringify({ error: errorMessage }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+      return new Response(
+        JSON.stringify({ 
+          error: errorMessage,
+          emailsProcessed: emailsProcessed || 0,
+          insightsGenerated: insightsGenerated || 0 
+        }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    } catch (logError) {
+      console.error('Failed to log error:', logError);
+      return new Response(
+        JSON.stringify({ error: 'Scan failed' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
   }
 });
