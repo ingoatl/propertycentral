@@ -842,27 +842,37 @@ State: ${state}
                       
                       let result = '';
                       
-                      // Show header with date and person
-                      result += `
+                      // If no hours logged, just show simple visit fee line
+                      if (hours === 0) {
+                        result += `
+                    <tr>
+                      <td style="padding: 12px 0; color: #2c3e50; font-size: 15px; border-bottom: 1px solid #f5f5f5;">
+                        Property Visit - ${dateStr} (${personName})
+                      </td>
+                      <td style="padding: 12px 0; color: #4a4a4a; font-size: 15px; text-align: right; font-weight: 600; border-bottom: 1px solid #f5f5f5;">$${totalVisitPrice.toFixed(2)}</td>
+                    </tr>`;
+                      } else {
+                        // If hours logged, show detailed breakdown
+                        // Show header with date and person
+                        result += `
                     <tr>
                       <td colspan="2" style="padding: 12px 0 4px 0; color: #2c3e50; font-size: 14px; font-weight: 700; border-bottom: none;">
                         Property Visit - ${dateStr} (${personName})
                       </td>
                     </tr>`;
-                      
-                      // Show visit fee
-                      if (visitFee > 0) {
-                        result += `
+                        
+                        // Show visit fee
+                        if (visitFee > 0) {
+                          result += `
                     <tr>
                       <td style="padding: 4px 0 4px 20px; color: #6b7280; font-size: 13px; border-bottom: none;">
                         ├─ Visit Fee
                       </td>
                       <td style="padding: 4px 0; color: #6b7280; font-size: 13px; text-align: right; border-bottom: none;">$${visitFee.toFixed(2)}</td>
                     </tr>`;
-                      }
-                      
-                      // Show hourly charges if hours > 0
-                      if (hours > 0) {
+                        }
+                        
+                        // Show hourly charges
                         result += `
                     <tr>
                       <td style="padding: 4px 0 4px 20px; color: #6b7280; font-size: 13px; border-bottom: none;">
@@ -870,16 +880,16 @@ State: ${state}
                       </td>
                       <td style="padding: 4px 0; color: #6b7280; font-size: 13px; text-align: right; border-bottom: none;">$${hourlyCharges.toFixed(2)}</td>
                     </tr>`;
-                      }
-                      
-                      // Show total row
-                      result += `
+                        
+                        // Show total row
+                        result += `
                     <tr>
                       <td style="padding: 4px 0 10px 20px; color: #2c3e50; font-size: 13px; font-weight: 600; border-bottom: 1px solid #f5f5f5;">
                         Visit Total:
                       </td>
                       <td style="padding: 4px 0 10px 0; color: #2c3e50; font-size: 14px; text-align: right; font-weight: 700; border-bottom: 1px solid #f5f5f5;">$${totalVisitPrice.toFixed(2)}</td>
                     </tr>`;
+                      }
                       
                       // Add notes if present
                       if (visit.notes && visit.notes.trim()) {
