@@ -23,156 +23,102 @@ serve(async (req) => {
     let deletedLineItems = 0;
     let affectedReconciliations = new Set<string>();
 
-    // STEP 1: Find and delete fake expenses from internal emails
-    console.log('Step 1: Finding fake expenses from internal emails...');
-    
-    // Get all email insights from internal senders that created expenses
-    const { data: internalEmailInsights, error: insightError } = await supabase
-      .from('email_insights')
-      .select('id, sender_email, expense_description, expense_created')
-      .ilike('sender_email', '%@peachhausgroup.com%')
-      .eq('expense_created', true);
+    // Collect all expense IDs to delete
+    const expenseIdsToDelete: string[] = [];
 
-    if (insightError) {
-      console.error('Error finding internal email insights:', insightError);
-    } else if (internalEmailInsights && internalEmailInsights.length > 0) {
-      console.log(`Found ${internalEmailInsights.length} fake expenses from internal emails`);
-      
-      const insightIds = internalEmailInsights.map(i => i.id);
-      
-      // Find expenses linked to these insights
-      const { data: fakeExpenses, error: fakeExpError } = await supabase
-        .from('expenses')
-        .select('id, property_id, amount, purpose, reconciliation_line_items(reconciliation_id)')
-        .in('email_insight_id', insightIds);
-      
-      if (fakeExpError) {
-        console.error('Error finding fake expenses:', fakeExpError);
-      } else if (fakeExpenses && fakeExpenses.length > 0) {
-        console.log(`Deleting ${fakeExpenses.length} fake expenses...`);
+    // STEP 1: Find expenses directly with suspicious patterns
+    console.log('Step 1: Finding expenses with suspicious descriptions...');
+    
+    const { data: suspiciousExpenses, error: suspError } = await supabase
+      .from('expenses')
+      .select('id, property_id, purpose, items_detail, vendor, email_insight_id, reconciliation_line_items(reconciliation_id)');
+    
+    if (suspError) {
+      console.error('Error fetching expenses:', suspError);
+    } else if (suspiciousExpenses) {
+      for (const exp of suspiciousExpenses) {
+        const purpose = (exp.purpose || '').toLowerCase();
+        const items = (exp.items_detail || '').toLowerCase();
+        const vendor = (exp.vendor || '').toLowerCase();
         
-        // Track affected reconciliations
-        for (const exp of fakeExpenses) {
+        // Check for contamination patterns
+        const isContaminated = 
+          purpose.includes('multiple expenses logged') ||
+          purpose.includes('multiple properties') ||
+          items.includes('multiple expenses logged') ||
+          items.includes('multiple properties') ||
+          vendor === 'property central' ||
+          vendor === 'peachhausgroup';
+        
+        if (isContaminated) {
+          console.log(`Found contaminated expense: ${exp.id} - ${exp.purpose?.substring(0, 50)}`);
+          expenseIdsToDelete.push(exp.id);
+          
           if (exp.reconciliation_line_items && exp.reconciliation_line_items.length > 0) {
             exp.reconciliation_line_items.forEach((li: any) => {
               affectedReconciliations.add(li.reconciliation_id);
             });
           }
         }
-        
-        const expenseIds = fakeExpenses.map(e => e.id);
-        
-        // Delete reconciliation line items first
-        const { error: deleteLineItemsError } = await supabase
-          .from('reconciliation_line_items')
-          .delete()
-          .in('item_id', expenseIds)
-          .eq('item_type', 'expense');
-        
-        if (deleteLineItemsError) {
-          console.error('Error deleting line items:', deleteLineItemsError);
-        } else {
-          deletedLineItems += fakeExpenses.reduce((sum, exp) => 
-            sum + (exp.reconciliation_line_items?.length || 0), 0);
-        }
-        
-        // Delete the fake expenses
-        const { error: deleteExpError } = await supabase
-          .from('expenses')
-          .delete()
-          .in('id', expenseIds);
-        
-        if (deleteExpError) {
-          console.error('Error deleting expenses:', deleteExpError);
-        } else {
-          deletedExpenses += fakeExpenses.length;
-        }
-        
-        // Update insights to mark expenses as not created
-        await supabase
-          .from('email_insights')
-          .update({ expense_created: false })
-          .in('id', insightIds);
       }
+      
+      console.log(`Found ${expenseIdsToDelete.length} contaminated expenses from patterns`);
     }
 
-    // STEP 2: Find and delete expenses with suspicious descriptions
-    console.log('Step 2: Finding expenses with suspicious descriptions...');
+    // STEP 2: Find expenses from internal emails
+    console.log('Step 2: Finding expenses from internal email senders...');
     
-    // Get all expenses first, then filter in JavaScript for better pattern matching
-    const { data: allExpensesForCheck, error: checkExpError } = await supabase
-      .from('expenses')
-      .select('id, property_id, purpose, items_detail, reconciliation_line_items(reconciliation_id)');
-    
-    if (checkExpError) {
-      console.error('Error fetching expenses for check:', checkExpError);
-    }
-    
-    const suspiciousExpenses = allExpensesForCheck?.filter(exp => {
-      const purpose = (exp.purpose || '').toLowerCase();
-      const items = (exp.items_detail || '').toLowerCase();
-      return purpose.includes('multiple expenses logged') ||
-             purpose.includes('multiple properties') ||
-             items.includes('multiple expenses logged') ||
-             items.includes('multiple properties');
-    }) || [];
-    
-    if (suspiciousExpenses && suspiciousExpenses.length > 0) {
-      console.log(`Found ${suspiciousExpenses.length} expenses with suspicious descriptions`);
+    const { data: internalEmailInsights, error: insightError } = await supabase
+      .from('email_insights')
+      .select('id')
+      .ilike('sender_email', '%@peachhausgroup.com%')
+      .eq('expense_created', true);
+
+    if (!insightError && internalEmailInsights && internalEmailInsights.length > 0) {
+      console.log(`Found ${internalEmailInsights.length} email insights from internal senders`);
       
-      for (const exp of suspiciousExpenses) {
-        if (exp.reconciliation_line_items && exp.reconciliation_line_items.length > 0) {
-          exp.reconciliation_line_items.forEach((li: any) => {
-            affectedReconciliations.add(li.reconciliation_id);
-          });
-        }
-      }
+      const insightIds = internalEmailInsights.map(i => i.id);
       
-      const suspExpIds = suspiciousExpenses.map(e => e.id);
-      
-      // Delete line items
-      const { error: delLineError } = await supabase
-        .from('reconciliation_line_items')
-        .delete()
-        .in('item_id', suspExpIds)
-        .eq('item_type', 'expense');
-      
-      if (!delLineError) {
-        deletedLineItems += suspiciousExpenses.reduce((sum, exp) => 
-          sum + (exp.reconciliation_line_items?.length || 0), 0);
-      }
-      
-      // Delete expenses
-      const { error: delSuspError } = await supabase
+      const { data: internalExpenses, error: intExpError } = await supabase
         .from('expenses')
-        .delete()
-        .in('id', suspExpIds);
+        .select('id, reconciliation_line_items(reconciliation_id)')
+        .in('email_insight_id', insightIds);
       
-      if (!delSuspError) {
-        deletedExpenses += suspiciousExpenses.length;
+      if (!intExpError && internalExpenses) {
+        console.log(`Found ${internalExpenses.length} expenses from internal emails`);
+        
+        for (const exp of internalExpenses) {
+          if (!expenseIdsToDelete.includes(exp.id)) {
+            expenseIdsToDelete.push(exp.id);
+          }
+          
+          if (exp.reconciliation_line_items && exp.reconciliation_line_items.length > 0) {
+            exp.reconciliation_line_items.forEach((li: any) => {
+              affectedReconciliations.add(li.reconciliation_id);
+            });
+          }
+        }
       }
     }
 
-    // STEP 3: Find and delete duplicate expenses (e.g., 4x $872.70 for Villa 14)
-    console.log('Step 3: Finding and deleting duplicate expenses...');
+    // STEP 3: Find duplicate expenses
+    console.log('Step 3: Finding duplicate expenses...');
     
-    // Find duplicates by property_id, amount, date, and order_number
     const { data: allExpenses, error: dupExpError } = await supabase
       .from('expenses')
       .select('id, property_id, amount, date, order_number, created_at, reconciliation_line_items(reconciliation_id)')
       .order('created_at', { ascending: true });
     
     if (!dupExpError && allExpenses) {
-      const seen = new Map<string, string>(); // key -> first expense ID
-      const duplicateIds: string[] = [];
+      const seen = new Map<string, string>();
       
       for (const exp of allExpenses) {
         if (exp.order_number) {
-          // For expenses with order numbers, use order_number as unique key
           const key = `${exp.property_id}-${exp.order_number}`;
-          if (seen.has(key)) {
-            // This is a duplicate
-            duplicateIds.push(exp.id);
+          if (seen.has(key) && !expenseIdsToDelete.includes(exp.id)) {
+            console.log(`Found duplicate expense: ${exp.id} (order: ${exp.order_number})`);
+            expenseIdsToDelete.push(exp.id);
+            
             if (exp.reconciliation_line_items && exp.reconciliation_line_items.length > 0) {
               exp.reconciliation_line_items.forEach((li: any) => {
                 affectedReconciliations.add(li.reconciliation_id);
@@ -181,54 +127,50 @@ serve(async (req) => {
           } else {
             seen.set(key, exp.id);
           }
-        } else {
-          // For expenses without order numbers, use property + amount + date as key
-          const key = `${exp.property_id}-${exp.amount}-${exp.date}`;
-          if (seen.has(key)) {
-            // This is a potential duplicate
-            duplicateIds.push(exp.id);
-            if (exp.reconciliation_line_items && exp.reconciliation_line_items.length > 0) {
-              exp.reconciliation_line_items.forEach((li: any) => {
-                affectedReconciliations.add(li.reconciliation_id);
-              });
-            }
-          } else {
-            seen.set(key, exp.id);
-          }
-        }
-      }
-      
-      if (duplicateIds.length > 0) {
-        console.log(`Found ${duplicateIds.length} duplicate expenses`);
-        
-        // Delete line items for duplicates
-        const { error: dupLineError } = await supabase
-          .from('reconciliation_line_items')
-          .delete()
-          .in('item_id', duplicateIds)
-          .eq('item_type', 'expense');
-        
-        if (!dupLineError) {
-          // Count deleted line items
-          const dupsWithLineItems = allExpenses.filter(e => 
-            duplicateIds.includes(e.id) && e.reconciliation_line_items && e.reconciliation_line_items.length > 0
-          );
-          deletedLineItems += dupsWithLineItems.reduce((sum, exp) => 
-            sum + (exp.reconciliation_line_items?.length || 0), 0);
-        }
-        
-        // Delete duplicate expenses
-        const { error: dupExpError } = await supabase
-          .from('expenses')
-          .delete()
-          .in('id', duplicateIds);
-        
-        if (!dupExpError) {
-          deletedExpenses += duplicateIds.length;
         }
       }
     }
 
+    console.log(`Total expenses to delete: ${expenseIdsToDelete.length}`);
+
+    // DELETE ALL CONTAMINATED EXPENSES
+    if (expenseIdsToDelete.length > 0) {
+      // First, count and delete line items
+      const { data: lineItemsToDelete, error: countError } = await supabase
+        .from('reconciliation_line_items')
+        .select('id')
+        .in('item_id', expenseIdsToDelete)
+        .eq('item_type', 'expense');
+      
+      if (!countError && lineItemsToDelete) {
+        deletedLineItems = lineItemsToDelete.length;
+        
+        const { error: delLineError } = await supabase
+          .from('reconciliation_line_items')
+          .delete()
+          .in('item_id', expenseIdsToDelete)
+          .eq('item_type', 'expense');
+        
+        if (delLineError) {
+          console.error('Error deleting line items:', delLineError);
+        } else {
+          console.log(`Deleted ${deletedLineItems} reconciliation line items`);
+        }
+      }
+      
+      // Delete expenses
+      const { error: delExpError } = await supabase
+        .from('expenses')
+        .delete()
+        .in('id', expenseIdsToDelete);
+      
+      if (delExpError) {
+        console.error('Error deleting expenses:', delExpError);
+      } else {
+        deletedExpenses = expenseIdsToDelete.length;
+        console.log(`Deleted ${deletedExpenses} contaminated expenses`);
+      }
+    }
     // STEP 4: Recalculate totals for affected reconciliations
     console.log(`Step 4: Recalculating totals for ${affectedReconciliations.size} affected reconciliations...`);
     

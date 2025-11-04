@@ -66,101 +66,103 @@ export function DataCleanupPanel() {
         </AlertDescription>
       </Alert>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Trash2 className="h-5 w-5" />
-              Phase 3: Clean Up Bad Data
-            </CardTitle>
-            <CardDescription>
-              Delete all contaminated expenses:
-              <ul className="list-disc list-inside mt-2 space-y-1 text-xs">
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Expense Data Cleanup & Email Rescan</CardTitle>
+          <CardDescription>
+            Fix contaminated expense data and rescan emails with improved filtering
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="space-y-4">
+            <div>
+              <h3 className="font-semibold text-sm mb-2 flex items-center gap-2">
+                <Trash2 className="h-4 w-4" />
+                Step 1: Clean Up Contaminated Data
+              </h3>
+              <p className="text-sm text-muted-foreground mb-3">
+                Delete all contaminated expenses:
+              </p>
+              <ul className="list-disc list-inside space-y-1 text-xs text-muted-foreground mb-3">
                 <li>Expenses from @peachhausgroup.com senders</li>
                 <li>Expenses with "Multiple expenses logged" descriptions</li>
                 <li>Duplicate expenses (same order number)</li>
                 <li>Expenses mentioning multiple properties</li>
               </ul>
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button 
-              onClick={handleCleanup}
-              disabled={isCleaningUp}
-              variant="destructive"
-              className="w-full"
-            >
-              {isCleaningUp ? (
-                <>
-                  <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                  Cleaning Up...
-                </>
-              ) : (
-                <>
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Clean Up Contaminated Data
-                </>
-              )}
-            </Button>
+              <Button 
+                onClick={handleCleanup}
+                disabled={isCleaningUp}
+                variant="destructive"
+                size="sm"
+              >
+                {isCleaningUp ? (
+                  <>
+                    <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                    Cleaning Up...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Run Cleanup
+                  </>
+                )}
+              </Button>
 
-            {cleanupResults && (
-              <div className="mt-4 space-y-2 text-sm">
-                <div className="flex items-center gap-2 text-green-600">
-                  <CheckCircle2 className="h-4 w-4" />
-                  <span>Cleanup Complete</span>
+              {cleanupResults && (
+                <div className="mt-3 space-y-2 text-sm">
+                  <div className="flex items-center gap-2 text-green-600">
+                    <CheckCircle2 className="h-4 w-4" />
+                    <span>Cleanup Complete</span>
+                  </div>
+                  <ul className="list-disc list-inside text-xs space-y-1 text-muted-foreground">
+                    <li>Deleted expenses: {cleanupResults.deletedExpenses}</li>
+                    <li>Deleted line items: {cleanupResults.deletedLineItems}</li>
+                    <li>Updated reconciliations: {cleanupResults.affectedReconciliations}</li>
+                  </ul>
                 </div>
-                <ul className="list-disc list-inside text-xs space-y-1 text-muted-foreground">
-                  <li>Deleted expenses: {cleanupResults.deletedExpenses}</li>
-                  <li>Deleted line items: {cleanupResults.deletedLineItems}</li>
-                  <li>Updated reconciliations: {cleanupResults.affectedReconciliations}</li>
-                </ul>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+              )}
+            </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <RefreshCw className="h-5 w-5" />
-              Phase 4: Full Email Rescan
-            </CardTitle>
-            <CardDescription>
-              After cleanup, rescan all emails from the last 60 days with improved filtering:
-              <ul className="list-disc list-inside mt-2 space-y-1 text-xs">
+            <div className="border-t pt-4">
+              <h3 className="font-semibold text-sm mb-2 flex items-center gap-2">
+                <RefreshCw className="h-4 w-4" />
+                Step 2: Rescan Emails (After Cleanup)
+              </h3>
+              <p className="text-sm text-muted-foreground mb-3">
+                After cleanup, rescan all emails from the last 60 days with improved filtering:
+              </p>
+              <ul className="list-disc list-inside space-y-1 text-xs text-muted-foreground mb-3">
                 <li>Filters out internal PeachHaus emails</li>
                 <li>Improved Amazon order detection</li>
                 <li>Better property matching from delivery addresses</li>
                 <li>Validates all expense data before creating</li>
               </ul>
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button 
-              onClick={handleFullRescan}
-              disabled={isRescanning || isCleaningUp}
-              className="w-full"
-            >
-              {isRescanning ? (
-                <>
-                  <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                  Rescanning Emails...
-                </>
-              ) : (
-                <>
-                  <RefreshCw className="mr-2 h-4 w-4" />
-                  Trigger Full Email Rescan
-                </>
-              )}
-            </Button>
-            <p className="mt-2 text-xs text-muted-foreground">
-              {cleanupResults 
-                ? "✓ Cleanup complete. Ready to rescan." 
-                : "Run cleanup first for best results."}
-            </p>
-          </CardContent>
-        </Card>
-      </div>
+              <Button 
+                onClick={handleFullRescan}
+                disabled={isRescanning || isCleaningUp}
+                size="sm"
+              >
+                {isRescanning ? (
+                  <>
+                    <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                    Rescanning Emails...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                    Rescan Emails
+                  </>
+                )}
+              </Button>
+              <p className="mt-2 text-xs text-muted-foreground">
+                {cleanupResults 
+                  ? "✓ Cleanup complete. Ready to rescan." 
+                  : "Run cleanup first for best results."}
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
