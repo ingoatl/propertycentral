@@ -801,38 +801,55 @@ State: ${state}
                       const description = expense.purpose || 'Maintenance & Supplies';
                       const dateStr = new Date(expense.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
                       
-                      // Build detailed description with order number, vendor, category
-                      let detailText = `${dateStr}: ${description}`;
-                      if (expense.vendor) detailText += ` - ${expense.vendor}`;
-                      if (expense.category) detailText += ` (${expense.category})`;
-                      if (expense.order_number) detailText += ` [Order #${expense.order_number}]`;
-                      
-                      // Check if there are line items (individual products)
-                      let lineItemsHtml = '';
+                      // Check if there are line items (individual products from Amazon orders, etc.)
                       if (expense.line_items?.items && Array.isArray(expense.line_items.items) && expense.line_items.items.length > 0) {
-                        lineItemsHtml = `
-                          <div style="margin-top: 6px; padding-left: 12px; font-size: 12px; color: #6b7280;">
-                            ${expense.line_items.items.map((item: any) => {
-                              const itemPrice = item.price ? ` - $${Number(item.price).toFixed(2)}` : '';
-                              return `<div style="margin: 2px 0;">• ${item.name}${itemPrice}</div>`;
-                            }).join('')}
-                          </div>`;
-                      } else if (expense.items_detail) {
-                        // Fallback to items_detail if available
-                        lineItemsHtml = `
-                          <div style="margin-top: 6px; padding-left: 12px; font-size: 12px; color: #6b7280;">
-                            ${expense.items_detail}
-                          </div>`;
+                        // For Amazon orders with line items, show each item as a separate row
+                        return expense.line_items.items.map((item: any, index: number) => {
+                          const itemPrice = item.price ? Number(item.price) : 0;
+                          const itemName = item.name || 'Item';
+                          
+                          // Build header for first item with order info
+                          let detailText = '';
+                          if (index === 0) {
+                            detailText = `${dateStr}: ${expense.vendor || 'Online Order'}`;
+                            if (expense.order_number) detailText += ` [Order #${expense.order_number}]`;
+                            detailText += `<br><span style="font-size: 13px; color: #6b7280; font-weight: normal;">├─ ${itemName}</span>`;
+                          } else {
+                            detailText = `<span style="font-size: 13px; color: #6b7280; margin-left: 8px;">${index === expense.line_items.items.length - 1 ? '└─' : '├─'} ${itemName}</span>`;
+                          }
+                          
+                          return `
+                          <tr>
+                            <td style="padding: ${index === 0 ? '10px' : '6px'} 0; color: #2c3e50; font-size: 14px; border-bottom: ${index === expense.line_items.items.length - 1 ? '1px solid #f5f5f5' : 'none'};">
+                              <div>${detailText}</div>
+                            </td>
+                            <td style="padding: ${index === 0 ? '10px' : '6px'} 0; color: #4a4a4a; font-size: 14px; text-align: right; font-weight: 600; border-bottom: ${index === expense.line_items.items.length - 1 ? '1px solid #f5f5f5' : 'none'}; vertical-align: top;">$${itemPrice.toFixed(2)}</td>
+                          </tr>`;
+                        }).join('');
+                      } else {
+                        // For regular expenses without line items, show as single row
+                        let detailText = `${dateStr}: ${description}`;
+                        if (expense.vendor) detailText += ` - ${expense.vendor}`;
+                        if (expense.category) detailText += ` (${expense.category})`;
+                        if (expense.order_number) detailText += ` [Order #${expense.order_number}]`;
+                        
+                        let extraDetail = '';
+                        if (expense.items_detail) {
+                          extraDetail = `
+                            <div style="margin-top: 6px; padding-left: 12px; font-size: 12px; color: #6b7280;">
+                              ${expense.items_detail}
+                            </div>`;
+                        }
+                        
+                        return `
+                        <tr>
+                          <td style="padding: 10px 0; color: #2c3e50; font-size: 14px; border-bottom: 1px solid #f5f5f5;">
+                            <div>${detailText}</div>
+                            ${extraDetail}
+                          </td>
+                          <td style="padding: 10px 0; color: #4a4a4a; font-size: 14px; text-align: right; font-weight: 600; border-bottom: 1px solid #f5f5f5; vertical-align: top;">$${Number(expense.amount).toFixed(2)}</td>
+                        </tr>`;
                       }
-                      
-                      return `
-                      <tr>
-                        <td style="padding: 10px 0; color: #2c3e50; font-size: 14px; border-bottom: 1px solid #f5f5f5;">
-                          <div>${detailText}</div>
-                          ${lineItemsHtml}
-                        </td>
-                        <td style="padding: 10px 0; color: #4a4a4a; font-size: 14px; text-align: right; font-weight: 600; border-bottom: 1px solid #f5f5f5; vertical-align: top;">$${Number(expense.amount).toFixed(2)}</td>
-                      </tr>`;
                     }).join('') : ''}
                     <tr style="background-color: #FFF3EC;">
                       <td style="padding: 16px 12px; color: #E86800; font-size: 16px; font-weight: 700;">Total: Services Provided</td>
