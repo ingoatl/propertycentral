@@ -64,6 +64,7 @@ const handler = async (req: Request): Promise<Response> => {
     let orderMinimumFee: number = 0;
     let visitCount: number = 0;
     let expenseCount: number = 0;
+    let visitTotal: number = 0;
     
     // Initialize date variables that will be used throughout
     const now = new Date();
@@ -122,22 +123,15 @@ const handler = async (req: Request): Promise<Response> => {
 
       if (itemsCalcError) throw itemsCalcError;
       
-      // Calculate visit total from checked line items
-      const visitTotal = (allLineItems || [])
+      // Calculate visit total from ALL checked visit line items (regardless of date)
+      visitTotal = (allLineItems || [])
         .filter((item: any) => item.item_type === "visit")
         .reduce((sum: number, item: any) => sum + Math.abs(item.amount), 0);
       visitCount = (allLineItems || []).filter((item: any) => item.item_type === "visit").length;
       
-      // Calculate expense total from checked line items, excluding visit-related expenses
+      // Calculate expense total from ALL checked expense line items (no filtering, include all)
       expenseTotal = (allLineItems || [])
-        .filter((item: any) => {
-          if (item.item_type !== "expense") return false;
-          const description = (item.description || '').toLowerCase();
-          return !description.includes('visit fee') && 
-                 !description.includes('visit charge') &&
-                 !description.includes('hourly charge') &&
-                 !description.includes('property visit');
-        })
+        .filter((item: any) => item.item_type === "expense")
         .reduce((sum: number, item: any) => sum + Math.abs(item.amount), 0);
       expenseCount = (allLineItems || []).filter((item: any) => item.item_type === "expense").length;
       
@@ -652,10 +646,16 @@ State: ${state}
     }
 
     // Calculate total expenses including visits for display
-    const visitExpenses = visits.reduce((sum, v) => sum + Number(v.price), 0);
+    // In reconciliation mode, use the calculated totals from line items
+    // In other modes, calculate from arrays
+    const visitExpenses = isReconciliationMode 
+      ? visitTotal 
+      : visits.reduce((sum, v) => sum + Number(v.price), 0);
     
-    // No need for additional filtering here since we already filtered when building the expenses array
-    const otherExpenses = expenses.reduce((sum, e) => sum + Number(e.amount), 0);
+    const otherExpenses = isReconciliationMode 
+      ? expenseTotal 
+      : expenses.reduce((sum, e) => sum + Number(e.amount), 0);
+    
     const totalExpensesWithVisits = otherExpenses + visitExpenses + managementFees + orderMinimumFee;
 
     console.log("Financial Summary:", {

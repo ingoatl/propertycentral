@@ -43,15 +43,9 @@ export const ReconciliationList = () => {
           .filter((item: any) => item.item_type === "visit")
           .reduce((sum: number, item: any) => sum + Math.abs(item.amount), 0);
 
+        // Include ALL expense line items (no filtering)
         const totalExpenses = (lineItems || [])
-          .filter((item: any) => {
-            if (item.item_type !== "expense") return false;
-            const description = (item.description || '').toLowerCase();
-            return !description.includes('visit fee') && 
-                   !description.includes('visit charge') &&
-                   !description.includes('hourly charge') &&
-                   !description.includes('property visit');
-          })
+          .filter((item: any) => item.item_type === "expense")
           .reduce((sum: number, item: any) => sum + Math.abs(item.amount), 0);
 
         return {
