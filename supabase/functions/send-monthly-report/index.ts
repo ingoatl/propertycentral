@@ -99,7 +99,6 @@ const handler = async (req: Request): Promise<Response> => {
       totalRevenue = Number(reconciliation.total_revenue || 0);
       bookingRevenue = Number(reconciliation.short_term_revenue || 0);
       midTermRevenue = Number(reconciliation.mid_term_revenue || 0);
-      expenseTotal = Number(reconciliation.total_expenses || 0);
       managementFees = Number(reconciliation.management_fee || 0);
       
       // Check if order minimum fee is verified before including it
@@ -113,19 +112,34 @@ const handler = async (req: Request): Promise<Response> => {
       
       orderMinimumFee = orderMinLineItem ? Math.abs(Number(orderMinLineItem.amount)) : 0;
       
-      // Fetch line items to calculate visit total (only verified and not excluded)
-      const { data: lineItemsForCalc, error: itemsCalcError } = await supabase
+      // Calculate ALL totals from checked line items (verified and not excluded) regardless of date
+      const { data: allLineItems, error: itemsCalcError } = await supabase
         .from("reconciliation_line_items")
         .select("*")
         .eq("reconciliation_id", reconciliation_id)
         .eq("verified", true)
-        .eq("excluded", false)
-        .eq("item_type", "visit");
+        .eq("excluded", false);
 
       if (itemsCalcError) throw itemsCalcError;
       
-      const visitTotal = (lineItemsForCalc || []).reduce((sum: number, item: any) => sum + Math.abs(item.amount), 0);
-      visitCount = lineItemsForCalc?.length || 0;
+      // Calculate visit total from checked line items
+      const visitTotal = (allLineItems || [])
+        .filter((item: any) => item.item_type === "visit")
+        .reduce((sum: number, item: any) => sum + Math.abs(item.amount), 0);
+      visitCount = (allLineItems || []).filter((item: any) => item.item_type === "visit").length;
+      
+      // Calculate expense total from checked line items, excluding visit-related expenses
+      expenseTotal = (allLineItems || [])
+        .filter((item: any) => {
+          if (item.item_type !== "expense") return false;
+          const description = (item.description || '').toLowerCase();
+          return !description.includes('visit fee') && 
+                 !description.includes('visit charge') &&
+                 !description.includes('hourly charge') &&
+                 !description.includes('property visit');
+        })
+        .reduce((sum: number, item: any) => sum + Math.abs(item.amount), 0);
+      expenseCount = (allLineItems || []).filter((item: any) => item.item_type === "expense").length;
       
       // CORRECT CALCULATION: Include visits as expenses
       netIncome = totalRevenue - managementFees - orderMinimumFee - expenseTotal - visitTotal;

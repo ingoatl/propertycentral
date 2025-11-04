@@ -30,8 +30,38 @@ export const ReconciliationList = () => {
 
       if (error) throw error;
 
-      // Return reconciliations without validation - use stored database values (hard-coded calculations)
-      return data || [];
+      // For each reconciliation, calculate totals from checked line items
+      const reconciliationsWithCalculatedTotals = await Promise.all((data || []).map(async (rec: any) => {
+        const { data: lineItems } = await supabase
+          .from("reconciliation_line_items")
+          .select("*")
+          .eq("reconciliation_id", rec.id)
+          .eq("verified", true)
+          .eq("excluded", false);
+
+        const visitFees = (lineItems || [])
+          .filter((item: any) => item.item_type === "visit")
+          .reduce((sum: number, item: any) => sum + Math.abs(item.amount), 0);
+
+        const totalExpenses = (lineItems || [])
+          .filter((item: any) => {
+            if (item.item_type !== "expense") return false;
+            const description = (item.description || '').toLowerCase();
+            return !description.includes('visit fee') && 
+                   !description.includes('visit charge') &&
+                   !description.includes('hourly charge') &&
+                   !description.includes('property visit');
+          })
+          .reduce((sum: number, item: any) => sum + Math.abs(item.amount), 0);
+
+        return {
+          ...rec,
+          calculated_visit_fees: visitFees,
+          calculated_total_expenses: totalExpenses
+        };
+      }));
+
+      return reconciliationsWithCalculatedTotals;
     },
   });
 
@@ -136,13 +166,13 @@ export const ReconciliationList = () => {
                     <div>
                       <p className="text-xs text-muted-foreground">Visit Fees</p>
                       <p className="font-semibold text-red-600">
-                        ${Number(rec.visit_fees || 0).toFixed(2)}
+                        ${Number(rec.calculated_visit_fees || 0).toFixed(2)}
                       </p>
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground">Expenses</p>
                       <p className="font-semibold text-red-600">
-                        ${Number(rec.total_expenses || 0).toFixed(2)}
+                        ${Number(rec.calculated_total_expenses || 0).toFixed(2)}
                       </p>
                     </div>
                     <div>
@@ -165,8 +195,8 @@ export const ReconciliationList = () => {
                             ${(
                               Number(rec.management_fee || 0) + 
                               Number(rec.order_minimum_fee || 0) + 
-                              Number(rec.visit_fees || 0) + 
-                              Number(rec.total_expenses || 0)
+                              Number(rec.calculated_visit_fees || 0) + 
+                              Number(rec.calculated_total_expenses || 0)
                             ).toFixed(2)}
                           </p>
                           <p className="text-xs text-muted-foreground mt-1">
