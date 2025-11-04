@@ -51,6 +51,19 @@ async function processEmailsInBackground(
 
       for (const message of batch) {
         try {
+          // Check if this email was already processed
+          const { data: existingInsight } = await supabase
+            .from('email_insights')
+            .select('id')
+            .eq('gmail_message_id', message.id)
+            .single();
+
+          if (existingInsight) {
+            emailsProcessed++;
+            console.log(`Skipping already processed email: ${message.id}`);
+            continue;
+          }
+
           const messageResponse = await fetch(
             `https://gmail.googleapis.com/gmail/v1/users/me/messages/${message.id}`,
             { headers: { Authorization: `Bearer ${accessToken}` } }
@@ -191,12 +204,12 @@ serve(async (req) => {
         .eq('user_id', tokenData.user_id);
     }
 
-    // Fetch emails from last 60 days
-    const sixtyDaysAgo = new Date();
-    sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
-    const afterDate = Math.floor(sixtyDaysAgo.getTime() / 1000);
+    // Fetch emails from last 35 days
+    const thirtyFiveDaysAgo = new Date();
+    thirtyFiveDaysAgo.setDate(thirtyFiveDaysAgo.getDate() - 35);
+    const afterDate = Math.floor(thirtyFiveDaysAgo.getTime() / 1000);
 
-    console.log(`Fetching emails after ${sixtyDaysAgo.toISOString()}`);
+    console.log(`Fetching emails after ${thirtyFiveDaysAgo.toISOString()}`);
 
     const messagesResponse = await fetch(
       `https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=500&q=after:${afterDate}`,
