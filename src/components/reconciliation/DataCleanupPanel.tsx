@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { AlertTriangle, Trash2, RefreshCw, CheckCircle2 } from "lucide-react";
+import { AlertTriangle, Trash2, RefreshCw, CheckCircle2, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Progress } from "@/components/ui/progress";
 
 export function DataCleanupPanel() {
   const [isCleaningUp, setIsCleaningUp] = useState(false);
@@ -128,6 +129,22 @@ export function DataCleanupPanel() {
                 <RefreshCw className="h-4 w-4" />
                 Step 2: Rescan Emails (After Cleanup)
               </h3>
+              
+              {isRescanning && (
+                <Alert className="mb-4">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <AlertDescription className="ml-2">
+                    <div className="space-y-2">
+                      <p className="font-medium">Scanning emails from the last 60 days...</p>
+                      <Progress value={100} className="w-full animate-pulse" />
+                      <p className="text-sm text-muted-foreground">
+                        Processing emails and extracting insights. This may take a few minutes.
+                      </p>
+                    </div>
+                  </AlertDescription>
+                </Alert>
+              )}
+              
               <p className="text-sm text-muted-foreground mb-3">
                 After cleanup, rescan all emails from the last 60 days with improved filtering:
               </p>

@@ -31,7 +31,7 @@ serve(async (req) => {
     
     const { data: suspiciousExpenses, error: suspError } = await supabase
       .from('expenses')
-      .select('id, property_id, purpose, items_detail, vendor, email_insight_id, reconciliation_line_items(reconciliation_id)');
+      .select('id, property_id, purpose, items_detail, vendor, email_insight_id');
     
     if (suspError) {
       console.error('Error fetching expenses:', suspError);
@@ -53,12 +53,6 @@ serve(async (req) => {
         if (isContaminated) {
           console.log(`Found contaminated expense: ${exp.id} - ${exp.purpose?.substring(0, 50)}`);
           expenseIdsToDelete.push(exp.id);
-          
-          if (exp.reconciliation_line_items && exp.reconciliation_line_items.length > 0) {
-            exp.reconciliation_line_items.forEach((li: any) => {
-              affectedReconciliations.add(li.reconciliation_id);
-            });
-          }
         }
       }
       
@@ -81,7 +75,7 @@ serve(async (req) => {
       
       const { data: internalExpenses, error: intExpError } = await supabase
         .from('expenses')
-        .select('id, reconciliation_line_items(reconciliation_id)')
+        .select('id')
         .in('email_insight_id', insightIds);
       
       if (!intExpError && internalExpenses) {
@@ -90,12 +84,6 @@ serve(async (req) => {
         for (const exp of internalExpenses) {
           if (!expenseIdsToDelete.includes(exp.id)) {
             expenseIdsToDelete.push(exp.id);
-          }
-          
-          if (exp.reconciliation_line_items && exp.reconciliation_line_items.length > 0) {
-            exp.reconciliation_line_items.forEach((li: any) => {
-              affectedReconciliations.add(li.reconciliation_id);
-            });
           }
         }
       }
@@ -106,7 +94,7 @@ serve(async (req) => {
     
     const { data: allExpenses, error: dupExpError } = await supabase
       .from('expenses')
-      .select('id, property_id, amount, date, order_number, created_at, reconciliation_line_items(reconciliation_id)')
+      .select('id, property_id, amount, date, order_number, created_at')
       .order('created_at', { ascending: true });
     
     if (!dupExpError && allExpenses) {
@@ -118,12 +106,6 @@ serve(async (req) => {
           if (seen.has(key) && !expenseIdsToDelete.includes(exp.id)) {
             console.log(`Found duplicate expense: ${exp.id} (order: ${exp.order_number})`);
             expenseIdsToDelete.push(exp.id);
-            
-            if (exp.reconciliation_line_items && exp.reconciliation_line_items.length > 0) {
-              exp.reconciliation_line_items.forEach((li: any) => {
-                affectedReconciliations.add(li.reconciliation_id);
-              });
-            }
           } else {
             seen.set(key, exp.id);
           }
@@ -132,6 +114,21 @@ serve(async (req) => {
     }
 
     console.log(`Total expenses to delete: ${expenseIdsToDelete.length}`);
+    
+    // Get affected reconciliations before deleting
+    if (expenseIdsToDelete.length > 0) {
+      const { data: affectedLines } = await supabase
+        .from('reconciliation_line_items')
+        .select('reconciliation_id')
+        .in('item_id', expenseIdsToDelete)
+        .eq('item_type', 'expense');
+      
+      if (affectedLines) {
+        affectedLines.forEach((line: any) => {
+          affectedReconciliations.add(line.reconciliation_id);
+        });
+      }
+    }
 
     // DELETE ALL CONTAMINATED EXPENSES
     if (expenseIdsToDelete.length > 0) {
