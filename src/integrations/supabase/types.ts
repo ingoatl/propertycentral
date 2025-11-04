@@ -223,6 +223,7 @@ export type Database = {
           insights_generated: number | null
           scan_date: string
           scan_status: string | null
+          total_emails: number | null
         }
         Insert: {
           emails_processed?: number | null
@@ -231,6 +232,7 @@ export type Database = {
           insights_generated?: number | null
           scan_date?: string
           scan_status?: string | null
+          total_emails?: number | null
         }
         Update: {
           emails_processed?: number | null
@@ -239,6 +241,7 @@ export type Database = {
           insights_generated?: number | null
           scan_date?: string
           scan_status?: string | null
+          total_emails?: number | null
         }
         Relationships: []
       }

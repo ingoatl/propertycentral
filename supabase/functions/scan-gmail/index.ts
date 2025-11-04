@@ -29,13 +29,130 @@ async function refreshAccessToken(refreshToken: string) {
   return tokens.access_token;
 }
 
+// Background task to process emails
+async function processEmailsInBackground(
+  accessToken: string,
+  messages: any[],
+  properties: any[],
+  owners: any[],
+  forceRescan: boolean,
+  supabase: any,
+  scanLogId: string
+) {
+  let emailsProcessed = 0;
+  let insightsGenerated = 0;
+
+  try {
+    const BATCH_SIZE = 20;
+    
+    for (let i = 0; i < messages.length; i += BATCH_SIZE) {
+      const batch = messages.slice(i, i + BATCH_SIZE);
+      console.log(`Processing batch ${Math.floor(i/BATCH_SIZE) + 1}/${Math.ceil(messages.length/BATCH_SIZE)} (${batch.length} emails)`);
+
+      for (const message of batch) {
+        try {
+          const messageResponse = await fetch(
+            `https://gmail.googleapis.com/gmail/v1/users/me/messages/${message.id}`,
+            { headers: { Authorization: `Bearer ${accessToken}` } }
+          );
+
+          if (!messageResponse.ok) {
+            emailsProcessed++;
+            continue;
+          }
+
+          const emailData = await messageResponse.json();
+          emailsProcessed++;
+
+          const headers = emailData.payload.headers;
+          const subject = headers.find((h: any) => h.name === 'Subject')?.value || '';
+          const from = headers.find((h: any) => h.name === 'From')?.value || '';
+          const dateStr = headers.find((h: any) => h.name === 'Date')?.value || '';
+          const emailDate = new Date(dateStr);
+
+          let body = '';
+          let rawHtml = '';
+          
+          if (emailData.payload.body?.data) {
+            body = atob(emailData.payload.body.data.replace(/-/g, '+').replace(/_/g, '/'));
+          } else if (emailData.payload.parts) {
+            const textPart = emailData.payload.parts.find((p: any) => p.mimeType === 'text/plain');
+            const htmlPart = emailData.payload.parts.find((p: any) => p.mimeType === 'text/html');
+            
+            if (textPart?.body?.data) {
+              body = atob(textPart.body.data.replace(/-/g, '+').replace(/_/g, '/'));
+            }
+            if (htmlPart?.body?.data) {
+              rawHtml = atob(htmlPart.body.data.replace(/-/g, '+').replace(/_/g, '/'));
+            }
+          }
+
+          const senderEmail = from.match(/<(.+?)>/)?.[1] || from;
+
+          const { data: insight } = await supabase.functions.invoke('extract-insights', {
+            body: {
+              subject,
+              body: body.substring(0, 2000),
+              rawHtml: rawHtml ? rawHtml.substring(0, 50000) : null,
+              senderEmail,
+              emailDate: emailDate.toISOString(),
+              gmailMessageId: message.id,
+              properties,
+              owners,
+            },
+          });
+
+          if (insight?.shouldSave) {
+            insightsGenerated++;
+          }
+
+          // Update progress every 10 emails
+          if (emailsProcessed % 10 === 0) {
+            await supabase
+              .from('email_scan_log')
+              .update({
+                emails_processed: emailsProcessed,
+                insights_generated: insightsGenerated,
+              })
+              .eq('id', scanLogId);
+          }
+
+          console.log(`Processed ${emailsProcessed}/${messages.length}: ${subject.substring(0, 50)}...`);
+        } catch (emailError) {
+          console.error('Error processing email:', emailError);
+        }
+      }
+    }
+
+    // Final update
+    await supabase
+      .from('email_scan_log')
+      .update({
+        emails_processed: emailsProcessed,
+        insights_generated: insightsGenerated,
+        scan_status: 'completed',
+      })
+      .eq('id', scanLogId);
+
+    console.log(`Scan completed: ${emailsProcessed} emails, ${insightsGenerated} insights`);
+  } catch (error) {
+    console.error('Background processing error:', error);
+    await supabase
+      .from('email_scan_log')
+      .update({
+        emails_processed: emailsProcessed,
+        insights_generated: insightsGenerated,
+        scan_status: 'failed',
+        error_message: error instanceof Error ? error.message : 'Unknown error',
+      })
+      .eq('id', scanLogId);
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
-
-  let emailsProcessed = 0;
-  let insightsGenerated = 0;
 
   try {
     const { forceRescan } = req.method === 'POST' ? await req.json() : { forceRescan: false };
@@ -44,21 +161,6 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
-
-    // PHASE 4: If force rescan requested, only clear scan logs (keep email_insights for duplicate detection)
-    if (forceRescan) {
-      console.log('Force rescan requested - clearing scan logs but keeping email insights for duplicate detection...');
-      const { error: clearError } = await supabase
-        .from('email_scan_log')
-        .delete()
-        .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all logs
-      
-      if (clearError) {
-        console.error('Error clearing scan logs:', clearError);
-      } else {
-        console.log('Scan logs cleared - emails will be reprocessed but duplicates prevented');
-      }
-    }
 
     console.log('Starting Gmail scan...');
 
@@ -118,141 +220,64 @@ serve(async (req) => {
     const { data: properties } = await supabase.from('properties').select('*');
     const { data: owners } = await supabase.from('property_owners').select('*');
 
-    // Process emails in batches with timeout protection
-    const BATCH_SIZE = 20;
-    const MAX_EXECUTION_TIME = 50000; // 50 seconds (leave buffer before 60s timeout)
-    const startTime = Date.now();
-    
-    for (let i = 0; i < messages.length; i += BATCH_SIZE) {
-      // Check if approaching timeout
-      if (Date.now() - startTime > MAX_EXECUTION_TIME) {
-        console.log(`Timeout approaching. Processed ${emailsProcessed}/${messages.length} emails.`);
-        break;
-      }
+    // Create initial scan log entry
+    const { data: scanLog, error: logError } = await supabase
+      .from('email_scan_log')
+      .insert({
+        emails_processed: 0,
+        insights_generated: 0,
+        scan_status: 'in_progress',
+        total_emails: messages.length,
+      })
+      .select()
+      .single();
 
-      const batch = messages.slice(i, i + BATCH_SIZE);
-      console.log(`Processing batch ${Math.floor(i/BATCH_SIZE) + 1} (${batch.length} emails)`);
-
-      for (const message of batch) {
-        try {
-          const messageResponse = await fetch(
-            `https://gmail.googleapis.com/gmail/v1/users/me/messages/${message.id}`,
-            {
-              headers: { Authorization: `Bearer ${accessToken}` },
-            }
-          );
-
-          if (!messageResponse.ok) {
-            emailsProcessed++;
-            continue;
-          }
-
-          const emailData = await messageResponse.json();
-          emailsProcessed++;
-
-          const headers = emailData.payload.headers;
-          const subject = headers.find((h: any) => h.name === 'Subject')?.value || '';
-          const from = headers.find((h: any) => h.name === 'From')?.value || '';
-          const dateStr = headers.find((h: any) => h.name === 'Date')?.value || '';
-          const emailDate = new Date(dateStr);
-
-          // Get email body (text and HTML)
-          let body = '';
-          let rawHtml = '';
-          
-          if (emailData.payload.body?.data) {
-            body = atob(emailData.payload.body.data.replace(/-/g, '+').replace(/_/g, '/'));
-          } else if (emailData.payload.parts) {
-            const textPart = emailData.payload.parts.find((p: any) => p.mimeType === 'text/plain');
-            const htmlPart = emailData.payload.parts.find((p: any) => p.mimeType === 'text/html');
-            
-            if (textPart?.body?.data) {
-              body = atob(textPart.body.data.replace(/-/g, '+').replace(/_/g, '/'));
-            }
-            
-            if (htmlPart?.body?.data) {
-              rawHtml = atob(htmlPart.body.data.replace(/-/g, '+').replace(/_/g, '/'));
-            }
-          }
-
-          // Extract sender email
-          const senderEmail = from.match(/<(.+?)>/)?.[1] || from;
-
-          // Call extract-insights function
-          const { data: insight } = await supabase.functions.invoke('extract-insights', {
-            body: {
-              subject,
-              body: body.substring(0, 2000), // Limit body size
-              rawHtml: rawHtml ? rawHtml.substring(0, 50000) : null, // Include HTML for receipt
-              senderEmail,
-              emailDate: emailDate.toISOString(),
-              gmailMessageId: message.id,
-              properties,
-              owners,
-            },
-          });
-
-          if (insight?.shouldSave) {
-            insightsGenerated++;
-          }
-
-          console.log(`Processed email ${emailsProcessed}/${messages.length}: ${subject.substring(0, 50)}...`);
-        } catch (emailError) {
-          console.error('Error processing email:', emailError);
-        }
-      }
+    if (logError || !scanLog) {
+      throw new Error('Failed to create scan log entry');
     }
 
-    // Log scan results
-    await supabase.from('email_scan_log').insert({
-      emails_processed: emailsProcessed,
-      insights_generated: insightsGenerated,
-      scan_status: 'completed',
-    });
+    // Start background processing
+    const backgroundTask = processEmailsInBackground(
+      accessToken,
+      messages,
+      properties || [],
+      owners || [],
+      forceRescan,
+      supabase,
+      scanLog.id
+    );
 
-    console.log(`Scan completed: ${emailsProcessed} emails processed, ${insightsGenerated} insights generated`);
+    // Use waitUntil to process in background
+    // @ts-ignore
+    if (typeof EdgeRuntime !== 'undefined' && EdgeRuntime.waitUntil) {
+      // @ts-ignore
+      EdgeRuntime.waitUntil(backgroundTask);
+    } else {
+      // Fallback: start processing but don't wait
+      backgroundTask.catch(err => console.error('Background task error:', err));
+    }
 
-    console.log(`Scan complete: ${emailsProcessed} emails processed, ${insightsGenerated} insights generated`);
+    console.log(`Scan started with ${messages.length} emails. Processing in background...`);
     
     return new Response(
       JSON.stringify({
         success: true,
-        emailsProcessed,
-        insightsGenerated,
+        scanLogId: scanLog.id,
+        totalEmails: messages.length,
+        message: 'Scan started in background',
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
     console.error('Error in scan-gmail:', error);
 
-    try {
-      const supabase = createClient(
-        Deno.env.get('SUPABASE_URL')!,
-        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-      );
-
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      
-      await supabase.from('email_scan_log').insert({
-        scan_status: 'failed',
-        error_message: errorMessage,
-        emails_processed: emailsProcessed || 0,
-      });
-
-      return new Response(
-        JSON.stringify({ 
-          error: errorMessage,
-          emailsProcessed: emailsProcessed || 0,
-          insightsGenerated: insightsGenerated || 0 
-        }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    } catch (logError) {
-      console.error('Failed to log error:', logError);
-      return new Response(
-        JSON.stringify({ error: 'Scan failed' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    
+    return new Response(
+      JSON.stringify({ 
+        error: errorMessage,
+      }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
   }
 });

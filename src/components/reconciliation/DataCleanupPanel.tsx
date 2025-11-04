@@ -43,33 +43,74 @@ export function DataCleanupPanel() {
     }
 
     setIsRescanning(true);
-    setScanProgress(10); // Initial progress
+    setScanProgress(5);
     setEmailsProcessed(0);
     toast.info("Starting email rescan...");
 
     try {
+      // Start the scan
       const { data, error } = await supabase.functions.invoke('scan-gmail', {
         body: { forceRescan: true }
       });
 
       if (error) throw error;
 
-      setScanProgress(100);
-      setEmailsProcessed(data.emailsProcessed || 0);
-      toast.success(`Email rescan completed: ${data.emailsProcessed} emails processed, ${data.insightsGenerated} insights generated`);
+      if (!data.scanLogId) {
+        throw new Error('No scan log ID returned');
+      }
+
+      const scanLogId = data.scanLogId;
+      const totalEmails = data.totalEmails || 0;
+      
+      toast.success(`Scan started! Processing ${totalEmails} emails in background...`);
+      setScanProgress(10);
+
+      // Poll for progress
+      const pollInterval = setInterval(async () => {
+        const { data: logData, error: logError } = await supabase
+          .from('email_scan_log')
+          .select('*')
+          .eq('id', scanLogId)
+          .single();
+
+        if (logError) {
+          console.error('Error polling scan progress:', logError);
+          return;
+        }
+
+        if (logData) {
+          const processed = logData.emails_processed || 0;
+          const total = logData.total_emails || totalEmails;
+          const progress = total > 0 ? Math.min((processed / total) * 100, 95) : 10;
+          
+          setScanProgress(progress);
+          setEmailsProcessed(processed);
+
+          if (logData.scan_status === 'completed') {
+            clearInterval(pollInterval);
+            setScanProgress(100);
+            setIsRescanning(false);
+            toast.success(`Scan complete! Processed ${processed} emails, generated ${logData.insights_generated} insights.`);
+          } else if (logData.scan_status === 'failed') {
+            clearInterval(pollInterval);
+            setIsRescanning(false);
+            toast.error(`Scan failed: ${logData.error_message}`);
+          }
+        }
+      }, 2000); // Poll every 2 seconds
+
+      // Cleanup after 10 minutes max
+      setTimeout(() => {
+        clearInterval(pollInterval);
+        if (isRescanning) {
+          setIsRescanning(false);
+          toast.warning('Scan is taking longer than expected. Check results later.');
+        }
+      }, 600000);
+
     } catch (error: any) {
       console.error('Rescan error:', error);
-      // Try to extract partial progress from error response
-      const partialData = error.context?.body;
-      const processedCount = partialData?.emailsProcessed || 0;
-      
-      if (processedCount > 0) {
-        setEmailsProcessed(processedCount);
-        toast.warning(`Scan interrupted after processing ${processedCount} emails. Partial results saved.`);
-      } else {
-        toast.error('Failed to rescan emails: ' + error.message);
-      }
-    } finally {
+      toast.error('Failed to start rescan: ' + error.message);
       setIsRescanning(false);
       setScanProgress(0);
     }
