@@ -96,27 +96,41 @@ export const ReconciliationReviewModal = ({
       }
 
       // Automatically detect and add new expenses within the reconciliation period
-      const reconciliationDate = new Date(rec.reconciliation_month);
+      const reconciliationDate = new Date(rec.reconciliation_month + 'T00:00:00');
       const startDate = new Date(reconciliationDate.getFullYear(), reconciliationDate.getMonth(), 1);
       const endDate = new Date(reconciliationDate.getFullYear(), reconciliationDate.getMonth() + 1, 0);
       
-      const { data: allExpensesInPeriod } = await supabase
+      // Format dates as YYYY-MM-DD for comparison
+      const startDateStr = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}-01`;
+      const endDateStr = `${endDate.getFullYear()}-${String(endDate.getMonth() + 1).padStart(2, '0')}-${String(endDate.getDate()).padStart(2, '0')}`;
+      
+      console.log(`Checking for expenses between ${startDateStr} and ${endDateStr} for property ${rec.property_id}`);
+      
+      const { data: allExpensesInPeriod, error: autoAddExpensesError } = await supabase
         .from('expenses')
         .select('*')
         .eq('property_id', rec.property_id)
-        .gte('date', startDate.toISOString().split('T')[0])
-        .lte('date', endDate.toISOString().split('T')[0]);
+        .gte('date', startDateStr)
+        .lte('date', endDateStr);
+      
+      if (autoAddExpensesError) {
+        console.error('Error fetching expenses:', autoAddExpensesError);
+      } else {
+        console.log(`Found ${allExpensesInPeriod?.length || 0} total expenses in period`);
+      }
       
       const existingExpenseLineItemIds = new Set(
         items?.filter((item: any) => item.item_type === 'expense').map((item: any) => item.item_id) || []
       );
+      
+      console.log(`Already have ${existingExpenseLineItemIds.size} expense line items`);
       
       const newExpenses = (allExpensesInPeriod || []).filter(
         (expense: any) => !existingExpenseLineItemIds.has(expense.id)
       );
       
       if (newExpenses.length > 0) {
-        console.log(`Auto-adding ${newExpenses.length} new expense(s) to reconciliation`);
+        console.log(`Auto-adding ${newExpenses.length} new expense(s):`, newExpenses.map(e => ({ id: e.id, amount: e.amount, date: e.date })));
         
         const { data: { user } } = await supabase.auth.getUser();
         
@@ -136,7 +150,11 @@ export const ReconciliationReviewModal = ({
           .from('reconciliation_line_items')
           .insert(newLineItems);
         
-        if (!insertError) {
+        if (insertError) {
+          console.error('Error inserting new line items:', insertError);
+        } else {
+          console.log('Successfully inserted new line items');
+          
           // Log in audit trail
           await supabase.from("reconciliation_audit_log").insert({
             reconciliation_id: reconciliationId,
@@ -145,9 +163,6 @@ export const ReconciliationReviewModal = ({
             notes: `Auto-added ${newExpenses.length} new expense(s) on modal open`
           });
           
-          // Show toast notification
-          toast.success(`Added ${newExpenses.length} new expense(s) to reconciliation`);
-          
           // Refetch to include new items
           const { data: updatedItems } = await supabase
             .from("reconciliation_line_items")
@@ -155,8 +170,12 @@ export const ReconciliationReviewModal = ({
             .eq("reconciliation_id", reconciliationId)
             .order("date", { ascending: false });
           
-          items.splice(0, items.length, ...(updatedItems || []));
+          if (updatedItems) {
+            items.splice(0, items.length, ...updatedItems);
+          }
         }
+      } else {
+        console.log('No new expenses to add');
       }
 
       // Fetch unbilled visits for this property
