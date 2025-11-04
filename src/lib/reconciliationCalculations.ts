@@ -12,6 +12,7 @@ export interface ReconciliationLineItem {
   amount: number;
   verified: boolean;
   excluded: boolean;
+  description?: string;
 }
 
 export interface ReconciliationData {
@@ -27,6 +28,7 @@ export interface ReconciliationData {
 /**
  * Calculate "Due from Owner" from line items
  * Formula: Mgmt Fee + Visit Fees (from checked visits) + Expenses (from checked expenses)
+ * Note: Filters out visit-related expenses to avoid double counting
  */
 export function calculateDueFromOwnerFromLineItems(
   lineItems: ReconciliationLineItem[],
@@ -47,9 +49,18 @@ export function calculateDueFromOwnerFromLineItems(
     .filter((item) => item.item_type === "visit")
     .reduce((sum, item) => sum + Math.abs(item.amount), 0);
 
-  // Calculate expenses from line items
+  // Calculate expenses from line items, filtering out visit-related expenses to avoid double counting
   const totalExpenses = validLineItems
-    .filter((item) => item.item_type === "expense")
+    .filter((item) => {
+      if (item.item_type !== "expense") return false;
+      
+      // Check if this is a visit-related expense (these should be counted in visitFees instead)
+      const description = ((item as any).description || '').toLowerCase();
+      return !description.includes('visit fee') && 
+             !description.includes('visit charge') &&
+             !description.includes('hourly charge') &&
+             !description.includes('property visit');
+    })
     .reduce((sum, item) => sum + Math.abs(item.amount), 0);
 
   // Calculate total due from owner
