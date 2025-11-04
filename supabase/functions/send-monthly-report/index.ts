@@ -152,17 +152,7 @@ const handler = async (req: Request): Promise<Response> => {
 
       // Map line items back to their original types for email display
       visits = (lineItems || [])
-        .filter((item: any) => {
-          if (item.item_type !== "visit") return false;
-          
-          // Filter out visits that are outside the reconciliation month
-          const visitDate = new Date(item.date);
-          const recMonth = new Date(reconciliation.reconciliation_month);
-          const recYear = recMonth.getFullYear();
-          const recMonthNum = recMonth.getMonth();
-          
-          return visitDate.getFullYear() === recYear && visitDate.getMonth() === recMonthNum;
-        })
+        .filter((item: any) => item.item_type === "visit")
         .map((item: any) => ({
           date: item.date,
           description: item.description,
@@ -187,16 +177,6 @@ const handler = async (req: Request): Promise<Response> => {
       expenses = (lineItems || [])
         .filter((item: any) => {
           if (item.item_type !== "expense") return false;
-          
-          // Filter out expenses outside the reconciliation month
-          const expenseDate = new Date(item.date);
-          const recMonth = new Date(reconciliation.reconciliation_month);
-          const recYear = recMonth.getFullYear();
-          const recMonthNum = recMonth.getMonth();
-          
-          if (expenseDate.getFullYear() !== recYear || expenseDate.getMonth() !== recMonthNum) {
-            return false;
-          }
           
           // Filter out visit-related expenses to avoid double counting
           const desc = (item.description || '').toLowerCase();
