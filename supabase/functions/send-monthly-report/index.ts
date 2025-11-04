@@ -152,7 +152,17 @@ const handler = async (req: Request): Promise<Response> => {
 
       // Map line items back to their original types for email display
       visits = (lineItems || [])
-        .filter((item: any) => item.item_type === "visit")
+        .filter((item: any) => {
+          if (item.item_type !== "visit") return false;
+          
+          // Filter out visits that are outside the reconciliation month
+          const visitDate = new Date(item.date);
+          const recMonth = new Date(reconciliation.reconciliation_month);
+          const recYear = recMonth.getFullYear();
+          const recMonthNum = recMonth.getMonth();
+          
+          return visitDate.getFullYear() === recYear && visitDate.getMonth() === recMonthNum;
+        })
         .map((item: any) => ({
           date: item.date,
           description: item.description,
@@ -175,7 +185,26 @@ const handler = async (req: Request): Promise<Response> => {
       }
       
       expenses = (lineItems || [])
-        .filter((item: any) => item.item_type === "expense")
+        .filter((item: any) => {
+          if (item.item_type !== "expense") return false;
+          
+          // Filter out expenses outside the reconciliation month
+          const expenseDate = new Date(item.date);
+          const recMonth = new Date(reconciliation.reconciliation_month);
+          const recYear = recMonth.getFullYear();
+          const recMonthNum = recMonth.getMonth();
+          
+          if (expenseDate.getFullYear() !== recYear || expenseDate.getMonth() !== recMonthNum) {
+            return false;
+          }
+          
+          // Filter out visit-related expenses to avoid double counting
+          const desc = (item.description || '').toLowerCase();
+          return !desc.includes('visit fee') && 
+                 !desc.includes('visit charge') &&
+                 !desc.includes('hourly charge') &&
+                 !desc.includes('property visit');
+        })
         .map((item: any) => {
           const detailedExpense = detailedExpenses.find((e: any) => e.id === item.item_id);
           return {
@@ -601,20 +630,8 @@ State: ${state}
     // Calculate total expenses including visits for display
     const visitExpenses = visits.reduce((sum, v) => sum + Number(v.price), 0);
     
-    // Filter out visit-related expenses to avoid double counting
-    const filteredExpenses = expenses.filter(e => {
-      const desc = (e.description || '').toLowerCase();
-      const purpose = (e.purpose || '').toLowerCase();
-      // Exclude expenses that are actually visit charges
-      return !desc.includes('visit fee') && 
-             !desc.includes('visit charge') &&
-             !desc.includes('hourly charge') &&
-             !purpose.includes('visit fee') &&
-             !purpose.includes('visit charge') &&
-             !purpose.includes('hourly charge');
-    });
-    
-    const otherExpenses = filteredExpenses.reduce((sum, e) => sum + Number(e.amount), 0);
+    // No need for additional filtering here since we already filtered when building the expenses array
+    const otherExpenses = expenses.reduce((sum, e) => sum + Number(e.amount), 0);
     const totalExpensesWithVisits = otherExpenses + visitExpenses + managementFees + orderMinimumFee;
 
     console.log("Financial Summary:", {
@@ -622,7 +639,6 @@ State: ${state}
       propertyName: property.name,
       visits: visits.length,
       expenses: expenses.length,
-      filteredExpenses: filteredExpenses.length,
       bookings: bookings.length,
       midTermBookings: midTermBookings.length,
       visitExpenses: visitExpenses,
@@ -812,7 +828,7 @@ State: ${state}
                       </td>
                       <td style="padding: 10px 0; color: #4a4a4a; font-size: 14px; text-align: right; font-weight: 600; border-bottom: 1px solid #f5f5f5;">$${Number(visit.price).toFixed(2)}</td>
                     </tr>`).join('') : ''}
-                    ${filteredExpenses && filteredExpenses.length > 0 ? filteredExpenses.map((expense: any) => {
+                    ${expenses && expenses.length > 0 ? expenses.map((expense: any) => {
                       const description = expense.purpose || 'Maintenance & Supplies';
                       const dateStr = new Date(expense.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
                       
