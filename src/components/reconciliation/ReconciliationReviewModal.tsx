@@ -9,7 +9,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
-import { Check, Home, DollarSign, Eye, RotateCcw, AlertTriangle, RefreshCw, Plus } from "lucide-react";
+import { Check, Home, DollarSign, Eye, RotateCcw, AlertTriangle, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { MonthlyEmailPreviewModal } from "./MonthlyEmailPreviewModal";
 import { calculateDueFromOwnerFromLineItems } from "@/lib/reconciliationCalculations";
@@ -85,6 +85,70 @@ export const ReconciliationReviewModal = ({
           }
           
           // Refetch to get updated data
+          const { data: updatedItems } = await supabase
+            .from("reconciliation_line_items")
+            .select("*")
+            .eq("reconciliation_id", reconciliationId)
+            .order("date", { ascending: false });
+          
+          items.splice(0, items.length, ...(updatedItems || []));
+        }
+      }
+
+      // Automatically detect and add new expenses within the reconciliation period
+      const reconciliationDate = new Date(rec.reconciliation_month);
+      const startDate = new Date(reconciliationDate.getFullYear(), reconciliationDate.getMonth(), 1);
+      const endDate = new Date(reconciliationDate.getFullYear(), reconciliationDate.getMonth() + 1, 0);
+      
+      const { data: allExpensesInPeriod } = await supabase
+        .from('expenses')
+        .select('*')
+        .eq('property_id', rec.property_id)
+        .gte('date', startDate.toISOString().split('T')[0])
+        .lte('date', endDate.toISOString().split('T')[0]);
+      
+      const existingExpenseLineItemIds = new Set(
+        items?.filter((item: any) => item.item_type === 'expense').map((item: any) => item.item_id) || []
+      );
+      
+      const newExpenses = (allExpensesInPeriod || []).filter(
+        (expense: any) => !existingExpenseLineItemIds.has(expense.id)
+      );
+      
+      if (newExpenses.length > 0) {
+        console.log(`Auto-adding ${newExpenses.length} new expense(s) to reconciliation`);
+        
+        const { data: { user } } = await supabase.auth.getUser();
+        
+        const newLineItems = newExpenses.map((expense: any) => ({
+          reconciliation_id: reconciliationId,
+          item_type: 'expense',
+          item_id: expense.id,
+          description: expense.purpose || expense.category || 'Expense',
+          amount: -(expense.amount || 0),
+          date: expense.date,
+          category: expense.category || 'Other',
+          verified: false,
+          excluded: false
+        }));
+        
+        const { error: insertError } = await supabase
+          .from('reconciliation_line_items')
+          .insert(newLineItems);
+        
+        if (!insertError) {
+          // Log in audit trail
+          await supabase.from("reconciliation_audit_log").insert({
+            reconciliation_id: reconciliationId,
+            action: 'items_added',
+            user_id: user?.id,
+            notes: `Auto-added ${newExpenses.length} new expense(s) on modal open`
+          });
+          
+          // Show toast notification
+          toast.success(`Added ${newExpenses.length} new expense(s) to reconciliation`);
+          
+          // Refetch to include new items
           const { data: updatedItems } = await supabase
             .from("reconciliation_line_items")
             .select("*")
@@ -246,85 +310,6 @@ export const ReconciliationReviewModal = ({
     }
   });
 
-  const addNewExpensesMutation = useMutation({
-    mutationFn: async () => {
-      if (!data?.reconciliation) {
-        throw new Error("No reconciliation data");
-      }
-
-      const reconciliationDate = new Date(data.reconciliation.reconciliation_month);
-      const startDate = new Date(reconciliationDate.getFullYear(), reconciliationDate.getMonth(), 1);
-      const endDate = new Date(reconciliationDate.getFullYear(), reconciliationDate.getMonth() + 1, 0);
-      
-      // Get all expenses within the reconciliation period
-      const { data: allExpenses, error: expensesError } = await supabase
-        .from('expenses')
-        .select('*')
-        .eq('property_id', data.reconciliation.property_id)
-        .gte('date', startDate.toISOString().split('T')[0])
-        .lte('date', endDate.toISOString().split('T')[0]);
-      
-      if (expensesError) throw expensesError;
-      
-      // Get existing expense line items
-      const existingExpenseIds = new Set(
-        data.lineItems
-          .filter((item: any) => item.item_type === 'expense')
-          .map((item: any) => item.item_id)
-      );
-      
-      // Find expenses not yet in line items
-      const newExpenses = (allExpenses || []).filter(
-        (expense: any) => !existingExpenseIds.has(expense.id)
-      );
-      
-      if (newExpenses.length === 0) {
-        return { addedCount: 0 };
-      }
-      
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      // Create line items for new expenses
-      const newLineItems = newExpenses.map((expense: any) => ({
-        reconciliation_id: reconciliationId,
-        item_type: 'expense',
-        item_id: expense.id,
-        description: expense.description || 'Expense',
-        amount: -(expense.amount || 0),
-        date: expense.date,
-        category: expense.category || 'Other',
-        verified: false,
-        excluded: false
-      }));
-      
-      const { error: insertError } = await supabase
-        .from('reconciliation_line_items')
-        .insert(newLineItems);
-      
-      if (insertError) throw insertError;
-      
-      // Log in audit trail
-      await supabase.from("reconciliation_audit_log").insert({
-        reconciliation_id: reconciliationId,
-        action: 'items_added',
-        user_id: user?.id,
-        notes: `Added ${newExpenses.length} new expense(s) to reconciliation`
-      });
-      
-      return { addedCount: newExpenses.length };
-    },
-    onSuccess: (result) => {
-      refetch();
-      if (result.addedCount > 0) {
-        toast.success(`Added ${result.addedCount} new expense(s) to reconciliation`);
-      } else {
-        toast.info("No new expenses found");
-      }
-    },
-    onError: () => {
-      toast.error("Failed to add new expenses");
-    }
-  });
 
   const fixTotalsMutation = useMutation({
     mutationFn: async () => {
@@ -495,16 +480,6 @@ export const ReconciliationReviewModal = ({
                   >
                     <RotateCcw className="w-4 h-4 mr-2" />
                     {cleanupOrphanedItemsMutation.isPending ? "Checking..." : "Remove Deleted Items"}
-                  </Button>
-                  <Button 
-                    size="sm" 
-                    onClick={() => addNewExpensesMutation.mutate()}
-                    disabled={addNewExpensesMutation.isPending}
-                    variant="outline"
-                    className="bg-white dark:bg-gray-900"
-                  >
-                    <Plus className="w-4 h-4 mr-2" />
-                    {addNewExpensesMutation.isPending ? "Adding..." : "Add New Expenses"}
                   </Button>
                 </div>
               </div>
