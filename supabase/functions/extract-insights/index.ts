@@ -601,7 +601,7 @@ ANALYZE CAREFULLY - Extract ALL order details including order number and deliver
       
       console.log('Checking for duplicate expenses with order number:', analysis.orderNumber);
       
-      // First check: If order_number exists, check if it's already logged
+      // CRITICAL: Check for duplicates by order number (for Amazon orders)
       if (analysis.orderNumber) {
         const { data: existingExpense } = await supabase
           .from('expenses')
@@ -622,6 +622,52 @@ ANALYZE CAREFULLY - Extract ALL order details including order number and deliver
           
           return new Response(
             JSON.stringify({ shouldSave: true, analysis, duplicate: true }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+      }
+      
+      // CRITICAL: For expenses WITHOUT order numbers, use fuzzy duplicate detection
+      if (!analysis.orderNumber) {
+        console.log('Checking for fuzzy duplicates (no order number)...');
+        
+        // Check for expenses with same property, similar amount, and date within 3 days
+        const expenseDate = new Date(analysis.orderDate || emailDate);
+        const threeDaysBefore = new Date(expenseDate);
+        threeDaysBefore.setDate(threeDaysBefore.getDate() - 3);
+        const threeDaysAfter = new Date(expenseDate);
+        threeDaysAfter.setDate(threeDaysAfter.getDate() + 3);
+        
+        const { data: similarExpenses } = await supabase
+          .from('expenses')
+          .select('id, amount, vendor, purpose')
+          .eq('property_id', property.id)
+          .gte('date', threeDaysBefore.toISOString().split('T')[0])
+          .lte('date', threeDaysAfter.toISOString().split('T')[0]);
+        
+        // Check if any similar expense exists with same amount and similar vendor/purpose
+        const isDuplicate = similarExpenses?.some(exp => {
+          const amountMatch = Math.abs(exp.amount - analysis.expenseAmount) < 0.01;
+          const vendorMatch = exp.vendor && analysis.vendor && 
+            exp.vendor.toLowerCase() === analysis.vendor.toLowerCase();
+          const purposeMatch = exp.purpose && analysis.expenseDescription &&
+            exp.purpose.toLowerCase().includes(analysis.expenseDescription.toLowerCase().substring(0, 20));
+          
+          return amountMatch && (vendorMatch || purposeMatch);
+        });
+        
+        if (isDuplicate) {
+          console.log('Fuzzy duplicate detected, skipping expense creation');
+          await supabase
+            .from('email_insights')
+            .update({ 
+              expense_created: false,
+              suggested_actions: (analysis.suggestedActions || '') + ' (Possible duplicate detected - similar expense exists)'
+            })
+            .eq('id', insertedInsight.id);
+          
+          return new Response(
+            JSON.stringify({ shouldSave: true, analysis, duplicate: true, fuzzyMatch: true }),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }

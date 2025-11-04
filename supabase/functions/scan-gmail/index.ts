@@ -42,18 +42,18 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
-    // PHASE 4: If force rescan requested, clear email_insights to reprocess everything
+    // PHASE 4: If force rescan requested, only clear scan logs (keep email_insights for duplicate detection)
     if (forceRescan) {
-      console.log('Force rescan requested - clearing existing email insights...');
+      console.log('Force rescan requested - clearing scan logs but keeping email insights for duplicate detection...');
       const { error: clearError } = await supabase
-        .from('email_insights')
+        .from('email_scan_log')
         .delete()
-        .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all
+        .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all logs
       
       if (clearError) {
-        console.error('Error clearing email insights:', clearError);
+        console.error('Error clearing scan logs:', clearError);
       } else {
-        console.log('Email insights cleared successfully');
+        console.log('Scan logs cleared - emails will be reprocessed but duplicates prevented');
       }
     }
 
