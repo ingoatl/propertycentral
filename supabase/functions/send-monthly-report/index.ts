@@ -150,14 +150,44 @@ const handler = async (req: Request): Promise<Response> => {
 
       if (itemsError) throw itemsError;
 
-      // Map line items back to their original types for email display
-      visits = (lineItems || [])
-        .filter((item: any) => item.item_type === "visit")
-        .map((item: any) => ({
-          date: item.date,
-          description: item.description,
-          price: Math.abs(item.amount),
-        }));
+      // Fetch actual visit records to get detailed breakdown (hours, visit fee, etc.)
+      const visitLineItems = (lineItems || [])
+        .filter((item: any) => item.item_type === "visit");
+      
+      const visitIds = visitLineItems.map((item: any) => item.item_id);
+      
+      if (visitIds.length > 0) {
+        const { data: visitRecords, error: visitError } = await supabase
+          .from("visits")
+          .select("*, properties!inner(visit_price)")
+          .in("id", visitIds);
+        
+        if (visitError) {
+          console.error("Error fetching visit records:", visitError);
+          visits = visitLineItems.map((item: any) => ({
+            description: item.description,
+            price: Math.abs(item.amount),
+            date: item.date,
+            visited_by: "Staff",
+            hours: 0,
+            visit_fee: 0
+          }));
+        } else {
+          visits = (visitRecords || []).map((v: any) => ({
+            id: v.id,
+            date: v.date,
+            time: v.time,
+            visited_by: v.visited_by || "Staff",
+            hours: v.hours || 0,
+            price: Number(v.price || 0),
+            visit_fee: Number(v.properties?.visit_price || 0),
+            notes: v.notes,
+            description: `Property visit - ${v.visited_by || "Staff"}`
+          }));
+        }
+      } else {
+        visits = [];
+      }
 
       // Fetch detailed expense data with line items for better descriptions
       const expenseIds = (lineItems || [])
@@ -802,23 +832,66 @@ State: ${state}
                       <td style="padding: 12px 0; color: #4a4a4a; font-size: 15px; text-align: right; font-weight: 600; border-bottom: 1px solid #f5f5f5;">$${orderMinimumFee.toFixed(2)}</td>
                     </tr>` : ''}
                     ${visits && visits.length > 0 ? visits.map((visit: any) => {
-                      // Extract person name from description if it exists
-                      // Description format: "Property visit - [Name]" or "Property visit - Staff"
-                      let personName = 'Staff';
-                      if (visit.description) {
-                        const match = visit.description.match(/Property visit - (.+)/i);
-                        if (match) {
-                          personName = match[1];
-                        }
+                      const personName = visit.visited_by || 'Staff';
+                      const dateStr = new Date(visit.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                      const visitFee = Number(visit.visit_fee || 0);
+                      const hours = Number(visit.hours || 0);
+                      const hourlyRate = 50; // Hard-coded: $50/hour
+                      const hourlyCharges = hours * hourlyRate;
+                      const totalVisitPrice = Number(visit.price || 0);
+                      
+                      let result = '';
+                      
+                      // Show header with date and person
+                      result += `
+                    <tr>
+                      <td colspan="2" style="padding: 12px 0 4px 0; color: #2c3e50; font-size: 14px; font-weight: 700; border-bottom: none;">
+                        Property Visit - ${dateStr} (${personName})
+                      </td>
+                    </tr>`;
+                      
+                      // Show visit fee
+                      if (visitFee > 0) {
+                        result += `
+                    <tr>
+                      <td style="padding: 4px 0 4px 20px; color: #6b7280; font-size: 13px; border-bottom: none;">
+                        ├─ Visit Fee
+                      </td>
+                      <td style="padding: 4px 0; color: #6b7280; font-size: 13px; text-align: right; border-bottom: none;">$${visitFee.toFixed(2)}</td>
+                    </tr>`;
                       }
                       
-                      return `
+                      // Show hourly charges if hours > 0
+                      if (hours > 0) {
+                        result += `
                     <tr>
-                      <td style="padding: 10px 0; color: #2c3e50; font-size: 14px; border-bottom: 1px solid #f5f5f5;">
-                        Property Visit - ${new Date(visit.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} (${personName})
+                      <td style="padding: 4px 0 4px 20px; color: #6b7280; font-size: 13px; border-bottom: none;">
+                        ${visitFee > 0 ? '└─' : '├─'} Hourly Charges: ${hours} hour${hours !== 1 ? 's' : ''} × $${hourlyRate.toFixed(2)}/hr
                       </td>
-                      <td style="padding: 10px 0; color: #4a4a4a; font-size: 14px; text-align: right; font-weight: 600; border-bottom: 1px solid #f5f5f5;">$${Number(visit.price).toFixed(2)}</td>
+                      <td style="padding: 4px 0; color: #6b7280; font-size: 13px; text-align: right; border-bottom: none;">$${hourlyCharges.toFixed(2)}</td>
                     </tr>`;
+                      }
+                      
+                      // Show total row
+                      result += `
+                    <tr>
+                      <td style="padding: 4px 0 10px 20px; color: #2c3e50; font-size: 13px; font-weight: 600; border-bottom: 1px solid #f5f5f5;">
+                        Visit Total:
+                      </td>
+                      <td style="padding: 4px 0 10px 0; color: #2c3e50; font-size: 14px; text-align: right; font-weight: 700; border-bottom: 1px solid #f5f5f5;">$${totalVisitPrice.toFixed(2)}</td>
+                    </tr>`;
+                      
+                      // Add notes if present
+                      if (visit.notes && visit.notes.trim()) {
+                        result += `
+                    <tr>
+                      <td colspan="2" style="padding: 4px 0 10px 20px; color: #6b7280; font-size: 12px; font-style: italic; border-bottom: 1px solid #f5f5f5;">
+                        📝 ${visit.notes}
+                      </td>
+                    </tr>`;
+                      }
+                      
+                      return result;
                     }).join('') : ''}
                     ${expenses && expenses.length > 0 ? expenses.map((expense: any) => {
                       const description = expense.purpose || 'Maintenance & Supplies';
