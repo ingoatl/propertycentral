@@ -106,12 +106,12 @@ export const PropertyExpenseView = ({
 
       if (error) throw error;
 
-      onExpenseDeleted();
       toast.success("Expense deleted");
+      
+      // Refresh the data from parent
+      await onExpenseDeleted();
     } catch (error: any) {
-      if (import.meta.env.DEV) {
-        console.error("Error deleting expense:", error);
-      }
+      console.error("Error deleting expense:", error);
       toast.error("Failed to delete expense");
     }
   };

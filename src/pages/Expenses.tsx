@@ -61,7 +61,7 @@ const Expenses = () => {
 
       if (expensesError) throw expensesError;
 
-      setExpenses((expensesData || []).map(e => ({
+      const mappedExpenses = (expensesData || []).map(e => ({
         id: e.id,
         propertyId: e.property_id,
         amount: Number(e.amount),
@@ -77,11 +77,15 @@ const Expenses = () => {
         itemsDetail: e.items_detail,
         deliveryAddress: e.delivery_address,
         exported: e.exported,
-      })));
+        isReturn: e.is_return,
+        parentExpenseId: e.parent_expense_id,
+        returnReason: e.return_reason,
+        lineItems: e.line_items as { items: { name: string; price: number; }[] } | undefined,
+      }));
+
+      setExpenses(mappedExpenses);
     } catch (error: any) {
-      if (import.meta.env.DEV) {
-        console.error("Error loading data:", error);
-      }
+      console.error("Error loading data:", error);
       toast.error("Failed to load data");
     }
   };
