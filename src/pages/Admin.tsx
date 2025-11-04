@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { CheckCircle, XCircle, Clock, Shield, UserPlus, Key, Users, MessageCircleQuestion, UserCog, Bug, Mail } from "lucide-react";
+import { CheckCircle, XCircle, Clock, Shield, UserPlus, Key, Users, MessageCircleQuestion, UserCog, Bug, Mail, Database } from "lucide-react";
 import { RescheduleLogsTab } from "@/components/admin/RescheduleLogsTab";
 import { z } from "zod";
 import { TeamMatrixTab } from "@/components/admin/TeamMatrixTab";
@@ -16,6 +16,7 @@ import { AllFAQsManagement } from "@/components/admin/AllFAQsManagement";
 import { AssignUnassignedTasksButton } from "@/components/onboarding/AssignUnassignedTasksButton";
 import { BugTrackerCard } from "@/components/admin/BugTrackerCard";
 import { EmailAIPromptsManager } from "@/components/admin/EmailAIPromptsManager";
+import { DataCleanupPanel } from "@/components/reconciliation/DataCleanupPanel";
 
 const createUserSchema = z.object({
   email: z.string().email("Invalid email address").max(255),
@@ -386,7 +387,7 @@ const Admin = () => {
       </div>
 
       <Tabs defaultValue="users" className="w-full">
-        <TabsList className="grid w-full grid-cols-6">
+        <TabsList className="grid w-full grid-cols-7">
           <TabsTrigger value="users">User Management</TabsTrigger>
           <TabsTrigger value="team-matrix">
             <Users className="w-4 h-4 mr-2" />
@@ -399,6 +400,10 @@ const Admin = () => {
           <TabsTrigger value="email-prompts">
             <Mail className="w-4 h-4 mr-2" />
             Email Prompts
+          </TabsTrigger>
+          <TabsTrigger value="data-cleanup">
+            <Database className="w-4 h-4 mr-2" />
+            Data Cleanup
           </TabsTrigger>
           <TabsTrigger value="bugs">
             <Bug className="w-4 h-4 mr-2" />
@@ -726,6 +731,10 @@ const Admin = () => {
 
         <TabsContent value="email-prompts" className="mt-8">
           <EmailAIPromptsManager />
+        </TabsContent>
+
+        <TabsContent value="data-cleanup" className="mt-8">
+          <DataCleanupPanel />
         </TabsContent>
 
         <TabsContent value="bugs" className="mt-8">

@@ -23,6 +23,56 @@ serve(async (req) => {
       rawHtml,
     } = await req.json();
 
+    // PHASE 1: EMAIL FILTERING - Reject internal PeachHaus emails immediately
+    const internalSenders = [
+      'admin@peachhausgroup.com',
+      'ingo@peachhausgroup.com',
+      'anja@peachhausgroup.com',
+    ];
+    
+    const isInternalSender = internalSenders.some(sender => 
+      senderEmail.toLowerCase().includes(sender.toLowerCase())
+    ) || senderEmail.toLowerCase().includes('@peachhausgroup.com');
+    
+    if (isInternalSender) {
+      console.log('Skipping internal PeachHaus email from:', senderEmail);
+      return new Response(
+        JSON.stringify({ 
+          shouldSave: false, 
+          reason: 'Internal email filtered',
+          sender: senderEmail 
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    // PHASE 1: SUBJECT LINE FILTERING - Skip system-generated emails
+    const skipSubjects = [
+      'team performance summary',
+      'monthly owner statement',
+      'property performance report',
+      '[test]',
+      'daily digest',
+      'performance digest',
+      'owner statement',
+    ];
+    
+    const shouldSkipSubject = skipSubjects.some(skip => 
+      subject.toLowerCase().includes(skip)
+    );
+    
+    if (shouldSkipSubject) {
+      console.log('Skipping system email with subject:', subject);
+      return new Response(
+        JSON.stringify({ 
+          shouldSave: false, 
+          reason: 'System email filtered',
+          subject: subject 
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
 
     // Create context for AI
@@ -34,6 +84,12 @@ serve(async (req) => {
       .join(', ');
 
     const systemPrompt = `You are an AI assistant analyzing property management emails with advanced sentiment analysis and expense detection capabilities.
+
+**CRITICAL VALIDATION RULES - REJECT EMAILS THAT:**
+1. Mention "Multiple expenses logged" or "multiple properties" in description
+2. Contain aggregated data from internal reports
+3. Are from @peachhausgroup.com senders (should already be filtered)
+4. Have no clear vendor or order information for expense claims
 
 **CRITICAL: Search for EXACT FULL NAMES of owners anywhere in the email (subject or body):**
 ${ownerList}
@@ -65,8 +121,16 @@ ${propertyList}
 
 **IF EITHER an owner name OR a property address is found, the email IS RELEVANT and should be processed**
 
-**CRITICAL INSTRUCTIONS FOR EXPENSE EXTRACTION:**
+   **CRITICAL INSTRUCTIONS FOR EXPENSE EXTRACTION:**
 You MUST extract ALL details accurately. Missing fields cause problems.
+
+**VALIDATION - REQUIRED FIELDS FOR EXPENSES:**
+- orderNumber OR invoiceNumber is REQUIRED
+- amount must be > 0
+- vendor must be identified (e.g., "Amazon", "Home Depot", "Lowe's")
+- description MUST NOT contain "multiple properties" or "multiple expenses logged"
+- description MUST be specific to items purchased or service provided
+- deliveryAddress should match ONE property only
 
 **CRITICAL - BOOKING vs EXPENSE vs RETURN DISTINCTION:**
 - Booking confirmations (Airbnb, VRBO, Booking.com, direct bookings) are INCOME, not expenses
@@ -104,18 +168,25 @@ Analyze the email comprehensively and extract:
 
 11. **EXPENSE DETECTION - READ EVERY WORD CAREFULLY**:
    
-   **CRITICAL - FOR AMAZON EMAILS:**
+   **PHASE 2 ENHANCEMENT - FOR AMAZON EMAILS:**
    - Amazon emails have VERY specific patterns you MUST recognize
-   - Look for "Order Confirmation" OR "Shipping Confirmation" headers
+   - Look for "Order Confirmation" OR "Shipment Notification" OR "Your Amazon.com order" in subject
+   - Subject patterns: "Your Amazon.com order of...", "Shipment notification", "Order Confirmation"
    - CRITICAL: Shipping addresses often have PREFIXES - extract the actual address!
      * Format: "CompanyName - OwnerName - StreetAddress City, State ZIP"
      * Example: "PeachHausGroup - Shaletha Colbert - 14 Villa Ct 1387 TYSONS COR MARIETTA, GA"
      * MUST extract: "14 Villa Ct" or full address "14 Villa Ct, Marietta, GA 30062"
    - Each order has:
-     * Order number in format: ###-#######-####### (EXTRACT THIS!)
+     * Order number in format: ###-#######-####### (EXTRACT THIS - REQUIRED!)
      * Delivery estimate like "Tuesday, October 1" or "Monday, September 22" (CONVERT TO YYYY-MM-DD!)
-     * Item list with individual prices
+     * Item list with individual prices in table format
+     * Total price clearly stated
      * Delivery address (EXTRACT EVEN IF IT HAS PREFIX!)
+   - REQUIRED for Amazon orders:
+     * Must have order number (orderNumber field)
+     * Must have vendor = "Amazon"
+     * Must have deliveryAddress extracted
+     * Must have lineItems array with item names and prices
    
    **STEP BY STEP EXTRACTION PROCESS:**
    
@@ -156,11 +227,21 @@ Analyze the email comprehensively and extract:
    - Extract total amount clearly stated
    - Find any address mentioned
    
-   **VALIDATION:**
-   - orderNumber MUST be extracted if this is an Amazon order
-   - deliveryAddress MUST be extracted if shipping address is mentioned
-   - expenseAmount MUST be the SUM of all items
-   - orderDate MUST be in YYYY-MM-DD format
+    **VALIDATION:**
+    - orderNumber MUST be extracted if this is an Amazon order (REQUIRED)
+    - deliveryAddress MUST be extracted if shipping address is mentioned (REQUIRED)
+    - expenseAmount MUST be the SUM of all items (REQUIRED > 0)
+    - orderDate MUST be in YYYY-MM-DD format (REQUIRED)
+    - vendor MUST be identified (e.g., "Amazon", "Home Depot") (REQUIRED)
+    - description MUST NOT contain "multiple properties" or vague summaries
+    - description MUST be specific to items purchased
+    
+    **REJECT IF:**
+    - Description mentions "Multiple expenses logged" or "multiple properties"
+    - No order/invoice number can be extracted
+    - Amount is 0 or negative (unless it's a return)
+    - Vendor cannot be identified
+    - Expense seems to aggregate data from multiple sources
 
 Return ONLY a JSON object:
 {
@@ -608,6 +689,35 @@ ANALYZE CAREFULLY - Extract ALL order details including order number and deliver
         ? { items: analysis.lineItems }
         : null;
 
+      // PHASE 6: SAFETY CONTROL - Validate expense before creating
+      const hasSuspiciousDescription = analysis.expenseDescription && (
+        analysis.expenseDescription.toLowerCase().includes('multiple expenses logged') ||
+        analysis.expenseDescription.toLowerCase().includes('multiple properties') ||
+        analysis.expenseDescription.toLowerCase().includes('logged for')
+      );
+      
+      if (hasSuspiciousDescription) {
+        console.log('REJECTED: Suspicious expense description detected:', analysis.expenseDescription);
+        await supabase
+          .from('email_insights')
+          .update({ 
+            expense_created: false,
+            suggested_actions: (analysis.suggestedActions || '') + ' [REJECTED: Suspicious aggregated description]'
+          })
+          .eq('id', insertedInsight.id);
+        
+        return new Response(
+          JSON.stringify({ 
+            shouldSave: true, 
+            analysis, 
+            expenseRejected: true,
+            reason: 'Suspicious aggregated description'
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      
+      // PHASE 6: SAFETY CONTROL - All auto-created expenses start unverified
       const { error: expenseError } = await supabase
         .from('expenses')
         .insert({
@@ -626,6 +736,7 @@ ANALYZE CAREFULLY - Extract ALL order details including order number and deliver
           email_screenshot_path: emailScreenshotPath,
           email_insight_id: insertedInsight.id,
           user_id: userData?.user_id || null,
+          exported: false, // PHASE 6: Start unverified/unexported for manual review
         });
 
       if (expenseError) {

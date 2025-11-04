@@ -35,10 +35,27 @@ serve(async (req) => {
   }
 
   try {
+    const { forceRescan } = req.method === 'POST' ? await req.json() : { forceRescan: false };
+    
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
+
+    // PHASE 4: If force rescan requested, clear email_insights to reprocess everything
+    if (forceRescan) {
+      console.log('Force rescan requested - clearing existing email insights...');
+      const { error: clearError } = await supabase
+        .from('email_insights')
+        .delete()
+        .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all
+      
+      if (clearError) {
+        console.error('Error clearing email insights:', clearError);
+      } else {
+        console.log('Email insights cleared successfully');
+      }
+    }
 
     console.log('Starting Gmail scan...');
 

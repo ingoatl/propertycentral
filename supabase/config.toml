@@ -60,3 +60,12 @@ verify_jwt = false
 
 [functions.send-daily-digest]
 verify_jwt = false
+
+[functions.cleanup-contaminated-expenses]
+verify_jwt = true
+
+[functions.create-reconciliation]
+verify_jwt = true
+
+[functions.update-reconciliation-and-resend]
+verify_jwt = true
