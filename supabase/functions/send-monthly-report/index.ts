@@ -801,13 +801,25 @@ State: ${state}
                       <td style="padding: 12px 0; color: #2c3e50; font-size: 15px; border-bottom: 1px solid #f5f5f5;">Operational Minimum Fee</td>
                       <td style="padding: 12px 0; color: #4a4a4a; font-size: 15px; text-align: right; font-weight: 600; border-bottom: 1px solid #f5f5f5;">$${orderMinimumFee.toFixed(2)}</td>
                     </tr>` : ''}
-                    ${visits && visits.length > 0 ? visits.map((visit: any) => `
+                    ${visits && visits.length > 0 ? visits.map((visit: any) => {
+                      // Extract person name from description if it exists
+                      // Description format: "Property visit - [Name]" or "Property visit - Staff"
+                      let personName = 'Staff';
+                      if (visit.description) {
+                        const match = visit.description.match(/Property visit - (.+)/i);
+                        if (match) {
+                          personName = match[1];
+                        }
+                      }
+                      
+                      return `
                     <tr>
                       <td style="padding: 10px 0; color: #2c3e50; font-size: 14px; border-bottom: 1px solid #f5f5f5;">
-                        Property Visit - ${new Date(visit.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}${visit.description ? ': ' + visit.description : ''}
+                        Property Visit - ${new Date(visit.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} (${personName})
                       </td>
                       <td style="padding: 10px 0; color: #4a4a4a; font-size: 14px; text-align: right; font-weight: 600; border-bottom: 1px solid #f5f5f5;">$${Number(visit.price).toFixed(2)}</td>
-                    </tr>`).join('') : ''}
+                    </tr>`;
+                    }).join('') : ''}
                     ${expenses && expenses.length > 0 ? expenses.map((expense: any) => {
                       const description = expense.purpose || 'Maintenance & Supplies';
                       const dateStr = new Date(expense.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
