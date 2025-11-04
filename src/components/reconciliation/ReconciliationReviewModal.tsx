@@ -185,6 +185,67 @@ export const ReconciliationReviewModal = ({
     }
   });
 
+  const cleanupOrphanedItemsMutation = useMutation({
+    mutationFn: async () => {
+      if (!data?.lineItems) {
+        throw new Error("No line items to check");
+      }
+
+      // Check for orphaned expense line items
+      const expenseLineItems = data.lineItems.filter((item: any) => item.item_type === 'expense');
+      const expenseIds = expenseLineItems.map((item: any) => item.item_id);
+      
+      if (expenseIds.length === 0) {
+        return { orphanedCount: 0 };
+      }
+
+      const { data: existingExpenses } = await supabase
+        .from("expenses")
+        .select("id")
+        .in("id", expenseIds);
+      
+      const existingIds = new Set(existingExpenses?.map((e: any) => e.id) || []);
+      const orphanedItems = expenseLineItems.filter((item: any) => !existingIds.has(item.item_id));
+      
+      if (orphanedItems.length > 0) {
+        const { data: { user } } = await supabase.auth.getUser();
+        
+        for (const orphan of orphanedItems) {
+          await supabase
+            .from("reconciliation_line_items")
+            .update({ 
+              verified: false,
+              excluded: true,
+              exclusion_reason: "Source expense was deleted"
+            })
+            .eq("id", orphan.id);
+          
+          // Log in audit trail
+          await supabase.from("reconciliation_audit_log").insert({
+            reconciliation_id: reconciliationId,
+            action: 'item_excluded',
+            user_id: user?.id,
+            item_id: orphan.id,
+            notes: 'Automatically excluded orphaned expense (source deleted)'
+          });
+        }
+      }
+      
+      return { orphanedCount: orphanedItems.length };
+    },
+    onSuccess: (result) => {
+      refetch();
+      if (result.orphanedCount > 0) {
+        toast.success(`Removed ${result.orphanedCount} deleted expense(s) from reconciliation`);
+      } else {
+        toast.info("No deleted expenses found");
+      }
+    },
+    onError: () => {
+      toast.error("Failed to cleanup orphaned items");
+    }
+  });
+
   const fixTotalsMutation = useMutation({
     mutationFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -332,16 +393,28 @@ export const ReconciliationReviewModal = ({
                     <p className="text-amber-700 dark:text-amber-300">Calculated: ${calculated.visitFees.toFixed(2)} visits, ${calculated.totalExpenses.toFixed(2)} expenses</p>
                   </div>
                 </div>
-                <Button 
-                  size="sm" 
-                  onClick={() => fixTotalsMutation.mutate()}
-                  disabled={fixTotalsMutation.isPending}
-                  variant="outline"
-                  className="bg-white dark:bg-gray-900"
-                >
-                  <RefreshCw className="w-4 h-4 mr-2" />
-                  {fixTotalsMutation.isPending ? "Fixing..." : "Fix Totals"}
-                </Button>
+                <div className="flex gap-2">
+                  <Button 
+                    size="sm" 
+                    onClick={() => fixTotalsMutation.mutate()}
+                    disabled={fixTotalsMutation.isPending}
+                    variant="outline"
+                    className="bg-white dark:bg-gray-900"
+                  >
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    {fixTotalsMutation.isPending ? "Fixing..." : "Fix Totals"}
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    onClick={() => cleanupOrphanedItemsMutation.mutate()}
+                    disabled={cleanupOrphanedItemsMutation.isPending}
+                    variant="outline"
+                    className="bg-white dark:bg-gray-900"
+                  >
+                    <RotateCcw className="w-4 h-4 mr-2" />
+                    {cleanupOrphanedItemsMutation.isPending ? "Checking..." : "Remove Deleted Items"}
+                  </Button>
+                </div>
               </div>
             </div>
           </Card>

@@ -113,12 +113,13 @@ const handler = async (req: Request): Promise<Response> => {
       
       orderMinimumFee = orderMinLineItem ? Math.abs(Number(orderMinLineItem.amount)) : 0;
       
-      // Fetch line items to calculate visit total
+      // Fetch line items to calculate visit total (only verified and not excluded)
       const { data: lineItemsForCalc, error: itemsCalcError } = await supabase
         .from("reconciliation_line_items")
         .select("*")
         .eq("reconciliation_id", reconciliation_id)
         .eq("verified", true)
+        .eq("excluded", false)
         .eq("item_type", "visit");
 
       if (itemsCalcError) throw itemsCalcError;
@@ -138,12 +139,13 @@ const handler = async (req: Request): Promise<Response> => {
         netIncome
       });
 
-      // Fetch line items for details
+      // Fetch line items for details (only verified and not excluded)
       const { data: lineItems, error: itemsError } = await supabase
         .from("reconciliation_line_items")
         .select("*")
         .eq("reconciliation_id", reconciliation_id)
         .eq("verified", true)
+        .eq("excluded", false)
         .order("date", { ascending: false });
 
       if (itemsError) throw itemsError;
