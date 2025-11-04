@@ -26,10 +26,11 @@ serve(async (req) => {
     // STEP 1: Find and delete fake expenses from internal emails
     console.log('Step 1: Finding fake expenses from internal emails...');
     
+    // Get all email insights from internal senders that created expenses
     const { data: internalEmailInsights, error: insightError } = await supabase
       .from('email_insights')
-      .select('id, sender_email, expense_created')
-      .or('sender_email.ilike.%@peachhausgroup.com%,expense_description.ilike.%Multiple expenses logged%,expense_description.ilike.%Team Performance%')
+      .select('id, sender_email, expense_description, expense_created')
+      .ilike('sender_email', '%@peachhausgroup.com%')
       .eq('expense_created', true);
 
     if (insightError) {
@@ -98,14 +99,25 @@ serve(async (req) => {
     // STEP 2: Find and delete expenses with suspicious descriptions
     console.log('Step 2: Finding expenses with suspicious descriptions...');
     
-    const { data: suspiciousExpenses, error: suspError } = await supabase
+    // Get all expenses first, then filter in JavaScript for better pattern matching
+    const { data: allExpensesForCheck, error: checkExpError } = await supabase
       .from('expenses')
-      .select('id, property_id, purpose, items_detail, reconciliation_line_items(reconciliation_id)')
-      .or('purpose.ilike.%Multiple expenses logged%,items_detail.ilike.%Multiple expenses logged%,purpose.ilike.%multiple properties%');
+      .select('id, property_id, purpose, items_detail, reconciliation_line_items(reconciliation_id)');
     
-    if (suspError) {
-      console.error('Error finding suspicious expenses:', suspError);
-    } else if (suspiciousExpenses && suspiciousExpenses.length > 0) {
+    if (checkExpError) {
+      console.error('Error fetching expenses for check:', checkExpError);
+    }
+    
+    const suspiciousExpenses = allExpensesForCheck?.filter(exp => {
+      const purpose = (exp.purpose || '').toLowerCase();
+      const items = (exp.items_detail || '').toLowerCase();
+      return purpose.includes('multiple expenses logged') ||
+             purpose.includes('multiple properties') ||
+             items.includes('multiple expenses logged') ||
+             items.includes('multiple properties');
+    }) || [];
+    
+    if (suspiciousExpenses && suspiciousExpenses.length > 0) {
       console.log(`Found ${suspiciousExpenses.length} expenses with suspicious descriptions`);
       
       for (const exp of suspiciousExpenses) {
@@ -145,12 +157,12 @@ serve(async (req) => {
     console.log('Step 3: Finding and deleting duplicate expenses...');
     
     // Find duplicates by property_id, amount, date, and order_number
-    const { data: allExpenses, error: allExpError } = await supabase
+    const { data: allExpenses, error: dupExpError } = await supabase
       .from('expenses')
       .select('id, property_id, amount, date, order_number, created_at, reconciliation_line_items(reconciliation_id)')
       .order('created_at', { ascending: true });
     
-    if (!allExpError && allExpenses) {
+    if (!dupExpError && allExpenses) {
       const seen = new Map<string, string>(); // key -> first expense ID
       const duplicateIds: string[] = [];
       
