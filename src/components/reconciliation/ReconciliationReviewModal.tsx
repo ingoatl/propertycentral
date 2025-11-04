@@ -55,6 +55,46 @@ export const ReconciliationReviewModal = ({
 
       if (itemsError) throw itemsError;
 
+      // Check for orphaned expense line items (where source expense was deleted)
+      const expenseLineItems = items?.filter((item: any) => item.item_type === 'expense') || [];
+      const expenseIds = expenseLineItems.map((item: any) => item.item_id);
+      
+      if (expenseIds.length > 0) {
+        const { data: existingExpenses } = await supabase
+          .from("expenses")
+          .select("id")
+          .in("id", expenseIds);
+        
+        const existingIds = new Set(existingExpenses?.map((e: any) => e.id) || []);
+        
+        // Mark orphaned items as excluded
+        const orphanedItems = expenseLineItems.filter((item: any) => !existingIds.has(item.item_id));
+        
+        if (orphanedItems.length > 0) {
+          console.log("Found orphaned expense line items:", orphanedItems.length);
+          
+          for (const orphan of orphanedItems) {
+            await supabase
+              .from("reconciliation_line_items")
+              .update({ 
+                verified: false,
+                excluded: true,
+                exclusion_reason: "Source expense was deleted"
+              })
+              .eq("id", orphan.id);
+          }
+          
+          // Refetch to get updated data
+          const { data: updatedItems } = await supabase
+            .from("reconciliation_line_items")
+            .select("*")
+            .eq("reconciliation_id", reconciliationId)
+            .order("date", { ascending: false });
+          
+          items.splice(0, items.length, ...(updatedItems || []));
+        }
+      }
+
       // Fetch unbilled visits for this property
       const { data: unbilledVisits, error: visitsError } = await supabase
         .from("visits")

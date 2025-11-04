@@ -99,6 +99,38 @@ export const PropertyExpenseView = ({
     }
 
     try {
+      // Check if expense is in any reconciliation line items
+      const { data: lineItems, error: lineItemsError } = await supabase
+        .from("reconciliation_line_items")
+        .select("id, reconciliation_id, reconciliation:monthly_reconciliations(status)")
+        .eq("item_type", "expense")
+        .eq("item_id", id);
+
+      if (lineItemsError) throw lineItemsError;
+
+      // Check if any are in approved/sent reconciliations
+      const inApprovedRecon = lineItems?.some((item: any) => 
+        item.reconciliation?.status === "approved" || 
+        item.reconciliation?.status === "statement_sent"
+      );
+
+      if (inApprovedRecon) {
+        toast.error("Cannot delete: This expense is in an approved reconciliation. Please contact admin.");
+        return;
+      }
+
+      // Delete from reconciliation line items first (if in draft reconciliations)
+      if (lineItems && lineItems.length > 0) {
+        const { error: deleteLineItemsError } = await supabase
+          .from("reconciliation_line_items")
+          .delete()
+          .eq("item_type", "expense")
+          .eq("item_id", id);
+
+        if (deleteLineItemsError) throw deleteLineItemsError;
+      }
+
+      // Delete the expense
       const { error } = await supabase
         .from("expenses")
         .delete()
