@@ -838,7 +838,8 @@ State: ${state}
                       const hours = Number(visit.hours || 0);
                       const hourlyRate = 50; // Hard-coded: $50/hour
                       const hourlyCharges = hours * hourlyRate;
-                      const totalVisitPrice = Number(visit.price || 0);
+                      // Calculate total as visitFee + hourlyCharges
+                      const totalVisitPrice = visitFee + hourlyCharges;
                       
                       let result = '';
                       
