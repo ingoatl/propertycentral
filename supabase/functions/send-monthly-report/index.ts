@@ -600,7 +600,21 @@ State: ${state}
 
     // Calculate total expenses including visits for display
     const visitExpenses = visits.reduce((sum, v) => sum + Number(v.price), 0);
-    const otherExpenses = expenses.reduce((sum, e) => sum + Number(e.amount), 0);
+    
+    // Filter out visit-related expenses to avoid double counting
+    const filteredExpenses = expenses.filter(e => {
+      const desc = (e.description || '').toLowerCase();
+      const purpose = (e.purpose || '').toLowerCase();
+      // Exclude expenses that are actually visit charges
+      return !desc.includes('visit fee') && 
+             !desc.includes('visit charge') &&
+             !desc.includes('hourly charge') &&
+             !purpose.includes('visit fee') &&
+             !purpose.includes('visit charge') &&
+             !purpose.includes('hourly charge');
+    });
+    
+    const otherExpenses = filteredExpenses.reduce((sum, e) => sum + Number(e.amount), 0);
     const totalExpensesWithVisits = otherExpenses + visitExpenses + managementFees + orderMinimumFee;
 
     console.log("Financial Summary:", {
@@ -608,6 +622,7 @@ State: ${state}
       propertyName: property.name,
       visits: visits.length,
       expenses: expenses.length,
+      filteredExpenses: filteredExpenses.length,
       bookings: bookings.length,
       midTermBookings: midTermBookings.length,
       visitExpenses: visitExpenses,
@@ -797,7 +812,7 @@ State: ${state}
                       </td>
                       <td style="padding: 10px 0; color: #4a4a4a; font-size: 14px; text-align: right; font-weight: 600; border-bottom: 1px solid #f5f5f5;">$${Number(visit.price).toFixed(2)}</td>
                     </tr>`).join('') : ''}
-                    ${expenses && expenses.length > 0 ? expenses.map((expense: any) => {
+                    ${filteredExpenses && filteredExpenses.length > 0 ? filteredExpenses.map((expense: any) => {
                       const description = expense.purpose || 'Maintenance & Supplies';
                       const dateStr = new Date(expense.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
                       
