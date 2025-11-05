@@ -667,7 +667,8 @@ export const ReconciliationReviewModal = ({
             )}
             {reconciliation.status === "approved" && (
               <Button onClick={() => setShowEmailPreview(true)}>
-                Preview & Send Email
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Recreate Email Preview
               </Button>
             )}
           </div>
