@@ -847,28 +847,31 @@ State: ${state}
                     </tr>` : ''}
                     ${visits && visits.length > 0 ? visits.map((visit: any) => {
                       const personName = visit.visited_by || 'Staff';
-                      const dateStr = new Date(visit.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                      // FIX: Use the actual stored price from the visit, don't recalculate
+                      const actualVisitPrice = Number(visit.price || 0);
                       const visitFee = Number(visit.visit_fee || 0);
                       const hours = Number(visit.hours || 0);
-                      const hourlyRate = 50; // Hard-coded: $50/hour
-                      const hourlyCharges = hours * hourlyRate;
-                      // Calculate total as visitFee + hourlyCharges
-                      const totalVisitPrice = visitFee + hourlyCharges;
+                      const hourlyRate = 50;
+                      
+                      // Format date correctly to avoid timezone issues
+                      const visitDate = new Date(visit.date + 'T12:00:00'); // Add noon time to avoid timezone shifts
+                      const dateStr = visitDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
                       
                       let result = '';
                       
-                      // If no hours logged, just show simple visit fee line
-                      if (hours === 0) {
+                      // If no hours logged or price matches visit fee, show simple line
+                      if (hours === 0 || actualVisitPrice === visitFee) {
                         result += `
                     <tr>
                       <td style="padding: 12px 0; color: #2c3e50; font-size: 15px; border-bottom: 1px solid #f5f5f5;">
                         Property Visit - ${dateStr} (${personName})
                       </td>
-                      <td style="padding: 12px 0; color: #4a4a4a; font-size: 15px; text-align: right; font-weight: 600; border-bottom: 1px solid #f5f5f5;">$${totalVisitPrice.toFixed(2)}</td>
+                      <td style="padding: 12px 0; color: #4a4a4a; font-size: 15px; text-align: right; font-weight: 600; border-bottom: 1px solid #f5f5f5;">$${actualVisitPrice.toFixed(2)}</td>
                     </tr>`;
                       } else {
-                        // If hours logged, show detailed breakdown
-                        // Show header with date and person
+                        // If hours logged AND price is higher than base fee, show detailed breakdown
+                        const hourlyCharges = actualVisitPrice - visitFee;
+                        
                         result += `
                     <tr>
                       <td colspan="2" style="padding: 12px 0 4px 0; color: #2c3e50; font-size: 14px; font-weight: 700; border-bottom: none;">
@@ -876,7 +879,7 @@ State: ${state}
                       </td>
                     </tr>`;
                         
-                        // Show visit fee
+                        // Show visit fee if exists
                         if (visitFee > 0) {
                           result += `
                     <tr>
@@ -887,14 +890,16 @@ State: ${state}
                     </tr>`;
                         }
                         
-                        // Show hourly charges
-                        result += `
+                        // Show hourly charges if any
+                        if (hourlyCharges > 0) {
+                          result += `
                     <tr>
                       <td style="padding: 4px 0 4px 20px; color: #6b7280; font-size: 13px; border-bottom: none;">
                         ${visitFee > 0 ? '└─' : '├─'} Hourly Charges: ${hours} hour${hours !== 1 ? 's' : ''} × $${hourlyRate.toFixed(2)}/hr
                       </td>
                       <td style="padding: 4px 0; color: #6b7280; font-size: 13px; text-align: right; border-bottom: none;">$${hourlyCharges.toFixed(2)}</td>
                     </tr>`;
+                        }
                         
                         // Show total row
                         result += `
@@ -902,7 +907,7 @@ State: ${state}
                       <td style="padding: 4px 0 10px 20px; color: #2c3e50; font-size: 13px; font-weight: 600; border-bottom: 1px solid #f5f5f5;">
                         Visit Total:
                       </td>
-                      <td style="padding: 4px 0 10px 0; color: #2c3e50; font-size: 14px; text-align: right; font-weight: 700; border-bottom: 1px solid #f5f5f5;">$${totalVisitPrice.toFixed(2)}</td>
+                      <td style="padding: 4px 0 10px 0; color: #2c3e50; font-size: 14px; text-align: right; font-weight: 700; border-bottom: 1px solid #f5f5f5;">$${actualVisitPrice.toFixed(2)}</td>
                     </tr>`;
                       }
                       
