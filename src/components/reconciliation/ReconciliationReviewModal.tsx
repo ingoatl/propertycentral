@@ -665,7 +665,7 @@ export const ReconciliationReviewModal = ({
                 {isApproving ? "Approving..." : "Approve Reconciliation"}
               </Button>
             )}
-            {reconciliation.status === "approved" && (
+            {(reconciliation.status === "approved" || reconciliation.status === "statement_sent") && (
               <Button onClick={() => setShowEmailPreview(true)}>
                 <RefreshCw className="w-4 h-4 mr-2" />
                 Recreate Email Preview
