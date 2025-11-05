@@ -784,7 +784,7 @@ State: ${state}
                     ${property.name}
                   </h2>
                   <p style="margin: 0 0 8px 0; color: #6c757d; font-size: 15px; line-height: 1.5;">
-                    📍 ${city}, ${state}
+                    📍 ${property.address}
                   </p>
                   <p style="margin: 0 0 12px 0; color: #8B5CF6; font-size: 14px; font-weight: 500;">
                     ${metroArea} Area
@@ -1145,7 +1145,7 @@ State: ${state}
                   ${property.name}
                 </h2>
                 <p style="margin: 0 0 8px 0; color: #6c757d; font-size: 15px; line-height: 1.5;">
-                  📍 ${city}, ${state}
+                  📍 ${property.address}
                 </p>
                 <p style="margin: 0 0 12px 0; color: #8B5CF6; font-size: 14px; font-weight: 500;">
                   ${metroArea} Area
