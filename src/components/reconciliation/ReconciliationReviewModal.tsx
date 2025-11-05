@@ -13,6 +13,7 @@ import { Check, Home, DollarSign, Eye, RotateCcw, AlertTriangle, RefreshCw } fro
 import { toast } from "sonner";
 import { MonthlyEmailPreviewModal } from "./MonthlyEmailPreviewModal";
 import { calculateDueFromOwnerFromLineItems } from "@/lib/reconciliationCalculations";
+import { VisitValidationPreview } from "./VisitValidationPreview";
 
 interface ReconciliationReviewModalProps {
   reconciliationId: string;
@@ -609,6 +610,7 @@ export const ReconciliationReviewModal = ({
           </TabsContent>
 
           <TabsContent value="visits" className="space-y-2">
+            <VisitValidationPreview visits={safeUnbilledVisits} className="mb-4" />
             {allVisits.length === 0 ? (
               <Card className="p-6 text-center text-muted-foreground">
                 <p>No visits found</p>

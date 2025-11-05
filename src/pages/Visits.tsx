@@ -7,7 +7,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Calendar as CalendarIcon, Clock, MapPin, CheckCircle2, ChevronDown, ChevronUp } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Calendar as CalendarIcon, Clock, MapPin, CheckCircle2, ChevronDown, ChevronUp, AlertTriangle } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { supabase } from "@/integrations/supabase/client";
@@ -17,6 +18,8 @@ import { z } from "zod";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import { validateVisitForReconciliation } from "@/lib/visitDataValidation";
+import { VisitReconciliationStatus } from "@/components/visits/VisitReconciliationStatus";
 
 const HOURLY_RATE = 50;
 
@@ -32,6 +35,7 @@ const visitSchema = z.object({
   visitedBy: z.string().min(1, "Please select who visited"),
   hours: z.number().min(0, "Hours cannot be negative").max(24, "Hours cannot exceed 24"),
   notes: z.string().max(2000, "Notes must be less than 2000 characters").optional(),
+  date: z.date({ required_error: "Date is required" }),
 });
 
 // Memoized visit item component for performance
@@ -103,6 +107,8 @@ const Visits = () => {
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [isFormOpen, setIsFormOpen] = useState(true);
+  const [showReconciliationStatus, setShowReconciliationStatus] = useState(false);
+  const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const isMobile = useIsMobile();
   
   const [formData, setFormData] = useState({
@@ -117,6 +123,27 @@ const Visits = () => {
   useEffect(() => {
     loadInitialData();
   }, []);
+
+  // Validate existing visits when loaded
+  useEffect(() => {
+    if (visits.length > 0) {
+      const errors: string[] = [];
+      visits.slice(0, 10).forEach((visit) => {
+        const validation = validateVisitForReconciliation({
+          ...visit,
+          property_id: visit.propertyId,
+          visited_by: "Unknown",
+          hours: 0,
+        });
+        if (!validation.isValid) {
+          errors.push(
+            `Visit on ${visit.date}: ${validation.errors[0]}`
+          );
+        }
+      });
+      setValidationErrors(errors);
+    }
+  }, [visits]);
 
   // Set up realtime subscription for visits
   useEffect(() => {
@@ -228,10 +255,24 @@ const Visits = () => {
       visitedBy: formData.visitedBy,
       hours,
       notes: formData.notes,
+      date: formData.date,
     });
 
     if (!validation.success) {
       toast.error(validation.error.errors[0].message);
+      return;
+    }
+
+    // Additional validation for amount
+    if (calculatedPrice <= 0) {
+      toast.error("Visit price must be greater than zero");
+      return;
+    }
+
+    // Date format validation (YYYY-MM-DD)
+    const visitDate = formData.date.toISOString().split("T")[0];
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(visitDate)) {
+      toast.error("Invalid date format. Must be YYYY-MM-DD");
       return;
     }
 
@@ -242,8 +283,7 @@ const Visits = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
       
-      // Use selected date and current time
-      const visitDate = formData.date.toISOString().split("T")[0];
+      // Use selected date and current time (already validated above)
       const currentTime = new Date().toTimeString().slice(0, 5);
 
       // Get the property to get visit price
@@ -521,6 +561,36 @@ const Visits = () => {
           </CollapsibleContent>
         </Collapsible>
       </Card>
+
+      {/* Validation Errors Alert */}
+      {validationErrors.length > 0 && (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>
+            <div className="font-semibold mb-1">Data Validation Errors:</div>
+            <ul className="list-disc list-inside text-sm space-y-1">
+              {validationErrors.map((error, idx) => (
+                <li key={idx}>{error}</li>
+              ))}
+            </ul>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* Reconciliation Status Toggle */}
+      <div className="flex justify-end">
+        <Button
+          variant="outline"
+          onClick={() => setShowReconciliationStatus(!showReconciliationStatus)}
+          className="gap-2"
+        >
+          <CheckCircle2 className="h-4 w-4" />
+          {showReconciliationStatus ? "Hide" : "Show"} Reconciliation Status
+        </Button>
+      </div>
+
+      {/* Reconciliation Status Card */}
+      {showReconciliationStatus && <VisitReconciliationStatus showAll={false} />}
 
       {/* Recent Visits - with loading skeletons */}
       <Card className="shadow-card border-border/50">
