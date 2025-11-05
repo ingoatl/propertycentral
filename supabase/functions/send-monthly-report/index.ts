@@ -1071,11 +1071,11 @@ State: ${state}
       
       let statementRecipients: string[] = [];
       
-      // If this is a test email, ONLY send to the test address
+      // If this is a test email, send to the test address
       if (isTestEmail && test_email) {
         statementRecipients = [test_email];
       } else {
-        // Normal mode: send to owners and info@
+        // Normal mode: send to owners
         if (ownerData) {
           // Add primary owner email
           if (ownerData.email) {
@@ -1086,11 +1086,11 @@ State: ${state}
             statementRecipients.push(ownerData.second_owner_email);
           }
         }
-        
-        // Always add info@ for reconciliation statements in normal mode
-        if (!statementRecipients.includes("info@peachhausgroup.com")) {
-          statementRecipients.push("info@peachhausgroup.com");
-        }
+      }
+      
+      // ALWAYS add info@ for ALL reconciliation statements (test or live)
+      if (!statementRecipients.includes("info@peachhausgroup.com")) {
+        statementRecipients.push("info@peachhausgroup.com");
       }
       
       const subjectPrefix = is_revised ? "REVISED " : "";
