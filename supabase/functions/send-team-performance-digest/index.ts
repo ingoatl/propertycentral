@@ -81,7 +81,7 @@ const handler = async (req: Request): Promise<Response> => {
 
     // Fetch daily performance entries from yesterday
     const yesterdayDate = yesterday.toISOString().split('T')[0];
-    const { data: dailyEntries, error: entriesError } = await supabase
+    const { data: rawDailyEntries, error: entriesError } = await supabase
       .from('daily_performance_entries')
       .select(`
         id,
@@ -96,6 +96,15 @@ const handler = async (req: Request): Promise<Response> => {
     if (entriesError) {
       console.error('Error fetching daily entries:', entriesError);
     }
+
+    // Transform daily entries to include user_name
+    const dailyEntries = rawDailyEntries?.map(entry => ({
+      id: entry.id,
+      date: entry.date,
+      entry: entry.entry,
+      user_id: entry.user_id,
+      user_name: `${entry.profiles.first_name} ${entry.profiles.last_name}`.trim()
+    })) || [];
 
     // Process each user
     for (const user of users || []) {
