@@ -107,20 +107,25 @@ export const MonthlyEmailPreviewModal = ({
   }, [reconciliation?.properties?.image_path]);
 
   const handleSendTestEmail = async () => {
+    if (!reconciliation.property_owners?.email) {
+      toast.error("Owner email not found");
+      return;
+    }
+
     setIsSendingTest(true);
-    const toastId = toast.loading("Sending test emails...");
+    const toastId = toast.loading("Sending test email...");
     try {
       const { error } = await supabase.functions.invoke("send-monthly-report", {
         body: { 
           reconciliation_id: reconciliation.id,
-          test_email: "info@peachhausgroup.com"
+          test_email: reconciliation.property_owners.email
         },
       });
 
       if (error) throw error;
-      toast.success("Test emails sent successfully to info@peachhausgroup.com", { id: toastId });
+      toast.success(`Test email sent successfully to ${reconciliation.property_owners.email}`, { id: toastId });
     } catch (error: any) {
-      toast.error(error.message || "Failed to send test emails", { id: toastId });
+      toast.error(error.message || "Failed to send test email", { id: toastId });
     } finally {
       setIsSendingTest(false);
     }
