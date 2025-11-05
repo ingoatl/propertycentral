@@ -79,6 +79,24 @@ const handler = async (req: Request): Promise<Response> => {
 
     const teamPerformance: TeamMemberPerformance[] = [];
 
+    // Fetch daily performance entries from yesterday
+    const yesterdayDate = yesterday.toISOString().split('T')[0];
+    const { data: dailyEntries, error: entriesError } = await supabase
+      .from('daily_performance_entries')
+      .select(`
+        id,
+        date,
+        entry,
+        user_id,
+        profiles!inner(first_name, last_name)
+      `)
+      .eq('date', yesterdayDate)
+      .order('created_at', { ascending: false });
+
+    if (entriesError) {
+      console.error('Error fetching daily entries:', entriesError);
+    }
+
     // Process each user
     for (const user of users || []) {
       try {
@@ -302,8 +320,8 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log(`Team performance summary: ${teamPerformance.length} active members`);
 
-    // Generate and send email
-    const emailHtml = generateTeamPerformanceEmail(teamPerformance);
+  // Generate and send email
+  const emailHtml = generateTeamPerformanceEmail(teamPerformance, dailyEntries || []);
 
     const reportDate = new Date();
     reportDate.setDate(reportDate.getDate() - 1);
@@ -345,7 +363,7 @@ const handler = async (req: Request): Promise<Response> => {
   }
 };
 
-function generateTeamPerformanceEmail(teamPerformance: TeamMemberPerformance[]): string {
+function generateTeamPerformanceEmail(teamPerformance: TeamMemberPerformance[], dailyEntries?: any[]): string {
   const formatTime = (timestamp: string) => {
     const date = new Date(timestamp);
     return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
@@ -606,6 +624,42 @@ function generateTeamPerformanceEmail(teamPerformance: TeamMemberPerformance[]):
                 </td>
               </tr>
               
+              ${dailyEntries && dailyEntries.length > 0 ? `
+              <!-- Daily Performance Entries Section -->
+              <tr>
+                <td style="padding: 40px; background-color: #ffffff;">
+                  <h2 style="margin: 0 0 30px 0; color: #1f2937; font-size: 26px; font-weight: bold; text-align: center; padding-bottom: 15px; border-bottom: 3px solid #3b82f6;">
+                    📝 Daily Performance Entries
+                  </h2>
+                  
+                  <div style="background: #f8fafc; padding: 24px; border-radius: 8px; border: 1px solid #e2e8f0;">
+                    ${dailyEntries.map((entry: any) => {
+                      const userName = `${entry.profiles?.first_name || ''} ${entry.profiles?.last_name || ''}`.trim() || 'Unknown User';
+                      const entryDate = new Date(entry.date + 'T12:00:00').toLocaleDateString('en-US', { 
+                        month: 'short', 
+                        day: 'numeric', 
+                        year: 'numeric' 
+                      });
+                      
+                      return `
+                        <div style="background: white; padding: 16px; border-radius: 6px; margin-bottom: 16px; border-left: 4px solid #3b82f6;">
+                          <table width="100%" cellpadding="0" cellspacing="0">
+                            <tr>
+                              <td style="font-weight: 600; color: #2c3e50; font-size: 15px;">👤 ${userName}</td>
+                              <td align="right" style="color: #64748b; font-size: 13px;">📅 ${entryDate}</td>
+                            </tr>
+                            <tr>
+                              <td colspan="2" style="padding-top: 8px; color: #475569; font-size: 14px; line-height: 1.6; white-space: pre-wrap;">${entry.entry}</td>
+                            </tr>
+                          </table>
+                        </div>
+                      `;
+                    }).join('')}
+                  </div>
+                </td>
+              </tr>
+              ` : ''}
+
               <!-- Footer -->
               <tr>
                 <td style="padding: 30px 40px; background: linear-gradient(135deg, #1f2937 0%, #111827 100%); border-top: 3px solid #FF7A00;">

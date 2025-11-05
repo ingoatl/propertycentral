@@ -100,6 +100,36 @@ export type Database = {
           },
         ]
       }
+      daily_performance_entries: {
+        Row: {
+          created_at: string
+          date: string
+          entry: string
+          id: string
+          team_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          date?: string
+          entry: string
+          id?: string
+          team_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          entry?: string
+          id?: string
+          team_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       email_ai_prompts: {
         Row: {
           created_at: string | null
