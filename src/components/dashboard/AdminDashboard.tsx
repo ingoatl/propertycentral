@@ -43,7 +43,7 @@ export const AdminDashboard = ({ summaries, onExport, onSync, syncing, onSendOve
   const totalRevenue = summaries.reduce((sum, s) => sum + (s.ownerrezRevenue || 0), 0);
   const ownedRevenue = ownedProperties.reduce((sum, s) => sum + (s.ownerrezRevenue || 0), 0);
   const managedRevenue = managedProperties.reduce((sum, s) => sum + (s.ownerrezRevenue || 0), 0);
-  const totalManagementFees = managedProperties.reduce((sum, s) => sum + (s.managementFees || 0), 0);
+  const totalManagementFees = summaries.reduce((sum, s) => sum + (s.managementFees || 0), 0);
   const totalExpenses = managedProperties.reduce((sum, s) => sum + (s.expenseTotal || 0), 0);
   const avgOccupancy = summaries.length > 0 
     ? summaries.reduce((sum, s) => sum + (s.occupancyRate || 0), 0) / summaries.length 

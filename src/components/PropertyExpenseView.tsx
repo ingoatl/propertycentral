@@ -34,9 +34,12 @@ export const PropertyExpenseView = ({
 
   // Filter expenses based on search term and billed status
   const filteredExpenses = expenses.filter((expense) => {
+    // Check if expense is in any approved or statement_sent reconciliation
+    const isBilled = expense.exported === true;
+    
     // Billed filter
-    if (billedFilter === "billed" && !expense.exported) return false;
-    if (billedFilter === "unbilled" && expense.exported) return false;
+    if (billedFilter === "billed" && !isBilled) return false;
+    if (billedFilter === "unbilled" && isBilled) return false;
     
     // Search filter
     if (!searchTerm) return true;
@@ -238,8 +241,8 @@ export const PropertyExpenseView = ({
                                 day: 'numeric'
                               })}
                             </p>
-                            {expense.exported && (
-                              <Badge variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100">
+                            {expense.exported === true && (
+                              <Badge className="bg-green-600 hover:bg-green-700 text-white dark:bg-green-700 dark:hover:bg-green-800">
                                 Billed
                               </Badge>
                             )}
