@@ -847,69 +847,21 @@ State: ${state}
                     </tr>` : ''}
                     ${visits && visits.length > 0 ? visits.map((visit: any) => {
                       const personName = visit.visited_by || 'Staff';
-                      // FIX: Use the actual stored price from the visit, don't recalculate
+                      // Use ONLY the actual stored price - don't fabricate charges
                       const actualVisitPrice = Number(visit.price || 0);
-                      const visitFee = Number(visit.visit_fee || 0);
-                      const hours = Number(visit.hours || 0);
-                      const hourlyRate = 50;
                       
                       // Format date correctly to avoid timezone issues
-                      const visitDate = new Date(visit.date + 'T12:00:00'); // Add noon time to avoid timezone shifts
+                      const visitDate = new Date(visit.date + 'T12:00:00');
                       const dateStr = visitDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
                       
-                      let result = '';
-                      
-                      // If no hours logged or price matches visit fee, show simple line
-                      if (hours === 0 || actualVisitPrice === visitFee) {
-                        result += `
+                      // Simple display - just show the actual price without fabricated breakdown
+                      let result = `
                     <tr>
                       <td style="padding: 12px 0; color: #2c3e50; font-size: 15px; border-bottom: 1px solid #f5f5f5;">
                         Property Visit - ${dateStr} (${personName})
                       </td>
                       <td style="padding: 12px 0; color: #4a4a4a; font-size: 15px; text-align: right; font-weight: 600; border-bottom: 1px solid #f5f5f5;">$${actualVisitPrice.toFixed(2)}</td>
                     </tr>`;
-                      } else {
-                        // If hours logged AND price is higher than base fee, show detailed breakdown
-                        const hourlyCharges = actualVisitPrice - visitFee;
-                        
-                        result += `
-                    <tr>
-                      <td colspan="2" style="padding: 12px 0 4px 0; color: #2c3e50; font-size: 14px; font-weight: 700; border-bottom: none;">
-                        Property Visit - ${dateStr} (${personName})
-                      </td>
-                    </tr>`;
-                        
-                        // Show visit fee if exists
-                        if (visitFee > 0) {
-                          result += `
-                    <tr>
-                      <td style="padding: 4px 0 4px 20px; color: #6b7280; font-size: 13px; border-bottom: none;">
-                        ├─ Visit Fee
-                      </td>
-                      <td style="padding: 4px 0; color: #6b7280; font-size: 13px; text-align: right; border-bottom: none;">$${visitFee.toFixed(2)}</td>
-                    </tr>`;
-                        }
-                        
-                        // Show hourly charges if any
-                        if (hourlyCharges > 0) {
-                          result += `
-                    <tr>
-                      <td style="padding: 4px 0 4px 20px; color: #6b7280; font-size: 13px; border-bottom: none;">
-                        ${visitFee > 0 ? '└─' : '├─'} Hourly Charges: ${hours} hour${hours !== 1 ? 's' : ''} × $${hourlyRate.toFixed(2)}/hr
-                      </td>
-                      <td style="padding: 4px 0; color: #6b7280; font-size: 13px; text-align: right; border-bottom: none;">$${hourlyCharges.toFixed(2)}</td>
-                    </tr>`;
-                        }
-                        
-                        // Show total row
-                        result += `
-                    <tr>
-                      <td style="padding: 4px 0 10px 20px; color: #2c3e50; font-size: 13px; font-weight: 600; border-bottom: 1px solid #f5f5f5;">
-                        Visit Total:
-                      </td>
-                      <td style="padding: 4px 0 10px 0; color: #2c3e50; font-size: 14px; text-align: right; font-weight: 700; border-bottom: 1px solid #f5f5f5;">$${actualVisitPrice.toFixed(2)}</td>
-                    </tr>`;
-                      }
                       
                       // Add notes if present
                       if (visit.notes && visit.notes.trim()) {
