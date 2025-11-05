@@ -141,7 +141,7 @@ const Visits = () => {
               notes: payload.new.notes,
               createdAt: payload.new.created_at,
             };
-            setVisits(prev => [newVisit, ...prev.slice(0, 9)]);
+            setVisits(prev => [newVisit, ...prev]);
           }
         }
       )
@@ -175,8 +175,7 @@ const Visits = () => {
         .from("visits")
         .select("*")
         .order("date", { ascending: false })
-        .order("time", { ascending: false })
-        .limit(10);
+        .order("time", { ascending: false });
 
       if (visitsError) throw visitsError;
 
