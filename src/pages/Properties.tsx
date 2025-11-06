@@ -417,7 +417,7 @@ const Properties = () => {
           </div>
         )}
         
-        {/* Hover-only action buttons */}
+        {/* Hover-only action buttons - Original 3 icons */}
         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center gap-2">
           <Button
             size="sm"
@@ -432,24 +432,34 @@ const Properties = () => {
             <Upload className="w-4 h-4 mr-1" />
             Upload
           </Button>
-          {property.image_path && (
-            <Button
-              size="sm"
-              variant="secondary"
-              className="shadow-lg"
-              onClick={(e) => {
-                e.stopPropagation();
-                setSelectedPropertyForDetails({
-                  id: property.id,
-                  name: property.name,
-                  projectId: propertyProjects[property.id]
-                });
-              }}
-            >
-              <Edit className="w-4 h-4 mr-1" />
-              Edit
-            </Button>
-          )}
+          <Button
+            size="sm"
+            variant="secondary"
+            className="shadow-lg"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleEdit(property);
+            }}
+          >
+            <Edit className="w-4 h-4 mr-1" />
+            Edit
+          </Button>
+          <Button
+            size="sm"
+            variant="secondary"
+            className="shadow-lg"
+            onClick={(e) => {
+              e.stopPropagation();
+              setSelectedPropertyForDetails({
+                id: property.id,
+                name: property.name,
+                projectId: propertyProjects[property.id]
+              });
+            }}
+          >
+            <FileText className="w-4 h-4 mr-1" />
+            Details
+          </Button>
         </div>
         
         {/* Hidden file input */}
