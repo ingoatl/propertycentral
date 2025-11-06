@@ -312,17 +312,8 @@ serve(async (req) => {
       });
     }
 
-    // Mark all included visits as billed
-    if (visits && visits.length > 0) {
-      const visitIds = visits.map(v => v.id);
-      await supabaseClient
-        .from("visits")
-        .update({ 
-          billed: true,
-          reconciliation_id: reconciliation.id 
-        })
-        .in("id", visitIds);
-    }
+    // Do NOT mark visits as billed here - they will be marked when reconciliation is approved
+    // This allows for review and ensures proper sync with the reconciliation approval process
 
     // Add expenses (excluding visit-related expenses to avoid double counting)
     for (const expense of expenses || []) {
