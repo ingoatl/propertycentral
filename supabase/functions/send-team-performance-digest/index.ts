@@ -98,15 +98,18 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     // Transform daily entries to include user_name
-    const dailyEntries = rawDailyEntries?.map(entry => ({
-      id: entry.id,
-      date: entry.date,
-      entry: entry.entry,
-      user_id: entry.user_id,
-      user_name: entry.profiles 
-        ? `${entry.profiles.first_name || ''} ${entry.profiles.last_name || ''}`.trim() 
-        : 'Unknown User'
-    })) || [];
+    const dailyEntries = rawDailyEntries?.map(entry => {
+      const profile = entry.profiles as any;
+      return {
+        id: entry.id,
+        date: entry.date,
+        entry: entry.entry,
+        user_id: entry.user_id,
+        user_name: profile 
+          ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim() 
+          : 'Unknown User'
+      };
+    }) || [];
 
     // Process each user
     for (const user of users || []) {

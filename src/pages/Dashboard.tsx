@@ -18,6 +18,67 @@ const Dashboard = () => {
 
   useEffect(() => {
     loadData();
+
+    // Set up real-time subscriptions for financial data changes
+    const reconciliationsChannel = supabase
+      .channel('reconciliations-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'monthly_reconciliations'
+        },
+        (payload) => {
+          console.log('Reconciliation changed:', payload);
+          // Reload data when reconciliations are approved or updated
+          if (payload.eventType === 'UPDATE' || payload.eventType === 'INSERT') {
+            loadData();
+          }
+        }
+      )
+      .subscribe();
+
+    const visitsChannel = supabase
+      .channel('visits-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'visits'
+        },
+        (payload) => {
+          console.log('Visit billed status changed:', payload);
+          // Reload when visits are marked as billed
+          loadData();
+        }
+      )
+      .subscribe();
+
+    const expensesChannel = supabase
+      .channel('expenses-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'expenses'
+        },
+        (payload) => {
+          console.log('Expense changed:', payload);
+          // Reload when expenses are added, updated, or deleted
+          loadData();
+        }
+      )
+      .subscribe();
+
+    // Cleanup subscriptions on unmount
+    return () => {
+      supabase.removeChannel(reconciliationsChannel);
+      supabase.removeChannel(visitsChannel);
+      supabase.removeChannel(expensesChannel);
+    };
   }, []);
 
   const loadData = async () => {
