@@ -26,7 +26,7 @@ export interface ReconciliationData {
 }
 
 /**
- * Calculate "Due from Owner" from line items
+ * Calculate "Due from Owner" from line items - ONLY APPROVED ITEMS
  * Formula: Mgmt Fee + Visit Fees (from checked visits) + Expenses (from checked expenses)
  * Note: Filters out visit-related expenses to avoid double counting
  */
@@ -38,39 +38,50 @@ export function calculateDueFromOwnerFromLineItems(
   visitFees: number;
   totalExpenses: number;
   dueFromOwner: number;
+  error?: string;
 } {
-  // Only include verified and non-excluded line items
-  const validLineItems = lineItems.filter(
-    (item) => item.verified && !item.excluded
-  );
+  try {
+    // ONLY include APPROVED items: verified=true AND excluded=false
+    const approvedItems = lineItems.filter(
+      (item) => item.verified === true && item.excluded === false
+    );
 
-  // Calculate visit fees from line items
-  const visitFees = validLineItems
-    .filter((item) => item.item_type === "visit")
-    .reduce((sum, item) => sum + Math.abs(item.amount), 0);
+    // Calculate visit fees from approved line items
+    const visitFees = approvedItems
+      .filter((item) => item.item_type === "visit")
+      .reduce((sum, item) => sum + Math.abs(item.amount), 0);
 
-  // Calculate expenses from line items, filtering out visit-related expenses to avoid double counting
-  const totalExpenses = validLineItems
-    .filter((item) => {
-      if (item.item_type !== "expense") return false;
-      
-      // Check if this is a visit-related expense (these should be counted in visitFees instead)
-      const description = ((item as any).description || '').toLowerCase();
-      return !description.includes('visit fee') && 
-             !description.includes('visit charge') &&
-             !description.includes('hourly charge') &&
-             !description.includes('property visit');
-    })
-    .reduce((sum, item) => sum + Math.abs(item.amount), 0);
+    // Calculate expenses from approved line items, filtering out visit-related expenses to avoid double counting
+    const totalExpenses = approvedItems
+      .filter((item) => {
+        if (item.item_type !== "expense") return false;
+        
+        // Check if this is a visit-related expense (these should be counted in visitFees instead)
+        const description = ((item as any).description || '').toLowerCase();
+        return !description.includes('visit fee') && 
+               !description.includes('visit charge') &&
+               !description.includes('hourly charge') &&
+               !description.includes('property visit');
+      })
+      .reduce((sum, item) => sum + Math.abs(item.amount), 0);
 
-  // Calculate total due from owner
-  const dueFromOwner = managementFee + orderMinimumFee + visitFees + totalExpenses;
+    // Calculate total due from owner
+    const dueFromOwner = managementFee + orderMinimumFee + visitFees + totalExpenses;
 
-  return {
-    visitFees,
-    totalExpenses,
-    dueFromOwner,
-  };
+    return {
+      visitFees,
+      totalExpenses,
+      dueFromOwner,
+    };
+  } catch (error) {
+    console.error("Calculation error:", error);
+    return {
+      visitFees: 0,
+      totalExpenses: 0,
+      dueFromOwner: managementFee + orderMinimumFee,
+      error: "Failed to calculate totals from approved items"
+    };
+  }
 }
 
 /**

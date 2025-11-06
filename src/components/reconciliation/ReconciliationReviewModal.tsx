@@ -61,6 +61,8 @@ export const ReconciliationReviewModal = ({
     };
   }, [open, reconciliationId]);
 
+  const [calculatorError, setCalculatorError] = useState<string | null>(null);
+
   const { data, refetch } = useQuery({
     queryKey: ["reconciliation", reconciliationId],
     queryFn: async () => {
@@ -597,56 +599,71 @@ export const ReconciliationReviewModal = ({
         <Card className="p-6 bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
           <h3 className="font-semibold mb-4 flex items-center gap-2">
             <DollarSign className="w-5 h-5 text-primary" />
-            📊 Live Financial Calculator (From Verified Items)
+            📊 Live Financial Calculator
           </h3>
-          <div className="grid grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <p className="text-sm font-medium text-muted-foreground mb-3">Booking Revenue (Owner Keeps)</p>
-              <div className="space-y-1">
-                <div className="flex justify-between text-sm">
-                  <span>Short-term:</span>
-                  <span className="font-medium">${Number(reconciliation.short_term_revenue || 0).toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span>Mid-term:</span>
-                  <span className="font-medium">${Number(reconciliation.mid_term_revenue || 0).toFixed(2)}</span>
-                </div>
-              </div>
-              <div className="flex justify-between font-semibold pt-2 border-t text-green-600">
-                <span>Total:</span>
-                <span>${Number(reconciliation.total_revenue || 0).toFixed(2)}</span>
-              </div>
+          {calculated.error ? (
+            <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
+              <p className="text-sm text-destructive font-medium">
+                ⚠️ {calculated.error}
+              </p>
             </div>
-            <div className="space-y-2">
-              <p className="text-sm font-medium text-muted-foreground mb-3">Amount Due from Owner</p>
-              <div className="space-y-1">
-                <div className="flex justify-between text-sm">
-                  <span>Management Fee ({reconciliation.properties?.management_fee_percentage || 15}%):</span>
-                  <span className="font-medium">${Number(reconciliation.management_fee || 0).toFixed(2)}</span>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <p className="text-sm font-medium text-muted-foreground mb-3">Booking Revenue (Owner Keeps)</p>
+                  <div className="space-y-1">
+                    <div className="flex justify-between text-sm">
+                      <span>Short-term:</span>
+                      <span className="font-medium">${Number(reconciliation.short_term_revenue || 0).toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span>Mid-term:</span>
+                      <span className="font-medium">${Number(reconciliation.mid_term_revenue || 0).toFixed(2)}</span>
+                    </div>
+                  </div>
+                  <div className="flex justify-between font-semibold pt-2 border-t text-green-600">
+                    <span>Total:</span>
+                    <span>${Number(reconciliation.total_revenue || 0).toFixed(2)}</span>
+                  </div>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span>Visit Fees:</span>
-                  <span className="font-medium text-orange-600">${calculated.visitFees.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span>Expenses:</span>
-                  <span className="font-medium text-orange-600">${calculated.totalExpenses.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span>Order Minimum:</span>
-                  <span className="font-medium">${Number(reconciliation.order_minimum_fee || 0).toFixed(2)}</span>
+                <div className="space-y-2">
+                  <p className="text-sm font-medium text-muted-foreground mb-3">Amount Due from Owner</p>
+                  <div className="space-y-1">
+                    <div className="flex justify-between text-sm">
+                      <span>Management Fee ({reconciliation.properties?.management_fee_percentage || 15}%):</span>
+                      <span className="font-medium">${Number(reconciliation.management_fee || 0).toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span>Visit Fees (approved):</span>
+                      <span className="font-medium text-orange-600">${calculated.visitFees.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span>Expenses (approved):</span>
+                      <span className="font-medium text-orange-600">${calculated.totalExpenses.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span>Order Minimum:</span>
+                      <span className="font-medium">${Number(reconciliation.order_minimum_fee || 0).toFixed(2)}</span>
+                    </div>
+                  </div>
+                  <div className="flex justify-between font-bold pt-2 border-t text-primary text-lg">
+                    <span>Total Due:</span>
+                    <span>${calculated.dueFromOwner.toFixed(2)}</span>
+                  </div>
                 </div>
               </div>
-              <div className="flex justify-between font-bold pt-2 border-t text-primary text-lg">
-                <span>Total Due:</span>
-                <span>${calculated.dueFromOwner.toFixed(2)}</span>
+              <div className="mt-4 pt-4 border-t flex items-center justify-between">
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <RefreshCw className="w-3 h-3" />
+                  <span>Updates automatically when items are approved/unapproved</span>
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  ✓ Only approved charges included
+                </div>
               </div>
-            </div>
-          </div>
-          <div className="mt-4 pt-4 border-t flex items-center gap-2 text-xs text-muted-foreground">
-            <RefreshCw className="w-3 h-3" />
-            <span>Updates automatically as you verify/unverify items</span>
-          </div>
+            </>
+          )}
         </Card>
 
         <Tabs defaultValue="unapproved" className="mt-4">

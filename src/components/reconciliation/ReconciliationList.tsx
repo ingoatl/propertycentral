@@ -30,28 +30,37 @@ export const ReconciliationList = () => {
 
       if (error) throw error;
 
-      // For each reconciliation, calculate totals from checked line items
+      // For each reconciliation, calculate totals from APPROVED line items only
       const reconciliationsWithCalculatedTotals = await Promise.all((data || []).map(async (rec: any) => {
-        const { data: lineItems } = await supabase
+        const { data: lineItems, error: lineItemsError } = await supabase
           .from("reconciliation_line_items")
           .select("*")
-          .eq("reconciliation_id", rec.id)
-          .eq("verified", true)
-          .eq("excluded", false);
+          .eq("reconciliation_id", rec.id);
 
-        const visitFees = (lineItems || [])
-          .filter((item: any) => item.item_type === "visit")
-          .reduce((sum: number, item: any) => sum + Math.abs(item.amount), 0);
+        if (lineItemsError) {
+          console.error("Error fetching line items:", lineItemsError);
+          return {
+            ...rec,
+            calculated_visit_fees: 0,
+            calculated_total_expenses: 0,
+            calculator_error: "Failed to load items"
+          };
+        }
 
-        // Include ALL expense line items (no filtering)
-        const totalExpenses = (lineItems || [])
-          .filter((item: any) => item.item_type === "expense")
-          .reduce((sum: number, item: any) => sum + Math.abs(item.amount), 0);
+        // Use shared calculation utility - only approved items
+        const { calculateDueFromOwnerFromLineItems } = await import("@/lib/reconciliationCalculations");
+        const calculated = calculateDueFromOwnerFromLineItems(
+          lineItems || [],
+          rec.management_fee || 0,
+          rec.order_minimum_fee || 0
+        );
 
         return {
           ...rec,
-          calculated_visit_fees: visitFees,
-          calculated_total_expenses: totalExpenses
+          calculated_visit_fees: calculated.visitFees,
+          calculated_total_expenses: calculated.totalExpenses,
+          calculated_due_from_owner: calculated.dueFromOwner,
+          calculator_error: calculated.error
         };
       }));
 
@@ -184,18 +193,21 @@ export const ReconciliationList = () => {
                     <div className="col-span-2">
                       <div className="flex items-center gap-2">
                         <div className="flex-1">
-                          <p className="text-xs text-muted-foreground">Due from Owner</p>
-                          <p className="font-bold text-primary text-lg">
-                            ${(
-                              Number(rec.management_fee || 0) + 
-                              Number(rec.order_minimum_fee || 0) + 
-                              Number(rec.calculated_visit_fees || 0) + 
-                              Number(rec.calculated_total_expenses || 0)
-                            ).toFixed(2)}
-                          </p>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Mgmt + Order Min + Visits + Expenses
-                          </p>
+                          <p className="text-xs text-muted-foreground">Due from Owner (Live Calculator)</p>
+                          {rec.calculator_error ? (
+                            <p className="font-semibold text-destructive text-sm">
+                              Error: {rec.calculator_error}
+                            </p>
+                          ) : (
+                            <>
+                              <p className="font-bold text-primary text-lg">
+                                ${Number(rec.calculated_due_from_owner || 0).toFixed(2)}
+                              </p>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                Only approved charges included
+                              </p>
+                            </>
+                          )}
                         </div>
                       </div>
                     </div>

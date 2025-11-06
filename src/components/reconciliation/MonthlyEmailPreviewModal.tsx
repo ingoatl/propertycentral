@@ -67,7 +67,7 @@ export const MonthlyEmailPreviewModal = ({
         console.error("Error fetching owner name:", error);
       }
 
-      // Fetch line items to calculate category totals using shared utility
+      // Fetch line items to calculate category totals using shared utility (APPROVED ONLY)
       try {
         const { data: lineItems, error: itemsError } = await supabase
           .from("reconciliation_line_items")
