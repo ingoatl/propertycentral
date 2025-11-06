@@ -308,16 +308,8 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
       const statusChanged = taskStatus !== newStatus;
       setTaskStatus(newStatus);
       
-      // Show success toast for URL fields
-      const isUrlField = task.title.toLowerCase().includes('url') || 
-                        task.title.toLowerCase().includes('link') ||
-                        task.title.toLowerCase().includes('airbnb') ||
-                        task.title.toLowerCase().includes('vrbo') ||
-                        task.title.toLowerCase().includes('booking') ||
-                        task.title.toLowerCase().includes('website') ||
-                        task.title.toLowerCase().includes('ical');
-      
-      if (isUrlField && normalizedValue.length > 0) {
+      // Show success toast for all field updates (except section headers)
+      if (task.field_type !== "section_header" && normalizedValue.length > 0) {
         toast.success("Saved!", {
           duration: 2000,
           position: "top-right",
@@ -332,16 +324,8 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
     } catch (error) {
       console.error("Failed to auto-save task:", error);
       
-      // Show error toast for URL fields
-      const isUrlField = task.title.toLowerCase().includes('url') || 
-                        task.title.toLowerCase().includes('link') ||
-                        task.title.toLowerCase().includes('airbnb') ||
-                        task.title.toLowerCase().includes('vrbo') ||
-                        task.title.toLowerCase().includes('booking') ||
-                        task.title.toLowerCase().includes('website') ||
-                        task.title.toLowerCase().includes('ical');
-      
-      if (isUrlField) {
+      // Show error toast for all field updates (except section headers)
+      if (task.field_type !== "section_header") {
         toast.error("Save failed — try again", {
           duration: 2000,
           position: "top-right",
