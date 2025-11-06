@@ -304,9 +304,25 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
         .update(updateData)
         .eq("id", task.id);
 
-      // Only update local status, don't trigger parent update to prevent card from closing
+      // Update local status without triggering parent update
       const statusChanged = taskStatus !== newStatus;
       setTaskStatus(newStatus);
+      
+      // Show success toast for URL fields
+      const isUrlField = task.title.toLowerCase().includes('url') || 
+                        task.title.toLowerCase().includes('link') ||
+                        task.title.toLowerCase().includes('airbnb') ||
+                        task.title.toLowerCase().includes('vrbo') ||
+                        task.title.toLowerCase().includes('booking') ||
+                        task.title.toLowerCase().includes('website') ||
+                        task.title.toLowerCase().includes('ical');
+      
+      if (isUrlField && normalizedValue.length > 0) {
+        toast.success("Saved!", {
+          duration: 2000,
+          position: "top-right",
+        });
+      }
       
       // Only call onUpdate if status changed (to update progress bar)
       // Don't call it during typing to prevent card from closing
@@ -315,6 +331,22 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
       }
     } catch (error) {
       console.error("Failed to auto-save task:", error);
+      
+      // Show error toast for URL fields
+      const isUrlField = task.title.toLowerCase().includes('url') || 
+                        task.title.toLowerCase().includes('link') ||
+                        task.title.toLowerCase().includes('airbnb') ||
+                        task.title.toLowerCase().includes('vrbo') ||
+                        task.title.toLowerCase().includes('booking') ||
+                        task.title.toLowerCase().includes('website') ||
+                        task.title.toLowerCase().includes('ical');
+      
+      if (isUrlField) {
+        toast.error("Save failed — try again", {
+          duration: 2000,
+          position: "top-right",
+        });
+      }
     }
   };
 
