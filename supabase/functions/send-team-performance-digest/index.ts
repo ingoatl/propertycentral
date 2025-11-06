@@ -103,7 +103,9 @@ const handler = async (req: Request): Promise<Response> => {
       date: entry.date,
       entry: entry.entry,
       user_id: entry.user_id,
-      user_name: `${entry.profiles.first_name} ${entry.profiles.last_name}`.trim()
+      user_name: entry.profiles 
+        ? `${entry.profiles.first_name || ''} ${entry.profiles.last_name || ''}`.trim() 
+        : 'Unknown User'
     })) || [];
 
     // Process each user
