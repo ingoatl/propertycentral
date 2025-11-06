@@ -417,62 +417,6 @@ const Properties = () => {
           </div>
         )}
         
-        <div className="absolute top-1.5 right-1.5" onClick={(e) => e.stopPropagation()}>
-          <label htmlFor={`upload-${property.id}`} className="cursor-pointer">
-            <Button
-              type="button"
-              size="sm"
-              variant="secondary"
-              className="h-7 px-2 text-xs gap-1.5 shadow-lg backdrop-blur-sm bg-background/80 hover:bg-background/90"
-              disabled={uploadingImage === property.id}
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                document.getElementById(`upload-${property.id}`)?.click();
-              }}
-            >
-              <Upload className="w-3 h-3" />
-              {uploadingImage === property.id ? "..." : "Upload"}
-            </Button>
-          </label>
-          <input
-            id={`upload-${property.id}`}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) handleImageUpload(property.id, file);
-            }}
-          />
-        </div>
-
-        <div className="absolute top-1.5 left-1.5 flex gap-1.5" onClick={(e) => e.stopPropagation()}>
-          <Button
-            variant="secondary"
-            size="icon"
-            className="h-7 w-7 shadow-lg backdrop-blur-sm bg-background/80 hover:bg-background/90"
-            onClick={(e) => {
-              e.stopPropagation();
-              handleEdit(property);
-            }}
-          >
-            <Edit className="w-3 h-3" />
-          </Button>
-          {isAdmin && (
-            <Button
-              variant="secondary"
-              size="icon"
-              className="h-7 w-7 shadow-lg backdrop-blur-sm bg-background/80 hover:bg-destructive hover:text-destructive-foreground"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleDelete(property.id);
-              }}
-            >
-              <Trash2 className="w-3 h-3" />
-            </Button>
-          )}
-        </div>
       </div>
 
       <CardHeader className="pb-2 pt-3 px-3">

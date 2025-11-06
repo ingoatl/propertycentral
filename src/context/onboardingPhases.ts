@@ -104,7 +104,6 @@ export const ONBOARDING_PHASES: PhaseDefinition[] = [
       { title: "CHBO (Corporate Housing by Owner)", field_type: "text", description: "Enter Listing URL" },
       { title: "Homads", field_type: "text", description: "Enter Listing URL" },
       { title: "MidTermRentalProperties.com", field_type: "text", description: "Enter Listing URL" },
-      { title: "Midtermrentals.com", field_type: "text", description: "Enter Listing URL" },
       { title: "June Homes", field_type: "text", description: "Enter Placeholder" },
       
       // Core Booking Platforms

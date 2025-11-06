@@ -12,8 +12,8 @@ export const visitDataSchema = z.object({
     "Date must be in YYYY-MM-DD format"
   ),
   time: z.string().regex(
-    /^([01]\d|2[0-3]):([0-5]\d)$/,
-    "Time must be in HH:MM format (24-hour)"
+    /^([01]\d|2[0-3]):([0-5]\d)(:[0-5]\d)?$/,
+    "Time must be in HH:MM or HH:MM:SS format (24-hour)"
   ),
   amount: z.number().positive("Amount must be a positive number").finite("Amount must be a finite number"),
   visitedBy: z.string().min(1, "Visited by is required").max(100, "Visited by must be less than 100 characters"),
