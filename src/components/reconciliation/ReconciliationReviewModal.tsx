@@ -406,6 +406,41 @@ export const ReconciliationReviewModal = ({
     try {
       const { data: { user } } = await supabase.auth.getUser();
 
+      // Get all VERIFIED line items that should be marked as billed
+      const verifiedItems = lineItems.filter((item: any) => 
+        item.verified && !item.excluded
+      );
+      
+      // Separate by type
+      const visitItems = verifiedItems.filter((i: any) => i.item_type === 'visit');
+      const expenseItems = verifiedItems.filter((i: any) => i.item_type === 'expense');
+      
+      // Mark visits as billed
+      if (visitItems.length > 0) {
+        const visitIds = visitItems.map((i: any) => i.item_id);
+        const { error: visitError } = await supabase
+          .from('visits')
+          .update({ 
+            billed: true,
+            reconciliation_id: reconciliationId 
+          })
+          .in('id', visitIds);
+        
+        if (visitError) throw visitError;
+      }
+      
+      // Mark expenses as exported (billed)
+      if (expenseItems.length > 0) {
+        const expenseIds = expenseItems.map((i: any) => i.item_id);
+        const { error: expenseError } = await supabase
+          .from('expenses')
+          .update({ exported: true })
+          .in('id', expenseIds);
+        
+        if (expenseError) throw expenseError;
+      }
+
+      // Update reconciliation status
       const { error } = await supabase
         .from("monthly_reconciliations")
         .update({
@@ -418,7 +453,15 @@ export const ReconciliationReviewModal = ({
 
       if (error) throw error;
 
-      toast.success("Reconciliation approved!");
+      // Log in audit trail
+      await supabase.from("reconciliation_audit_log").insert({
+        reconciliation_id: reconciliationId,
+        action: 'reconciliation_approved',
+        user_id: user?.id,
+        notes: `Approved with ${visitItems.length} visits and ${expenseItems.length} expenses marked as billed`
+      });
+
+      toast.success(`Reconciliation approved! ${visitItems.length} visits and ${expenseItems.length} expenses marked as billed.`);
       await refetch();
       setNotes("");
       setShowEmailPreview(true);

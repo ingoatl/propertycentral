@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { Calendar as CalendarIcon, Clock, MapPin, CheckCircle2, ChevronDown, ChevronUp, AlertTriangle } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -53,13 +54,13 @@ const VisitItem = memo(({ visit, getPropertyName, getPropertyAddress }: any) => 
               {getPropertyName(visit.propertyId)}
             </h3>
             {billingStatus ? (
-              <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
-                Billed
-              </span>
+              <Badge variant="default" className="bg-green-600 hover:bg-green-700 text-white">
+                ✓ Billed
+              </Badge>
             ) : (
-              <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+              <Badge variant="outline" className="border-amber-500 text-amber-700 dark:text-amber-400">
                 Unbilled
-              </span>
+              </Badge>
             )}
           </div>
           <p className="text-sm text-muted-foreground flex items-center gap-1.5">
