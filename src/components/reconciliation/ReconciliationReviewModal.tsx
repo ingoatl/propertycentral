@@ -377,67 +377,37 @@ export const ReconciliationReviewModal = ({
   });
 
 
-  const fixTotalsMutation = useMutation({
-    mutationFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!data?.lineItems || !data?.reconciliation) {
-        throw new Error("Missing data");
-      }
-
-      // Calculate correct totals from line items
-      const calculated = calculateDueFromOwnerFromLineItems(
-        data.lineItems,
-        data.reconciliation.management_fee,
-        data.reconciliation.order_minimum_fee
-      );
-
-      // Update reconciliation with corrected values
-      const { error } = await supabase
-        .from("monthly_reconciliations")
-        .update({
-          visit_fees: calculated.visitFees,
-          total_expenses: calculated.totalExpenses,
-          net_to_owner: data.reconciliation.total_revenue - calculated.dueFromOwner
-        })
-        .eq("id", reconciliationId);
-
-      if (error) throw error;
-
-      // Log the correction in audit trail
-      await supabase.from("reconciliation_audit_log").insert({
-        reconciliation_id: reconciliationId,
-        action: 'total_recalculated',
-        user_id: user?.id,
-        previous_values: {
-          visit_fees: data.reconciliation.visit_fees,
-          total_expenses: data.reconciliation.total_expenses
-        },
-        new_values: {
-          visit_fees: calculated.visitFees,
-          total_expenses: calculated.totalExpenses
-        },
-        notes: 'Totals recalculated from line items'
-      });
-
-      return calculated;
-    },
-    onSuccess: () => {
-      refetch();
-      toast.success("Totals fixed successfully");
-    },
-    onError: () => {
-      toast.error("Failed to fix totals");
-    }
-  });
+  // Removed fix totals mutation - no longer needed with live calculation system
 
   const handleApprove = async () => {
+    if (!data?.lineItems) return;
+
+    // Validation: Check if any items are approved
+    const approvedItems = data.lineItems.filter((item: any) => item.verified && !item.excluded);
+    const approvedVisits = approvedItems.filter((item: any) => item.item_type === 'visit');
+    const approvedExpenses = approvedItems.filter((item: any) => item.item_type === 'expense');
+    
+    if (approvedItems.length === 0) {
+      toast.error("You haven't approved any items. Please check at least one item before approving.");
+      return;
+    }
+
+    // Show confirmation with counts
+    const confirmMessage = `You are about to approve this reconciliation with:\n\n` +
+      `• ${approvedVisits.length} visit(s) (will be marked as billed)\n` +
+      `• ${approvedExpenses.length} expense(s) (will be marked as exported)\n\n` +
+      `These items will be included in the owner statement. Continue?`;
+    
+    if (!window.confirm(confirmMessage)) {
+      return;
+    }
+
     setIsApproving(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
 
       // Get all VERIFIED line items that should be marked as billed
-      const verifiedItems = lineItems.filter((item: any) => 
+      const verifiedItems = data.lineItems.filter((item: any) => 
         item.verified && !item.excluded
       );
       
@@ -570,16 +540,6 @@ export const ReconciliationReviewModal = ({
                   </div>
                 </div>
                 <div className="flex gap-2">
-                  <Button 
-                    size="sm" 
-                    onClick={() => fixTotalsMutation.mutate()}
-                    disabled={fixTotalsMutation.isPending}
-                    variant="outline"
-                    className="bg-white dark:bg-gray-900"
-                  >
-                    <RefreshCw className="w-4 h-4 mr-2" />
-                    {fixTotalsMutation.isPending ? "Fixing..." : "Fix Totals"}
-                  </Button>
                   <Button 
                     size="sm" 
                     onClick={() => cleanupOrphanedItemsMutation.mutate()}

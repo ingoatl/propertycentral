@@ -84,41 +84,7 @@ export function calculateDueFromOwnerFromLineItems(
   }
 }
 
-/**
- * Validate if stored reconciliation values match line items
- */
-export function validateReconciliationTotals(
-  reconciliation: ReconciliationData,
-  lineItems: ReconciliationLineItem[]
-): {
-  isValid: boolean;
-  visitFeesMismatch: boolean;
-  expensesMismatch: boolean;
-  calculatedValues: {
-    visitFees: number;
-    totalExpenses: number;
-    dueFromOwner: number;
-  };
-} {
-  const calculated = calculateDueFromOwnerFromLineItems(
-    lineItems,
-    reconciliation.management_fee,
-    reconciliation.order_minimum_fee
-  );
-
-  const visitFeesMismatch = 
-    Math.abs(reconciliation.visit_fees - calculated.visitFees) > 0.01;
-  
-  const expensesMismatch = 
-    Math.abs(reconciliation.total_expenses - calculated.totalExpenses) > 0.01;
-
-  return {
-    isValid: !visitFeesMismatch && !expensesMismatch,
-    visitFeesMismatch,
-    expensesMismatch,
-    calculatedValues: calculated,
-  };
-}
+// Validation function removed - we now use live calculation from approved line items only
 
 /**
  * Format currency for display

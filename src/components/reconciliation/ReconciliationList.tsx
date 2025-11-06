@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
@@ -15,6 +15,29 @@ export const ReconciliationList = () => {
   const [selectedReconciliation, setSelectedReconciliation] = useState<string | null>(null);
   const [sendingPerformance, setSendingPerformance] = useState<string | null>(null);
   const [sendingStatement, setSendingStatement] = useState<string | null>(null);
+
+  // Real-time subscription for line item changes
+  useEffect(() => {
+    const channel = supabase
+      .channel('reconciliation-line-items-list-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'reconciliation_line_items'
+        },
+        () => {
+          // Refetch reconciliations when any line item changes
+          refetch();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
   const { data: reconciliations, isLoading, refetch } = useQuery({
     queryKey: ["reconciliations"],
