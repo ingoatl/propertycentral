@@ -34,6 +34,11 @@ export const PropertyExpenseView = ({
 
   // Filter expenses based on search term and billed status
   const filteredExpenses = expenses.filter((expense) => {
+    // Exclude visit-related expenses (legacy data cleanup)
+    if (expense.category === "Visit Charges") return false;
+    if (expense.purpose?.toLowerCase().includes("visit fee")) return false;
+    if (expense.purpose?.toLowerCase().includes("hourly charges")) return false;
+    
     // Check if expense is in any approved or statement_sent reconciliation
     const isBilled = expense.exported === true;
     

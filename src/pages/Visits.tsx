@@ -343,45 +343,7 @@ const Visits = () => {
 
       if (visitError) throw visitError;
 
-      // Create expenses array
-      const expenses = [];
-
-      // Build base description with notes if present
-      const notesAddition = previousFormData.notes ? ` - ${previousFormData.notes}` : '';
-
-      // 1. Always add visit price expense
-      expenses.push({
-        property_id: previousFormData.propertyId,
-        amount: property.visitPrice,
-        date: selectedDate,
-        purpose: `Visit fee (${previousFormData.visitedBy})${notesAddition}`,
-        category: "Visit Charges",
-        vendor: "PeachHaus",
-        user_id: user.id,
-      });
-
-      // 2. Add hourly charges expense only if hours > 0
-      if (hours > 0) {
-        const hourlyCharges = hours * HOURLY_RATE;
-        expenses.push({
-          property_id: previousFormData.propertyId,
-          amount: hourlyCharges,
-          date: selectedDate,
-          purpose: `Hourly charges - ${hours} hour${hours !== 1 ? 's' : ''} @ $${HOURLY_RATE}/hr (${previousFormData.visitedBy})${notesAddition}`,
-          category: "Visit Charges",
-          vendor: "PeachHaus",
-          user_id: user.id,
-        });
-      }
-
-      // Insert all expenses
-      const { error: expenseError } = await supabase
-        .from("expenses")
-        .insert(expenses);
-
-      if (expenseError) throw expenseError;
-
-      toast.success("Visit and expense logged successfully!");
+      toast.success("Visit logged successfully!");
     } catch (error: any) {
       if (import.meta.env.DEV) {
         console.error("Error adding visit:", error);
