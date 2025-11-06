@@ -6,6 +6,7 @@ import { useAdminCheck } from "@/hooks/useAdminCheck";
 import { AdminDashboard } from "@/components/dashboard/AdminDashboard";
 import { UserTasksDashboard } from "@/components/dashboard/UserTasksDashboard";
 import { DashboardFAQTab } from "@/components/dashboard/DashboardFAQTab";
+import { MyBugReportsCard } from "@/components/dashboard/MyBugReportsCard";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 
@@ -417,6 +418,7 @@ const Dashboard = () => {
             <TabsList>
               <TabsTrigger value="tasks">My Tasks</TabsTrigger>
               <TabsTrigger value="faqs">FAQs</TabsTrigger>
+              <TabsTrigger value="bugs">My Bug Reports</TabsTrigger>
             </TabsList>
 
             <TabsContent value="tasks">
@@ -425,6 +427,10 @@ const Dashboard = () => {
 
             <TabsContent value="faqs">
               <DashboardFAQTab />
+            </TabsContent>
+
+            <TabsContent value="bugs">
+              <MyBugReportsCard />
             </TabsContent>
           </Tabs>
         </CardContent>
