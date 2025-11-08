@@ -36,6 +36,23 @@ serve(async (req) => {
     const lastDayOfMonth = new Date(firstDayOfMonth.getFullYear(), firstDayOfMonth.getMonth() + 1, 0);
     const monthString = firstDayOfMonth.toISOString().split("T")[0];
 
+    // Date range validation
+    const today = new Date();
+    const monthDate = new Date(month);
+    
+    // Prevent creating reconciliations for future months
+    if (monthDate > today) {
+      throw new Error("Cannot create reconciliation for future months");
+    }
+    
+    // Warn if creating for months > 2 months old
+    const twoMonthsAgo = new Date();
+    twoMonthsAgo.setMonth(today.getMonth() - 2);
+    
+    if (monthDate < twoMonthsAgo) {
+      console.warn(`⚠️ Creating reconciliation for old month: ${monthString} (${Math.floor((today.getTime() - monthDate.getTime()) / (1000 * 60 * 60 * 24 * 30))} months ago)`);
+    }
+
     console.log(`Checking for existing reconciliation: property=${property_id}, month=${monthString}`);
 
     // Check if reconciliation already exists for this property and month
@@ -170,7 +187,7 @@ serve(async (req) => {
 
     console.log(`Found ${midTermBookings?.length || 0} mid-term bookings for the period`);
 
-    // Fetch all UNBILLED expenses for the month
+    // Fetch UNBILLED expenses for the reconciliation month only
     const { data: expenses } = await supabaseClient
       .from("expenses")
       .select("*")
@@ -179,12 +196,18 @@ serve(async (req) => {
       .gte("date", firstDayOfMonth.toISOString().split("T")[0])
       .lte("date", lastDayOfMonth.toISOString().split("T")[0]);
 
-    // Fetch ALL UNBILLED visits for this property (not just current month)
+    console.log(`Found ${expenses?.length || 0} unbilled expenses for the reconciliation month`);
+
+    // Fetch UNBILLED visits for the reconciliation month only (not all historical visits)
     const { data: visits } = await supabaseClient
       .from("visits")
       .select("*")
       .eq("property_id", property_id)
-      .eq("billed", false);
+      .eq("billed", false)
+      .gte("date", firstDayOfMonth.toISOString().split("T")[0])
+      .lte("date", lastDayOfMonth.toISOString().split("T")[0]);
+
+    console.log(`Found ${visits?.length || 0} unbilled visits for the reconciliation month`);
 
     // Calculate totals with prorated mid-term revenue
     const shortTermRevenue = (bookings || []).reduce((sum, b) => sum + (b.total_amount && b.total_amount > 0 ? b.total_amount : 0), 0);
