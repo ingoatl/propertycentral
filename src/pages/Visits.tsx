@@ -146,31 +146,45 @@ const Visits = () => {
     }
   }, [visits]);
 
-  // Set up realtime subscription for visits
+  // Set up realtime subscription for visits - only for updates/deletes
+  // (Inserts are handled optimistically in handleSubmit)
   useEffect(() => {
     const channel = supabase
       .channel('visits-changes')
       .on(
         'postgres_changes',
         {
-          event: '*',
+          event: 'UPDATE',
           schema: 'public',
           table: 'visits'
         },
         (payload) => {
-          if (payload.eventType === 'INSERT') {
-            // Add new visit to the list
-            const newVisit: Visit = {
-              id: payload.new.id,
-              propertyId: payload.new.property_id,
-              date: payload.new.date,
-              time: payload.new.time,
-              price: Number(payload.new.price),
-              notes: payload.new.notes,
-              createdAt: payload.new.created_at,
-            };
-            setVisits(prev => [newVisit, ...prev]);
-          }
+          // Update existing visit in the list
+          setVisits(prev => prev.map(visit => 
+            visit.id === payload.new.id 
+              ? {
+                  id: payload.new.id,
+                  propertyId: payload.new.property_id,
+                  date: payload.new.date,
+                  time: payload.new.time,
+                  price: Number(payload.new.price),
+                  notes: payload.new.notes,
+                  createdAt: payload.new.created_at,
+                }
+              : visit
+          ));
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table: 'visits'
+        },
+        (payload) => {
+          // Remove deleted visit from the list
+          setVisits(prev => prev.filter(visit => visit.id !== payload.old.id));
         }
       )
       .subscribe();
@@ -292,8 +306,9 @@ const Visits = () => {
       if (!property) throw new Error("Property not found");
 
       // Optimistic UI update - add visit immediately
+      const tempId = `temp-${Date.now()}`;
       const optimisticVisit: Visit = {
-        id: `temp-${Date.now()}`,
+        id: tempId,
         propertyId: formData.propertyId,
         date: visitDate,
         time: currentTime,
@@ -329,7 +344,7 @@ const Visits = () => {
       const selectedDate = previousFormData.date.toISOString().split("T")[0];
       
       // Insert visit in background
-      const { error: visitError } = await supabase
+      const { data: insertedVisit, error: visitError } = await supabase
         .from("visits")
         .insert({
           property_id: previousFormData.propertyId,
@@ -340,9 +355,28 @@ const Visits = () => {
           visited_by: previousFormData.visitedBy,
           notes: previousFormData.notes || null,
           user_id: user.id,
-        });
+        })
+        .select()
+        .single();
 
       if (visitError) throw visitError;
+
+      // Replace optimistic visit with real one
+      if (insertedVisit) {
+        setVisits(prev => prev.map(visit => 
+          visit.id === tempId 
+            ? {
+                id: insertedVisit.id,
+                propertyId: insertedVisit.property_id,
+                date: insertedVisit.date,
+                time: insertedVisit.time,
+                price: Number(insertedVisit.price),
+                notes: insertedVisit.notes,
+                createdAt: insertedVisit.created_at,
+              }
+            : visit
+        ));
+      }
 
       toast.success("Visit logged successfully!");
     } catch (error: any) {
