@@ -213,9 +213,11 @@ const Visits = () => {
         createdAt: p.created_at,
       })));
 
+      // Only fetch UNBILLED visits to display in the Visits tab
       const { data: visitsData, error: visitsError } = await supabase
         .from("visits")
         .select("*")
+        .eq("billed", false)
         .order("date", { ascending: false })
         .order("time", { ascending: false });
 
