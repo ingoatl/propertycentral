@@ -9,7 +9,8 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { Calendar as CalendarIcon, Clock, MapPin, CheckCircle2, ChevronDown, ChevronUp, AlertTriangle } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Calendar as CalendarIcon, Clock, MapPin, CheckCircle2, ChevronDown, ChevronUp, AlertTriangle, FileText } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { supabase } from "@/integrations/supabase/client";
@@ -105,11 +106,13 @@ VisitItem.displayName = "VisitItem";
 const Visits = () => {
   const [properties, setProperties] = useState<Property[]>([]);
   const [visits, setVisits] = useState<Visit[]>([]);
+  const [billedVisits, setBilledVisits] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [isFormOpen, setIsFormOpen] = useState(true);
   const [showReconciliationStatus, setShowReconciliationStatus] = useState(false);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  const [activeTab, setActiveTab] = useState("unbilled");
   const isMobile = useIsMobile();
   
   const [formData, setFormData] = useState({
@@ -232,6 +235,25 @@ const Visits = () => {
         notes: v.notes,
         createdAt: v.created_at,
       })));
+
+      // Fetch billed visits with reconciliation info
+      const { data: billedData, error: billedError } = await supabase
+        .from("visits")
+        .select(`
+          *,
+          reconciliation:reconciliation_id (
+            id,
+            reconciliation_month,
+            status
+          )
+        `)
+        .eq("billed", true)
+        .order("date", { ascending: false })
+        .order("time", { ascending: false });
+
+      if (billedError) throw billedError;
+      setBilledVisits(billedData || []);
+
     } catch (error: any) {
       if (import.meta.env.DEV) {
         console.error("Error loading data:", error);
@@ -591,43 +613,159 @@ const Visits = () => {
       {/* Reconciliation Status Card */}
       {showReconciliationStatus && <VisitReconciliationStatus showAll={false} />}
 
-      {/* Recent Visits - with loading skeletons */}
+      {/* Visits Tabs */}
       <Card className="shadow-card border-border/50">
-        <CardHeader className="bg-gradient-subtle rounded-t-lg pb-3">
-          <CardTitle className="text-base sm:text-lg md:text-xl">Recent Visits</CardTitle>
-        </CardHeader>
-        <CardContent className="pt-4">
-          {initialLoading ? (
-            <div className="space-y-3">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="p-4 border border-border/50 rounded-xl space-y-3">
-                  <Skeleton className="h-5 w-3/4" />
-                  <Skeleton className="h-4 w-1/2" />
-                  <div className="flex gap-2">
-                    <Skeleton className="h-4 w-24" />
-                    <Skeleton className="h-4 w-24" />
-                  </div>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <CardHeader className="bg-gradient-subtle rounded-t-lg pb-3">
+            <TabsList className="grid w-full grid-cols-2 bg-background/50">
+              <TabsTrigger value="unbilled" className="gap-2">
+                <AlertTriangle className="h-4 w-4" />
+                Unbilled Visits
+                {visits.length > 0 && (
+                  <Badge variant="secondary" className="ml-1">{visits.length}</Badge>
+                )}
+              </TabsTrigger>
+              <TabsTrigger value="history" className="gap-2">
+                <FileText className="h-4 w-4" />
+                Billed History
+                {billedVisits.length > 0 && (
+                  <Badge variant="outline" className="ml-1">{billedVisits.length}</Badge>
+                )}
+              </TabsTrigger>
+            </TabsList>
+          </CardHeader>
+
+          <CardContent className="pt-4">
+            {/* Unbilled Visits Tab */}
+            <TabsContent value="unbilled" className="mt-0">
+              {initialLoading ? (
+                <div className="space-y-3">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="p-4 border border-border/50 rounded-xl space-y-3">
+                      <Skeleton className="h-5 w-3/4" />
+                      <Skeleton className="h-4 w-1/2" />
+                      <div className="flex gap-2">
+                        <Skeleton className="h-4 w-24" />
+                        <Skeleton className="h-4 w-24" />
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          ) : visits.length === 0 ? (
-            <div className="text-center py-8 sm:py-12">
-              <CalendarIcon className="h-10 w-10 sm:h-12 sm:w-12 text-muted-foreground mx-auto mb-3 sm:mb-4 opacity-50" />
-              <p className="text-sm sm:text-base text-muted-foreground">No visits logged yet</p>
-            </div>
-          ) : (
-            <div className="space-y-2 sm:space-y-3">
-              {visits.map((visit) => (
-                <VisitItem 
-                  key={visit.id} 
-                  visit={visit} 
-                  getPropertyName={getPropertyName}
-                  getPropertyAddress={getPropertyAddress}
-                />
-              ))}
-            </div>
-          )}
-        </CardContent>
+              ) : visits.length === 0 ? (
+                <div className="text-center py-8 sm:py-12">
+                  <CheckCircle2 className="h-10 w-10 sm:h-12 sm:w-12 text-green-500 mx-auto mb-3 sm:mb-4 opacity-50" />
+                  <p className="text-sm sm:text-base font-semibold text-foreground">All visits are billed!</p>
+                  <p className="text-xs sm:text-sm text-muted-foreground mt-1">No pending visits to bill</p>
+                </div>
+              ) : (
+                <div className="space-y-2 sm:space-y-3">
+                  {visits.map((visit) => (
+                    <VisitItem 
+                      key={visit.id} 
+                      visit={visit} 
+                      getPropertyName={getPropertyName}
+                      getPropertyAddress={getPropertyAddress}
+                    />
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+
+            {/* Billed History Tab */}
+            <TabsContent value="history" className="mt-0">
+              {initialLoading ? (
+                <div className="space-y-3">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="p-4 border border-border/50 rounded-xl space-y-3">
+                      <Skeleton className="h-5 w-3/4" />
+                      <Skeleton className="h-4 w-1/2" />
+                      <div className="flex gap-2">
+                        <Skeleton className="h-4 w-24" />
+                        <Skeleton className="h-4 w-24" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : billedVisits.length === 0 ? (
+                <div className="text-center py-8 sm:py-12">
+                  <FileText className="h-10 w-10 sm:h-12 sm:w-12 text-muted-foreground mx-auto mb-3 sm:mb-4 opacity-50" />
+                  <p className="text-sm sm:text-base text-muted-foreground">No billed visits yet</p>
+                  <p className="text-xs sm:text-sm text-muted-foreground/70 mt-1">Historical visits will appear here once billed</p>
+                </div>
+              ) : (
+                <div className="space-y-2 sm:space-y-3">
+                  {billedVisits.map((visit) => (
+                    <div 
+                      key={visit.id}
+                      className="p-4 sm:p-5 border border-border/50 rounded-xl bg-muted/20 animate-fade-in"
+                    >
+                      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                        <div className="flex-1 space-y-2">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h3 className="font-semibold text-base sm:text-lg text-foreground">
+                              {getPropertyName(visit.property_id)}
+                            </h3>
+                            <Badge variant="default" className="bg-green-600 hover:bg-green-700 text-white">
+                              ✓ Billed
+                            </Badge>
+                            {visit.reconciliation && (
+                              <Badge variant="outline" className="gap-1">
+                                <FileText className="h-3 w-3" />
+                                {format(new Date(visit.reconciliation.reconciliation_month), "MMM yyyy")}
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-sm text-muted-foreground flex items-center gap-1.5">
+                            <MapPin className="w-3.5 h-3.5 flex-shrink-0" />
+                            <span className="line-clamp-1">{getPropertyAddress(visit.property_id)}</span>
+                          </p>
+                          <div className="flex flex-wrap items-center gap-3 text-xs sm:text-sm text-muted-foreground">
+                            <span className="flex items-center gap-1.5">
+                              <CalendarIcon className="w-3.5 h-3.5" />
+                              {new Date(visit.date).toLocaleDateString('en-US', { 
+                                month: 'short', 
+                                day: 'numeric',
+                                year: 'numeric'
+                              })}
+                            </span>
+                            <span className="flex items-center gap-1.5">
+                              <Clock className="w-3.5 h-3.5" />
+                              {visit.time}
+                            </span>
+                          </div>
+                          {visit.visited_by && (
+                            <p className="text-sm font-medium text-foreground">
+                              👤 {visit.visited_by}
+                            </p>
+                          )}
+                          {visit.notes && (
+                            <p className="text-sm text-muted-foreground mt-2 italic border-l-2 border-primary/30 pl-3">
+                              {visit.notes}
+                            </p>
+                          )}
+                          {visit.reconciliation && (
+                            <div className="mt-3 pt-3 border-t border-border/30">
+                              <p className="text-xs text-muted-foreground">
+                                <span className="font-semibold">Reconciliation: </span>
+                                {format(new Date(visit.reconciliation.reconciliation_month), "MMMM yyyy")}
+                                <span className="ml-2">
+                                  Status: <span className="capitalize">{visit.reconciliation.status}</span>
+                                </span>
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                        <div className="text-left sm:text-right">
+                          <p className="text-2xl font-bold text-muted-foreground">${Number(visit.price).toFixed(2)}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </TabsContent>
+          </CardContent>
+        </Tabs>
       </Card>
     </div>
   );
