@@ -81,17 +81,17 @@ const handler = async (req: Request): Promise<Response> => {
 
     // Fetch daily performance entries from yesterday
     const yesterdayDate = yesterday.toISOString().split('T')[0];
-    const { data: rawDailyEntries, error: entriesError } = await supabase
-      .from('daily_performance_entries')
-      .select(`
-        id,
-        date,
-        entry,
-        user_id,
-        profiles!inner(first_name, last_name)
-      `)
-      .eq('date', yesterdayDate)
-      .order('created_at', { ascending: false });
+  const { data: rawDailyEntries, error: entriesError } = await supabase
+    .from('daily_performance_entries')
+    .select(`
+      id,
+      date,
+      entry,
+      user_id,
+      profiles!inner(first_name)
+    `)
+    .eq('date', yesterdayDate)
+    .order('created_at', { ascending: false });
 
     if (entriesError) {
       console.error('Error fetching daily entries:', entriesError);
@@ -105,9 +105,7 @@ const handler = async (req: Request): Promise<Response> => {
         date: entry.date,
         entry: entry.entry,
         user_id: entry.user_id,
-        user_name: profile 
-          ? `${profile.first_name || ''} ${profile.last_name || ''}`.trim() 
-          : 'Unknown User'
+        user_name: profile?.first_name || 'Unknown User'
       };
     }) || [];
 

@@ -6,6 +6,8 @@ import { PropertyPerformanceGrid } from "./PropertyPerformanceGrid";
 import { RecentActivityFeed } from "./RecentActivityFeed";
 import { EnhancedTeamPerformance } from "./EnhancedTeamPerformance";
 import { OwnedPropertiesPerformance } from "./OwnedPropertiesPerformance";
+import { DailyPerformanceEntriesList } from "./DailyPerformanceEntriesList";
+import { SendTestTeamDigestButton } from "./SendTestTeamDigestButton";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Download, RefreshCw, Building2, DollarSign, TrendingUp, AlertCircle, MessageCircleQuestion, Bug } from "lucide-react";
@@ -16,6 +18,7 @@ import { PendingQuestionsCard } from "@/components/admin/PendingQuestionsCard";
 import { DashboardBugReportsCard } from "@/components/admin/DashboardBugReportsCard";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface AdminDashboardProps {
   summaries: PropertySummary[];
@@ -316,6 +319,7 @@ export const AdminDashboard = ({ summaries, onExport, onSync, syncing, onSendOve
               </p>
             </div>
             <div className="flex items-center gap-3 max-md:gap-2 max-md:flex-wrap max-md:w-full">
+              <SendTestTeamDigestButton />
               <Button onClick={onSendOverdueEmails} variant="outline" size="sm" className="max-md:flex-1">
                 <AlertCircle className="h-4 w-4 max-md:mr-1" />
                 <span className="max-md:text-xs">Overdue</span>
@@ -333,7 +337,16 @@ export const AdminDashboard = ({ summaries, onExport, onSync, syncing, onSendOve
         </div>
       </div>
 
-      <div className="container mx-auto px-6 max-md:px-3 py-8 max-md:py-4 space-y-8 max-md:space-y-6">
+      <Tabs defaultValue="overview" className="w-full">
+        <div className="container mx-auto px-6 max-md:px-3">
+          <TabsList className="my-6">
+            <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="daily-entries">Daily Entries</TabsTrigger>
+          </TabsList>
+        </div>
+
+        <TabsContent value="overview" className="mt-0">
+        <div className="container mx-auto px-6 max-md:px-3 py-8 max-md:py-4 space-y-8 max-md:space-y-6">
         {/* Alert Section */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 max-md:gap-4">
           <div className="lg:col-span-2">
@@ -448,6 +461,17 @@ export const AdminDashboard = ({ summaries, onExport, onSync, syncing, onSendOve
           <DashboardBugReportsCard />
         </div>
       </div>
+      </TabsContent>
+
+      <TabsContent value="daily-entries">
+        <div className="container mx-auto px-6 max-md:px-3 py-8 max-md:py-4">
+          <DailyPerformanceEntriesList 
+            startDate={new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]}
+            endDate={new Date().toISOString().split('T')[0]}
+          />
+        </div>
+      </TabsContent>
+      </Tabs>
 
       {/* Property Detail Modal */}
       <Dialog open={!!selectedProperty} onOpenChange={() => setSelectedProperty(null)}>

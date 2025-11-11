@@ -7,6 +7,7 @@ import { AdminDashboard } from "@/components/dashboard/AdminDashboard";
 import { UserTasksDashboard } from "@/components/dashboard/UserTasksDashboard";
 import { DashboardFAQTab } from "@/components/dashboard/DashboardFAQTab";
 import { MyBugReportsCard } from "@/components/dashboard/MyBugReportsCard";
+import { DailyPerformanceEntry } from "@/components/dashboard/DailyPerformanceEntry";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 
@@ -470,6 +471,9 @@ const Dashboard = () => {
   // Non-admin users get simplified view
   return (
     <div className="p-8 space-y-6">
+      {/* Daily Performance Entry - Prominent at top */}
+      <DailyPerformanceEntry />
+      
       <Card>
         <CardHeader>
           <CardTitle>My Dashboard</CardTitle>
