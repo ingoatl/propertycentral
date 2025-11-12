@@ -37,6 +37,7 @@ import { TaskFilePreview } from "./TaskFilePreview";
 import { TaskFileUpload } from "./TaskFileUpload";
 import { ProfessionalPhotosUpload } from "./ProfessionalPhotosUpload";
 import { StableFieldWrapper } from "@/components/ui/stable-form";
+import { TaskSaveIndicator } from "./TaskSaveIndicator";
 
 interface TaskItemProps {
   task: OnboardingTask;
@@ -70,6 +71,8 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
   const [attachmentsKey, setAttachmentsKey] = useState(0);
   const [debounceTimer, setDebounceTimer] = useState<NodeJS.Timeout | null>(null);
   const [assignedUserName, setAssignedUserName] = useState<string | null>(null);
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'typing' | 'saving' | 'saved'>('idle');
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   
   const { isAdmin } = useAdminCheck();
   const hasValue = task.field_value && task.field_value.trim() !== "";
@@ -281,6 +284,7 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
 
   const autoSave = async (value: string, isCompleted: boolean = true, notesValue?: string) => {
     try {
+      setSaveStatus('saving');
       const normalizedValue = value?.trim() || '';
       const hasNotes = (notesValue?.trim() || notes?.trim())?.length > 0;
       const hasFile = !!task.file_path;
@@ -307,14 +311,11 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
       // Update local status without triggering parent update
       const statusChanged = taskStatus !== newStatus;
       setTaskStatus(newStatus);
+      setHasUnsavedChanges(false);
+      setSaveStatus('saved');
       
-      // Show success toast for all field updates (except section headers)
-      if (task.field_type !== "section_header" && normalizedValue.length > 0) {
-        toast.success("Saved!", {
-          duration: 2000,
-          position: "top-right",
-        });
-      }
+      // Auto-hide "saved" indicator after 2 seconds
+      setTimeout(() => setSaveStatus('idle'), 2000);
       
       // Only call onUpdate if status changed (to update progress bar)
       // Don't call it during typing to prevent card from closing
@@ -323,6 +324,7 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
       }
     } catch (error) {
       console.error("Failed to auto-save task:", error);
+      setSaveStatus('idle');
       
       // Show error toast for all field updates (except section headers)
       if (task.field_type !== "section_header") {
@@ -460,15 +462,17 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
 
   const handleInputChange = (value: string) => {
     setFieldValue(value);
+    setHasUnsavedChanges(true);
+    setSaveStatus('typing');
     
-    // Debounce and auto-save for faster updates (300ms instead of waiting for blur)
+    // Debounce and auto-save (2000ms industry standard)
     if (debounceTimer) {
       clearTimeout(debounceTimer);
     }
     
     const timer = setTimeout(() => {
       autoSave(value);
-    }, 300);
+    }, 2000);
     
     setDebounceTimer(timer);
   };
@@ -478,7 +482,7 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
     if (debounceTimer) {
       clearTimeout(debounceTimer);
     }
-    if (fieldValue !== task.field_value) {
+    if (fieldValue !== task.field_value || hasUnsavedChanges) {
       autoSave(fieldValue);
     }
   };
@@ -1275,6 +1279,7 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
                       )}
                     </>
                   )}
+                  <TaskSaveIndicator status={saveStatus} />
                 </div>
                 <div className="flex items-center gap-2">
                   {taskStatus !== 'completed' && (
