@@ -309,7 +309,6 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
         .eq("id", task.id);
 
       // Update local status without triggering parent update
-      const statusChanged = taskStatus !== newStatus;
       setTaskStatus(newStatus);
       setHasUnsavedChanges(false);
       setSaveStatus('saved');
@@ -317,11 +316,8 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
       // Auto-hide "saved" indicator after 2 seconds
       setTimeout(() => setSaveStatus('idle'), 2000);
       
-      // Only call onUpdate if status changed (to update progress bar)
-      // Don't call it during typing to prevent card from closing
-      if (statusChanged) {
-        onUpdate();
-      }
+      // Removed onUpdate() call to prevent task card from closing after save
+      // Progress bar will update when dialog closes instead
     } catch (error) {
       console.error("Failed to auto-save task:", error);
       setSaveStatus('idle');
