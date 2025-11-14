@@ -464,25 +464,10 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
     setFieldValue(value);
     setHasUnsavedChanges(true);
     setSaveStatus('typing');
-    
-    // Debounce and auto-save (2000ms industry standard)
-    if (debounceTimer) {
-      clearTimeout(debounceTimer);
-    }
-    
-    const timer = setTimeout(() => {
-      autoSave(value);
-    }, 2000);
-    
-    setDebounceTimer(timer);
   };
 
-  const handleInputBlur = () => {
-    // Clear any pending debounce and save immediately on blur
-    if (debounceTimer) {
-      clearTimeout(debounceTimer);
-    }
-    if (fieldValue !== task.field_value || hasUnsavedChanges) {
+  const handleManualSave = () => {
+    if (hasUnsavedChanges) {
       autoSave(fieldValue);
     }
   };
@@ -535,7 +520,6 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
                 <Textarea
                   value={fieldValue}
                   onChange={(e) => handleInputChange(e.target.value)}
-                  onBlur={handleInputBlur}
                   placeholder={task.description || "Enter details..."}
                   rows={2}
                   disabled={isReadOnly}
@@ -764,7 +748,6 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
                 step="0.01"
                 value={fieldValue}
                 onChange={(e) => handleInputChange(e.target.value)}
-                onBlur={handleInputBlur}
                 className={cn(
                   "pl-7 h-9 text-sm",
                   isReadOnly && "border-2 border-green-200 bg-green-50/30 text-foreground font-medium"
@@ -853,7 +836,6 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
                 type="tel"
                 value={fieldValue}
                 onChange={(e) => handleInputChange(e.target.value)}
-                onBlur={handleInputBlur}
                 placeholder="(555) 123-4567"
                 disabled={isReadOnly}
                 className={cn(
@@ -957,7 +939,6 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
                 <Input
                   value={fieldValue}
                   onChange={(e) => handleInputChange(e.target.value)}
-                  onBlur={handleInputBlur}
                   placeholder={task.description || "Enter value..."}
                   disabled={isReadOnly}
                   className={cn(
@@ -1279,7 +1260,19 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
                       )}
                     </>
                   )}
-                  <TaskSaveIndicator status={saveStatus} />
+                  <div className="flex items-center gap-2">
+                    <TaskSaveIndicator status={saveStatus} />
+                    {hasUnsavedChanges && (
+                      <Button
+                        size="sm"
+                        onClick={handleManualSave}
+                        disabled={saveStatus === 'saving'}
+                        className="h-7"
+                      >
+                        {saveStatus === 'saving' ? 'Saving...' : 'Save'}
+                      </Button>
+                    )}
+                  </div>
                 </div>
                 <div className="flex items-center gap-2">
                   {taskStatus !== 'completed' && (
