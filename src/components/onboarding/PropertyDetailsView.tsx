@@ -29,13 +29,12 @@ export function PropertyDetailsView({ projectId, propertyId }: PropertyDetailsVi
     try {
       setLoading(true);
       
-      // Load tasks with field values
+      // Load ALL tasks (not just those with field_value)
+      // This ensures attachments show even if no text value was entered
       const { data: tasksData, error: tasksError } = await supabase
         .from('onboarding_tasks')
         .select('*')
         .eq('project_id', projectId)
-        .not('field_value', 'is', null)
-        .neq('field_value', '')
         .order('phase_number', { ascending: true });
 
       if (tasksError) throw tasksError;
@@ -60,11 +59,14 @@ export function PropertyDetailsView({ projectId, propertyId }: PropertyDetailsVi
     };
 
     tasks.forEach(task => {
-      if (!task.field_value) return;
-
-      const title = task.title.toLowerCase();
-      const value = task.field_value;
+      // Show task if it has a field_value OR if it has attachments
+      const hasValue = task.field_value && task.field_value.trim() !== '';
       const taskId = task.id;
+      
+      if (!hasValue && !taskId) return; // Skip if no value and no taskId for attachments
+      
+      const title = task.title.toLowerCase();
+      const value = task.field_value || '(See attachments)';
 
       if (title.includes('owner') || title.includes('contact')) {
         if (title.includes('email')) {
