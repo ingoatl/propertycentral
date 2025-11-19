@@ -6,6 +6,7 @@ import { OnboardingTask } from "@/types/onboarding";
 import { Loader2, MapPin, User, Lock, Phone, Link as LinkIcon, Mail, Home } from "lucide-react";
 import { toast } from "sonner";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { TaskFilePreview } from "./TaskFilePreview";
 
 interface PropertyDetailsViewProps {
   projectId: string;
@@ -13,7 +14,7 @@ interface PropertyDetailsViewProps {
 }
 
 interface CategorizedData {
-  [category: string]: { label: string; value: string; icon?: any }[];
+  [category: string]: { label: string; value: string; icon?: any; taskId?: string }[];
 }
 
 export function PropertyDetailsView({ projectId, propertyId }: PropertyDetailsViewProps) {
@@ -63,33 +64,34 @@ export function PropertyDetailsView({ projectId, propertyId }: PropertyDetailsVi
 
       const title = task.title.toLowerCase();
       const value = task.field_value;
+      const taskId = task.id;
 
       if (title.includes('owner') || title.includes('contact')) {
         if (title.includes('email')) {
-          categories['Owner Information'].push({ label: task.title, value, icon: Mail });
+          categories['Owner Information'].push({ label: task.title, value, icon: Mail, taskId });
         } else if (title.includes('phone')) {
-          categories['Owner Information'].push({ label: task.title, value, icon: Phone });
+          categories['Owner Information'].push({ label: task.title, value, icon: Phone, taskId });
         } else if (title.includes('name')) {
-          categories['Owner Information'].push({ label: task.title, value, icon: User });
+          categories['Owner Information'].push({ label: task.title, value, icon: User, taskId });
         } else {
-          categories['Owner Information'].push({ label: task.title, value });
+          categories['Owner Information'].push({ label: task.title, value, taskId });
         }
       } else if (title.includes('code') || title.includes('password') || title.includes('wifi') || title.includes('lock') || title.includes('gate')) {
-        categories['Access & Codes'].push({ label: task.title, value, icon: Lock });
+        categories['Access & Codes'].push({ label: task.title, value, icon: Lock, taskId });
       } else if (title.includes('address') || title.includes('bedroom') || title.includes('bathroom') || title.includes('parking')) {
         if (title.includes('address')) {
-          categories['Property Details'].push({ label: task.title, value, icon: MapPin });
+          categories['Property Details'].push({ label: task.title, value, icon: MapPin, taskId });
         } else {
-          categories['Property Details'].push({ label: task.title, value, icon: Home });
+          categories['Property Details'].push({ label: task.title, value, icon: Home, taskId });
         }
       } else if (title.includes('listing') || title.includes('airbnb') || title.includes('vrbo') || title.includes('link') || title.includes('url')) {
-        categories['Listings & Links'].push({ label: task.title, value, icon: LinkIcon });
+        categories['Listings & Links'].push({ label: task.title, value, icon: LinkIcon, taskId });
       } else if (title.includes('cleaner') || title.includes('maintenance') || title.includes('vendor') || title.includes('service')) {
-        categories['Service Providers'].push({ label: task.title, value });
+        categories['Service Providers'].push({ label: task.title, value, taskId });
       } else if (title.includes('utility') || title.includes('electric') || title.includes('water') || title.includes('gas') || title.includes('account')) {
-        categories['Utilities & Accounts'].push({ label: task.title, value });
+        categories['Utilities & Accounts'].push({ label: task.title, value, taskId });
       } else if (title.includes('emergency') || title.includes('safety') || title.includes('fire') || title.includes('alarm')) {
-        categories['Emergency & Safety'].push({ label: task.title, value });
+        categories['Emergency & Safety'].push({ label: task.title, value, taskId });
       }
     });
 
@@ -134,6 +136,11 @@ export function PropertyDetailsView({ projectId, propertyId }: PropertyDetailsVi
                           </p>
                         </div>
                         <p className="text-sm ml-5 break-words">{item.value}</p>
+                        {item.taskId && (
+                          <div className="ml-5 mt-2">
+                            <TaskFilePreview taskId={item.taskId} />
+                          </div>
+                        )}
                       </div>
                     );
                   })}
