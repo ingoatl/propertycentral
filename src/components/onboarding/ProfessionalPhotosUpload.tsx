@@ -27,9 +27,9 @@ export const ProfessionalPhotosUpload = ({ taskId, onFilesUploaded }: Profession
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Check file size (max 10MB)
-    if (file.size > 10 * 1024 * 1024) {
-      toast.error("File exceeds 10MB limit");
+    // Check file size (max 50MB)
+    if (file.size > 50 * 1024 * 1024) {
+      toast.error("File exceeds 50MB limit");
       return;
     }
 

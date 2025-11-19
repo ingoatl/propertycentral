@@ -116,8 +116,8 @@ const Expenses = () => {
         toast.error("Please upload an image (JPG, PNG, WEBP) or PDF file");
         return;
       }
-      if (file.size > 10 * 1024 * 1024) { // 10MB limit
-        toast.error("File size must be less than 10MB");
+      if (file.size > 50 * 1024 * 1024) { // 50MB limit
+        toast.error("File size must be less than 50MB");
         return;
       }
       setSelectedFile(file);
