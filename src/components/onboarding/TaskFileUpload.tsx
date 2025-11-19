@@ -20,10 +20,10 @@ export const TaskFileUpload = ({ taskId, onFilesUploaded }: TaskFileUploadProps)
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
 
-    // Check file sizes (max 10MB per file)
-    const invalidFiles = files.filter(f => f.size > 10 * 1024 * 1024);
+    // Check file sizes (max 50MB per file)
+    const invalidFiles = files.filter(f => f.size > 50 * 1024 * 1024);
     if (invalidFiles.length > 0) {
-      toast.error("Some files exceed 10MB limit");
+      toast.error("Some files exceed 50MB limit");
       return;
     }
 
