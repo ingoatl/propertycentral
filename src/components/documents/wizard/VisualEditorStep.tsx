@@ -73,8 +73,9 @@ const VisualEditorStep = ({ data, updateData }: Props) => {
       <div>
         <Label className="text-lg font-medium">Visual Field Editor</Label>
         <p className="text-sm text-muted-foreground mt-1">
-          Create a draft document and use SignWell's visual editor to place signature fields,
-          text fields, checkboxes, and assign them to the guest or host.
+          Create a draft document with your pre-filled data. Guest info, property details, and lease
+          terms from the previous step will automatically fill any text tags in your template
+          (like [[guest_name]], [[property_address]], [[monthly_rent]]).
         </p>
       </div>
 
