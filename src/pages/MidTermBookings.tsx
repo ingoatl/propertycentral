@@ -13,15 +13,16 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { z } from "zod";
 import { format } from "date-fns";
-import { Plus, Trash2, CalendarIcon, Edit, User, Mail, Send, CheckCircle, FileText } from "lucide-react";
+import { Plus, Trash2, CalendarIcon, Edit, User, Mail, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { BookingDocuments } from "@/components/documents/BookingDocuments";
 import { DocumentTemplatesManager } from "@/components/documents/DocumentTemplatesManager";
+
 const bookingSchema = z.object({
   propertyId: z.string().uuid("Please select a property"),
   tenantName: z.string().min(1, "Tenant name is required").max(255),
-  tenantEmail: z.string().email("Invalid email address").optional().or(z.literal("")),
+  tenantEmail: z.string().email("Invalid email address"),
   tenantPhone: z.string().optional(),
   startDate: z.date({ required_error: "Start date is required" }),
   endDate: z.date({ required_error: "End date is required" }),
@@ -43,9 +44,6 @@ interface MidTermBooking {
   notes: string | null;
   status: string;
   created_at: string;
-  review_email_sent: boolean | null;
-  review_submitted: boolean | null;
-  review_token: string | null;
 }
 
 interface Property {
@@ -60,7 +58,6 @@ const MidTermBookings = () => {
   const [loading, setLoading] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingBooking, setEditingBooking] = useState<MidTermBooking | null>(null);
-  const [sendingReviewEmail, setSendingReviewEmail] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     propertyId: "",
     tenantName: "",
@@ -126,7 +123,7 @@ const MidTermBookings = () => {
     const validation = bookingSchema.safeParse({
       propertyId: formData.propertyId,
       tenantName: formData.tenantName,
-      tenantEmail: formData.tenantEmail || undefined,
+      tenantEmail: formData.tenantEmail,
       tenantPhone: formData.tenantPhone,
       startDate: formData.startDate,
       endDate: formData.endDate,
@@ -153,7 +150,7 @@ const MidTermBookings = () => {
       const bookingData = {
         property_id: formData.propertyId,
         tenant_name: formData.tenantName,
-        tenant_email: formData.tenantEmail || null,
+        tenant_email: formData.tenantEmail,
         tenant_phone: formData.tenantPhone || null,
         start_date: format(formData.startDate!, "yyyy-MM-dd"),
         end_date: format(formData.endDate!, "yyyy-MM-dd"),
@@ -225,37 +222,6 @@ const MidTermBookings = () => {
     }
   };
 
-  const handleSendReviewEmail = async (booking: MidTermBooking) => {
-    if (!booking.tenant_email) {
-      toast.error("No email address for this tenant");
-      return;
-    }
-
-    try {
-      setSendingReviewEmail(booking.id);
-      const property = properties.find(p => p.id === booking.property_id);
-      
-      const { error } = await supabase.functions.invoke("send-review-request-email", {
-        body: {
-          bookingId: booking.id,
-          tenantName: booking.tenant_name,
-          tenantEmail: booking.tenant_email,
-          propertyName: property?.name || "Your Property",
-          reviewToken: booking.review_token,
-        },
-      });
-
-      if (error) throw error;
-      toast.success("Review request email sent!");
-      loadData();
-    } catch (error: any) {
-      console.error("Error sending review email:", error);
-      toast.error("Failed to send review email");
-    } finally {
-      setSendingReviewEmail(null);
-    }
-  };
-
   const getPropertyName = (propertyId: string) => {
     return properties.find(p => p.id === propertyId)?.name || "Unknown Property";
   };
@@ -297,332 +263,301 @@ const MidTermBookings = () => {
             </Button>
           </div>
 
-      {/* Booking Dialog */}
-      <Dialog open={dialogOpen} onOpenChange={(open) => {
-        setDialogOpen(open);
-        if (!open) resetForm();
-      }}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{editingBooking ? "Edit" : "Add"} Mid-term Booking</DialogTitle>
-            <DialogDescription>
-              Enter tenant and rental details for the mid-term agreement
-            </DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="property">Property</Label>
-              <Select
-                value={formData.propertyId}
-                onValueChange={(value) => setFormData({ ...formData, propertyId: value })}
-              >
-                <SelectTrigger id="property">
-                  <SelectValue placeholder="Select a mid-term rental property..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {properties.map((property) => (
-                    <SelectItem key={property.id} value={property.id}>
-                      {property.name} - {property.address}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="tenantName">Tenant Name *</Label>
-                <Input
-                  id="tenantName"
-                  value={formData.tenantName}
-                  onChange={(e) => setFormData({ ...formData, tenantName: e.target.value })}
-                  placeholder="John Doe"
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="tenantEmail">Tenant Email</Label>
-                <Input
-                  id="tenantEmail"
-                  type="email"
-                  value={formData.tenantEmail}
-                  onChange={(e) => setFormData({ ...formData, tenantEmail: e.target.value })}
-                  placeholder="john@example.com"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="tenantPhone">Tenant Phone</Label>
-              <Input
-                id="tenantPhone"
-                type="tel"
-                value={formData.tenantPhone}
-                onChange={(e) => setFormData({ ...formData, tenantPhone: e.target.value })}
-                placeholder="+1 (555) 123-4567"
-              />
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Start Date *</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className={cn(
-                        "w-full justify-start text-left font-normal",
-                        !formData.startDate && "text-muted-foreground"
-                      )}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {formData.startDate ? format(formData.startDate, "PPP") : "Pick a date"}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={formData.startDate}
-                      onSelect={(date) => setFormData({ ...formData, startDate: date })}
-                      initialFocus
-                      className="pointer-events-auto"
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
-
-              <div className="space-y-2">
-                <Label>End Date *</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className={cn(
-                        "w-full justify-start text-left font-normal",
-                        !formData.endDate && "text-muted-foreground"
-                      )}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {formData.endDate ? format(formData.endDate, "PPP") : "Pick a date"}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={formData.endDate}
-                      onSelect={(date) => setFormData({ ...formData, endDate: date })}
-                      initialFocus
-                      className="pointer-events-auto"
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="monthlyRent">Monthly Rent ($) *</Label>
-                <Input
-                  id="monthlyRent"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={formData.monthlyRent}
-                  onChange={(e) => setFormData({ ...formData, monthlyRent: e.target.value })}
-                  placeholder="2500.00"
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="depositAmount">Deposit Amount ($)</Label>
-                <Input
-                  id="depositAmount"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={formData.depositAmount}
-                  onChange={(e) => setFormData({ ...formData, depositAmount: e.target.value })}
-                  placeholder="0.00"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="notes">Notes</Label>
-              <Textarea
-                id="notes"
-                value={formData.notes}
-                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                placeholder="Additional notes about the tenant or rental agreement..."
-                rows={3}
-              />
-            </div>
-
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  setDialogOpen(false);
-                  resetForm();
-                }}
-              >
-                Cancel
-              </Button>
-              <Button type="submit" disabled={loading} className="shadow-warm">
-                {loading ? "Saving..." : editingBooking ? "Update Booking" : "Create Booking"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-
-      {/* Bookings List */}
-      <div className="grid gap-4">
-        {loading && bookings.length === 0 ? (
-          <Card>
-            <CardContent className="pt-6">
-              <p className="text-center text-muted-foreground">Loading...</p>
-            </CardContent>
-          </Card>
-        ) : bookings.length === 0 ? (
-          <Card>
-            <CardContent className="pt-12 pb-12 text-center">
-              <User className="h-12 w-12 text-muted-foreground mx-auto mb-4 opacity-50" />
-              <p className="text-muted-foreground">No mid-term bookings yet. Add your first booking to get started!</p>
-            </CardContent>
-          </Card>
-        ) : (
-          bookings.map((booking) => (
-            <Card key={booking.id} className="shadow-card border-border/50 hover:shadow-warm transition-shadow">
-              <CardHeader className="bg-gradient-subtle rounded-t-lg">
-                <div className="flex justify-between items-start">
-                  <div className="flex-1">
-                    <CardTitle className="flex items-center gap-2">
-                      <User className="w-5 h-5" />
-                      {booking.tenant_name}
-                    </CardTitle>
-                    <CardDescription className="mt-2 space-y-1">
-                      <div className="font-medium text-foreground">
-                        {getPropertyName(booking.property_id)}
-                      </div>
-                      {booking.tenant_email && (
-                        <div className="flex items-center gap-1">
-                          <Mail className="w-3 h-3" />
-                          {booking.tenant_email}
-                        </div>
-                      )}
-                      {booking.tenant_phone && <div>📞 {booking.tenant_phone}</div>}
-                    </CardDescription>
-                  </div>
-                  <div className="flex gap-2 flex-wrap justify-end">
-                    <Badge variant={booking.status === "active" ? "default" : "secondary"}>
-                      {booking.status}
-                    </Badge>
-                    {booking.review_submitted && (
-                      <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
-                        <CheckCircle className="w-3 h-3 mr-1" />
-                        Reviewed
-                      </Badge>
-                    )}
-                    {booking.review_email_sent && !booking.review_submitted && (
-                      <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-                        <Send className="w-3 h-3 mr-1" />
-                        Email Sent
-                      </Badge>
-                    )}
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleEdit(booking)}
-                      className="text-primary hover:text-primary hover:bg-primary/10"
-                    >
-                      <Edit className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleDelete(booking.id)}
-                      className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </div>
+          {/* Booking Dialog */}
+          <Dialog open={dialogOpen} onOpenChange={(open) => {
+            setDialogOpen(open);
+            if (!open) resetForm();
+          }}>
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>{editingBooking ? "Edit" : "Add"} Mid-term Booking</DialogTitle>
+                <DialogDescription>
+                  Enter tenant and rental details for the mid-term agreement
+                </DialogDescription>
+              </DialogHeader>
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="property">Property</Label>
+                  <Select
+                    value={formData.propertyId}
+                    onValueChange={(value) => setFormData({ ...formData, propertyId: value })}
+                  >
+                    <SelectTrigger id="property">
+                      <SelectValue placeholder="Select a mid-term rental property..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {properties.map((property) => (
+                        <SelectItem key={property.id} value={property.id}>
+                          {property.name} - {property.address}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
-              </CardHeader>
-              <CardContent className="pt-6">
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <div className="text-sm text-muted-foreground">Rental Period</div>
-                    <div className="flex items-center gap-2">
-                      <CalendarIcon className="w-4 h-4" />
-                      <span className="font-medium">
-                        {format(new Date(booking.start_date), "MMM dd, yyyy")} -{" "}
-                        {format(new Date(booking.end_date), "MMM dd, yyyy")}
-                      </span>
-                    </div>
+                    <Label htmlFor="tenantName">Tenant Name *</Label>
+                    <Input
+                      id="tenantName"
+                      value={formData.tenantName}
+                      onChange={(e) => setFormData({ ...formData, tenantName: e.target.value })}
+                      placeholder="John Doe"
+                      required
+                    />
                   </div>
                   <div className="space-y-2">
-                    <div className="text-sm text-muted-foreground">Monthly Rent</div>
-                    <div className="text-xl font-bold text-primary">
-                      ${booking.monthly_rent.toLocaleString()}
-                    </div>
+                    <Label htmlFor="tenantEmail">Tenant Email *</Label>
+                    <Input
+                      id="tenantEmail"
+                      type="email"
+                      value={formData.tenantEmail}
+                      onChange={(e) => setFormData({ ...formData, tenantEmail: e.target.value })}
+                      placeholder="john@example.com"
+                      required
+                    />
                   </div>
                 </div>
-                {booking.deposit_amount > 0 && (
-                  <div className="mt-4 pt-4 border-t border-border/50">
-                    <span className="text-sm text-muted-foreground">Deposit: </span>
-                    <span className="font-medium">${booking.deposit_amount.toLocaleString()}</span>
-                  </div>
-                )}
-                {booking.notes && (
-                  <div className="mt-4 pt-4 border-t border-border/50">
-                    <span className="text-sm text-muted-foreground">Notes: </span>
-                    <span>{booking.notes}</span>
-                  </div>
-                )}
-                
-                {/* Review Request Button */}
-                {booking.tenant_email && !booking.review_submitted && (
-                  <div className="mt-4 pt-4 border-t border-border/50">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleSendReviewEmail(booking)}
-                      disabled={sendingReviewEmail === booking.id}
-                      className="gap-2"
-                    >
-                      <Send className="w-4 h-4" />
-                      {sendingReviewEmail === booking.id 
-                        ? "Sending..." 
-                        : booking.review_email_sent 
-                          ? "Resend Review Request" 
-                          : "Send Review Request"}
-                    </Button>
-                  </div>
-                )}
 
-                {/* Documents Section */}
-                <div className="mt-4 pt-4 border-t border-border/50">
-                  <BookingDocuments 
-                    booking={{
-                      id: booking.id,
-                      tenant_name: booking.tenant_name,
-                      tenant_email: booking.tenant_email,
-                      property_id: booking.property_id,
-                      monthly_rent: booking.monthly_rent,
-                      deposit_amount: booking.deposit_amount,
-                      start_date: booking.start_date,
-                      end_date: booking.end_date,
-                    }}
-                    properties={properties}
+                <div className="space-y-2">
+                  <Label htmlFor="tenantPhone">Tenant Phone</Label>
+                  <Input
+                    id="tenantPhone"
+                    type="tel"
+                    value={formData.tenantPhone}
+                    onChange={(e) => setFormData({ ...formData, tenantPhone: e.target.value })}
+                    placeholder="+1 (555) 123-4567"
                   />
                 </div>
-              </CardContent>
-            </Card>
-          ))
-        )}
-      </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Start Date *</Label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className={cn(
+                            "w-full justify-start text-left font-normal",
+                            !formData.startDate && "text-muted-foreground"
+                          )}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {formData.startDate ? format(formData.startDate, "PPP") : "Pick a date"}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={formData.startDate}
+                          onSelect={(date) => setFormData({ ...formData, startDate: date })}
+                          initialFocus
+                          className="pointer-events-auto"
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>End Date *</Label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className={cn(
+                            "w-full justify-start text-left font-normal",
+                            !formData.endDate && "text-muted-foreground"
+                          )}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {formData.endDate ? format(formData.endDate, "PPP") : "Pick a date"}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={formData.endDate}
+                          onSelect={(date) => setFormData({ ...formData, endDate: date })}
+                          initialFocus
+                          className="pointer-events-auto"
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="monthlyRent">Monthly Rent ($) *</Label>
+                    <Input
+                      id="monthlyRent"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={formData.monthlyRent}
+                      onChange={(e) => setFormData({ ...formData, monthlyRent: e.target.value })}
+                      placeholder="2500.00"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="depositAmount">Deposit Amount ($)</Label>
+                    <Input
+                      id="depositAmount"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={formData.depositAmount}
+                      onChange={(e) => setFormData({ ...formData, depositAmount: e.target.value })}
+                      placeholder="0.00"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="notes">Notes</Label>
+                  <Textarea
+                    id="notes"
+                    value={formData.notes}
+                    onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                    placeholder="Additional notes about the tenant or rental agreement..."
+                    rows={3}
+                  />
+                </div>
+
+                <DialogFooter>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setDialogOpen(false);
+                      resetForm();
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                  <Button type="submit" disabled={loading} className="shadow-warm">
+                    {loading ? "Saving..." : editingBooking ? "Update Booking" : "Create Booking"}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
+
+          {/* Bookings List */}
+          <div className="grid gap-4">
+            {loading && bookings.length === 0 ? (
+              <Card>
+                <CardContent className="pt-6">
+                  <p className="text-center text-muted-foreground">Loading...</p>
+                </CardContent>
+              </Card>
+            ) : bookings.length === 0 ? (
+              <Card>
+                <CardContent className="pt-12 pb-12 text-center">
+                  <User className="h-12 w-12 text-muted-foreground mx-auto mb-4 opacity-50" />
+                  <p className="text-muted-foreground">No mid-term bookings yet. Add your first booking to get started!</p>
+                </CardContent>
+              </Card>
+            ) : (
+              bookings.map((booking) => (
+                <Card key={booking.id} className="shadow-card border-border/50 hover:shadow-warm transition-shadow">
+                  <CardHeader className="bg-gradient-subtle rounded-t-lg">
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <CardTitle className="flex items-center gap-2">
+                          <User className="w-5 h-5" />
+                          {booking.tenant_name}
+                        </CardTitle>
+                        <CardDescription className="mt-2 space-y-1">
+                          <div className="font-medium text-foreground">
+                            {getPropertyName(booking.property_id)}
+                          </div>
+                          {booking.tenant_email && (
+                            <div className="flex items-center gap-1">
+                              <Mail className="w-3 h-3" />
+                              {booking.tenant_email}
+                            </div>
+                          )}
+                          {booking.tenant_phone && <div>📞 {booking.tenant_phone}</div>}
+                        </CardDescription>
+                      </div>
+                      <div className="flex gap-2 flex-wrap justify-end">
+                        <Badge variant={booking.status === "active" ? "default" : "secondary"}>
+                          {booking.status}
+                        </Badge>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleEdit(booking)}
+                          className="text-primary hover:text-primary hover:bg-primary/10"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDelete(booking.id)}
+                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="pt-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <div className="text-sm text-muted-foreground">Rental Period</div>
+                        <div className="flex items-center gap-2">
+                          <CalendarIcon className="w-4 h-4" />
+                          <span className="font-medium">
+                            {format(new Date(booking.start_date), "MMM dd, yyyy")} -{" "}
+                            {format(new Date(booking.end_date), "MMM dd, yyyy")}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <div className="text-sm text-muted-foreground">Monthly Rent</div>
+                        <div className="text-xl font-bold text-primary">
+                          ${booking.monthly_rent.toLocaleString()}
+                        </div>
+                      </div>
+                    </div>
+                    {booking.deposit_amount > 0 && (
+                      <div className="mt-4 pt-4 border-t border-border/50">
+                        <span className="text-sm text-muted-foreground">Deposit: </span>
+                        <span className="font-medium">${booking.deposit_amount.toLocaleString()}</span>
+                      </div>
+                    )}
+                    {booking.notes && (
+                      <div className="mt-4 pt-4 border-t border-border/50">
+                        <span className="text-sm text-muted-foreground">Notes: </span>
+                        <span>{booking.notes}</span>
+                      </div>
+                    )}
+
+                    {/* Documents Section */}
+                    <div className="mt-4 pt-4 border-t border-border/50">
+                      <BookingDocuments 
+                        booking={{
+                          id: booking.id,
+                          tenant_name: booking.tenant_name,
+                          tenant_email: booking.tenant_email,
+                          property_id: booking.property_id,
+                          monthly_rent: booking.monthly_rent,
+                          deposit_amount: booking.deposit_amount,
+                          start_date: booking.start_date,
+                          end_date: booking.end_date,
+                        }}
+                        properties={properties}
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            )}
+          </div>
         </TabsContent>
 
         <TabsContent value="templates" className="mt-6">
