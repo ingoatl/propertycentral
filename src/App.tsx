@@ -16,6 +16,7 @@ import MonthlyCharges from "./pages/MonthlyCharges";
 import MidTermBookings from "./pages/MidTermBookings";
 import Bookings from "./pages/Bookings";
 import LeaveReview from "./pages/LeaveReview";
+import PublicReview from "./pages/PublicReview";
 
 const queryClient = new QueryClient();
 
@@ -28,6 +29,7 @@ const App = () => (
         <Routes>
           <Route path="/auth" element={<Auth />} />
           <Route path="/leave-review" element={<LeaveReview />} />
+          <Route path="/review" element={<PublicReview />} />
           <Route path="*" element={
             <Layout>
               <Routes>
