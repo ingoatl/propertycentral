@@ -17,6 +17,7 @@ import MidTermBookings from "./pages/MidTermBookings";
 import Bookings from "./pages/Bookings";
 import LeaveReview from "./pages/LeaveReview";
 import PublicReview from "./pages/PublicReview";
+import Documents from "./pages/Documents";
 
 const queryClient = new QueryClient();
 
@@ -42,6 +43,7 @@ const App = () => (
                 <Route path="/charges" element={<MonthlyCharges />} />
                 <Route path="/mid-term-bookings" element={<MidTermBookings />} />
                 <Route path="/bookings" element={<Bookings />} />
+                <Route path="/documents" element={<Documents />} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>
