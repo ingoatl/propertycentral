@@ -3,7 +3,6 @@ project_id = "ijsxcaaqphaciaenlegl"
 [functions.backfill-expense-receipts]
 verify_jwt = false
 
-
 [functions.send-team-performance-digest]
 verify_jwt = false
 
@@ -77,4 +76,13 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.check-review-eligible-tenants]
+verify_jwt = false
+
+[functions.signwell-create-document]
+verify_jwt = true
+
+[functions.signwell-get-signing-url]
+verify_jwt = true
+
+[functions.signwell-webhook]
 verify_jwt = false

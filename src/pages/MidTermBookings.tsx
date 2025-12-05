@@ -9,13 +9,15 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Textarea } from "@/components/ui/textarea";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { z } from "zod";
 import { format } from "date-fns";
-import { Plus, Trash2, CalendarIcon, Edit, User, Mail, Send, CheckCircle } from "lucide-react";
+import { Plus, Trash2, CalendarIcon, Edit, User, Mail, Send, CheckCircle, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
-
+import { BookingDocuments } from "@/components/documents/BookingDocuments";
+import { DocumentTemplatesManager } from "@/components/documents/DocumentTemplatesManager";
 const bookingSchema = z.object({
   propertyId: z.string().uuid("Please select a property"),
   tenantName: z.string().min(1, "Tenant name is required").max(255),
@@ -267,17 +269,33 @@ const MidTermBookings = () => {
           </h1>
           <p className="text-muted-foreground mt-1">Track monthly rental agreements and revenue</p>
         </div>
-        <Button
-          onClick={() => {
-            resetForm();
-            setDialogOpen(true);
-          }}
-          className="gap-2 shadow-warm hover:scale-105 transition-transform"
-        >
-          <Plus className="w-4 h-4" />
-          Add Booking
-        </Button>
       </div>
+
+      <Tabs defaultValue="bookings" className="w-full">
+        <TabsList>
+          <TabsTrigger value="bookings" className="gap-2">
+            <User className="w-4 h-4" />
+            Bookings
+          </TabsTrigger>
+          <TabsTrigger value="templates" className="gap-2">
+            <FileText className="w-4 h-4" />
+            Document Templates
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="bookings" className="mt-6">
+          <div className="flex justify-end mb-4">
+            <Button
+              onClick={() => {
+                resetForm();
+                setDialogOpen(true);
+              }}
+              className="gap-2 shadow-warm hover:scale-105 transition-transform"
+            >
+              <Plus className="w-4 h-4" />
+              Add Booking
+            </Button>
+          </div>
 
       {/* Booking Dialog */}
       <Dialog open={dialogOpen} onOpenChange={(open) => {
@@ -583,11 +601,34 @@ const MidTermBookings = () => {
                     </Button>
                   </div>
                 )}
+
+                {/* Documents Section */}
+                <div className="mt-4 pt-4 border-t border-border/50">
+                  <BookingDocuments 
+                    booking={{
+                      id: booking.id,
+                      tenant_name: booking.tenant_name,
+                      tenant_email: booking.tenant_email,
+                      property_id: booking.property_id,
+                      monthly_rent: booking.monthly_rent,
+                      deposit_amount: booking.deposit_amount,
+                      start_date: booking.start_date,
+                      end_date: booking.end_date,
+                    }}
+                    properties={properties}
+                  />
+                </div>
               </CardContent>
             </Card>
           ))
         )}
       </div>
+        </TabsContent>
+
+        <TabsContent value="templates" className="mt-6">
+          <DocumentTemplatesManager />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };

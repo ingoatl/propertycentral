@@ -14,6 +14,66 @@ export type Database = {
   }
   public: {
     Tables: {
+      booking_documents: {
+        Row: {
+          booking_id: string | null
+          completed_at: string | null
+          created_at: string | null
+          guest_signed_at: string | null
+          host_signed_at: string | null
+          host_signer_id: string | null
+          id: string
+          sent_at: string | null
+          signed_document_path: string | null
+          signwell_document_id: string | null
+          status: string | null
+          template_id: string | null
+        }
+        Insert: {
+          booking_id?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          guest_signed_at?: string | null
+          host_signed_at?: string | null
+          host_signer_id?: string | null
+          id?: string
+          sent_at?: string | null
+          signed_document_path?: string | null
+          signwell_document_id?: string | null
+          status?: string | null
+          template_id?: string | null
+        }
+        Update: {
+          booking_id?: string | null
+          completed_at?: string | null
+          created_at?: string | null
+          guest_signed_at?: string | null
+          host_signed_at?: string | null
+          host_signer_id?: string | null
+          id?: string
+          sent_at?: string | null
+          signed_document_path?: string | null
+          signwell_document_id?: string | null
+          status?: string | null
+          template_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "booking_documents_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "mid_term_bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booking_documents_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "document_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       bug_reports: {
         Row: {
           description: string
@@ -127,6 +187,86 @@ export type Database = {
           team_id?: string | null
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      document_audit_log: {
+        Row: {
+          action: string
+          created_at: string | null
+          document_id: string | null
+          id: string
+          ip_address: string | null
+          metadata: Json | null
+          performed_by: string | null
+          user_agent: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string | null
+          document_id?: string | null
+          id?: string
+          ip_address?: string | null
+          metadata?: Json | null
+          performed_by?: string | null
+          user_agent?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string | null
+          document_id?: string | null
+          id?: string
+          ip_address?: string | null
+          metadata?: Json | null
+          performed_by?: string | null
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_audit_log_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "booking_documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      document_templates: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          field_mappings: Json | null
+          file_path: string
+          id: string
+          is_active: boolean | null
+          name: string
+          signwell_template_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          field_mappings?: Json | null
+          file_path: string
+          id?: string
+          is_active?: boolean | null
+          name: string
+          signwell_template_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          field_mappings?: Json | null
+          file_path?: string
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          signwell_template_id?: string | null
+          updated_at?: string | null
         }
         Relationships: []
       }
