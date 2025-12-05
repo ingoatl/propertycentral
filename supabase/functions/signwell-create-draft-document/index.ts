@@ -91,7 +91,10 @@ serve(async (req) => {
         : [
             {
               name: template.name,
-              file_url: `${SUPABASE_URL}/storage/v1/object/public/onboarding-documents/${template.file_path}`,
+              // Check if file_path is already a full URL or just a relative path
+              file_url: template.file_path.startsWith("http")
+                ? template.file_path
+                : `${SUPABASE_URL}/storage/v1/object/public/onboarding-documents/${template.file_path}`,
             },
           ],
       template_id: template.signwell_template_id || undefined,
