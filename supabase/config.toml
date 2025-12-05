@@ -86,3 +86,9 @@ verify_jwt = true
 
 [functions.signwell-webhook]
 verify_jwt = false
+
+[functions.signwell-create-draft-document]
+verify_jwt = true
+
+[functions.signwell-finalize-document]
+verify_jwt = true

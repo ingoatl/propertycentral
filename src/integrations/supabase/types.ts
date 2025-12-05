@@ -19,12 +19,21 @@ export type Database = {
           booking_id: string | null
           completed_at: string | null
           created_at: string | null
+          created_by: string | null
+          document_name: string | null
+          document_type: string | null
+          embedded_edit_url: string | null
+          field_configuration: Json | null
           guest_signed_at: string | null
           guest_signing_url: string | null
           host_signed_at: string | null
           host_signer_id: string | null
           host_signing_url: string | null
           id: string
+          is_draft: boolean | null
+          property_id: string | null
+          recipient_email: string | null
+          recipient_name: string | null
           sent_at: string | null
           signed_document_path: string | null
           signwell_document_id: string | null
@@ -35,12 +44,21 @@ export type Database = {
           booking_id?: string | null
           completed_at?: string | null
           created_at?: string | null
+          created_by?: string | null
+          document_name?: string | null
+          document_type?: string | null
+          embedded_edit_url?: string | null
+          field_configuration?: Json | null
           guest_signed_at?: string | null
           guest_signing_url?: string | null
           host_signed_at?: string | null
           host_signer_id?: string | null
           host_signing_url?: string | null
           id?: string
+          is_draft?: boolean | null
+          property_id?: string | null
+          recipient_email?: string | null
+          recipient_name?: string | null
           sent_at?: string | null
           signed_document_path?: string | null
           signwell_document_id?: string | null
@@ -51,12 +69,21 @@ export type Database = {
           booking_id?: string | null
           completed_at?: string | null
           created_at?: string | null
+          created_by?: string | null
+          document_name?: string | null
+          document_type?: string | null
+          embedded_edit_url?: string | null
+          field_configuration?: Json | null
           guest_signed_at?: string | null
           guest_signing_url?: string | null
           host_signed_at?: string | null
           host_signer_id?: string | null
           host_signing_url?: string | null
           id?: string
+          is_draft?: boolean | null
+          property_id?: string | null
+          recipient_email?: string | null
+          recipient_name?: string | null
           sent_at?: string | null
           signed_document_path?: string | null
           signwell_document_id?: string | null
@@ -69,6 +96,20 @@ export type Database = {
             columns: ["booking_id"]
             isOneToOne: false
             referencedRelation: "mid_term_bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booking_documents_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "comprehensive_property_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booking_documents_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
             referencedColumns: ["id"]
           },
           {

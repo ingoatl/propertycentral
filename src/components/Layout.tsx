@@ -1,6 +1,6 @@
 import { ReactNode, useState, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Home, Building2, DollarSign, Calendar, LogOut, Shield, Users, Receipt, FileText, CalendarDays } from "lucide-react";
+import { Home, Building2, DollarSign, Calendar, LogOut, Shield, Users, Receipt, FileText, CalendarDays, FileSignature } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
@@ -92,6 +92,7 @@ const Layout = ({ children }: LayoutProps) => {
       { path: "/expenses", label: "Expenses", icon: DollarSign },
       { path: "/bookings", label: "Bookings", icon: CalendarDays },
       { path: "/mid-term-bookings", label: "Mid-term Bookings", icon: FileText },
+      { path: "/documents", label: "Documents", icon: FileSignature },
     ] : []),
     ...(isAdmin ? [
       { path: "/owners", label: "Owners", icon: Users },
