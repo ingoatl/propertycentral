@@ -69,3 +69,12 @@ verify_jwt = true
 
 [functions.update-reconciliation-and-resend]
 verify_jwt = true
+
+[functions.send-review-request-email]
+verify_jwt = false
+
+[functions.mark-review-submitted]
+verify_jwt = false
+
+[functions.check-review-eligible-tenants]
+verify_jwt = false

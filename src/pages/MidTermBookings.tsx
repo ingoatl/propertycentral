@@ -12,13 +12,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { z } from "zod";
 import { format } from "date-fns";
-import { Plus, Trash2, CalendarIcon, Edit, User } from "lucide-react";
+import { Plus, Trash2, CalendarIcon, Edit, User, Mail, Send, CheckCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 
 const bookingSchema = z.object({
   propertyId: z.string().uuid("Please select a property"),
   tenantName: z.string().min(1, "Tenant name is required").max(255),
+  tenantEmail: z.string().email("Invalid email address").optional().or(z.literal("")),
   tenantPhone: z.string().optional(),
   startDate: z.date({ required_error: "Start date is required" }),
   endDate: z.date({ required_error: "End date is required" }),
@@ -40,6 +41,9 @@ interface MidTermBooking {
   notes: string | null;
   status: string;
   created_at: string;
+  review_email_sent: boolean | null;
+  review_submitted: boolean | null;
+  review_token: string | null;
 }
 
 interface Property {
@@ -54,9 +58,11 @@ const MidTermBookings = () => {
   const [loading, setLoading] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingBooking, setEditingBooking] = useState<MidTermBooking | null>(null);
+  const [sendingReviewEmail, setSendingReviewEmail] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     propertyId: "",
     tenantName: "",
+    tenantEmail: "",
     tenantPhone: "",
     startDate: undefined as Date | undefined,
     endDate: undefined as Date | undefined,
@@ -101,6 +107,7 @@ const MidTermBookings = () => {
     setFormData({
       propertyId: "",
       tenantName: "",
+      tenantEmail: "",
       tenantPhone: "",
       startDate: undefined,
       endDate: undefined,
@@ -117,6 +124,7 @@ const MidTermBookings = () => {
     const validation = bookingSchema.safeParse({
       propertyId: formData.propertyId,
       tenantName: formData.tenantName,
+      tenantEmail: formData.tenantEmail || undefined,
       tenantPhone: formData.tenantPhone,
       startDate: formData.startDate,
       endDate: formData.endDate,
@@ -143,6 +151,7 @@ const MidTermBookings = () => {
       const bookingData = {
         property_id: formData.propertyId,
         tenant_name: formData.tenantName,
+        tenant_email: formData.tenantEmail || null,
         tenant_phone: formData.tenantPhone || null,
         start_date: format(formData.startDate!, "yyyy-MM-dd"),
         end_date: format(formData.endDate!, "yyyy-MM-dd"),
@@ -185,6 +194,7 @@ const MidTermBookings = () => {
     setFormData({
       propertyId: booking.property_id,
       tenantName: booking.tenant_name,
+      tenantEmail: booking.tenant_email || "",
       tenantPhone: booking.tenant_phone || "",
       startDate: new Date(booking.start_date),
       endDate: new Date(booking.end_date),
@@ -210,6 +220,37 @@ const MidTermBookings = () => {
     } catch (error: any) {
       console.error("Error deleting booking:", error);
       toast.error("Failed to delete booking");
+    }
+  };
+
+  const handleSendReviewEmail = async (booking: MidTermBooking) => {
+    if (!booking.tenant_email) {
+      toast.error("No email address for this tenant");
+      return;
+    }
+
+    try {
+      setSendingReviewEmail(booking.id);
+      const property = properties.find(p => p.id === booking.property_id);
+      
+      const { error } = await supabase.functions.invoke("send-review-request-email", {
+        body: {
+          bookingId: booking.id,
+          tenantName: booking.tenant_name,
+          tenantEmail: booking.tenant_email,
+          propertyName: property?.name || "Your Property",
+          reviewToken: booking.review_token,
+        },
+      });
+
+      if (error) throw error;
+      toast.success("Review request email sent!");
+      loadData();
+    } catch (error: any) {
+      console.error("Error sending review email:", error);
+      toast.error("Failed to send review email");
+    } finally {
+      setSendingReviewEmail(null);
     }
   };
 
@@ -282,15 +323,26 @@ const MidTermBookings = () => {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="tenantPhone">Tenant Phone</Label>
+                <Label htmlFor="tenantEmail">Tenant Email</Label>
                 <Input
-                  id="tenantPhone"
-                  type="tel"
-                  value={formData.tenantPhone}
-                  onChange={(e) => setFormData({ ...formData, tenantPhone: e.target.value })}
-                  placeholder="+1 (555) 123-4567"
+                  id="tenantEmail"
+                  type="email"
+                  value={formData.tenantEmail}
+                  onChange={(e) => setFormData({ ...formData, tenantEmail: e.target.value })}
+                  placeholder="john@example.com"
                 />
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="tenantPhone">Tenant Phone</Label>
+              <Input
+                id="tenantPhone"
+                type="tel"
+                value={formData.tenantPhone}
+                onChange={(e) => setFormData({ ...formData, tenantPhone: e.target.value })}
+                placeholder="+1 (555) 123-4567"
+              />
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -436,13 +488,31 @@ const MidTermBookings = () => {
                       <div className="font-medium text-foreground">
                         {getPropertyName(booking.property_id)}
                       </div>
+                      {booking.tenant_email && (
+                        <div className="flex items-center gap-1">
+                          <Mail className="w-3 h-3" />
+                          {booking.tenant_email}
+                        </div>
+                      )}
                       {booking.tenant_phone && <div>📞 {booking.tenant_phone}</div>}
                     </CardDescription>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 flex-wrap justify-end">
                     <Badge variant={booking.status === "active" ? "default" : "secondary"}>
                       {booking.status}
                     </Badge>
+                    {booking.review_submitted && (
+                      <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                        <CheckCircle className="w-3 h-3 mr-1" />
+                        Reviewed
+                      </Badge>
+                    )}
+                    {booking.review_email_sent && !booking.review_submitted && (
+                      <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                        <Send className="w-3 h-3 mr-1" />
+                        Email Sent
+                      </Badge>
+                    )}
                     <Button
                       variant="ghost"
                       size="icon"
@@ -476,23 +546,43 @@ const MidTermBookings = () => {
                   </div>
                   <div className="space-y-2">
                     <div className="text-sm text-muted-foreground">Monthly Rent</div>
-                    <div className="text-2xl font-bold text-primary">
-                      ${Number(booking.monthly_rent).toFixed(2)}
+                    <div className="text-xl font-bold text-primary">
+                      ${booking.monthly_rent.toLocaleString()}
                     </div>
                   </div>
-                  {booking.deposit_amount > 0 && (
-                    <div className="space-y-2">
-                      <div className="text-sm text-muted-foreground">Deposit</div>
-                      <div className="font-medium">${Number(booking.deposit_amount).toFixed(2)}</div>
-                    </div>
-                  )}
-                  {booking.notes && (
-                    <div className="col-span-full space-y-2">
-                      <div className="text-sm text-muted-foreground">Notes</div>
-                      <div className="text-sm bg-muted/30 p-3 rounded-lg">{booking.notes}</div>
-                    </div>
-                  )}
                 </div>
+                {booking.deposit_amount > 0 && (
+                  <div className="mt-4 pt-4 border-t border-border/50">
+                    <span className="text-sm text-muted-foreground">Deposit: </span>
+                    <span className="font-medium">${booking.deposit_amount.toLocaleString()}</span>
+                  </div>
+                )}
+                {booking.notes && (
+                  <div className="mt-4 pt-4 border-t border-border/50">
+                    <span className="text-sm text-muted-foreground">Notes: </span>
+                    <span>{booking.notes}</span>
+                  </div>
+                )}
+                
+                {/* Review Request Button */}
+                {booking.tenant_email && !booking.review_submitted && (
+                  <div className="mt-4 pt-4 border-t border-border/50">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleSendReviewEmail(booking)}
+                      disabled={sendingReviewEmail === booking.id}
+                      className="gap-2"
+                    >
+                      <Send className="w-4 h-4" />
+                      {sendingReviewEmail === booking.id 
+                        ? "Sending..." 
+                        : booking.review_email_sent 
+                          ? "Resend Review Request" 
+                          : "Send Review Request"}
+                    </Button>
+                  </div>
+                )}
               </CardContent>
             </Card>
           ))

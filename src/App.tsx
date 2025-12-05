@@ -15,6 +15,7 @@ import PropertyOwners from "./pages/PropertyOwners";
 import MonthlyCharges from "./pages/MonthlyCharges";
 import MidTermBookings from "./pages/MidTermBookings";
 import Bookings from "./pages/Bookings";
+import LeaveReview from "./pages/LeaveReview";
 
 const queryClient = new QueryClient();
 
@@ -26,6 +27,7 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/auth" element={<Auth />} />
+          <Route path="/leave-review" element={<LeaveReview />} />
           <Route path="*" element={
             <Layout>
               <Routes>
