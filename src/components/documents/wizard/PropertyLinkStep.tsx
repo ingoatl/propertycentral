@@ -81,9 +81,10 @@ const PropertyLinkStep = ({ data, updateData }: Props) => {
   };
 
   const handlePropertySelect = (propertyId: string) => {
-    const property = properties.find((p) => p.id === propertyId);
+    const actualId = propertyId === "_none" ? null : propertyId;
+    const property = actualId ? properties.find((p) => p.id === actualId) : null;
     updateData({
-      propertyId,
+      propertyId: actualId,
       propertyName: property?.name || null,
       bookingId: null,
       preFillData: {
@@ -94,19 +95,24 @@ const PropertyLinkStep = ({ data, updateData }: Props) => {
   };
 
   const handleBookingSelect = (bookingId: string) => {
-    const booking = bookings.find((b) => b.id === bookingId);
-    if (booking) {
-      updateData({
-        bookingId,
-        guestName: booking.tenant_name,
-        guestEmail: booking.tenant_email || "",
-        preFillData: {
-          ...data.preFillData,
-          monthlyRent: booking.monthly_rent.toString(),
-          leaseStartDate: booking.start_date,
-          leaseEndDate: booking.end_date,
-        },
-      });
+    const actualId = bookingId === "_none" ? null : bookingId;
+    if (actualId) {
+      const booking = bookings.find((b) => b.id === actualId);
+      if (booking) {
+        updateData({
+          bookingId: actualId,
+          guestName: booking.tenant_name,
+          guestEmail: booking.tenant_email || "",
+          preFillData: {
+            ...data.preFillData,
+            monthlyRent: booking.monthly_rent.toString(),
+            leaseStartDate: booking.start_date,
+            leaseEndDate: booking.end_date,
+          },
+        });
+      }
+    } else {
+      updateData({ bookingId: null });
     }
   };
 
@@ -134,12 +140,12 @@ const PropertyLinkStep = ({ data, updateData }: Props) => {
             <Building className="h-4 w-4" />
             Property
           </Label>
-          <Select value={data.propertyId || ""} onValueChange={handlePropertySelect}>
+          <Select value={data.propertyId || "_none"} onValueChange={handlePropertySelect}>
             <SelectTrigger>
               <SelectValue placeholder="Select a property (optional)" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">No property</SelectItem>
+              <SelectItem value="_none">No property</SelectItem>
               {properties.map((property) => (
                 <SelectItem key={property.id} value={property.id}>
                   {property.name} - {property.address}
@@ -158,12 +164,12 @@ const PropertyLinkStep = ({ data, updateData }: Props) => {
             {loadingBookings ? (
               <Skeleton className="h-10 w-full" />
             ) : (
-              <Select value={data.bookingId || ""} onValueChange={handleBookingSelect}>
+              <Select value={data.bookingId || "_none"} onValueChange={handleBookingSelect}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select a booking (optional)" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">No booking - standalone document</SelectItem>
+                  <SelectItem value="_none">No booking - standalone document</SelectItem>
                   {bookings.map((booking) => (
                     <SelectItem key={booking.id} value={booking.id}>
                       {booking.tenant_name} ({format(new Date(booking.start_date), "MMM d")} -{" "}
