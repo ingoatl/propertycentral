@@ -46,7 +46,7 @@ serve(async (req) => {
       throw new Error('Template not found');
     }
 
-    // Create document with SignWell API
+    // Create document with SignWell API - NO automatic emails (reminders: false)
     const signwellResponse = await fetch('https://www.signwell.com/api/v1/documents', {
       method: 'POST',
       headers: {
@@ -56,7 +56,7 @@ serve(async (req) => {
       body: JSON.stringify({
         name: `${template.name} - ${guestName}`,
         embedded_signing: true,
-        reminders: true,
+        reminders: false, // CRITICAL: No automatic emails to recipients
         apply_signing_order: true,
         recipients: [
           {
@@ -93,13 +93,25 @@ serve(async (req) => {
     const signwellData = await signwellResponse.json();
     console.log('SignWell document created:', signwellData.id);
 
-    // Update booking document record
+    // Extract signing URLs for both guest and host
+    const guestRecipient = signwellData.recipients?.find((r: any) => r.placeholder_name === 'Guest');
+    const hostRecipient = signwellData.recipients?.find((r: any) => r.placeholder_name === 'Host');
+
+    const guestSigningUrl = guestRecipient?.embedded_signing_url || null;
+    const hostSigningUrl = hostRecipient?.embedded_signing_url || null;
+
+    console.log('Guest signing URL obtained:', !!guestSigningUrl);
+    console.log('Host signing URL obtained:', !!hostSigningUrl);
+
+    // Update booking document record with SignWell ID and signing URLs
     const { error: updateError } = await supabase
       .from('booking_documents')
       .update({
         signwell_document_id: signwellData.id,
         status: 'pending_guest',
         sent_at: new Date().toISOString(),
+        guest_signing_url: guestSigningUrl,
+        host_signing_url: hostSigningUrl,
       })
       .eq('id', documentId);
 
@@ -111,21 +123,20 @@ serve(async (req) => {
     // Create audit log entry
     await supabase.from('document_audit_log').insert({
       document_id: documentId,
-      action: 'sent',
+      action: 'created',
       performed_by: hostEmail,
       metadata: {
         signwell_document_id: signwellData.id,
+        guest_name: guestName,
         guest_email: guestEmail,
       },
     });
 
-    // Get embedded signing URL for guest
-    const guestRecipient = signwellData.recipients?.find((r: any) => r.placeholder_name === 'Guest');
-    
     return new Response(JSON.stringify({
       success: true,
       signwellDocumentId: signwellData.id,
-      guestSigningUrl: guestRecipient?.embedded_signing_url,
+      guestSigningUrl,
+      hostSigningUrl,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
