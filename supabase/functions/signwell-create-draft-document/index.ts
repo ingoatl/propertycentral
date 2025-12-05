@@ -90,7 +90,10 @@ serve(async (req) => {
         ? undefined
         : [
             {
-              name: template.name,
+              // SignWell requires the file name to include the extension
+              name: template.file_path.includes(".")
+                ? `${template.name.trim()}.${template.file_path.split(".").pop()}`
+                : template.name,
               // Check if file_path is already a full URL or just a relative path
               file_url: template.file_path.startsWith("http")
                 ? template.file_path
