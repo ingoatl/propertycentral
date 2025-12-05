@@ -1,5 +1,8 @@
 project_id = "ijsxcaaqphaciaenlegl"
 
+[functions.analyze-document-fields]
+verify_jwt = true
+
 [functions.backfill-expense-receipts]
 verify_jwt = false
 

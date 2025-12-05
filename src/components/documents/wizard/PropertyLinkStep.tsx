@@ -87,9 +87,9 @@ const PropertyLinkStep = ({ data, updateData }: Props) => {
       propertyId: actualId,
       propertyName: property?.name || null,
       bookingId: null,
-      preFillData: {
-        ...data.preFillData,
-        propertyAddress: property?.address || "",
+      fieldValues: {
+        ...data.fieldValues,
+        property_address: property?.address || "",
       },
     });
   };
@@ -103,11 +103,11 @@ const PropertyLinkStep = ({ data, updateData }: Props) => {
           bookingId: actualId,
           guestName: booking.tenant_name,
           guestEmail: booking.tenant_email || "",
-          preFillData: {
-            ...data.preFillData,
-            monthlyRent: booking.monthly_rent.toString(),
-            leaseStartDate: booking.start_date,
-            leaseEndDate: booking.end_date,
+          fieldValues: {
+            ...data.fieldValues,
+            monthly_rent: booking.monthly_rent.toString(),
+            lease_start_date: booking.start_date,
+            lease_end_date: booking.end_date,
           },
         });
       }

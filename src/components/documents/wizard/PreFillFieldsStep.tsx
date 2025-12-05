@@ -3,223 +3,197 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
-import { WizardData } from "../DocumentCreateWizard";
+import { Badge } from "@/components/ui/badge";
+import { WizardData, DetectedField } from "../DocumentCreateWizard";
+import { User, Building, DollarSign, Calendar, Users, Car, Phone, FileCheck, HelpCircle } from "lucide-react";
 
 interface Props {
   data: WizardData;
   updateData: (updates: Partial<WizardData>) => void;
 }
 
+const CATEGORY_CONFIG: Record<string, { label: string; icon: React.ComponentType<{ className?: string }> }> = {
+  property: { label: "Property Details", icon: Building },
+  financial: { label: "Financial Terms", icon: DollarSign },
+  dates: { label: "Lease Dates", icon: Calendar },
+  occupancy: { label: "Occupancy & Policies", icon: Users },
+  contact: { label: "Contact Information", icon: Phone },
+  identification: { label: "Identification", icon: User },
+  vehicle: { label: "Vehicle Information", icon: Car },
+  emergency: { label: "Emergency Contact", icon: Phone },
+  acknowledgment: { label: "Acknowledgments", icon: FileCheck },
+  other: { label: "Other Fields", icon: HelpCircle },
+};
+
 const PreFillFieldsStep = ({ data, updateData }: Props) => {
-  const updatePreFillData = (field: string, value: string) => {
+  const updateFieldValue = (fieldId: string, value: string | boolean) => {
     updateData({
-      preFillData: {
-        ...data.preFillData,
-        [field]: value,
+      fieldValues: {
+        ...data.fieldValues,
+        [fieldId]: value,
       },
     });
   };
 
-  const updateGuestFields = (field: string, value: boolean) => {
-    updateData({
-      guestFields: {
-        ...data.guestFields,
-        [field]: value,
-      },
+  // Separate admin and guest fields
+  const adminFields = data.detectedFields.filter((f) => f.filled_by === "admin");
+  const guestFields = data.detectedFields.filter((f) => f.filled_by === "guest");
+
+  // Group fields by category
+  const groupFieldsByCategory = (fields: DetectedField[]) => {
+    const grouped: Record<string, DetectedField[]> = {};
+    fields.forEach((field) => {
+      const category = field.category || "other";
+      if (!grouped[category]) {
+        grouped[category] = [];
+      }
+      grouped[category].push(field);
     });
+    return grouped;
   };
+
+  const adminFieldsByCategory = groupFieldsByCategory(adminFields);
+  const guestFieldsByCategory = groupFieldsByCategory(guestFields);
+
+  const renderField = (field: DetectedField, isGuestField: boolean = false) => {
+    const value = data.fieldValues[field.api_id];
+
+    if (field.type === "checkbox") {
+      return (
+        <div key={field.api_id} className="flex items-center space-x-2">
+          <Checkbox
+            id={field.api_id}
+            checked={value === true}
+            onCheckedChange={(checked) => updateFieldValue(field.api_id, checked as boolean)}
+            disabled={isGuestField}
+          />
+          <Label htmlFor={field.api_id} className="font-normal">
+            {field.label}
+            {isGuestField && <Badge variant="outline" className="ml-2 text-xs">Guest fills</Badge>}
+          </Label>
+        </div>
+      );
+    }
+
+    if (field.type === "textarea") {
+      return (
+        <div key={field.api_id} className="space-y-2">
+          <Label htmlFor={field.api_id}>
+            {field.label}
+            {isGuestField && <Badge variant="outline" className="ml-2 text-xs">Guest fills</Badge>}
+          </Label>
+          <Textarea
+            id={field.api_id}
+            value={(value as string) || ""}
+            onChange={(e) => updateFieldValue(field.api_id, e.target.value)}
+            placeholder={isGuestField ? "Guest will fill this field" : `Enter ${field.label.toLowerCase()}`}
+            disabled={isGuestField}
+            rows={3}
+          />
+        </div>
+      );
+    }
+
+    return (
+      <div key={field.api_id} className="space-y-2">
+        <Label htmlFor={field.api_id}>
+          {field.label}
+          {isGuestField && <Badge variant="outline" className="ml-2 text-xs">Guest fills</Badge>}
+        </Label>
+        <Input
+          id={field.api_id}
+          type={field.type === "number" ? "number" : field.type === "date" ? "date" : "text"}
+          value={(value as string) || ""}
+          onChange={(e) => updateFieldValue(field.api_id, e.target.value)}
+          placeholder={isGuestField ? "Guest will fill this field" : `Enter ${field.label.toLowerCase()}`}
+          disabled={isGuestField}
+        />
+      </div>
+    );
+  };
+
+  const renderCategorySection = (
+    category: string,
+    fields: DetectedField[],
+    isGuestSection: boolean = false
+  ) => {
+    const config = CATEGORY_CONFIG[category] || CATEGORY_CONFIG.other;
+    const Icon = config.icon;
+
+    return (
+      <div key={category} className="space-y-4">
+        <div className="flex items-center gap-2">
+          <Icon className="h-4 w-4 text-muted-foreground" />
+          <h3 className="font-medium">{config.label}</h3>
+        </div>
+        <div className={`grid grid-cols-1 ${fields.some(f => f.type === "textarea" || f.type === "checkbox") ? "" : "md:grid-cols-2"} gap-4`}>
+          {fields.map((field) => renderField(field, isGuestSection))}
+        </div>
+      </div>
+    );
+  };
+
+  if (data.detectedFields.length === 0) {
+    return (
+      <div className="text-center py-12">
+        <HelpCircle className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+        <h3 className="text-lg font-medium mb-2">No Fields Detected</h3>
+        <p className="text-muted-foreground">
+          No fillable fields were detected in this template. You can still proceed to add signature fields in the visual editor.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
       <div>
         <Label className="text-lg font-medium">Pre-fill Document Fields</Label>
         <p className="text-sm text-muted-foreground mt-1">
-          Enter property and lease details to pre-fill the document. These values will automatically
-          replace text tags in your template (e.g., [[property_address]], [[monthly_rent]]).
+          Fill in the fields below. Admin fields will be pre-filled in the document. Guest fields will be filled by the tenant when signing.
         </p>
       </div>
-      
+
+      {/* Summary */}
       <div className="p-3 bg-muted rounded-lg border">
-        <p className="text-xs text-muted-foreground">
-          <strong>Template Tags:</strong> [[guest_name]], [[guest_email]], [[property_address]], 
-          [[brand_name]], [[monthly_rent]], [[security_deposit]], [[lease_start_date]], 
-          [[lease_end_date]], [[max_occupants]], [[pet_policy]], [[additional_terms]], [[agreement_date]]
+        <p className="text-sm">
+          <span className="font-medium">{adminFields.length}</span> fields for you to fill •{" "}
+          <span className="font-medium">{guestFields.length}</span> fields for guest to fill
         </p>
       </div>
 
-      {/* Property Details */}
-      <div className="space-y-4">
-        <h3 className="font-medium">Property Details</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="propertyAddress">Property Address</Label>
-            <Input
-              id="propertyAddress"
-              value={data.preFillData.propertyAddress}
-              onChange={(e) => updatePreFillData("propertyAddress", e.target.value)}
-              placeholder="123 Main St, City, State 12345"
-            />
+      {/* Admin Fields */}
+      {adminFields.length > 0 && (
+        <div className="space-y-6">
+          <div className="flex items-center gap-2">
+            <Badge variant="default">Admin Fields</Badge>
+            <span className="text-sm text-muted-foreground">Fill these before sending</span>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="brandName">Property Brand Name</Label>
-            <Input
-              id="brandName"
-              value={data.preFillData.brandName}
-              onChange={(e) => updatePreFillData("brandName", e.target.value)}
-              placeholder="e.g., The Sunset Villa"
-            />
-          </div>
+          
+          {Object.entries(adminFieldsByCategory).map(([category, fields]) => (
+            <div key={category}>
+              {renderCategorySection(category, fields, false)}
+              <Separator className="mt-6" />
+            </div>
+          ))}
         </div>
-      </div>
+      )}
 
-      <Separator />
-
-      {/* Financial Terms */}
-      <div className="space-y-4">
-        <h3 className="font-medium">Financial Terms</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="monthlyRent">Monthly Rent ($)</Label>
-            <Input
-              id="monthlyRent"
-              type="number"
-              value={data.preFillData.monthlyRent}
-              onChange={(e) => updatePreFillData("monthlyRent", e.target.value)}
-              placeholder="2500"
-            />
+      {/* Guest Fields */}
+      {guestFields.length > 0 && (
+        <div className="space-y-6">
+          <div className="flex items-center gap-2">
+            <Badge variant="secondary">Guest Fields</Badge>
+            <span className="text-sm text-muted-foreground">Guest will fill these when signing</span>
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="securityDeposit">Security Deposit ($)</Label>
-            <Input
-              id="securityDeposit"
-              type="number"
-              value={data.preFillData.securityDeposit}
-              onChange={(e) => updatePreFillData("securityDeposit", e.target.value)}
-              placeholder="2500"
-            />
-          </div>
+          
+          {Object.entries(guestFieldsByCategory).map(([category, fields]) => (
+            <div key={category}>
+              {renderCategorySection(category, fields, true)}
+            </div>
+          ))}
         </div>
-      </div>
-
-      <Separator />
-
-      {/* Lease Dates */}
-      <div className="space-y-4">
-        <h3 className="font-medium">Lease Dates</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="leaseStartDate">Lease Start Date</Label>
-            <Input
-              id="leaseStartDate"
-              type="date"
-              value={data.preFillData.leaseStartDate}
-              onChange={(e) => updatePreFillData("leaseStartDate", e.target.value)}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="leaseEndDate">Lease End Date</Label>
-            <Input
-              id="leaseEndDate"
-              type="date"
-              value={data.preFillData.leaseEndDate}
-              onChange={(e) => updatePreFillData("leaseEndDate", e.target.value)}
-            />
-          </div>
-        </div>
-      </div>
-
-      <Separator />
-
-      {/* Occupancy & Policies */}
-      <div className="space-y-4">
-        <h3 className="font-medium">Occupancy & Policies</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="maxOccupants">Maximum Occupants</Label>
-            <Input
-              id="maxOccupants"
-              type="number"
-              value={data.preFillData.maxOccupants}
-              onChange={(e) => updatePreFillData("maxOccupants", e.target.value)}
-              placeholder="4"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="petPolicy">Pet Policy</Label>
-            <Input
-              id="petPolicy"
-              value={data.preFillData.petPolicy}
-              onChange={(e) => updatePreFillData("petPolicy", e.target.value)}
-              placeholder="No pets allowed"
-            />
-          </div>
-        </div>
-      </div>
-
-      <Separator />
-
-      {/* Additional Terms */}
-      <div className="space-y-4">
-        <h3 className="font-medium">Additional Terms</h3>
-        <div className="space-y-2">
-          <Label htmlFor="additionalTerms">Special Terms & Conditions</Label>
-          <Textarea
-            id="additionalTerms"
-            value={data.preFillData.additionalTerms}
-            onChange={(e) => updatePreFillData("additionalTerms", e.target.value)}
-            placeholder="Enter any additional terms or conditions..."
-            rows={4}
-          />
-        </div>
-      </div>
-
-      <Separator />
-
-      {/* Guest Required Fields */}
-      <div className="space-y-4">
-        <h3 className="font-medium">Guest Required Fields</h3>
-        <p className="text-sm text-muted-foreground">
-          Select which fields the guest must fill out when signing
-        </p>
-        <div className="space-y-3">
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="requireEmergencyContact"
-              checked={data.guestFields.requireEmergencyContact}
-              onCheckedChange={(checked) =>
-                updateGuestFields("requireEmergencyContact", checked as boolean)
-              }
-            />
-            <Label htmlFor="requireEmergencyContact" className="font-normal">
-              Require Emergency Contact Information
-            </Label>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="requireVehicleInfo"
-              checked={data.guestFields.requireVehicleInfo}
-              onCheckedChange={(checked) =>
-                updateGuestFields("requireVehicleInfo", checked as boolean)
-              }
-            />
-            <Label htmlFor="requireVehicleInfo" className="font-normal">
-              Require Vehicle Information (make, model, license plate)
-            </Label>
-          </div>
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="requireAcknowledgment"
-              checked={data.guestFields.requireAcknowledgment}
-              onCheckedChange={(checked) =>
-                updateGuestFields("requireAcknowledgment", checked as boolean)
-              }
-            />
-            <Label htmlFor="requireAcknowledgment" className="font-normal">
-              Require Terms Acknowledgment Checkboxes
-            </Label>
-          </div>
-        </div>
-      </div>
+      )}
     </div>
   );
 };
