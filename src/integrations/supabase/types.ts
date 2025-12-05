@@ -20,8 +20,10 @@ export type Database = {
           completed_at: string | null
           created_at: string | null
           guest_signed_at: string | null
+          guest_signing_url: string | null
           host_signed_at: string | null
           host_signer_id: string | null
+          host_signing_url: string | null
           id: string
           sent_at: string | null
           signed_document_path: string | null
@@ -34,8 +36,10 @@ export type Database = {
           completed_at?: string | null
           created_at?: string | null
           guest_signed_at?: string | null
+          guest_signing_url?: string | null
           host_signed_at?: string | null
           host_signer_id?: string | null
+          host_signing_url?: string | null
           id?: string
           sent_at?: string | null
           signed_document_path?: string | null
@@ -48,8 +52,10 @@ export type Database = {
           completed_at?: string | null
           created_at?: string | null
           guest_signed_at?: string | null
+          guest_signing_url?: string | null
           host_signed_at?: string | null
           host_signer_id?: string | null
+          host_signing_url?: string | null
           id?: string
           sent_at?: string | null
           signed_document_path?: string | null

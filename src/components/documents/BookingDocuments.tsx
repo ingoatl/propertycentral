@@ -3,9 +3,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { FileText, Send, Eye, Clock, CheckCircle, XCircle, Copy, ExternalLink } from "lucide-react";
+import { FileText, Plus, Eye, Clock, CheckCircle, XCircle, Copy, ExternalLink, Pen, Loader2 } from "lucide-react";
 import { format } from "date-fns";
-import { SendAgreementDialog } from "./SendAgreementDialog";
+import { CreateAgreementDialog } from "./CreateAgreementDialog";
 import { DocumentAuditTrail } from "./DocumentAuditTrail";
 
 interface BookingDocument {
@@ -19,6 +19,8 @@ interface BookingDocument {
   created_at: string;
   sent_at: string | null;
   completed_at: string | null;
+  guest_signing_url: string | null;
+  host_signing_url: string | null;
   template?: {
     name: string;
   };
@@ -49,10 +51,9 @@ interface BookingDocumentsProps {
 export function BookingDocuments({ booking, properties }: BookingDocumentsProps) {
   const [documents, setDocuments] = useState<BookingDocument[]>([]);
   const [loading, setLoading] = useState(true);
-  const [sendDialogOpen, setSendDialogOpen] = useState(false);
-  const [selectedDocument, setSelectedDocument] = useState<BookingDocument | null>(null);
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [showAuditTrail, setShowAuditTrail] = useState<string | null>(null);
-  const [gettingSigningUrl, setGettingSigningUrl] = useState<string | null>(null);
+  const [refreshingUrl, setRefreshingUrl] = useState<string | null>(null);
 
   useEffect(() => {
     loadDocuments();
@@ -83,11 +84,11 @@ export function BookingDocuments({ booking, properties }: BookingDocumentsProps)
       case 'draft':
         return <Badge variant="secondary"><Clock className="w-3 h-3 mr-1" />Draft</Badge>;
       case 'pending_guest':
-        return <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200"><Clock className="w-3 h-3 mr-1" />Awaiting Guest</Badge>;
+        return <Badge variant="outline" className="border-amber-500 text-amber-600"><Pen className="w-3 h-3 mr-1" />Awaiting Guest</Badge>;
       case 'pending_host':
-        return <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200"><Clock className="w-3 h-3 mr-1" />Awaiting Host</Badge>;
+        return <Badge variant="outline" className="border-blue-500 text-blue-600"><Pen className="w-3 h-3 mr-1" />Awaiting Host</Badge>;
       case 'completed':
-        return <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200"><CheckCircle className="w-3 h-3 mr-1" />Completed</Badge>;
+        return <Badge className="bg-green-500"><CheckCircle className="w-3 h-3 mr-1" />Completed</Badge>;
       case 'declined':
         return <Badge variant="destructive"><XCircle className="w-3 h-3 mr-1" />Declined</Badge>;
       default:
@@ -95,45 +96,20 @@ export function BookingDocuments({ booking, properties }: BookingDocumentsProps)
     }
   };
 
-  const handleGetSigningUrl = async (doc: BookingDocument, recipientType: 'guest' | 'host') => {
-    if (!doc.signwell_document_id) {
-      toast.error('Document not sent yet');
-      return;
-    }
-
+  const copyToClipboard = async (url: string, label: string) => {
     try {
-      setGettingSigningUrl(doc.id);
-      const { data, error } = await supabase.functions.invoke('signwell-get-signing-url', {
-        body: {
-          signwellDocumentId: doc.signwell_document_id,
-          recipientType,
-        },
-      });
-
-      if (error) throw error;
-
-      if (data?.signingUrl) {
-        await navigator.clipboard.writeText(data.signingUrl);
-        toast.success(`${recipientType === 'guest' ? 'Guest' : 'Host'} signing link copied to clipboard!`);
-      } else {
-        toast.error('Signing URL not available');
-      }
-    } catch (error: any) {
-      console.error('Error getting signing URL:', error);
-      toast.error('Failed to get signing URL');
-    } finally {
-      setGettingSigningUrl(null);
+      await navigator.clipboard.writeText(url);
+      toast.success(`${label} copied to clipboard!`);
+    } catch (err) {
+      toast.error('Failed to copy link');
     }
   };
 
-  const handleOpenSigningUrl = async (doc: BookingDocument, recipientType: 'guest' | 'host') => {
-    if (!doc.signwell_document_id) {
-      toast.error('Document not sent yet');
-      return;
-    }
-
+  const refreshSigningUrl = async (doc: BookingDocument, recipientType: 'guest' | 'host') => {
+    if (!doc.signwell_document_id) return;
+    
+    setRefreshingUrl(`${doc.id}-${recipientType}`);
     try {
-      setGettingSigningUrl(doc.id);
       const { data, error } = await supabase.functions.invoke('signwell-get-signing-url', {
         body: {
           signwellDocumentId: doc.signwell_document_id,
@@ -142,24 +118,27 @@ export function BookingDocuments({ booking, properties }: BookingDocumentsProps)
       });
 
       if (error) throw error;
-
       if (data?.signingUrl) {
         window.open(data.signingUrl, '_blank');
       } else {
-        toast.error('Signing URL not available');
+        toast.error('Could not get signing URL');
       }
-    } catch (error: any) {
-      console.error('Error getting signing URL:', error);
-      toast.error('Failed to get signing URL');
+    } catch (err: any) {
+      toast.error(`Failed to get signing URL: ${err.message}`);
     } finally {
-      setGettingSigningUrl(null);
+      setRefreshingUrl(null);
     }
   };
 
-  const property = properties.find(p => p.id === booking.property_id);
+  const property = properties.find(p => p.id === booking.property_id) || null;
 
   if (loading) {
-    return <div className="text-sm text-muted-foreground">Loading documents...</div>;
+    return (
+      <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
+        <Loader2 className="h-4 w-4 animate-spin" />
+        Loading documents...
+      </div>
+    );
   }
 
   return (
@@ -167,27 +146,27 @@ export function BookingDocuments({ booking, properties }: BookingDocumentsProps)
       <div className="flex items-center justify-between">
         <h4 className="text-sm font-medium flex items-center gap-2">
           <FileText className="w-4 h-4" />
-          Documents
+          Agreements
         </h4>
         <Button 
           variant="outline" 
           size="sm" 
-          onClick={() => setSendDialogOpen(true)}
+          onClick={() => setCreateDialogOpen(true)}
           className="gap-1"
         >
-          <Send className="w-3 h-3" />
-          Send Agreement
+          <Plus className="w-3 h-3" />
+          Create Agreement
         </Button>
       </div>
 
       {documents.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No documents yet</p>
+        <p className="text-sm text-muted-foreground">No agreements yet.</p>
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-3">
           {documents.map((doc) => (
             <div 
               key={doc.id} 
-              className="p-3 bg-muted/50 rounded-lg border border-border/50 space-y-2"
+              className="border rounded-lg p-3 space-y-3 bg-card"
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -196,52 +175,108 @@ export function BookingDocuments({ booking, properties }: BookingDocumentsProps)
                 </div>
                 {getStatusBadge(doc.status)}
               </div>
-              
-              {doc.sent_at && (
-                <p className="text-xs text-muted-foreground">
-                  Sent: {format(new Date(doc.sent_at), "MMM dd, yyyy 'at' h:mm a")}
-                </p>
+
+              {/* Signing Links Section - Pending Guest */}
+              {doc.status === 'pending_guest' && (
+                <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg p-3 space-y-2">
+                  <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                    Share this link with the guest to sign:
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {doc.guest_signing_url ? (
+                      <>
+                        <Button 
+                          size="sm" 
+                          onClick={() => copyToClipboard(doc.guest_signing_url!, 'Guest signing link')}
+                        >
+                          <Copy className="h-3 w-3 mr-1" />
+                          Copy Guest Link
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => window.open(doc.guest_signing_url!, '_blank')}
+                        >
+                          <ExternalLink className="h-3 w-3 mr-1" />
+                          Preview
+                        </Button>
+                      </>
+                    ) : (
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={() => refreshSigningUrl(doc, 'guest')}
+                        disabled={refreshingUrl === `${doc.id}-guest`}
+                      >
+                        {refreshingUrl === `${doc.id}-guest` ? (
+                          <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                        ) : (
+                          <ExternalLink className="h-3 w-3 mr-1" />
+                        )}
+                        Get Guest Link
+                      </Button>
+                    )}
+                  </div>
+                </div>
               )}
 
-              <div className="flex flex-wrap gap-2">
-                {doc.status === 'pending_guest' && (
-                  <>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      onClick={() => handleGetSigningUrl(doc, 'guest')}
-                      disabled={gettingSigningUrl === doc.id}
-                      className="gap-1 text-xs"
-                    >
-                      <Copy className="w-3 h-3" />
-                      Copy Guest Link
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      onClick={() => handleOpenSigningUrl(doc, 'guest')}
-                      disabled={gettingSigningUrl === doc.id}
-                      className="gap-1 text-xs"
-                    >
-                      <ExternalLink className="w-3 h-3" />
-                      Open Guest Signing
-                    </Button>
-                  </>
-                )}
-                
-                {doc.status === 'pending_host' && (
-                  <Button 
-                    variant="default" 
-                    size="sm" 
-                    onClick={() => handleOpenSigningUrl(doc, 'host')}
-                    disabled={gettingSigningUrl === doc.id}
-                    className="gap-1 text-xs"
-                  >
-                    <ExternalLink className="w-3 h-3" />
-                    Sign as Host
-                  </Button>
-                )}
+              {/* Signing Links Section - Pending Host */}
+              {doc.status === 'pending_host' && (
+                <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-3 space-y-2">
+                  <p className="text-sm font-medium text-blue-800 dark:text-blue-200">
+                    Guest has signed! Now sign as host:
+                  </p>
+                  <div className="flex gap-2">
+                    {doc.host_signing_url ? (
+                      <Button 
+                        size="sm"
+                        onClick={() => window.open(doc.host_signing_url!, '_blank')}
+                      >
+                        <Pen className="h-3 w-3 mr-1" />
+                        Sign as Host
+                      </Button>
+                    ) : (
+                      <Button 
+                        size="sm"
+                        onClick={() => refreshSigningUrl(doc, 'host')}
+                        disabled={refreshingUrl === `${doc.id}-host`}
+                      >
+                        {refreshingUrl === `${doc.id}-host` ? (
+                          <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                        ) : (
+                          <Pen className="h-3 w-3 mr-1" />
+                        )}
+                        Sign as Host
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              )}
 
+              {/* Completed Status */}
+              {doc.status === 'completed' && (
+                <div className="bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800 rounded-lg p-3">
+                  <p className="text-sm text-green-800 dark:text-green-200">
+                    ✓ Agreement fully signed on {doc.completed_at ? format(new Date(doc.completed_at), 'MMM d, yyyy') : 'N/A'}
+                  </p>
+                </div>
+              )}
+
+              {/* Timestamps */}
+              <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                {doc.sent_at && (
+                  <span>Created: {format(new Date(doc.sent_at), 'MMM d, yyyy')}</span>
+                )}
+                {doc.guest_signed_at && (
+                  <span>Guest signed: {format(new Date(doc.guest_signed_at), 'MMM d, yyyy')}</span>
+                )}
+                {doc.host_signed_at && (
+                  <span>Host signed: {format(new Date(doc.host_signed_at), 'MMM d, yyyy')}</span>
+                )}
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-2 pt-2 border-t">
                 <Button 
                   variant="ghost" 
                   size="sm" 
@@ -261,9 +296,9 @@ export function BookingDocuments({ booking, properties }: BookingDocumentsProps)
         </div>
       )}
 
-      <SendAgreementDialog
-        open={sendDialogOpen}
-        onOpenChange={setSendDialogOpen}
+      <CreateAgreementDialog
+        open={createDialogOpen}
+        onOpenChange={setCreateDialogOpen}
         booking={booking}
         property={property}
         onSuccess={loadDocuments}
