@@ -48,11 +48,12 @@ const ReviewCreateStep = ({ data, updateData, onComplete }: Props) => {
       } else {
         throw new Error(result.error || "Failed to finalize document");
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error finalizing:", error);
+      const message = error instanceof Error ? error.message : "Failed to finalize document";
       toast({
         title: "Error",
-        description: error.message || "Failed to finalize document",
+        description: message,
         variant: "destructive",
       });
     } finally {
@@ -76,6 +77,17 @@ const ReviewCreateStep = ({ data, updateData, onComplete }: Props) => {
     onComplete();
     window.location.reload();
   };
+
+  // Get values from fieldValues
+  const propertyAddress = data.fieldValues.property_address as string || "";
+  const leaseStartDate = data.fieldValues.lease_start_date as string || "";
+  const leaseEndDate = data.fieldValues.lease_end_date as string || "";
+  const monthlyRent = data.fieldValues.monthly_rent as string || "";
+  const securityDeposit = data.fieldValues.security_deposit as string || "";
+
+  // Get guest fields from detected fields
+  const guestFields = data.detectedFields.filter((f) => f.filled_by === "guest");
+  const guestFieldCategories = [...new Set(guestFields.map((f) => f.category))];
 
   return (
     <div className="space-y-6">
@@ -113,21 +125,21 @@ const ReviewCreateStep = ({ data, updateData, onComplete }: Props) => {
               <Building className="h-5 w-5 text-primary mt-0.5" />
               <div>
                 <h4 className="font-medium">{data.propertyName}</h4>
-                <p className="text-sm text-muted-foreground">{data.preFillData.propertyAddress}</p>
+                <p className="text-sm text-muted-foreground">{propertyAddress}</p>
               </div>
             </div>
           </>
         )}
 
-        {data.preFillData.leaseStartDate && data.preFillData.leaseEndDate && (
+        {leaseStartDate && leaseEndDate && (
           <>
             <Separator />
             <div className="flex items-start gap-3">
               <Calendar className="h-5 w-5 text-primary mt-0.5" />
               <div>
                 <h4 className="font-medium">
-                  {format(new Date(data.preFillData.leaseStartDate), "MMM d, yyyy")} -{" "}
-                  {format(new Date(data.preFillData.leaseEndDate), "MMM d, yyyy")}
+                  {format(new Date(leaseStartDate), "MMM d, yyyy")} -{" "}
+                  {format(new Date(leaseEndDate), "MMM d, yyyy")}
                 </h4>
                 <p className="text-sm text-muted-foreground">Lease Period</p>
               </div>
@@ -135,18 +147,18 @@ const ReviewCreateStep = ({ data, updateData, onComplete }: Props) => {
           </>
         )}
 
-        {data.preFillData.monthlyRent && (
+        {monthlyRent && (
           <>
             <Separator />
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
                 <span className="text-muted-foreground">Monthly Rent:</span>{" "}
-                <strong>${data.preFillData.monthlyRent}</strong>
+                <strong>${monthlyRent}</strong>
               </div>
-              {data.preFillData.securityDeposit && (
+              {securityDeposit && (
                 <div>
                   <span className="text-muted-foreground">Security Deposit:</span>{" "}
-                  <strong>${data.preFillData.securityDeposit}</strong>
+                  <strong>${securityDeposit}</strong>
                 </div>
               )}
             </div>
@@ -155,18 +167,18 @@ const ReviewCreateStep = ({ data, updateData, onComplete }: Props) => {
       </div>
 
       {/* Guest Fields */}
-      <div className="space-y-2">
-        <h4 className="font-medium">Guest Required Fields</h4>
-        <div className="flex flex-wrap gap-2">
-          {data.guestFields.requireEmergencyContact && (
-            <Badge variant="outline">Emergency Contact</Badge>
-          )}
-          {data.guestFields.requireVehicleInfo && <Badge variant="outline">Vehicle Info</Badge>}
-          {data.guestFields.requireAcknowledgment && (
-            <Badge variant="outline">Acknowledgments</Badge>
-          )}
+      {guestFields.length > 0 && (
+        <div className="space-y-2">
+          <h4 className="font-medium">Guest Required Fields ({guestFields.length})</h4>
+          <div className="flex flex-wrap gap-2">
+            {guestFieldCategories.map((category) => (
+              <Badge key={category} variant="outline" className="capitalize">
+                {category.replace("_", " ")}
+              </Badge>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       <Separator />
 

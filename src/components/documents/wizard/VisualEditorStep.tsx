@@ -19,6 +19,33 @@ const VisualEditorStep = ({ data, updateData }: Props) => {
   const createDraftDocument = async () => {
     setCreating(true);
     try {
+      // Build pre-fill data from fieldValues for admin fields
+      const adminFields = data.detectedFields.filter((f) => f.filled_by === "admin");
+      const preFillData: Record<string, string> = {};
+      
+      adminFields.forEach((field) => {
+        const value = data.fieldValues[field.api_id];
+        if (value && typeof value === "string") {
+          preFillData[field.api_id] = value;
+        }
+      });
+
+      // Add guest info to pre-fill data
+      preFillData.guest_name = data.guestName;
+      preFillData.tenant_name = data.guestName;
+      preFillData.guest_email = data.guestEmail;
+      preFillData.tenant_email = data.guestEmail;
+
+      // Get guest fields that the tenant needs to fill
+      const guestFields = data.detectedFields
+        .filter((f) => f.filled_by === "guest")
+        .map((f) => ({
+          api_id: f.api_id,
+          label: f.label,
+          type: f.type,
+          category: f.category,
+        }));
+
       const { data: result, error } = await supabase.functions.invoke(
         "signwell-create-draft-document",
         {
@@ -29,8 +56,9 @@ const VisualEditorStep = ({ data, updateData }: Props) => {
             recipientEmail: data.guestEmail,
             propertyId: data.propertyId,
             bookingId: data.bookingId,
-            preFillData: data.preFillData,
-            guestFields: data.guestFields,
+            preFillData,
+            guestFields,
+            detectedFields: data.detectedFields,
           },
         }
       );
@@ -49,11 +77,12 @@ const VisualEditorStep = ({ data, updateData }: Props) => {
       } else {
         throw new Error(result.error || "Failed to create draft document");
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error creating draft:", error);
+      const message = error instanceof Error ? error.message : "Failed to create draft document";
       toast({
         title: "Error",
-        description: error.message || "Failed to create draft document",
+        description: message,
         variant: "destructive",
       });
     } finally {
@@ -68,16 +97,29 @@ const VisualEditorStep = ({ data, updateData }: Props) => {
     }
   };
 
+  // Count fields by type
+  const adminFieldCount = data.detectedFields.filter((f) => f.filled_by === "admin").length;
+  const guestFieldCount = data.detectedFields.filter((f) => f.filled_by === "guest").length;
+
   return (
     <div className="space-y-6">
       <div>
         <Label className="text-lg font-medium">Visual Field Editor</Label>
         <p className="text-sm text-muted-foreground mt-1">
-          Create a draft document with your pre-filled data. Guest info, property details, and lease
-          terms from the previous step will automatically fill any text tags in your template
-          (like [[guest_name]], [[property_address]], [[monthly_rent]]).
+          Create a draft document with your pre-filled data, then add signature fields in the visual editor.
         </p>
       </div>
+
+      {/* Field Summary */}
+      {data.detectedFields.length > 0 && (
+        <div className="p-4 bg-muted rounded-lg border">
+          <h4 className="font-medium mb-2">Fields to be included:</h4>
+          <ul className="text-sm space-y-1 text-muted-foreground">
+            <li>• {adminFieldCount} pre-filled fields (admin values)</li>
+            <li>• {guestFieldCount} fields for guest to complete</li>
+          </ul>
+        </div>
+      )}
 
       {!data.signwellDocumentId ? (
         <div className="text-center py-8 space-y-4">

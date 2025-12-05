@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { ChevronLeft, ChevronRight, FileText, Building, User, Edit, CheckCircle } from "lucide-react";
@@ -10,6 +10,14 @@ import PreFillFieldsStep from "./wizard/PreFillFieldsStep";
 import VisualEditorStep from "./wizard/VisualEditorStep";
 import ReviewCreateStep from "./wizard/ReviewCreateStep";
 
+export interface DetectedField {
+  api_id: string;
+  label: string;
+  type: "text" | "number" | "date" | "email" | "phone" | "textarea" | "checkbox";
+  filled_by: "admin" | "guest";
+  category: "property" | "financial" | "dates" | "occupancy" | "contact" | "identification" | "vehicle" | "emergency" | "acknowledgment" | "other";
+}
+
 export interface WizardData {
   templateId: string | null;
   templateName: string | null;
@@ -19,22 +27,8 @@ export interface WizardData {
   guestName: string;
   guestEmail: string;
   documentName: string;
-  preFillData: {
-    propertyAddress: string;
-    brandName: string;
-    monthlyRent: string;
-    securityDeposit: string;
-    leaseStartDate: string;
-    leaseEndDate: string;
-    maxOccupants: string;
-    petPolicy: string;
-    additionalTerms: string;
-  };
-  guestFields: {
-    requireEmergencyContact: boolean;
-    requireVehicleInfo: boolean;
-    requireAcknowledgment: boolean;
-  };
+  detectedFields: DetectedField[];
+  fieldValues: Record<string, string | boolean>;
   signwellDocumentId: string | null;
   embeddedEditUrl: string | null;
   guestSigningUrl: string | null;
@@ -61,22 +55,8 @@ const DocumentCreateWizard = () => {
     guestName: "",
     guestEmail: "",
     documentName: "",
-    preFillData: {
-      propertyAddress: "",
-      brandName: "",
-      monthlyRent: "",
-      securityDeposit: "",
-      leaseStartDate: "",
-      leaseEndDate: "",
-      maxOccupants: "",
-      petPolicy: "",
-      additionalTerms: "",
-    },
-    guestFields: {
-      requireEmergencyContact: true,
-      requireVehicleInfo: false,
-      requireAcknowledgment: true,
-    },
+    detectedFields: [],
+    fieldValues: {},
     signwellDocumentId: null,
     embeddedEditUrl: null,
     guestSigningUrl: null,
