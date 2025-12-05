@@ -34,8 +34,16 @@ const PreFillFieldsStep = ({ data, updateData }: Props) => {
       <div>
         <Label className="text-lg font-medium">Pre-fill Document Fields</Label>
         <p className="text-sm text-muted-foreground mt-1">
-          Enter property and lease details to pre-fill the document. The guest will fill their own
-          information when signing.
+          Enter property and lease details to pre-fill the document. These values will automatically
+          replace text tags in your template (e.g., [[property_address]], [[monthly_rent]]).
+        </p>
+      </div>
+      
+      <div className="p-3 bg-muted rounded-lg border">
+        <p className="text-xs text-muted-foreground">
+          <strong>Template Tags:</strong> [[guest_name]], [[guest_email]], [[property_address]], 
+          [[brand_name]], [[monthly_rent]], [[security_deposit]], [[lease_start_date]], 
+          [[lease_end_date]], [[max_occupants]], [[pet_policy]], [[additional_terms]], [[agreement_date]]
         </p>
       </div>
 
