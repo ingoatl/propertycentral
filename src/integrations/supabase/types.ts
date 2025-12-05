@@ -601,11 +601,17 @@ export type Database = {
           created_at: string
           deposit_amount: number | null
           end_date: string
+          gift_card_sent: boolean | null
           id: string
           monthly_rent: number
           nightly_rate: number | null
           notes: string | null
           property_id: string
+          review_email_sent: boolean | null
+          review_email_sent_at: string | null
+          review_submitted: boolean | null
+          review_submitted_at: string | null
+          review_token: string | null
           start_date: string
           status: string
           tenant_email: string | null
@@ -618,11 +624,17 @@ export type Database = {
           created_at?: string
           deposit_amount?: number | null
           end_date: string
+          gift_card_sent?: boolean | null
           id?: string
           monthly_rent: number
           nightly_rate?: number | null
           notes?: string | null
           property_id: string
+          review_email_sent?: boolean | null
+          review_email_sent_at?: string | null
+          review_submitted?: boolean | null
+          review_submitted_at?: string | null
+          review_token?: string | null
           start_date: string
           status?: string
           tenant_email?: string | null
@@ -635,11 +647,17 @@ export type Database = {
           created_at?: string
           deposit_amount?: number | null
           end_date?: string
+          gift_card_sent?: boolean | null
           id?: string
           monthly_rent?: number
           nightly_rate?: number | null
           notes?: string | null
           property_id?: string
+          review_email_sent?: boolean | null
+          review_email_sent_at?: string | null
+          review_submitted?: boolean | null
+          review_submitted_at?: string | null
+          review_token?: string | null
           start_date?: string
           status?: string
           tenant_email?: string | null
