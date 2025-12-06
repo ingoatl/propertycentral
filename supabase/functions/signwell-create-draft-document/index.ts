@@ -31,9 +31,11 @@ serve(async (req) => {
       bookingId,
       preFillData,
       guestFields,
+      detectedFields,
     } = await req.json();
 
     console.log("Creating draft document:", { templateId, documentName, recipientName });
+    console.log("Pre-fill data received:", JSON.stringify(preFillData, null, 2));
 
     // Get template details
     const { data: template, error: templateError } = await supabase
@@ -47,65 +49,103 @@ serve(async (req) => {
     }
 
     // Build placeholder fields array for SignWell text tag replacement
+    // These are used to fill in [[field_name]] text tags in the document
     const placeholderFields: Array<{ api_id: string; value: string }> = [];
     
-    // Add guest info fields
+    // Add all pre-fill data fields dynamically
+    if (preFillData && typeof preFillData === "object") {
+      for (const [key, value] of Object.entries(preFillData)) {
+        if (value && typeof value === "string" && value.trim()) {
+          // Add the field with its original api_id
+          placeholderFields.push({ api_id: key, value: value.trim() });
+          
+          // Also add common aliases for better text tag matching
+          if (key === "property_address") {
+            placeholderFields.push({ api_id: "address", value: value.trim() });
+          }
+          if (key === "monthly_rent") {
+            const formattedRent = value.startsWith("$") ? value : `$${value}`;
+            placeholderFields.push({ api_id: "rent_amount", value: formattedRent });
+            placeholderFields.push({ api_id: "rent", value: formattedRent });
+            // Update the original to include $ if needed
+            const idx = placeholderFields.findIndex(f => f.api_id === key);
+            if (idx >= 0) placeholderFields[idx].value = formattedRent;
+          }
+          if (key === "security_deposit") {
+            const formattedDeposit = value.startsWith("$") ? value : `$${value}`;
+            placeholderFields.push({ api_id: "deposit_amount", value: formattedDeposit });
+            placeholderFields.push({ api_id: "deposit", value: formattedDeposit });
+            const idx = placeholderFields.findIndex(f => f.api_id === key);
+            if (idx >= 0) placeholderFields[idx].value = formattedDeposit;
+          }
+          if (key === "lease_start_date" || key === "start_date") {
+            try {
+              const startDate = new Date(value);
+              if (!isNaN(startDate.getTime())) {
+                const formattedStart = startDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+                placeholderFields.push({ api_id: "start_date", value: formattedStart });
+                placeholderFields.push({ api_id: "lease_start", value: formattedStart });
+                const idx = placeholderFields.findIndex(f => f.api_id === key);
+                if (idx >= 0) placeholderFields[idx].value = formattedStart;
+              }
+            } catch (e) {
+              console.log("Could not parse start date:", value);
+            }
+          }
+          if (key === "lease_end_date" || key === "end_date") {
+            try {
+              const endDate = new Date(value);
+              if (!isNaN(endDate.getTime())) {
+                const formattedEnd = endDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+                placeholderFields.push({ api_id: "end_date", value: formattedEnd });
+                placeholderFields.push({ api_id: "lease_end", value: formattedEnd });
+                const idx = placeholderFields.findIndex(f => f.api_id === key);
+                if (idx >= 0) placeholderFields[idx].value = formattedEnd;
+              }
+            } catch (e) {
+              console.log("Could not parse end date:", value);
+            }
+          }
+          if (key === "brand_name" || key === "property_name") {
+            placeholderFields.push({ api_id: "property_name", value: value.trim() });
+            placeholderFields.push({ api_id: "brand_name", value: value.trim() });
+          }
+        }
+      }
+    }
+    
+    // Add guest info fields with aliases
     if (recipientName) {
       placeholderFields.push({ api_id: "guest_name", value: recipientName });
       placeholderFields.push({ api_id: "tenant_name", value: recipientName });
+      placeholderFields.push({ api_id: "renter_name", value: recipientName });
+      placeholderFields.push({ api_id: "lessee_name", value: recipientName });
     }
     if (recipientEmail) {
       placeholderFields.push({ api_id: "guest_email", value: recipientEmail });
       placeholderFields.push({ api_id: "tenant_email", value: recipientEmail });
+      placeholderFields.push({ api_id: "renter_email", value: recipientEmail });
     }
     
-    // Add property and lease details from pre-fill data
-    if (preFillData) {
-      if (preFillData.propertyAddress) {
-        placeholderFields.push({ api_id: "property_address", value: preFillData.propertyAddress });
-      }
-      if (preFillData.brandName) {
-        placeholderFields.push({ api_id: "brand_name", value: preFillData.brandName });
-        placeholderFields.push({ api_id: "property_name", value: preFillData.brandName });
-      }
-      if (preFillData.monthlyRent) {
-        placeholderFields.push({ api_id: "monthly_rent", value: `$${preFillData.monthlyRent}` });
-        placeholderFields.push({ api_id: "rent_amount", value: `$${preFillData.monthlyRent}` });
-      }
-      if (preFillData.securityDeposit) {
-        placeholderFields.push({ api_id: "security_deposit", value: `$${preFillData.securityDeposit}` });
-        placeholderFields.push({ api_id: "deposit_amount", value: `$${preFillData.securityDeposit}` });
-      }
-      if (preFillData.leaseStartDate) {
-        const startDate = new Date(preFillData.leaseStartDate);
-        const formattedStart = startDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-        placeholderFields.push({ api_id: "lease_start_date", value: formattedStart });
-        placeholderFields.push({ api_id: "start_date", value: formattedStart });
-      }
-      if (preFillData.leaseEndDate) {
-        const endDate = new Date(preFillData.leaseEndDate);
-        const formattedEnd = endDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-        placeholderFields.push({ api_id: "lease_end_date", value: formattedEnd });
-        placeholderFields.push({ api_id: "end_date", value: formattedEnd });
-      }
-      if (preFillData.maxOccupants) {
-        placeholderFields.push({ api_id: "max_occupants", value: preFillData.maxOccupants });
-      }
-      if (preFillData.petPolicy) {
-        placeholderFields.push({ api_id: "pet_policy", value: preFillData.petPolicy });
-      }
-      if (preFillData.additionalTerms) {
-        placeholderFields.push({ api_id: "additional_terms", value: preFillData.additionalTerms });
-      }
-    }
-    
-    // Add today's date for agreement date field
+    // Add today's date for agreement date fields
     const today = new Date();
     const formattedToday = today.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
     placeholderFields.push({ api_id: "agreement_date", value: formattedToday });
     placeholderFields.push({ api_id: "todays_date", value: formattedToday });
+    placeholderFields.push({ api_id: "today_date", value: formattedToday });
+    placeholderFields.push({ api_id: "current_date", value: formattedToday });
 
-    console.log("Placeholder fields being sent:", JSON.stringify(placeholderFields, null, 2));
+    // Remove duplicates by api_id (keep first occurrence)
+    const uniquePlaceholderFields: Array<{ api_id: string; value: string }> = [];
+    const seenApiIds = new Set<string>();
+    for (const field of placeholderFields) {
+      if (!seenApiIds.has(field.api_id)) {
+        seenApiIds.add(field.api_id);
+        uniquePlaceholderFields.push(field);
+      }
+    }
+
+    console.log("Placeholder fields being sent:", JSON.stringify(uniquePlaceholderFields, null, 2));
 
     // Create document in SignWell with draft mode
     const signwellPayload: Record<string, unknown> = {
@@ -151,8 +191,8 @@ serve(async (req) => {
     };
     
     // Add placeholder fields if we have any - this fills in text tags in the document
-    if (placeholderFields.length > 0) {
-      signwellPayload.placeholder_fields = placeholderFields;
+    if (uniquePlaceholderFields.length > 0) {
+      signwellPayload.placeholder_fields = uniquePlaceholderFields;
     }
 
     console.log("SignWell payload:", JSON.stringify(signwellPayload, null, 2));
@@ -198,7 +238,7 @@ serve(async (req) => {
         embedded_edit_url: signwellData.embedded_edit_url,
         is_draft: true,
         status: "draft",
-        field_configuration: { preFillData, guestFields },
+        field_configuration: { preFillData, guestFields, detectedFields },
         created_by: userId,
       })
       .select()
@@ -214,7 +254,7 @@ serve(async (req) => {
       document_id: docRecord.id,
       action: "draft_created",
       performed_by: userId || "system",
-      metadata: { signwellDocumentId: signwellData.id },
+      metadata: { signwellDocumentId: signwellData.id, fieldsPreFilled: uniquePlaceholderFields.length },
     });
 
     return new Response(
