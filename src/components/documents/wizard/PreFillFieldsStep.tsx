@@ -4,8 +4,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { WizardData, DetectedField } from "../DocumentCreateWizard";
-import { User, Building, DollarSign, Calendar, Users, Car, Phone, FileCheck, HelpCircle } from "lucide-react";
+import { User, Building, DollarSign, Calendar, Users, Car, Phone, FileCheck, HelpCircle, PenTool, Info } from "lucide-react";
 
 interface Props {
   data: WizardData;
@@ -22,6 +23,7 @@ const CATEGORY_CONFIG: Record<string, { label: string; icon: React.ComponentType
   vehicle: { label: "Vehicle Information", icon: Car },
   emergency: { label: "Emergency Contact", icon: Phone },
   acknowledgment: { label: "Acknowledgments", icon: FileCheck },
+  signature: { label: "Signatures", icon: PenTool },
   other: { label: "Other Fields", icon: HelpCircle },
 };
 
@@ -35,9 +37,13 @@ const PreFillFieldsStep = ({ data, updateData }: Props) => {
     });
   };
 
-  // Separate admin and guest fields
-  const adminFields = data.detectedFields.filter((f) => f.filled_by === "admin");
-  const guestFields = data.detectedFields.filter((f) => f.filled_by === "guest");
+  // Separate fields by type
+  const adminFields = data.detectedFields.filter((f) => f.filled_by === "admin" && f.category !== "signature");
+  const guestFields = data.detectedFields.filter((f) => f.filled_by === "guest" && f.category !== "signature");
+  const signatureFields = data.detectedFields.filter((f) => f.category === "signature");
+  
+  const guestSignatureFields = signatureFields.filter(f => f.filled_by === "guest");
+  const hostSignatureFields = signatureFields.filter(f => f.filled_by === "admin");
 
   // Group fields by category
   const groupFieldsByCategory = (fields: DetectedField[]) => {
@@ -53,10 +59,14 @@ const PreFillFieldsStep = ({ data, updateData }: Props) => {
   };
 
   const adminFieldsByCategory = groupFieldsByCategory(adminFields);
-  const guestFieldsByCategory = groupFieldsByCategory(guestFields);
 
   const renderField = (field: DetectedField, isGuestField: boolean = false) => {
     const value = data.fieldValues[field.api_id];
+
+    // Skip signature type fields - they're placed in visual editor
+    if (field.type === "signature") {
+      return null;
+    }
 
     if (field.type === "checkbox") {
       return (
@@ -119,6 +129,9 @@ const PreFillFieldsStep = ({ data, updateData }: Props) => {
   ) => {
     const config = CATEGORY_CONFIG[category] || CATEGORY_CONFIG.other;
     const Icon = config.icon;
+    const renderedFields = fields.map((field) => renderField(field, isGuestSection)).filter(Boolean);
+    
+    if (renderedFields.length === 0) return null;
 
     return (
       <div key={category} className="space-y-4">
@@ -127,7 +140,7 @@ const PreFillFieldsStep = ({ data, updateData }: Props) => {
           <h3 className="font-medium">{config.label}</h3>
         </div>
         <div className={`grid grid-cols-1 ${fields.some(f => f.type === "textarea" || f.type === "checkbox") ? "" : "md:grid-cols-2"} gap-4`}>
-          {fields.map((field) => renderField(field, isGuestSection))}
+          {renderedFields}
         </div>
       </div>
     );
@@ -148,17 +161,26 @@ const PreFillFieldsStep = ({ data, updateData }: Props) => {
   return (
     <div className="space-y-6">
       <div>
-        <Label className="text-lg font-medium">Pre-fill Document Fields</Label>
+        <Label className="text-lg font-medium">Prepare Document Values</Label>
         <p className="text-sm text-muted-foreground mt-1">
-          Fill in the fields below. Admin fields will be pre-filled in the document. Guest fields will be filled by the tenant when signing.
+          Fill in the admin fields below. These values will be used when you place text fields in the visual editor.
         </p>
       </div>
+
+      {/* Important Info Alert */}
+      <Alert>
+        <Info className="h-4 w-4" />
+        <AlertDescription>
+          <strong>How this works:</strong> Enter values here, then in the next step you'll use the visual editor to drag and drop fields onto the document. Text fields can display these pre-filled values.
+        </AlertDescription>
+      </Alert>
 
       {/* Summary */}
       <div className="p-3 bg-muted rounded-lg border">
         <p className="text-sm">
-          <span className="font-medium">{adminFields.length}</span> fields for you to fill •{" "}
-          <span className="font-medium">{guestFields.length}</span> fields for guest to fill
+          <span className="font-medium">{adminFields.length}</span> admin fields •{" "}
+          <span className="font-medium">{guestFields.length}</span> guest fields •{" "}
+          <span className="font-medium">{signatureFields.length}</span> signature fields
         </p>
       </div>
 
@@ -167,7 +189,7 @@ const PreFillFieldsStep = ({ data, updateData }: Props) => {
         <div className="space-y-6">
           <div className="flex items-center gap-2">
             <Badge variant="default">Admin Fields</Badge>
-            <span className="text-sm text-muted-foreground">Fill these before sending</span>
+            <span className="text-sm text-muted-foreground">Fill these before opening the visual editor</span>
           </div>
           
           {Object.entries(adminFieldsByCategory).map(([category, fields]) => (
@@ -179,19 +201,56 @@ const PreFillFieldsStep = ({ data, updateData }: Props) => {
         </div>
       )}
 
-      {/* Guest Fields */}
+      {/* Guest Fields Summary */}
       {guestFields.length > 0 && (
-        <div className="space-y-6">
+        <div className="space-y-4">
           <div className="flex items-center gap-2">
             <Badge variant="secondary">Guest Fields</Badge>
             <span className="text-sm text-muted-foreground">Guest will fill these when signing</span>
           </div>
           
-          {Object.entries(guestFieldsByCategory).map(([category, fields]) => (
-            <div key={category}>
-              {renderCategorySection(category, fields, true)}
-            </div>
-          ))}
+          <div className="p-4 bg-secondary/20 rounded-lg border">
+            <h4 className="font-medium text-sm mb-2">Fields guest will complete:</h4>
+            <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
+              {guestFields.map((field) => (
+                <li key={field.api_id}>{field.label}</li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
+
+      {/* Signature Fields Summary */}
+      {signatureFields.length > 0 && (
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <Badge className="bg-amber-500">Signature Fields</Badge>
+            <span className="text-sm text-muted-foreground">Add these in the visual editor</span>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {guestSignatureFields.length > 0 && (
+              <div className="p-4 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200 dark:border-blue-800">
+                <h4 className="font-medium text-sm mb-2 text-blue-800 dark:text-blue-200">Guest Signatures:</h4>
+                <ul className="text-sm text-blue-700 dark:text-blue-300 space-y-1 list-disc list-inside">
+                  {guestSignatureFields.map((field) => (
+                    <li key={field.api_id}>{field.label}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            
+            {hostSignatureFields.length > 0 && (
+              <div className="p-4 bg-purple-50 dark:bg-purple-950 rounded-lg border border-purple-200 dark:border-purple-800">
+                <h4 className="font-medium text-sm mb-2 text-purple-800 dark:text-purple-200">Host Signatures:</h4>
+                <ul className="text-sm text-purple-700 dark:text-purple-300 space-y-1 list-disc list-inside">
+                  {hostSignatureFields.map((field) => (
+                    <li key={field.api_id}>{field.label}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>

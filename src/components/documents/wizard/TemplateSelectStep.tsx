@@ -3,7 +3,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
-import { FileText, Check, Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { FileText, Check, Loader2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { WizardData, DetectedField } from "../DocumentCreateWizard";
 
@@ -53,12 +54,12 @@ const TemplateSelectStep = ({ data, updateData }: Props) => {
     }
   };
 
-  const analyzeTemplateFields = async (templateId: string): Promise<DetectedField[]> => {
+  const analyzeTemplateFields = async (templateId: string, forceReanalyze: boolean = false): Promise<DetectedField[]> => {
     try {
       setAnalyzingTemplateId(templateId);
       
       const { data: response, error } = await supabase.functions.invoke("analyze-document-fields", {
-        body: { templateId },
+        body: { templateId, forceReanalyze },
       });
 
       if (error) throw error;
@@ -110,6 +111,36 @@ const TemplateSelectStep = ({ data, updateData }: Props) => {
     }
   };
 
+  const handleReanalyze = async (e: React.MouseEvent, template: Template) => {
+    e.stopPropagation();
+    toast.info("Re-analyzing document with enhanced signature detection...");
+    
+    // Clear cached fields in database first
+    await supabase
+      .from("document_templates")
+      .update({ field_mappings: null })
+      .eq("id", template.id);
+    
+    const fields = await analyzeTemplateFields(template.id, true);
+    
+    if (fields.length > 0) {
+      // Update wizard data if this template is selected
+      if (data.templateId === template.id) {
+        updateData({
+          detectedFields: fields,
+        });
+      }
+      
+      // Update local template cache
+      setTemplates(prev => 
+        prev.map(t => t.id === template.id ? { ...t, field_mappings: fields } : t)
+      );
+      
+      const signatureFields = fields.filter(f => f.category === "signature").length;
+      toast.success(`Re-detected ${fields.length} fields (${signatureFields} signature fields)`);
+    }
+  };
+
   if (loading) {
     return (
       <div className="space-y-4">
@@ -140,7 +171,7 @@ const TemplateSelectStep = ({ data, updateData }: Props) => {
       <div>
         <Label className="text-lg font-medium">Select a Document Template</Label>
         <p className="text-sm text-muted-foreground mt-1">
-          Choose the template for your document. Fields will be automatically detected.
+          Choose the template for your document. Fields including signatures will be automatically detected.
         </p>
       </div>
 
@@ -149,6 +180,7 @@ const TemplateSelectStep = ({ data, updateData }: Props) => {
           const isSelected = data.templateId === template.id;
           const isAnalyzing = analyzingTemplateId === template.id;
           const hasFields = template.field_mappings && template.field_mappings.length > 0;
+          const signatureCount = template.field_mappings?.filter(f => f.category === "signature").length || 0;
           
           return (
             <Card
@@ -158,33 +190,51 @@ const TemplateSelectStep = ({ data, updateData }: Props) => {
               } ${isAnalyzing ? "opacity-70" : ""}`}
               onClick={() => !isAnalyzing && selectTemplate(template)}
             >
-              <CardContent className="p-4 flex items-start gap-3">
-                <div
-                  className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                    isSelected ? "bg-primary text-primary-foreground" : "bg-muted"
-                  }`}
-                >
-                  {isAnalyzing ? (
-                    <Loader2 className="h-5 w-5 animate-spin" />
-                  ) : isSelected ? (
-                    <Check className="h-5 w-5" />
-                  ) : (
-                    <FileText className="h-5 w-5" />
-                  )}
+              <CardContent className="p-4">
+                <div className="flex items-start gap-3">
+                  <div
+                    className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${
+                      isSelected ? "bg-primary text-primary-foreground" : "bg-muted"
+                    }`}
+                  >
+                    {isAnalyzing ? (
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                    ) : isSelected ? (
+                      <Check className="h-5 w-5" />
+                    ) : (
+                      <FileText className="h-5 w-5" />
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h4 className="font-medium truncate">{template.name}</h4>
+                    {template.description && (
+                      <p className="text-sm text-muted-foreground line-clamp-2">
+                        {template.description}
+                      </p>
+                    )}
+                    {hasFields && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {template.field_mappings!.length} fields • {signatureCount} signatures
+                      </p>
+                    )}
+                  </div>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <h4 className="font-medium truncate">{template.name}</h4>
-                  {template.description && (
-                    <p className="text-sm text-muted-foreground line-clamp-2">
-                      {template.description}
-                    </p>
-                  )}
-                  {hasFields && (
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {template.field_mappings!.length} fields detected
-                    </p>
-                  )}
-                </div>
+                
+                {/* Re-analyze button */}
+                {hasFields && (
+                  <div className="mt-3 pt-3 border-t flex justify-end">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={(e) => handleReanalyze(e, template)}
+                      disabled={isAnalyzing}
+                      className="text-xs"
+                    >
+                      <RefreshCw className={`h-3 w-3 mr-1 ${isAnalyzing ? 'animate-spin' : ''}`} />
+                      Re-analyze Fields
+                    </Button>
+                  </div>
+                )}
               </CardContent>
             </Card>
           );
