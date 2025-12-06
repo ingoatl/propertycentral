@@ -102,19 +102,14 @@ const VisualEditorStep = ({ data, updateData }: Props) => {
     }
   };
 
-  // Helper to get the effective assignment (user override or default)
-  const getFieldAssignment = (field: { api_id: string; filled_by: "admin" | "guest" }): "admin" | "guest" => {
-    return data.fieldAssignments?.[field.api_id] || field.filled_by;
-  };
-
-  // Get signature fields grouped by signer (using effective assignment)
+  // Get signature fields grouped by signer
   const signatureFields = data.detectedFields.filter((f) => f.category === "signature");
-  const guestSignatureFields = signatureFields.filter(f => getFieldAssignment(f) === "guest");
-  const hostSignatureFields = signatureFields.filter(f => getFieldAssignment(f) === "admin");
+  const guestSignatureFields = signatureFields.filter(f => f.filled_by === "guest");
+  const hostSignatureFields = signatureFields.filter(f => f.filled_by === "admin");
   
-  // Get non-signature guest fields (using effective assignment)
+  // Get non-signature guest fields
   const guestTextFields = data.detectedFields.filter(
-    (f) => getFieldAssignment(f) === "guest" && f.category !== "signature" && f.type !== "signature"
+    (f) => f.filled_by === "guest" && f.category !== "signature" && f.type !== "signature"
   );
 
   return (
