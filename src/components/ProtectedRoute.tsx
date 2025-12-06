@@ -71,14 +71,8 @@ export const useAuth = () => {
     };
   }, [navigate, checkApprovalStatus]);
 
-  // Show pending approval message if logged in but not approved
-  if (user && !loading && !isApproved) {
-    return {
-      user,
-      loading: false,
-      pendingApproval: true,
-    };
-  }
+  // Compute pendingApproval status
+  const pendingApproval = user && !loading && !isApproved;
 
-  return { user, loading, isApproved };
+  return { user, loading, isApproved, pendingApproval };
 };
