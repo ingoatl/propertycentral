@@ -2,10 +2,11 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { ChevronLeft, ChevronRight, FileText, Building, User, Edit, CheckCircle, PenTool } from "lucide-react";
+import { ChevronLeft, ChevronRight, FileText, Building, User, Edit, CheckCircle, PenTool, ToggleLeft } from "lucide-react";
 import TemplateSelectStep from "./wizard/TemplateSelectStep";
 import PropertyLinkStep from "./wizard/PropertyLinkStep";
 import GuestInfoStep from "./wizard/GuestInfoStep";
+import AssignFieldsStep from "./wizard/AssignFieldsStep";
 import PreFillFieldsStep from "./wizard/PreFillFieldsStep";
 import VisualEditorStep from "./wizard/VisualEditorStep";
 import ReviewCreateStep from "./wizard/ReviewCreateStep";
@@ -39,9 +40,10 @@ const STEPS = [
   { id: 1, title: "Select Template", icon: FileText },
   { id: 2, title: "Link Property", icon: Building },
   { id: 3, title: "Guest Info", icon: User },
-  { id: 4, title: "Prepare Values", icon: Edit },
-  { id: 5, title: "Place Fields", icon: PenTool },
-  { id: 6, title: "Review & Send", icon: CheckCircle },
+  { id: 4, title: "Assign Fields", icon: ToggleLeft },
+  { id: 5, title: "Fill Values", icon: Edit },
+  { id: 6, title: "Place Fields", icon: PenTool },
+  { id: 7, title: "Review & Send", icon: CheckCircle },
 ];
 
 const DocumentCreateWizard = () => {
@@ -78,10 +80,12 @@ const DocumentCreateWizard = () => {
       case 3:
         return wizardData.guestName.trim() !== "" && wizardData.guestEmail.trim() !== "";
       case 4:
-        return true; // Pre-fill is optional
+        return true; // Assign fields - always can proceed
       case 5:
-        return !!wizardData.signwellDocumentId;
+        return true; // Pre-fill is optional
       case 6:
+        return !!wizardData.signwellDocumentId;
+      case 7:
         return true;
       default:
         return false;
@@ -97,10 +101,12 @@ const DocumentCreateWizard = () => {
       case 3:
         return <GuestInfoStep data={wizardData} updateData={updateWizardData} />;
       case 4:
-        return <PreFillFieldsStep data={wizardData} updateData={updateWizardData} />;
+        return <AssignFieldsStep data={wizardData} updateData={updateWizardData} />;
       case 5:
-        return <VisualEditorStep data={wizardData} updateData={updateWizardData} />;
+        return <PreFillFieldsStep data={wizardData} updateData={updateWizardData} />;
       case 6:
+        return <VisualEditorStep data={wizardData} updateData={updateWizardData} />;
+      case 7:
         return <ReviewCreateStep data={wizardData} updateData={updateWizardData} onComplete={() => setCurrentStep(1)} />;
       default:
         return null;
