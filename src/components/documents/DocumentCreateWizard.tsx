@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { ChevronLeft, ChevronRight, FileText, Building, User, Edit, CheckCircle } from "lucide-react";
+import { ChevronLeft, ChevronRight, FileText, Building, User, Edit, CheckCircle, PenTool } from "lucide-react";
 import TemplateSelectStep from "./wizard/TemplateSelectStep";
 import PropertyLinkStep from "./wizard/PropertyLinkStep";
 import GuestInfoStep from "./wizard/GuestInfoStep";
@@ -13,9 +13,9 @@ import ReviewCreateStep from "./wizard/ReviewCreateStep";
 export interface DetectedField {
   api_id: string;
   label: string;
-  type: "text" | "number" | "date" | "email" | "phone" | "textarea" | "checkbox";
+  type: "text" | "number" | "date" | "email" | "phone" | "textarea" | "checkbox" | "signature";
   filled_by: "admin" | "guest";
-  category: "property" | "financial" | "dates" | "occupancy" | "contact" | "identification" | "vehicle" | "emergency" | "acknowledgment" | "other";
+  category: "property" | "financial" | "dates" | "occupancy" | "contact" | "identification" | "vehicle" | "emergency" | "acknowledgment" | "signature" | "other";
 }
 
 export interface WizardData {
@@ -39,9 +39,9 @@ const STEPS = [
   { id: 1, title: "Select Template", icon: FileText },
   { id: 2, title: "Link Property", icon: Building },
   { id: 3, title: "Guest Info", icon: User },
-  { id: 4, title: "Pre-fill Fields", icon: Edit },
-  { id: 5, title: "Visual Editor", icon: Edit },
-  { id: 6, title: "Review & Create", icon: CheckCircle },
+  { id: 4, title: "Prepare Values", icon: Edit },
+  { id: 5, title: "Place Fields", icon: PenTool },
+  { id: 6, title: "Review & Send", icon: CheckCircle },
 ];
 
 const DocumentCreateWizard = () => {

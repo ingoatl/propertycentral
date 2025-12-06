@@ -22,9 +22,9 @@ serve(async (req) => {
     }
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-    const { templateId } = await req.json();
+    const { templateId, forceReanalyze } = await req.json();
 
-    console.log("Analyzing document fields for template:", templateId);
+    console.log("Analyzing document fields for template:", templateId, "forceReanalyze:", forceReanalyze);
 
     // Get template details
     const { data: template, error: templateError } = await supabase
@@ -37,8 +37,8 @@ serve(async (req) => {
       throw new Error("Template not found");
     }
 
-    // Check if we already have cached field mappings
-    if (template.field_mappings && Array.isArray(template.field_mappings) && template.field_mappings.length > 0) {
+    // Check if we already have cached field mappings (unless force re-analyze)
+    if (!forceReanalyze && template.field_mappings && Array.isArray(template.field_mappings) && template.field_mappings.length > 0) {
       console.log("Using cached field mappings");
       return new Response(
         JSON.stringify({
@@ -96,31 +96,53 @@ serve(async (req) => {
     console.log("Extracted document text length:", documentText.length);
     console.log("Document preview:", documentText.substring(0, 500));
 
-    // Use AI to analyze the document and identify fields
-    const aiPrompt = `Analyze this rental/lease agreement document and identify ALL fields that need to be filled in. 
+    // Use AI to analyze the document and identify fields - ENHANCED for signature detection
+    const aiPrompt = `Analyze this rental/lease agreement document and identify ALL fields that need to be filled in, INCLUDING signature blocks.
 
 Document content:
 ${documentText.substring(0, 15000)}
 
+IMPORTANT: Look carefully for:
+1. Regular form fields (name blanks, date blanks, amounts, addresses)
+2. SIGNATURE BLOCKS - These are critical! Look for:
+   - "Guest Signature" or "Tenant Signature" lines
+   - "Guest Name (print)" lines
+   - "Host/Agent Signature" or "Landlord Signature" lines
+   - "Host Name (print)" lines
+   - Date lines near signatures
+   - Any lines with "Signature", "Sign", "(print)", "X___" patterns
+
 For each field found, determine:
 1. The field name/label (use snake_case for api_id)
-2. The field type: "text", "number", "date", "email", "phone", "textarea", "checkbox"
-3. Who should fill it: "admin" (property manager fills before sending) or "guest" (tenant fills when signing)
+2. The field type: "text", "number", "date", "email", "phone", "textarea", "checkbox", "signature"
+3. Who should fill it: "admin" (property manager fills before sending) or "guest" (tenant fills/signs)
 4. A user-friendly label
-5. The category: "property", "financial", "dates", "occupancy", "contact", "identification", "vehicle", "emergency", "acknowledgment", "other"
+5. The category: "property", "financial", "dates", "occupancy", "contact", "identification", "vehicle", "emergency", "acknowledgment", "signature", "other"
 
 Rules for determining admin vs guest:
-- Admin fills: property address, rent amounts, deposit, lease dates, property rules, policies, landlord info
-- Guest fills: guest personal info (address, phone, ID), emergency contacts, vehicle info, acknowledgments, initials, signatures
+- Admin fills: property address, rent amounts, deposit, lease dates, property rules, policies, landlord info, property name
+- Guest fills/signs: guest personal info, emergency contacts, vehicle info, acknowledgments, initials
+- Guest SIGNS: guest_signature, guest_date_signed
+- Host/Admin SIGNS: host_signature, host_date_signed, agent_signature
+
+CRITICAL SIGNATURE FIELDS TO DETECT:
+- guest_name_print (type: text, filled_by: guest, category: signature) - Guest prints their name
+- guest_signature (type: signature, filled_by: guest, category: signature) - Guest signature
+- guest_date_signed (type: date, filled_by: guest, category: signature) - Date guest signs
+- host_name_print (type: text, filled_by: admin, category: signature) - Host/Agent prints name
+- host_signature (type: signature, filled_by: admin, category: signature) - Host/Agent signature  
+- host_date_signed (type: date, filled_by: admin, category: signature) - Date host signs
 
 Return a JSON array of field objects. Example format:
 [
   {"api_id": "property_address", "label": "Property Address", "type": "text", "filled_by": "admin", "category": "property"},
   {"api_id": "monthly_rent", "label": "Monthly Rent", "type": "number", "filled_by": "admin", "category": "financial"},
-  {"api_id": "guest_phone", "label": "Guest Phone Number", "type": "phone", "filled_by": "guest", "category": "contact"},
-  {"api_id": "emergency_contact_name", "label": "Emergency Contact Name", "type": "text", "filled_by": "guest", "category": "emergency"},
-  {"api_id": "vehicle_make", "label": "Vehicle Make", "type": "text", "filled_by": "guest", "category": "vehicle"},
-  {"api_id": "rules_acknowledgment", "label": "I acknowledge the house rules", "type": "checkbox", "filled_by": "guest", "category": "acknowledgment"}
+  {"api_id": "guest_name_print", "label": "Guest Name (Print)", "type": "text", "filled_by": "guest", "category": "signature"},
+  {"api_id": "guest_signature", "label": "Guest Signature", "type": "signature", "filled_by": "guest", "category": "signature"},
+  {"api_id": "guest_date_signed", "label": "Guest Date Signed", "type": "date", "filled_by": "guest", "category": "signature"},
+  {"api_id": "host_name_print", "label": "Host/Agent Name (Print)", "type": "text", "filled_by": "admin", "category": "signature"},
+  {"api_id": "host_signature", "label": "Host/Agent Signature", "type": "signature", "filled_by": "admin", "category": "signature"},
+  {"api_id": "host_date_signed", "label": "Host Date Signed", "type": "date", "filled_by": "admin", "category": "signature"}
 ]
 
 Return ONLY the JSON array, no other text.`;
@@ -136,7 +158,7 @@ Return ONLY the JSON array, no other text.`;
         messages: [
           {
             role: "system",
-            content: "You are an expert at analyzing legal documents and identifying form fields. Return only valid JSON arrays.",
+            content: "You are an expert at analyzing legal documents and identifying form fields AND signature blocks. Return only valid JSON arrays. Pay special attention to signature lines at the end of documents.",
           },
           { role: "user", content: aiPrompt },
         ],
@@ -175,7 +197,7 @@ Return ONLY the JSON array, no other text.`;
       fields = JSON.parse(jsonStr.trim());
     } catch (parseError) {
       console.error("Error parsing AI response:", parseError);
-      // Return default fields if parsing fails
+      // Return comprehensive default fields including signatures if parsing fails
       fields = [
         { api_id: "property_address", label: "Property Address", type: "text", filled_by: "admin", category: "property" },
         { api_id: "monthly_rent", label: "Monthly Rent", type: "number", filled_by: "admin", category: "financial" },
@@ -184,18 +206,38 @@ Return ONLY the JSON array, no other text.`;
         { api_id: "lease_end_date", label: "Lease End Date", type: "date", filled_by: "admin", category: "dates" },
         { api_id: "guest_name", label: "Guest Name", type: "text", filled_by: "admin", category: "contact" },
         { api_id: "guest_email", label: "Guest Email", type: "email", filled_by: "admin", category: "contact" },
+        { api_id: "guest_name_print", label: "Guest Name (Print)", type: "text", filled_by: "guest", category: "signature" },
+        { api_id: "guest_signature", label: "Guest Signature", type: "signature", filled_by: "guest", category: "signature" },
+        { api_id: "guest_date_signed", label: "Guest Date Signed", type: "date", filled_by: "guest", category: "signature" },
+        { api_id: "host_name_print", label: "Host/Agent Name (Print)", type: "text", filled_by: "admin", category: "signature" },
+        { api_id: "host_signature", label: "Host/Agent Signature", type: "signature", filled_by: "admin", category: "signature" },
+        { api_id: "host_date_signed", label: "Host Date Signed", type: "date", filled_by: "admin", category: "signature" },
       ];
     }
 
-    // Ensure we always have essential guest info fields
+    // Ensure we always have essential fields
     const hasGuestName = fields.some(f => f.api_id === "guest_name" || f.api_id === "tenant_name");
     const hasGuestEmail = fields.some(f => f.api_id === "guest_email" || f.api_id === "tenant_email");
+    const hasGuestSignature = fields.some(f => f.api_id === "guest_signature" || f.api_id === "tenant_signature");
+    const hasHostSignature = fields.some(f => f.api_id === "host_signature" || f.api_id === "agent_signature" || f.api_id === "landlord_signature");
     
     if (!hasGuestName) {
       fields.unshift({ api_id: "guest_name", label: "Guest Name", type: "text", filled_by: "admin", category: "contact" });
     }
     if (!hasGuestEmail) {
       fields.splice(1, 0, { api_id: "guest_email", label: "Guest Email", type: "email", filled_by: "admin", category: "contact" });
+    }
+    
+    // Always ensure signature fields exist
+    if (!hasGuestSignature) {
+      fields.push({ api_id: "guest_name_print", label: "Guest Name (Print)", type: "text", filled_by: "guest", category: "signature" });
+      fields.push({ api_id: "guest_signature", label: "Guest Signature", type: "signature", filled_by: "guest", category: "signature" });
+      fields.push({ api_id: "guest_date_signed", label: "Guest Date Signed", type: "date", filled_by: "guest", category: "signature" });
+    }
+    if (!hasHostSignature) {
+      fields.push({ api_id: "host_name_print", label: "Host/Agent Name (Print)", type: "text", filled_by: "admin", category: "signature" });
+      fields.push({ api_id: "host_signature", label: "Host/Agent Signature", type: "signature", filled_by: "admin", category: "signature" });
+      fields.push({ api_id: "host_date_signed", label: "Host Date Signed", type: "date", filled_by: "admin", category: "signature" });
     }
 
     console.log("Detected fields:", fields.length);
