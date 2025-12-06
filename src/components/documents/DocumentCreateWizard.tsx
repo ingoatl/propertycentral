@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -69,9 +69,9 @@ const DocumentCreateWizard = () => {
     hostSigningUrl: null,
   });
 
-  const updateWizardData = (updates: Partial<WizardData>) => {
+  const updateWizardData = useCallback((updates: Partial<WizardData>) => {
     setWizardData((prev) => ({ ...prev, ...updates }));
-  };
+  }, []);
 
   const progress = ((currentStep - 1) / (STEPS.length - 1)) * 100;
 
