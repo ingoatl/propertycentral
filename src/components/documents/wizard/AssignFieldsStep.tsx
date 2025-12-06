@@ -30,10 +30,11 @@ const AssignFieldsStep = ({ data, updateData }: Props) => {
 
   // Initialize field assignments from detected fields if not already set
   useEffect(() => {
+    // Only initialize once when detectedFields exist and fieldAssignments are empty
     if (
       !initializedRef.current &&
-      Object.keys(data.fieldAssignments).length === 0 &&
-      data.detectedFields.length > 0
+      data.detectedFields.length > 0 &&
+      Object.keys(data.fieldAssignments).length === 0
     ) {
       initializedRef.current = true;
       const initialAssignments: Record<string, "admin" | "guest"> = {};
@@ -42,8 +43,7 @@ const AssignFieldsStep = ({ data, updateData }: Props) => {
       });
       updateData({ fieldAssignments: initialAssignments });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data.detectedFields.length]);
+  }, [data.detectedFields, data.fieldAssignments, updateData]);
 
   const toggleFieldAssignment = (fieldId: string) => {
     const currentAssignment = data.fieldAssignments[fieldId] || "admin";
