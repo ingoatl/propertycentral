@@ -37,13 +37,22 @@ const PreFillFieldsStep = ({ data, updateData }: Props) => {
     });
   };
 
-  // Separate fields by type
-  const adminFields = data.detectedFields.filter((f) => f.filled_by === "admin" && f.category !== "signature");
-  const guestFields = data.detectedFields.filter((f) => f.filled_by === "guest" && f.category !== "signature");
-  const signatureFields = data.detectedFields.filter((f) => f.category === "signature");
+  // Use field assignments to determine admin vs guest fields
+  const getFieldAssignment = (fieldId: string) => {
+    return data.fieldAssignments[fieldId] || "admin";
+  };
+
+  // Separate fields by assignment (not by AI detection)
+  const adminFields = data.detectedFields.filter(
+    (f) => getFieldAssignment(f.api_id) === "admin" && f.type !== "signature"
+  );
+  const guestFields = data.detectedFields.filter(
+    (f) => getFieldAssignment(f.api_id) === "guest" && f.type !== "signature"
+  );
+  const signatureFields = data.detectedFields.filter((f) => f.type === "signature");
   
-  const guestSignatureFields = signatureFields.filter(f => f.filled_by === "guest");
-  const hostSignatureFields = signatureFields.filter(f => f.filled_by === "admin");
+  const guestSignatureFields = signatureFields.filter(f => getFieldAssignment(f.api_id) === "guest");
+  const hostSignatureFields = signatureFields.filter(f => getFieldAssignment(f.api_id) === "admin");
 
   // Group fields by category
   const groupFieldsByCategory = (fields: DetectedField[]) => {
