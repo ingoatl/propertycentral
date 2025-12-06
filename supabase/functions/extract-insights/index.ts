@@ -1,3 +1,4 @@
+import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -73,7 +74,7 @@ serve(async (req) => {
       );
     }
 
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+    const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
 
     // Create context for AI
     const propertyList = properties
@@ -272,16 +273,16 @@ Body: ${body}
 
 ANALYZE CAREFULLY - Extract ALL order details including order number and delivery address.`;
 
-    console.log('Calling Lovable AI for email analysis...');
+    console.log('Calling OpenAI API for email analysis...');
 
-    const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+        'Authorization': `Bearer ${OPENAI_API_KEY}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-2.5-flash',
+        model: 'gpt-4o-mini',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt },
@@ -292,7 +293,7 @@ ANALYZE CAREFULLY - Extract ALL order details including order number and deliver
 
     if (!response.ok) {
       const error = await response.text();
-      console.error('Lovable AI error:', error);
+      console.error('OpenAI API error:', error);
       throw new Error('Failed to analyze email with AI');
     }
 
@@ -423,389 +424,164 @@ ANALYZE CAREFULLY - Extract ALL order details including order number and deliver
       );
     }
 
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    );
+    // Initialize Supabase client for database operations
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Check if already processed
-    const { data: existing } = await supabase
-      .from('email_insights')
-      .select('id')
-      .eq('gmail_message_id', gmailMessageId)
-      .maybeSingle();
-
-    if (existing) {
-      console.log('Email already processed, skipping...');
-      return new Response(
-        JSON.stringify({ shouldSave: false, reason: 'Already processed' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    // Check for duplicate email insight
+    if (gmailMessageId) {
+      const { data: existingInsight } = await supabase
+        .from('email_insights')
+        .select('id')
+        .eq('gmail_message_id', gmailMessageId)
+        .single();
+      
+      if (existingInsight) {
+        console.log('Email insight already exists for gmail_message_id:', gmailMessageId);
+        return new Response(
+          JSON.stringify({ shouldSave: false, reason: 'Duplicate email' }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
     }
 
-    // Save insight
-    const { data: insertedInsight, error: insertError } = await supabase
+    // Create expense if detected and validated
+    let expenseCreated = false;
+    let expenseId = null;
+    
+    // Check for return/refund
+    const isReturn = analysis.isReturn === true || 
+      subject.toLowerCase().includes('refund') || 
+      subject.toLowerCase().includes('return');
+    
+    if (analysis.expenseDetected && property) {
+      // Validate expense data - don't create without order number for Amazon
+      const isAmazon = analysis.vendor?.toLowerCase().includes('amazon');
+      const hasValidOrderNumber = analysis.orderNumber && analysis.orderNumber.length > 5;
+      const hasValidAmount = analysis.expenseAmount && analysis.expenseAmount > 0;
+      const hasValidDescription = analysis.expenseDescription && 
+        !analysis.expenseDescription.toLowerCase().includes('multiple properties') &&
+        !analysis.expenseDescription.toLowerCase().includes('multiple expenses logged');
+      
+      // For returns, amount can be negative
+      const isValidReturn = isReturn && analysis.expenseAmount;
+      
+      if ((isAmazon && !hasValidOrderNumber) || (!hasValidAmount && !isValidReturn) || !hasValidDescription) {
+        console.log('Invalid expense data, skipping expense creation:', {
+          isAmazon,
+          hasValidOrderNumber,
+          hasValidAmount,
+          hasValidDescription,
+          isReturn
+        });
+      } else {
+        // Check for duplicate expense by order number
+        if (analysis.orderNumber) {
+          const { data: existingExpense } = await supabase
+            .from('expenses')
+            .select('id')
+            .eq('order_number', analysis.orderNumber)
+            .eq('property_id', property.id)
+            .single();
+          
+          if (existingExpense) {
+            console.log('Expense already exists for order:', analysis.orderNumber);
+          } else {
+            // Create the expense
+            const expenseData: any = {
+              property_id: property.id,
+              amount: isReturn ? -Math.abs(analysis.expenseAmount) : analysis.expenseAmount,
+              purpose: analysis.expenseDescription,
+              date: analysis.orderDate || emailDate.split('T')[0],
+              vendor: analysis.vendor,
+              order_number: analysis.orderNumber,
+              order_date: analysis.orderDate,
+              tracking_number: analysis.trackingNumber,
+              delivery_address: analysis.deliveryAddress,
+              is_return: isReturn,
+              line_items: analysis.lineItems,
+              items_detail: analysis.lineItems ? 
+                analysis.lineItems.map((item: any) => `${item.name}: $${item.price}`).join(', ') : 
+                null,
+            };
+            
+            const { data: newExpense, error: expenseError } = await supabase
+              .from('expenses')
+              .insert(expenseData)
+              .select()
+              .single();
+            
+            if (expenseError) {
+              console.error('Error creating expense:', expenseError);
+            } else {
+              expenseCreated = true;
+              expenseId = newExpense.id;
+              console.log('Created expense:', newExpense.id, 'Amount:', expenseData.amount);
+            }
+          }
+        }
+      }
+    }
+
+    // Save email insight
+    const insightData = {
+      subject,
+      sender_email: senderEmail,
+      email_date: emailDate,
+      gmail_message_id: gmailMessageId,
+      property_id: property?.id || null,
+      owner_id: owner?.id || null,
+      category: analysis.category,
+      summary: analysis.summary,
+      sentiment: analysis.sentiment,
+      action_required: analysis.actionRequired,
+      suggested_actions: analysis.suggestedActions,
+      priority: analysis.priority,
+      due_date: analysis.dueDate,
+      status: 'new',
+      expense_detected: analysis.expenseDetected,
+      expense_amount: analysis.expenseAmount,
+      expense_description: analysis.expenseDescription,
+      expense_created: expenseCreated,
+    };
+
+    const { data: insight, error: insightError } = await supabase
       .from('email_insights')
-      .insert({
-        property_id: property?.id || null,
-        owner_id: owner?.id || null,
-        email_date: emailDate,
-        sender_email: senderEmail,
-        subject,
-        summary: analysis.summary,
-        category: analysis.category,
-        sentiment: analysis.sentiment,
-        action_required: analysis.actionRequired,
-        suggested_actions: analysis.suggestedActions,
-        priority: analysis.priority,
-        due_date: analysis.dueDate,
-        expense_detected: analysis.expenseDetected || false,
-        expense_amount: analysis.expenseAmount || null,
-        expense_description: analysis.expenseDescription || null,
-        status: 'new',
-        gmail_message_id: gmailMessageId,
-      })
+      .insert(insightData)
       .select()
       .single();
 
-    if (insertError) {
-      console.error('Failed to save insight:', insertError);
-      throw insertError;
+    if (insightError) {
+      console.error('Error saving email insight:', insightError);
+      throw insightError;
     }
 
-    console.log('Insight saved successfully');
-
-    // If expense detected and we have a property, check for duplicates before creating
-    // CRITICAL: Only create expenses for actual expense categories, NOT for bookings (which are income)
-    const expenseCategories = ['expense', 'order', 'maintenance', 'utilities', 'insurance'];
-    if (analysis.expenseDetected && 
-        analysis.expenseAmount && 
-        property?.id && 
-        expenseCategories.includes(analysis.category)) {
-      
-      // NEW: Handle returns/refunds separately
-      if (analysis.isReturn && analysis.originalOrderNumber && analysis.refundAmount) {
-        console.log('Processing return/refund for order:', analysis.originalOrderNumber);
-        
-        // Find the original expense
-        const { data: originalExpense, error: findError } = await supabase
-          .from('expenses')
-          .select('*')
-          .eq('property_id', property.id)
-          .eq('order_number', analysis.originalOrderNumber)
-          .eq('is_return', false)
-          .maybeSingle();
-        
-        if (!originalExpense) {
-          console.log('Original expense not found for return, creating standalone return record');
-        } else {
-          console.log('Found original expense for return:', originalExpense.id);
-        }
-        
-        const { data: userData } = await supabase
-          .from('gmail_oauth_tokens')
-          .select('user_id')
-          .maybeSingle();
-        
-        // Save email content as HTML receipt
-        let emailScreenshotPath = null;
-        if (rawHtml || body) {
-          try {
-            const emailContent = rawHtml || `
-              <html>
-                <head>
-                  <meta charset="utf-8">
-                  <title>${subject}</title>
-                  <style>
-                    body { font-family: Arial, sans-serif; padding: 20px; max-width: 800px; margin: 0 auto; }
-                    .header { border-bottom: 2px solid #333; padding-bottom: 10px; margin-bottom: 20px; }
-                    .meta { color: #666; font-size: 14px; margin-bottom: 10px; }
-                    .content { line-height: 1.6; }
-                  </style>
-                </head>
-                <body>
-                  <div class="header">
-                    <h2>${subject}</h2>
-                    <div class="meta">From: ${senderEmail}</div>
-                    <div class="meta">Date: ${new Date(emailDate).toLocaleString()}</div>
-                  </div>
-                  <div class="content">
-                    ${body.replace(/\n/g, '<br>')}
-                  </div>
-                </body>
-              </html>
-            `;
-            
-            const fileName = `return-receipt-${Date.now()}-${Math.random().toString(36).substring(7)}.html`;
-            const filePath = `${property.id}/${fileName}`;
-            
-            const { error: uploadError } = await supabase.storage
-              .from('expense-documents')
-              .upload(filePath, emailContent, {
-                contentType: 'text/html',
-                upsert: false
-              });
-            
-            if (!uploadError) {
-              emailScreenshotPath = filePath;
-              console.log('Return receipt saved:', filePath);
-            }
-          } catch (uploadErr) {
-            console.error('Error saving return receipt:', uploadErr);
-          }
-        }
-        
-        // Create return expense record with negative amount
-        const returnLineItems = analysis.returnedItems && Array.isArray(analysis.returnedItems) && analysis.returnedItems.length > 0
-          ? { items: analysis.returnedItems }
-          : null;
-        
-        const { error: returnError } = await supabase
-          .from('expenses')
-          .insert({
-            property_id: property.id,
-            amount: -Math.abs(analysis.refundAmount), // Negative amount for return
-            date: analysis.returnDate || new Date(emailDate).toISOString().split('T')[0],
-            purpose: `Return/Refund: ${analysis.returnReason || 'Items returned'}`,
-            category: 'return',
-            order_number: analysis.originalOrderNumber,
-            vendor: originalExpense?.vendor || analysis.vendor || 'Amazon',
-            items_detail: analysis.returnReason || null,
-            delivery_address: originalExpense?.delivery_address || analysis.deliveryAddress || null,
-            line_items: returnLineItems,
-            email_screenshot_path: emailScreenshotPath,
-            email_insight_id: insertedInsight.id,
-            user_id: userData?.user_id || null,
-            is_return: true,
-            parent_expense_id: originalExpense?.id || null,
-            return_reason: analysis.returnReason || null,
-            refund_amount: analysis.refundAmount,
-          });
-        
-        if (returnError) {
-          console.error('Failed to create return expense:', returnError);
-        } else {
-          await supabase
-            .from('email_insights')
-            .update({ expense_created: true })
-            .eq('id', insertedInsight.id);
-          
-          console.log('Return expense created successfully');
-        }
-        
-        return new Response(
-          JSON.stringify({ shouldSave: true, analysis, isReturn: true }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-      
-      console.log('Checking for duplicate expenses with order number:', analysis.orderNumber);
-      
-      // CRITICAL: Check for duplicates by order number (for Amazon orders)
-      if (analysis.orderNumber) {
-        const { data: existingExpense } = await supabase
-          .from('expenses')
-          .select('id, order_number')
-          .eq('property_id', property.id)
-          .eq('order_number', analysis.orderNumber)
-          .maybeSingle();
-
-        if (existingExpense) {
-          console.log('Duplicate order number found, skipping expense creation:', analysis.orderNumber);
-          await supabase
-            .from('email_insights')
-            .update({ 
-              expense_created: false,
-              suggested_actions: (analysis.suggestedActions || '') + ` (Duplicate order ${analysis.orderNumber} - already logged)`
-            })
-            .eq('id', insertedInsight.id);
-          
-          return new Response(
-            JSON.stringify({ shouldSave: true, analysis, duplicate: true }),
-            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
-        }
-      }
-      
-      // CRITICAL: For expenses WITHOUT order numbers, use fuzzy duplicate detection
-      if (!analysis.orderNumber) {
-        console.log('Checking for fuzzy duplicates (no order number)...');
-        
-        // Check for expenses with same property, similar amount, and date within 3 days
-        const expenseDate = new Date(analysis.orderDate || emailDate);
-        const threeDaysBefore = new Date(expenseDate);
-        threeDaysBefore.setDate(threeDaysBefore.getDate() - 3);
-        const threeDaysAfter = new Date(expenseDate);
-        threeDaysAfter.setDate(threeDaysAfter.getDate() + 3);
-        
-        const { data: similarExpenses } = await supabase
-          .from('expenses')
-          .select('id, amount, vendor, purpose')
-          .eq('property_id', property.id)
-          .gte('date', threeDaysBefore.toISOString().split('T')[0])
-          .lte('date', threeDaysAfter.toISOString().split('T')[0]);
-        
-        // Check if any similar expense exists with same amount and similar vendor/purpose
-        const isDuplicate = similarExpenses?.some(exp => {
-          const amountMatch = Math.abs(exp.amount - analysis.expenseAmount) < 0.01;
-          const vendorMatch = exp.vendor && analysis.vendor && 
-            exp.vendor.toLowerCase() === analysis.vendor.toLowerCase();
-          const purposeMatch = exp.purpose && analysis.expenseDescription &&
-            exp.purpose.toLowerCase().includes(analysis.expenseDescription.toLowerCase().substring(0, 20));
-          
-          return amountMatch && (vendorMatch || purposeMatch);
-        });
-        
-        if (isDuplicate) {
-          console.log('Fuzzy duplicate detected, skipping expense creation');
-          await supabase
-            .from('email_insights')
-            .update({ 
-              expense_created: false,
-              suggested_actions: (analysis.suggestedActions || '') + ' (Possible duplicate detected - similar expense exists)'
-            })
-            .eq('id', insertedInsight.id);
-          
-          return new Response(
-            JSON.stringify({ shouldSave: true, analysis, duplicate: true, fuzzyMatch: true }),
-            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
-        }
-      }
-      
-      console.log('Creating expense record with full details...');
-      
-      const { data: userData } = await supabase
-        .from('gmail_oauth_tokens')
-        .select('user_id')
-        .maybeSingle();
-
-      // Save email content as HTML file for receipt viewing
-      let emailScreenshotPath = null;
-      if (rawHtml || body) {
-        try {
-          const emailContent = rawHtml || `
-            <html>
-              <head>
-                <meta charset="utf-8">
-                <title>${subject}</title>
-                <style>
-                  body { font-family: Arial, sans-serif; padding: 20px; max-width: 800px; margin: 0 auto; }
-                  .header { border-bottom: 2px solid #333; padding-bottom: 10px; margin-bottom: 20px; }
-                  .meta { color: #666; font-size: 14px; margin-bottom: 10px; }
-                  .content { line-height: 1.6; }
-                </style>
-              </head>
-              <body>
-                <div class="header">
-                  <h2>${subject}</h2>
-                  <div class="meta">From: ${senderEmail}</div>
-                  <div class="meta">Date: ${new Date(emailDate).toLocaleString()}</div>
-                </div>
-                <div class="content">
-                  ${body.replace(/\n/g, '<br>')}
-                </div>
-              </body>
-            </html>
-          `;
-          
-          const fileName = `expense-receipt-${Date.now()}-${Math.random().toString(36).substring(7)}.html`;
-          const filePath = `${property.id}/${fileName}`;
-          
-          const { error: uploadError } = await supabase.storage
-            .from('expense-documents')
-            .upload(filePath, emailContent, {
-              contentType: 'text/html',
-              upsert: false
-            });
-          
-          if (!uploadError) {
-            emailScreenshotPath = filePath;
-            console.log('Email receipt saved:', filePath);
-          } else {
-            console.error('Failed to upload email receipt:', uploadError);
-          }
-        } catch (uploadErr) {
-          console.error('Error saving email receipt:', uploadErr);
-        }
-      }
-
-      // Prepare line items data
-      const lineItemsData = analysis.lineItems && Array.isArray(analysis.lineItems) && analysis.lineItems.length > 0
-        ? { items: analysis.lineItems }
-        : null;
-
-      // PHASE 6: SAFETY CONTROL - Validate expense before creating
-      const hasSuspiciousDescription = analysis.expenseDescription && (
-        analysis.expenseDescription.toLowerCase().includes('multiple expenses logged') ||
-        analysis.expenseDescription.toLowerCase().includes('multiple properties') ||
-        analysis.expenseDescription.toLowerCase().includes('logged for')
-      );
-      
-      if (hasSuspiciousDescription) {
-        console.log('REJECTED: Suspicious expense description detected:', analysis.expenseDescription);
-        await supabase
-          .from('email_insights')
-          .update({ 
-            expense_created: false,
-            suggested_actions: (analysis.suggestedActions || '') + ' [REJECTED: Suspicious aggregated description]'
-          })
-          .eq('id', insertedInsight.id);
-        
-        return new Response(
-          JSON.stringify({ 
-            shouldSave: true, 
-            analysis, 
-            expenseRejected: true,
-            reason: 'Suspicious aggregated description'
-          }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-      
-      // PHASE 6: SAFETY CONTROL - All auto-created expenses start unverified
-      const { error: expenseError } = await supabase
+    // Update expense with email_insight_id if created
+    if (expenseCreated && expenseId && insight) {
+      await supabase
         .from('expenses')
-        .insert({
-          property_id: property.id,
-          amount: analysis.expenseAmount,
-          date: analysis.orderDate || new Date(emailDate).toISOString().split('T')[0],
-          purpose: analysis.expenseDescription || `Email expense: ${subject}`,
-          category: analysis.category || 'order',
-          order_number: analysis.orderNumber || null,
-          order_date: analysis.orderDate || null,
-          tracking_number: analysis.trackingNumber || null,
-          vendor: analysis.vendor || null,
-          items_detail: analysis.expenseDescription || null,
-          delivery_address: analysis.deliveryAddress || null,
-          line_items: lineItemsData,
-          email_screenshot_path: emailScreenshotPath,
-          email_insight_id: insertedInsight.id,
-          user_id: userData?.user_id || null,
-          exported: false, // PHASE 6: Start unverified/unexported for manual review
-        });
-
-      if (expenseError) {
-        console.error('Failed to create expense:', expenseError);
-      } else {
-        await supabase
-          .from('email_insights')
-          .update({ expense_created: true })
-          .eq('id', insertedInsight.id);
-        
-        console.log('Expense record created successfully with order details');
-      }
+        .update({ email_insight_id: insight.id })
+        .eq('id', expenseId);
     }
+
+    console.log('Saved email insight:', insight.id);
 
     return new Response(
-      JSON.stringify({ shouldSave: true, analysis }),
+      JSON.stringify({ 
+        shouldSave: true, 
+        insight,
+        expenseCreated,
+        expenseId,
+        analysis
+      }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error in extract-insights:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const message = error instanceof Error ? error.message : 'Unknown error';
     return new Response(
-      JSON.stringify({ error: errorMessage, shouldSave: false }),
+      JSON.stringify({ error: message }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
