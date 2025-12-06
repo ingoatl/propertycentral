@@ -20,7 +20,14 @@ import LeaveReview from "./pages/LeaveReview";
 import PublicReview from "./pages/PublicReview";
 import Documents from "./pages/Documents";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 const App = () => (
   <ErrorBoundary>
@@ -33,24 +40,17 @@ const App = () => (
             <Route path="/auth" element={<Auth />} />
             <Route path="/leave-review" element={<LeaveReview />} />
             <Route path="/review" element={<PublicReview />} />
-            <Route path="*" element={
-              <Layout>
-                <Routes>
-                  <Route path="/" element={<Dashboard />} />
-                  <Route path="/properties" element={<Properties />} />
-                  <Route path="/visits" element={<Visits />} />
-                  <Route path="/expenses" element={<Expenses />} />
-                  <Route path="/admin" element={<Admin />} />
-                  <Route path="/owners" element={<PropertyOwners />} />
-                  <Route path="/charges" element={<MonthlyCharges />} />
-                  <Route path="/mid-term-bookings" element={<MidTermBookings />} />
-                  <Route path="/bookings" element={<Bookings />} />
-                  <Route path="/documents" element={<Documents />} />
-                  {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-                  <Route path="*" element={<NotFound />} />
-                </Routes>
-              </Layout>
-            } />
+            <Route path="/" element={<Layout><Dashboard /></Layout>} />
+            <Route path="/properties" element={<Layout><Properties /></Layout>} />
+            <Route path="/visits" element={<Layout><Visits /></Layout>} />
+            <Route path="/expenses" element={<Layout><Expenses /></Layout>} />
+            <Route path="/admin" element={<Layout><Admin /></Layout>} />
+            <Route path="/owners" element={<Layout><PropertyOwners /></Layout>} />
+            <Route path="/charges" element={<Layout><MonthlyCharges /></Layout>} />
+            <Route path="/mid-term-bookings" element={<Layout><MidTermBookings /></Layout>} />
+            <Route path="/bookings" element={<Layout><Bookings /></Layout>} />
+            <Route path="/documents" element={<Layout><Documents /></Layout>} />
+            <Route path="*" element={<Layout><NotFound /></Layout>} />
           </Routes>
         </BrowserRouter>
       </TooltipProvider>
