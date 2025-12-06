@@ -1,17 +1,18 @@
+import { ComponentType } from "react";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { WizardData, DetectedField } from "../DocumentCreateWizard";
-import { User, Building, DollarSign, Calendar, Users, Car, Phone, FileCheck, HelpCircle, PenTool, Info, UserCog } from "lucide-react";
+import { User, Building, DollarSign, Calendar, Users, Car, Phone, FileCheck, HelpCircle, PenTool, Info, UserCog, LucideIcon } from "lucide-react";
 
 interface Props {
   data: WizardData;
   updateData: (updates: Partial<WizardData>) => void;
 }
 
-const CATEGORY_CONFIG: Record<string, { label: string; icon: React.ComponentType<{ className?: string }> }> = {
+const CATEGORY_CONFIG: Record<string, { label: string; icon: LucideIcon }> = {
   property: { label: "Property Details", icon: Building },
   financial: { label: "Financial Terms", icon: DollarSign },
   dates: { label: "Lease Dates", icon: Calendar },
