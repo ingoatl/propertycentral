@@ -19,24 +19,28 @@ const VisualEditorStep = ({ data, updateData }: Props) => {
   const createDraftDocument = async () => {
     setCreating(true);
     try {
-      // Build pre-fill data from fieldValues for admin fields
-      const adminFields = data.detectedFields.filter((f) => f.filled_by === "admin");
+      // Build pre-fill data from ALL fieldValues (not just admin fields)
+      // Include both admin-filled values and any pre-populated guest info
       const preFillData: Record<string, string> = {};
       
-      adminFields.forEach((field) => {
-        const value = data.fieldValues[field.api_id];
-        if (value && typeof value === "string") {
-          preFillData[field.api_id] = value;
+      // Add all field values from the wizard
+      for (const [fieldId, value] of Object.entries(data.fieldValues)) {
+        if (value && typeof value === "string" && value.trim()) {
+          preFillData[fieldId] = value.trim();
         }
-      });
+      }
 
-      // Add guest info to pre-fill data
-      preFillData.guest_name = data.guestName;
-      preFillData.tenant_name = data.guestName;
-      preFillData.guest_email = data.guestEmail;
-      preFillData.tenant_email = data.guestEmail;
+      // Add guest info to pre-fill data with multiple aliases
+      if (data.guestName) {
+        preFillData.guest_name = data.guestName;
+        preFillData.tenant_name = data.guestName;
+      }
+      if (data.guestEmail) {
+        preFillData.guest_email = data.guestEmail;
+        preFillData.tenant_email = data.guestEmail;
+      }
 
-      // Get guest fields that the tenant needs to fill
+      // Get guest fields that the tenant needs to fill during signing
       const guestFields = data.detectedFields
         .filter((f) => f.filled_by === "guest")
         .map((f) => ({
@@ -45,6 +49,9 @@ const VisualEditorStep = ({ data, updateData }: Props) => {
           type: f.type,
           category: f.category,
         }));
+
+      console.log("Creating draft with preFillData:", preFillData);
+      console.log("Guest fields for signing:", guestFields);
 
       const { data: result, error } = await supabase.functions.invoke(
         "signwell-create-draft-document",
