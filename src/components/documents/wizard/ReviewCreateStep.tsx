@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Loader2, Send, Copy, CheckCircle, FileText, User, Building, Calendar } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { WizardData } from "../DocumentCreateWizard";
-import { format, isValid, parseISO } from "date-fns";
+import { format } from "date-fns";
 
 interface Props {
   data: WizardData;
@@ -131,15 +131,15 @@ const ReviewCreateStep = ({ data, updateData, onComplete }: Props) => {
           </>
         )}
 
-        {leaseStartDate && leaseEndDate && isValid(parseISO(leaseStartDate)) && isValid(parseISO(leaseEndDate)) && (
+        {leaseStartDate && leaseEndDate && (
           <>
             <Separator />
             <div className="flex items-start gap-3">
               <Calendar className="h-5 w-5 text-primary mt-0.5" />
               <div>
                 <h4 className="font-medium">
-                  {format(parseISO(leaseStartDate), "MMM d, yyyy")} -{" "}
-                  {format(parseISO(leaseEndDate), "MMM d, yyyy")}
+                  {format(new Date(leaseStartDate), "MMM d, yyyy")} -{" "}
+                  {format(new Date(leaseEndDate), "MMM d, yyyy")}
                 </h4>
                 <p className="text-sm text-muted-foreground">Lease Period</p>
               </div>

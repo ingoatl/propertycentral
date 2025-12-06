@@ -42,12 +42,8 @@ const PropertyLinkStep = ({ data, updateData }: Props) => {
       loadBookings(data.propertyId);
     } else {
       setBookings([]);
-      // Only update if bookingId is not already null to prevent loops
-      if (data.bookingId !== null) {
-        updateData({ bookingId: null });
-      }
+      updateData({ bookingId: null });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data.propertyId]);
 
   const loadProperties = async () => {

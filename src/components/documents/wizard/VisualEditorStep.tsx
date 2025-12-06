@@ -102,22 +102,14 @@ const VisualEditorStep = ({ data, updateData }: Props) => {
     }
   };
 
-  // Use field assignments to determine who fills what
-  const getFieldAssignment = (fieldId: string) => {
-    return data.fieldAssignments[fieldId] || "admin";
-  };
-
-  // Get signature fields grouped by assignment
-  const signatureFields = data.detectedFields.filter((f) => f.type === "signature");
-  const guestSignatureFields = signatureFields.filter(f => getFieldAssignment(f.api_id) === "guest");
-  const hostSignatureFields = signatureFields.filter(f => getFieldAssignment(f.api_id) === "admin");
+  // Get signature fields grouped by signer
+  const signatureFields = data.detectedFields.filter((f) => f.category === "signature");
+  const guestSignatureFields = signatureFields.filter(f => f.filled_by === "guest");
+  const hostSignatureFields = signatureFields.filter(f => f.filled_by === "admin");
   
-  // Get non-signature fields by assignment
+  // Get non-signature guest fields
   const guestTextFields = data.detectedFields.filter(
-    (f) => getFieldAssignment(f.api_id) === "guest" && f.type !== "signature"
-  );
-  const adminTextFields = data.detectedFields.filter(
-    (f) => getFieldAssignment(f.api_id) === "admin" && f.type !== "signature"
+    (f) => f.filled_by === "guest" && f.category !== "signature" && f.type !== "signature"
   );
 
   return (
@@ -238,20 +230,11 @@ const VisualEditorStep = ({ data, updateData }: Props) => {
                     For Guest (Signer 1):
                   </p>
                   <ul className="text-sm text-amber-700 dark:text-amber-300 space-y-1 list-disc list-inside">
-                    {guestSignatureFields.map(f => (
-                      <li key={f.api_id}>
-                        <Badge variant="outline" className="text-xs mr-1">Signature</Badge>
-                        {f.label}
-                      </li>
-                    ))}
-                    {guestTextFields.map(f => (
-                      <li key={f.api_id}>
-                        <Badge variant="outline" className="text-xs mr-1">Text</Badge>
-                        {f.label}
-                      </li>
-                    ))}
-                    {guestSignatureFields.length === 0 && guestTextFields.length === 0 && (
-                      <li className="text-muted-foreground">No guest fields assigned</li>
+                    <li>Add <Badge variant="outline" className="text-xs">Signature</Badge> field</li>
+                    <li>Add <Badge variant="outline" className="text-xs">Text</Badge> for printed name</li>
+                    <li>Add <Badge variant="outline" className="text-xs">Date</Badge> for signing date</li>
+                    {guestTextFields.length > 0 && (
+                      <li>Add text fields for: {guestTextFields.map(f => f.label).join(", ")}</li>
                     )}
                   </ul>
                 </div>
@@ -260,39 +243,12 @@ const VisualEditorStep = ({ data, updateData }: Props) => {
                     For Host (Signer 2):
                   </p>
                   <ul className="text-sm text-amber-700 dark:text-amber-300 space-y-1 list-disc list-inside">
-                    {hostSignatureFields.map(f => (
-                      <li key={f.api_id}>
-                        <Badge variant="outline" className="text-xs mr-1">Signature</Badge>
-                        {f.label}
-                      </li>
-                    ))}
-                    {hostSignatureFields.length === 0 && (
-                      <li className="text-muted-foreground">No host signature fields assigned</li>
-                    )}
+                    <li>Add <Badge variant="outline" className="text-xs">Signature</Badge> field</li>
+                    <li>Add <Badge variant="outline" className="text-xs">Text</Badge> for printed name</li>
+                    <li>Add <Badge variant="outline" className="text-xs">Date</Badge> for signing date</li>
                   </ul>
                 </div>
               </div>
-              
-              {/* Admin pre-filled values reference */}
-              {adminTextFields.length > 0 && (
-                <div className="mt-4 pt-3 border-t border-amber-200 dark:border-amber-700">
-                  <p className="text-sm font-medium text-amber-800 dark:text-amber-200 mb-2">
-                    Pre-filled admin values (type these in the document):
-                  </p>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-1 text-xs">
-                    {adminTextFields.map(f => {
-                      const value = data.fieldValues[f.api_id];
-                      return (
-                        <div key={f.api_id} className="text-amber-700 dark:text-amber-300">
-                          <span className="font-medium">{f.label}:</span>{" "}
-                          {value ? String(value) : <span className="italic text-muted-foreground">Not set</span>}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-              
               <div className="mt-4 pt-3 border-t border-amber-200 dark:border-amber-700">
                 <p className="text-sm text-amber-700 dark:text-amber-300">
                   <strong>When done:</strong> Save in the editor, then return here and click "Next" to finalize.
