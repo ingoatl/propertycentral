@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { User, Mail, FileText } from "lucide-react";
@@ -9,6 +10,21 @@ interface Props {
 }
 
 const GuestInfoStep = ({ data, updateData }: Props) => {
+  // Auto-generate document name when guest name or property changes
+  useEffect(() => {
+    const propertyAddress = data.fieldValues.property_address as string || "";
+    const guestName = data.guestName || "";
+    
+    // Only auto-generate if we have both values and name hasn't been manually customized
+    if (guestName && propertyAddress) {
+      const generatedName = `Innkeeper Agreement - ${propertyAddress} - ${guestName}`;
+      // Only update if the name is empty or still matches a previously generated format
+      if (!data.documentName || data.documentName.startsWith("Innkeeper Agreement - ")) {
+        updateData({ documentName: generatedName });
+      }
+    }
+  }, [data.guestName, data.fieldValues.property_address]);
+
   return (
     <div className="space-y-6">
       <div>
@@ -19,22 +35,6 @@ const GuestInfoStep = ({ data, updateData }: Props) => {
       </div>
 
       <div className="space-y-4">
-        <div className="space-y-2">
-          <Label htmlFor="documentName" className="flex items-center gap-2">
-            <FileText className="h-4 w-4" />
-            Document Name
-          </Label>
-          <Input
-            id="documentName"
-            value={data.documentName}
-            onChange={(e) => updateData({ documentName: e.target.value })}
-            placeholder="e.g., Rental Agreement - 123 Main St"
-          />
-          <p className="text-xs text-muted-foreground">
-            A friendly name to identify this document
-          </p>
-        </div>
-
         <div className="space-y-2">
           <Label htmlFor="guestName" className="flex items-center gap-2">
             <User className="h-4 w-4" />
@@ -64,6 +64,22 @@ const GuestInfoStep = ({ data, updateData }: Props) => {
           />
           <p className="text-xs text-muted-foreground">
             The signing link will be sent to this email address
+          </p>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="documentName" className="flex items-center gap-2">
+            <FileText className="h-4 w-4" />
+            Document Name
+          </Label>
+          <Input
+            id="documentName"
+            value={data.documentName}
+            onChange={(e) => updateData({ documentName: e.target.value })}
+            placeholder="e.g., Innkeeper Agreement - 123 Main St - John Doe"
+          />
+          <p className="text-xs text-muted-foreground">
+            Auto-generated from property address and guest name. You can customize if needed.
           </p>
         </div>
       </div>
