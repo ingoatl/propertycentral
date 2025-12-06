@@ -1,3 +1,4 @@
+import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 
@@ -129,11 +130,11 @@ serve(async (req) => {
 
   try {
     const { messages } = await req.json();
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+    if (!OPENAI_API_KEY) throw new Error("OPENAI_API_KEY is not configured");
     if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
       throw new Error("Supabase credentials not configured");
     }
@@ -315,14 +316,14 @@ Be helpful and concise.`;
     let pendingToolCalls: any[] = [];
     let assistantMessage = "";
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-pro",
+        model: "gpt-4o-mini",
         messages: [
           { role: "system", content: systemPrompt },
           ...messages,
@@ -335,8 +336,8 @@ Be helpful and concise.`;
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("AI gateway error:", response.status, errorText);
-      throw new Error(`AI gateway error: ${response.status}`);
+      console.error("OpenAI API error:", response.status, errorText);
+      throw new Error(`OpenAI API error: ${response.status}`);
     }
 
     const encoder = new TextEncoder();
@@ -624,14 +625,14 @@ Be helpful and concise.`;
                   toolCallCount: pendingToolCalls.length
                 });
                 
-                const followUpResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+                const followUpResponse = await fetch("https://api.openai.com/v1/chat/completions", {
                   method: "POST",
                   headers: {
-                    Authorization: `Bearer ${LOVABLE_API_KEY}`,
+                    Authorization: `Bearer ${OPENAI_API_KEY}`,
                     "Content-Type": "application/json",
                   },
                   body: JSON.stringify({
-                    model: "google/gemini-2.5-pro",
+                    model: "gpt-4o-mini",
                     messages: followUpMessages,
                     stream: true,
                   }),
@@ -639,7 +640,7 @@ Be helpful and concise.`;
 
                 if (!followUpResponse.ok) {
                   const errorText = await followUpResponse.text();
-                  console.error("Follow-up AI gateway error:", followUpResponse.status, errorText);
+                  console.error("Follow-up OpenAI API error:", followUpResponse.status, errorText);
                   
                   // Fallback: provide raw tool results
                   const fallbackMessage = `I found information but had trouble formatting it. Here's what I found:\n\n${
