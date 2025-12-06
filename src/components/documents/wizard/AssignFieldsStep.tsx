@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
@@ -26,16 +26,24 @@ const CATEGORY_CONFIG: Record<string, { label: string; icon: React.ComponentType
 };
 
 const AssignFieldsStep = ({ data, updateData }: Props) => {
+  const initializedRef = useRef(false);
+
   // Initialize field assignments from detected fields if not already set
   useEffect(() => {
-    if (Object.keys(data.fieldAssignments).length === 0 && data.detectedFields.length > 0) {
+    if (
+      !initializedRef.current &&
+      Object.keys(data.fieldAssignments).length === 0 &&
+      data.detectedFields.length > 0
+    ) {
+      initializedRef.current = true;
       const initialAssignments: Record<string, "admin" | "guest"> = {};
       data.detectedFields.forEach((field) => {
         initialAssignments[field.api_id] = field.filled_by;
       });
       updateData({ fieldAssignments: initialAssignments });
     }
-  }, [data.detectedFields, data.fieldAssignments, updateData]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data.detectedFields.length]);
 
   const toggleFieldAssignment = (fieldId: string) => {
     const currentAssignment = data.fieldAssignments[fieldId] || "admin";
