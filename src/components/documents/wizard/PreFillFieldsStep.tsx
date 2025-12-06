@@ -37,13 +37,22 @@ const PreFillFieldsStep = ({ data, updateData }: Props) => {
     });
   };
 
-  // Separate fields by type
-  const adminFields = data.detectedFields.filter((f) => f.filled_by === "admin" && f.category !== "signature");
-  const guestFields = data.detectedFields.filter((f) => f.filled_by === "guest" && f.category !== "signature");
+  // Helper to get the effective assignment (user override or default)
+  const getFieldAssignment = (field: DetectedField): "admin" | "guest" => {
+    return data.fieldAssignments[field.api_id] || field.filled_by;
+  };
+
+  // Separate fields by effective assignment
+  const adminFields = data.detectedFields.filter(
+    (f) => getFieldAssignment(f) === "admin" && f.category !== "signature"
+  );
+  const guestFields = data.detectedFields.filter(
+    (f) => getFieldAssignment(f) === "guest" && f.category !== "signature"
+  );
   const signatureFields = data.detectedFields.filter((f) => f.category === "signature");
   
-  const guestSignatureFields = signatureFields.filter(f => f.filled_by === "guest");
-  const hostSignatureFields = signatureFields.filter(f => f.filled_by === "admin");
+  const guestSignatureFields = signatureFields.filter(f => getFieldAssignment(f) === "guest");
+  const hostSignatureFields = signatureFields.filter(f => getFieldAssignment(f) === "admin");
 
   // Group fields by category
   const groupFieldsByCategory = (fields: DetectedField[]) => {
