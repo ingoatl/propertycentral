@@ -7,6 +7,8 @@ import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { Check, Home, DollarSign, Eye, RotateCcw, AlertTriangle, RefreshCw } from "lucide-react";
@@ -31,6 +33,8 @@ export const ReconciliationReviewModal = ({
   const [notes, setNotes] = useState("");
   const [isApproving, setIsApproving] = useState(false);
   const [showEmailPreview, setShowEmailPreview] = useState(false);
+  const [revenueOverride, setRevenueOverride] = useState<string>("");
+  const [showOverrideInput, setShowOverrideInput] = useState(false);
   const queryClient = useQueryClient();
 
   // Set up real-time subscriptions for line item changes
@@ -505,6 +509,61 @@ export const ReconciliationReviewModal = ({
   });
 
 
+  // Mutation to save revenue override
+  const saveRevenueOverrideMutation = useMutation({
+    mutationFn: async (overrideValue: number | null) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      // Calculate new management fee based on override
+      const property = data?.reconciliation?.properties;
+      const percentage = property?.management_fee_percentage || 15;
+      const minimumFee = property?.order_minimum_fee || 0;
+      
+      let newManagementFee = 0;
+      if (overrideValue !== null) {
+        // If override is 0 or very low, just use minimum fee
+        const calculatedFee = overrideValue * (percentage / 100);
+        newManagementFee = Math.max(calculatedFee, minimumFee);
+      }
+      
+      const { error } = await supabase
+        .from("monthly_reconciliations")
+        .update({ 
+          revenue_override: overrideValue,
+          total_revenue: overrideValue ?? data?.reconciliation?.total_revenue ?? 0,
+          management_fee: overrideValue !== null ? newManagementFee : data?.reconciliation?.management_fee ?? 0,
+          updated_at: new Date().toISOString()
+        })
+        .eq("id", reconciliationId);
+      
+      if (error) throw error;
+      
+      // Log in audit trail
+      await supabase.from("reconciliation_audit_log").insert({
+        reconciliation_id: reconciliationId,
+        action: 'revenue_override_set',
+        user_id: user?.id,
+        notes: overrideValue !== null 
+          ? `Manual revenue override set to $${overrideValue.toFixed(2)} (tenant non-payment)`
+          : 'Revenue override cleared'
+      });
+      
+      return { overrideValue };
+    },
+    onSuccess: (result) => {
+      refetch();
+      if (result.overrideValue !== null) {
+        toast.success(`Revenue override saved: $${result.overrideValue.toFixed(2)}`);
+      } else {
+        toast.success("Revenue override cleared");
+      }
+      setShowOverrideInput(false);
+    },
+    onError: () => {
+      toast.error("Failed to save revenue override");
+    }
+  });
+
   // Removed fix totals mutation - no longer needed with live calculation system
 
   const handleApprove = async () => {
@@ -668,7 +727,76 @@ export const ReconciliationReviewModal = ({
             <>
               <div className="grid grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <p className="text-sm font-medium text-muted-foreground mb-3">Booking Revenue (Owner Keeps)</p>
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-medium text-muted-foreground mb-3">Booking Revenue (Owner Keeps)</p>
+                    {reconciliation.status === "draft" && (
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={() => {
+                          setShowOverrideInput(!showOverrideInput);
+                          if (!showOverrideInput && reconciliation.revenue_override !== null) {
+                            setRevenueOverride(String(reconciliation.revenue_override));
+                          }
+                        }}
+                        className="text-xs h-6"
+                      >
+                        {reconciliation.revenue_override !== null ? "Edit Override" : "Override (non-payment)"}
+                      </Button>
+                    )}
+                  </div>
+                  
+                  {reconciliation.revenue_override !== null && (
+                    <div className="p-2 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded text-xs mb-2">
+                      <span className="font-medium text-amber-700 dark:text-amber-300">⚠️ Manual Override Active:</span>
+                      <span className="ml-1">Revenue overridden to ${Number(reconciliation.revenue_override).toFixed(2)} (tenant non-payment)</span>
+                    </div>
+                  )}
+                  
+                  {showOverrideInput && (
+                    <div className="p-3 bg-muted/50 border rounded-lg space-y-2 mb-2">
+                      <Label className="text-xs font-medium">Manual Revenue Override</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Use when tenant hasn't paid or paid partially. Set to 0 to apply minimum fee only.
+                      </p>
+                      <div className="flex gap-2">
+                        <Input
+                          type="number"
+                          placeholder="0.00"
+                          value={revenueOverride}
+                          onChange={(e) => setRevenueOverride(e.target.value)}
+                          className="w-32"
+                          step="0.01"
+                          min="0"
+                        />
+                        <Button 
+                          size="sm" 
+                          onClick={() => {
+                            const value = parseFloat(revenueOverride);
+                            if (!isNaN(value) && value >= 0) {
+                              saveRevenueOverrideMutation.mutate(value);
+                            } else {
+                              toast.error("Please enter a valid amount");
+                            }
+                          }}
+                          disabled={saveRevenueOverrideMutation.isPending}
+                        >
+                          Save
+                        </Button>
+                        {reconciliation.revenue_override !== null && (
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            onClick={() => saveRevenueOverrideMutation.mutate(null)}
+                            disabled={saveRevenueOverrideMutation.isPending}
+                          >
+                            Clear
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  
                   <div className="space-y-1">
                     <div className="flex justify-between text-sm">
                       <span>Short-term:</span>
@@ -680,7 +808,7 @@ export const ReconciliationReviewModal = ({
                     </div>
                   </div>
                   <div className="flex justify-between font-semibold pt-2 border-t text-green-600">
-                    <span>Total:</span>
+                    <span>Total{reconciliation.revenue_override !== null ? " (Overridden)" : ""}:</span>
                     <span>${Number(reconciliation.total_revenue || 0).toFixed(2)}</span>
                   </div>
                 </div>
@@ -693,12 +821,14 @@ export const ReconciliationReviewModal = ({
                       const calculatedFee = (reconciliation.total_revenue || 0) * (percentage / 100);
                       const actualFee = Number(reconciliation.management_fee || 0);
                       const usedMinimum = minimumFee > 0 && actualFee >= minimumFee && calculatedFee < minimumFee;
+                      const hasOverride = reconciliation.revenue_override !== null;
                       
                       return (
                         <div className="flex justify-between text-sm">
                           <span>
                             Management Fee ({percentage}%)
-                            {usedMinimum && <span className="text-amber-600 ml-1">(min $250)</span>}:
+                            {usedMinimum && <span className="text-amber-600 ml-1">(min ${minimumFee})</span>}
+                            {hasOverride && <span className="text-amber-600 ml-1">(overridden)</span>}:
                           </span>
                           <span className="font-medium">${actualFee.toFixed(2)}</span>
                         </div>
