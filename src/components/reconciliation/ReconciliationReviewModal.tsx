@@ -575,10 +575,10 @@ export const ReconciliationReviewModal = ({
   const { reconciliation, lineItems, unbilledVisits, unbilledExpenses } = data;
   
   // Calculate actual totals from verified line items
+  // Note: management_fee already includes minimum fee if applicable, don't add order_minimum_fee separately
   const calculated = calculateDueFromOwnerFromLineItems(
     lineItems,
-    reconciliation.management_fee,
-    reconciliation.order_minimum_fee
+    reconciliation.management_fee
   );
 
   // Check for discrepancies
@@ -712,10 +712,6 @@ export const ReconciliationReviewModal = ({
                     <div className="flex justify-between text-sm">
                       <span>Expenses (approved):</span>
                       <span className="font-medium text-orange-600">${calculated.totalExpenses.toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span>Order Minimum:</span>
-                      <span className="font-medium">${Number(reconciliation.order_minimum_fee || 0).toFixed(2)}</span>
                     </div>
                   </div>
                   <div className="flex justify-between font-bold pt-2 border-t text-primary text-lg">

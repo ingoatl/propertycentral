@@ -32,8 +32,7 @@ export interface ReconciliationData {
  */
 export function calculateDueFromOwnerFromLineItems(
   lineItems: ReconciliationLineItem[],
-  managementFee: number,
-  orderMinimumFee: number = 0
+  managementFee: number
 ): {
   visitFees: number;
   totalExpenses: number;
@@ -65,8 +64,8 @@ export function calculateDueFromOwnerFromLineItems(
       })
       .reduce((sum, item) => sum + Math.abs(item.amount), 0);
 
-    // Calculate total due from owner
-    const dueFromOwner = managementFee + orderMinimumFee + visitFees + totalExpenses;
+    // Calculate total due from owner (management fee already includes minimum if applicable)
+    const dueFromOwner = managementFee + visitFees + totalExpenses;
 
     return {
       visitFees,
@@ -78,7 +77,7 @@ export function calculateDueFromOwnerFromLineItems(
     return {
       visitFees: 0,
       totalExpenses: 0,
-      dueFromOwner: managementFee + orderMinimumFee,
+      dueFromOwner: managementFee,
       error: "Failed to calculate totals from approved items"
     };
   }
