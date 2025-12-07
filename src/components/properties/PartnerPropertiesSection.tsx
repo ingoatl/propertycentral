@@ -9,16 +9,15 @@ import {
   MapPin, 
   Bed, 
   Bath, 
-  Square, 
-  Users, 
+  FileText,
+  Database,
+  ClipboardList,
   ExternalLink, 
   RefreshCw,
   CheckCircle,
   AlertTriangle,
   Clock,
-  Eye,
-  ListPlus,
-  ClipboardList
+  Image as ImageIcon
 } from "lucide-react";
 import { toast } from "sonner";
 import { format, addDays } from "date-fns";
@@ -75,6 +74,12 @@ interface SyncLog {
   completed_at: string | null;
 }
 
+interface ListingProject {
+  id: string;
+  partner_property_id: string;
+  progress: number | null;
+}
+
 // Chris's user ID for auto-assignment
 const CHRIS_USER_ID = "c4d6b107-70cd-487f-884c-0400edaf9f6f";
 
@@ -94,7 +99,7 @@ export const PartnerPropertiesSection = () => {
   const [properties, setProperties] = useState<PartnerProperty[]>([]);
   const [lastSync, setLastSync] = useState<SyncLog | null>(null);
   const [loading, setLoading] = useState(true);
-  const [listingProjects, setListingProjects] = useState<Record<string, string>>({});
+  const [listingProjects, setListingProjects] = useState<Record<string, { id: string; progress: number }>>({});
   const [selectedProperty, setSelectedProperty] = useState<PartnerProperty | null>(null);
   const [detailsModalOpen, setDetailsModalOpen] = useState(false);
   const [creatingProject, setCreatingProject] = useState<string | null>(null);
@@ -143,17 +148,35 @@ export const PartnerPropertiesSection = () => {
     try {
       const { data, error } = await supabase
         .from("onboarding_projects")
-        .select("id, partner_property_id")
+        .select("id, partner_property_id, progress")
         .not("partner_property_id", "is", null);
 
       if (error) throw error;
       
-      const projectMap: Record<string, string> = {};
-      (data || []).forEach(project => {
+      const projectMap: Record<string, { id: string; progress: number }> = {};
+      
+      for (const project of data || []) {
         if (project.partner_property_id) {
-          projectMap[project.partner_property_id] = project.id;
+          // Calculate real progress from tasks
+          const { data: tasks } = await supabase
+            .from("onboarding_tasks")
+            .select("status, field_value")
+            .eq("project_id", project.id);
+          
+          let progress = project.progress || 0;
+          if (tasks && tasks.length > 0) {
+            const tasksWithProgress = tasks.filter(
+              t => t.status === "completed" || (t.field_value && t.field_value.trim() !== "")
+            ).length;
+            progress = (tasksWithProgress / tasks.length) * 100;
+          }
+          
+          projectMap[project.partner_property_id] = { 
+            id: project.id, 
+            progress 
+          };
         }
-      });
+      }
       setListingProjects(projectMap);
     } catch (error) {
       console.error("Error loading listing projects:", error);
@@ -163,7 +186,7 @@ export const PartnerPropertiesSection = () => {
   const createListingProject = async (property: PartnerProperty) => {
     setCreatingProject(property.id);
     try {
-      // Get Chris's profile for owner name
+      // Get Chris's profile
       const { data: chrisProfile } = await supabase
         .from("profiles")
         .select("first_name, email")
@@ -176,7 +199,7 @@ export const PartnerPropertiesSection = () => {
         property.property_title || 
         "Partner Property";
 
-      // Create the project
+      // Create the project with partner_property_id
       const { data: project, error: projectError } = await supabase
         .from("onboarding_projects")
         .insert({
@@ -202,7 +225,6 @@ export const PartnerPropertiesSection = () => {
         assigned_to: chrisProfile?.first_name || "Chris",
         assigned_to_uuid: CHRIS_USER_ID,
         due_date: format(addDays(new Date(), 7 + index), "yyyy-MM-dd"),
-        // Pre-fill existing listing URL if it's the Airbnb task
         field_value: task.title.includes("Airbnb") && property.existing_listing_url 
           ? property.existing_listing_url 
           : null,
@@ -217,13 +239,13 @@ export const PartnerPropertiesSection = () => {
       // Update local state
       setListingProjects(prev => ({
         ...prev,
-        [property.id]: project.id
+        [property.id]: { id: project.id, progress: 0 }
       }));
 
       toast.success(`Listing project created and assigned to ${chrisProfile?.first_name || "Chris"}`);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error creating listing project:", error);
-      toast.error("Failed to create listing project");
+      toast.error(error.message || "Failed to create listing project");
     } finally {
       setCreatingProject(null);
     }
@@ -306,16 +328,20 @@ export const PartnerPropertiesSection = () => {
         
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3">
           {properties.map((property, index) => {
-            const hasProject = listingProjects[property.id];
+            const projectInfo = listingProjects[property.id];
             const isCreating = creatingProject === property.id;
+            const displayAddress = property.address || 
+              [property.city, property.state, property.zip_code].filter(Boolean).join(", ") || 
+              "No address";
 
             return (
               <Card 
                 key={property.id}
-                className="shadow-card hover:shadow-warm transition-all duration-300 border-border/50 overflow-hidden group border-l-4 border-l-orange-400"
+                className="shadow-card hover:shadow-warm transition-all duration-300 border-border/50 overflow-hidden group"
                 style={{ animationDelay: `${index * 0.05}s` }}
               >
-                <div className="relative w-full aspect-[16/9] bg-muted overflow-hidden">
+                {/* Image with hover actions - matching existing property cards */}
+                <div className="relative w-full aspect-[16/9] bg-muted overflow-hidden cursor-pointer">
                   {property.featured_image_url ? (
                     <img 
                       src={property.featured_image_url} 
@@ -324,18 +350,39 @@ export const PartnerPropertiesSection = () => {
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-orange-100 to-orange-50 dark:from-orange-900/20 dark:to-orange-800/10">
-                      <Building2 className="w-12 h-12 text-orange-300" />
+                      <ImageIcon className="w-12 h-12 text-muted-foreground/30" />
                     </div>
                   )}
-                  <Badge className="absolute top-2 right-2 bg-orange-500 text-white">
-                    Partner
-                  </Badge>
-                  {hasProject && (
-                    <Badge className="absolute top-2 left-2 bg-green-600 text-white">
-                      <ClipboardList className="w-3 h-3 mr-1" />
-                      Listed
-                    </Badge>
-                  )}
+                  
+                  {/* Hover-only action button */}
+                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      className="shadow-lg"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openPropertyDetails(property);
+                      }}
+                    >
+                      <FileText className="w-4 h-4 mr-1" />
+                      Details
+                    </Button>
+                    {property.existing_listing_url && (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        className="shadow-lg"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          window.open(property.existing_listing_url!, "_blank");
+                        }}
+                      >
+                        <ExternalLink className="w-4 h-4 mr-1" />
+                        Airbnb
+                      </Button>
+                    )}
+                  </div>
                 </div>
 
                 <CardHeader className="pb-2 pt-3 px-3">
@@ -343,17 +390,16 @@ export const PartnerPropertiesSection = () => {
                     <CardTitle className="text-base text-foreground group-hover:text-primary transition-colors line-clamp-2 flex-1">
                       {property.property_title || "Untitled Property"}
                     </CardTitle>
+                    <Badge className="flex-shrink-0 text-[10px] px-2 py-0.5 bg-orange-500 text-white">
+                      Partner
+                    </Badge>
                   </div>
                   <CardDescription className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
                     <MapPin className="w-3 h-3 flex-shrink-0" />
-                    <span className="line-clamp-1">
-                      {property.address || [property.city, property.state].filter(Boolean).join(", ") || "No address"}
-                    </span>
+                    <span className="line-clamp-1">{displayAddress}</span>
                   </CardDescription>
-                </CardHeader>
-                
-                <CardContent className="px-3 pb-3 space-y-2">
-                  <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                  {/* Property specs like bed/bath */}
+                  <div className="flex items-center gap-3 pt-1 text-xs text-muted-foreground">
                     {property.bedrooms && (
                       <span className="flex items-center gap-1">
                         <Bed className="w-3 h-3" />
@@ -366,75 +412,85 @@ export const PartnerPropertiesSection = () => {
                         {property.bathrooms} bath
                       </span>
                     )}
-                    {property.square_footage && (
-                      <span className="flex items-center gap-1">
-                        <Square className="w-3 h-3" />
-                        {property.square_footage.toLocaleString()} sqft
+                    {property.monthly_price && (
+                      <span className="font-medium text-primary">
+                        ${property.monthly_price.toLocaleString()}/mo
                       </span>
                     )}
                   </div>
-
-                  {property.monthly_price && (
-                    <div className="text-sm font-semibold text-primary">
-                      ${property.monthly_price.toLocaleString()}/mo
+                </CardHeader>
+                
+                <CardContent className="px-3 pb-3 space-y-2">
+                  {/* Progress bar - only show if project exists */}
+                  {projectInfo && (
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-muted-foreground">Progress</span>
+                        <span className="font-medium">{Math.round(projectInfo.progress)}%</span>
+                      </div>
+                      <div className="w-full bg-muted rounded-full h-1.5">
+                        <div
+                          className="bg-primary h-1.5 rounded-full transition-all duration-300"
+                          style={{ width: `${projectInfo.progress}%` }}
+                        />
+                      </div>
                     </div>
                   )}
 
-                  {/* Action Buttons */}
-                  <div className="flex gap-2 pt-1">
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="flex-1 h-8 text-xs"
-                      onClick={() => openPropertyDetails(property)}
-                    >
-                      <Eye className="w-3 h-3 mr-1" />
-                      Details
-                    </Button>
-                    
-                    {hasProject ? (
-                      <Button 
-                        variant="secondary" 
-                        size="sm" 
-                        className="flex-1 h-8 text-xs"
-                        onClick={() => window.location.href = `/properties?project=${hasProject}`}
-                      >
-                        <ClipboardList className="w-3 h-3 mr-1" />
-                        View Tasks
-                      </Button>
-                    ) : (
-                      <Button 
-                        variant="default" 
-                        size="sm" 
-                        className="flex-1 h-8 text-xs"
-                        onClick={() => createListingProject(property)}
-                        disabled={isCreating}
-                      >
-                        {isCreating ? (
-                          <RefreshCw className="w-3 h-3 mr-1 animate-spin" />
-                        ) : (
-                          <ListPlus className="w-3 h-3 mr-1" />
-                        )}
-                        {isCreating ? "Creating..." : "Create Listings"}
-                      </Button>
-                    )}
-                  </div>
+                  {/* Property Details button */}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => openPropertyDetails(property)}
+                    className="w-full h-8 text-xs"
+                  >
+                    <FileText className="w-3 h-3 mr-1.5" />
+                    Property Details
+                  </Button>
 
-                  {property.existing_listing_url && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="w-full h-7 text-xs text-muted-foreground"
-                      onClick={() => window.open(property.existing_listing_url!, "_blank")}
+                  {/* Show Listing Data button */}
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => openPropertyDetails(property)}
+                    className="w-full h-8 text-xs"
+                  >
+                    <Database className="w-3 h-3 mr-1.5" />
+                    Show Listing Data
+                  </Button>
+
+                  {/* Create Listings / View Tasks button */}
+                  {projectInfo ? (
+                    <Button 
+                      variant="default" 
+                      size="sm" 
+                      className="w-full h-8 text-xs"
+                      onClick={() => window.location.href = `/properties?openWorkflow=${projectInfo.id}`}
                     >
-                      <ExternalLink className="w-3 h-3 mr-1" />
-                      View Existing Listing
+                      <ClipboardList className="w-3 h-3 mr-1.5" />
+                      View Listings Tasks
+                    </Button>
+                  ) : (
+                    <Button 
+                      variant="default" 
+                      size="sm" 
+                      className="w-full h-8 text-xs"
+                      onClick={() => createListingProject(property)}
+                      disabled={isCreating}
+                    >
+                      {isCreating ? (
+                        <RefreshCw className="w-3 h-3 mr-1.5 animate-spin" />
+                      ) : (
+                        <ClipboardList className="w-3 h-3 mr-1.5" />
+                      )}
+                      {isCreating ? "Creating..." : "Create Listings"}
                     </Button>
                   )}
 
+                  {/* Contact info */}
                   {property.contact_name && (
-                    <div className="text-xs text-muted-foreground truncate">
-                      Contact: {property.contact_name}
+                    <div className="text-xs text-muted-foreground truncate pt-1 border-t">
+                      Owner: {property.contact_name}
                     </div>
                   )}
                 </CardContent>
