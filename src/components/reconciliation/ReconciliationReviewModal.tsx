@@ -488,8 +488,8 @@ export const ReconciliationReviewModal = ({
     Math.abs(reconciliation.visit_fees - calculated.visitFees) > 0.01 ||
     Math.abs(reconciliation.total_expenses - calculated.totalExpenses) > 0.01;
 
-  // Split items by verification status
-  const unverifiedItems = lineItems.filter((i: any) => !i.verified);
+  // Split items by verification status - only show expenses and visits in "Needs Approval" (not booking income)
+  const unverifiedItems = lineItems.filter((i: any) => !i.verified && i.item_type !== "booking" && i.item_type !== "mid_term_booking");
   
   // Type-specific tabs show ALL items of that type (both verified and unverified)
   const allBookings = lineItems.filter((i: any) => i.item_type === "booking" || i.item_type === "mid_term_booking");
