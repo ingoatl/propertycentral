@@ -272,25 +272,23 @@ serve(async (req) => {
       test_mode: false,
       draft: true,
       with_signature_page: false,
-      reminders: false,
-      apply_signing_order: true,
+      reminders: true, // Enable email reminders
+      apply_signing_order: false, // Allow parallel signing - both can sign at the same time
       embedded_signing: true,
-      embedded_signing_notifications: false,
+      embedded_signing_notifications: true, // Enable signing notifications via email
       name: documentName || template.name,
       recipients: [
         {
           id: "guest",
           email: recipientEmail,
           name: recipientName,
-          signing_order: 1,
-          send_email: false,
+          send_email: true, // Send email to guest
         },
         {
           id: "host",
           email: "anja@peachhausgroup.com",
           name: "PeachHaus Group",
-          signing_order: 2,
-          send_email: false,
+          send_email: true, // Send email to host
         },
       ],
     };
