@@ -148,22 +148,41 @@ serve(async (req) => {
 
     console.log(`Calculated nightly rate from ${bookings?.length || 0} bookings: $${calculatedNightlyRate.toFixed(2)} (${totalNights} total nights, $${bookingRevenueForRate} total revenue)`);
 
-    // Determine order minimum based on nightly rate tier
-    let orderMinimumFee = 250; // Default minimum
+    // Check if there are any mid-term bookings for this month FIRST before determining order minimum
+    // If there's mid-term revenue, we skip the order minimum fee entirely
+    const { data: midTermBookingsForMinimumCheck } = await supabaseClient
+      .from("mid_term_bookings")
+      .select("*")
+      .eq("property_id", property_id)
+      .eq("status", "active")
+      .lte("start_date", lastDayOfMonth.toISOString().split("T")[0])
+      .gte("end_date", firstDayOfMonth.toISOString().split("T")[0]);
 
-    if (calculatedNightlyRate > 0) {
-      if (calculatedNightlyRate < 200) {
-        orderMinimumFee = 250;
-      } else if (calculatedNightlyRate >= 200 && calculatedNightlyRate <= 400) {
-        orderMinimumFee = 400;
+    const hasMidTermBookings = (midTermBookingsForMinimumCheck?.length || 0) > 0;
+    console.log(`Mid-term bookings for minimum check: ${midTermBookingsForMinimumCheck?.length || 0}, hasMidTermBookings: ${hasMidTermBookings}`);
+
+    // Determine order minimum based on nightly rate tier - ONLY if no mid-term bookings
+    let orderMinimumFee = 0; // Default to 0, only set if no mid-term bookings and no short-term bookings
+
+    if (!hasMidTermBookings) {
+      // No mid-term bookings - apply order minimum logic based on short-term bookings
+      if (calculatedNightlyRate > 0) {
+        // Has short-term bookings - set minimum based on rate tier
+        if (calculatedNightlyRate < 200) {
+          orderMinimumFee = 250;
+        } else if (calculatedNightlyRate >= 200 && calculatedNightlyRate <= 400) {
+          orderMinimumFee = 400;
+        } else {
+          orderMinimumFee = 750;
+        }
+        console.log(`Nightly rate $${calculatedNightlyRate.toFixed(2)} → Order minimum: $${orderMinimumFee}`);
       } else {
-        orderMinimumFee = 750;
+        // No bookings at all this month → charge minimum
+        orderMinimumFee = 250;
+        console.log(`No bookings found for property ${property.name} → Charging minimum order fee: $${orderMinimumFee}`);
       }
-      
-      console.log(`Nightly rate $${calculatedNightlyRate.toFixed(2)} → Order minimum: $${orderMinimumFee}`);
     } else {
-      // No bookings this month → charge minimum
-      console.log(`No bookings found for property ${property.name} → Charging minimum order fee: $${orderMinimumFee}`);
+      console.log(`Property has mid-term booking revenue - skipping order minimum fee`);
     }
 
     // Update property with calculated nightly rate and order minimum
@@ -365,16 +384,18 @@ serve(async (req) => {
       });
     }
 
-    // Add order minimum fee as a line item
-    lineItems.push({
-      reconciliation_id: reconciliation.id,
-      item_type: "order_minimum",
-      item_id: reconciliation.id,
-      description: `Monthly Order Minimum Fee (Rate Tier: ${calculatedNightlyRate > 0 ? `$${calculatedNightlyRate.toFixed(2)}/night` : 'No Bookings'})`,
-      amount: -Math.abs(orderMinimumFee), // Negative because it's a deduction
-      date: firstDayOfMonth.toISOString().split("T")[0],
-      category: "Order Minimum Fee",
-    });
+    // Add order minimum fee as a line item ONLY if there's no mid-term revenue
+    if (orderMinimumFee > 0) {
+      lineItems.push({
+        reconciliation_id: reconciliation.id,
+        item_type: "order_minimum",
+        item_id: reconciliation.id,
+        description: `Monthly Order Minimum Fee (Rate Tier: ${calculatedNightlyRate > 0 ? `$${calculatedNightlyRate.toFixed(2)}/night` : 'No Bookings'})`,
+        amount: -Math.abs(orderMinimumFee), // Negative because it's a deduction
+        date: firstDayOfMonth.toISOString().split("T")[0],
+        category: "Order Minimum Fee",
+      });
+    }
 
     // Create line items with verified: false (manual approval required)
     // Add source tracking and creation metadata
