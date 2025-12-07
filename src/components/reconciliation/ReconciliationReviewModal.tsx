@@ -261,12 +261,25 @@ export const ReconciliationReviewModal = ({
         (visit: any) => !existingVisitLineItemIds.has(visit.id) && !visit.billed
       );
       
-      if (newVisits.length > 0) {
-        console.log(`Auto-adding ${newVisits.length} new visit(s):`, newVisits.map(v => ({ id: v.id, price: v.price, date: v.date, visited_by: v.visited_by })));
+      // WATCHDOG: Additional filter to ensure no billed visits slip through
+      const trulyNewVisits = newVisits.filter((visit: any) => {
+        if (visit.billed === true) {
+          console.warn(`⚠️ WATCHDOG: Blocked already-billed visit from being added: ${visit.id} (${visit.visited_by}, ${visit.date})`);
+          return false;
+        }
+        if (visit.reconciliation_id) {
+          console.warn(`⚠️ WATCHDOG: Blocked visit already assigned to reconciliation: ${visit.id} → ${visit.reconciliation_id}`);
+          return false;
+        }
+        return true;
+      });
+
+      if (trulyNewVisits.length > 0) {
+        console.log(`Auto-adding ${trulyNewVisits.length} new visit(s):`, trulyNewVisits.map((v: any) => ({ id: v.id, price: v.price, date: v.date, visited_by: v.visited_by })));
         
         const { data: { user } } = await supabase.auth.getUser();
         
-        const newVisitLineItems = newVisits.map((visit: any) => ({
+        const newVisitLineItems = trulyNewVisits.map((visit: any) => ({
           reconciliation_id: reconciliationId,
           item_type: 'visit',
           item_id: visit.id,
@@ -290,7 +303,7 @@ export const ReconciliationReviewModal = ({
           console.log('Successfully inserted new visit line items');
           
           // Update the visit_fees total on the reconciliation
-          const totalNewVisitFees = newVisits.reduce((sum: number, v: any) => sum + (v.price || 0), 0);
+          const totalNewVisitFees = trulyNewVisits.reduce((sum: number, v: any) => sum + (v.price || 0), 0);
           const currentVisitFees = rec.visit_fees || 0;
           
           await supabase
@@ -303,7 +316,7 @@ export const ReconciliationReviewModal = ({
             reconciliation_id: reconciliationId,
             action: 'visits_added',
             user_id: user?.id,
-            notes: `Auto-added ${newVisits.length} new visit(s) on modal open`
+            notes: `Auto-added ${trulyNewVisits.length} new visit(s) on modal open`
           });
           
           // Refetch to include new items
@@ -318,7 +331,7 @@ export const ReconciliationReviewModal = ({
           }
         }
       } else {
-        console.log('No new visits to add');
+        console.log('No new visits to add (all filtered by watchdog or already included)');
       }
 
       // Fetch unbilled visits for this property (for display purposes)

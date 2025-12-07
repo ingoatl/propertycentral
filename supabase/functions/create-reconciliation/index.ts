@@ -386,8 +386,14 @@ serve(async (req) => {
       }
     }
 
-    // Add visits as expenses (negative amounts) and mark as billed
+    // Add visits as expenses (negative amounts) - WATCHDOG: Skip already-billed visits
     for (const visit of visits || []) {
+      // WATCHDOG: Double-check visit is not already billed
+      if (visit.billed === true) {
+        console.warn(`⚠️ WATCHDOG: Skipping already-billed visit ${visit.id} (${visit.visited_by}, ${visit.date})`);
+        continue;
+      }
+      
       lineItems.push({
         reconciliation_id: reconciliation.id,
         item_type: "visit",
