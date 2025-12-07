@@ -2,7 +2,8 @@ import { useState, useEffect, useMemo } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Mail, Send, TestTube, Loader2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Mail, Send, TestTube, Eye, DollarSign, RotateCcw, CheckCircle2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -13,6 +14,17 @@ interface MonthlyEmailPreviewModalProps {
   onOpenChange: (open: boolean) => void;
   reconciliation: any;
   onSuccess: () => void;
+}
+
+interface ApprovedLineItem {
+  id: string;
+  item_type: string;
+  description: string;
+  amount: number;
+  date: string;
+  category?: string;
+  verified: boolean;
+  excluded: boolean;
 }
 
 export const MonthlyEmailPreviewModal = ({
@@ -29,6 +41,8 @@ export const MonthlyEmailPreviewModal = ({
   const [dueFromOwner, setDueFromOwner] = useState(0);
   const [shortTermRevenue, setShortTermRevenue] = useState(0);
   const [midTermRevenue, setMidTermRevenue] = useState(0);
+  const [approvedVisits, setApprovedVisits] = useState<ApprovedLineItem[]>([]);
+  const [approvedExpenses, setApprovedExpenses] = useState<ApprovedLineItem[]>([]);
 
   useEffect(() => {
     const fetchOwnerAndLineItems = async () => {
@@ -72,7 +86,8 @@ export const MonthlyEmailPreviewModal = ({
         const { data: lineItems, error: itemsError } = await supabase
           .from("reconciliation_line_items")
           .select("*")
-          .eq("reconciliation_id", reconciliation.id);
+          .eq("reconciliation_id", reconciliation.id)
+          .order("date", { ascending: false });
 
         if (!itemsError && lineItems) {
           const calculated = calculateDueFromOwnerFromLineItems(
@@ -83,6 +98,27 @@ export const MonthlyEmailPreviewModal = ({
           setVisitTotal(calculated.visitFees);
           setExpenseTotal(calculated.totalExpenses);
           setDueFromOwner(calculated.dueFromOwner);
+          
+          // Filter approved items for display
+          const approved = lineItems.filter((item: any) => item.verified && !item.excluded);
+          
+          const visits = approved
+            .filter((item: any) => item.item_type === 'visit')
+            .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
+          
+          const expenses = approved
+            .filter((item: any) => {
+              if (item.item_type !== 'expense') return false;
+              const desc = (item.description || '').toLowerCase();
+              return !desc.includes('visit fee') && 
+                     !desc.includes('visit charge') &&
+                     !desc.includes('hourly charge') &&
+                     !desc.includes('property visit');
+            })
+            .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
+          
+          setApprovedVisits(visits);
+          setApprovedExpenses(expenses);
         }
         
         // Set revenue split
@@ -95,15 +131,6 @@ export const MonthlyEmailPreviewModal = ({
 
     fetchOwnerAndLineItems();
   }, [reconciliation?.owner_id, reconciliation?.id]);
-
-  // Get proper image URL from Supabase storage
-  const propertyImageUrl = useMemo(() => {
-    if (!reconciliation?.properties?.image_path) return null;
-    const imagePath = reconciliation.properties.image_path;
-    const filename = imagePath.split('/').pop();
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-    return `${supabaseUrl}/storage/v1/object/public/property-images/${filename}`;
-  }, [reconciliation?.properties?.image_path]);
 
   const handleSendTestEmail = async () => {
     setIsSendingTest(true);
@@ -140,7 +167,7 @@ export const MonthlyEmailPreviewModal = ({
       `Owner: ${reconciliation.property_owners?.name}\n` +
       `Email: ${reconciliation.property_owners?.email}\n\n` +
       `Review Deadline: ${deadlineDate}\n` +
-      `Net Amount: $${Number(reconciliation.net_to_owner || 0).toFixed(2)}\n\n` +
+      `Amount Due: $${dueFromOwner.toFixed(2)}\n\n` +
       `The owner will be charged automatically on ${deadlineDate} unless they respond.\n\n` +
       `Send statement now?`
     );
@@ -166,8 +193,7 @@ export const MonthlyEmailPreviewModal = ({
   };
 
   const monthLabel = format(new Date(reconciliation.reconciliation_month + 'T00:00:00'), "MMMM yyyy");
-  const nextMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 5);
-  const deadlineDate = nextMonth.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  const managementFee = Number(reconciliation.management_fee || 0);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -180,9 +206,85 @@ export const MonthlyEmailPreviewModal = ({
         </DialogHeader>
 
         <div className="space-y-6">
+          {/* Live Calculation Summary - Match Review Modal */}
+          <Card className="p-4 bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
+            <h3 className="font-semibold mb-3 flex items-center gap-2">
+              <DollarSign className="w-5 h-5 text-primary" />
+              Statement Summary (From Approved Items)
+            </h3>
+            <div className="grid grid-cols-3 gap-4 text-sm">
+              <div className="text-center p-3 bg-background rounded-lg border">
+                <div className="text-xs text-muted-foreground mb-1">Management Fee</div>
+                <div className="font-bold text-lg">${managementFee.toFixed(2)}</div>
+              </div>
+              <div className="text-center p-3 bg-background rounded-lg border">
+                <div className="text-xs text-muted-foreground mb-1">Visit Fees ({approvedVisits.length})</div>
+                <div className="font-bold text-lg text-orange-600">${visitTotal.toFixed(2)}</div>
+              </div>
+              <div className="text-center p-3 bg-background rounded-lg border">
+                <div className="text-xs text-muted-foreground mb-1">Expenses ({approvedExpenses.length})</div>
+                <div className="font-bold text-lg text-orange-600">${expenseTotal.toFixed(2)}</div>
+              </div>
+            </div>
+            <div className="mt-4 pt-3 border-t flex justify-between items-center">
+              <span className="font-medium">Total Due from Owner:</span>
+              <span className="text-2xl font-bold text-primary">${dueFromOwner.toFixed(2)}</span>
+            </div>
+          </Card>
+
+          {/* Detailed Line Items Preview */}
+          <Card className="p-4">
+            <h3 className="font-semibold mb-3 flex items-center gap-2">
+              <CheckCircle2 className="w-5 h-5 text-green-600" />
+              Approved Line Items Included in Statement
+            </h3>
+            
+            {/* Visits */}
+            {approvedVisits.length > 0 && (
+              <div className="mb-4">
+                <div className="flex items-center gap-2 mb-2 text-sm font-medium text-muted-foreground">
+                  <Eye className="w-4 h-4" />
+                  Visits ({approvedVisits.length})
+                </div>
+                <div className="space-y-1">
+                  {approvedVisits.map((visit) => (
+                    <div key={visit.id} className="flex justify-between text-sm py-1 px-2 bg-muted/30 rounded">
+                      <span className="flex-1">{visit.description}</span>
+                      <span className="text-muted-foreground mr-4">{format(new Date(visit.date + 'T00:00:00'), 'MMM dd')}</span>
+                      <span className="font-medium text-orange-600">${Math.abs(visit.amount).toFixed(2)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            {/* Expenses */}
+            {approvedExpenses.length > 0 && (
+              <div className="mb-4">
+                <div className="flex items-center gap-2 mb-2 text-sm font-medium text-muted-foreground">
+                  <RotateCcw className="w-4 h-4" />
+                  Expenses ({approvedExpenses.length})
+                </div>
+                <div className="space-y-1">
+                  {approvedExpenses.map((expense) => (
+                    <div key={expense.id} className="flex justify-between text-sm py-1 px-2 bg-muted/30 rounded">
+                      <span className="flex-1 truncate mr-2">{expense.description}</span>
+                      <span className="text-muted-foreground mr-4">{format(new Date(expense.date + 'T00:00:00'), 'MMM dd')}</span>
+                      <span className="font-medium text-orange-600">${Math.abs(expense.amount).toFixed(2)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            {approvedVisits.length === 0 && approvedExpenses.length === 0 && (
+              <p className="text-sm text-muted-foreground">No visits or expenses in this statement</p>
+            )}
+          </Card>
+
           {/* Official Owner Statement */}
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-primary">Official Owner Statement</h3>
+            <h3 className="text-lg font-semibold text-primary">Email Preview</h3>
             <Card className="p-4 bg-muted/30">
               <div className="space-y-1 text-sm">
                 <div className="flex items-start gap-2">
@@ -196,7 +298,7 @@ export const MonthlyEmailPreviewModal = ({
               </div>
             </Card>
 
-            {/* Email Preview - New PeachHaus Design */}
+            {/* Email Preview - PeachHaus Design */}
           <div className="border rounded-lg overflow-hidden shadow-sm bg-white dark:bg-gray-900">
             {/* Logo Header */}
             <div className="bg-white dark:bg-gray-900 border-b-4 border-[#FF8C42] p-8 text-center">
@@ -227,12 +329,9 @@ export const MonthlyEmailPreviewModal = ({
                 This statement provides a comprehensive breakdown of all revenue collected and expenses incurred on your behalf 
                 during the reporting period. All amounts reflected herein have been verified and reconciled with our accounting records.
               </p>
-              <p className="text-sm leading-relaxed text-gray-700 dark:text-gray-300">
-                In accordance with our management agreement, payment processing will occur automatically unless we receive written notification of discrepancies prior to the deadline.
-              </p>
             </div>
 
-            {/* Property Info Card - NO IMAGE as per spec */}
+            {/* Property Info Card */}
             <div className="mx-8 mb-8 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 rounded-2xl p-6 border border-gray-200 dark:border-gray-700 shadow-sm">
               <div className="flex items-start gap-5">
                 <div className="w-12 h-12 bg-gradient-to-br from-pink-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg flex-shrink-0">
@@ -255,7 +354,7 @@ export const MonthlyEmailPreviewModal = ({
                 📊 Performance Summary
               </h2>
               
-              {/* Income & Activity Section */}
+              {/* Income Section */}
               <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl p-6 mb-6 shadow-sm">
                 <h3 className="text-lg font-bold text-gray-800 dark:text-gray-200 mb-4">
                   Income & Activity
@@ -286,7 +385,7 @@ export const MonthlyEmailPreviewModal = ({
                 </div>
               </div>
 
-              {/* PeachHaus Services Rendered Section */}
+              {/* Services Rendered Section */}
               <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl p-6 mb-6 shadow-sm">
                 <h3 className="text-lg font-bold text-gray-800 dark:text-gray-200 mb-4">
                   🧰 PeachHaus Services Rendered
@@ -294,34 +393,42 @@ export const MonthlyEmailPreviewModal = ({
                 <div className="space-y-3">
                   <div className="flex justify-between pb-3 border-b dark:border-gray-700">
                     <span className="text-sm text-gray-700 dark:text-gray-300">
-                      Management & Oversight ({reconciliation.properties?.management_fee_percentage || 15}%)
+                      Management Fee ({reconciliation.properties?.management_fee_percentage || 15}%)
                     </span>
                     <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-                      ${Number(reconciliation.management_fee || 0).toFixed(2)}
+                      ${managementFee.toFixed(2)}
                     </span>
                   </div>
-                  {Number(reconciliation.order_minimum_fee || 0) > 0 && (
-                    <div className="flex justify-between pb-3 border-b dark:border-gray-700">
-                      <span className="text-sm text-gray-700 dark:text-gray-300">Operational Minimum Fee</span>
-                      <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-                        ${Number(reconciliation.order_minimum_fee || 0).toFixed(2)}
+                  
+                  {/* Visit Line Items */}
+                  {approvedVisits.map((visit) => (
+                    <div key={visit.id} className="flex justify-between pb-2 text-sm border-b dark:border-gray-700">
+                      <span className="text-gray-600 dark:text-gray-400">
+                        {visit.description} ({format(new Date(visit.date + 'T00:00:00'), 'MMM dd')})
+                      </span>
+                      <span className="font-medium text-gray-700 dark:text-gray-300">
+                        ${Math.abs(visit.amount).toFixed(2)}
                       </span>
                     </div>
-                  )}
-                  <div className="text-sm text-gray-600 dark:text-gray-400 italic">
-                    Individual line items (visits & expenses) - {visitTotal > 0 ? `$${visitTotal.toFixed(2)} visits` : 'No visits'}, {expenseTotal > 0 ? `$${expenseTotal.toFixed(2)} expenses` : 'No expenses'}
-                  </div>
+                  ))}
+                  
+                  {/* Expense Line Items */}
+                  {approvedExpenses.map((expense) => (
+                    <div key={expense.id} className="flex justify-between pb-2 text-sm border-b dark:border-gray-700">
+                      <span className="text-gray-600 dark:text-gray-400 flex-1 truncate mr-2">
+                        {expense.description}
+                      </span>
+                      <span className="font-medium text-gray-700 dark:text-gray-300">
+                        ${Math.abs(expense.amount).toFixed(2)}
+                      </span>
+                    </div>
+                  ))}
+                  
                   <div className="flex justify-between pt-4 -mx-6 px-6 py-4 rounded-lg" style={{ backgroundColor: '#FFF3EC' }}>
-                    <span className="text-sm font-bold" style={{ color: '#E86800' }}>Total: Services Provided</span>
+                    <span className="text-sm font-bold" style={{ color: '#E86800' }}>Total Due from Owner</span>
                     <span className="text-sm font-bold" style={{ color: '#E86800' }}>
-                      ${(visitTotal + expenseTotal + Number(reconciliation.management_fee || 0) + Number(reconciliation.order_minimum_fee || 0)).toFixed(2)}
+                      ${dueFromOwner.toFixed(2)}
                     </span>
-                  </div>
-                  <div className="pt-4 -mx-6 px-6">
-                    <p className="text-xs text-gray-600 dark:text-gray-400 italic leading-relaxed">
-                      Reflects PeachHaus management and service charges for this period.<br />
-                      All services are part of PeachHaus' proactive management to protect property value and guest experience.
-                    </p>
                   </div>
                 </div>
               </div>
@@ -349,8 +456,7 @@ export const MonthlyEmailPreviewModal = ({
                 </a>
               </p>
               <p className="text-xs text-gray-400 leading-relaxed">
-                This is an official financial statement. Please retain for your records.<br />
-                Thank you for trusting PeachHaus with your investment property.
+                This is an official financial statement. Please retain for your records.
               </p>
             </div>
           </div>
