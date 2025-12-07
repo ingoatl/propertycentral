@@ -214,6 +214,14 @@ serve(async (req) => {
       replacements["renter_email"] = recipientEmail;
     }
     
+    // Always set host/landlord/agent name to PeachHaus Group LLC
+    replacements["host_name"] = "PeachHaus Group LLC";
+    replacements["landlord_name"] = "PeachHaus Group LLC";
+    replacements["agent_name"] = "PeachHaus Group LLC";
+    replacements["innkeeper_name"] = "PeachHaus Group LLC";
+    replacements["management_company"] = "PeachHaus Group LLC";
+    replacements["company_name"] = "PeachHaus Group LLC";
+    
     // Add today's date
     const today = new Date();
     const formattedToday = today.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });

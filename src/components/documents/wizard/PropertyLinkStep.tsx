@@ -90,8 +90,23 @@ const PropertyLinkStep = ({ data, updateData }: Props) => {
       fieldValues: {
         ...data.fieldValues,
         property_address: property?.address || "",
+        property_name: property?.name || "",
+        host_name: "PeachHaus Group LLC",
+        landlord_name: "PeachHaus Group LLC",
+        agent_name: "PeachHaus Group LLC",
+        innkeeper_name: "PeachHaus Group LLC",
       },
     });
+  };
+
+  // Format date as "Month Day, Year" (e.g., "December 19, 2025")
+  const formatDateForDisplay = (dateStr: string): string => {
+    try {
+      const date = new Date(dateStr + 'T00:00:00');
+      return format(date, "MMMM d, yyyy");
+    } catch {
+      return dateStr;
+    }
   };
 
   const handleBookingSelect = (bookingId: string) => {
@@ -106,8 +121,10 @@ const PropertyLinkStep = ({ data, updateData }: Props) => {
           fieldValues: {
             ...data.fieldValues,
             monthly_rent: booking.monthly_rent.toString(),
-            lease_start_date: booking.start_date,
-            lease_end_date: booking.end_date,
+            lease_start_date: formatDateForDisplay(booking.start_date),
+            lease_end_date: formatDateForDisplay(booking.end_date),
+            start_date: formatDateForDisplay(booking.start_date),
+            end_date: formatDateForDisplay(booking.end_date),
           },
         });
       }

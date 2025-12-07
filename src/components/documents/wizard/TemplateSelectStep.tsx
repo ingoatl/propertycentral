@@ -112,8 +112,10 @@ const TemplateSelectStep = ({ data, updateData }: Props) => {
 
     // Check if we already have cached field mappings
     if (template.field_mappings && template.field_mappings.length > 0) {
+      // Apply default assignments: dates and address fields should be admin by default
+      const processedFields = applyDefaultAssignments(template.field_mappings);
       updateData({
-        detectedFields: template.field_mappings,
+        detectedFields: processedFields,
       });
     } else {
       // Analyze the document to detect fields
@@ -121,8 +123,10 @@ const TemplateSelectStep = ({ data, updateData }: Props) => {
       const fields = await analyzeTemplateFields(template.id);
       
       if (fields.length > 0) {
+        // Apply default assignments
+        const processedFields = applyDefaultAssignments(fields);
         updateData({
-          detectedFields: fields,
+          detectedFields: processedFields,
         });
         toast.success(`Detected ${fields.length} fields in document`);
         
@@ -132,6 +136,32 @@ const TemplateSelectStep = ({ data, updateData }: Props) => {
         );
       }
     }
+  };
+
+  // Apply smart defaults: dates and certain fields should be admin by default
+  const applyDefaultAssignments = (fields: DetectedField[]): DetectedField[] => {
+    const ADMIN_DEFAULT_PATTERNS = [
+      'date', 'start', 'end', 'lease', 'term', 'rent', 'deposit', 'fee',
+      'address', 'property', 'city', 'state', 'host', 'landlord', 'agent',
+      'innkeeper', 'brand', 'listing', 'agreement'
+    ];
+    
+    return fields.map(field => {
+      const apiIdLower = field.api_id.toLowerCase();
+      const labelLower = field.label.toLowerCase();
+      
+      // Check if this field should default to admin
+      const shouldBeAdmin = ADMIN_DEFAULT_PATTERNS.some(pattern => 
+        apiIdLower.includes(pattern) || labelLower.includes(pattern)
+      );
+      
+      // For date fields in the 'dates' category, always default to admin
+      if (field.category === 'dates' || field.type === 'date' || shouldBeAdmin) {
+        return { ...field, filled_by: 'admin' as const };
+      }
+      
+      return field;
+    });
   };
 
   const handleReanalyze = async (e: React.MouseEvent, template: Template) => {

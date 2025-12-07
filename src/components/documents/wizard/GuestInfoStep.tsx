@@ -17,7 +17,8 @@ const GuestInfoStep = ({ data, updateData }: Props) => {
     
     // Only auto-generate if we have both values and name hasn't been manually customized
     if (guestName && propertyAddress) {
-      const generatedName = `Innkeeper Agreement - ${propertyAddress} - ${guestName}`;
+      // Format: "Innkeeper Agreement - Guest Name - Property Address"
+      const generatedName = `Innkeeper Agreement - ${guestName} - ${propertyAddress}`;
       // Only update if the name is empty or still matches a previously generated format
       if (!data.documentName || data.documentName.startsWith("Innkeeper Agreement - ")) {
         updateData({ documentName: generatedName });
