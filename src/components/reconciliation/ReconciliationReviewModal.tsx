@@ -358,11 +358,28 @@ export const ReconciliationReviewModal = ({
         (visit: any) => !lineItemVisitIds.includes(visit.id)
       );
 
+      // Fetch full visit details for visit line items
+      let visitDetailsMap: Record<string, any> = {};
+      if (lineItemVisitIds.length > 0) {
+        const { data: visitDetails } = await supabase
+          .from("visits")
+          .select("*")
+          .in("id", lineItemVisitIds);
+        
+        if (visitDetails) {
+          visitDetailsMap = visitDetails.reduce((acc: Record<string, any>, visit: any) => {
+            acc[visit.id] = visit;
+            return acc;
+          }, {});
+        }
+      }
+
       return { 
         reconciliation: rec, 
         lineItems: items, 
         unbilledVisits: filteredUnbilledVisits,
-        unbilledExpenses: filteredUnbilledExpenses
+        unbilledExpenses: filteredUnbilledExpenses,
+        visitDetailsMap
       };
     },
     enabled: open,
@@ -759,7 +776,8 @@ export const ReconciliationReviewModal = ({
                   item={item} 
                   onToggleVerified={(id, val) => toggleVerifiedMutation.mutate({ itemId: id, currentValue: val })} 
                   getIcon={getItemIcon}
-                  showWarnings 
+                  showWarnings
+                  visitDetails={data?.visitDetailsMap?.[item.item_id]}
                 />
               ))
             )}
@@ -811,7 +829,8 @@ export const ReconciliationReviewModal = ({
                   key={item.id} 
                   item={item} 
                   onToggleVerified={(id, val) => toggleVerifiedMutation.mutate({ itemId: id, currentValue: val })} 
-                  getIcon={getItemIcon} 
+                  getIcon={getItemIcon}
+                  visitDetails={data?.visitDetailsMap?.[item.item_id]}
                 />
               ))
             )}
@@ -875,7 +894,7 @@ export const ReconciliationReviewModal = ({
   );
 };
 
-const LineItemRow = ({ item, onToggleVerified, getIcon, showWarnings = false }: any) => {
+const LineItemRow = ({ item, onToggleVerified, getIcon, showWarnings = false, visitDetails }: any) => {
   const isExpense = item.item_type === 'visit' || item.item_type === 'expense' || item.amount < 0;
   const displayAmount = item.item_type === 'visit' || item.item_type === 'expense' 
     ? Math.abs(item.amount) 
@@ -902,6 +921,19 @@ const LineItemRow = ({ item, onToggleVerified, getIcon, showWarnings = false }: 
   const missingSource = !item.source;
   const missingAddedBy = !item.added_by;
   const hasWarning = showWarnings && (missingSource || missingAddedBy || isVisitRelatedExpense);
+  
+  // Format visit time if available
+  const formatVisitTime = (time: string) => {
+    if (!time) return null;
+    try {
+      const [hours, minutes] = time.split(':').map(Number);
+      const period = hours >= 12 ? 'PM' : 'AM';
+      const displayHours = hours % 12 || 12;
+      return `${displayHours}:${minutes.toString().padStart(2, '0')} ${period}`;
+    } catch {
+      return time;
+    }
+  };
   
   return (
     <div className={`flex items-start gap-3 p-3 border rounded-lg hover:bg-muted/50 ${
@@ -934,6 +966,29 @@ const LineItemRow = ({ item, onToggleVerified, getIcon, showWarnings = false }: 
             </span>
           )}
         </div>
+        
+        {/* Visit details section - only for visit items with full details */}
+        {item.item_type === 'visit' && visitDetails && (
+          <div className="flex items-center gap-4 text-xs text-muted-foreground mb-1 bg-muted/30 rounded px-2 py-1">
+            {visitDetails.time && (
+              <span className="flex items-center gap-1">
+                <span className="font-medium">Time:</span> {formatVisitTime(visitDetails.time)}
+              </span>
+            )}
+            {visitDetails.hours !== undefined && visitDetails.hours !== null && (
+              <span className="flex items-center gap-1">
+                <span className="font-medium">Hours:</span> {visitDetails.hours}h
+              </span>
+            )}
+            {visitDetails.notes && (
+              <span className="flex items-center gap-1 flex-1">
+                <span className="font-medium">Notes:</span> 
+                <span className="truncate" title={visitDetails.notes}>{visitDetails.notes}</span>
+              </span>
+            )}
+          </div>
+        )}
+        
         <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
           <span>{format(new Date(item.date + 'T00:00:00'), "MMM dd, yyyy")}</span>
           {item.category && <span>• {item.category}</span>}
