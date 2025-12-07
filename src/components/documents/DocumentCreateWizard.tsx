@@ -20,6 +20,12 @@ export interface DetectedField {
   category: "property" | "financial" | "dates" | "occupancy" | "contact" | "identification" | "vehicle" | "emergency" | "acknowledgment" | "signature" | "other";
 }
 
+interface CustomClause {
+  id: string;
+  title: string;
+  content: string;
+}
+
 export interface WizardData {
   templateId: string | null;
   templateName: string | null;
@@ -35,13 +41,17 @@ export interface WizardData {
   embeddedEditUrl: string | null;
   guestSigningUrl: string | null;
   hostSigningUrl: string | null;
+  // Edit document content fields
+  additionalTerms: string;
+  customClauses: CustomClause[];
+  internalNotes: string;
 }
 
 const STEPS = [
   { id: 1, title: "Select Template", icon: FileText },
-  { id: 2, title: "Link Property", icon: Building },
-  { id: 3, title: "Guest Info", icon: User },
-  { id: 4, title: "Edit Document", icon: FileEdit },
+  { id: 2, title: "Edit Document", icon: FileEdit },
+  { id: 3, title: "Link Property", icon: Building },
+  { id: 4, title: "Guest Info", icon: User },
   { id: 5, title: "Assign Fields", icon: ToggleLeft },
   { id: 6, title: "Fill Values", icon: Edit },
   { id: 7, title: "Place Fields", icon: PenTool },
@@ -65,6 +75,9 @@ const DocumentCreateWizard = () => {
     embeddedEditUrl: null,
     guestSigningUrl: null,
     hostSigningUrl: null,
+    additionalTerms: "",
+    customClauses: [],
+    internalNotes: "",
   });
 
   const updateWizardData = (updates: Partial<WizardData>) => {
@@ -78,11 +91,11 @@ const DocumentCreateWizard = () => {
       case 1:
         return !!wizardData.templateId;
       case 2:
-        return true; // Property link is optional
+        return true; // Edit document - always can proceed
       case 3:
-        return wizardData.guestName.trim() !== "" && wizardData.guestEmail.trim() !== "";
+        return true; // Property link is optional
       case 4:
-        return !!wizardData.signwellDocumentId; // Edit Document - need draft created
+        return wizardData.guestName.trim() !== "" && wizardData.guestEmail.trim() !== "";
       case 5:
         return true; // Assign fields - always can proceed
       case 6:
@@ -101,11 +114,11 @@ const DocumentCreateWizard = () => {
       case 1:
         return <TemplateSelectStep data={wizardData} updateData={updateWizardData} />;
       case 2:
-        return <PropertyLinkStep data={wizardData} updateData={updateWizardData} />;
-      case 3:
-        return <GuestInfoStep data={wizardData} updateData={updateWizardData} />;
-      case 4:
         return <EditDocumentStep data={wizardData} updateData={updateWizardData} />;
+      case 3:
+        return <PropertyLinkStep data={wizardData} updateData={updateWizardData} />;
+      case 4:
+        return <GuestInfoStep data={wizardData} updateData={updateWizardData} />;
       case 5:
         return <AssignFieldsStep data={wizardData} updateData={updateWizardData} />;
       case 6:
