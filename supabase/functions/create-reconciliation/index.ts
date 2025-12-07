@@ -408,11 +408,19 @@ serve(async (req) => {
         continue;
       }
       
+      // Prefer items_detail for full item names, fallback to purpose
+      let expenseDescription = expense.items_detail || expense.purpose || "Expense";
+      
+      // If it's a generic description like "1 item from Amazon", try to get more detail
+      if (expenseDescription.match(/^\d+\s*items?\s*(from|on)\s*amazon/i) && expense.items_detail) {
+        expenseDescription = expense.items_detail;
+      }
+      
       lineItems.push({
         reconciliation_id: reconciliation.id,
         item_type: "expense",
         item_id: expense.id,
-        description: expense.purpose || "Expense",
+        description: expenseDescription,
         amount: -Math.abs(expense.amount), // Negative for expenses
         date: expense.date,
         category: expense.category || "General Expense",
