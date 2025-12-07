@@ -5,7 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { DollarSign, Calendar as CalendarIcon, Receipt, Upload, ChevronRight } from "lucide-react";
+import { DollarSign, Calendar as CalendarIcon, Receipt, Upload, ChevronRight, Building, Users } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { Property, Expense } from "@/types";
 import { toast } from "sonner";
@@ -38,12 +39,15 @@ const expenseSchema = z.object({
     }),
 });
 
+type PropertyViewType = "managed" | "owned";
+
 const Expenses = () => {
   const [properties, setProperties] = useState<Property[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [selectedPropertyId, setSelectedPropertyId] = useState<string | null>(null);
+  const [propertyView, setPropertyView] = useState<PropertyViewType>("managed");
   const [formData, setFormData] = useState({
     propertyId: "",
     amount: "",
@@ -70,6 +74,7 @@ const Expenses = () => {
         address: p.address,
         visitPrice: Number(p.visit_price),
         createdAt: p.created_at,
+        propertyType: p.property_type,
       })));
 
       const { data: expensesData, error: expensesError } = await supabase
@@ -208,14 +213,27 @@ const Expenses = () => {
     return property?.address || "";
   };
 
-  // Group expenses by property
-  const expensesByProperty = expenses.reduce((acc, expense) => {
-    if (!acc[expense.propertyId]) {
-      acc[expense.propertyId] = [];
+  // Filter properties based on view type
+  const filteredProperties = properties.filter(p => {
+    if (propertyView === "managed") {
+      return p.propertyType === "Client-Managed";
+    } else {
+      return p.propertyType === "Company-Owned";
     }
-    acc[expense.propertyId].push(expense);
-    return acc;
-  }, {} as Record<string, Expense[]>);
+  });
+
+  const filteredPropertyIds = new Set(filteredProperties.map(p => p.id));
+
+  // Group expenses by property (only for filtered properties)
+  const expensesByProperty = expenses
+    .filter(expense => filteredPropertyIds.has(expense.propertyId))
+    .reduce((acc, expense) => {
+      if (!acc[expense.propertyId]) {
+        acc[expense.propertyId] = [];
+      }
+      acc[expense.propertyId].push(expense);
+      return acc;
+    }, {} as Record<string, Expense[]>);
 
   const getPropertyTotal = (propertyId: string) => {
     return expensesByProperty[propertyId]?.reduce((sum, exp) => sum + exp.amount, 0) || 0;
@@ -239,12 +257,26 @@ const Expenses = () => {
 
   return (
     <div className="container mx-auto p-6 space-y-6">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
           <h1 className="text-3xl font-bold">Expenses</h1>
           <p className="text-muted-foreground mt-1">Record and track property expenses</p>
         </div>
-        <BackfillReceiptsButton />
+        <div className="flex items-center gap-3">
+          <Tabs value={propertyView} onValueChange={(v) => setPropertyView(v as PropertyViewType)} className="w-auto">
+            <TabsList className="bg-muted">
+              <TabsTrigger value="managed" className="flex items-center gap-2">
+                <Users className="h-4 w-4" />
+                <span className="hidden sm:inline">Managed</span>
+              </TabsTrigger>
+              <TabsTrigger value="owned" className="flex items-center gap-2">
+                <Building className="h-4 w-4" />
+                <span className="hidden sm:inline">Owned</span>
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+          <BackfillReceiptsButton />
+        </div>
       </div>
 
       <Card>
