@@ -18,6 +18,7 @@ import { z } from "zod";
 import { useAdminCheck } from "@/hooks/useAdminCheck";
 import { Badge } from "@/components/ui/badge";
 import { BulkUpdateListingURLs } from "@/components/onboarding/BulkUpdateListingURLs";
+import { PartnerPropertiesSection } from "@/components/properties/PartnerPropertiesSection";
 
 const propertySchema = z.object({
   name: z.string().trim().min(1, "Name is required").max(200, "Name must be less than 200 characters"),
@@ -836,6 +837,9 @@ const Properties = () => {
           </div>
         </div>
       )}
+
+      {/* Partner Properties Section */}
+      <PartnerPropertiesSection />
 
       {filteredProperties.length === 0 && (
         <Card className="shadow-card border-border/50">

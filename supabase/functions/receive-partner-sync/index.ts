@@ -14,6 +14,14 @@ serve(async (req) => {
 
   console.log("=== Receive Partner Sync Started ===");
 
+  const startedAt = new Date().toISOString();
+  let syncLogId: string | null = null;
+
+  const supabase = createClient(
+    Deno.env.get('SUPABASE_URL')!,
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+  );
+
   try {
     // Validate API key
     const apiKey = req.headers.get('x-api-key');
@@ -39,14 +47,30 @@ serve(async (req) => {
 
     console.log(`Received ${properties.length} properties to sync`);
 
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    );
+    // Create sync log entry for watchdog monitoring
+    const { data: logData, error: logError } = await supabase
+      .from('partner_sync_log')
+      .insert({
+        sync_type: 'incoming',
+        source_system: 'midtermnation',
+        properties_synced: 0,
+        properties_failed: 0,
+        sync_status: 'in_progress',
+        started_at: startedAt,
+      })
+      .select('id')
+      .single();
+
+    if (logError) {
+      console.error('Failed to create sync log:', logError);
+    } else {
+      syncLogId = logData.id;
+      console.log(`Created sync log: ${syncLogId}`);
+    }
 
     let successCount = 0;
     let errorCount = 0;
-    const errors: string[] = [];
+    const errors: { source_id: string; error: string }[] = [];
 
     for (const property of properties) {
       console.log(`Processing property: ${property.property_title} (source_id: ${property.source_id})`);
@@ -100,11 +124,31 @@ serve(async (req) => {
 
       if (error) {
         errorCount++;
-        errors.push(`${property.source_id}: ${error.message}`);
+        errors.push({ source_id: property.source_id, error: error.message });
         console.error(`Failed to sync property ${property.source_id}:`, error);
       } else {
         successCount++;
         console.log(`Successfully synced property: ${property.property_title}`);
+      }
+    }
+
+    // Update sync log with final results
+    if (syncLogId) {
+      const { error: updateError } = await supabase
+        .from('partner_sync_log')
+        .update({
+          properties_synced: successCount,
+          properties_failed: errorCount,
+          error_details: errors,
+          sync_status: errorCount > 0 && successCount === 0 ? 'failed' : 'completed',
+          completed_at: new Date().toISOString(),
+        })
+        .eq('id', syncLogId);
+
+      if (updateError) {
+        console.error('Failed to update sync log:', updateError);
+      } else {
+        console.log(`Updated sync log: ${successCount} synced, ${errorCount} failed`);
       }
     }
 
@@ -124,6 +168,19 @@ serve(async (req) => {
   } catch (error: unknown) {
     console.error('Sync error:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+
+    // Update sync log on failure
+    if (syncLogId) {
+      await supabase
+        .from('partner_sync_log')
+        .update({
+          sync_status: 'failed',
+          error_details: [{ error: errorMessage }],
+          completed_at: new Date().toISOString(),
+        })
+        .eq('id', syncLogId);
+    }
+
     return new Response(
       JSON.stringify({ error: errorMessage }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

@@ -1594,6 +1594,45 @@ export type Database = {
         }
         Relationships: []
       }
+      partner_sync_log: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          error_details: Json | null
+          id: string
+          properties_failed: number
+          properties_synced: number
+          source_system: string
+          started_at: string
+          sync_status: string
+          sync_type: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          error_details?: Json | null
+          id?: string
+          properties_failed?: number
+          properties_synced?: number
+          source_system: string
+          started_at?: string
+          sync_status?: string
+          sync_type?: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          error_details?: Json | null
+          id?: string
+          properties_failed?: number
+          properties_synced?: number
+          source_system?: string
+          started_at?: string
+          sync_status?: string
+          sync_type?: string
+        }
+        Relationships: []
+      }
       phase_role_assignments: {
         Row: {
           created_at: string
