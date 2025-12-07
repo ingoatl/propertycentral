@@ -65,6 +65,8 @@ const handler = async (req: Request): Promise<Response> => {
     let visitCount: number = 0;
     let expenseCount: number = 0;
     let visitTotal: number = 0;
+    let cleaningFeesTotal: number = 0;
+    let petFeesTotal: number = 0;
     
     // Initialize date variables that will be used throughout
     const now = new Date();
@@ -163,14 +165,25 @@ const handler = async (req: Request): Promise<Response> => {
         .reduce((sum: number, item: any) => sum + Math.abs(item.amount), 0);
       visitCount = deduplicatedLineItems.filter((item: any) => item.item_type === "visit").length;
       
-      // Calculate expense total from deduplicated expense line items
+      // Calculate expense total from deduplicated expense line items (exclude pass-through fees)
       expenseTotal = deduplicatedLineItems
-        .filter((item: any) => item.item_type === "expense")
+        .filter((item: any) => item.item_type === "expense" && item.fee_type !== 'cleaning_fee' && item.fee_type !== 'pet_fee')
         .reduce((sum: number, item: any) => sum + Math.abs(item.amount), 0);
-      expenseCount = deduplicatedLineItems.filter((item: any) => item.item_type === "expense").length;
+      expenseCount = deduplicatedLineItems.filter((item: any) => item.item_type === "expense" && item.fee_type !== 'cleaning_fee' && item.fee_type !== 'pet_fee').length;
       
-      // CORRECT CALCULATION: Include visits as expenses
-      netIncome = totalRevenue - managementFees - orderMinimumFee - expenseTotal - visitTotal;
+      // Calculate pass-through fees (cleaning and pet fees)
+      cleaningFeesTotal = deduplicatedLineItems
+        .filter((item: any) => item.fee_type === 'cleaning_fee')
+        .reduce((sum: number, item: any) => sum + Math.abs(item.amount), 0);
+      
+      petFeesTotal = deduplicatedLineItems
+        .filter((item: any) => item.fee_type === 'pet_fee')
+        .reduce((sum: number, item: any) => sum + Math.abs(item.amount), 0);
+      
+      console.log("Pass-through fees:", { cleaningFeesTotal, petFeesTotal });
+      
+      // CORRECT CALCULATION: Include visits, expenses, AND pass-through fees
+      netIncome = totalRevenue - managementFees - orderMinimumFee - expenseTotal - visitTotal - cleaningFeesTotal - petFeesTotal;
       
       console.log("Reconciliation mode net calculation:", {
         totalRevenue,
@@ -734,8 +747,8 @@ State: ${state}
       otherExpenses = expenses.reduce((sum, e) => sum + Number(e.amount), 0);
     }
     
-    // Calculate total from what we will actually DISPLAY
-    const totalExpensesWithVisits = otherExpenses + visitExpenses + managementFees + orderMinimumFee;
+    // Calculate total from what we will actually DISPLAY (includes pass-through fees)
+    const totalExpensesWithVisits = otherExpenses + visitExpenses + managementFees + orderMinimumFee + cleaningFeesTotal + petFeesTotal;
 
     // FINAL WATCHDOG: Log individual components for audit
     console.log("=== CALCULATION WATCHDOG SUMMARY ===");
@@ -1049,8 +1062,27 @@ State: ${state}
                         </tr>`;
                       }
                     }).join('') : ''}
+                    ${cleaningFeesTotal > 0 ? `
+                    <tr>
+                      <td colspan="2" style="padding: 16px 0 8px 0; color: #2c3e50; font-size: 14px; font-weight: 600; border-bottom: none;">
+                        🔄 Pass-Through Fees (collected from guests, paid to service providers)
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 8px 0 8px 20px; color: #2c3e50; font-size: 14px; border-bottom: 1px solid #f5f5f5;">
+                        Cleaning Fees
+                      </td>
+                      <td style="padding: 8px 0; color: #4a4a4a; font-size: 14px; text-align: right; font-weight: 600; border-bottom: 1px solid #f5f5f5;">$${cleaningFeesTotal.toFixed(2)}</td>
+                    </tr>` : ''}
+                    ${petFeesTotal > 0 ? `
+                    <tr>
+                      <td style="padding: 8px 0 8px 20px; color: #2c3e50; font-size: 14px; border-bottom: 1px solid #f5f5f5;">
+                        Pet Fees
+                      </td>
+                      <td style="padding: 8px 0; color: #4a4a4a; font-size: 14px; text-align: right; font-weight: 600; border-bottom: 1px solid #f5f5f5;">$${petFeesTotal.toFixed(2)}</td>
+                    </tr>` : ''}
                     <tr style="background-color: #FFF3EC;">
-                      <td style="padding: 16px 12px; color: #E86800; font-size: 16px; font-weight: 700;">Total: Services Provided</td>
+                      <td style="padding: 16px 12px; color: #E86800; font-size: 16px; font-weight: 700;">Total: Amount Due from Owner</td>
                       <td style="padding: 16px 12px; color: #E86800; font-size: 16px; text-align: right; font-weight: 800;">$${totalExpensesWithVisits.toFixed(2)}</td>
                     </tr>
                     <tr>
