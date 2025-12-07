@@ -205,7 +205,7 @@ export const PartnerPropertiesSection = () => {
         .insert({
           owner_name: ownerName,
           property_address: propertyAddress,
-          status: "in_progress",
+          status: "in-progress",
           progress: 0,
           partner_property_id: property.id,
         })
