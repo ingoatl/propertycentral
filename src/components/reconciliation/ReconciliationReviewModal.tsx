@@ -258,7 +258,7 @@ export const ReconciliationReviewModal = ({
       console.log(`Already have ${existingVisitLineItemIds.size} visit line items`);
       
       const newVisits = (allVisitsInPeriod || []).filter(
-        (visit: any) => !existingVisitLineItemIds.has(visit.id)
+        (visit: any) => !existingVisitLineItemIds.has(visit.id) && !visit.billed
       );
       
       if (newVisits.length > 0) {
