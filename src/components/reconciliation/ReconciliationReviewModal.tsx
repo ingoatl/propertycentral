@@ -623,6 +623,7 @@ export const ReconciliationReviewModal = ({
   const allBookings = lineItems.filter((i: any) => i.item_type === "booking" || i.item_type === "mid_term_booking");
   const allExpenses = lineItems.filter((i: any) => i.item_type === "expense");
   const allVisits = lineItems.filter((i: any) => i.item_type === "visit");
+  const allPassThroughFees = lineItems.filter((i: any) => i.item_type === "pass_through_fee");
   
   // Count verified items for display
   const verifiedCount = lineItems.filter((i: any) => i.verified && !i.excluded).length;
@@ -743,6 +744,18 @@ export const ReconciliationReviewModal = ({
                       <span>Expenses (approved):</span>
                       <span className="font-medium text-orange-600">${calculated.totalExpenses.toFixed(2)}</span>
                     </div>
+                    {(calculated.cleaningFees > 0 || calculated.petFees > 0) && (
+                      <>
+                        <div className="flex justify-between text-sm">
+                          <span>Cleaning Fees (pass-through):</span>
+                          <span className="font-medium text-purple-600">${calculated.cleaningFees.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span>Pet Fees (pass-through):</span>
+                          <span className="font-medium text-purple-600">${calculated.petFees.toFixed(2)}</span>
+                        </div>
+                      </>
+                    )}
                   </div>
                   <div className="flex justify-between font-bold pt-2 border-t text-primary text-lg">
                     <span>Total Due:</span>
@@ -774,6 +787,11 @@ export const ReconciliationReviewModal = ({
             <TabsTrigger value="bookings">Bookings ({allBookings.length})</TabsTrigger>
             <TabsTrigger value="expenses">Expenses ({allExpenses.length})</TabsTrigger>
             <TabsTrigger value="visits">Visits ({allVisits.length})</TabsTrigger>
+            {allPassThroughFees.length > 0 && (
+              <TabsTrigger value="passthrough" className="text-purple-600">
+                Pass-Through ({allPassThroughFees.length})
+              </TabsTrigger>
+            )}
           </TabsList>
 
           <TabsContent value="unapproved" className="space-y-2">
@@ -844,6 +862,29 @@ export const ReconciliationReviewModal = ({
                   onToggleVerified={(id, val) => toggleVerifiedMutation.mutate({ itemId: id, currentValue: val })} 
                   getIcon={getItemIcon}
                   visitDetails={data?.visitDetailsMap?.[item.item_id]}
+                />
+              ))
+            )}
+          </TabsContent>
+
+          <TabsContent value="passthrough" className="space-y-2">
+            <Card className="p-4 bg-purple-50 dark:bg-purple-950 border-purple-200 dark:border-purple-800 mb-4">
+              <p className="text-sm text-purple-800 dark:text-purple-200">
+                <strong>Pass-Through Fees:</strong> These are cleaning and pet fees collected from guests. 
+                Since the owner receives these funds and we pay the service providers, the owner owes us these amounts back.
+              </p>
+            </Card>
+            {allPassThroughFees.length === 0 ? (
+              <Card className="p-6 text-center text-muted-foreground">
+                <p>No pass-through fees found</p>
+              </Card>
+            ) : (
+              allPassThroughFees.map((item: any) => (
+                <LineItemRow 
+                  key={item.id} 
+                  item={item} 
+                  onToggleVerified={(id, val) => toggleVerifiedMutation.mutate({ itemId: id, currentValue: val })} 
+                  getIcon={getItemIcon}
                 />
               ))
             )}

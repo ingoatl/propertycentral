@@ -101,7 +101,7 @@ serve(async (req) => {
 
     console.log(`Found ${midTermBookingsEarly?.length || 0} mid-term bookings for duplicate detection`);
 
-    // Fetch all bookings for the month from OwnerRez
+    // Fetch all bookings for the month from OwnerRez - NOW WITH FEE BREAKDOWN
     const { data: allBookings } = await supabaseClient
       .from("ownerrez_bookings")
       .select("*")
@@ -110,22 +110,17 @@ serve(async (req) => {
       .lte("check_in", lastDayOfMonth.toISOString().split("T")[0]);
 
     // Filter out OwnerRez bookings that overlap with mid-term bookings (duplicate detection)
-    // This prevents double-counting when a booking exists in both systems
     const bookings = (allBookings || []).filter(ownerrezBooking => {
       const ownerrezStart = new Date(ownerrezBooking.check_in);
       const ownerrezEnd = new Date(ownerrezBooking.check_out);
       const ownerrezGuest = (ownerrezBooking.guest_name || "").toLowerCase().trim();
       
-      // Check if any mid-term booking overlaps with this OwnerRez booking
       const isDuplicate = (midTermBookingsEarly || []).some(midTerm => {
         const midTermStart = new Date(midTerm.start_date);
         const midTermEnd = new Date(midTerm.end_date);
         const midTermGuest = (midTerm.tenant_name || "").toLowerCase().trim();
         
-        // Check for date overlap
         const datesOverlap = ownerrezStart <= midTermEnd && ownerrezEnd >= midTermStart;
-        
-        // Check if guest names are similar (partial match to handle "Kelly Thew" vs "Kelly T")
         const guestMatch = ownerrezGuest.includes(midTermGuest.split(" ")[0]) || 
                           midTermGuest.includes(ownerrezGuest.split(" ")[0]);
         
@@ -141,76 +136,51 @@ serve(async (req) => {
 
     console.log(`Filtered to ${bookings.length} short-term bookings after removing mid-term duplicates`);
 
-    // Calculate average nightly rate from bookings for this property
-    let calculatedNightlyRate = 0;
-    let bookingRevenueForRate = 0;
+    // Calculate totals WITH FEE BREAKDOWN
+    let accommodationRevenueTotal = 0;
+    let cleaningFeesTotal = 0;
+    let petFeesTotal = 0;
     let totalNights = 0;
     
     if (bookings && bookings.length > 0) {
       for (const booking of bookings) {
-        // Skip bookings with no revenue or invalid dates
-        if (!booking.total_amount || booking.total_amount <= 0) {
-          console.log(`Skipping booking ${booking.id} - no revenue ($${booking.total_amount || 0})`);
-          continue;
-        }
+        // Use accommodation_revenue for management fee base, fallback to total_amount
+        const accommodationRevenue = Number(booking.accommodation_revenue || booking.total_amount || 0);
+        const cleaningFee = Number(booking.cleaning_fee || 0);
+        const petFee = Number(booking.pet_fee || 0);
+        
+        if (accommodationRevenue <= 0) continue;
 
-        if (!booking.check_in || !booking.check_out) {
-          console.log(`Skipping booking ${booking.id} - missing check-in or check-out dates`);
-          continue;
-        }
+        accommodationRevenueTotal += accommodationRevenue;
+        cleaningFeesTotal += cleaningFee;
+        petFeesTotal += petFee;
 
-        try {
+        if (booking.check_in && booking.check_out) {
           const checkIn = new Date(booking.check_in);
           const checkOut = new Date(booking.check_out);
-          
-          // Validate dates
-          if (isNaN(checkIn.getTime()) || isNaN(checkOut.getTime())) {
-            console.log(`Skipping booking ${booking.id} - invalid dates`);
-            continue;
-          }
-
           const nights = Math.ceil((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24));
-          
-          if (nights <= 0) {
-            console.log(`Skipping booking ${booking.id} - invalid night count: ${nights}`);
-            continue;
-          }
-
-          bookingRevenueForRate += booking.total_amount;
-          totalNights += nights;
-        } catch (err) {
-          console.error(`Error processing booking ${booking.id}:`, err);
-          continue;
+          if (nights > 0) totalNights += nights;
         }
-      }
-      
-      if (totalNights > 0) {
-        calculatedNightlyRate = bookingRevenueForRate / totalNights;
       }
     }
 
-    console.log(`Calculated nightly rate from ${bookings?.length || 0} bookings: $${calculatedNightlyRate.toFixed(2)} (${totalNights} total nights, $${bookingRevenueForRate} total revenue)`);
+    console.log(`Fee breakdown from ${bookings?.length || 0} bookings:`);
+    console.log(`  Accommodation Revenue (mgmt fee base): $${accommodationRevenueTotal.toFixed(2)}`);
+    console.log(`  Cleaning Fees (pass-through): $${cleaningFeesTotal.toFixed(2)}`);
+    console.log(`  Pet Fees (pass-through): $${petFeesTotal.toFixed(2)}`);
+    console.log(`  Total Nights: ${totalNights}`);
 
-    // Check if there are any mid-term bookings for this month FIRST before determining order minimum
-    // If there's mid-term revenue, we skip the order minimum fee entirely
-    const { data: midTermBookingsForMinimumCheck } = await supabaseClient
-      .from("mid_term_bookings")
-      .select("*")
-      .eq("property_id", property_id)
-      .eq("status", "active")
-      .lte("start_date", lastDayOfMonth.toISOString().split("T")[0])
-      .gte("end_date", firstDayOfMonth.toISOString().split("T")[0]);
+    // Calculate nightly rate from ACCOMMODATION revenue only
+    const calculatedNightlyRate = totalNights > 0 ? accommodationRevenueTotal / totalNights : 0;
 
-    const hasMidTermBookings = (midTermBookingsForMinimumCheck?.length || 0) > 0;
-    console.log(`Mid-term bookings for minimum check: ${midTermBookingsForMinimumCheck?.length || 0}, hasMidTermBookings: ${hasMidTermBookings}`);
-
+    // Check for mid-term bookings
+    const hasMidTermBookings = (midTermBookingsEarly?.length || 0) > 0;
+    
     // Determine order minimum based on nightly rate tier - ONLY if no mid-term bookings
-    let orderMinimumFee = 0; // Default to 0, only set if no mid-term bookings and no short-term bookings
+    let orderMinimumFee = 0;
 
     if (!hasMidTermBookings) {
-      // No mid-term bookings - apply order minimum logic based on short-term bookings
       if (calculatedNightlyRate > 0) {
-        // Has short-term bookings - set minimum based on rate tier
         if (calculatedNightlyRate < 200) {
           orderMinimumFee = 250;
         } else if (calculatedNightlyRate >= 200 && calculatedNightlyRate <= 400) {
@@ -220,7 +190,6 @@ serve(async (req) => {
         }
         console.log(`Nightly rate $${calculatedNightlyRate.toFixed(2)} → Order minimum: $${orderMinimumFee}`);
       } else {
-        // No bookings at all this month → charge minimum
         orderMinimumFee = 250;
         console.log(`No bookings found for property ${property.name} → Charging minimum order fee: $${orderMinimumFee}`);
       }
@@ -237,10 +206,9 @@ serve(async (req) => {
       })
       .eq("id", property_id);
 
-    // Use the mid-term bookings we already fetched earlier for duplicate detection
+    // Use mid-term bookings for revenue calculation
     const midTermBookings = midTermBookingsEarly;
-    console.log(`Using ${midTermBookings?.length || 0} mid-term bookings for revenue calculation`);
-
+    
     // Fetch UNBILLED expenses for the reconciliation month only
     const { data: expenses } = await supabaseClient
       .from("expenses")
@@ -252,7 +220,7 @@ serve(async (req) => {
 
     console.log(`Found ${expenses?.length || 0} unbilled expenses for the reconciliation month`);
 
-    // Fetch UNBILLED visits for the reconciliation month only (not all historical visits)
+    // Fetch UNBILLED visits for the reconciliation month only
     const { data: visits } = await supabaseClient
       .from("visits")
       .select("*")
@@ -263,10 +231,7 @@ serve(async (req) => {
 
     console.log(`Found ${visits?.length || 0} unbilled visits for the reconciliation month`);
 
-    // Calculate totals with prorated mid-term revenue
-    const shortTermRevenue = (bookings || []).reduce((sum, b) => sum + (b.total_amount && b.total_amount > 0 ? b.total_amount : 0), 0);
-    
-    // Calculate prorated mid-term revenue
+    // Calculate mid-term revenue (prorated)
     let midTermRevenue = 0;
     for (const booking of midTermBookings || []) {
       const bookingStart = new Date(booking.start_date);
@@ -282,16 +247,26 @@ serve(async (req) => {
       
       midTermRevenue += proratedAmount;
     }
-    
+
+    // SHORT-TERM REVENUE = total_amount (what guest paid, for display)
+    // But management fee is calculated on ACCOMMODATION REVENUE only
+    const shortTermRevenue = (bookings || []).reduce((sum, b) => sum + Number(b.total_amount || 0), 0);
     const totalRevenue = shortTermRevenue + midTermRevenue;
+    
     const visitFees = (visits || []).reduce((sum, v) => sum + (v.price || 0), 0);
     const totalExpenses = (expenses || []).reduce((sum, e) => sum + (e.amount || 0), 0);
     
-    // Management fee calculated from booking revenue (property-specific percentage)
-    const calculatedManagementFee = totalRevenue * (managementFeePercentage / 100);
+    // MANAGEMENT FEE calculated on ACCOMMODATION REVENUE ONLY (per agreement)
+    // NOT on cleaning fees, pet fees, or other ancillary charges
+    const managementFeeBase = accommodationRevenueTotal + midTermRevenue;
+    const calculatedManagementFee = managementFeeBase * (managementFeePercentage / 100);
     
-    // Use the property's order_minimum_fee as a floor for management fee
-    // If the calculated management fee is less than the minimum, use the minimum instead
+    console.log(`Management fee calculation:`);
+    console.log(`  Base (accommodation + mid-term): $${managementFeeBase.toFixed(2)}`);
+    console.log(`  Percentage: ${managementFeePercentage}%`);
+    console.log(`  Calculated fee: $${calculatedManagementFee.toFixed(2)}`);
+    
+    // Apply order minimum as floor
     const propertyMinimumFee = property.order_minimum_fee || 0;
     const managementFee = Math.max(calculatedManagementFee, propertyMinimumFee);
     const usedMinimumFee = managementFee > calculatedManagementFee;
@@ -300,10 +275,19 @@ serve(async (req) => {
       console.log(`Management fee minimum applied: calculated $${calculatedManagementFee.toFixed(2)} < minimum $${propertyMinimumFee}, using $${managementFee}`);
     }
     
-    // Due from Owner = Management Fee + Visit Fees + Expenses (NOT including order_minimum_fee)
-    const dueFromOwner = managementFee + visitFees + totalExpenses;
+    // Due from Owner = Management Fee + Visit Fees + Expenses + Cleaning Fees + Pet Fees
+    // Cleaning and pet fees are pass-through: owner received them from guest, needs to pay us back
+    const dueFromOwner = managementFee + visitFees + totalExpenses + cleaningFeesTotal + petFeesTotal;
 
-    console.log(`Reconciliation calculation: Short-term: $${shortTermRevenue}, Mid-term: $${midTermRevenue}, Total Revenue: $${totalRevenue}, Visit Fees: $${visitFees}, Expenses: $${totalExpenses}, Management Fee (${managementFeePercentage}%): $${calculatedManagementFee.toFixed(2)}${usedMinimumFee ? ` (min: $${propertyMinimumFee})` : ''}, Final Management Fee: $${managementFee}, Due from Owner: $${dueFromOwner}`);
+    console.log(`Reconciliation calculation:`);
+    console.log(`  Short-term (display): $${shortTermRevenue}, Mid-term: $${midTermRevenue}`);
+    console.log(`  Total Revenue (display): $${totalRevenue}`);
+    console.log(`  Accommodation Revenue (mgmt base): $${accommodationRevenueTotal}`);
+    console.log(`  Cleaning Fees (pass-through): $${cleaningFeesTotal}`);
+    console.log(`  Pet Fees (pass-through): $${petFeesTotal}`);
+    console.log(`  Management Fee: $${managementFee}`);
+    console.log(`  Visit Fees: $${visitFees}, Expenses: $${totalExpenses}`);
+    console.log(`  Due from Owner: $${dueFromOwner}`);
 
     // Create reconciliation
     const { data: reconciliation, error: recError } = await supabaseClient
@@ -326,7 +310,6 @@ serve(async (req) => {
       .single();
 
     if (recError) {
-      // Handle duplicate key error specifically
       if (recError.code === "23505") {
         console.error("Duplicate key error - reconciliation already exists");
         return new Response(
@@ -341,38 +324,71 @@ serve(async (req) => {
     }
 
     // Create line items
-    const lineItems = [];
+    const lineItems: any[] = [];
 
-    // Add bookings (only those with revenue)
+    // Add bookings with fee breakdown
     for (const booking of bookings || []) {
-      if ((booking.total_amount || 0) > 0) {
+      const totalAmount = Number(booking.total_amount || 0);
+      if (totalAmount <= 0) continue;
+      
+      const accommodationRevenue = Number(booking.accommodation_revenue || totalAmount);
+      const cleaningFee = Number(booking.cleaning_fee || 0);
+      const petFee = Number(booking.pet_fee || 0);
+      
+      // Main booking line item (accommodation revenue for display)
+      lineItems.push({
+        reconciliation_id: reconciliation.id,
+        item_type: "booking",
+        item_id: booking.id,
+        description: `${booking.guest_name || "Guest"} - ${booking.ownerrez_listing_name}`,
+        amount: accommodationRevenue,
+        date: booking.check_in,
+        category: "Short-term Booking",
+        fee_type: "accommodation",
+      });
+      
+      // Cleaning fee pass-through line item
+      if (cleaningFee > 0) {
         lineItems.push({
           reconciliation_id: reconciliation.id,
-          item_type: "booking",
-          item_id: booking.id,
-          description: `${booking.guest_name || "Guest"} - ${booking.ownerrez_listing_name}`,
-          amount: booking.total_amount,
+          item_type: "pass_through_fee",
+          item_id: `${booking.id}_cleaning`,
+          description: `Cleaning Fee - ${booking.guest_name || "Guest"}`,
+          amount: -cleaningFee, // Negative = due from owner
           date: booking.check_in,
-          category: "Short-term Booking",
+          category: "Cleaning Fee",
+          fee_type: "cleaning_fee",
+        });
+      }
+      
+      // Pet fee pass-through line item
+      if (petFee > 0) {
+        lineItems.push({
+          reconciliation_id: reconciliation.id,
+          item_type: "pass_through_fee",
+          item_id: `${booking.id}_pet`,
+          description: `Pet Fee - ${booking.guest_name || "Guest"}`,
+          amount: -petFee, // Negative = due from owner
+          date: booking.check_in,
+          category: "Pet Fee",
+          fee_type: "pet_fee",
         });
       }
     }
 
-    // Add mid-term bookings (prorated if needed, only with revenue)
+    // Add mid-term bookings (prorated if needed)
     for (const booking of midTermBookings || []) {
       const bookingStart = new Date(booking.start_date);
       const bookingEnd = new Date(booking.end_date);
       const monthStart = new Date(firstDayOfMonth);
       const monthEnd = new Date(lastDayOfMonth);
       
-      // Calculate prorated amount for this month
       const effectiveStart = bookingStart > monthStart ? bookingStart : monthStart;
       const effectiveEnd = bookingEnd < monthEnd ? bookingEnd : monthEnd;
       const daysInBooking = Math.ceil((effectiveEnd.getTime() - effectiveStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
       const daysInMonth = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0).getDate();
       const proratedAmount = (booking.monthly_rent / daysInMonth) * daysInBooking;
       
-      // Only add if there's revenue
       if (proratedAmount > 0) {
         lineItems.push({
           reconciliation_id: reconciliation.id,
@@ -382,15 +398,15 @@ serve(async (req) => {
           amount: proratedAmount,
           date: effectiveStart.toISOString().split("T")[0],
           category: "Mid-term Rental",
+          fee_type: "accommodation",
         });
       }
     }
 
-    // Add visits as expenses (negative amounts) - WATCHDOG: Skip already-billed visits
+    // Add visits
     for (const visit of visits || []) {
-      // WATCHDOG: Double-check visit is not already billed
       if (visit.billed === true) {
-        console.warn(`⚠️ WATCHDOG: Skipping already-billed visit ${visit.id} (${visit.visited_by}, ${visit.date})`);
+        console.warn(`⚠️ WATCHDOG: Skipping already-billed visit ${visit.id}`);
         continue;
       }
       
@@ -399,20 +415,17 @@ serve(async (req) => {
         item_type: "visit",
         item_id: visit.id,
         description: `Property visit - ${visit.visited_by || "Staff"}`,
-        amount: -Math.abs(visit.price), // Negative for expenses
+        amount: -Math.abs(visit.price),
         date: visit.date,
         category: "Visit Fee",
+        fee_type: "visit",
       });
     }
 
-    // Do NOT mark visits as billed here - they will be marked when reconciliation is approved
-    // This allows for review and ensures proper sync with the reconciliation approval process
-
-    // Add expenses (excluding visit-related expenses to avoid double counting)
+    // Add expenses (excluding visit-related)
     for (const expense of expenses || []) {
       const description = (expense.purpose || "").toLowerCase();
       
-      // Skip visit-related expenses - these are already counted in visit fees
       const isVisitRelated = 
         description.includes('visit fee') ||
         description.includes('visit charge') ||
@@ -424,10 +437,7 @@ serve(async (req) => {
         continue;
       }
       
-      // Prefer items_detail for full item names, fallback to purpose
       let expenseDescription = expense.items_detail || expense.purpose || "Expense";
-      
-      // If it's a generic description like "1 item from Amazon", try to get more detail
       if (expenseDescription.match(/^\d+\s*items?\s*(from|on)\s*amazon/i) && expense.items_detail) {
         expenseDescription = expense.items_detail;
       }
@@ -437,35 +447,14 @@ serve(async (req) => {
         item_type: "expense",
         item_id: expense.id,
         description: expenseDescription,
-        amount: -Math.abs(expense.amount), // Negative for expenses
+        amount: -Math.abs(expense.amount),
         date: expense.date,
         category: expense.category || "General Expense",
+        fee_type: "expense",
       });
     }
 
-    // ============================================================
-    // WATCHDOG: Order Minimum Fee Logic Validation
-    // ============================================================
-    // The order minimum fee is NEVER a separate line item. It is ONLY used 
-    // as a FLOOR for the management fee calculation.
-    // 
-    // CORRECT LOGIC:
-    // - If no revenue → management fee = order minimum (already applied above)
-    // - If revenue exists but commission < minimum → management fee = minimum (already applied above)
-    // - If commission >= minimum → management fee = commission (already applied above)
-    //
-    // DO NOT add order_minimum as a separate line item - this would double charge owners!
-    // The management fee line item already includes the minimum fee when applicable.
-    // ============================================================
-    
-    // WATCHDOG CHECK: Verify management fee is consistent with business rules
-    const watchdogExpectedFee = Math.max(calculatedManagementFee, orderMinimumFee);
-    if (Math.abs(managementFee - watchdogExpectedFee) > 0.01) {
-      console.error(`⚠️ WATCHDOG VIOLATION: Management fee mismatch! Expected: $${watchdogExpectedFee.toFixed(2)}, Got: $${managementFee.toFixed(2)}`);
-    }
-    
-    // WATCHDOG: Ensure order minimum is NEVER added as a line item
-    // This check prevents accidental reintroduction of this bug
+    // WATCHDOG: Verify no order_minimum line items
     const hasOrderMinimumLineItem = lineItems.some(item => item.item_type === 'order_minimum');
     if (hasOrderMinimumLineItem) {
       console.error(`⚠️ WATCHDOG VIOLATION: Order minimum was added as a line item! Removing it.`);
@@ -474,14 +463,17 @@ serve(async (req) => {
       lineItems.push(...filteredItems);
     }
     
-    console.log(`WATCHDOG: Management fee verified - calculated: $${calculatedManagementFee.toFixed(2)}, minimum: $${orderMinimumFee}, final: $${managementFee}`);
-    console.log(`WATCHDOG: ${lineItems.length} line items ready (no order_minimum line item - correctly using it as fee floor only)`);
+    console.log(`WATCHDOG: ${lineItems.length} line items ready`);
+    console.log(`  - Bookings: ${lineItems.filter(i => i.item_type === 'booking').length}`);
+    console.log(`  - Pass-through fees: ${lineItems.filter(i => i.item_type === 'pass_through_fee').length}`);
+    console.log(`  - Mid-term: ${lineItems.filter(i => i.item_type === 'mid_term_booking').length}`);
+    console.log(`  - Visits: ${lineItems.filter(i => i.item_type === 'visit').length}`);
+    console.log(`  - Expenses: ${lineItems.filter(i => i.item_type === 'expense').length}`);
 
-    // Create line items with verified: false (manual approval required)
-    // Add source tracking and creation metadata
+    // Create line items with verified: false
     const lineItemsWithMetadata = lineItems.map(item => ({
       ...item,
-      verified: false, // All items start unchecked for manual approval
+      verified: false,
       source: 'auto_generated',
       added_by: user.id
     }));
@@ -501,6 +493,11 @@ serve(async (req) => {
         success: true,
         reconciliation,
         lineItemCount: lineItems.length,
+        feeBreakdown: {
+          accommodationRevenue: accommodationRevenueTotal,
+          cleaningFees: cleaningFeesTotal,
+          petFees: petFeesTotal,
+        }
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
