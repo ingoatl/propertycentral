@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import JSZip from "https://esm.sh/jszip@3.10.1";
+import { encode as base64Encode } from "https://deno.land/std@0.168.0/encoding/base64.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -222,8 +223,14 @@ serve(async (req) => {
       const processedDocx = await processDocx(docxBuffer, replacements);
       console.log("Processed DOCX, size:", processedDocx.byteLength);
       
-      // Convert to base64 for SignWell
-      processedFileBase64 = btoa(String.fromCharCode(...processedDocx));
+      // Convert to base64 for SignWell using chunked approach (avoids stack overflow)
+      const chunks: string[] = [];
+      const chunkSize = 8192;
+      for (let i = 0; i < processedDocx.length; i += chunkSize) {
+        const chunk = processedDocx.subarray(i, i + chunkSize);
+        chunks.push(String.fromCharCode.apply(null, Array.from(chunk)));
+      }
+      processedFileBase64 = btoa(chunks.join(''));
     }
 
     // Build SignWell payload
