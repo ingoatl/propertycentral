@@ -545,6 +545,7 @@ export type Database = {
       expenses: {
         Row: {
           amount: number
+          billed: boolean | null
           category: string | null
           created_at: string
           date: string
@@ -562,6 +563,7 @@ export type Database = {
           parent_expense_id: string | null
           property_id: string
           purpose: string | null
+          reconciliation_id: string | null
           refund_amount: number | null
           return_reason: string | null
           tracking_number: string | null
@@ -570,6 +572,7 @@ export type Database = {
         }
         Insert: {
           amount: number
+          billed?: boolean | null
           category?: string | null
           created_at?: string
           date: string
@@ -587,6 +590,7 @@ export type Database = {
           parent_expense_id?: string | null
           property_id: string
           purpose?: string | null
+          reconciliation_id?: string | null
           refund_amount?: number | null
           return_reason?: string | null
           tracking_number?: string | null
@@ -595,6 +599,7 @@ export type Database = {
         }
         Update: {
           amount?: number
+          billed?: boolean | null
           category?: string | null
           created_at?: string
           date?: string
@@ -612,6 +617,7 @@ export type Database = {
           parent_expense_id?: string | null
           property_id?: string
           purpose?: string | null
+          reconciliation_id?: string | null
           refund_amount?: number | null
           return_reason?: string | null
           tracking_number?: string | null
@@ -645,6 +651,13 @@ export type Database = {
             columns: ["property_id"]
             isOneToOne: false
             referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expenses_reconciliation_id_fkey"
+            columns: ["reconciliation_id"]
+            isOneToOne: false
+            referencedRelation: "monthly_reconciliations"
             referencedColumns: ["id"]
           },
         ]
