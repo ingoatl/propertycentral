@@ -36,10 +36,11 @@ export const CreateReconciliationDialog = ({
     },
   });
 
-  // Generate last 6 months
+  // Generate last 6 months - start from LAST month (not current month)
+  // Reconciliations are typically done for the previous month
   const months = Array.from({ length: 6 }, (_, i) => {
     const date = new Date();
-    date.setMonth(date.getMonth() - i);
+    date.setMonth(date.getMonth() - 1 - i); // Start from last month
     return {
       value: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-01`,
       label: date.toLocaleDateString("en-US", { month: "long", year: "numeric" }),
