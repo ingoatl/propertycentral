@@ -7,6 +7,7 @@ import { Expense } from "@/types";
 import { Calendar as CalendarIcon, Trash2, Eye, ChevronLeft, Search, RotateCcw } from "lucide-react";
 import { ExpenseDetailModal } from "@/components/ExpenseDetailModal";
 import { ExpenseDocumentLink } from "@/components/ExpenseDocumentLink";
+import { ForceDeleteExpenseDialog } from "@/components/ForceDeleteExpenseDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -31,6 +32,7 @@ export const PropertyExpenseView = ({
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [billedFilter, setBilledFilter] = useState<"all" | "billed" | "unbilled">("all");
+  const [forceDeleteExpense, setForceDeleteExpense] = useState<{ id: string; description: string } | null>(null);
 
   // Filter expenses based on search term and billed status
   const filteredExpenses = expenses.filter((expense) => {
@@ -101,11 +103,7 @@ export const PropertyExpenseView = ({
     }, 0);
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this expense?")) {
-      return;
-    }
-
+  const handleDelete = async (id: string, expense: Expense) => {
     try {
       // Check if expense is in any reconciliation line items
       const { data: lineItems, error: lineItemsError } = await supabase
@@ -123,7 +121,16 @@ export const PropertyExpenseView = ({
       );
 
       if (inApprovedRecon) {
-        toast.error("Cannot delete: This expense is in an approved reconciliation. Please contact admin.");
+        // Open the force delete dialog instead of blocking
+        const description = expense.vendor 
+          ? `${expense.vendor} - $${expense.amount.toFixed(2)} on ${new Date(expense.date).toLocaleDateString()}`
+          : `$${expense.amount.toFixed(2)} on ${new Date(expense.date).toLocaleDateString()}`;
+        setForceDeleteExpense({ id, description });
+        return;
+      }
+
+      // Normal deletion flow - confirm first
+      if (!confirm("Are you sure you want to delete this expense?")) {
         return;
       }
 
@@ -333,7 +340,7 @@ export const PropertyExpenseView = ({
                               size="icon"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                handleDelete(expense.id);
+                                handleDelete(expense.id, expense);
                               }}
                               className="text-destructive hover:text-destructive hover:bg-destructive/10"
                             >
@@ -390,7 +397,7 @@ export const PropertyExpenseView = ({
                               size="icon"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                handleDelete(returnExpense.id);
+                                handleDelete(returnExpense.id, returnExpense);
                               }}
                               className="text-destructive hover:text-destructive hover:bg-destructive/10"
                             >
@@ -426,6 +433,14 @@ export const PropertyExpenseView = ({
         propertyAddress={propertyAddress}
         open={isDetailModalOpen}
         onOpenChange={setIsDetailModalOpen}
+      />
+
+      <ForceDeleteExpenseDialog
+        open={!!forceDeleteExpense}
+        onOpenChange={(open) => !open && setForceDeleteExpense(null)}
+        expenseId={forceDeleteExpense?.id || ""}
+        expenseDescription={forceDeleteExpense?.description || ""}
+        onDeleted={onExpenseDeleted}
       />
     </div>
   );
