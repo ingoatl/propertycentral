@@ -16,6 +16,7 @@ import { OverdueTasksCard } from "./OverdueTasksCard";
 import { AllTasksCard } from "./AllTasksCard";
 import { PendingQuestionsCard } from "@/components/admin/PendingQuestionsCard";
 import { DashboardBugReportsCard } from "@/components/admin/DashboardBugReportsCard";
+import { ExpenseWatchdogCard } from "@/components/admin/ExpenseWatchdogCard";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -454,6 +455,9 @@ export const AdminDashboard = ({ summaries, onExport, onSync, syncing, onSendOve
             completedTasks={teamData.completedTasks}
           />
         </div>
+
+        {/* Expense Watchdog - Critical for catching missing/wrong expenses */}
+        <ExpenseWatchdogCard />
 
         {/* Admin Cards */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 max-md:gap-4">

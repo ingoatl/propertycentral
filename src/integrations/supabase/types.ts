@@ -462,6 +462,86 @@ export type Database = {
         }
         Relationships: []
       }
+      expense_verifications: {
+        Row: {
+          created_at: string
+          discrepancy_reason: string | null
+          email_insight_id: string | null
+          expense_id: string | null
+          extracted_amount: number | null
+          id: string
+          order_number: string | null
+          property_id: string
+          raw_email_data: Json | null
+          updated_at: string
+          verification_status: string
+          verified_amount: number | null
+          verified_at: string | null
+          verified_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          discrepancy_reason?: string | null
+          email_insight_id?: string | null
+          expense_id?: string | null
+          extracted_amount?: number | null
+          id?: string
+          order_number?: string | null
+          property_id: string
+          raw_email_data?: Json | null
+          updated_at?: string
+          verification_status?: string
+          verified_amount?: number | null
+          verified_at?: string | null
+          verified_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          discrepancy_reason?: string | null
+          email_insight_id?: string | null
+          expense_id?: string | null
+          extracted_amount?: number | null
+          id?: string
+          order_number?: string | null
+          property_id?: string
+          raw_email_data?: Json | null
+          updated_at?: string
+          verification_status?: string
+          verified_amount?: number | null
+          verified_at?: string | null
+          verified_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "expense_verifications_email_insight_id_fkey"
+            columns: ["email_insight_id"]
+            isOneToOne: false
+            referencedRelation: "email_insights"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expense_verifications_expense_id_fkey"
+            columns: ["expense_id"]
+            isOneToOne: false
+            referencedRelation: "expenses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expense_verifications_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "comprehensive_property_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expense_verifications_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       expenses: {
         Row: {
           amount: number

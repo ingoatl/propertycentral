@@ -7,6 +7,166 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// ============ AMAZON HTML PARSER - Direct extraction for validation ============
+
+interface ParsedAmazonOrder {
+  orderNumber: string | null;
+  totalAmount: number | null;
+  items: Array<{ name: string; price: number }>;
+  deliveryAddress: string | null;
+  orderDate: string | null;
+  confidence: 'high' | 'medium' | 'low';
+}
+
+function parseAmazonEmailDirectly(subject: string, body: string, rawHtml: string | null): ParsedAmazonOrder | null {
+  const content = rawHtml || body;
+  
+  // Check if this is an Amazon email
+  const isAmazon = subject.toLowerCase().includes('amazon') || 
+                   content.toLowerCase().includes('amazon.com');
+  
+  if (!isAmazon) return null;
+
+  const result: ParsedAmazonOrder = {
+    orderNumber: null,
+    totalAmount: null,
+    items: [],
+    deliveryAddress: null,
+    orderDate: null,
+    confidence: 'low'
+  };
+
+  // Extract order number - multiple patterns
+  const orderPatterns = [
+    /order\s*#?\s*(\d{3}-\d{7}-\d{7})/gi,
+    /orderID[=:]?\s*(\d{3}-\d{7}-\d{7})/gi,
+    /(\d{3}-\d{7}-\d{7})/g,
+  ];
+
+  for (const pattern of orderPatterns) {
+    const matches = content.match(pattern);
+    if (matches && matches.length > 0) {
+      const numMatch = matches[0].match(/(\d{3}-\d{7}-\d{7})/);
+      if (numMatch) {
+        result.orderNumber = numMatch[1];
+        break;
+      }
+    }
+  }
+
+  // Extract total amount - CRITICAL: look for Grand Total first
+  const grandTotalMatch = content.match(/Grand\s*Total[:\s]*\$?\s*([\d,]+\.?\d*)/i);
+  if (grandTotalMatch) {
+    result.totalAmount = parseFloat(grandTotalMatch[1].replace(/,/g, ''));
+  } else {
+    // Fallback to other patterns
+    const amountPatterns = [
+      /Order\s*Total[:\s]*\$?([\d,]+\.?\d*)/gi,
+      /Item.*Subtotal[:\s]*\$?([\d,]+\.?\d*)/gi,
+    ];
+
+    for (const pattern of amountPatterns) {
+      const match = content.match(pattern);
+      if (match) {
+        const amount = parseFloat(match[1].replace(/,/g, ''));
+        if (amount > 0 && amount < 10000) {
+          result.totalAmount = amount;
+          break;
+        }
+      }
+    }
+  }
+
+  // Extract items with prices
+  const itemMatches = [...content.matchAll(/(?:(\d+)\s*(?:of|x):?\s*)?([A-Za-z][^$\n]{5,100}?)\s*\$\s*([\d,]+\.?\d{2})/g)];
+  for (const match of itemMatches) {
+    const name = (match[2] || '').trim().replace(/\s+/g, ' ');
+    const price = parseFloat((match[3] || '0').replace(/,/g, ''));
+    
+    if (price > 0 && price < 5000 && 
+        !name.toLowerCase().includes('total') &&
+        !name.toLowerCase().includes('shipping') &&
+        !name.toLowerCase().includes('tax') &&
+        !name.toLowerCase().includes('subtotal') &&
+        !name.toLowerCase().includes('before')) {
+      result.items.push({ name: name.substring(0, 100), price });
+    }
+  }
+
+  // Calculate confidence
+  let confidenceScore = 0;
+  if (result.orderNumber) confidenceScore += 3;
+  if (result.totalAmount) confidenceScore += 2;
+  if (result.items.length > 0) confidenceScore += 1;
+
+  if (confidenceScore >= 5) {
+    result.confidence = 'high';
+  } else if (confidenceScore >= 3) {
+    result.confidence = 'medium';
+  }
+
+  console.log('Direct parse result:', JSON.stringify(result, null, 2));
+  return result.orderNumber || result.totalAmount ? result : null;
+}
+
+function validateAndReconcile(
+  aiAnalysis: any, 
+  parsedData: ParsedAmazonOrder | null
+): { amount: number | null; orderNumber: string | null; discrepancy: string | null; shouldFlag: boolean } {
+  
+  if (!parsedData) {
+    return { 
+      amount: aiAnalysis.expenseAmount, 
+      orderNumber: aiAnalysis.orderNumber,
+      discrepancy: null,
+      shouldFlag: false
+    };
+  }
+
+  let discrepancy: string | null = null;
+  let shouldFlag = false;
+
+  // Validate amount
+  let finalAmount = aiAnalysis.expenseAmount;
+  if (parsedData.totalAmount && aiAnalysis.expenseAmount) {
+    const diff = Math.abs(parsedData.totalAmount - aiAnalysis.expenseAmount);
+    const percentDiff = diff / Math.max(parsedData.totalAmount, aiAnalysis.expenseAmount);
+    
+    if (percentDiff > 0.05) { // More than 5% difference
+      discrepancy = `Amount mismatch: AI=$${aiAnalysis.expenseAmount?.toFixed(2)}, Parsed=$${parsedData.totalAmount.toFixed(2)}`;
+      finalAmount = parsedData.totalAmount; // Trust parsed data
+      shouldFlag = true;
+      console.warn('WATCHDOG: Amount discrepancy detected!', discrepancy);
+    }
+  } else if (parsedData.totalAmount && !aiAnalysis.expenseAmount) {
+    finalAmount = parsedData.totalAmount;
+    discrepancy = 'AI missed amount, using parsed';
+    shouldFlag = true;
+  }
+
+  // Validate order number
+  let finalOrderNumber = aiAnalysis.orderNumber;
+  if (parsedData.orderNumber && !aiAnalysis.orderNumber) {
+    finalOrderNumber = parsedData.orderNumber;
+    discrepancy = (discrepancy ? discrepancy + '; ' : '') + 'AI missed order number';
+    shouldFlag = true;
+  } else if (parsedData.orderNumber && aiAnalysis.orderNumber) {
+    const normalizedParsed = parsedData.orderNumber.replace(/\D/g, '');
+    const normalizedAI = aiAnalysis.orderNumber.replace(/\D/g, '');
+    
+    if (normalizedParsed !== normalizedAI) {
+      discrepancy = (discrepancy ? discrepancy + '; ' : '') + 
+        `Order # mismatch: AI=${aiAnalysis.orderNumber}, Parsed=${parsedData.orderNumber}`;
+      finalOrderNumber = parsedData.orderNumber; // Trust parsed
+      shouldFlag = true;
+    }
+  }
+
+  return { amount: finalAmount, orderNumber: finalOrderNumber, discrepancy, shouldFlag };
+}
+
+// ============ END PARSER ============
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -446,9 +606,20 @@ ANALYZE CAREFULLY - Extract ALL order details including order number and deliver
       }
     }
 
+    // ========== WATCHDOG: Direct HTML parsing for validation ==========
+    const parsedData = parseAmazonEmailDirectly(subject, body, rawHtml);
+    const validation = validateAndReconcile(analysis, parsedData);
+    
+    console.log('Watchdog validation result:', JSON.stringify(validation, null, 2));
+    
+    // Use validated/corrected values
+    const validatedAmount = validation.amount || analysis.expenseAmount;
+    const validatedOrderNumber = validation.orderNumber || analysis.orderNumber;
+    
     // Create expense if detected and validated
     let expenseCreated = false;
     let expenseId = null;
+    let watchdogFlagged = validation.shouldFlag;
     
     // Check for return/refund
     const isReturn = analysis.isReturn === true || 
@@ -458,14 +629,14 @@ ANALYZE CAREFULLY - Extract ALL order details including order number and deliver
     if (analysis.expenseDetected && property) {
       // Validate expense data - don't create without order number for Amazon
       const isAmazon = analysis.vendor?.toLowerCase().includes('amazon');
-      const hasValidOrderNumber = analysis.orderNumber && analysis.orderNumber.length > 5;
-      const hasValidAmount = analysis.expenseAmount && analysis.expenseAmount > 0;
+      const hasValidOrderNumber = validatedOrderNumber && validatedOrderNumber.length > 5;
+      const hasValidAmount = validatedAmount && validatedAmount > 0;
       const hasValidDescription = analysis.expenseDescription && 
         !analysis.expenseDescription.toLowerCase().includes('multiple properties') &&
         !analysis.expenseDescription.toLowerCase().includes('multiple expenses logged');
       
       // For returns, amount can be negative
-      const isValidReturn = isReturn && analysis.expenseAmount;
+      const isValidReturn = isReturn && validatedAmount;
       
       if ((isAmazon && !hasValidOrderNumber) || (!hasValidAmount && !isValidReturn) || !hasValidDescription) {
         console.log('Invalid expense data, skipping expense creation:', {
@@ -475,35 +646,58 @@ ANALYZE CAREFULLY - Extract ALL order details including order number and deliver
           hasValidDescription,
           isReturn
         });
+        watchdogFlagged = true; // Flag for manual review
       } else {
         // Check for duplicate expense by order number
-        if (analysis.orderNumber) {
+        const orderToCheck = validatedOrderNumber;
+        if (orderToCheck) {
           const { data: existingExpense } = await supabase
             .from('expenses')
-            .select('id')
-            .eq('order_number', analysis.orderNumber)
+            .select('id, amount')
+            .eq('order_number', orderToCheck)
             .eq('property_id', property.id)
-            .single();
+            .maybeSingle();
           
           if (existingExpense) {
-            console.log('Expense already exists for order:', analysis.orderNumber);
+            console.log('Expense already exists for order:', orderToCheck);
+            
+            // WATCHDOG: Check if existing expense has wrong amount
+            if (validatedAmount && Math.abs(existingExpense.amount - validatedAmount) > 0.01) {
+              console.warn('WATCHDOG: Existing expense has different amount!', 
+                `Existing: ${existingExpense.amount}, Should be: ${validatedAmount}`);
+              watchdogFlagged = true;
+              
+              // Create verification record
+              await supabase
+                .from('expense_verifications')
+                .insert({
+                  expense_id: existingExpense.id,
+                  property_id: property.id,
+                  order_number: orderToCheck,
+                  extracted_amount: validatedAmount,
+                  verified_amount: existingExpense.amount,
+                  verification_status: 'flagged',
+                  discrepancy_reason: validation.discrepancy || `Amount mismatch: expected $${validatedAmount}, found $${existingExpense.amount}`,
+                  raw_email_data: { subject, parsedData, aiAnalysis: analysis }
+                });
+            }
           } else {
-            // Create the expense
+            // Create the expense with VALIDATED values
             const expenseData: any = {
               property_id: property.id,
-              amount: isReturn ? -Math.abs(analysis.expenseAmount) : analysis.expenseAmount,
+              amount: isReturn ? -Math.abs(validatedAmount) : validatedAmount,
               purpose: analysis.expenseDescription,
               date: analysis.orderDate || emailDate.split('T')[0],
               vendor: analysis.vendor,
-              order_number: analysis.orderNumber,
+              order_number: validatedOrderNumber,
               order_date: analysis.orderDate,
               tracking_number: analysis.trackingNumber,
               delivery_address: analysis.deliveryAddress,
               is_return: isReturn,
-              line_items: analysis.lineItems,
+              line_items: analysis.lineItems || (parsedData?.items ? { items: parsedData.items } : null),
               items_detail: analysis.lineItems ? 
                 analysis.lineItems.map((item: any) => `${item.name}: $${item.price}`).join(', ') : 
-                null,
+                (parsedData?.items?.map(i => `${i.name}: $${i.price}`).join(', ') || null),
             };
             
             const { data: newExpense, error: expenseError } = await supabase
@@ -514,11 +708,65 @@ ANALYZE CAREFULLY - Extract ALL order details including order number and deliver
             
             if (expenseError) {
               console.error('Error creating expense:', expenseError);
+              watchdogFlagged = true;
             } else {
               expenseCreated = true;
               expenseId = newExpense.id;
               console.log('Created expense:', newExpense.id, 'Amount:', expenseData.amount);
+              
+              // If watchdog found discrepancy, create verification record
+              if (validation.shouldFlag && validation.discrepancy) {
+                await supabase
+                  .from('expense_verifications')
+                  .insert({
+                    expense_id: newExpense.id,
+                    property_id: property.id,
+                    order_number: validatedOrderNumber,
+                    extracted_amount: validatedAmount,
+                    verification_status: 'flagged',
+                    discrepancy_reason: validation.discrepancy,
+                    raw_email_data: { subject, parsedData, aiAnalysis: analysis }
+                  });
+              }
             }
+          }
+        } else {
+          // No order number - still try to create but flag it
+          console.warn('WATCHDOG: Creating expense without order number - flagging for review');
+          watchdogFlagged = true;
+          
+          const expenseData: any = {
+            property_id: property.id,
+            amount: isReturn ? -Math.abs(validatedAmount) : validatedAmount,
+            purpose: analysis.expenseDescription,
+            date: analysis.orderDate || emailDate.split('T')[0],
+            vendor: analysis.vendor,
+            order_number: null,
+            order_date: analysis.orderDate,
+            is_return: isReturn,
+          };
+          
+          const { data: newExpense, error: expenseError } = await supabase
+            .from('expenses')
+            .insert(expenseData)
+            .select()
+            .single();
+          
+          if (!expenseError && newExpense) {
+            expenseCreated = true;
+            expenseId = newExpense.id;
+            
+            // Flag for verification
+            await supabase
+              .from('expense_verifications')
+              .insert({
+                expense_id: newExpense.id,
+                property_id: property.id,
+                extracted_amount: validatedAmount,
+                verification_status: 'pending',
+                discrepancy_reason: 'No order number - needs manual verification',
+                raw_email_data: { subject, parsedData, aiAnalysis: analysis }
+              });
           }
         }
       }
