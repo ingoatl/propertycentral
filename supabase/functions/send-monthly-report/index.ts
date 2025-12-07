@@ -1420,24 +1420,68 @@ State: ${state}
     } // End of performance email (NOT reconciliation mode)
 
 
-    // If in reconciliation mode and NOT a test email, mark expenses as billed and update reconciliation status
+    // If in reconciliation mode and NOT a test email, mark items as billed and update reconciliation status
     if (isReconciliationMode && !isTestEmail) {
-      // Mark all expense line items as exported/billed
-      const { data: expenseLineItems } = await supabase
+      // ========== MARK ALL ITEMS AS BILLED ==========
+      // Get all approved line items to mark their source records as billed
+      const { data: approvedLineItems } = await supabase
         .from("reconciliation_line_items")
-        .select("item_id")
+        .select("item_id, item_type")
         .eq("reconciliation_id", reconciliation_id)
-        .eq("item_type", "expense")
-        .eq("verified", true);
-
-      if (expenseLineItems && expenseLineItems.length > 0) {
-        const expenseIds = expenseLineItems.map((item: any) => item.item_id);
-        await supabase
-          .from("expenses")
-          .update({ exported: true })
-          .in("id", expenseIds);
+        .eq("verified", true)
+        .eq("excluded", false);
+      
+      if (approvedLineItems && approvedLineItems.length > 0) {
+        // Extract unique visit IDs
+        const visitIds = [...new Set(
+          approvedLineItems
+            .filter((item: any) => item.item_type === "visit")
+            .map((item: any) => item.item_id)
+        )];
         
-        console.log(`Marked ${expenseIds.length} expenses as billed`);
+        // Extract unique expense IDs
+        const expenseIds = [...new Set(
+          approvedLineItems
+            .filter((item: any) => item.item_type === "expense")
+            .map((item: any) => item.item_id)
+        )];
+        
+        // Mark visits as billed with reconciliation reference
+        if (visitIds.length > 0) {
+          const { error: visitError } = await supabase
+            .from("visits")
+            .update({ 
+              billed: true, 
+              reconciliation_id: reconciliation_id 
+            })
+            .in("id", visitIds);
+          
+          if (visitError) {
+            console.error("Error marking visits as billed:", visitError);
+          } else {
+            console.log(`✅ Marked ${visitIds.length} visits as BILLED`);
+          }
+        }
+        
+        // Mark expenses as billed with reconciliation reference
+        if (expenseIds.length > 0) {
+          const { error: expenseError } = await supabase
+            .from("expenses")
+            .update({ 
+              billed: true, 
+              exported: true,  // Keep legacy field for compatibility
+              reconciliation_id: reconciliation_id 
+            })
+            .in("id", expenseIds);
+          
+          if (expenseError) {
+            console.error("Error marking expenses as billed:", expenseError);
+          } else {
+            console.log(`✅ Marked ${expenseIds.length} expenses as BILLED`);
+          }
+        }
+        
+        console.log(`📧 STATEMENT SENT - Marked as billed: ${visitIds.length} visits, ${expenseIds.length} expenses`);
       }
 
       // Calculate next month's 5th for deadline using reportDate
