@@ -77,8 +77,7 @@ export const MonthlyEmailPreviewModal = ({
         if (!itemsError && lineItems) {
           const calculated = calculateDueFromOwnerFromLineItems(
             lineItems,
-            reconciliation.management_fee || 0,
-            reconciliation.order_minimum_fee || 0
+            reconciliation.management_fee || 0
           );
           
           setVisitTotal(calculated.visitFees);

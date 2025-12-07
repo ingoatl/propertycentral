@@ -74,8 +74,7 @@ export const ReconciliationList = () => {
         const { calculateDueFromOwnerFromLineItems } = await import("@/lib/reconciliationCalculations");
         const calculated = calculateDueFromOwnerFromLineItems(
           lineItems || [],
-          rec.management_fee || 0,
-          rec.order_minimum_fee || 0
+          rec.management_fee || 0
         );
 
         return {
