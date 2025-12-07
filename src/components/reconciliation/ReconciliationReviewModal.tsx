@@ -181,17 +181,27 @@ export const ReconciliationReviewModal = ({
           
           return !isVisitRelated;
         })
-        .map((expense: any) => ({
-          reconciliation_id: reconciliationId,
-          item_type: 'expense',
-          item_id: expense.id,
-          description: expense.purpose || expense.category || 'Expense',
-          amount: -(expense.amount || 0),
-          date: expense.date,
-          category: expense.category || 'Other',
-          verified: false,
-          excluded: false
-        }));
+        .map((expense: any) => {
+          // Prefer items_detail for full item names, fallback to purpose
+          let description = expense.items_detail || expense.purpose || expense.category || 'Expense';
+          
+          // If it's a generic description like "1 item from Amazon", try to get more detail
+          if (description.match(/^\d+\s*items?\s*(from|on)\s*amazon/i) && expense.items_detail) {
+            description = expense.items_detail;
+          }
+          
+          return {
+            reconciliation_id: reconciliationId,
+            item_type: 'expense',
+            item_id: expense.id,
+            description,
+            amount: -(expense.amount || 0),
+            date: expense.date,
+            category: expense.category || 'Other',
+            verified: false,
+            excluded: false
+          };
+        });
         
         const { error: insertError } = await supabase
           .from('reconciliation_line_items')

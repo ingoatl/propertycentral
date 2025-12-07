@@ -418,13 +418,13 @@ Return ONLY a JSON object:
   "dueDate": string or null,
   "expenseDetected": boolean,
   "expenseAmount": number or null,
-  "expenseDescription": string or null,
+  "expenseDescription": string or null (CRITICAL: Must contain FULL ITEM NAMES - NEVER say "1 item from Amazon" - instead say "Clorox Toilet Plunger with Hideaway Holder" or "Ring Video Doorbell Wired" - list ALL items purchased with their full product names),
   "orderNumber": string or null (REQUIRED for Amazon),
   "orderDate": string or null (YYYY-MM-DD),
   "trackingNumber": string or null,
   "vendor": string or null,
   "deliveryAddress": string or null (REQUIRED if address in email),
-  "lineItems": array of objects or null (e.g., [{"name": "Sugar In The Raw", "price": 5.99}, {"name": "Throw Pillows", "price": 15.99}])
+  "lineItems": array of objects or null (e.g., [{"name": "Ring Video Doorbell Wired (newest model)", "price": 59.99}, {"name": "BOTHSTAR Keypad Door Knob with Key (2 Pack)", "price": 93.26}])
 }`;
 
     const userPrompt = `Email from: ${senderEmail}
@@ -682,11 +682,19 @@ ANALYZE CAREFULLY - Extract ALL order details including order number and deliver
                 });
             }
           } else {
+            // Build items_detail from lineItems for full item names
+            const itemsDetailFromLineItems = analysis.lineItems 
+              ? analysis.lineItems.map((item: any) => item.name).join(', ')
+              : (parsedData?.items?.map(i => i.name).join(', ') || null);
+            
+            // Use items_detail as purpose for full item descriptions, fallback to AI description
+            const expensePurpose = itemsDetailFromLineItems || analysis.expenseDescription;
+            
             // Create the expense with VALIDATED values
             const expenseData: any = {
               property_id: property.id,
               amount: isReturn ? -Math.abs(validatedAmount) : validatedAmount,
-              purpose: analysis.expenseDescription,
+              purpose: expensePurpose,
               date: analysis.orderDate || emailDate.split('T')[0],
               vendor: analysis.vendor,
               order_number: validatedOrderNumber,
@@ -695,9 +703,7 @@ ANALYZE CAREFULLY - Extract ALL order details including order number and deliver
               delivery_address: analysis.deliveryAddress,
               is_return: isReturn,
               line_items: analysis.lineItems || (parsedData?.items ? { items: parsedData.items } : null),
-              items_detail: analysis.lineItems ? 
-                analysis.lineItems.map((item: any) => `${item.name}: $${item.price}`).join(', ') : 
-                (parsedData?.items?.map(i => `${i.name}: $${i.price}`).join(', ') || null),
+              items_detail: itemsDetailFromLineItems,
             };
             
             const { data: newExpense, error: expenseError } = await supabase
