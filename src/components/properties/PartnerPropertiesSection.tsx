@@ -207,7 +207,7 @@ export const PartnerPropertiesSection = () => {
               <CardDescription className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
                 <MapPin className="w-3 h-3 flex-shrink-0" />
                 <span className="line-clamp-1">
-                  {[property.city, property.state].filter(Boolean).join(", ") || property.address || "No address"}
+                  {property.address || [property.city, property.state].filter(Boolean).join(", ") || "No address"}
                 </span>
               </CardDescription>
             </CardHeader>
