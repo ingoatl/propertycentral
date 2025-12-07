@@ -37,8 +37,25 @@ const PreFillFieldsStep = ({ data, updateData }: Props) => {
     });
   };
 
+  // Fields that should be auto-filled and hidden from the form
+  const AUTO_FILLED_FIELDS = [
+    'property_address', 'address', 'rental_address', 'listing_address',
+    'host_name', 'landlord_name', 'agent_name', 'innkeeper_name',
+    'property_name', 'listing_city', 'city', 'property_city',
+  ];
+
+  // Filter out auto-filled fields from admin fields
+  const isAutoFilledField = (apiId: string) => {
+    return AUTO_FILLED_FIELDS.some(field => 
+      apiId.toLowerCase().includes(field.toLowerCase().replace('_', '')) ||
+      apiId.toLowerCase() === field.toLowerCase()
+    );
+  };
+
   // Separate fields by type
-  const adminFields = data.detectedFields.filter((f) => f.filled_by === "admin" && f.category !== "signature");
+  const adminFields = data.detectedFields.filter(
+    (f) => f.filled_by === "admin" && f.category !== "signature" && !isAutoFilledField(f.api_id)
+  );
   const guestFields = data.detectedFields.filter((f) => f.filled_by === "guest" && f.category !== "signature");
   const signatureFields = data.detectedFields.filter((f) => f.category === "signature");
   
