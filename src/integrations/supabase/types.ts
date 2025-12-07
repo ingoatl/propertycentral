@@ -1178,6 +1178,7 @@ export type Database = {
           created_at: string
           id: string
           owner_name: string
+          partner_property_id: string | null
           progress: number | null
           property_address: string
           property_id: string | null
@@ -1189,6 +1190,7 @@ export type Database = {
           created_at?: string
           id?: string
           owner_name: string
+          partner_property_id?: string | null
           progress?: number | null
           property_address: string
           property_id?: string | null
@@ -1200,6 +1202,7 @@ export type Database = {
           created_at?: string
           id?: string
           owner_name?: string
+          partner_property_id?: string | null
           progress?: number | null
           property_address?: string
           property_id?: string | null
@@ -1208,6 +1211,13 @@ export type Database = {
           webhook_url?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "onboarding_projects_partner_property_id_fkey"
+            columns: ["partner_property_id"]
+            isOneToOne: false
+            referencedRelation: "partner_properties"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "onboarding_projects_property_id_fkey"
             columns: ["property_id"]
