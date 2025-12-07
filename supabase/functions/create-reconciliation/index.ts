@@ -90,13 +90,56 @@ serve(async (req) => {
     const managementFeePercentage = property.management_fee_percentage || 15.00;
     console.log(`Using management fee: ${managementFeePercentage}% for property ${property.name}`);
 
-    // Fetch all bookings for the month
-    const { data: bookings } = await supabaseClient
+    // First fetch mid-term bookings to filter out duplicates from OwnerRez
+    const { data: midTermBookingsEarly } = await supabaseClient
+      .from("mid_term_bookings")
+      .select("*")
+      .eq("property_id", property_id)
+      .eq("status", "active")
+      .lte("start_date", lastDayOfMonth.toISOString().split("T")[0])
+      .gte("end_date", firstDayOfMonth.toISOString().split("T")[0]);
+
+    console.log(`Found ${midTermBookingsEarly?.length || 0} mid-term bookings for duplicate detection`);
+
+    // Fetch all bookings for the month from OwnerRez
+    const { data: allBookings } = await supabaseClient
       .from("ownerrez_bookings")
       .select("*")
       .eq("property_id", property_id)
       .gte("check_in", firstDayOfMonth.toISOString().split("T")[0])
       .lte("check_in", lastDayOfMonth.toISOString().split("T")[0]);
+
+    // Filter out OwnerRez bookings that overlap with mid-term bookings (duplicate detection)
+    // This prevents double-counting when a booking exists in both systems
+    const bookings = (allBookings || []).filter(ownerrezBooking => {
+      const ownerrezStart = new Date(ownerrezBooking.check_in);
+      const ownerrezEnd = new Date(ownerrezBooking.check_out);
+      const ownerrezGuest = (ownerrezBooking.guest_name || "").toLowerCase().trim();
+      
+      // Check if any mid-term booking overlaps with this OwnerRez booking
+      const isDuplicate = (midTermBookingsEarly || []).some(midTerm => {
+        const midTermStart = new Date(midTerm.start_date);
+        const midTermEnd = new Date(midTerm.end_date);
+        const midTermGuest = (midTerm.tenant_name || "").toLowerCase().trim();
+        
+        // Check for date overlap
+        const datesOverlap = ownerrezStart <= midTermEnd && ownerrezEnd >= midTermStart;
+        
+        // Check if guest names are similar (partial match to handle "Kelly Thew" vs "Kelly T")
+        const guestMatch = ownerrezGuest.includes(midTermGuest.split(" ")[0]) || 
+                          midTermGuest.includes(ownerrezGuest.split(" ")[0]);
+        
+        if (datesOverlap && guestMatch) {
+          console.log(`Filtering out OwnerRez booking "${ownerrezBooking.guest_name}" - overlaps with mid-term booking "${midTerm.tenant_name}"`);
+          return true;
+        }
+        return false;
+      });
+      
+      return !isDuplicate;
+    });
+
+    console.log(`Filtered to ${bookings.length} short-term bookings after removing mid-term duplicates`);
 
     // Calculate average nightly rate from bookings for this property
     let calculatedNightlyRate = 0;
@@ -194,17 +237,9 @@ serve(async (req) => {
       })
       .eq("id", property_id);
 
-    // Fetch mid-term bookings that are active during the month
-    // Include bookings that: start during month OR are ongoing (started before and end after/during)
-    const { data: midTermBookings, error: midTermError } = await supabaseClient
-      .from("mid_term_bookings")
-      .select("*")
-      .eq("property_id", property_id)
-      .eq("status", "active")
-      .lte("start_date", lastDayOfMonth.toISOString().split("T")[0])
-      .gte("end_date", firstDayOfMonth.toISOString().split("T")[0]);
-
-    console.log(`Found ${midTermBookings?.length || 0} mid-term bookings for the period`);
+    // Use the mid-term bookings we already fetched earlier for duplicate detection
+    const midTermBookings = midTermBookingsEarly;
+    console.log(`Using ${midTermBookings?.length || 0} mid-term bookings for revenue calculation`);
 
     // Fetch UNBILLED expenses for the reconciliation month only
     const { data: expenses } = await supabaseClient
