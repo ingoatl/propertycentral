@@ -70,7 +70,7 @@ export const ReconciliationReviewModal = ({
         .from("monthly_reconciliations")
         .select(`
           *,
-          properties(id, name, address, management_fee_percentage),
+          properties(id, name, address, management_fee_percentage, order_minimum_fee),
           property_owners(name, email)
         `)
         .eq("id", reconciliationId)
@@ -686,10 +686,23 @@ export const ReconciliationReviewModal = ({
                 <div className="space-y-2">
                   <p className="text-sm font-medium text-muted-foreground mb-3">Amount Due from Owner</p>
                   <div className="space-y-1">
-                    <div className="flex justify-between text-sm">
-                      <span>Management Fee ({reconciliation.properties?.management_fee_percentage || 15}%):</span>
-                      <span className="font-medium">${Number(reconciliation.management_fee || 0).toFixed(2)}</span>
-                    </div>
+                    {(() => {
+                      const percentage = reconciliation.properties?.management_fee_percentage || 15;
+                      const minimumFee = reconciliation.properties?.order_minimum_fee || 0;
+                      const calculatedFee = (reconciliation.total_revenue || 0) * (percentage / 100);
+                      const actualFee = Number(reconciliation.management_fee || 0);
+                      const usedMinimum = minimumFee > 0 && actualFee >= minimumFee && calculatedFee < minimumFee;
+                      
+                      return (
+                        <div className="flex justify-between text-sm">
+                          <span>
+                            Management Fee ({percentage}%)
+                            {usedMinimum && <span className="text-amber-600 ml-1">(min $250)</span>}:
+                          </span>
+                          <span className="font-medium">${actualFee.toFixed(2)}</span>
+                        </div>
+                      );
+                    })()}
                     <div className="flex justify-between text-sm">
                       <span>Visit Fees (approved):</span>
                       <span className="font-medium text-orange-600">${calculated.visitFees.toFixed(2)}</span>
