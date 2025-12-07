@@ -8,10 +8,18 @@ const corsHeaders = {
 
 interface OwnerRezListing {
   property_id: number;
-  name?: string;  // Property name if available
+  name?: string;
   bedroom_count?: number;
   bathroom_count?: number;
   occupancy_max?: number;
+}
+
+interface OwnerRezCharge {
+  id: number;
+  type: string;
+  description?: string;
+  amount: number;
+  surcharge_id?: number;
 }
 
 interface OwnerRezBooking {
@@ -32,6 +40,7 @@ interface OwnerRezBooking {
   total_amount: number;
   status: string;
   type?: string;
+  charges?: OwnerRezCharge[];
 }
 
 interface OwnerRezGuest {
@@ -39,6 +48,82 @@ interface OwnerRezGuest {
   first_name: string;
   last_name: string;
   name?: string;
+}
+
+/**
+ * Parse booking charges to extract fee breakdown
+ * According to agreement: Management fee is calculated on nightly accommodation revenue ONLY
+ * Excludes: cleaning fees, pet fees, early check-in fees, late checkout fees, other ancillary charges
+ */
+function parseBookingCharges(charges: OwnerRezCharge[]): {
+  accommodationRevenue: number;
+  cleaningFee: number;
+  petFee: number;
+  otherFees: number;
+  promotionsDiscount: number;
+} {
+  let accommodationRevenue = 0;
+  let cleaningFee = 0;
+  let petFee = 0;
+  let otherFees = 0;
+  let promotionsDiscount = 0;
+
+  for (const charge of charges || []) {
+    const description = (charge.description || '').toLowerCase();
+    const amount = Number(charge.amount || 0);
+    const chargeType = (charge.type || '').toLowerCase();
+
+    // Handle negative amounts as discounts/promotions
+    if (amount < 0) {
+      promotionsDiscount += Math.abs(amount);
+      console.log(`  Discount/Promotion: -$${Math.abs(amount).toFixed(2)} (${charge.description})`);
+      continue;
+    }
+
+    // Rental/Accommodation charges - this is what management fee is based on
+    if (chargeType === 'rental' || chargeType === 'rent' || 
+        description.includes('nightly') || description.includes('accommodation') ||
+        description.includes('room rate') || description.includes('rental')) {
+      accommodationRevenue += amount;
+      console.log(`  Accommodation: $${amount.toFixed(2)} (${charge.description})`);
+    }
+    // Cleaning fees - pass-through to owner
+    else if (description.includes('clean') || description.includes('housekeeping')) {
+      cleaningFee += amount;
+      console.log(`  Cleaning Fee: $${amount.toFixed(2)} (${charge.description})`);
+    }
+    // Pet fees - pass-through to owner
+    else if (description.includes('pet')) {
+      petFee += amount;
+      console.log(`  Pet Fee: $${amount.toFixed(2)} (${charge.description})`);
+    }
+    // Other fees (early check-in, late checkout, etc.) - these are NOT included in management fee base
+    else if (description.includes('check-in') || description.includes('checkout') ||
+             description.includes('early') || description.includes('late') ||
+             chargeType === 'misc' || chargeType === 'surcharge' || chargeType === 'fee') {
+      otherFees += amount;
+      console.log(`  Other Fee: $${amount.toFixed(2)} (${charge.description})`);
+    }
+    // Default: treat as accommodation if no specific category matches
+    else {
+      // Only add to accommodation if it looks like a primary charge
+      if (chargeType === '' || chargeType === 'charge') {
+        accommodationRevenue += amount;
+        console.log(`  Default → Accommodation: $${amount.toFixed(2)} (${charge.description})`);
+      } else {
+        otherFees += amount;
+        console.log(`  Default → Other: $${amount.toFixed(2)} (${charge.description})`);
+      }
+    }
+  }
+
+  return {
+    accommodationRevenue,
+    cleaningFee,
+    petFee,
+    otherFees,
+    promotionsDiscount
+  };
 }
 
 serve(async (req) => {
@@ -223,13 +308,13 @@ serve(async (req) => {
       console.log('First listing structure:', JSON.stringify(listings[0], null, 2));
     }
 
-    // Fetch ALL bookings from OwnerRez (without filtering by property)
+    // Fetch ALL bookings from OwnerRez WITH CHARGES for fee breakdown
     const startDate = new Date();
     startDate.setMonth(startDate.getMonth() - 12);
     
-    console.log('Fetching all bookings with guest details from OwnerRez...');
+    console.log('Fetching all bookings with guest and charges details from OwnerRez...');
     const allBookingsResponse = await fetch(
-      `https://api.ownerrez.com/v2/bookings?since_utc=${startDate.toISOString()}&expand=guest`,
+      `https://api.ownerrez.com/v2/bookings?since_utc=${startDate.toISOString()}&expand=guest,charges`,
       {
         headers: {
           'Authorization': authHeader,
@@ -253,8 +338,8 @@ serve(async (req) => {
     // Log the first booking structure to see what fields are available
     if (allBookings.length > 0) {
       console.log('First booking structure:', JSON.stringify(allBookings[0], null, 2));
-      if (allBookings[0].guest) {
-        console.log('Guest data embedded in booking:', JSON.stringify(allBookings[0].guest, null, 2));
+      if (allBookings[0].charges) {
+        console.log('Charges data available:', allBookings[0].charges.length, 'charges');
       }
     }
 
@@ -309,6 +394,8 @@ serve(async (req) => {
     let totalSyncedBookings = 0;
     let totalRevenue = 0;
     let totalManagementFees = 0;
+    let totalCleaningFees = 0;
+    let totalPetFees = 0;
 
     // Group bookings by property_id
     const bookingsByProperty = new Map<number, OwnerRezBooking[]>();
@@ -341,17 +428,47 @@ serve(async (req) => {
         const localPropertyId = getLocalPropertyId(propertyName);
 
         console.log(`Processing ${bookings.length} bookings for ${propertyName} (${(managementFeeRate * 100).toFixed(0)}% management fee)`);
-        console.log(`Sample booking - ID: ${bookings[0]?.id}, Total: $${bookings[0]?.total_amount || 0}`);
 
         let listingRevenue = 0;
         let listingManagementFees = 0;
+        let listingCleaningFees = 0;
+        let listingPetFees = 0;
         
         for (const booking of bookings) {
-          const bookingTotal = booking.total_amount || 0;
-          listingRevenue += bookingTotal;
+          console.log(`\nProcessing booking ${booking.id}:`);
           
-          const managementFee = bookingTotal * managementFeeRate;
+          // Parse charges to get fee breakdown
+          const feeBreakdown = parseBookingCharges(booking.charges || []);
+          
+          // WATCHDOG: Validate that breakdown sum matches total_amount (with some tolerance)
+          const breakdownSum = feeBreakdown.accommodationRevenue + feeBreakdown.cleaningFee + 
+                              feeBreakdown.petFee + feeBreakdown.otherFees - feeBreakdown.promotionsDiscount;
+          const totalAmount = booking.total_amount || 0;
+          
+          if (Math.abs(breakdownSum - totalAmount) > 1) {
+            console.warn(`⚠️ SYNC WATCHDOG: Fee breakdown mismatch for booking ${booking.id}`);
+            console.warn(`  Breakdown sum: $${breakdownSum.toFixed(2)}, Total amount: $${totalAmount.toFixed(2)}`);
+            console.warn(`  Difference: $${Math.abs(breakdownSum - totalAmount).toFixed(2)}`);
+            
+            // If no charges data available, use total_amount as accommodation revenue
+            if (!booking.charges || booking.charges.length === 0) {
+              console.log(`  No charges data - using total_amount as accommodation revenue`);
+              feeBreakdown.accommodationRevenue = totalAmount;
+            }
+          }
+          
+          // Management fee is calculated ONLY on accommodation revenue (per agreement)
+          const managementFee = feeBreakdown.accommodationRevenue * managementFeeRate;
+          
+          listingRevenue += totalAmount;
           listingManagementFees += managementFee;
+          listingCleaningFees += feeBreakdown.cleaningFee;
+          listingPetFees += feeBreakdown.petFee;
+
+          console.log(`  Summary: Accommodation=$${feeBreakdown.accommodationRevenue.toFixed(2)}, ` +
+                     `Cleaning=$${feeBreakdown.cleaningFee.toFixed(2)}, Pet=$${feeBreakdown.petFee.toFixed(2)}, ` +
+                     `Other=$${feeBreakdown.otherFees.toFixed(2)}, Discount=$${feeBreakdown.promotionsDiscount.toFixed(2)}`);
+          console.log(`  Management Fee (${(managementFeeRate * 100).toFixed(0)}% of $${feeBreakdown.accommodationRevenue.toFixed(2)}): $${managementFee.toFixed(2)}`);
 
           // Determine guest name - check embedded guest data first, then guest_id lookup
           let guestName: string | null = null;
@@ -362,10 +479,8 @@ serve(async (req) => {
             if (booking.guest) {
               if (booking.guest.name) {
                 guestName = booking.guest.name;
-                console.log(`Booking ${booking.id}: Found embedded guest name "${guestName}"`);
               } else if (booking.guest.first_name || booking.guest.last_name) {
                 guestName = `${booking.guest.first_name || ''} ${booking.guest.last_name || ''}`.trim();
-                console.log(`Booking ${booking.id}: Built guest name "${guestName}" from embedded first/last name`);
               }
             }
             
@@ -378,17 +493,12 @@ serve(async (req) => {
                 } else if (guest.first_name || guest.last_name) {
                   guestName = `${guest.first_name || ''} ${guest.last_name || ''}`.trim();
                 }
-                console.log(`Booking ${booking.id}: Found guest "${guestName}" in map for guest_id ${booking.guest_id}`);
-              } else {
-                console.log(`Booking ${booking.id}: No guest found in map for guest_id ${booking.guest_id}`);
               }
             }
           }
-          
-          console.log(`Booking ${booking.id}: guest_id=${booking.guest_id}, guest_name="${guestName}", type="${booking.type}", status="${booking.status}", has_embedded_guest=${!!booking.guest}`);
 
-          // Upsert booking data with local property ID if available
-          const { data, error } = await supabase
+          // Upsert booking data with fee breakdown
+          const { error } = await supabase
             .from('ownerrez_bookings')
             .upsert({
               property_id: localPropertyId,
@@ -398,7 +508,12 @@ serve(async (req) => {
               guest_name: guestName,
               check_in: booking.arrival,
               check_out: booking.departure,
-              total_amount: bookingTotal,
+              total_amount: totalAmount,
+              accommodation_revenue: feeBreakdown.accommodationRevenue,
+              cleaning_fee: feeBreakdown.cleaningFee,
+              pet_fee: feeBreakdown.petFee,
+              other_fees: feeBreakdown.otherFees,
+              promotions_discount: feeBreakdown.promotionsDiscount,
               management_fee: managementFee,
               booking_status: booking.status,
               sync_date: new Date().toISOString(),
@@ -415,13 +530,26 @@ serve(async (req) => {
         totalSyncedBookings += bookings.length;
         totalRevenue += listingRevenue;
         totalManagementFees += listingManagementFees;
+        totalCleaningFees += listingCleaningFees;
+        totalPetFees += listingPetFees;
 
-        console.log(`Synced ${bookings.length} bookings - Revenue: $${listingRevenue.toFixed(2)}, Mgmt Fees: $${listingManagementFees.toFixed(2)}`);
+        console.log(`\nSynced ${bookings.length} bookings for ${propertyName}:`);
+        console.log(`  Total Revenue: $${listingRevenue.toFixed(2)}`);
+        console.log(`  Management Fees: $${listingManagementFees.toFixed(2)}`);
+        console.log(`  Cleaning Fees (pass-through): $${listingCleaningFees.toFixed(2)}`);
+        console.log(`  Pet Fees (pass-through): $${listingPetFees.toFixed(2)}`);
       } catch (error) {
         console.error(`Error syncing property ${listing.property_id}:`, error);
         continue;
       }
     }
+
+    console.log('\n========== SYNC SUMMARY ==========');
+    console.log(`Total Bookings Synced: ${totalSyncedBookings}`);
+    console.log(`Total Revenue: $${totalRevenue.toFixed(2)}`);
+    console.log(`Total Management Fees: $${totalManagementFees.toFixed(2)}`);
+    console.log(`Total Cleaning Fees (pass-through): $${totalCleaningFees.toFixed(2)}`);
+    console.log(`Total Pet Fees (pass-through): $${totalPetFees.toFixed(2)}`);
 
     return new Response(
       JSON.stringify({ 
@@ -432,6 +560,8 @@ serve(async (req) => {
           totalBookings: totalSyncedBookings,
           totalRevenue: totalRevenue.toFixed(2),
           totalManagementFees: totalManagementFees.toFixed(2),
+          totalCleaningFees: totalCleaningFees.toFixed(2),
+          totalPetFees: totalPetFees.toFixed(2),
         },
       }),
       {

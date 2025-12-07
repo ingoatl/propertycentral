@@ -1380,48 +1380,63 @@ export type Database = {
       }
       ownerrez_bookings: {
         Row: {
+          accommodation_revenue: number | null
           booking_id: string | null
           booking_status: string | null
           check_in: string | null
           check_out: string | null
+          cleaning_fee: number | null
           created_at: string
           guest_name: string | null
           id: string
           management_fee: number
+          other_fees: number | null
           ownerrez_listing_id: string
           ownerrez_listing_name: string
+          pet_fee: number | null
+          promotions_discount: number | null
           property_id: string | null
           sync_date: string
           total_amount: number
           updated_at: string
         }
         Insert: {
+          accommodation_revenue?: number | null
           booking_id?: string | null
           booking_status?: string | null
           check_in?: string | null
           check_out?: string | null
+          cleaning_fee?: number | null
           created_at?: string
           guest_name?: string | null
           id?: string
           management_fee?: number
+          other_fees?: number | null
           ownerrez_listing_id: string
           ownerrez_listing_name: string
+          pet_fee?: number | null
+          promotions_discount?: number | null
           property_id?: string | null
           sync_date?: string
           total_amount?: number
           updated_at?: string
         }
         Update: {
+          accommodation_revenue?: number | null
           booking_id?: string | null
           booking_status?: string | null
           check_in?: string | null
           check_out?: string | null
+          cleaning_fee?: number | null
           created_at?: string
           guest_name?: string | null
           id?: string
           management_fee?: number
+          other_fees?: number | null
           ownerrez_listing_id?: string
           ownerrez_listing_name?: string
+          pet_fee?: number | null
+          promotions_discount?: number | null
           property_id?: string | null
           sync_date?: string
           total_amount?: number
@@ -1999,6 +2014,7 @@ export type Database = {
           description: string
           excluded: boolean | null
           exclusion_reason: string | null
+          fee_type: string | null
           id: string
           item_id: string
           item_type: string
@@ -2018,6 +2034,7 @@ export type Database = {
           description: string
           excluded?: boolean | null
           exclusion_reason?: string | null
+          fee_type?: string | null
           id?: string
           item_id: string
           item_type: string
@@ -2037,6 +2054,7 @@ export type Database = {
           description?: string
           excluded?: boolean | null
           exclusion_reason?: string | null
+          fee_type?: string | null
           id?: string
           item_id?: string
           item_type?: string
