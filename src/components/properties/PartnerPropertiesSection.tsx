@@ -106,7 +106,7 @@ export const PartnerPropertiesSection = () => {
   const [detailsModalOpen, setDetailsModalOpen] = useState(false);
   const [showListingDataView, setShowListingDataView] = useState(false);
   const [creatingProject, setCreatingProject] = useState<string | null>(null);
-  const [selectedWorkflowProject, setSelectedWorkflowProject] = useState<{ id: string; name: string; address: string; projectId: string } | null>(null);
+  const [selectedWorkflowProject, setSelectedWorkflowProject] = useState<{ id: string; name: string; address: string; projectId: string; ownerName: string } | null>(null);
 
   useEffect(() => {
     loadPartnerProperties();
@@ -478,12 +478,13 @@ export const PartnerPropertiesSection = () => {
                           id: property.id,
                           name: property.property_title || "Partner Property",
                           address: displayAddress,
-                          projectId: projectInfo.id
+                          projectId: projectInfo.id,
+                          ownerName: property.contact_name || "MidTermNation Partner"
                         });
                       }}
                     >
                       <ClipboardList className="w-3 h-3 mr-1.5" />
-                      View Listings Tasks
+                      Onboarding
                     </Button>
                   ) : (
                     <Button 
@@ -502,11 +503,11 @@ export const PartnerPropertiesSection = () => {
                     </Button>
                   )}
 
-                  {/* Contact info */}
+                  {/* Owner info from API */}
                   {property.contact_name && (
                     <div className="flex items-center gap-1 text-xs text-muted-foreground truncate pt-1 border-t">
                       <User className="w-3 h-3 flex-shrink-0" />
-                      <span className="truncate">Contact: {property.contact_name}</span>
+                      <span className="truncate">Owner: {property.contact_name}</span>
                     </div>
                   )}
                 </CardContent>
@@ -537,7 +538,7 @@ export const PartnerPropertiesSection = () => {
           }}
           project={{ 
             id: selectedWorkflowProject.projectId, 
-            owner_name: selectedWorkflowProject.name,
+            owner_name: selectedWorkflowProject.ownerName,
             property_address: selectedWorkflowProject.address,
             status: "in-progress",
             progress: 0,
