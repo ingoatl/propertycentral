@@ -5,9 +5,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { WizardData, DetectedField } from "../DocumentCreateWizard";
 import { User, Building, DollarSign, Calendar, Users, Car, Phone, FileCheck, HelpCircle, PenTool, Info } from "lucide-react";
-
 interface Props {
   data: WizardData;
   updateData: (updates: Partial<WizardData>) => void;
@@ -42,7 +42,22 @@ const PreFillFieldsStep = ({ data, updateData }: Props) => {
     'property_address', 'address', 'rental_address', 'listing_address',
     'host_name', 'landlord_name', 'agent_name', 'innkeeper_name',
     'property_name', 'listing_city', 'city', 'property_city',
+    'lease_start', 'start_date', 'check_in_date', 'checkin_date',
+    'lease_end', 'end_date', 'check_out_date', 'checkout_date',
   ];
+  
+  // Fields that need AM/PM time selection
+  const TIME_FIELDS = [
+    'check_in_time', 'checkin_time', 'check_out_time', 'checkout_time',
+    'arrival_time', 'departure_time',
+  ];
+  
+  const isTimeField = (apiId: string) => {
+    return TIME_FIELDS.some(field => 
+      apiId.toLowerCase().includes(field.toLowerCase().replace('_', '')) ||
+      apiId.toLowerCase() === field.toLowerCase()
+    );
+  };
 
   // Filter out auto-filled fields from admin fields
   const isAutoFilledField = (apiId: string) => {
@@ -117,6 +132,57 @@ const PreFillFieldsStep = ({ data, updateData }: Props) => {
             disabled={isGuestField}
             rows={3}
           />
+        </div>
+      );
+    }
+
+    // Time fields with AM/PM selector
+    if (isTimeField(field.api_id)) {
+      const currentValue = (value as string) || "";
+      const timeMatch = currentValue.match(/^(\d{1,2})\s*(AM|PM)?$/i);
+      const hour = timeMatch ? timeMatch[1] : "";
+      const period = timeMatch ? (timeMatch[2]?.toUpperCase() || "") : "";
+      
+      const updateTimeValue = (newHour: string, newPeriod: string) => {
+        if (newHour && newPeriod) {
+          updateFieldValue(field.api_id, `${newHour} ${newPeriod}`);
+        } else if (newHour) {
+          updateFieldValue(field.api_id, newHour);
+        }
+      };
+      
+      return (
+        <div key={field.api_id} className="space-y-2">
+          <Label htmlFor={field.api_id}>
+            {field.label}
+            {isGuestField && <Badge variant="outline" className="ml-2 text-xs">Guest fills</Badge>}
+          </Label>
+          <div className="flex gap-2">
+            <Input
+              id={field.api_id}
+              type="number"
+              min="1"
+              max="12"
+              value={hour}
+              onChange={(e) => updateTimeValue(e.target.value, period)}
+              placeholder="Hour"
+              disabled={isGuestField}
+              className="w-20"
+            />
+            <Select
+              value={period}
+              onValueChange={(newPeriod) => updateTimeValue(hour, newPeriod)}
+              disabled={isGuestField}
+            >
+              <SelectTrigger className="w-24">
+                <SelectValue placeholder="AM/PM" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="AM">AM</SelectItem>
+                <SelectItem value="PM">PM</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
       );
     }

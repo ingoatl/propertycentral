@@ -10,21 +10,26 @@ interface Props {
 }
 
 const GuestInfoStep = ({ data, updateData }: Props) => {
+  // Check if template name contains "innkeeper"
+  const isInnkeeperTemplate = data.templateName?.toLowerCase().includes("innkeeper");
+  
   // Auto-generate document name when guest name or property changes
   useEffect(() => {
+    if (!isInnkeeperTemplate) return;
+    
     const propertyAddress = data.fieldValues.property_address as string || "";
     const guestName = data.guestName || "";
     
-    // Only auto-generate if we have both values and name hasn't been manually customized
-    if (guestName && propertyAddress) {
-      // Format: "Innkeeper Agreement - Guest Name - Property Address"
-      const generatedName = `Innkeeper Agreement - ${guestName} - ${propertyAddress}`;
-      // Only update if the name is empty or still matches a previously generated format
-      if (!data.documentName || data.documentName.startsWith("Innkeeper Agreement - ")) {
-        updateData({ documentName: generatedName });
-      }
+    // Generate name with placeholders or actual values
+    const displayGuestName = guestName || "(Guest Name)";
+    const displayAddress = propertyAddress || "(Property Address)";
+    const generatedName = `Innkeeper Agreement - ${displayGuestName} - ${displayAddress}`;
+    
+    // Update if the name is empty or still matches a previously generated format
+    if (!data.documentName || data.documentName.startsWith("Innkeeper Agreement - ")) {
+      updateData({ documentName: generatedName });
     }
-  }, [data.guestName, data.fieldValues.property_address]);
+  }, [data.guestName, data.fieldValues.property_address, isInnkeeperTemplate]);
 
   return (
     <div className="space-y-6">
