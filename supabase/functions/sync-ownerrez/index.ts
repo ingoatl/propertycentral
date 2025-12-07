@@ -114,10 +114,15 @@ serve(async (req) => {
       }
       
       // Canadian Way Haven (3708 Canadian Way, Tucker, GA 30084) - 20%
-      if (addressLower.includes('canadian way') || addressLower.includes('3708')) {
+      // OwnerRez listing name: "Peaceful 4BR Family Home w/ Fenced Yard/ NearEmory"
+      if (addressLower.includes('canadian way') || addressLower.includes('3708') || addressLower.includes('tucker')) {
         propertyMapping['canadian way haven'] = prop.id;
         propertyMapping['canadian way'] = prop.id;
-        console.log(`Mapped Canadian Way Haven to ${prop.id}`);
+        propertyMapping['peaceful 4br family home'] = prop.id;
+        propertyMapping['peaceful 4br'] = prop.id;
+        propertyMapping['fenced yard'] = prop.id;
+        propertyMapping['nearemory'] = prop.id;
+        console.log(`Mapped Canadian Way Haven / Peaceful 4BR to ${prop.id}`);
       }
     }
 
@@ -146,8 +151,13 @@ serve(async (req) => {
       'smoke hollow': 0.18,
       
       // Canadian Way Haven - 3708 Canadian Way, Tucker, GA 30084
+      // OwnerRez listing: "Peaceful 4BR Family Home w/ Fenced Yard/ NearEmory"
       'canadian way haven': 0.20,
       'canadian way': 0.20,
+      'peaceful 4br family home': 0.20,
+      'peaceful 4br': 0.20,
+      'fenced yard': 0.20,
+      'nearemory': 0.20,
     };
 
     // Function to determine management fee rate based on property name
