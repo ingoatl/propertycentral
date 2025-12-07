@@ -80,21 +80,47 @@ const PropertyLinkStep = ({ data, updateData }: Props) => {
     }
   };
 
+  // Extract city from address string
+  const extractCityFromAddress = (address: string): string => {
+    // Typical format: "123 Main St, City, ST 12345" or "123 Main St, City, State 12345"
+    const parts = address.split(',').map(p => p.trim());
+    if (parts.length >= 2) {
+      // City is usually the second-to-last part (before state/zip)
+      return parts[1] || "";
+    }
+    return "";
+  };
+
   const handlePropertySelect = (propertyId: string) => {
     const actualId = propertyId === "_none" ? null : propertyId;
     const property = actualId ? properties.find((p) => p.id === actualId) : null;
+    const propertyAddress = property?.address || "";
+    const propertyCity = extractCityFromAddress(propertyAddress);
+    
     updateData({
       propertyId: actualId,
       propertyName: property?.name || null,
       bookingId: null,
       fieldValues: {
         ...data.fieldValues,
-        property_address: property?.address || "",
+        // Address fields - all aliases
+        property_address: propertyAddress,
+        address: propertyAddress,
+        rental_address: propertyAddress,
+        listing_address: propertyAddress,
+        // City fields
+        listing_city: propertyCity,
+        city: propertyCity,
+        property_city: propertyCity,
+        // Property name
         property_name: property?.name || "",
+        // Host/Agent fields - always PeachHaus
         host_name: "PeachHaus Group LLC",
         landlord_name: "PeachHaus Group LLC",
         agent_name: "PeachHaus Group LLC",
         innkeeper_name: "PeachHaus Group LLC",
+        management_company: "PeachHaus Group LLC",
+        company_name: "PeachHaus Group LLC",
       },
     });
   };
@@ -120,11 +146,27 @@ const PropertyLinkStep = ({ data, updateData }: Props) => {
           guestEmail: booking.tenant_email || "",
           fieldValues: {
             ...data.fieldValues,
+            // Financial
             monthly_rent: booking.monthly_rent.toString(),
+            rent: booking.monthly_rent.toString(),
+            rent_amount: booking.monthly_rent.toString(),
+            // Dates - formatted
             lease_start_date: formatDateForDisplay(booking.start_date),
             lease_end_date: formatDateForDisplay(booking.end_date),
             start_date: formatDateForDisplay(booking.start_date),
             end_date: formatDateForDisplay(booking.end_date),
+            lease_start: formatDateForDisplay(booking.start_date),
+            lease_end: formatDateForDisplay(booking.end_date),
+            check_in_date: formatDateForDisplay(booking.start_date),
+            check_out_date: formatDateForDisplay(booking.end_date),
+            // Guest info - auto-fill from booking
+            guest_name: booking.tenant_name,
+            tenant_name: booking.tenant_name,
+            renter_name: booking.tenant_name,
+            occupant_name: booking.tenant_name,
+            guest_full_name: booking.tenant_name,
+            guest_email: booking.tenant_email || "",
+            tenant_email: booking.tenant_email || "",
           },
         });
       }

@@ -49,7 +49,20 @@ const GuestInfoStep = ({ data, updateData }: Props) => {
           <Input
             id="guestName"
             value={data.guestName}
-            onChange={(e) => updateData({ guestName: e.target.value })}
+            onChange={(e) => {
+              const newName = e.target.value;
+              updateData({ 
+                guestName: newName,
+                fieldValues: {
+                  ...data.fieldValues,
+                  guest_name: newName,
+                  tenant_name: newName,
+                  renter_name: newName,
+                  occupant_name: newName,
+                  guest_full_name: newName,
+                }
+              });
+            }}
             placeholder="Enter guest's full legal name"
             required
           />
@@ -64,7 +77,19 @@ const GuestInfoStep = ({ data, updateData }: Props) => {
             id="guestEmail"
             type="email"
             value={data.guestEmail}
-            onChange={(e) => updateData({ guestEmail: e.target.value })}
+            onChange={(e) => {
+              const newEmail = e.target.value;
+              updateData({ 
+                guestEmail: newEmail,
+                fieldValues: {
+                  ...data.fieldValues,
+                  guest_email: newEmail,
+                  tenant_email: newEmail,
+                  renter_email: newEmail,
+                  occupant_email: newEmail,
+                }
+              });
+            }}
             placeholder="guest@example.com"
             required
           />

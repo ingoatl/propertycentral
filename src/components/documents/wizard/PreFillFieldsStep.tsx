@@ -44,6 +44,9 @@ const PreFillFieldsStep = ({ data, updateData }: Props) => {
     'property_name', 'listing_city', 'city', 'property_city',
     'lease_start', 'start_date', 'check_in_date', 'checkin_date',
     'lease_end', 'end_date', 'check_out_date', 'checkout_date',
+    // Guest contact info - already collected in Guest Info step
+    'guest_email', 'tenant_email', 'renter_email', 'occupant_email', 'email',
+    'guest_name', 'tenant_name', 'renter_name', 'occupant_name', 'guest_full_name',
   ];
   
   // Fields that need AM/PM time selection
