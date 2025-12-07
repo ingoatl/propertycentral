@@ -1,7 +1,7 @@
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
-import { FileText } from "lucide-react";
+import { FileText, Loader2 } from "lucide-react";
 import { WizardData } from "../DocumentCreateWizard";
 
 interface Props {
@@ -10,6 +10,9 @@ interface Props {
 }
 
 const EditDocumentStep = ({ data, updateData }: Props) => {
+  const hasContent = data.documentContent && data.documentContent.trim().length > 0;
+  const isLoading = data.templateId && !hasContent;
+
   return (
     <div className="space-y-4">
       <div>
@@ -32,12 +35,21 @@ const EditDocumentStep = ({ data, updateData }: Props) => {
       {/* Raw Document Editor */}
       <div className="space-y-2">
         <Label className="text-sm font-medium">Document Text</Label>
-        <Textarea
-          placeholder="Paste or type your document content here..."
-          value={data.documentContent || ""}
-          onChange={(e) => updateData({ documentContent: e.target.value })}
-          className="min-h-[500px] font-mono text-sm leading-relaxed resize-y"
-        />
+        {isLoading ? (
+          <div className="min-h-[500px] border rounded-md flex items-center justify-center bg-muted/30">
+            <div className="flex flex-col items-center gap-2 text-muted-foreground">
+              <Loader2 className="h-6 w-6 animate-spin" />
+              <span className="text-sm">Loading document content...</span>
+            </div>
+          </div>
+        ) : (
+          <Textarea
+            placeholder="Document content will appear here after selecting a template..."
+            value={data.documentContent || ""}
+            onChange={(e) => updateData({ documentContent: e.target.value })}
+            className="min-h-[500px] font-mono text-sm leading-relaxed resize-y"
+          />
+        )}
         <p className="text-xs text-muted-foreground">
           Use placeholders like [[guest_name]], [[property_address]], [[monthly_rent]] for dynamic fields.
         </p>

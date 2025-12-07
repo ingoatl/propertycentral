@@ -12,6 +12,7 @@ interface Template {
   id: string;
   name: string;
   description: string | null;
+  file_path: string;
   is_active: boolean | null;
   field_mappings: DetectedField[] | null;
 }
@@ -86,12 +87,34 @@ const TemplateSelectStep = ({ data, updateData }: Props) => {
       documentName: template.name,
     });
 
+    // Fetch document content for editing
+    toast.info("Loading document content...");
+    try {
+      const { data: response, error } = await supabase.functions.invoke("extract-document-text", {
+        body: { templateId: template.id },
+      });
+      
+      if (error) throw error;
+      
+      if (response?.success && response?.content) {
+        updateData({
+          documentContent: response.content,
+        });
+        toast.success("Document content loaded");
+      } else {
+        console.error("Failed to load document content:", response?.error);
+        toast.error("Could not load document text");
+      }
+    } catch (error) {
+      console.error("Error loading document content:", error);
+      toast.error("Failed to load document content");
+    }
+
     // Check if we already have cached field mappings
     if (template.field_mappings && template.field_mappings.length > 0) {
       updateData({
         detectedFields: template.field_mappings,
       });
-      toast.success(`Loaded ${template.field_mappings.length} fields from template`);
     } else {
       // Analyze the document to detect fields
       toast.info("Analyzing document to detect fields...");
