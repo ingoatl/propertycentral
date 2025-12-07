@@ -1,13 +1,11 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Mail, Send, TestTube, Eye, DollarSign, RotateCcw, CheckCircle2, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format } from "date-fns";
-import { calculateDueFromOwnerFromLineItems } from "@/lib/reconciliationCalculations";
 
 interface MonthlyEmailPreviewModalProps {
   open: boolean;
@@ -90,7 +88,7 @@ export const MonthlyEmailPreviewModal = ({
         console.error("Error fetching owner name:", error);
       }
 
-      // Fetch line items to calculate category totals using shared utility (APPROVED ONLY)
+      // Fetch line items to calculate category totals (APPROVED ONLY)
       try {
         const { data: lineItems, error: itemsError } = await supabase
           .from("reconciliation_line_items")
@@ -99,15 +97,6 @@ export const MonthlyEmailPreviewModal = ({
           .order("date", { ascending: false });
 
         if (!itemsError && lineItems) {
-          const calculated = calculateDueFromOwnerFromLineItems(
-            lineItems,
-            reconciliation.management_fee || 0
-          );
-          
-          setVisitTotal(calculated.visitFees);
-          setExpenseTotal(calculated.totalExpenses);
-          setDueFromOwner(calculated.dueFromOwner);
-          
           // Filter approved items for display
           const approved = lineItems.filter((item: any) => item.verified && !item.excluded);
           
@@ -179,6 +168,28 @@ export const MonthlyEmailPreviewModal = ({
           
           setApprovedVisits(visits);
           setApprovedExpenses(expenses);
+          
+          // ========== CALCULATION WATCHDOG ==========
+          // Calculate totals FROM THE DISPLAYED ITEMS to ensure preview matches what will be sent
+          const displayedVisitTotal = visits.reduce((sum: number, v: any) => sum + Math.abs(v.amount), 0);
+          const displayedExpenseTotal = expenses.reduce((sum: number, e: any) => sum + Math.abs(e.amount), 0);
+          const mgmtFee = reconciliation.management_fee || 0;
+          const calculatedDueFromOwner = mgmtFee + displayedVisitTotal + displayedExpenseTotal;
+          
+          setVisitTotal(displayedVisitTotal);
+          setExpenseTotal(displayedExpenseTotal);
+          setDueFromOwner(calculatedDueFromOwner);
+          
+          // Log watchdog summary for debugging
+          console.log("=== PREVIEW CALCULATION WATCHDOG ===");
+          console.log(`Management Fee: $${mgmtFee.toFixed(2)}`);
+          console.log(`Visit Total (${visits.length} visits): $${displayedVisitTotal.toFixed(2)}`);
+          visits.forEach((v: any, i: number) => console.log(`  └ Visit ${i+1}: ${v.description} = $${Math.abs(v.amount).toFixed(2)}`));
+          console.log(`Expense Total (${expenses.length} expenses): $${displayedExpenseTotal.toFixed(2)}`);
+          expenses.forEach((e: any, i: number) => console.log(`  └ Expense ${i+1}: ${e.description?.substring(0, 40)} = $${Math.abs(e.amount).toFixed(2)}`));
+          console.log(`TOTAL DUE: $${calculatedDueFromOwner.toFixed(2)}`);
+          console.log(`Formula: ${mgmtFee} + ${displayedVisitTotal} + ${displayedExpenseTotal} = ${calculatedDueFromOwner}`);
+          console.log("=====================================");
         }
         
         // Set revenue split
@@ -190,7 +201,7 @@ export const MonthlyEmailPreviewModal = ({
     };
 
     fetchOwnerAndLineItems();
-  }, [reconciliation?.owner_id, reconciliation?.id]);
+  }, [reconciliation?.owner_id, reconciliation?.id, reconciliation?.management_fee]);
 
   const handleSendTestEmail = async () => {
     setIsSendingTest(true);
