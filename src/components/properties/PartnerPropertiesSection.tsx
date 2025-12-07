@@ -23,6 +23,7 @@ import {
 import { toast } from "sonner";
 import { format, addDays } from "date-fns";
 import { PartnerPropertyDetailsModal } from "./PartnerPropertyDetailsModal";
+import { PartnerListingDataModal } from "./PartnerListingDataModal";
 import { WorkflowDialog } from "@/components/onboarding/WorkflowDialog";
 
 interface PartnerProperty {
@@ -104,7 +105,7 @@ export const PartnerPropertiesSection = () => {
   const [listingProjects, setListingProjects] = useState<Record<string, { id: string; progress: number }>>({});
   const [selectedProperty, setSelectedProperty] = useState<PartnerProperty | null>(null);
   const [detailsModalOpen, setDetailsModalOpen] = useState(false);
-  const [showListingDataView, setShowListingDataView] = useState(false);
+  const [listingDataModalOpen, setListingDataModalOpen] = useState(false);
   const [creatingProject, setCreatingProject] = useState<string | null>(null);
   const [selectedWorkflowProject, setSelectedWorkflowProject] = useState<{ id: string; name: string; address: string; projectId: string; ownerName: string } | null>(null);
 
@@ -255,10 +256,14 @@ export const PartnerPropertiesSection = () => {
     }
   };
 
-  const openPropertyDetails = (property: PartnerProperty, showListingData = false) => {
+  const openPropertyDetails = (property: PartnerProperty) => {
     setSelectedProperty(property);
-    setShowListingDataView(showListingData);
     setDetailsModalOpen(true);
+  };
+
+  const openListingData = (property: PartnerProperty) => {
+    setSelectedProperty(property);
+    setListingDataModalOpen(true);
   };
 
   const getSyncStatusBadge = () => {
@@ -457,7 +462,7 @@ export const PartnerPropertiesSection = () => {
                   <Button
                     variant="secondary"
                     size="sm"
-                    onClick={() => openPropertyDetails(property, true)}
+                    onClick={() => openListingData(property)}
                     className="w-full h-8 text-xs"
                   >
                     <Database className="w-3 h-3 mr-1.5" />
@@ -520,11 +525,13 @@ export const PartnerPropertiesSection = () => {
       <PartnerPropertyDetailsModal 
         property={selectedProperty}
         open={detailsModalOpen}
-        onOpenChange={(open) => {
-          setDetailsModalOpen(open);
-          if (!open) setShowListingDataView(false);
-        }}
-        showListingData={showListingDataView}
+        onOpenChange={setDetailsModalOpen}
+      />
+
+      <PartnerListingDataModal
+        property={selectedProperty}
+        open={listingDataModalOpen}
+        onOpenChange={setListingDataModalOpen}
       />
 
       {selectedWorkflowProject && (
