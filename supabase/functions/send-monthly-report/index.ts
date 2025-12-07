@@ -1424,64 +1424,94 @@ State: ${state}
     if (isReconciliationMode && !isTestEmail) {
       // ========== MARK ALL ITEMS AS BILLED ==========
       // Get all approved line items to mark their source records as billed
-      const { data: approvedLineItems } = await supabase
+      const { data: approvedLineItems, error: lineItemsError } = await supabase
         .from("reconciliation_line_items")
         .select("item_id, item_type")
         .eq("reconciliation_id", reconciliation_id)
         .eq("verified", true)
         .eq("excluded", false);
       
+      if (lineItemsError) {
+        console.error("❌ Error fetching line items for billing:", lineItemsError);
+      }
+      
+      console.log(`📋 BILLING WATCHDOG: Found ${approvedLineItems?.length || 0} approved line items to mark as billed`);
+      
       if (approvedLineItems && approvedLineItems.length > 0) {
+        // Log all line items for debugging
+        approvedLineItems.forEach((item: any, idx: number) => {
+          console.log(`  └ Item ${idx + 1}: type=${item.item_type}, id=${item.item_id}`);
+        });
+        
         // Extract unique visit IDs
-        const visitIds = [...new Set(
-          approvedLineItems
-            .filter((item: any) => item.item_type === "visit")
-            .map((item: any) => item.item_id)
-        )];
+        const visitLineItems = approvedLineItems.filter((item: any) => item.item_type === "visit");
+        const visitIds = [...new Set(visitLineItems.map((item: any) => item.item_id))].filter(Boolean);
         
         // Extract unique expense IDs
-        const expenseIds = [...new Set(
-          approvedLineItems
-            .filter((item: any) => item.item_type === "expense")
-            .map((item: any) => item.item_id)
-        )];
+        const expenseLineItems = approvedLineItems.filter((item: any) => item.item_type === "expense");
+        const expenseIds = [...new Set(expenseLineItems.map((item: any) => item.item_id))].filter(Boolean);
+        
+        console.log(`📊 BILLING WATCHDOG: Processing ${visitIds.length} unique visits and ${expenseIds.length} unique expenses`);
+        console.log(`  └ Visit IDs: ${JSON.stringify(visitIds)}`);
+        console.log(`  └ Expense IDs: ${JSON.stringify(expenseIds)}`);
         
         // Mark visits as billed with reconciliation reference
         if (visitIds.length > 0) {
-          const { error: visitError } = await supabase
+          const { data: updatedVisits, error: visitError } = await supabase
             .from("visits")
             .update({ 
               billed: true, 
               reconciliation_id: reconciliation_id 
             })
-            .in("id", visitIds);
+            .in("id", visitIds)
+            .select("id");
           
           if (visitError) {
-            console.error("Error marking visits as billed:", visitError);
+            console.error("❌ Error marking visits as billed:", visitError);
           } else {
-            console.log(`✅ Marked ${visitIds.length} visits as BILLED`);
+            const actuallyUpdated = updatedVisits?.length || 0;
+            console.log(`✅ Marked ${actuallyUpdated} visits as BILLED (requested: ${visitIds.length})`);
+            
+            // WATCHDOG: Check if all visits were marked
+            if (actuallyUpdated !== visitIds.length) {
+              console.warn(`⚠️ BILLING WATCHDOG: Mismatch! Expected to mark ${visitIds.length} visits, but only ${actuallyUpdated} were updated`);
+              console.warn(`  └ Some visit IDs may not exist in visits table`);
+            }
           }
+        } else {
+          console.log("ℹ️ No visits to mark as billed");
         }
         
         // Mark expenses as billed with reconciliation reference
         if (expenseIds.length > 0) {
-          const { error: expenseError } = await supabase
+          const { data: updatedExpenses, error: expenseError } = await supabase
             .from("expenses")
             .update({ 
               billed: true, 
               exported: true,  // Keep legacy field for compatibility
               reconciliation_id: reconciliation_id 
             })
-            .in("id", expenseIds);
+            .in("id", expenseIds)
+            .select("id");
           
           if (expenseError) {
-            console.error("Error marking expenses as billed:", expenseError);
+            console.error("❌ Error marking expenses as billed:", expenseError);
           } else {
-            console.log(`✅ Marked ${expenseIds.length} expenses as BILLED`);
+            const actuallyUpdated = updatedExpenses?.length || 0;
+            console.log(`✅ Marked ${actuallyUpdated} expenses as BILLED (requested: ${expenseIds.length})`);
+            
+            // WATCHDOG: Check if all expenses were marked
+            if (actuallyUpdated !== expenseIds.length) {
+              console.warn(`⚠️ BILLING WATCHDOG: Mismatch! Expected to mark ${expenseIds.length} expenses, but only ${actuallyUpdated} were updated`);
+            }
           }
+        } else {
+          console.log("ℹ️ No expenses to mark as billed");
         }
         
-        console.log(`📧 STATEMENT SENT - Marked as billed: ${visitIds.length} visits, ${expenseIds.length} expenses`);
+        console.log(`📧 STATEMENT SENT - Billing complete for reconciliation ${reconciliation_id}`);
+      } else {
+        console.warn("⚠️ No approved line items found to mark as billed");
       }
 
       // Calculate next month's 5th for deadline using reportDate
