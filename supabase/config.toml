@@ -95,3 +95,6 @@ verify_jwt = true
 
 [functions.signwell-finalize-document]
 verify_jwt = true
+
+[functions.receive-partner-sync]
+verify_jwt = false
