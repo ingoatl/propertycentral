@@ -703,18 +703,51 @@ State: ${state}
       console.error("Error generating AI insights:", error);
     }
 
-    // Calculate total expenses including visits for display
-    // In reconciliation mode, use the calculated totals from line items
-    // In other modes, calculate from arrays
-    const visitExpenses = isReconciliationMode 
-      ? visitTotal 
-      : visits.reduce((sum, v) => sum + Number(v.price), 0);
+    // ========== CALCULATION WATCHDOG ==========
+    // In reconciliation mode, calculate totals DIRECTLY from the arrays that will be displayed
+    // This ensures what we show in the email matches what we calculate
     
-    const otherExpenses = isReconciliationMode 
-      ? expenseTotal 
-      : expenses.reduce((sum, e) => sum + Number(e.amount), 0);
+    let visitExpenses: number;
+    let otherExpenses: number;
     
+    if (isReconciliationMode) {
+      // Calculate visit expenses from the ACTUAL visits array that will be displayed
+      visitExpenses = visits.reduce((sum, v) => sum + Number(v.price || 0), 0);
+      
+      // Calculate expense total from the ACTUAL expenses array that will be displayed
+      otherExpenses = expenses.reduce((sum, e) => sum + Number(e.amount || 0), 0);
+      
+      // WATCHDOG: Compare with line item calculations and log discrepancies
+      if (Math.abs(visitExpenses - visitTotal) > 0.01) {
+        console.error(`🚨 WATCHDOG ALERT: Visit calculation mismatch! Displayed visits sum: $${visitExpenses.toFixed(2)}, Line items sum: $${visitTotal.toFixed(2)}`);
+        console.error(`Visits array has ${visits.length} items, line items had ${visitCount} items`);
+        // Log each visit for debugging
+        visits.forEach((v, i) => console.log(`  Visit ${i+1}: ${v.visited_by} on ${v.date} = $${v.price}`));
+      }
+      
+      if (Math.abs(otherExpenses - expenseTotal) > 0.01) {
+        console.error(`🚨 WATCHDOG ALERT: Expense calculation mismatch! Displayed expenses sum: $${otherExpenses.toFixed(2)}, Line items sum: $${expenseTotal.toFixed(2)}`);
+        console.error(`Expenses array has ${expenses.length} items, line items had ${expenseCount} items`);
+      }
+    } else {
+      visitExpenses = visits.reduce((sum, v) => sum + Number(v.price), 0);
+      otherExpenses = expenses.reduce((sum, e) => sum + Number(e.amount), 0);
+    }
+    
+    // Calculate total from what we will actually DISPLAY
     const totalExpensesWithVisits = otherExpenses + visitExpenses + managementFees + orderMinimumFee;
+
+    // FINAL WATCHDOG: Log individual components for audit
+    console.log("=== CALCULATION WATCHDOG SUMMARY ===");
+    console.log(`Management Fees: $${managementFees.toFixed(2)}`);
+    console.log(`Order Minimum: $${orderMinimumFee.toFixed(2)}`);
+    console.log(`Visit Expenses (${visits.length} visits): $${visitExpenses.toFixed(2)}`);
+    visits.forEach((v, i) => console.log(`  └ Visit ${i+1}: ${v.visited_by} on ${v.date} = $${Number(v.price || 0).toFixed(2)}`));
+    console.log(`Other Expenses (${expenses.length} expenses): $${otherExpenses.toFixed(2)}`);
+    expenses.forEach((e, i) => console.log(`  └ Expense ${i+1}: ${e.purpose?.substring(0, 40)} = $${Number(e.amount || 0).toFixed(2)}`));
+    console.log(`TOTAL SERVICES: $${totalExpensesWithVisits.toFixed(2)}`);
+    console.log(`Formula: ${managementFees} + ${orderMinimumFee} + ${visitExpenses} + ${otherExpenses} = ${totalExpensesWithVisits}`);
+    console.log("=====================================");
 
     console.log("Financial Summary:", {
       propertyId: property.id,
