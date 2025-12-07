@@ -37,6 +37,7 @@ export function calculateDueFromOwnerFromLineItems(
   visitFees: number;
   totalExpenses: number;
   dueFromOwner: number;
+  duplicatesDetected?: number;
   error?: string;
 } {
   try {
@@ -45,13 +46,43 @@ export function calculateDueFromOwnerFromLineItems(
       (item) => item.verified === true && item.excluded === false
     );
 
-    // Calculate visit fees from approved line items
-    const visitFees = approvedItems
+    // WATCHDOG: Detect and log duplicate item_ids
+    const itemIdCounts = new Map<string, number>();
+    approvedItems.forEach((item: any) => {
+      if (item.item_id) {
+        const key = `${item.item_type}:${item.item_id}`;
+        itemIdCounts.set(key, (itemIdCounts.get(key) || 0) + 1);
+      }
+    });
+    
+    let duplicatesDetected = 0;
+    itemIdCounts.forEach((count, key) => {
+      if (count > 1) {
+        duplicatesDetected += count - 1;
+        console.warn(`⚠️ CALCULATION WATCHDOG: Duplicate detected - ${key} appears ${count}x`);
+      }
+    });
+
+    // Deduplicate by item_id for accurate calculation
+    const seenItemIds = new Set<string>();
+    const deduplicatedItems = approvedItems.filter((item: any) => {
+      if (!item.item_id) return true; // Keep items without item_id
+      const key = `${item.item_type}:${item.item_id}`;
+      if (seenItemIds.has(key)) {
+        console.log(`CALCULATION WATCHDOG: Excluding duplicate from calc: ${key}`);
+        return false;
+      }
+      seenItemIds.add(key);
+      return true;
+    });
+
+    // Calculate visit fees from deduplicated line items
+    const visitFees = deduplicatedItems
       .filter((item) => item.item_type === "visit")
       .reduce((sum, item) => sum + Math.abs(item.amount), 0);
 
-    // Calculate expenses from approved line items, filtering out visit-related expenses to avoid double counting
-    const totalExpenses = approvedItems
+    // Calculate expenses from deduplicated line items, filtering out visit-related expenses
+    const totalExpenses = deduplicatedItems
       .filter((item) => {
         if (item.item_type !== "expense") return false;
         
@@ -71,6 +102,7 @@ export function calculateDueFromOwnerFromLineItems(
       visitFees,
       totalExpenses,
       dueFromOwner,
+      duplicatesDetected: duplicatesDetected > 0 ? duplicatesDetected : undefined,
     };
   } catch (error) {
     console.error("Calculation error:", error);

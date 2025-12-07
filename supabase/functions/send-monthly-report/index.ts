@@ -123,17 +123,51 @@ const handler = async (req: Request): Promise<Response> => {
 
       if (itemsCalcError) throw itemsCalcError;
       
-      // Calculate visit total from ALL checked visit line items (regardless of date)
-      visitTotal = (allLineItems || [])
+      // WATCHDOG: Detect and deduplicate line items with same item_id
+      const itemIdCounts = new Map<string, number>();
+      (allLineItems || []).forEach((item: any) => {
+        if (item.item_id) {
+          const key = `${item.item_type}:${item.item_id}`;
+          itemIdCounts.set(key, (itemIdCounts.get(key) || 0) + 1);
+        }
+      });
+      
+      let duplicatesDetected = 0;
+      itemIdCounts.forEach((count, key) => {
+        if (count > 1) {
+          duplicatesDetected += count - 1;
+          console.warn(`⚠️ EMAIL WATCHDOG: Duplicate line item detected - ${key} appears ${count}x`);
+        }
+      });
+      
+      if (duplicatesDetected > 0) {
+        console.warn(`⚠️ EMAIL WATCHDOG: Found ${duplicatesDetected} duplicate line items that will be deduplicated`);
+      }
+      
+      // Deduplicate by item_id for accurate calculation
+      const seenItemIds = new Set<string>();
+      const deduplicatedLineItems = (allLineItems || []).filter((item: any) => {
+        if (!item.item_id) return true;
+        const key = `${item.item_type}:${item.item_id}`;
+        if (seenItemIds.has(key)) {
+          console.log(`EMAIL WATCHDOG: Excluding duplicate from calculation: ${key}`);
+          return false;
+        }
+        seenItemIds.add(key);
+        return true;
+      });
+      
+      // Calculate visit total from deduplicated visit line items
+      visitTotal = deduplicatedLineItems
         .filter((item: any) => item.item_type === "visit")
         .reduce((sum: number, item: any) => sum + Math.abs(item.amount), 0);
-      visitCount = (allLineItems || []).filter((item: any) => item.item_type === "visit").length;
+      visitCount = deduplicatedLineItems.filter((item: any) => item.item_type === "visit").length;
       
-      // Calculate expense total from ALL checked expense line items (no filtering, include all)
-      expenseTotal = (allLineItems || [])
+      // Calculate expense total from deduplicated expense line items
+      expenseTotal = deduplicatedLineItems
         .filter((item: any) => item.item_type === "expense")
         .reduce((sum: number, item: any) => sum + Math.abs(item.amount), 0);
-      expenseCount = (allLineItems || []).filter((item: any) => item.item_type === "expense").length;
+      expenseCount = deduplicatedLineItems.filter((item: any) => item.item_type === "expense").length;
       
       // CORRECT CALCULATION: Include visits as expenses
       netIncome = totalRevenue - managementFees - orderMinimumFee - expenseTotal - visitTotal;
@@ -144,7 +178,8 @@ const handler = async (req: Request): Promise<Response> => {
         orderMinimumFee,
         expenseTotal,
         visitTotal,
-        netIncome
+        netIncome,
+        duplicatesDetected
       });
 
       // Fetch line items for details (only verified and not excluded)
@@ -157,18 +192,32 @@ const handler = async (req: Request): Promise<Response> => {
         .order("date", { ascending: false });
 
       if (itemsError) throw itemsError;
+      
+      // Deduplicate line items by item_id for display
+      const seenDisplayIds = new Set<string>();
+      const deduplicatedDisplayItems = (lineItems || []).filter((item: any) => {
+        if (!item.item_id) return true;
+        const key = `${item.item_type}:${item.item_id}`;
+        if (seenDisplayIds.has(key)) {
+          console.log(`EMAIL WATCHDOG: Excluding duplicate from display: ${item.description}`);
+          return false;
+        }
+        seenDisplayIds.add(key);
+        return true;
+      });
 
       // Fetch actual visit records to get detailed breakdown (hours, visit fee, etc.)
-      const visitLineItems = (lineItems || [])
+      const visitLineItems = deduplicatedDisplayItems
         .filter((item: any) => item.item_type === "visit");
       
-      const visitIds = visitLineItems.map((item: any) => item.item_id);
+      // Get unique visit IDs only
+      const uniqueVisitIds = [...new Set(visitLineItems.map((item: any) => item.item_id))];
       
-      if (visitIds.length > 0) {
+      if (uniqueVisitIds.length > 0) {
         const { data: visitRecords, error: visitError } = await supabase
           .from("visits")
           .select("*, properties!inner(visit_price)")
-          .in("id", visitIds);
+          .in("id", uniqueVisitIds);
         
         if (visitError) {
           console.error("Error fetching visit records:", visitError);
@@ -178,9 +227,11 @@ const handler = async (req: Request): Promise<Response> => {
             date: item.date,
             visited_by: "Staff",
             hours: 0,
-            visit_fee: 0
+            visit_fee: 0,
+            notes: null
           }));
         } else {
+          // Map each unique visit record - no duplicates
           visits = (visitRecords || []).map((v: any) => ({
             id: v.id,
             date: v.date,
@@ -192,27 +243,32 @@ const handler = async (req: Request): Promise<Response> => {
             notes: v.notes,
             description: `Property visit - ${v.visited_by || "Staff"}`
           }));
+          
+          console.log(`EMAIL: Fetched ${visits.length} unique visits (from ${visitLineItems.length} line items)`);
         }
       } else {
         visits = [];
       }
 
       // Fetch detailed expense data with line items for better descriptions
-      const expenseIds = (lineItems || [])
-        .filter((item: any) => item.item_type === "expense")
-        .map((item: any) => item.item_id);
+      // Use unique expense IDs only (from deduplicated list)
+      const uniqueExpenseIds = [...new Set(
+        deduplicatedDisplayItems
+          .filter((item: any) => item.item_type === "expense")
+          .map((item: any) => item.item_id)
+      )];
       
       let detailedExpenses: any[] = [];
-      if (expenseIds.length > 0) {
+      if (uniqueExpenseIds.length > 0) {
         const { data: expenseData } = await supabase
           .from("expenses")
           .select("id, date, amount, purpose, category, vendor, order_number, items_detail, line_items")
-          .in("id", expenseIds);
+          .in("id", uniqueExpenseIds);
         
         detailedExpenses = expenseData || [];
       }
       
-      expenses = (lineItems || [])
+      expenses = deduplicatedDisplayItems
         .filter((item: any) => {
           if (item.item_type !== "expense") return false;
           
@@ -226,6 +282,7 @@ const handler = async (req: Request): Promise<Response> => {
         .map((item: any) => {
           const detailedExpense = detailedExpenses.find((e: any) => e.id === item.item_id);
           return {
+            id: item.item_id,
             date: item.date,
             amount: Math.abs(item.amount),
             purpose: item.description,
@@ -237,9 +294,10 @@ const handler = async (req: Request): Promise<Response> => {
           };
         });
       
+      console.log(`EMAIL: Processing ${expenses.length} unique expenses`);
       expenseCount = expenses.length;
 
-      bookings = (lineItems || [])
+      bookings = deduplicatedDisplayItems
         .filter((item: any) => item.item_type === "booking")
         .map((item: any) => ({
           guest_name: item.description,
@@ -247,7 +305,7 @@ const handler = async (req: Request): Promise<Response> => {
           total_amount: item.amount,
         }));
 
-      midTermBookings = (lineItems || [])
+      midTermBookings = deduplicatedDisplayItems
         .filter((item: any) => item.item_type === "mid_term_booking")
         .map((item: any) => ({
           tenant_name: item.description,

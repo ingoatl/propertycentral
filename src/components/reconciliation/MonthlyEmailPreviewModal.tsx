@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Mail, Send, TestTube, Eye, DollarSign, RotateCcw, CheckCircle2 } from "lucide-react";
+import { Mail, Send, TestTube, Eye, DollarSign, RotateCcw, CheckCircle2, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -18,6 +18,7 @@ interface MonthlyEmailPreviewModalProps {
 
 interface ApprovedLineItem {
   id: string;
+  item_id: string;
   item_type: string;
   description: string;
   amount: number;
@@ -25,6 +26,13 @@ interface ApprovedLineItem {
   category?: string;
   verified: boolean;
   excluded: boolean;
+  notes?: string;
+}
+
+interface DuplicateWarning {
+  type: 'visit' | 'expense';
+  item_id: string;
+  count: number;
 }
 
 export const MonthlyEmailPreviewModal = ({
@@ -43,6 +51,7 @@ export const MonthlyEmailPreviewModal = ({
   const [midTermRevenue, setMidTermRevenue] = useState(0);
   const [approvedVisits, setApprovedVisits] = useState<ApprovedLineItem[]>([]);
   const [approvedExpenses, setApprovedExpenses] = useState<ApprovedLineItem[]>([]);
+  const [duplicateWarnings, setDuplicateWarnings] = useState<DuplicateWarning[]>([]);
 
   useEffect(() => {
     const fetchOwnerAndLineItems = async () => {
@@ -102,11 +111,62 @@ export const MonthlyEmailPreviewModal = ({
           // Filter approved items for display
           const approved = lineItems.filter((item: any) => item.verified && !item.excluded);
           
-          const visits = approved
+          // WATCHDOG: Detect duplicate item_ids (same source item added multiple times)
+          const itemIdCounts = new Map<string, number>();
+          approved.forEach((item: any) => {
+            const key = `${item.item_type}:${item.item_id}`;
+            itemIdCounts.set(key, (itemIdCounts.get(key) || 0) + 1);
+          });
+          
+          const duplicates: DuplicateWarning[] = [];
+          itemIdCounts.forEach((count, key) => {
+            if (count > 1) {
+              const [type, item_id] = key.split(':');
+              duplicates.push({ 
+                type: type as 'visit' | 'expense', 
+                item_id, 
+                count 
+              });
+              console.warn(`⚠️ WATCHDOG: Duplicate line item detected - ${type} ${item_id} appears ${count} times`);
+            }
+          });
+          setDuplicateWarnings(duplicates);
+          
+          // Deduplicate by item_id for display (keep first occurrence only)
+          const seenItemIds = new Set<string>();
+          const deduplicatedApproved = approved.filter((item: any) => {
+            const key = `${item.item_type}:${item.item_id}`;
+            if (seenItemIds.has(key)) {
+              console.log(`WATCHDOG: Filtering out duplicate line item: ${item.description}`);
+              return false;
+            }
+            seenItemIds.add(key);
+            return true;
+          });
+          
+          const visits = deduplicatedApproved
             .filter((item: any) => item.item_type === 'visit')
             .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
           
-          const expenses = approved
+          // Fetch visit notes from the visits table for better display
+          if (visits.length > 0) {
+            const visitIds = visits.map((v: any) => v.item_id);
+            const { data: visitDetails } = await supabase
+              .from("visits")
+              .select("id, notes, visited_by")
+              .in("id", visitIds);
+            
+            if (visitDetails) {
+              visits.forEach((v: any) => {
+                const detail = visitDetails.find((d: any) => d.id === v.item_id);
+                if (detail?.notes) {
+                  v.notes = detail.notes;
+                }
+              });
+            }
+          }
+          
+          const expenses = deduplicatedApproved
             .filter((item: any) => {
               if (item.item_type !== 'expense') return false;
               const desc = (item.description || '').toLowerCase();
@@ -206,6 +266,29 @@ export const MonthlyEmailPreviewModal = ({
         </DialogHeader>
 
         <div className="space-y-6">
+          {/* Watchdog Warning for Duplicates */}
+          {duplicateWarnings.length > 0 && (
+            <Card className="p-4 bg-destructive/10 border-destructive/30">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="w-5 h-5 text-destructive mt-0.5" />
+                <div>
+                  <h4 className="font-semibold text-destructive mb-1">⚠️ Duplicate Line Items Detected</h4>
+                  <p className="text-sm text-destructive/80 mb-2">
+                    The following items appear multiple times in the reconciliation. They have been deduplicated for this preview, 
+                    but you should clean up the database to avoid billing errors.
+                  </p>
+                  <ul className="text-xs space-y-1">
+                    {duplicateWarnings.map((dup, i) => (
+                      <li key={i} className="font-mono">
+                        • {dup.type}: {dup.item_id} (appears {dup.count}x)
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </Card>
+          )}
+
           {/* Live Calculation Summary - Match Review Modal */}
           <Card className="p-4 bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
             <h3 className="font-semibold mb-3 flex items-center gap-2">
@@ -246,12 +329,19 @@ export const MonthlyEmailPreviewModal = ({
                   <Eye className="w-4 h-4" />
                   Visits ({approvedVisits.length})
                 </div>
-                <div className="space-y-1">
+                <div className="space-y-2">
                   {approvedVisits.map((visit) => (
-                    <div key={visit.id} className="flex justify-between text-sm py-1 px-2 bg-muted/30 rounded">
-                      <span className="flex-1">{visit.description}</span>
-                      <span className="text-muted-foreground mr-4">{format(new Date(visit.date + 'T00:00:00'), 'MMM dd')}</span>
-                      <span className="font-medium text-orange-600">${Math.abs(visit.amount).toFixed(2)}</span>
+                    <div key={visit.id} className="p-2 bg-muted/30 rounded border-l-2 border-orange-400">
+                      <div className="flex justify-between text-sm">
+                        <span className="font-medium">{visit.description}</span>
+                        <span className="font-medium text-orange-600">${Math.abs(visit.amount).toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                        <span>{format(new Date(visit.date + 'T00:00:00'), 'MMM dd, yyyy')}</span>
+                      </div>
+                      {visit.notes && (
+                        <p className="text-xs text-muted-foreground mt-1 italic">📝 {visit.notes}</p>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -265,12 +355,17 @@ export const MonthlyEmailPreviewModal = ({
                   <RotateCcw className="w-4 h-4" />
                   Expenses ({approvedExpenses.length})
                 </div>
-                <div className="space-y-1">
+                <div className="space-y-2">
                   {approvedExpenses.map((expense) => (
-                    <div key={expense.id} className="flex justify-between text-sm py-1 px-2 bg-muted/30 rounded">
-                      <span className="flex-1 truncate mr-2">{expense.description}</span>
-                      <span className="text-muted-foreground mr-4">{format(new Date(expense.date + 'T00:00:00'), 'MMM dd')}</span>
-                      <span className="font-medium text-orange-600">${Math.abs(expense.amount).toFixed(2)}</span>
+                    <div key={expense.id} className="p-2 bg-muted/30 rounded border-l-2 border-blue-400">
+                      <div className="flex justify-between text-sm">
+                        <span className="font-medium flex-1 mr-2">{expense.description}</span>
+                        <span className="font-medium text-orange-600">${Math.abs(expense.amount).toFixed(2)}</span>
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        {format(new Date(expense.date + 'T00:00:00'), 'MMM dd, yyyy')}
+                        {expense.category && <span className="ml-2">• {expense.category}</span>}
+                      </div>
                     </div>
                   ))}
                 </div>
