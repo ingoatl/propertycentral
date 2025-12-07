@@ -6,10 +6,44 @@ export interface Property {
   rentalType?: "hybrid" | "mid_term" | "long_term";
   createdAt: string;
   image_path?: string;
-  propertyType?: "Client-Managed" | "Company-Owned" | "Inactive";
+  propertyType?: "Client-Managed" | "Company-Owned" | "Inactive" | "Partner";
   managementFeePercentage?: number;
   nightlyRate?: number;
   orderMinimumFee?: number;
+}
+
+export interface PartnerProperty {
+  id: string;
+  source_id: string;
+  source_system: string;
+  category: string;
+  property_title: string;
+  address: string;
+  city: string;
+  state: string;
+  zip_code: string;
+  property_type: string;
+  property_description: string;
+  bedrooms: number;
+  bathrooms: number;
+  square_footage: number;
+  max_guests: number;
+  featured_image_url: string;
+  gallery_images: string[];
+  amenities: any;
+  monthly_price: number;
+  security_deposit: number;
+  cleaning_fee: number;
+  contact_name: string;
+  contact_email: string;
+  contact_phone: string;
+  pet_policy: string;
+  ical_url: string;
+  existing_listing_url: string;
+  virtual_tour_url: string;
+  status: string;
+  synced_at: string;
+  created_at: string;
 }
 
 export interface PropertyMetrics {

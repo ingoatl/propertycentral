@@ -1459,6 +1459,141 @@ export type Database = {
           },
         ]
       }
+      partner_properties: {
+        Row: {
+          address: string | null
+          amenities: Json | null
+          appliances_included: string[] | null
+          bathrooms: number | null
+          bedrooms: number | null
+          category: string
+          city: string | null
+          cleaning_fee: number | null
+          contact_email: string | null
+          contact_name: string | null
+          contact_phone: string | null
+          created_at: string | null
+          existing_listing_url: string | null
+          featured_image_url: string | null
+          gallery_images: string[] | null
+          ical_url: string | null
+          id: string
+          is_public: boolean | null
+          max_guests: number | null
+          monthly_price: number | null
+          parking_spaces: number | null
+          parking_type: string | null
+          pet_policy: string | null
+          pet_policy_details: string | null
+          property_description: string | null
+          property_title: string | null
+          property_type: string | null
+          security_deposit: number | null
+          services_included: string[] | null
+          slug: string | null
+          source_id: string
+          source_system: string
+          square_footage: number | null
+          state: string | null
+          status: string | null
+          stories: number | null
+          synced_at: string | null
+          updated_at: string | null
+          utilities_included: string[] | null
+          virtual_tour_url: string | null
+          year_built: number | null
+          zip_code: string | null
+        }
+        Insert: {
+          address?: string | null
+          amenities?: Json | null
+          appliances_included?: string[] | null
+          bathrooms?: number | null
+          bedrooms?: number | null
+          category?: string
+          city?: string | null
+          cleaning_fee?: number | null
+          contact_email?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
+          created_at?: string | null
+          existing_listing_url?: string | null
+          featured_image_url?: string | null
+          gallery_images?: string[] | null
+          ical_url?: string | null
+          id?: string
+          is_public?: boolean | null
+          max_guests?: number | null
+          monthly_price?: number | null
+          parking_spaces?: number | null
+          parking_type?: string | null
+          pet_policy?: string | null
+          pet_policy_details?: string | null
+          property_description?: string | null
+          property_title?: string | null
+          property_type?: string | null
+          security_deposit?: number | null
+          services_included?: string[] | null
+          slug?: string | null
+          source_id: string
+          source_system?: string
+          square_footage?: number | null
+          state?: string | null
+          status?: string | null
+          stories?: number | null
+          synced_at?: string | null
+          updated_at?: string | null
+          utilities_included?: string[] | null
+          virtual_tour_url?: string | null
+          year_built?: number | null
+          zip_code?: string | null
+        }
+        Update: {
+          address?: string | null
+          amenities?: Json | null
+          appliances_included?: string[] | null
+          bathrooms?: number | null
+          bedrooms?: number | null
+          category?: string
+          city?: string | null
+          cleaning_fee?: number | null
+          contact_email?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
+          created_at?: string | null
+          existing_listing_url?: string | null
+          featured_image_url?: string | null
+          gallery_images?: string[] | null
+          ical_url?: string | null
+          id?: string
+          is_public?: boolean | null
+          max_guests?: number | null
+          monthly_price?: number | null
+          parking_spaces?: number | null
+          parking_type?: string | null
+          pet_policy?: string | null
+          pet_policy_details?: string | null
+          property_description?: string | null
+          property_title?: string | null
+          property_type?: string | null
+          security_deposit?: number | null
+          services_included?: string[] | null
+          slug?: string | null
+          source_id?: string
+          source_system?: string
+          square_footage?: number | null
+          state?: string | null
+          status?: string | null
+          stories?: number | null
+          synced_at?: string | null
+          updated_at?: string | null
+          utilities_included?: string[] | null
+          virtual_tour_url?: string | null
+          year_built?: number | null
+          zip_code?: string | null
+        }
+        Relationships: []
+      }
       phase_role_assignments: {
         Row: {
           created_at: string
