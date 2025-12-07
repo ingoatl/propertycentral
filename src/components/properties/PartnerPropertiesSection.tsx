@@ -17,11 +17,13 @@ import {
   CheckCircle,
   AlertTriangle,
   Clock,
-  Image as ImageIcon
+  Image as ImageIcon,
+  User
 } from "lucide-react";
 import { toast } from "sonner";
 import { format, addDays } from "date-fns";
 import { PartnerPropertyDetailsModal } from "./PartnerPropertyDetailsModal";
+import { WorkflowDialog } from "@/components/onboarding/WorkflowDialog";
 
 interface PartnerProperty {
   id: string;
@@ -103,6 +105,7 @@ export const PartnerPropertiesSection = () => {
   const [selectedProperty, setSelectedProperty] = useState<PartnerProperty | null>(null);
   const [detailsModalOpen, setDetailsModalOpen] = useState(false);
   const [creatingProject, setCreatingProject] = useState<string | null>(null);
+  const [selectedWorkflowProject, setSelectedWorkflowProject] = useState<{ id: string; name: string; address: string; projectId: string } | null>(null);
 
   useEffect(() => {
     loadPartnerProperties();
@@ -465,7 +468,17 @@ export const PartnerPropertiesSection = () => {
                       variant="default" 
                       size="sm" 
                       className="w-full h-8 text-xs"
-                      onClick={() => window.location.href = `/properties?openWorkflow=${projectInfo.id}`}
+                      onClick={() => {
+                        const displayAddress = property.address || 
+                          [property.city, property.state, property.zip_code].filter(Boolean).join(", ") || 
+                          "Partner Property";
+                        setSelectedWorkflowProject({
+                          id: property.id,
+                          name: property.property_title || "Partner Property",
+                          address: displayAddress,
+                          projectId: projectInfo.id
+                        });
+                      }}
                     >
                       <ClipboardList className="w-3 h-3 mr-1.5" />
                       View Listings Tasks
@@ -489,8 +502,9 @@ export const PartnerPropertiesSection = () => {
 
                   {/* Contact info */}
                   {property.contact_name && (
-                    <div className="text-xs text-muted-foreground truncate pt-1 border-t">
-                      Owner: {property.contact_name}
+                    <div className="flex items-center gap-1 text-xs text-muted-foreground truncate pt-1 border-t">
+                      <User className="w-3 h-3 flex-shrink-0" />
+                      <span className="truncate">Contact: {property.contact_name}</span>
                     </div>
                   )}
                 </CardContent>
@@ -505,6 +519,32 @@ export const PartnerPropertiesSection = () => {
         open={detailsModalOpen}
         onOpenChange={setDetailsModalOpen}
       />
+
+      {selectedWorkflowProject && (
+        <WorkflowDialog
+          open={!!selectedWorkflowProject}
+          onOpenChange={(open) => {
+            if (!open) {
+              setSelectedWorkflowProject(null);
+              loadListingProjects();
+            }
+          }}
+          project={{ 
+            id: selectedWorkflowProject.projectId, 
+            owner_name: selectedWorkflowProject.name,
+            property_address: selectedWorkflowProject.address,
+            status: "in-progress",
+            progress: 0,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          }}
+          propertyId={selectedWorkflowProject.id}
+          propertyName={selectedWorkflowProject.name}
+          propertyAddress={selectedWorkflowProject.address}
+          visitPrice={0}
+          onUpdate={loadListingProjects}
+        />
+      )}
     </>
   );
 };
