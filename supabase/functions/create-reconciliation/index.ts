@@ -288,12 +288,22 @@ serve(async (req) => {
     const totalExpenses = (expenses || []).reduce((sum, e) => sum + (e.amount || 0), 0);
     
     // Management fee calculated from booking revenue (property-specific percentage)
-    const managementFee = totalRevenue * (managementFeePercentage / 100);
+    const calculatedManagementFee = totalRevenue * (managementFeePercentage / 100);
+    
+    // Use the property's order_minimum_fee as a floor for management fee
+    // If the calculated management fee is less than the minimum, use the minimum instead
+    const propertyMinimumFee = property.order_minimum_fee || 0;
+    const managementFee = Math.max(calculatedManagementFee, propertyMinimumFee);
+    const usedMinimumFee = managementFee > calculatedManagementFee;
+    
+    if (usedMinimumFee) {
+      console.log(`Management fee minimum applied: calculated $${calculatedManagementFee.toFixed(2)} < minimum $${propertyMinimumFee}, using $${managementFee}`);
+    }
     
     // Due from Owner = Management Fee + Visit Fees + Expenses (NOT including order_minimum_fee)
     const dueFromOwner = managementFee + visitFees + totalExpenses;
 
-    console.log(`Reconciliation calculation: Short-term: $${shortTermRevenue}, Mid-term: $${midTermRevenue}, Total Revenue: $${totalRevenue}, Visit Fees: $${visitFees}, Expenses: $${totalExpenses}, Management Fee (${managementFeePercentage}%): $${managementFee}, Due from Owner: $${dueFromOwner}`);
+    console.log(`Reconciliation calculation: Short-term: $${shortTermRevenue}, Mid-term: $${midTermRevenue}, Total Revenue: $${totalRevenue}, Visit Fees: $${visitFees}, Expenses: $${totalExpenses}, Management Fee (${managementFeePercentage}%): $${calculatedManagementFee.toFixed(2)}${usedMinimumFee ? ` (min: $${propertyMinimumFee})` : ''}, Final Management Fee: $${managementFee}, Due from Owner: $${dueFromOwner}`);
 
     // Create reconciliation
     const { data: reconciliation, error: recError } = await supabaseClient
