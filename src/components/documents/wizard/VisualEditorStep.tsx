@@ -124,26 +124,35 @@ const VisualEditorStep = ({ data, updateData }: Props) => {
       {/* Fields to Place Summary */}
       <div className="space-y-3">
         <h4 className="font-medium text-sm">Fields to place in the visual editor:</h4>
+        <p className="text-xs text-muted-foreground">
+          In SignWell's editor, drag fields from the left sidebar. <strong>Assign each field to the correct signer</strong> - 
+          Guest fields will have input boxes the guest can type into when signing.
+        </p>
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {/* Guest Fields */}
           <div className="p-3 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200 dark:border-blue-800">
             <div className="flex items-center gap-2 mb-2">
               <User className="h-4 w-4 text-blue-600" />
-              <span className="font-medium text-sm text-blue-800 dark:text-blue-200">Guest (Signer 1)</span>
+              <span className="font-medium text-sm text-blue-800 dark:text-blue-200">Guest (Signer 1) - Can Input</span>
             </div>
+            <p className="text-xs text-blue-600 dark:text-blue-400 mb-2">
+              Assign these to <strong>"Guest"</strong> in SignWell - guest will fill these:
+            </p>
             <ul className="text-xs text-blue-700 dark:text-blue-300 space-y-1">
               {guestSignatureFields.map((f) => (
                 <li key={f.api_id} className="flex items-center gap-1">
-                  {f.type === "signature" ? <PenTool className="h-3 w-3" /> : <span>•</span>}
-                  {f.label}
+                  <PenTool className="h-3 w-3" />
+                  {f.label} <Badge variant="outline" className="text-xs ml-1">Signature</Badge>
                 </li>
               ))}
               {guestTextFields.map((f) => (
-                <li key={f.api_id}>• {f.label}</li>
+                <li key={f.api_id}>
+                  • {f.label} <Badge variant="outline" className="text-xs ml-1">Text Input</Badge>
+                </li>
               ))}
               {guestSignatureFields.length === 0 && guestTextFields.length === 0 && (
-                <li className="text-muted-foreground">No guest fields detected</li>
+                <li className="text-muted-foreground">Add signature + date for guest</li>
               )}
             </ul>
           </div>
@@ -154,15 +163,18 @@ const VisualEditorStep = ({ data, updateData }: Props) => {
               <Building className="h-4 w-4 text-purple-600" />
               <span className="font-medium text-sm text-purple-800 dark:text-purple-200">Host (Signer 2)</span>
             </div>
+            <p className="text-xs text-purple-600 dark:text-purple-400 mb-2">
+              Assign these to <strong>"PeachHaus Group"</strong> in SignWell:
+            </p>
             <ul className="text-xs text-purple-700 dark:text-purple-300 space-y-1">
               {hostSignatureFields.map((f) => (
                 <li key={f.api_id} className="flex items-center gap-1">
-                  {f.type === "signature" ? <PenTool className="h-3 w-3" /> : <span>•</span>}
-                  {f.label}
+                  <PenTool className="h-3 w-3" />
+                  {f.label} <Badge variant="outline" className="text-xs ml-1">Signature</Badge>
                 </li>
               ))}
               {hostSignatureFields.length === 0 && (
-                <li className="text-muted-foreground">No host signature fields detected</li>
+                <li className="text-muted-foreground">Add signature + date for host</li>
               )}
             </ul>
           </div>
