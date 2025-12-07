@@ -949,10 +949,13 @@ export const ReconciliationReviewModal = ({
 };
 
 const LineItemRow = ({ item, onToggleVerified, getIcon, showWarnings = false, visitDetails }: any) => {
-  const isExpense = item.item_type === 'visit' || item.item_type === 'expense' || item.amount < 0;
-  const displayAmount = item.item_type === 'visit' || item.item_type === 'expense' 
+  const isExpense = item.item_type === 'visit' || item.item_type === 'expense' || item.item_type === 'pass_through_fee' || item.amount < 0;
+  const displayAmount = item.item_type === 'visit' || item.item_type === 'expense' || item.item_type === 'pass_through_fee'
     ? Math.abs(item.amount) 
     : item.amount;
+  
+  // Bookings are revenue info, not charges to approve - they should be display-only
+  const isBookingItem = item.item_type === 'booking' || item.item_type === 'mid_term_booking';
   
   // Check if this is a visit-related expense that should be excluded
   const description = (item.description || '').toLowerCase();
@@ -994,11 +997,18 @@ const LineItemRow = ({ item, onToggleVerified, getIcon, showWarnings = false, vi
       isVisitRelatedExpense ? 'border-red-300 bg-red-50/50 dark:bg-red-950/20' : 
       hasWarning ? 'border-amber-300 bg-amber-50/50 dark:bg-amber-950/20' : ''
     } ${item.excluded ? 'opacity-50' : ''}`}>
-      <Checkbox
-        checked={item.verified}
-        onCheckedChange={() => onToggleVerified(item.id, item.verified)}
-        disabled={item.excluded}
-      />
+      {/* Bookings are display-only (revenue info), other items have approval checkbox */}
+      {isBookingItem ? (
+        <div className="w-4 h-4 flex items-center justify-center text-green-600" title="Booking revenue (no approval needed)">
+          <Check className="w-4 h-4" />
+        </div>
+      ) : (
+        <Checkbox
+          checked={item.verified}
+          onCheckedChange={() => onToggleVerified(item.id, item.verified)}
+          disabled={item.excluded}
+        />
+      )}
       <div className="flex items-center gap-2 text-muted-foreground">
         {getIcon(item.item_type)}
       </div>
