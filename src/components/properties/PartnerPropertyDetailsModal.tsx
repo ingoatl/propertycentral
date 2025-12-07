@@ -2,15 +2,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Bed, Bath, Square, Users, Car, Building, DollarSign, 
-  Mail, Phone, User, PawPrint, ExternalLink, MapPin,
-  Wifi, Tv, Wind, Droplets, Flame, Zap, FileText, Database, Copy, Check
+  Mail, Phone, User, PawPrint, ExternalLink, MapPin
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useState } from "react";
-import { toast } from "sonner";
 
 interface PartnerProperty {
   id: string;
@@ -53,17 +49,13 @@ interface PartnerPropertyDetailsModalProps {
   property: PartnerProperty | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  showListingData?: boolean;
 }
 
 export function PartnerPropertyDetailsModal({ 
   property, 
   open, 
-  onOpenChange,
-  showListingData = false
+  onOpenChange
 }: PartnerPropertyDetailsModalProps) {
-  const [copiedField, setCopiedField] = useState<string | null>(null);
-  
   if (!property) return null;
 
   const formatCurrency = (amount: number | null) => {
@@ -88,50 +80,10 @@ export function PartnerPropertyDetailsModal({
       ? Object.values(property.amenities).flat()
       : [];
 
-  const copyToClipboard = (value: string, fieldName: string) => {
-    navigator.clipboard.writeText(value);
-    setCopiedField(fieldName);
-    toast.success(`${fieldName} copied to clipboard`);
-    setTimeout(() => setCopiedField(null), 2000);
-  };
-
-  // Listing data items for quick copy
-  const listingDataItems = [
-    { label: "Property Title", value: property.property_title },
-    { label: "Full Address", value: property.address || [property.city, property.state, property.zip_code].filter(Boolean).join(", ") },
-    { label: "City", value: property.city },
-    { label: "State", value: property.state },
-    { label: "Zip Code", value: property.zip_code },
-    { label: "Property Type", value: property.property_type },
-    { label: "Bedrooms", value: property.bedrooms?.toString() },
-    { label: "Bathrooms", value: property.bathrooms?.toString() },
-    { label: "Square Footage", value: property.square_footage?.toLocaleString() },
-    { label: "Max Guests", value: property.max_guests?.toString() },
-    { label: "Stories", value: property.stories?.toString() },
-    { label: "Parking Spaces", value: property.parking_spaces?.toString() },
-    { label: "Parking Type", value: property.parking_type },
-    { label: "Year Built", value: property.year_built?.toString() },
-    { label: "Monthly Rent", value: property.monthly_price ? `$${property.monthly_price.toLocaleString()}` : null },
-    { label: "Security Deposit", value: property.security_deposit ? `$${property.security_deposit.toLocaleString()}` : null },
-    { label: "Cleaning Fee", value: property.cleaning_fee ? `$${property.cleaning_fee.toLocaleString()}` : null },
-    { label: "Pet Policy", value: property.pet_policy },
-    { label: "Pet Details", value: property.pet_policy_details },
-    { label: "Description", value: property.property_description },
-    { label: "Amenities", value: amenitiesList.length > 0 ? amenitiesList.join(", ") : null },
-    { label: "Services Included", value: property.services_included?.join(", ") },
-    { label: "Utilities Included", value: property.utilities_included?.join(", ") },
-    { label: "Appliances Included", value: property.appliances_included?.join(", ") },
-    { label: "Contact Name", value: property.contact_name },
-    { label: "Contact Email", value: property.contact_email },
-    { label: "Contact Phone", value: property.contact_phone },
-    { label: "Existing Listing URL", value: property.existing_listing_url },
-    { label: "Virtual Tour URL", value: property.virtual_tour_url },
-  ].filter(item => item.value);
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh] p-0">
-        <DialogHeader className="p-6 pb-2">
+        <DialogHeader className="p-6 pb-4">
           <DialogTitle className="text-xl font-semibold">
             {property.property_title || "Partner Property Details"}
           </DialogTitle>
@@ -141,23 +93,8 @@ export function PartnerPropertyDetailsModal({
           </div>
         </DialogHeader>
         
-        <Tabs defaultValue={showListingData ? "listing-data" : "details"} className="w-full">
-          <div className="px-6">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="details" className="gap-2">
-                <FileText className="w-4 h-4" />
-                Property Details
-              </TabsTrigger>
-              <TabsTrigger value="listing-data" className="gap-2">
-                <Database className="w-4 h-4" />
-                Listing Data
-              </TabsTrigger>
-            </TabsList>
-          </div>
-
-          <TabsContent value="details" className="mt-0">
-            <ScrollArea className="max-h-[calc(90vh-180px)]">
-              <div className="p-6 pt-4 space-y-6">
+        <ScrollArea className="max-h-[calc(90vh-120px)]">
+          <div className="p-6 pt-0 space-y-6">
             {/* Featured Image & Gallery */}
             {property.featured_image_url && (
               <div className="space-y-3">
@@ -393,14 +330,14 @@ export function PartnerPropertyDetailsModal({
             {/* Contact Information */}
             <div>
               <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
-                Contact Information
+                Owner Information
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {property.contact_name && (
                   <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg">
                     <User className="w-4 h-4 text-primary" />
                     <div>
-                      <p className="text-xs text-muted-foreground">Contact</p>
+                      <p className="text-xs text-muted-foreground">Owner</p>
                       <p className="font-medium text-sm">{property.contact_name}</p>
                     </div>
                   </div>
@@ -459,83 +396,8 @@ export function PartnerPropertyDetailsModal({
                 Last synced: {formatDate(property.synced_at)} • Status: <Badge variant="secondary" className="text-xs ml-1">{property.status || "active"}</Badge>
               </p>
             </div>
-              </div>
-            </ScrollArea>
-          </TabsContent>
-
-          <TabsContent value="listing-data" className="mt-0">
-            <ScrollArea className="max-h-[calc(90vh-180px)]">
-              <div className="p-6 pt-4 space-y-4">
-                <div className="flex items-center justify-between mb-4">
-                  <p className="text-sm text-muted-foreground">
-                    Click any field to copy its value to clipboard for listing platforms.
-                  </p>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      const allText = listingDataItems.map(item => `${item.label}: ${item.value}`).join("\n");
-                      navigator.clipboard.writeText(allText);
-                      toast.success("All listing data copied!");
-                    }}
-                  >
-                    <Copy className="w-3 h-3 mr-1.5" />
-                    Copy All
-                  </Button>
-                </div>
-
-                <div className="grid gap-2">
-                  {listingDataItems.map((item, idx) => (
-                    <div 
-                      key={idx}
-                      className="flex items-center justify-between p-3 bg-muted/50 rounded-lg hover:bg-muted cursor-pointer transition-colors group"
-                      onClick={() => copyToClipboard(item.value!, item.label)}
-                    >
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                          {item.label}
-                        </p>
-                        <p className="text-sm font-medium truncate pr-4">
-                          {item.value}
-                        </p>
-                      </div>
-                      <div className="flex-shrink-0">
-                        {copiedField === item.label ? (
-                          <Check className="w-4 h-4 text-green-600" />
-                        ) : (
-                          <Copy className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Featured Image for reference */}
-                {property.featured_image_url && (
-                  <div className="pt-4 border-t">
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">
-                      Featured Image
-                    </p>
-                    <img 
-                      src={property.featured_image_url} 
-                      alt={property.property_title || "Property"} 
-                      className="w-full h-48 object-cover rounded-lg"
-                    />
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="mt-2 text-xs"
-                      onClick={() => copyToClipboard(property.featured_image_url!, "Image URL")}
-                    >
-                      <Copy className="w-3 h-3 mr-1.5" />
-                      Copy Image URL
-                    </Button>
-                  </div>
-                )}
-              </div>
-            </ScrollArea>
-          </TabsContent>
-        </Tabs>
+          </div>
+        </ScrollArea>
       </DialogContent>
     </Dialog>
   );
