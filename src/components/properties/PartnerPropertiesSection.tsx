@@ -104,6 +104,7 @@ export const PartnerPropertiesSection = () => {
   const [listingProjects, setListingProjects] = useState<Record<string, { id: string; progress: number }>>({});
   const [selectedProperty, setSelectedProperty] = useState<PartnerProperty | null>(null);
   const [detailsModalOpen, setDetailsModalOpen] = useState(false);
+  const [showListingDataView, setShowListingDataView] = useState(false);
   const [creatingProject, setCreatingProject] = useState<string | null>(null);
   const [selectedWorkflowProject, setSelectedWorkflowProject] = useState<{ id: string; name: string; address: string; projectId: string } | null>(null);
 
@@ -254,8 +255,9 @@ export const PartnerPropertiesSection = () => {
     }
   };
 
-  const openPropertyDetails = (property: PartnerProperty) => {
+  const openPropertyDetails = (property: PartnerProperty, showListingData = false) => {
     setSelectedProperty(property);
+    setShowListingDataView(showListingData);
     setDetailsModalOpen(true);
   };
 
@@ -455,7 +457,7 @@ export const PartnerPropertiesSection = () => {
                   <Button
                     variant="secondary"
                     size="sm"
-                    onClick={() => openPropertyDetails(property)}
+                    onClick={() => openPropertyDetails(property, true)}
                     className="w-full h-8 text-xs"
                   >
                     <Database className="w-3 h-3 mr-1.5" />
@@ -517,7 +519,11 @@ export const PartnerPropertiesSection = () => {
       <PartnerPropertyDetailsModal 
         property={selectedProperty}
         open={detailsModalOpen}
-        onOpenChange={setDetailsModalOpen}
+        onOpenChange={(open) => {
+          setDetailsModalOpen(open);
+          if (!open) setShowListingDataView(false);
+        }}
+        showListingData={showListingDataView}
       />
 
       {selectedWorkflowProject && (
@@ -543,6 +549,7 @@ export const PartnerPropertiesSection = () => {
           propertyAddress={selectedWorkflowProject.address}
           visitPrice={0}
           onUpdate={loadListingProjects}
+          isPartnerProperty={true}
         />
       )}
     </>

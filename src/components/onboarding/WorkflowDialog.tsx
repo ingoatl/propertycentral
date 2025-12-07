@@ -22,9 +22,10 @@ interface WorkflowDialogProps {
   visitPrice: number;
   onUpdate: () => void;
   taskId?: string;
+  isPartnerProperty?: boolean;
 }
 
-export const WorkflowDialog = ({ open, onOpenChange, project, propertyId, propertyName, propertyAddress, visitPrice, onUpdate, taskId }: WorkflowDialogProps) => {
+export const WorkflowDialog = ({ open, onOpenChange, project, propertyId, propertyName, propertyAddress, visitPrice, onUpdate, taskId, isPartnerProperty = false }: WorkflowDialogProps) => {
   const [tasks, setTasks] = useState<OnboardingTask[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -345,7 +346,7 @@ export const WorkflowDialog = ({ open, onOpenChange, project, propertyId, proper
       <DialogContent className="max-w-6xl max-h-[90vh] max-md:max-w-full max-md:h-screen max-md:p-4" onPointerDownOutside={(e) => e.preventDefault()}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 max-md:text-base md:text-xl">
-            <span className="max-md:hidden">{propertyName} - Onboarding Workflow</span>
+            <span className="max-md:hidden">{propertyName} - {isPartnerProperty ? "Listing Tasks" : "Onboarding Workflow"}</span>
             <span className="md:hidden truncate">{propertyAddress}</span>
           </DialogTitle>
           <div className="flex flex-col gap-2 text-sm text-muted-foreground max-md:hidden">
@@ -353,10 +354,12 @@ export const WorkflowDialog = ({ open, onOpenChange, project, propertyId, proper
               <Building2 className="h-4 w-4" />
               {propertyAddress}
             </div>
-            <div className="flex items-center gap-2">
-              <DollarSign className="h-4 w-4" />
-              Visit Price: ${visitPrice}
-            </div>
+            {!isPartnerProperty && (
+              <div className="flex items-center gap-2">
+                <DollarSign className="h-4 w-4" />
+                Visit Price: ${visitPrice}
+              </div>
+            )}
             {project && (
               <div className="flex items-center gap-2">
                 <span className="font-medium">Status:</span>
@@ -427,6 +430,7 @@ export const WorkflowDialog = ({ open, onOpenChange, project, propertyId, proper
                     searchQuery={searchQuery}
                     taskId={taskId}
                     showMyTasksOnly={showMyTasksOnly}
+                    isPartnerProperty={isPartnerProperty}
                   />
 
                   {showMyTasksOnly && filteredTasks.length === 0 && !searchQuery && (
@@ -443,8 +447,8 @@ export const WorkflowDialog = ({ open, onOpenChange, project, propertyId, proper
                     </div>
                   )}
 
-                  {/* Inspection Card - moved to end */}
-                  <InspectionCard projectId={project.id} />
+                  {/* Inspection Card - only for regular properties */}
+                  {!isPartnerProperty && <InspectionCard projectId={project.id} />}
                 </div>
               )}
             </ScrollArea>
