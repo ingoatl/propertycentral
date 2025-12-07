@@ -63,16 +63,21 @@ export const WorkflowPhases = ({ projectId, tasks, onTaskUpdate, searchQuery = "
 
   const highlightedPhases = getHighlightedPhases();
 
+  // For partner properties, only show Phase 7 (Listings)
+  const phasesToShow = isPartnerProperty 
+    ? ONBOARDING_PHASES.filter(phase => phase.id === 7)
+    : ONBOARDING_PHASES;
+
   return (
     <div className="space-y-4">
-      {ONBOARDING_PHASES.map((phase) => {
+      {phasesToShow.map((phase) => {
         const phaseTasks = tasks.filter(t => t.phase_number === phase.id);
         const completion = getPhaseCompletion(phase.id);
         const isHighlighted = highlightedPhases.has(phase.id);
         const shouldExpand = isHighlighted || expandedPhases.has(phase.id);
 
-        // Skip phases with no tasks when searching, showing "My Tasks" only, OR for partner properties
-        if ((searchQuery || showMyTasksOnly || isPartnerProperty) && phaseTasks.length === 0) {
+        // Skip phases with no tasks when searching or showing "My Tasks" only
+        if ((searchQuery || showMyTasksOnly) && phaseTasks.length === 0) {
           return null;
         }
 
