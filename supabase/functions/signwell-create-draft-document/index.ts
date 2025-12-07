@@ -127,7 +127,30 @@ serve(async (req) => {
           
           // Add common aliases
           if (key === "property_address") {
-            replacements["address"] = value.trim();
+            const addr = value.trim();
+            replacements["address"] = addr;
+            replacements["listing_address"] = addr;
+            
+            // Extract city from address (format: "123 Street, City, State ZIP")
+            const parts = addr.split(",").map(p => p.trim());
+            if (parts.length >= 2) {
+              // City is typically the second-to-last part before state/zip
+              const cityPart = parts.length >= 3 ? parts[1] : parts[0];
+              if (cityPart) {
+                replacements["listing_city"] = cityPart;
+                replacements["city"] = cityPart;
+                replacements["property_city"] = cityPart;
+              }
+              // State is typically the last part (may include ZIP)
+              if (parts.length >= 3) {
+                const stateZip = parts[2].trim();
+                const statePart = stateZip.split(" ")[0];
+                if (statePart) {
+                  replacements["listing_state"] = statePart;
+                  replacements["state"] = statePart;
+                }
+              }
+            }
           }
           if (key === "monthly_rent") {
             const formatted = value.startsWith("$") ? value : `$${value}`;
@@ -175,12 +198,15 @@ serve(async (req) => {
       }
     }
     
-    // Add guest info
+    // Add guest info with all common variations
     if (recipientName) {
       replacements["guest_name"] = recipientName;
+      replacements["guest_full_name"] = recipientName;
       replacements["tenant_name"] = recipientName;
+      replacements["tenant_full_name"] = recipientName;
       replacements["renter_name"] = recipientName;
       replacements["lessee_name"] = recipientName;
+      replacements["occupant_name"] = recipientName;
     }
     if (recipientEmail) {
       replacements["guest_email"] = recipientEmail;
