@@ -611,10 +611,8 @@ export const ReconciliationReviewModal = ({
     reconciliation.management_fee
   );
 
-  // Check for discrepancies
-  const hasDiscrepancy = 
-    Math.abs(reconciliation.visit_fees - calculated.visitFees) > 0.01 ||
-    Math.abs(reconciliation.total_expenses - calculated.totalExpenses) > 0.01;
+  // No longer show mismatch warnings - the Live Financial Calculator is the source of truth
+  // and always calculates from verified line items in real-time
 
   // Split items by verification status - only show expenses and visits in "Needs Approval" (not booking income)
   const unverifiedItems = lineItems.filter((i: any) => !i.verified && i.item_type !== "booking" && i.item_type !== "mid_term_booking");
@@ -650,40 +648,6 @@ export const ReconciliationReviewModal = ({
             <Badge>{format(new Date(reconciliation.reconciliation_month + 'T00:00:00'), "MMMM yyyy")}</Badge>
           </DialogTitle>
         </DialogHeader>
-
-        {hasDiscrepancy && (
-          <Card className="p-4 bg-amber-50 dark:bg-amber-950 border-amber-200 dark:border-amber-800">
-            <div className="flex items-start gap-3">
-              <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5" />
-              <div className="flex-1">
-                <h4 className="font-semibold text-amber-900 dark:text-amber-100 mb-1">Totals Mismatch Detected</h4>
-                <p className="text-sm text-amber-800 dark:text-amber-200 mb-3">
-                  Stored totals don't match line items. Click "Fix Totals" to recalculate from verified items.
-                </p>
-                <div className="grid grid-cols-2 gap-2 text-xs mb-3">
-                  <div>
-                    <p className="text-amber-700 dark:text-amber-300">Stored: ${reconciliation.visit_fees.toFixed(2)} visits, ${reconciliation.total_expenses.toFixed(2)} expenses</p>
-                  </div>
-                  <div>
-                    <p className="text-amber-700 dark:text-amber-300">Calculated: ${calculated.visitFees.toFixed(2)} visits, ${calculated.totalExpenses.toFixed(2)} expenses</p>
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <Button 
-                    size="sm" 
-                    onClick={() => cleanupOrphanedItemsMutation.mutate()}
-                    disabled={cleanupOrphanedItemsMutation.isPending}
-                    variant="outline"
-                    className="bg-white dark:bg-gray-900"
-                  >
-                    <RotateCcw className="w-4 h-4 mr-2" />
-                    {cleanupOrphanedItemsMutation.isPending ? "Checking..." : "Remove Deleted Items"}
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </Card>
-        )}
 
         <Card className="p-6 bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
           <h3 className="font-semibold mb-4 flex items-center gap-2">
