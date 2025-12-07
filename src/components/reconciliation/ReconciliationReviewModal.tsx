@@ -402,8 +402,10 @@ export const ReconciliationReviewModal = ({
 
       return { itemId, newValue: !currentValue };
     },
-    onSuccess: () => {
-      refetch();
+    onSuccess: async () => {
+      // Invalidate and refetch to ensure calculator updates immediately
+      await queryClient.invalidateQueries({ queryKey: ["reconciliation", reconciliationId] });
+      await refetch();
       toast.success("Item status updated");
     },
     onError: () => {
