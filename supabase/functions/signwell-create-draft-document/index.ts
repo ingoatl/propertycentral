@@ -1,10 +1,77 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import JSZip from "https://esm.sh/jszip@3.10.1";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+
+// Replace all [[placeholder]] tags in the DOCX XML content
+function replacePlaceholders(xmlContent: string, replacements: Record<string, string>): string {
+  let result = xmlContent;
+  
+  // First, clean up any Word-split placeholders (Word sometimes splits text across XML tags)
+  // Match patterns like [[field]] that may have XML tags interspersed
+  const placeholderRegex = /\[\[([^\]]+)\]\]/g;
+  
+  // Replace each placeholder with its value
+  for (const [key, value] of Object.entries(replacements)) {
+    // Try multiple formats: [[key]], {{key}}, {key}
+    const patterns = [
+      new RegExp(`\\[\\[${escapeRegex(key)}\\]\\]`, 'gi'),
+      new RegExp(`\\{\\{${escapeRegex(key)}\\}\\}`, 'gi'),
+      new RegExp(`\\{${escapeRegex(key)}\\}`, 'gi'),
+    ];
+    
+    for (const pattern of patterns) {
+      result = result.replace(pattern, escapeXml(value));
+    }
+  }
+  
+  return result;
+}
+
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function escapeXml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
+// Process DOCX file and replace placeholders
+async function processDocx(docxBuffer: ArrayBuffer, replacements: Record<string, string>): Promise<Uint8Array> {
+  const zip = await JSZip.loadAsync(docxBuffer);
+  
+  // Process the main document content
+  const documentXml = await zip.file("word/document.xml")?.async("string");
+  if (documentXml) {
+    const processedXml = replacePlaceholders(documentXml, replacements);
+    zip.file("word/document.xml", processedXml);
+  }
+  
+  // Also process headers and footers
+  const headerFooterFiles = Object.keys(zip.files).filter(
+    name => name.match(/word\/(header|footer)\d*\.xml/)
+  );
+  
+  for (const fileName of headerFooterFiles) {
+    const content = await zip.file(fileName)?.async("string");
+    if (content) {
+      const processedContent = replacePlaceholders(content, replacements);
+      zip.file(fileName, processedContent);
+    }
+  }
+  
+  // Generate the modified DOCX
+  return await zip.generateAsync({ type: "uint8array" });
+}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -48,45 +115,39 @@ serve(async (req) => {
       throw new Error("Template not found");
     }
 
-    // Build placeholder fields array for SignWell text tag replacement
-    // These are used to fill in [[field_name]] text tags in the document
-    const placeholderFields: Array<{ api_id: string; value: string }> = [];
+    // Build replacements object with all variations of field names
+    const replacements: Record<string, string> = {};
     
-    // Add all pre-fill data fields dynamically
+    // Add all pre-fill data fields
     if (preFillData && typeof preFillData === "object") {
       for (const [key, value] of Object.entries(preFillData)) {
         if (value && typeof value === "string" && value.trim()) {
-          // Add the field with its original api_id
-          placeholderFields.push({ api_id: key, value: value.trim() });
+          replacements[key] = value.trim();
           
-          // Also add common aliases for better text tag matching
+          // Add common aliases
           if (key === "property_address") {
-            placeholderFields.push({ api_id: "address", value: value.trim() });
+            replacements["address"] = value.trim();
           }
           if (key === "monthly_rent") {
-            const formattedRent = value.startsWith("$") ? value : `$${value}`;
-            placeholderFields.push({ api_id: "rent_amount", value: formattedRent });
-            placeholderFields.push({ api_id: "rent", value: formattedRent });
-            // Update the original to include $ if needed
-            const idx = placeholderFields.findIndex(f => f.api_id === key);
-            if (idx >= 0) placeholderFields[idx].value = formattedRent;
+            const formatted = value.startsWith("$") ? value : `$${value}`;
+            replacements[key] = formatted;
+            replacements["rent_amount"] = formatted;
+            replacements["rent"] = formatted;
           }
           if (key === "security_deposit") {
-            const formattedDeposit = value.startsWith("$") ? value : `$${value}`;
-            placeholderFields.push({ api_id: "deposit_amount", value: formattedDeposit });
-            placeholderFields.push({ api_id: "deposit", value: formattedDeposit });
-            const idx = placeholderFields.findIndex(f => f.api_id === key);
-            if (idx >= 0) placeholderFields[idx].value = formattedDeposit;
+            const formatted = value.startsWith("$") ? value : `$${value}`;
+            replacements[key] = formatted;
+            replacements["deposit_amount"] = formatted;
+            replacements["deposit"] = formatted;
           }
           if (key === "lease_start_date" || key === "start_date") {
             try {
-              const startDate = new Date(value);
-              if (!isNaN(startDate.getTime())) {
-                const formattedStart = startDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-                placeholderFields.push({ api_id: "start_date", value: formattedStart });
-                placeholderFields.push({ api_id: "lease_start", value: formattedStart });
-                const idx = placeholderFields.findIndex(f => f.api_id === key);
-                if (idx >= 0) placeholderFields[idx].value = formattedStart;
+              const date = new Date(value);
+              if (!isNaN(date.getTime())) {
+                const formatted = date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+                replacements[key] = formatted;
+                replacements["start_date"] = formatted;
+                replacements["lease_start"] = formatted;
               }
             } catch (e) {
               console.log("Could not parse start date:", value);
@@ -94,63 +155,81 @@ serve(async (req) => {
           }
           if (key === "lease_end_date" || key === "end_date") {
             try {
-              const endDate = new Date(value);
-              if (!isNaN(endDate.getTime())) {
-                const formattedEnd = endDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-                placeholderFields.push({ api_id: "end_date", value: formattedEnd });
-                placeholderFields.push({ api_id: "lease_end", value: formattedEnd });
-                const idx = placeholderFields.findIndex(f => f.api_id === key);
-                if (idx >= 0) placeholderFields[idx].value = formattedEnd;
+              const date = new Date(value);
+              if (!isNaN(date.getTime())) {
+                const formatted = date.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+                replacements[key] = formatted;
+                replacements["end_date"] = formatted;
+                replacements["lease_end"] = formatted;
               }
             } catch (e) {
               console.log("Could not parse end date:", value);
             }
           }
           if (key === "brand_name" || key === "property_name") {
-            placeholderFields.push({ api_id: "property_name", value: value.trim() });
-            placeholderFields.push({ api_id: "brand_name", value: value.trim() });
+            replacements["property_name"] = value.trim();
+            replacements["brand_name"] = value.trim();
           }
         }
       }
     }
     
-    // Add guest info fields with aliases
+    // Add guest info
     if (recipientName) {
-      placeholderFields.push({ api_id: "guest_name", value: recipientName });
-      placeholderFields.push({ api_id: "tenant_name", value: recipientName });
-      placeholderFields.push({ api_id: "renter_name", value: recipientName });
-      placeholderFields.push({ api_id: "lessee_name", value: recipientName });
+      replacements["guest_name"] = recipientName;
+      replacements["tenant_name"] = recipientName;
+      replacements["renter_name"] = recipientName;
+      replacements["lessee_name"] = recipientName;
     }
     if (recipientEmail) {
-      placeholderFields.push({ api_id: "guest_email", value: recipientEmail });
-      placeholderFields.push({ api_id: "tenant_email", value: recipientEmail });
-      placeholderFields.push({ api_id: "renter_email", value: recipientEmail });
+      replacements["guest_email"] = recipientEmail;
+      replacements["tenant_email"] = recipientEmail;
+      replacements["renter_email"] = recipientEmail;
     }
     
-    // Add today's date for agreement date fields
+    // Add today's date
     const today = new Date();
     const formattedToday = today.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-    placeholderFields.push({ api_id: "agreement_date", value: formattedToday });
-    placeholderFields.push({ api_id: "todays_date", value: formattedToday });
-    placeholderFields.push({ api_id: "today_date", value: formattedToday });
-    placeholderFields.push({ api_id: "current_date", value: formattedToday });
+    replacements["agreement_date"] = formattedToday;
+    replacements["todays_date"] = formattedToday;
+    replacements["today_date"] = formattedToday;
+    replacements["current_date"] = formattedToday;
 
-    // Remove duplicates by api_id (keep first occurrence)
-    const uniquePlaceholderFields: Array<{ api_id: string; value: string }> = [];
-    const seenApiIds = new Set<string>();
-    for (const field of placeholderFields) {
-      if (!seenApiIds.has(field.api_id)) {
-        seenApiIds.add(field.api_id);
-        uniquePlaceholderFields.push(field);
+    console.log("Replacements to apply:", JSON.stringify(replacements, null, 2));
+
+    // Determine the file URL
+    const fileUrl = template.file_path.startsWith("http")
+      ? template.file_path
+      : `${SUPABASE_URL}/storage/v1/object/public/onboarding-documents/${template.file_path}`;
+    
+    // Check if it's a DOCX file that we can process
+    const isDocx = template.file_path.toLowerCase().endsWith('.docx');
+    let processedFileBase64: string | null = null;
+    
+    if (isDocx && Object.keys(replacements).length > 0) {
+      console.log("Processing DOCX file for placeholder replacement...");
+      
+      // Download the DOCX file
+      const docxResponse = await fetch(fileUrl);
+      if (!docxResponse.ok) {
+        throw new Error(`Failed to download template: ${docxResponse.status}`);
       }
+      
+      const docxBuffer = await docxResponse.arrayBuffer();
+      console.log("Downloaded DOCX, size:", docxBuffer.byteLength);
+      
+      // Process the DOCX and replace placeholders
+      const processedDocx = await processDocx(docxBuffer, replacements);
+      console.log("Processed DOCX, size:", processedDocx.byteLength);
+      
+      // Convert to base64 for SignWell
+      processedFileBase64 = btoa(String.fromCharCode(...processedDocx));
     }
 
-    console.log("Placeholder fields being sent:", JSON.stringify(uniquePlaceholderFields, null, 2));
-
-    // Create document in SignWell with draft mode
+    // Build SignWell payload
     const signwellPayload: Record<string, unknown> = {
       test_mode: false,
-      draft: true, // Create as draft for visual editing
+      draft: true,
       with_signature_page: false,
       reminders: false,
       apply_signing_order: true,
@@ -173,29 +252,37 @@ serve(async (req) => {
           send_email: false,
         },
       ],
-      files: template.signwell_template_id
-        ? undefined
-        : [
-            {
-              // SignWell requires the file name to include the extension
-              name: template.file_path.includes(".")
-                ? `${template.name.trim()}.${template.file_path.split(".").pop()}`
-                : template.name,
-              // Check if file_path is already a full URL or just a relative path
-              file_url: template.file_path.startsWith("http")
-                ? template.file_path
-                : `${SUPABASE_URL}/storage/v1/object/public/onboarding-documents/${template.file_path}`,
-            },
-          ],
-      template_id: template.signwell_template_id || undefined,
     };
     
-    // Add placeholder fields if we have any - this fills in text tags in the document
-    if (uniquePlaceholderFields.length > 0) {
-      signwellPayload.placeholder_fields = uniquePlaceholderFields;
+    // Use processed file or original URL
+    if (processedFileBase64) {
+      signwellPayload.files = [
+        {
+          name: `${template.name.trim()}.docx`,
+          file_base64: processedFileBase64,
+        },
+      ];
+    } else if (template.signwell_template_id) {
+      signwellPayload.template_id = template.signwell_template_id;
+    } else {
+      signwellPayload.files = [
+        {
+          name: template.file_path.includes(".")
+            ? `${template.name.trim()}.${template.file_path.split(".").pop()}`
+            : template.name,
+          file_url: fileUrl,
+        },
+      ];
     }
 
-    console.log("SignWell payload:", JSON.stringify(signwellPayload, null, 2));
+    console.log("SignWell payload (excluding file_base64):", JSON.stringify({
+      ...signwellPayload,
+      files: signwellPayload.files ? (signwellPayload.files as any[]).map((f: any) => ({
+        name: f.name,
+        file_url: f.file_url,
+        has_base64: !!f.file_base64,
+      })) : undefined,
+    }, null, 2));
 
     const signwellResponse = await fetch("https://www.signwell.com/api/v1/documents/", {
       method: "POST",
@@ -238,7 +325,7 @@ serve(async (req) => {
         embedded_edit_url: signwellData.embedded_edit_url,
         is_draft: true,
         status: "draft",
-        field_configuration: { preFillData, guestFields, detectedFields },
+        field_configuration: { preFillData, guestFields, detectedFields, replacementsApplied: Object.keys(replacements) },
         created_by: userId,
       })
       .select()
@@ -254,7 +341,11 @@ serve(async (req) => {
       document_id: docRecord.id,
       action: "draft_created",
       performed_by: userId || "system",
-      metadata: { signwellDocumentId: signwellData.id, fieldsPreFilled: uniquePlaceholderFields.length },
+      metadata: { 
+        signwellDocumentId: signwellData.id, 
+        fieldsReplaced: Object.keys(replacements).length,
+        wasDocxProcessed: !!processedFileBase64,
+      },
     });
 
     return new Response(
