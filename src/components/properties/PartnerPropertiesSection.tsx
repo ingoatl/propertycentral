@@ -219,21 +219,37 @@ export const PartnerPropertiesSection = () => {
 
       if (projectError) throw projectError;
 
-      // Create Phase 7 tasks assigned to Chris
-      const tasks = PHASE_7_TASKS.map((task, index) => ({
-        project_id: project.id,
-        phase_number: 7,
-        phase_title: "Listings & Booking Platforms",
-        title: task.title,
-        field_type: task.field_type,
-        status: "pending",
-        assigned_to: chrisProfile?.first_name || "Chris",
-        assigned_to_uuid: CHRIS_USER_ID,
-        due_date: format(addDays(new Date(), 7 + index), "yyyy-MM-dd"),
-        field_value: task.title.includes("Airbnb") && property.existing_listing_url 
-          ? property.existing_listing_url 
-          : null,
-      }));
+      // Map partner property data to task fields
+      const getFieldValueForTask = (taskTitle: string): string | null => {
+        // Map existing_listing_url to Airbnb task (primary source from MidTermNation)
+        if (taskTitle.includes("Airbnb") && property.existing_listing_url) {
+          return property.existing_listing_url;
+        }
+        // Map virtual_tour_url if available
+        if (taskTitle.includes("PeachHaus Website") && property.virtual_tour_url) {
+          return property.virtual_tour_url;
+        }
+        return null;
+      };
+
+      // Create Phase 7 tasks assigned to Chris with auto-filled values
+      const tasks = PHASE_7_TASKS.map((task, index) => {
+        const fieldValue = getFieldValueForTask(task.title);
+        const hasValue = fieldValue && fieldValue.trim() !== "";
+        
+        return {
+          project_id: project.id,
+          phase_number: 7,
+          phase_title: "Listings & Booking Platforms",
+          title: task.title,
+          field_type: task.field_type,
+          status: hasValue ? "completed" : "pending",
+          assigned_to: chrisProfile?.first_name || "Chris",
+          assigned_to_uuid: CHRIS_USER_ID,
+          due_date: format(addDays(new Date(), 7 + index), "yyyy-MM-dd"),
+          field_value: fieldValue,
+        };
+      });
 
       const { error: tasksError } = await supabase
         .from("onboarding_tasks")
