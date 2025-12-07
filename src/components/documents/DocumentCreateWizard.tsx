@@ -41,10 +41,8 @@ export interface WizardData {
   embeddedEditUrl: string | null;
   guestSigningUrl: string | null;
   hostSigningUrl: string | null;
-  // Edit document content fields
-  additionalTerms: string;
-  customClauses: CustomClause[];
-  internalNotes: string;
+  // Edit document content
+  documentContent: string;
 }
 
 const STEPS = [
@@ -75,9 +73,7 @@ const DocumentCreateWizard = () => {
     embeddedEditUrl: null,
     guestSigningUrl: null,
     hostSigningUrl: null,
-    additionalTerms: "",
-    customClauses: [],
-    internalNotes: "",
+    documentContent: "",
   });
 
   const updateWizardData = (updates: Partial<WizardData>) => {
