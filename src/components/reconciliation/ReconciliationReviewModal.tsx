@@ -515,16 +515,20 @@ export const ReconciliationReviewModal = ({
     const approvedVisits = approvedItems.filter((item: any) => item.item_type === 'visit');
     const approvedExpenses = approvedItems.filter((item: any) => item.item_type === 'expense');
     
-    if (approvedItems.length === 0) {
-      toast.error("You haven't approved any items. Please check at least one item before approving.");
+    // Allow approval with zero items if there are notes (special cases like deposit deductions)
+    if (approvedItems.length === 0 && !notes?.trim()) {
+      toast.error("No items to approve. For special cases (e.g., deposit deductions), please add a note explaining the situation.");
       return;
     }
 
     // Show confirmation with counts
-    const confirmMessage = `You are about to approve this reconciliation with:\n\n` +
-      `• ${approvedVisits.length} visit(s) (will be marked as billed)\n` +
-      `• ${approvedExpenses.length} expense(s) (will be marked as exported)\n\n` +
-      `These items will be included in the owner statement. Continue?`;
+    const isSpecialCase = approvedItems.length === 0 && notes?.trim();
+    const confirmMessage = isSpecialCase 
+      ? `This is a special case with no line items.\n\nNote: ${notes}\n\nApprove this reconciliation?`
+      : `You are about to approve this reconciliation with:\n\n` +
+        `• ${approvedVisits.length} visit(s) (will be marked as billed)\n` +
+        `• ${approvedExpenses.length} expense(s) (will be marked as exported)\n\n` +
+        `These items will be included in the owner statement. Continue?`;
     
     if (!window.confirm(confirmMessage)) {
       return;
