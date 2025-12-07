@@ -275,10 +275,23 @@ const handler = async (req: Request): Promise<Response> => {
       if (uniqueExpenseIds.length > 0) {
         const { data: expenseData } = await supabase
           .from("expenses")
-          .select("id, date, amount, purpose, category, vendor, order_number, items_detail, line_items")
+          .select("id, date, amount, purpose, category, vendor, order_number, items_detail, line_items, file_path")
           .in("id", uniqueExpenseIds);
         
         detailedExpenses = expenseData || [];
+        
+        // Generate signed URLs for receipts
+        for (const expense of detailedExpenses) {
+          if (expense.file_path) {
+            const { data: signedUrlData } = await supabase.storage
+              .from('expense-documents')
+              .createSignedUrl(expense.file_path, 60 * 60 * 24 * 7); // 7 days
+            
+            if (signedUrlData?.signedUrl) {
+              expense.receipt_url = signedUrlData.signedUrl;
+            }
+          }
+        }
       }
       
       expenses = deduplicatedDisplayItems
@@ -298,12 +311,13 @@ const handler = async (req: Request): Promise<Response> => {
             id: item.item_id,
             date: item.date,
             amount: Math.abs(item.amount),
-            purpose: item.description,
-            category: item.category,
+            purpose: detailedExpense?.items_detail || detailedExpense?.purpose || item.description,
+            category: detailedExpense?.category || item.category,
             vendor: detailedExpense?.vendor || (item.description.includes(' - ') ? item.description.split(' - ')[1] : null),
             order_number: detailedExpense?.order_number,
             items_detail: detailedExpense?.items_detail,
             line_items: detailedExpense?.line_items,
+            receipt_url: detailedExpense?.receipt_url,
           };
         });
       
@@ -1027,11 +1041,11 @@ State: ${state}
                           </tr>`;
                         });
                         
-                        // Show total row (use actual expense amount, not sum of line items)
+                        // Show total row with receipt link if available
                         result += `
                         <tr>
                           <td style="padding: 4px 0 10px 20px; color: #2c3e50; font-size: 13px; font-weight: 600; border-bottom: 1px solid #f5f5f5;">
-                            Order Total:
+                            Order Total:${expense.receipt_url ? ` <a href="${expense.receipt_url}" style="color: #FF7F00; text-decoration: underline; font-weight: normal; font-size: 12px; margin-left: 8px;">📎 View Receipt</a>` : ''}
                           </td>
                           <td style="padding: 4px 0 10px 0; color: #2c3e50; font-size: 14px; text-align: right; font-weight: 700; border-bottom: 1px solid #f5f5f5;">$${actualTotal.toFixed(2)}</td>
                         </tr>`;
@@ -1044,6 +1058,12 @@ State: ${state}
                         if (expense.category) detailText += ` (${expense.category})`;
                         if (expense.order_number) detailText += ` [Order #${expense.order_number}]`;
                         
+                        // Add receipt link
+                        let receiptLink = '';
+                        if (expense.receipt_url) {
+                          receiptLink = `<a href="${expense.receipt_url}" style="color: #FF7F00; text-decoration: underline; font-size: 12px; margin-left: 8px;">📎 View Receipt</a>`;
+                        }
+                        
                         let extraDetail = '';
                         if (expense.items_detail) {
                           extraDetail = `
@@ -1055,7 +1075,7 @@ State: ${state}
                         return `
                         <tr>
                           <td style="padding: 10px 0; color: #2c3e50; font-size: 14px; border-bottom: 1px solid #f5f5f5;">
-                            <div>${detailText}</div>
+                            <div>${detailText}${receiptLink}</div>
                             ${extraDetail}
                           </td>
                           <td style="padding: 10px 0; color: #4a4a4a; font-size: 14px; text-align: right; font-weight: 600; border-bottom: 1px solid #f5f5f5; vertical-align: top;">$${Number(expense.amount).toFixed(2)}</td>
