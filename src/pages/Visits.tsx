@@ -308,8 +308,8 @@ const Visits = () => {
       return;
     }
 
-    // Date format validation (YYYY-MM-DD)
-    const visitDate = formData.date.toISOString().split("T")[0];
+    // Date format validation (YYYY-MM-DD) - Use local date to avoid timezone shift
+    const visitDate = `${formData.date.getFullYear()}-${String(formData.date.getMonth() + 1).padStart(2, '0')}-${String(formData.date.getDate()).padStart(2, '0')}`;
     if (!/^\d{4}-\d{2}-\d{2}$/.test(visitDate)) {
       toast.error("Invalid date format. Must be YYYY-MM-DD");
       return;
@@ -364,8 +364,8 @@ const Visits = () => {
         navigator.vibrate(50);
       }
 
-      // Use the selected date from the form
-      const selectedDate = previousFormData.date.toISOString().split("T")[0];
+      // Use the selected date from the form - Use local date to avoid timezone shift
+      const selectedDate = `${previousFormData.date.getFullYear()}-${String(previousFormData.date.getMonth() + 1).padStart(2, '0')}-${String(previousFormData.date.getDate()).padStart(2, '0')}`;
       
       // Insert visit in background
       const { data: insertedVisit, error: visitError } = await supabase
