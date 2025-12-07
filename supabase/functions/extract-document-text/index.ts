@@ -39,17 +39,39 @@ serve(async (req) => {
       );
     }
 
-    // Download the file from storage
-    const { data: fileData, error: downloadError } = await supabase.storage
-      .from("documents")
-      .download(template.file_path);
+    // The file_path might be a full URL or a relative path
+    let fileData: Blob;
+    
+    if (template.file_path.startsWith("http")) {
+      // It's a full URL, fetch directly
+      console.log("Fetching from URL:", template.file_path);
+      const response = await fetch(template.file_path);
+      if (!response.ok) {
+        console.error("Fetch error:", response.status, response.statusText);
+        return new Response(
+          JSON.stringify({ success: false, error: `Failed to fetch document: ${response.statusText}` }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+        );
+      }
+      fileData = await response.blob();
+    } else {
+      // It's a relative path, download from storage
+      // Determine the bucket - templates are in signed-documents bucket
+      const bucketName = template.file_path.includes("templates/") ? "signed-documents" : "documents";
+      console.log("Downloading from bucket:", bucketName, "path:", template.file_path);
+      
+      const { data, error: downloadError } = await supabase.storage
+        .from(bucketName)
+        .download(template.file_path);
 
-    if (downloadError || !fileData) {
-      console.error("Download error:", downloadError);
-      return new Response(
-        JSON.stringify({ success: false, error: "Failed to download document" }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
-      );
+      if (downloadError || !data) {
+        console.error("Download error:", downloadError);
+        return new Response(
+          JSON.stringify({ success: false, error: "Failed to download document" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+        );
+      }
+      fileData = data;
     }
 
     const fileName = template.file_path.toLowerCase();
