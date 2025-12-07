@@ -10,9 +10,10 @@ interface WorkflowPhasesProps {
   searchQuery?: string;
   taskId?: string;
   showMyTasksOnly?: boolean;
+  isPartnerProperty?: boolean;
 }
 
-export const WorkflowPhases = ({ projectId, tasks, onTaskUpdate, searchQuery = "", taskId, showMyTasksOnly = false }: WorkflowPhasesProps) => {
+export const WorkflowPhases = ({ projectId, tasks, onTaskUpdate, searchQuery = "", taskId, showMyTasksOnly = false, isPartnerProperty = false }: WorkflowPhasesProps) => {
   // Start with all phases closed by default
   const [expandedPhases, setExpandedPhases] = useState<Set<number>>(() => 
     new Set()
@@ -70,8 +71,8 @@ export const WorkflowPhases = ({ projectId, tasks, onTaskUpdate, searchQuery = "
         const isHighlighted = highlightedPhases.has(phase.id);
         const shouldExpand = isHighlighted || expandedPhases.has(phase.id);
 
-        // Skip phases with no tasks when searching OR when showing "My Tasks" only
-        if ((searchQuery || showMyTasksOnly) && phaseTasks.length === 0) {
+        // Skip phases with no tasks when searching, showing "My Tasks" only, OR for partner properties
+        if ((searchQuery || showMyTasksOnly || isPartnerProperty) && phaseTasks.length === 0) {
           return null;
         }
 
