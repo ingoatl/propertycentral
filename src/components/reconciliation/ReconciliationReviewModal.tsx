@@ -225,7 +225,93 @@ export const ReconciliationReviewModal = ({
         console.log('No new expenses to add');
       }
 
-      // Fetch unbilled visits for this property
+      // AUTO-ADD VISITS within the reconciliation period (same as expenses)
+      console.log(`Checking for visits between ${startDateStr} and ${endDateStr} for property ${rec.property_id}`);
+      
+      const { data: allVisitsInPeriod, error: autoAddVisitsError } = await supabase
+        .from('visits')
+        .select('*')
+        .eq('property_id', rec.property_id)
+        .gte('date', startDateStr)
+        .lte('date', endDateStr);
+      
+      if (autoAddVisitsError) {
+        console.error('Error fetching visits:', autoAddVisitsError);
+      } else {
+        console.log(`Found ${allVisitsInPeriod?.length || 0} total visits in period`);
+      }
+      
+      const existingVisitLineItemIds = new Set(
+        items?.filter((item: any) => item.item_type === 'visit').map((item: any) => item.item_id) || []
+      );
+      
+      console.log(`Already have ${existingVisitLineItemIds.size} visit line items`);
+      
+      const newVisits = (allVisitsInPeriod || []).filter(
+        (visit: any) => !existingVisitLineItemIds.has(visit.id)
+      );
+      
+      if (newVisits.length > 0) {
+        console.log(`Auto-adding ${newVisits.length} new visit(s):`, newVisits.map(v => ({ id: v.id, price: v.price, date: v.date, visited_by: v.visited_by })));
+        
+        const { data: { user } } = await supabase.auth.getUser();
+        
+        const newVisitLineItems = newVisits.map((visit: any) => ({
+          reconciliation_id: reconciliationId,
+          item_type: 'visit',
+          item_id: visit.id,
+          description: `Property visit${visit.visited_by ? ` - ${visit.visited_by}` : ''}`,
+          amount: -(visit.price || 0),
+          date: visit.date,
+          category: 'Visit Fee',
+          verified: false,
+          excluded: false,
+          source: 'auto_generated',
+          added_by: user?.id
+        }));
+        
+        const { error: insertVisitsError } = await supabase
+          .from('reconciliation_line_items')
+          .insert(newVisitLineItems);
+        
+        if (insertVisitsError) {
+          console.error('Error inserting new visit line items:', insertVisitsError);
+        } else {
+          console.log('Successfully inserted new visit line items');
+          
+          // Update the visit_fees total on the reconciliation
+          const totalNewVisitFees = newVisits.reduce((sum: number, v: any) => sum + (v.price || 0), 0);
+          const currentVisitFees = rec.visit_fees || 0;
+          
+          await supabase
+            .from('monthly_reconciliations')
+            .update({ visit_fees: currentVisitFees + totalNewVisitFees, updated_at: new Date().toISOString() })
+            .eq('id', reconciliationId);
+          
+          // Log in audit trail
+          await supabase.from("reconciliation_audit_log").insert({
+            reconciliation_id: reconciliationId,
+            action: 'visits_added',
+            user_id: user?.id,
+            notes: `Auto-added ${newVisits.length} new visit(s) on modal open`
+          });
+          
+          // Refetch to include new items
+          const { data: updatedItems } = await supabase
+            .from("reconciliation_line_items")
+            .select("*")
+            .eq("reconciliation_id", reconciliationId)
+            .order("date", { ascending: false });
+          
+          if (updatedItems) {
+            items.splice(0, items.length, ...updatedItems);
+          }
+        }
+      } else {
+        console.log('No new visits to add');
+      }
+
+      // Fetch unbilled visits for this property (for display purposes)
       const { data: unbilledVisits, error: visitsError } = await supabase
         .from("visits")
         .select("*")
