@@ -437,18 +437,39 @@ serve(async (req) => {
       });
     }
 
-    // Add order minimum fee as a line item ONLY if there's no mid-term revenue
-    if (orderMinimumFee > 0) {
-      lineItems.push({
-        reconciliation_id: reconciliation.id,
-        item_type: "order_minimum",
-        item_id: reconciliation.id,
-        description: `Monthly Order Minimum Fee (Rate Tier: ${calculatedNightlyRate > 0 ? `$${calculatedNightlyRate.toFixed(2)}/night` : 'No Bookings'})`,
-        amount: -Math.abs(orderMinimumFee), // Negative because it's a deduction
-        date: firstDayOfMonth.toISOString().split("T")[0],
-        category: "Order Minimum Fee",
-      });
+    // ============================================================
+    // WATCHDOG: Order Minimum Fee Logic Validation
+    // ============================================================
+    // The order minimum fee is NEVER a separate line item. It is ONLY used 
+    // as a FLOOR for the management fee calculation.
+    // 
+    // CORRECT LOGIC:
+    // - If no revenue → management fee = order minimum (already applied above)
+    // - If revenue exists but commission < minimum → management fee = minimum (already applied above)
+    // - If commission >= minimum → management fee = commission (already applied above)
+    //
+    // DO NOT add order_minimum as a separate line item - this would double charge owners!
+    // The management fee line item already includes the minimum fee when applicable.
+    // ============================================================
+    
+    // WATCHDOG CHECK: Verify management fee is consistent with business rules
+    const watchdogExpectedFee = Math.max(calculatedManagementFee, orderMinimumFee);
+    if (Math.abs(managementFee - watchdogExpectedFee) > 0.01) {
+      console.error(`⚠️ WATCHDOG VIOLATION: Management fee mismatch! Expected: $${watchdogExpectedFee.toFixed(2)}, Got: $${managementFee.toFixed(2)}`);
     }
+    
+    // WATCHDOG: Ensure order minimum is NEVER added as a line item
+    // This check prevents accidental reintroduction of this bug
+    const hasOrderMinimumLineItem = lineItems.some(item => item.item_type === 'order_minimum');
+    if (hasOrderMinimumLineItem) {
+      console.error(`⚠️ WATCHDOG VIOLATION: Order minimum was added as a line item! Removing it.`);
+      const filteredItems = lineItems.filter(item => item.item_type !== 'order_minimum');
+      lineItems.length = 0;
+      lineItems.push(...filteredItems);
+    }
+    
+    console.log(`WATCHDOG: Management fee verified - calculated: $${calculatedManagementFee.toFixed(2)}, minimum: $${orderMinimumFee}, final: $${managementFee}`);
+    console.log(`WATCHDOG: ${lineItems.length} line items ready (no order_minimum line item - correctly using it as fee floor only)`);
 
     // Create line items with verified: false (manual approval required)
     // Add source tracking and creation metadata
