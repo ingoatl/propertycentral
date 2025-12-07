@@ -1037,6 +1037,7 @@ export type Database = {
           owner_response_deadline: string | null
           property_id: string
           reconciliation_month: string
+          revenue_override: number | null
           reviewed_at: string | null
           reviewed_by: string | null
           short_term_revenue: number | null
@@ -1067,6 +1068,7 @@ export type Database = {
           owner_response_deadline?: string | null
           property_id: string
           reconciliation_month: string
+          revenue_override?: number | null
           reviewed_at?: string | null
           reviewed_by?: string | null
           short_term_revenue?: number | null
@@ -1097,6 +1099,7 @@ export type Database = {
           owner_response_deadline?: string | null
           property_id?: string
           reconciliation_month?: string
+          revenue_override?: number | null
           reviewed_at?: string | null
           reviewed_by?: string | null
           short_term_revenue?: number | null
