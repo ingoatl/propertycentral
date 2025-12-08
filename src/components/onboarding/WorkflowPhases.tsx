@@ -93,6 +93,7 @@ export const WorkflowPhases = ({ projectId, tasks, onTaskUpdate, searchQuery = "
             onTaskUpdate={onTaskUpdate}
             highlighted={isHighlighted}
             projectId={projectId}
+            isPartnerProperty={isPartnerProperty}
           />
         );
       })}
