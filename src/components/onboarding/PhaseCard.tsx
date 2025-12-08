@@ -23,6 +23,7 @@ interface PhaseCardProps {
   onTaskUpdate: () => void;
   highlighted?: boolean;
   projectId: string;
+  isPartnerProperty?: boolean;
 }
 
 export const PhaseCard = ({
@@ -35,6 +36,7 @@ export const PhaseCard = ({
   onTaskUpdate,
   highlighted = false,
   projectId,
+  isPartnerProperty = false,
 }: PhaseCardProps) => {
   const isComplete = completion === 100;
   const [showAddTaskDialog, setShowAddTaskDialog] = useState(false);
@@ -164,6 +166,27 @@ export const PhaseCard = ({
           <CardContent className="space-y-2 pt-0 max-md:space-y-3 max-md:p-5 max-md:pt-0">
             {tasks
               .filter((task) => {
+                // Tasks to hide for ALL properties (Mobile removed everywhere)
+                const globalHiddenTasks = ['Mobile'];
+                if (globalHiddenTasks.includes(task.title)) {
+                  return false;
+                }
+                
+                // Tasks to hide for Partner Properties only
+                const partnerHiddenTasks = [
+                  'Airbnb',
+                  'Airbnb – 1-Year Listing',
+                  'VRBO',
+                  'Booking.com',
+                  'Furnished Finder',
+                  'CHBO (Corporate Housing by Owner)',
+                  'June Homes',
+                  'Direct Booking Page'
+                ];
+                if (isPartnerProperty && partnerHiddenTasks.includes(task.title)) {
+                  return false;
+                }
+                
                 // Admin-only tasks: hide from non-admins
                 const adminOnlyTasks = [
                   'Signed Management Agreement Link',
