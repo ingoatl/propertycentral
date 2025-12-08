@@ -96,32 +96,9 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
     loadAssignedUserName();
   }, [task.assigned_to_uuid, task.assigned_role_id, task.phase_number]);
 
-  // Auto-correct status if task has data but is marked as pending
-  useEffect(() => {
-    const correctStatus = async () => {
-      const hasData = task.field_value || task.file_path;
-      if (hasData && task.status === 'pending') {
-        try {
-          const { data: { user } } = await supabase.auth.getUser();
-          await supabase
-            .from("onboarding_tasks")
-            .update({ 
-              status: 'completed',
-              completed_date: new Date().toISOString(),
-              completed_by: user?.id
-            })
-            .eq("id", task.id);
-          
-          setTaskStatus('completed');
-          onUpdate(); // Refresh to show updated progress
-        } catch (error) {
-          console.error("Failed to correct task status:", error);
-        }
-      }
-    };
-    
-    correctStatus();
-  }, [task.id, task.field_value, task.file_path, task.status, onUpdate]);
+  // REMOVED: Auto-correct status logic was causing bugs where rescheduling a due date 
+  // would auto-mark tasks as completed if they had any data. Tasks should only be 
+  // marked complete when explicitly saved with data, not on every render.
 
   const loadSOP = async () => {
     // Load global SOP for this task by matching title and phase
