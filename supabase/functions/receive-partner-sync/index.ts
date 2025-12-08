@@ -133,7 +133,7 @@ serve(async (req) => {
         console.log(`Successfully synced property: ${property.property_title}`);
         
         // Auto-fill existing onboarding tasks with synced data
-        if (upsertedProperty?.id && property.existing_listing_url) {
+        if (upsertedProperty?.id) {
           // Find onboarding project linked to this partner property
           const { data: linkedProject } = await supabase
             .from('onboarding_projects')
@@ -142,21 +142,37 @@ serve(async (req) => {
             .single();
           
           if (linkedProject) {
-            // Update Airbnb task with the listing URL if empty
-            const { error: updateError } = await supabase
-              .from('onboarding_tasks')
-              .update({ 
-                field_value: property.existing_listing_url,
-                status: 'completed'
-              })
-              .eq('project_id', linkedProject.id)
-              .ilike('title', '%Airbnb%')
-              .or('field_value.is.null,field_value.eq.""');
-            
-            if (updateError) {
-              console.error(`Failed to update Airbnb task for project ${linkedProject.id}:`, updateError);
-            } else {
-              console.log(`Auto-filled Airbnb task for project ${linkedProject.id}`);
+            // Define field mappings: task title pattern -> property value
+            const fieldMappings = [
+              { titlePattern: '%Airbnb%', value: property.existing_listing_url },
+              { titlePattern: '%Year Built%', value: property.year_built?.toString() },
+              { titlePattern: '%Max Occupancy%', value: property.max_guests?.toString() },
+              { titlePattern: '%Square Footage%', value: property.square_footage?.toString() },
+              { titlePattern: '%Bedrooms%', value: property.bedrooms?.toString() },
+              { titlePattern: '%Bathrooms%', value: property.bathrooms?.toString() },
+              { titlePattern: '%Parking Capacity%', value: property.parking_spaces?.toString() },
+              { titlePattern: '%Parking Type%', value: property.parking_type },
+              { titlePattern: '%Stories%', value: property.stories?.toString() },
+            ];
+
+            for (const mapping of fieldMappings) {
+              if (mapping.value) {
+                const { error: updateError } = await supabase
+                  .from('onboarding_tasks')
+                  .update({ 
+                    field_value: mapping.value,
+                    status: 'completed'
+                  })
+                  .eq('project_id', linkedProject.id)
+                  .ilike('title', mapping.titlePattern)
+                  .or('field_value.is.null,field_value.eq.""');
+                
+                if (updateError) {
+                  console.error(`Failed to update ${mapping.titlePattern} task:`, updateError);
+                } else {
+                  console.log(`Auto-filled ${mapping.titlePattern} with: ${mapping.value}`);
+                }
+              }
             }
           }
         }
