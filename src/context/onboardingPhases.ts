@@ -175,6 +175,8 @@ export const ONBOARDING_PHASES: PhaseDefinition[] = [
     tasks: [
       { title: "Brand Name", field_type: "text", description: "Marketing brand name for the property" },
       { title: "Property Type Detail", field_type: "text", description: "SFH, Townhouse, Townhome, Condo, etc." },
+      { title: "Year Built", field_type: "text", description: "Year the property was constructed" },
+      { title: "Max Occupancy", field_type: "text", description: "Maximum number of guests allowed" },
       { title: "Stories", field_type: "text", description: "Number of floors/stories" },
       { title: "Square Footage", field_type: "text" },
       { title: "Bedrooms", field_type: "text" },
