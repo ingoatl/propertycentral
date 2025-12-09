@@ -247,9 +247,10 @@ const PropertyOwners = () => {
     setPaymentMethods(methodsMap);
   };
 
-  const handlePaymentMethodAdded = () => {
+  const handlePaymentMethodAdded = async () => {
     setAddingPaymentFor(null);
-    loadPaymentMethods();
+    // Reload owner data first to get updated stripe_customer_id, then load payment methods
+    await loadData();
     toast.success("Payment method added successfully");
   };
 
