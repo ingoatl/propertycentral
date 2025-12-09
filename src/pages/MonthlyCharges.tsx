@@ -56,6 +56,8 @@ const EXPENSE_CATEGORIES = [
 
 const CHARGE_CATEGORIES = [
   "Management Fee",
+  "Security Deposit",
+  "Onboarding Fee",
   "Late Fee",
   "Service Fee",
   "Other"
