@@ -52,17 +52,24 @@ serve(async (req) => {
       apiVersion: "2025-08-27.basil",
     });
 
-    // Get payment methods for this customer
-    const paymentMethods = await stripe.paymentMethods.list({
-      customer: owner.stripe_customer_id,
-      type: owner.payment_method === "ach" ? "us_bank_account" : "card",
-    });
+    // Get ALL payment methods for this customer (both cards and bank accounts)
+    const [cardMethods, bankMethods] = await Promise.all([
+      stripe.paymentMethods.list({
+        customer: owner.stripe_customer_id,
+        type: "card",
+      }),
+      stripe.paymentMethods.list({
+        customer: owner.stripe_customer_id,
+        type: "us_bank_account",
+      }),
+    ]);
 
-    console.log("Found payment methods:", paymentMethods.data.length);
+    const allMethods = [...cardMethods.data, ...bankMethods.data];
+    console.log("Found payment methods:", allMethods.length, "(cards:", cardMethods.data.length, ", banks:", bankMethods.data.length, ")");
 
     return new Response(
       JSON.stringify({ 
-        paymentMethods: paymentMethods.data.map((pm: any) => ({
+        paymentMethods: allMethods.map((pm: any) => ({
           id: pm.id,
           type: pm.type,
           card: pm.card ? {
