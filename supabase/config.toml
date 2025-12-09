@@ -98,3 +98,6 @@ verify_jwt = true
 
 [functions.receive-partner-sync]
 verify_jwt = false
+
+[functions.get-public-properties]
+verify_jwt = false
