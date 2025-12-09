@@ -207,6 +207,44 @@ export type Database = {
           },
         ]
       }
+      charge_line_items: {
+        Row: {
+          amount: number
+          category: string
+          charge_id: string | null
+          created_at: string | null
+          description: string | null
+          id: string
+          qbo_account_code: string | null
+        }
+        Insert: {
+          amount: number
+          category: string
+          charge_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          qbo_account_code?: string | null
+        }
+        Update: {
+          amount?: number
+          category?: string
+          charge_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          qbo_account_code?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "charge_line_items_charge_id_fkey"
+            columns: ["charge_id"]
+            isOneToOne: false
+            referencedRelation: "monthly_charges"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       daily_performance_entries: {
         Row: {
           created_at: string
@@ -972,8 +1010,11 @@ export type Database = {
           created_at: string
           exported: boolean | null
           id: string
+          is_multi_line: boolean | null
           owner_id: string
           receipt_path: string | null
+          statement_date: string | null
+          statement_notes: string | null
           stripe_invoice_id: string | null
           stripe_payment_intent_id: string | null
           total_management_fees: number
@@ -986,8 +1027,11 @@ export type Database = {
           created_at?: string
           exported?: boolean | null
           id?: string
+          is_multi_line?: boolean | null
           owner_id: string
           receipt_path?: string | null
+          statement_date?: string | null
+          statement_notes?: string | null
           stripe_invoice_id?: string | null
           stripe_payment_intent_id?: string | null
           total_management_fees?: number
@@ -1000,8 +1044,11 @@ export type Database = {
           created_at?: string
           exported?: boolean | null
           id?: string
+          is_multi_line?: boolean | null
           owner_id?: string
           receipt_path?: string | null
+          statement_date?: string | null
+          statement_notes?: string | null
           stripe_invoice_id?: string | null
           stripe_payment_intent_id?: string | null
           total_management_fees?: number
@@ -2256,6 +2303,57 @@ export type Database = {
             columns: ["reconciliation_id"]
             isOneToOne: false
             referencedRelation: "monthly_reconciliations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      security_deposit_returns: {
+        Row: {
+          amount: number
+          created_at: string | null
+          id: string
+          notes: string | null
+          original_charge_id: string | null
+          owner_id: string
+          return_date: string
+          return_method: string | null
+          returned_by: string | null
+        }
+        Insert: {
+          amount: number
+          created_at?: string | null
+          id?: string
+          notes?: string | null
+          original_charge_id?: string | null
+          owner_id: string
+          return_date?: string
+          return_method?: string | null
+          returned_by?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string | null
+          id?: string
+          notes?: string | null
+          original_charge_id?: string | null
+          owner_id?: string
+          return_date?: string
+          return_method?: string | null
+          returned_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "security_deposit_returns_original_charge_id_fkey"
+            columns: ["original_charge_id"]
+            isOneToOne: false
+            referencedRelation: "monthly_charges"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "security_deposit_returns_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "property_owners"
             referencedColumns: ["id"]
           },
         ]

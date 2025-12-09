@@ -13,7 +13,7 @@ import { SendTestPerformanceEmailButton } from "@/components/reconciliation/Send
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Loader2, Download, FileText, ExternalLink, DollarSign, Receipt } from "lucide-react";
+import { Loader2, Download, FileText, ExternalLink, DollarSign, Plus, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 
 interface Transaction {
@@ -42,6 +42,13 @@ interface Property {
   name: string;
 }
 
+interface ChargeLineItem {
+  id: string;
+  category: string;
+  description: string;
+  amount: string;
+}
+
 const EXPENSE_CATEGORIES = [
   "Maintenance",
   "Utilities",
@@ -60,6 +67,7 @@ const CHARGE_CATEGORIES = [
   "Onboarding Fee",
   "Late Fee",
   "Service Fee",
+  "Design Setup",
   "Other"
 ];
 
@@ -68,14 +76,21 @@ export default function MonthlyCharges() {
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
   
-  // Charge Owner Form State
+  // Multi-Line Charge Builder State
   const [owners, setOwners] = useState<PropertyOwner[]>([]);
   const [selectedOwner, setSelectedOwner] = useState<string>("");
+  const [statementDate, setStatementDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
+  const [statementNotes, setStatementNotes] = useState<string>("");
+  const [chargeLineItems, setChargeLineItems] = useState<ChargeLineItem[]>([
+    { id: crypto.randomUUID(), category: "Management Fee", description: "", amount: "" }
+  ]);
+  const [chargingOwner, setChargingOwner] = useState(false);
+  
+  // Legacy single charge state (for compatibility)
   const [chargeAmount, setChargeAmount] = useState<string>("");
   const [chargeMonth, setChargeMonth] = useState<string>(format(new Date(), 'yyyy-MM'));
   const [chargeDescription, setChargeDescription] = useState<string>("");
   const [chargeCategory, setChargeCategory] = useState<string>("Management Fee");
-  const [chargingOwner, setChargingOwner] = useState(false);
   
   // Record Expense Form State
   const [properties, setProperties] = useState<Property[]>([]);
@@ -223,6 +238,91 @@ export default function MonthlyCharges() {
       toast.error("Failed to load transactions");
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Line item management functions
+  const addLineItem = () => {
+    setChargeLineItems([
+      ...chargeLineItems,
+      { id: crypto.randomUUID(), category: "Management Fee", description: "", amount: "" }
+    ]);
+  };
+
+  const removeLineItem = (id: string) => {
+    if (chargeLineItems.length > 1) {
+      setChargeLineItems(chargeLineItems.filter(item => item.id !== id));
+    }
+  };
+
+  const updateLineItem = (id: string, field: keyof ChargeLineItem, value: string) => {
+    setChargeLineItems(chargeLineItems.map(item => 
+      item.id === id ? { ...item, [field]: value } : item
+    ));
+  };
+
+  const calculateTotal = () => {
+    return chargeLineItems.reduce((sum, item) => {
+      const amount = parseFloat(item.amount) || 0;
+      return sum + amount;
+    }, 0);
+  };
+
+  const handleMultiLineCharge = async (isDraft: boolean = false) => {
+    if (!selectedOwner) {
+      toast.error("Please select an owner");
+      return;
+    }
+
+    const validLineItems = chargeLineItems.filter(item => 
+      item.category && parseFloat(item.amount) > 0
+    );
+
+    if (validLineItems.length === 0) {
+      toast.error("Please add at least one fee with an amount");
+      return;
+    }
+
+    try {
+      setChargingOwner(true);
+
+      const { data, error } = await supabase.functions.invoke('charge-owner-fees', {
+        body: {
+          ownerId: selectedOwner,
+          lineItems: validLineItems.map(item => ({
+            category: item.category,
+            description: item.description,
+            amount: parseFloat(item.amount)
+          })),
+          statementDate,
+          statementNotes,
+          isDraft
+        }
+      });
+
+      if (error) throw error;
+
+      if (isDraft) {
+        toast.success("Charge saved as draft");
+      } else {
+        toast.success(data.status === "paid" 
+          ? "Owner charged successfully and statement sent!" 
+          : "Charge created and statement sent!");
+      }
+
+      // Reset form
+      setSelectedOwner("");
+      setStatementDate(format(new Date(), 'yyyy-MM-dd'));
+      setStatementNotes("");
+      setChargeLineItems([
+        { id: crypto.randomUUID(), category: "Management Fee", description: "", amount: "" }
+      ]);
+      loadTransactions();
+    } catch (error: any) {
+      console.error('Error charging owner:', error);
+      toast.error(error.message || "Failed to charge owner");
+    } finally {
+      setChargingOwner(false);
     }
   };
 
@@ -455,10 +555,14 @@ export default function MonthlyCharges() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <DollarSign className="w-5 h-5" />
-                Charge Owner
+                Multi-Line Charge Builder
               </CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Add multiple fees in one charge with detailed statement email
+              </p>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-6">
+              {/* Owner Selection */}
               <div className="space-y-2">
                 <Label htmlFor="owner">Owner *</Label>
                 <Select value={selectedOwner} onValueChange={setSelectedOwner}>
@@ -475,67 +579,130 @@ export default function MonthlyCharges() {
                 </Select>
               </div>
 
+              {/* Statement Date */}
               <div className="space-y-2">
-                <Label htmlFor="charge-month">Month *</Label>
+                <Label htmlFor="statement-date">Statement Date</Label>
                 <Input
-                  id="charge-month"
-                  type="month"
-                  value={chargeMonth}
-                  onChange={(e) => setChargeMonth(e.target.value)}
+                  id="statement-date"
+                  type="date"
+                  value={statementDate}
+                  onChange={(e) => setStatementDate(e.target.value)}
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="charge-amount">Amount *</Label>
-                <Input
-                  id="charge-amount"
-                  type="number"
-                  step="0.01"
-                  placeholder="0.00"
-                  value={chargeAmount}
-                  onChange={(e) => setChargeAmount(e.target.value)}
-                />
+              {/* Line Items */}
+              <div className="space-y-4">
+                <Label>Fee Items</Label>
+                {chargeLineItems.map((item, index) => (
+                  <div key={item.id} className="border rounded-lg p-4 space-y-3 bg-muted/30">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-muted-foreground">
+                        Fee #{index + 1}
+                      </span>
+                      {chargeLineItems.length > 1 && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeLineItem(item.id)}
+                          className="text-destructive hover:text-destructive"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      )}
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <div className="space-y-1">
+                        <Label className="text-xs">Category *</Label>
+                        <Select 
+                          value={item.category} 
+                          onValueChange={(value) => updateLineItem(item.id, 'category', value)}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {CHARGE_CATEGORIES.map(cat => (
+                              <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      
+                      <div className="space-y-1">
+                        <Label className="text-xs">Description</Label>
+                        <Input
+                          placeholder="e.g., Property setup & orientation"
+                          value={item.description}
+                          onChange={(e) => updateLineItem(item.id, 'description', e.target.value)}
+                        />
+                      </div>
+                      
+                      <div className="space-y-1">
+                        <Label className="text-xs">Amount *</Label>
+                        <div className="relative">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            placeholder="0.00"
+                            value={item.amount}
+                            onChange={(e) => updateLineItem(item.id, 'amount', e.target.value)}
+                            className="pl-7"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={addLineItem}
+                  className="w-full gap-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  Add Another Fee
+                </Button>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="charge-category">Category</Label>
-                <Select value={chargeCategory} onValueChange={setChargeCategory}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {CHARGE_CATEGORIES.map(cat => (
-                      <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              {/* Total */}
+              <div className="border-t pt-4">
+                <div className="flex justify-between items-center text-lg font-semibold">
+                  <span>Total:</span>
+                  <span className="text-primary">${calculateTotal().toFixed(2)}</span>
+                </div>
               </div>
 
+              {/* Statement Notes */}
               <div className="space-y-2">
-                <Label htmlFor="charge-description">Description</Label>
+                <Label htmlFor="statement-notes">Statement Notes (optional)</Label>
                 <Textarea
-                  id="charge-description"
-                  placeholder="Optional notes..."
-                  value={chargeDescription}
-                  onChange={(e) => setChargeDescription(e.target.value)}
+                  id="statement-notes"
+                  placeholder="Additional notes to include in the statement email..."
+                  value={statementNotes}
+                  onChange={(e) => setStatementNotes(e.target.value)}
                 />
               </div>
 
+              {/* Action Buttons */}
               <div className="flex gap-2">
                 <Button 
-                  onClick={() => handleChargeOwner(false)} 
+                  onClick={() => handleMultiLineCharge(false)} 
                   disabled={chargingOwner}
                   className="flex-1"
                 >
-                  {chargingOwner ? <Loader2 className="w-4 h-4 animate-spin" /> : "Charge via Stripe"}
+                  {chargingOwner ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                  Charge Now & Send Statement
                 </Button>
                 <Button 
-                  onClick={() => handleChargeOwner(true)} 
+                  onClick={() => handleMultiLineCharge(true)} 
                   disabled={chargingOwner}
                   variant="outline"
                   className="flex-1"
                 >
-                  Save as Pending
+                  Save as Draft
                 </Button>
               </div>
             </CardContent>
