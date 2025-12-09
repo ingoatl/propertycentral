@@ -13,7 +13,7 @@ import { SendTestPerformanceEmailButton } from "@/components/reconciliation/Send
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Loader2, Download, FileText, ExternalLink, DollarSign, Plus, Trash2 } from "lucide-react";
+import { Loader2, Download, FileText, ExternalLink, DollarSign, Plus, Trash2, Send, Mail } from "lucide-react";
 import { format } from "date-fns";
 
 interface Transaction {
@@ -268,7 +268,7 @@ export default function MonthlyCharges() {
     }, 0);
   };
 
-  const handleMultiLineCharge = async (isDraft: boolean = false) => {
+  const handleMultiLineCharge = async (isDraft: boolean = false, isTest: boolean = false) => {
     if (!selectedOwner) {
       toast.error("Please select an owner");
       return;
@@ -296,28 +296,32 @@ export default function MonthlyCharges() {
           })),
           statementDate,
           statementNotes,
-          isDraft
+          isDraft,
+          isTest,
+          testEmail: isTest ? "ingo@peachhausgroup.com" : undefined
         }
       });
 
       if (error) throw error;
 
-      if (isDraft) {
+      if (isTest) {
+        toast.success("Test statement sent to ingo@peachhausgroup.com");
+      } else if (isDraft) {
         toast.success("Charge saved as draft");
       } else {
         toast.success(data.status === "paid" 
           ? "Owner charged successfully and statement sent!" 
           : "Charge created and statement sent!");
-      }
 
-      // Reset form
-      setSelectedOwner("");
-      setStatementDate(format(new Date(), 'yyyy-MM-dd'));
-      setStatementNotes("");
-      setChargeLineItems([
-        { id: crypto.randomUUID(), category: "Management Fee", description: "", amount: "" }
-      ]);
-      loadTransactions();
+        // Reset form only if not a test
+        setSelectedOwner("");
+        setStatementDate(format(new Date(), 'yyyy-MM-dd'));
+        setStatementNotes("");
+        setChargeLineItems([
+          { id: crypto.randomUUID(), category: "Management Fee", description: "", amount: "" }
+        ]);
+        loadTransactions();
+      }
     } catch (error: any) {
       console.error('Error charging owner:', error);
       toast.error(error.message || "Failed to charge owner");
@@ -325,6 +329,7 @@ export default function MonthlyCharges() {
       setChargingOwner(false);
     }
   };
+
 
   const handleChargeOwner = async (viaPending: boolean = false) => {
     if (!selectedOwner || !chargeAmount || !chargeMonth) {
@@ -687,22 +692,134 @@ export default function MonthlyCharges() {
               </div>
 
               {/* Action Buttons */}
+              <div className="flex flex-col gap-3">
+                <div className="flex gap-2">
+                  <Button 
+                    onClick={() => handleMultiLineCharge(false, false)} 
+                    disabled={chargingOwner}
+                    className="flex-1"
+                  >
+                    {chargingOwner ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Send className="w-4 h-4 mr-2" />}
+                    Charge Now & Send Statement
+                  </Button>
+                  <Button 
+                    onClick={() => handleMultiLineCharge(true, false)} 
+                    disabled={chargingOwner}
+                    variant="outline"
+                    className="flex-1"
+                  >
+                    Save as Draft
+                  </Button>
+                </div>
+                <Button 
+                  onClick={() => handleMultiLineCharge(false, true)} 
+                  disabled={chargingOwner}
+                  variant="secondary"
+                  className="w-full gap-2"
+                >
+                  <Mail className="w-4 h-4" />
+                  Send Test to ingo@peachhausgroup.com
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Legacy Single Charge Section for Reconciled Months */}
+          <Card className="mt-6">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <DollarSign className="w-5 h-5" />
+                Charge for Reconciled Month
+              </CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Quick charge for a specific reconciliation month
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="legacy-owner">Owner *</Label>
+                  <Select value={selectedOwner} onValueChange={setSelectedOwner}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select owner..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {owners.map(owner => (
+                        <SelectItem key={owner.id} value={owner.id}>
+                          {owner.name} ({owner.email})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="charge-month">Month *</Label>
+                  <Input
+                    id="charge-month"
+                    type="month"
+                    value={chargeMonth}
+                    onChange={(e) => setChargeMonth(e.target.value)}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="charge-amount">Amount *</Label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
+                    <Input
+                      id="charge-amount"
+                      type="number"
+                      step="0.01"
+                      placeholder="0.00"
+                      value={chargeAmount}
+                      onChange={(e) => setChargeAmount(e.target.value)}
+                      className="pl-7"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="charge-category">Category</Label>
+                  <Select value={chargeCategory} onValueChange={setChargeCategory}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {CHARGE_CATEGORIES.map(cat => (
+                        <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="charge-description">Description</Label>
+                <Textarea
+                  id="charge-description"
+                  placeholder="Optional notes..."
+                  value={chargeDescription}
+                  onChange={(e) => setChargeDescription(e.target.value)}
+                  rows={2}
+                />
+              </div>
+
               <div className="flex gap-2">
                 <Button 
-                  onClick={() => handleMultiLineCharge(false)} 
+                  onClick={() => handleChargeOwner(false)} 
                   disabled={chargingOwner}
                   className="flex-1"
                 >
-                  {chargingOwner ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-                  Charge Now & Send Statement
+                  {chargingOwner ? <Loader2 className="w-4 h-4 animate-spin" /> : "Charge via Stripe"}
                 </Button>
                 <Button 
-                  onClick={() => handleMultiLineCharge(true)} 
+                  onClick={() => handleChargeOwner(true)} 
                   disabled={chargingOwner}
                   variant="outline"
                   className="flex-1"
                 >
-                  Save as Draft
+                  Save as Pending
                 </Button>
               </div>
             </CardContent>
