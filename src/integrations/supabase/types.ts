@@ -2582,6 +2582,221 @@ export type Database = {
           },
         ]
       }
+      utility_accounts: {
+        Row: {
+          account_number: string | null
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          notes: string | null
+          property_id: string | null
+          provider: string | null
+          updated_at: string | null
+          utility_type: string
+        }
+        Insert: {
+          account_number?: string | null
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          notes?: string | null
+          property_id?: string | null
+          provider?: string | null
+          updated_at?: string | null
+          utility_type: string
+        }
+        Update: {
+          account_number?: string | null
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          notes?: string | null
+          property_id?: string | null
+          provider?: string | null
+          updated_at?: string | null
+          utility_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "utility_accounts_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "comprehensive_property_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "utility_accounts_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      utility_anomaly_alerts: {
+        Row: {
+          alert_type: string
+          created_at: string | null
+          email_sent: boolean | null
+          email_sent_at: string | null
+          id: string
+          is_resolved: boolean | null
+          message: string
+          percentage_change: number | null
+          property_id: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          severity: string | null
+          utility_reading_id: string | null
+        }
+        Insert: {
+          alert_type: string
+          created_at?: string | null
+          email_sent?: boolean | null
+          email_sent_at?: string | null
+          id?: string
+          is_resolved?: boolean | null
+          message: string
+          percentage_change?: number | null
+          property_id?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          severity?: string | null
+          utility_reading_id?: string | null
+        }
+        Update: {
+          alert_type?: string
+          created_at?: string | null
+          email_sent?: boolean | null
+          email_sent_at?: string | null
+          id?: string
+          is_resolved?: boolean | null
+          message?: string
+          percentage_change?: number | null
+          property_id?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          severity?: string | null
+          utility_reading_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "utility_anomaly_alerts_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "comprehensive_property_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "utility_anomaly_alerts_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "utility_anomaly_alerts_utility_reading_id_fkey"
+            columns: ["utility_reading_id"]
+            isOneToOne: false
+            referencedRelation: "utility_readings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      utility_readings: {
+        Row: {
+          account_number: string | null
+          amount_due: number
+          anomaly_percentage: number | null
+          anomaly_reason: string | null
+          bill_date: string
+          created_at: string | null
+          due_date: string | null
+          email_insight_id: string | null
+          id: string
+          is_anomaly: boolean | null
+          previous_amount: number | null
+          previous_usage: number | null
+          property_id: string | null
+          provider: string | null
+          raw_email_data: Json | null
+          service_period_end: string | null
+          service_period_start: string | null
+          updated_at: string | null
+          usage_amount: number | null
+          usage_unit: string | null
+          utility_type: string
+        }
+        Insert: {
+          account_number?: string | null
+          amount_due: number
+          anomaly_percentage?: number | null
+          anomaly_reason?: string | null
+          bill_date: string
+          created_at?: string | null
+          due_date?: string | null
+          email_insight_id?: string | null
+          id?: string
+          is_anomaly?: boolean | null
+          previous_amount?: number | null
+          previous_usage?: number | null
+          property_id?: string | null
+          provider?: string | null
+          raw_email_data?: Json | null
+          service_period_end?: string | null
+          service_period_start?: string | null
+          updated_at?: string | null
+          usage_amount?: number | null
+          usage_unit?: string | null
+          utility_type: string
+        }
+        Update: {
+          account_number?: string | null
+          amount_due?: number
+          anomaly_percentage?: number | null
+          anomaly_reason?: string | null
+          bill_date?: string
+          created_at?: string | null
+          due_date?: string | null
+          email_insight_id?: string | null
+          id?: string
+          is_anomaly?: boolean | null
+          previous_amount?: number | null
+          previous_usage?: number | null
+          property_id?: string | null
+          provider?: string | null
+          raw_email_data?: Json | null
+          service_period_end?: string | null
+          service_period_start?: string | null
+          updated_at?: string | null
+          usage_amount?: number | null
+          usage_unit?: string | null
+          utility_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "utility_readings_email_insight_id_fkey"
+            columns: ["email_insight_id"]
+            isOneToOne: false
+            referencedRelation: "email_insights"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "utility_readings_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "comprehensive_property_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "utility_readings_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       visits: {
         Row: {
           billed: boolean | null
