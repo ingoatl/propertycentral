@@ -6,7 +6,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Gmail label name to property ID mapping (based on user's Gmail label structure under "Utilities")
+// Gmail label name to property ID mapping
 const LABEL_PROPERTY_MAP: Record<string, { id: string; name: string }> = {
   "169 Willow Stream": { id: "6ffe191b-d85c-44f3-b91b-f8d38bee16b4", name: "Modern + Cozy Townhome" },
   "2580 Old Roswell": { id: "9904f14f-4cf0-44d7-bc3e-1207bcc28a34", name: "Luxurious & Spacious Apartment" },
@@ -14,18 +14,43 @@ const LABEL_PROPERTY_MAP: Record<string, { id: string; name: string }> = {
   "3155 Duvall Pl": { id: "6c80c23b-997a-45af-8702-aeb7a7cf3e81", name: "Scandi Chic" },
   "4241 Osburn": { id: "695bfc2a-4187-4377-8e25-18aa2fcd0454", name: "Alpine" },
   "5198 Laurel Bridge": { id: "9f7f6d4d-9873-46be-926f-c5a48863a946", name: "Scandinavian Retreat" },
+  "5360 Durham Ridge": { id: "fa81c7ec-7e9b-48ab-aa8c-d2ddf41eea9b", name: "Family Retreat" },
   "5360 Durham Rid": { id: "fa81c7ec-7e9b-48ab-aa8c-d2ddf41eea9b", name: "Family Retreat" },
 };
 
-// Provider detection
+// All utility providers - comprehensive list
 const PROVIDERS = [
+  // Gas
   { pattern: /scana/i, type: "gas", name: "SCANA Energy" },
   { pattern: /gas\s*south/i, type: "gas", name: "Gas South" },
+  { pattern: /georgia\s*natural\s*gas|gng/i, type: "gas", name: "Georgia Natural Gas" },
+  { pattern: /atlanta\s*gas/i, type: "gas", name: "Atlanta Gas Light" },
+  
+  // Electric
   { pattern: /georgia\s*power/i, type: "electric", name: "Georgia Power" },
-  { pattern: /cobb.*water|cobbcounty/i, type: "water", name: "Cobb County Water System" },
+  { pattern: /jackson\s*emc|jacksonemc|myjacksonemc/i, type: "electric", name: "Jackson EMC" },
+  { pattern: /cobb\s*emc/i, type: "electric", name: "Cobb EMC" },
+  { pattern: /walton\s*emc/i, type: "electric", name: "Walton EMC" },
+  { pattern: /sawnee\s*emc/i, type: "electric", name: "Sawnee EMC" },
+  { pattern: /greystone/i, type: "electric", name: "GreyStone Power" },
+  
+  // Water
+  { pattern: /cobb.*water|cobbcounty.*water/i, type: "water", name: "Cobb County Water" },
   { pattern: /smyrna.*water|smyrnaga/i, type: "water", name: "Smyrna Water" },
-  { pattern: /dekalb/i, type: "water", name: "DeKalb County Water" },
-  { pattern: /gwinnett/i, type: "water", name: "Gwinnett County Water" },
+  { pattern: /dekalb.*water/i, type: "water", name: "DeKalb County Water" },
+  { pattern: /gwinnett.*water|gwinnett.*count/i, type: "water", name: "Gwinnett County Water" },
+  { pattern: /fulton.*water/i, type: "water", name: "Fulton County Water" },
+  { pattern: /roswell.*water/i, type: "water", name: "Roswell Water" },
+  { pattern: /kennesaw.*water/i, type: "water", name: "Kennesaw Water" },
+  { pattern: /utility\s*billing/i, type: "water", name: "Utility Billing" },
+  
+  // Internet/Cable
+  { pattern: /spectrum/i, type: "internet", name: "Spectrum" },
+  { pattern: /xfinity|comcast/i, type: "internet", name: "Xfinity" },
+  { pattern: /att\.com|at&t/i, type: "internet", name: "AT&T" },
+  { pattern: /google\s*fiber/i, type: "internet", name: "Google Fiber" },
+  { pattern: /verizon/i, type: "internet", name: "Verizon" },
+  { pattern: /t-mobile/i, type: "internet", name: "T-Mobile" },
 ];
 
 function detectProvider(text: string): { type: string; name: string } | null {
@@ -36,20 +61,39 @@ function detectProvider(text: string): { type: string; name: string } | null {
 }
 
 function extractAmount(text: string): number | null {
-  const matches = text.match(/\$\s*([\d,]+\.?\d*)/g);
-  if (!matches) return null;
+  // Look for common bill amount patterns
+  const patterns = [
+    /total\s*(?:due|amount|balance)[:\s]*\$?\s*([\d,]+\.?\d*)/gi,
+    /amount\s*due[:\s]*\$?\s*([\d,]+\.?\d*)/gi,
+    /balance\s*due[:\s]*\$?\s*([\d,]+\.?\d*)/gi,
+    /new\s*balance[:\s]*\$?\s*([\d,]+\.?\d*)/gi,
+    /\$\s*([\d,]+\.?\d*)/g,
+  ];
   
-  const amounts = matches
-    .map(m => parseFloat(m.replace(/[$,]/g, "")))
-    .filter(a => a > 5 && a < 5000);
+  for (const pattern of patterns) {
+    const match = pattern.exec(text);
+    if (match) {
+      const amount = parseFloat(match[1].replace(/,/g, ""));
+      if (amount > 5 && amount < 5000) return amount;
+    }
+  }
   
-  return amounts.length > 0 ? Math.max(...amounts) : null;
+  // Fallback: find all dollar amounts
+  const allAmounts = text.match(/\$\s*([\d,]+\.?\d*)/g);
+  if (allAmounts) {
+    const amounts = allAmounts
+      .map(m => parseFloat(m.replace(/[$,]/g, "")))
+      .filter(a => a > 5 && a < 5000);
+    if (amounts.length > 0) return Math.max(...amounts);
+  }
+  
+  return null;
 }
 
 function extractAccountNumber(text: string): string | null {
   const patterns = [
-    /account\s*(?:#|num|no)?[:\s]*(\d{6,15})/gi,
-    /acct\s*(?:#|num|no)?[:\s]*(\d{6,15})/gi,
+    /account\s*(?:#|num|number|no)?[:\s]*(\d{6,15})/gi,
+    /acct\s*(?:#|num|number|no)?[:\s]*(\d{6,15})/gi,
   ];
   
   for (const p of patterns) {
@@ -73,29 +117,6 @@ async function refreshToken(refreshToken: string): Promise<string> {
   const data = await response.json();
   if (data.error) throw new Error(data.error_description || data.error);
   return data.access_token;
-}
-
-// Find property ID from Gmail labels
-function matchPropertyFromLabels(labelIds: string[], labelMap: Map<string, string>): { id: string; name: string; method: string } | null {
-  for (const labelId of labelIds) {
-    const labelName = labelMap.get(labelId);
-    if (labelName) {
-      // Check direct match first
-      for (const [key, prop] of Object.entries(LABEL_PROPERTY_MAP)) {
-        if (labelName.includes(key) || key.includes(labelName.split("/").pop() || "")) {
-          return { ...prop, method: "label" };
-        }
-      }
-      // Check if label name contains any street number
-      for (const [key, prop] of Object.entries(LABEL_PROPERTY_MAP)) {
-        const streetNum = key.split(" ")[0];
-        if (labelName.includes(streetNum)) {
-          return { ...prop, method: "label" };
-        }
-      }
-    }
-  }
-  return null;
 }
 
 serve(async (req) => {
@@ -130,7 +151,7 @@ serve(async (req) => {
 
     const accessToken = await refreshToken(tokenData.refresh_token);
 
-    // Step 1: Fetch ALL Gmail labels to build a map
+    // Fetch Gmail labels
     console.log("Fetching Gmail labels...");
     const labelsRes = await fetch(
       "https://gmail.googleapis.com/gmail/v1/users/me/labels",
@@ -140,36 +161,32 @@ serve(async (req) => {
     if (!labelsRes.ok) throw new Error("Failed to fetch Gmail labels");
     
     const labelsData = await labelsRes.json();
-    const labelMap = new Map<string, string>();
     const utilityLabels: { id: string; name: string; propertyId: string; propertyName: string }[] = [];
     
-    // Build label ID to name map and find Utilities sub-labels
+    // Find Utilities sub-labels
     for (const label of labelsData.labels || []) {
-      labelMap.set(label.id, label.name);
-      
-      // Check if this is a Utilities sub-label
       if (label.name?.startsWith("Utilities/")) {
         const subLabelName = label.name.replace("Utilities/", "");
-        console.log(`Found Utilities label: ${subLabelName}`);
+        console.log(`Found label: ${subLabelName}`);
         
-        // Match to property
+        // Match to property by street number
         for (const [key, prop] of Object.entries(LABEL_PROPERTY_MAP)) {
           const streetNum = key.split(" ")[0];
-          if (subLabelName.includes(streetNum) || subLabelName.includes(key)) {
+          if (subLabelName.includes(streetNum)) {
             utilityLabels.push({
               id: label.id,
               name: subLabelName,
               propertyId: prop.id,
               propertyName: prop.name,
             });
-            console.log(`  -> Mapped to: ${prop.name} (${prop.id})`);
+            console.log(`  Mapped: ${prop.name}`);
             break;
           }
         }
       }
     }
 
-    console.log(`Found ${utilityLabels.length} utility labels mapped to properties`);
+    console.log(`Found ${utilityLabels.length} utility labels`);
 
     // Get existing message IDs
     const { data: existing } = await supabase
@@ -180,37 +197,37 @@ serve(async (req) => {
     const existingIds = new Set(existing?.map(r => r.gmail_message_id) || []);
 
     let newReadings = 0;
-    let matched = 0;
-    let totalProcessed = 0;
+    let skippedDupe = 0;
+    const propertyStats: Record<string, { name: string; count: number }> = {};
 
-    // Step 2: For each utility label, fetch emails and create readings
+    // Process each label
     for (const utilLabel of utilityLabels) {
-      if (Date.now() - startTime > 25000) {
-        console.log("Approaching timeout, stopping");
+      if (Date.now() - startTime > 45000) {
+        console.log("Approaching timeout");
         break;
       }
 
-      console.log(`\nScanning label: ${utilLabel.name} -> ${utilLabel.propertyName}`);
+      console.log(`\n--- ${utilLabel.propertyName} (${utilLabel.name}) ---`);
+      propertyStats[utilLabel.propertyId] = { name: utilLabel.propertyName, count: 0 };
       
-      // Search emails with this label
+      // Fetch ALL emails from this label
       const searchRes = await fetch(
-        `https://gmail.googleapis.com/gmail/v1/users/me/messages?labelIds=${utilLabel.id}&maxResults=50`,
+        `https://gmail.googleapis.com/gmail/v1/users/me/messages?labelIds=${utilLabel.id}&maxResults=100`,
         { headers: { Authorization: `Bearer ${accessToken}` } }
       );
       
-      if (!searchRes.ok) {
-        console.log(`  Failed to fetch emails for ${utilLabel.name}`);
-        continue;
-      }
+      if (!searchRes.ok) continue;
       
       const { messages = [] } = await searchRes.json();
-      console.log(`  Found ${messages.length} emails`);
+      console.log(`  ${messages.length} emails found`);
 
-      // Process each email
       for (const msg of messages) {
-        if (existingIds.has(msg.id)) continue;
+        if (existingIds.has(msg.id)) {
+          skippedDupe++;
+          continue;
+        }
         
-        if (Date.now() - startTime > 25000) break;
+        if (Date.now() - startTime > 45000) break;
 
         try {
           const msgRes = await fetch(
@@ -250,14 +267,14 @@ serve(async (req) => {
           // Detect provider
           const provider = detectProvider(fullText);
           if (!provider) {
-            console.log(`  Skip (no provider): ${subject.substring(0, 40)}`);
+            console.log(`  SKIP (unknown provider): ${subject.substring(0, 50)}`);
             continue;
           }
 
           // Extract amount
           const amount = extractAmount(fullText);
           if (!amount) {
-            console.log(`  Skip (no amount): ${subject.substring(0, 40)}`);
+            console.log(`  SKIP (no amount): ${subject.substring(0, 50)}`);
             continue;
           }
 
@@ -270,7 +287,7 @@ serve(async (req) => {
             if (!isNaN(d.getTime())) billDate = d.toISOString().split("T")[0];
           } catch {}
 
-          // Insert reading - property ID comes from the label!
+          // Insert reading
           const { error: insertErr } = await supabase.from("utility_readings").insert({
             property_id: utilLabel.propertyId,
             utility_type: provider.type,
@@ -285,26 +302,30 @@ serve(async (req) => {
 
           if (!insertErr) {
             newReadings++;
-            matched++;
-            totalProcessed++;
-            console.log(`  Added: ${provider.name} $${amount} on ${billDate}`);
+            propertyStats[utilLabel.propertyId].count++;
+            existingIds.add(msg.id);
+            console.log(`  + ${provider.name} $${amount} (${billDate})`);
           }
           
         } catch (e) {
-          console.error("  Error processing message:", e);
+          console.error("  Error:", e);
         }
       }
     }
 
-    console.log(`\nDone: ${newReadings} new readings, all ${matched} matched via labels`);
+    // Summary
+    console.log("\n=== SUMMARY ===");
+    for (const [id, stats] of Object.entries(propertyStats)) {
+      console.log(`${stats.name}: ${stats.count} new readings`);
+    }
+    console.log(`Total: ${newReadings} new, ${skippedDupe} duplicates skipped`);
 
     return new Response(
       JSON.stringify({ 
         success: true, 
         newReadings, 
-        matched, 
-        labelsFound: utilityLabels.length,
-        properties: utilityLabels.map(l => l.propertyName),
+        skippedDuplicates: skippedDupe,
+        properties: Object.values(propertyStats),
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
