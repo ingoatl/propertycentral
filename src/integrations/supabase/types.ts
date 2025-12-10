@@ -2782,6 +2782,7 @@ export type Database = {
           gmail_message_id: string | null
           id: string
           is_anomaly: boolean | null
+          match_method: string | null
           previous_amount: number | null
           previous_usage: number | null
           property_id: string | null
@@ -2807,6 +2808,7 @@ export type Database = {
           gmail_message_id?: string | null
           id?: string
           is_anomaly?: boolean | null
+          match_method?: string | null
           previous_amount?: number | null
           previous_usage?: number | null
           property_id?: string | null
@@ -2832,6 +2834,7 @@ export type Database = {
           gmail_message_id?: string | null
           id?: string
           is_anomaly?: boolean | null
+          match_method?: string | null
           previous_amount?: number | null
           previous_usage?: number | null
           property_id?: string | null

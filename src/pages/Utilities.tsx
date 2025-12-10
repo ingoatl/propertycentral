@@ -43,6 +43,20 @@ export default function Utilities() {
   const [isAnalyzingProviders, setIsAnalyzingProviders] = useState(false);
   const [alertInfoOpen, setAlertInfoOpen] = useState(false);
 
+  // Fetch ALL Company-Owned properties
+  const { data: companyProperties } = useQuery({
+    queryKey: ["company-owned-properties"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("properties")
+        .select("id, name, address")
+        .eq("property_type", "Company-Owned")
+        .order("name");
+      if (error) throw error;
+      return data;
+    },
+  });
+
   const { data: readings, refetch: refetchReadings, isLoading } = useQuery({
     queryKey: ["utility-readings"],
     queryFn: async () => {
@@ -109,10 +123,13 @@ export default function Utilities() {
         body: { months: 6 }
       });
       if (error) throw error;
-      toast.success(`Scan complete: ${data.newReadings} new readings found`);
+      const matched = data.matched || 0;
+      const unmatched = (data.newReadings || 0) - matched;
+      toast.success(`Scan complete: ${data.newReadings || 0} bills found, ${matched} matched, ${unmatched} unassigned`);
       refetchReadings();
     } catch (error: any) {
-      toast.error("Failed to scan inbox: " + error.message);
+      console.error("Scan error:", error);
+      toast.error("Failed to scan inbox: " + (error.message || "Unknown error"));
     } finally {
       setIsScanning(false);
     }
@@ -173,7 +190,7 @@ export default function Utilities() {
     }
   };
 
-  // Group readings by property - only include properties with actual readings
+  // Group readings by property - include ALL Company-Owned properties
   const getPropertiesWithReadings = () => {
     const propertyData: Record<string, {
       property: { id: string; name: string; address: string };
@@ -182,6 +199,17 @@ export default function Utilities() {
       utilities: Record<string, { latest: any; history: any[] }>;
       monthlyData: Record<string, Record<string, number>>;
     }> = {};
+
+    // Initialize ALL Company-Owned properties first (so they all show even without readings)
+    companyProperties?.forEach(prop => {
+      propertyData[prop.id] = {
+        property: prop,
+        readings: [],
+        totalSpend: 0,
+        utilities: {},
+        monthlyData: {},
+      };
+    });
 
     // Group readings by property
     readings?.forEach(reading => {

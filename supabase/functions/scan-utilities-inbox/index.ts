@@ -535,6 +535,7 @@ serve(async (req) => {
           amount_due: Math.abs(utilityData.amount_due || 0),
           service_address: utilityData.service_address || null,
           gmail_message_id: message.id,
+          match_method: matchMethod || 'unmatched',
           raw_email_data: {
             subject,
             from,
