@@ -29,18 +29,17 @@ function parseToISODate(dateStr: string | null | undefined, fallbackDate: string
   if (!dateStr) return fallbackDate;
   
   try {
-    // Try direct ISO parse
     const parsed = new Date(dateStr);
     if (!isNaN(parsed.getTime())) {
       return parsed.toISOString().split('T')[0];
     }
   } catch {}
   
-  // Try parsing common formats
+  // Try common formats
   const patterns = [
-    /(\d{1,2})\/(\d{1,2})\/(\d{4})/, // MM/DD/YYYY
-    /(\d{1,2})-(\d{1,2})-(\d{4})/,   // MM-DD-YYYY
-    /(\w+)\s+(\d{1,2}),?\s+(\d{4})/, // Month DD, YYYY
+    /(\d{1,2})\/(\d{1,2})\/(\d{4})/,
+    /(\d{1,2})-(\d{1,2})-(\d{4})/,
+    /(\w+)\s+(\d{1,2}),?\s+(\d{4})/,
   ];
   
   for (const pattern of patterns) {
@@ -70,79 +69,87 @@ serve(async (req) => {
       throw new Error('OPENAI_API_KEY is not configured');
     }
 
-    // Parse the email date as fallback
     const emailDateParsed = parseToISODate(emailDate, new Date().toISOString().split('T')[0]);
 
-    // Build property list for matching with full address details
+    // Build detailed property list for matching
     const propertyList = properties?.map((p: any) => {
-      // Extract address components for better matching
-      const address = p.address || '';
-      const streetMatch = address.match(/^(\d+)\s+(.+?),/);
-      const streetNum = streetMatch?.[1] || '';
-      const streetName = streetMatch?.[2] || '';
+      const addr = p.address || '';
+      // Parse address components
+      const streetMatch = addr.match(/^(\d+)\s+(.+?)(?:,|$)/);
+      const cityMatch = addr.match(/,\s*([^,]+),\s*GA/i);
+      const zipMatch = addr.match(/\b(\d{5})\b/);
       
-      return `ID: ${p.id} | Name: "${p.name}" | Full Address: "${p.address}" | Street: "${streetNum} ${streetName}"`;
-    }).join('\n') || 'No properties provided';
+      return `- ID: ${p.id}
+  Name: "${p.name}"
+  Address: "${addr}"
+  Street#: ${streetMatch?.[1] || 'unknown'}
+  StreetName: ${streetMatch?.[2] || 'unknown'}
+  City: ${cityMatch?.[1] || 'unknown'}
+  Zip: ${zipMatch?.[1] || 'unknown'}`;
+    }).join('\n\n') || 'No properties provided';
 
-    const systemPrompt = `You are an expert at extracting utility bill data from emails and matching service addresses to properties.
+    const systemPrompt = `You are an expert utility bill data extractor. Your job is to:
+1. Extract billing data from utility company emails
+2. Match the SERVICE ADDRESS to the correct property
 
 CRITICAL RULES:
-1. Extract ONLY what you can clearly see in the email - DO NOT guess or hallucinate
-2. For amounts, extract the EXACT number shown (positive values only)
-3. For dates, use email date as bill_date if not explicitly shown
-4. For property matching, match by STREET NUMBER AND STREET NAME - these are the key identifiers
+- Extract ONLY data you can see - NEVER guess or make up values
+- The amount_due MUST be a positive number > 0. If you can't find a bill amount, return 0.
+- bill_date is REQUIRED - use email date "${emailDateParsed}" if bill date not shown
+- service_address is CRITICAL - look for it in headers, body, "Service Location", "Service Address", "Account Location"
 
-EXTRACTION FIELDS (ALL REQUIRED):
-- utility_type: One of 'electric', 'gas', 'water', 'sewer', 'trash', 'internet' (REQUIRED)
-- provider: The utility company name (REQUIRED)
-- account_number: Account/customer number if visible (can be null)
-- bill_date: Bill date in YYYY-MM-DD format - USE EMAIL DATE IF NOT VISIBLE (REQUIRED, never null)
-- service_period_start: Billing period start YYYY-MM-DD (can be null)
-- service_period_end: Billing period end YYYY-MM-DD (can be null)
-- due_date: Payment due date YYYY-MM-DD (can be null)
-- usage_amount: Numeric consumption value (can be null)
-- usage_unit: 'kWh', 'therms', 'CCF', 'gallons', 'Mbps' (can be null)
-- amount_due: Total amount due as positive number (REQUIRED, default to 0 if unclear)
-- service_address: The service address from the bill (can be null)
-- matched_property_id: UUID of matched property (REQUIRED - match by street number + name)
-- confidence: 'high', 'medium', or 'low' (REQUIRED)
-
-PROVIDER TO UTILITY TYPE:
-- Georgia Power, Duke Energy, Sawnee EMC, Jackson EMC → electric
-- Gas South, SCANA Energy, Georgia Natural Gas, Atlanta Gas Light → gas
+UTILITY TYPE MAPPING:
+- Georgia Power, Duke Energy, EMC → electric
+- Gas South, SCANA, Georgia Natural Gas, Atlanta Gas Light → gas
 - DeKalb County, Cobb County Water, Fulton County, Gwinnett County → water
 - Waste Management, Republic Services → trash
-- Comcast, Xfinity, AT&T, Spectrum, Google Fiber, Verizon → internet
+- Comcast, Xfinity, AT&T, Spectrum, Google Fiber → internet
 
-PROPERTY MATCHING (MOST IMPORTANT):
-1. Extract the service address street number (e.g., "3155" from "3155 Duvall Pl")
-2. Extract the street name (e.g., "Duvall" or "Duvall Pl")
-3. Match to a property where BOTH street number AND a portion of street name match
-4. Example: Service "3155 Duvall Place" matches "3155 Duvall Pl, Kennesaw, GA"
-5. Example: Service "5360 Durham Ridge" matches "5360 Durham Ridge Ct, Lilburn"
-6. If you find a street number + name match, return that property's ID
-7. If no clear match, return null
+PROPERTY MATCHING RULES:
+You MUST match service addresses to properties by comparing:
+1. Street NUMBER must match exactly (e.g., "3155" = "3155")
+2. Street NAME should match partially (e.g., "Duvall" matches "Duvall Pl")
+3. If street number matches and street name is similar, return that property ID
+4. Only return a property ID from the list provided - NEVER make one up
+5. If you cannot find a clear match, return null for matched_property_id
 
-TODAY'S DATE FOR REFERENCE: ${emailDateParsed}
-
-Return ONLY valid JSON. Never include explanations outside JSON.`;
+RETURN FORMAT (valid JSON only):
+{
+  "utility_type": "electric|gas|water|sewer|trash|internet",
+  "provider": "Company Name",
+  "account_number": "123456" or null,
+  "bill_date": "YYYY-MM-DD",
+  "service_period_start": "YYYY-MM-DD" or null,
+  "service_period_end": "YYYY-MM-DD" or null,
+  "due_date": "YYYY-MM-DD" or null,
+  "usage_amount": 123.45 or null,
+  "usage_unit": "kWh|therms|CCF|gallons" or null,
+  "amount_due": 123.45,
+  "service_address": "Full address from bill" or null,
+  "matched_property_id": "uuid" or null,
+  "confidence": "high|medium|low"
+}`;
 
     const userPrompt = `Extract utility bill data and match to a property.
 
-AVAILABLE PROPERTIES (match by street number + name):
+AVAILABLE PROPERTIES TO MATCH:
 ${propertyList}
 
-EMAIL DATA:
+EMAIL DETAILS:
 From: ${senderEmail}
-Date: ${emailDate} (use as bill_date: ${emailDateParsed} if bill date not shown)
+Date: ${emailDate} (use "${emailDateParsed}" as bill_date if not found)
 Subject: ${emailSubject}
 
-Body:
+BODY:
 ${emailBody}
 
-Return JSON with these exact fields: utility_type, provider, account_number, bill_date (YYYY-MM-DD, never null), service_period_start, service_period_end, due_date, usage_amount, usage_unit, amount_due, service_address, matched_property_id, confidence`;
+INSTRUCTIONS:
+1. Find the SERVICE ADDRESS in the email (look for "Service Location", "Service Address", street addresses)
+2. Extract the amount due (look for "Amount Due", "Total Due", "Balance", dollar amounts)
+3. Match the service address to one of the properties above by street number and name
+4. Return JSON only, no other text`;
 
-    console.log('Calling OpenAI for utility extraction...');
+    console.log('Calling OpenAI...');
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -163,36 +170,35 @@ Return JSON with these exact fields: utility_type, provider, account_number, bil
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('OpenAI API error:', response.status, errorText);
+      console.error('OpenAI error:', response.status, errorText);
       throw new Error(`OpenAI API error: ${response.status}`);
     }
 
     const data = await response.json();
     const content = data.choices?.[0]?.message?.content || '';
     
-    console.log('OpenAI response:', content);
+    console.log('OpenAI response:', content.substring(0, 500));
 
-    // Extract JSON from the response
+    // Parse JSON
     let utilityData: UtilityData;
     try {
       const jsonMatch = content.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         utilityData = JSON.parse(jsonMatch[0]);
       } else {
-        throw new Error('No JSON found in response');
+        throw new Error('No JSON found');
       }
     } catch (parseError) {
-      console.error('Failed to parse AI response:', content);
-      throw new Error('Failed to parse utility data from AI response');
+      console.error('Parse failed:', content);
+      throw new Error('Failed to parse AI response');
     }
 
-    // Validate and sanitize required fields
+    // Validate required fields
     if (!utilityData.utility_type) {
-      console.error('Missing utility_type:', utilityData);
-      throw new Error('Missing utility_type field');
+      throw new Error('Missing utility_type');
     }
 
-    // Ensure bill_date is never null - use email date as fallback
+    // Ensure bill_date
     if (!utilityData.bill_date) {
       utilityData.bill_date = emailDateParsed;
     } else {
@@ -201,24 +207,38 @@ Return JSON with these exact fields: utility_type, provider, account_number, bil
 
     // Parse other dates
     if (utilityData.service_period_start) {
-      utilityData.service_period_start = parseToISODate(utilityData.service_period_start, null as any) || null;
+      utilityData.service_period_start = parseToISODate(utilityData.service_period_start, '') || null;
     }
     if (utilityData.service_period_end) {
-      utilityData.service_period_end = parseToISODate(utilityData.service_period_end, null as any) || null;
+      utilityData.service_period_end = parseToISODate(utilityData.service_period_end, '') || null;
     }
     if (utilityData.due_date) {
-      utilityData.due_date = parseToISODate(utilityData.due_date, null as any) || null;
+      utilityData.due_date = parseToISODate(utilityData.due_date, '') || null;
     }
 
-    // Ensure amount is positive and defaulted
+    // Ensure positive amount
     utilityData.amount_due = Math.abs(utilityData.amount_due || 0);
 
-    // Default confidence if missing
+    // Validate matched_property_id is from our list
+    if (utilityData.matched_property_id) {
+      const isValidId = properties?.some((p: any) => p.id === utilityData.matched_property_id);
+      if (!isValidId) {
+        console.log(`Invalid property ID "${utilityData.matched_property_id}" - not in provided list`);
+        utilityData.matched_property_id = null;
+      }
+    }
+
+    // Default confidence
     if (!utilityData.confidence) {
       utilityData.confidence = utilityData.matched_property_id ? 'medium' : 'low';
     }
 
-    console.log('Extracted utility data:', JSON.stringify(utilityData, null, 2));
+    console.log('Extracted:', JSON.stringify({
+      provider: utilityData.provider,
+      amount: utilityData.amount_due,
+      address: utilityData.service_address,
+      matched: utilityData.matched_property_id ? 'YES' : 'NO'
+    }));
 
     return new Response(JSON.stringify({ 
       success: true, 
@@ -228,7 +248,7 @@ Return JSON with these exact fields: utility_type, provider, account_number, bil
     });
 
   } catch (error: unknown) {
-    console.error('Error in extract-utility-data:', error);
+    console.error('Error:', error);
     return new Response(JSON.stringify({ 
       success: false, 
       error: error instanceof Error ? error.message : 'Unknown error'
