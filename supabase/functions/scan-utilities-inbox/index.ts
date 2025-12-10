@@ -88,39 +88,92 @@ function detectProvider(text: string): { type: string; name: string } | null {
   return null;
 }
 
-// Enhanced amount extraction
-function extractAmount(text: string): number | null {
-  // Priority patterns for bill amounts
-  const patterns = [
-    /total\s*(?:due|amount|balance|owed)[:\s]*\$?\s*([\d,]+\.?\d*)/gi,
-    /amount\s*(?:due|owed|payable)[:\s]*\$?\s*([\d,]+\.?\d*)/gi,
-    /balance\s*(?:due|forward|total)[:\s]*\$?\s*([\d,]+\.?\d*)/gi,
-    /(?:new|current)\s*(?:balance|charges)[:\s]*\$?\s*([\d,]+\.?\d*)/gi,
-    /payment\s*(?:amount|due)[:\s]*\$?\s*([\d,]+\.?\d*)/gi,
-    /(?:your|this)\s*(?:bill|statement)[:\s]*\$?\s*([\d,]+\.?\d*)/gi,
-    /(?:pay|paid)\s*\$?\s*([\d,]+\.?\d*)/gi,
-    /charged\s*\$?\s*([\d,]+\.?\d*)/gi,
+// Enhanced amount extraction with extensive patterns
+function extractAmount(text: string, subject: string = ""): { amount: number | null; source: string } {
+  const fullText = `${subject} ${text}`;
+  
+  // Provider-specific patterns (highest priority)
+  const providerPatterns = [
+    // SCANA Energy specific
+    { pattern: /invoice\s*(?:total|amount)[:\s]*\$?\s*([\d,]+\.?\d{2})/gi, source: "scana_invoice" },
+    { pattern: /total\s*charges[:\s]*\$?\s*([\d,]+\.?\d{2})/gi, source: "total_charges" },
+    
+    // Georgia Power / EMC specific
+    { pattern: /amount\s*due[:\s]*\$?\s*([\d,]+\.?\d{2})/gi, source: "amount_due" },
+    { pattern: /current\s*bill[:\s]*\$?\s*([\d,]+\.?\d{2})/gi, source: "current_bill" },
+    { pattern: /bill\s*amount[:\s]*\$?\s*([\d,]+\.?\d{2})/gi, source: "bill_amount" },
+    
+    // Jackson EMC specific
+    { pattern: /total\s*due[:\s]*\$?\s*([\d,]+\.?\d{2})/gi, source: "jackson_total_due" },
+    { pattern: /(?:your|this)\s*bill[:\s]*\$?\s*([\d,]+\.?\d{2})/gi, source: "your_bill" },
+    
+    // Water utilities (Gwinnett, DeKalb, Cobb)
+    { pattern: /water\s*(?:bill|charges?)[:\s]*\$?\s*([\d,]+\.?\d{2})/gi, source: "water_bill" },
+    { pattern: /sewer\s*(?:bill|charges?)[:\s]*\$?\s*([\d,]+\.?\d{2})/gi, source: "sewer_bill" },
+    { pattern: /total\s*amount\s*due[:\s]*\$?\s*([\d,]+\.?\d{2})/gi, source: "total_amount_due" },
+    { pattern: /balance\s*due[:\s]*\$?\s*([\d,]+\.?\d{2})/gi, source: "balance_due" },
+    
+    // Internet/Cable
+    { pattern: /(?:monthly|recurring)\s*(?:charges?|total)[:\s]*\$?\s*([\d,]+\.?\d{2})/gi, source: "monthly_charges" },
+    { pattern: /auto[- ]?pay\s*(?:amount)?[:\s]*\$?\s*([\d,]+\.?\d{2})/gi, source: "autopay" },
+    
+    // Generic high-confidence patterns
+    { pattern: /(?:please\s*)?pay[:\s]*\$?\s*([\d,]+\.?\d{2})/gi, source: "please_pay" },
+    { pattern: /payment\s*(?:of|amount)[:\s]*\$?\s*([\d,]+\.?\d{2})/gi, source: "payment_amount" },
+    { pattern: /(?:we\s*)?(?:received|charged)[:\s]*\$?\s*([\d,]+\.?\d{2})/gi, source: "charged" },
+    { pattern: /(?:new|current)\s*balance[:\s]*\$?\s*([\d,]+\.?\d{2})/gi, source: "new_balance" },
+    { pattern: /statement\s*(?:balance|total)[:\s]*\$?\s*([\d,]+\.?\d{2})/gi, source: "statement_balance" },
+    
+    // Subject line patterns (often contain the amount)
+    { pattern: /\$\s*([\d,]+\.?\d{2})\s*(?:due|bill|payment|statement)/gi, source: "subject_amount" },
+    { pattern: /(?:due|bill|payment|statement)[:\s]*\$?\s*([\d,]+\.?\d{2})/gi, source: "subject_due" },
+    
+    // HTML table patterns (amounts in td elements)
+    { pattern: /<td[^>]*>\s*\$?\s*([\d,]+\.?\d{2})\s*<\/td>/gi, source: "html_table" },
+    
+    // Fallback patterns
+    { pattern: /total[:\s]*\$?\s*([\d,]+\.?\d{2})/gi, source: "total_generic" },
+    { pattern: /due[:\s]*\$?\s*([\d,]+\.?\d{2})/gi, source: "due_generic" },
+    { pattern: /owes?[:\s]*\$?\s*([\d,]+\.?\d{2})/gi, source: "owe_generic" },
   ];
   
-  for (const pattern of patterns) {
-    pattern.lastIndex = 0; // Reset regex
-    const match = pattern.exec(text);
+  for (const { pattern, source } of providerPatterns) {
+    pattern.lastIndex = 0;
+    const match = pattern.exec(fullText);
     if (match) {
       const amount = parseFloat(match[1].replace(/,/g, ""));
-      if (amount >= 5 && amount <= 3000) return amount;
+      if (amount >= 5 && amount <= 5000) {
+        return { amount, source };
+      }
     }
   }
   
-  // Fallback: find the largest reasonable dollar amount
-  const allAmounts = text.match(/\$\s*([\d,]+\.\d{2})/g);
-  if (allAmounts) {
-    const amounts = allAmounts
-      .map(m => parseFloat(m.replace(/[$,]/g, "")))
-      .filter(a => a >= 5 && a <= 3000);
-    if (amounts.length > 0) return Math.max(...amounts);
+  // Last resort: find ALL dollar amounts and pick the most likely bill amount
+  const allDollarMatches = fullText.match(/\$\s*([\d,]+\.?\d{2})/g) || [];
+  const amounts = allDollarMatches
+    .map(m => parseFloat(m.replace(/[$,\s]/g, "")))
+    .filter(a => a >= 10 && a <= 5000);
+  
+  if (amounts.length > 0) {
+    // If multiple amounts, prefer amounts between $20-$500 (typical utility range)
+    const typicalAmounts = amounts.filter(a => a >= 20 && a <= 500);
+    if (typicalAmounts.length > 0) {
+      return { amount: Math.max(...typicalAmounts), source: "typical_range" };
+    }
+    return { amount: Math.max(...amounts), source: "fallback_max" };
   }
   
-  return null;
+  // Try to find amounts without $ sign (some emails format differently)
+  const noSignPattern = /(?:amount|total|due|bill|pay)[:\s]+(\d{2,4}\.\d{2})/gi;
+  let match;
+  while ((match = noSignPattern.exec(fullText)) !== null) {
+    const amount = parseFloat(match[1]);
+    if (amount >= 10 && amount <= 5000) {
+      return { amount, source: "no_dollar_sign" };
+    }
+  }
+  
+  return { amount: null, source: "not_found" };
 }
 
 function extractAccountNumber(text: string): string | null {
@@ -350,13 +403,24 @@ serve(async (req) => {
           const provider = detectProvider(fullText);
           if (!provider) {
             skippedNoProvider++;
+            // Log provider detection failure for debugging
+            if (skippedNoProvider <= 3) {
+              console.log(`  ⚠ No provider detected in: ${subject.substring(0, 60)}...`);
+            }
             continue;
           }
 
-          // Extract amount
-          const amount = extractAmount(fullText);
+          // Extract amount with enhanced patterns
+          const { amount, source: amountSource } = extractAmount(textContent, subject);
           if (!amount) {
             skippedNoAmount++;
+            // Log amount extraction failures for debugging
+            if (skippedNoAmount <= 5) {
+              console.log(`  ⚠ No amount found in: ${subject.substring(0, 60)}... (provider: ${provider.name})`);
+              // Log a snippet of the email to help debug
+              const snippet = textContent.substring(0, 300).replace(/\s+/g, " ");
+              console.log(`    Snippet: ${snippet}...`);
+            }
             continue;
           }
 
