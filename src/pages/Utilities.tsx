@@ -449,18 +449,43 @@ export default function Utilities() {
             </Card>
           ) : (
             <div className="space-y-6">
+              {/* Properties with missing utility data warning */}
+              {assignedProperties.filter(([, data]) => Object.keys(data.utilities).length === 0).length > 0 && (
+                <Card className="border-amber-500 bg-amber-50/50 dark:bg-amber-950/20">
+                  <CardContent className="py-4">
+                    <div className="flex items-center gap-3">
+                      <AlertTriangle className="h-5 w-5 text-amber-600" />
+                      <div>
+                        <p className="font-medium text-amber-800 dark:text-amber-200">
+                          {assignedProperties.filter(([, data]) => Object.keys(data.utilities).length === 0).length} properties have no utility data
+                        </p>
+                        <p className="text-sm text-amber-700 dark:text-amber-300">
+                          {assignedProperties.filter(([, data]) => Object.keys(data.utilities).length === 0).map(([, d]) => d.property?.name).join(", ")}
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
               {assignedProperties.map(([propId, data]) => {
                 const chartData = getPropertyChartData(data.monthlyData);
                 const utilityTypes = Object.keys(data.utilities);
+                const hasNoData = utilityTypes.length === 0;
 
                 return (
-                  <Card key={propId}>
+                  <Card key={propId} className={hasNoData ? "border-amber-400 opacity-70" : ""}>
                     <CardHeader className="pb-2">
                       <div className="flex justify-between items-start">
                         <div>
                           <CardTitle className="flex items-center gap-2">
                             <Building2 className="h-5 w-5" />
                             {data.property?.name || "Unknown Property"}
+                            {hasNoData && (
+                              <Badge variant="outline" className="text-amber-600 border-amber-400">
+                                No Data
+                              </Badge>
+                            )}
                           </CardTitle>
                           {data.property?.address && (
                             <CardDescription>{data.property.address}</CardDescription>
@@ -505,7 +530,7 @@ export default function Utilities() {
                       </div>
 
                       {/* Monthly Cost Chart */}
-                      {chartData.length > 0 && (
+                      {chartData.length > 0 ? (
                         <div className="h-[250px]">
                           <ResponsiveContainer width="100%" height="100%">
                             <AreaChart data={chartData}>
@@ -532,27 +557,33 @@ export default function Utilities() {
                             </AreaChart>
                           </ResponsiveContainer>
                         </div>
+                      ) : (
+                        <div className="h-[100px] flex items-center justify-center border rounded-lg bg-muted/30">
+                          <p className="text-sm text-muted-foreground">No utility bills scanned yet for this property</p>
+                        </div>
                       )}
 
                       {/* Recent Bills */}
-                      <div className="border-t pt-4">
-                        <h4 className="text-sm font-medium mb-2">Recent Bills</h4>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 max-h-[150px] overflow-y-auto">
-                          {data.readings?.slice(0, 6).map(reading => {
-                            const Icon = UTILITY_ICONS[reading.utility_type];
-                            return (
-                              <div key={reading.id} className="flex items-center gap-2 p-2 bg-muted/50 rounded text-sm">
-                                <Icon className="h-4 w-4" style={{ color: UTILITY_COLORS[reading.utility_type] }} />
-                                <span className="flex-1 truncate">{reading.provider}</span>
-                                <span className="font-medium">${reading.amount_due?.toFixed(0)}</span>
-                                <span className="text-xs text-muted-foreground">
-                                  {reading.bill_date ? format(new Date(reading.bill_date), "MMM d") : ""}
-                                </span>
-                              </div>
-                            );
-                          })}
+                      {data.readings && data.readings.length > 0 && (
+                        <div className="border-t pt-4">
+                          <h4 className="text-sm font-medium mb-2">Recent Bills</h4>
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 max-h-[150px] overflow-y-auto">
+                            {data.readings?.slice(0, 6).map(reading => {
+                              const Icon = UTILITY_ICONS[reading.utility_type];
+                              return (
+                                <div key={reading.id} className="flex items-center gap-2 p-2 bg-muted/50 rounded text-sm">
+                                  <Icon className="h-4 w-4" style={{ color: UTILITY_COLORS[reading.utility_type] }} />
+                                  <span className="flex-1 truncate">{reading.provider}</span>
+                                  <span className="font-medium">${reading.amount_due?.toFixed(0)}</span>
+                                  <span className="text-xs text-muted-foreground">
+                                    {reading.bill_date ? format(new Date(reading.bill_date), "MMM d") : ""}
+                                  </span>
+                                </div>
+                              );
+                            })}
+                          </div>
                         </div>
-                      </div>
+                      )}
                     </CardContent>
                   </Card>
                 );
