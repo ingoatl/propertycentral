@@ -496,6 +496,26 @@ serve(async (req) => {
         }
       }
 
+      // Fallback: Search for property addresses in the email body
+      if (!matchedPropertyId) {
+        for (const prop of properties) {
+          const streetMatch = prop.address.match(/^(\d+)\s+(.+?)(?:,|$)/i);
+          if (!streetMatch) continue;
+          
+          const streetNum = streetMatch[1];
+          const streetName = streetMatch[2].split(' ')[0].toLowerCase();
+          
+          // Look for street number followed by partial street name
+          const searchPattern = new RegExp(`\\b${streetNum}\\s+\\w*${streetName.substring(0, 4)}`, 'i');
+          if (searchPattern.test(body)) {
+            matchedPropertyId = prop.id;
+            matchMethod = 'body_search';
+            console.log(`  Found in body: ${streetNum} ${streetName} → ${prop.name}`);
+            break;
+          }
+        }
+      }
+
       if (matchedPropertyId) matchedCount++;
 
       // Insert reading
