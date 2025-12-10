@@ -6,22 +6,15 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Hardcoded Company-Owned property mappings
-const PROPERTIES = [
-  { id: "695bfc2a-4187-4377-8e25-18aa2fcd0454", name: "Alpine", streetNum: "4241", keywords: ["osburn", "duluth"], zip: "30096" },
-  { id: "fa81c7ec-7e9b-48ab-aa8c-d2ddf41eea9b", name: "Family Retreat", streetNum: "5360", keywords: ["durham", "lilburn"], zip: "30047" },
-  { id: "96e2819b-c0e8-4281-b535-5c99c39973b3", name: "Lavish Living", streetNum: "3069", keywords: ["rita"], zip: "30080" },
-  { id: "9904f14f-4cf0-44d7-bc3e-1207bcc28a34", name: "Luxurious Apartment", streetNum: "2580", keywords: ["roswell"], zip: "30076" },
-  { id: "6ffe191b-d85c-44f3-b91b-f8d38bee16b4", name: "Modern Townhome", streetNum: "169", keywords: ["willow"], zip: "30076" },
-  { id: "6c80c23b-997a-45af-8702-aeb7a7cf3e81", name: "Scandi Chic", streetNum: "3155", keywords: ["duvall", "kennesaw"], zip: "30144" },
-  { id: "9f7f6d4d-9873-46be-926f-c5a48863a946", name: "Scandinavian Retreat", streetNum: "5198", keywords: ["laurel", "bridge"], zip: "30082" },
-];
-
-// Known account number mappings
-const ACCOUNT_MAP: Record<string, string> = {
-  "100118047": "6c80c23b-997a-45af-8702-aeb7a7cf3e81", // Cobb Water - Scandi Chic
-  "4310134357135": "9f7f6d4d-9873-46be-926f-c5a48863a946", // SCANA - Scandinavian Retreat
-  "4918100": "9f7f6d4d-9873-46be-926f-c5a48863a946", // Smyrna Water - Scandinavian Retreat
+// Gmail label name to property ID mapping (based on user's Gmail label structure under "Utilities")
+const LABEL_PROPERTY_MAP: Record<string, { id: string; name: string }> = {
+  "169 Willow Stream": { id: "6ffe191b-d85c-44f3-b91b-f8d38bee16b4", name: "Modern + Cozy Townhome" },
+  "2580 Old Roswell": { id: "9904f14f-4cf0-44d7-bc3e-1207bcc28a34", name: "Luxurious & Spacious Apartment" },
+  "3069 Rita Way": { id: "96e2819b-c0e8-4281-b535-5c99c39973b3", name: "Lavish Living" },
+  "3155 Duvall Pl": { id: "6c80c23b-997a-45af-8702-aeb7a7cf3e81", name: "Scandi Chic" },
+  "4241 Osburn": { id: "695bfc2a-4187-4377-8e25-18aa2fcd0454", name: "Alpine" },
+  "5198 Laurel Bridge": { id: "9f7f6d4d-9873-46be-926f-c5a48863a946", name: "Scandinavian Retreat" },
+  "5360 Durham Rid": { id: "fa81c7ec-7e9b-48ab-aa8c-d2ddf41eea9b", name: "Family Retreat" },
 };
 
 // Provider detection
@@ -66,48 +59,6 @@ function extractAccountNumber(text: string): string | null {
   return null;
 }
 
-function matchProperty(text: string, accountNum: string | null): { id: string; method: string } | null {
-  const searchText = text.toUpperCase();
-  
-  // 1. Account number match (highest priority)
-  if (accountNum && ACCOUNT_MAP[accountNum]) {
-    return { id: ACCOUNT_MAP[accountNum], method: "account" };
-  }
-  
-  // 2. Street number + keyword match
-  for (const prop of PROPERTIES) {
-    if (searchText.includes(prop.streetNum)) {
-      const hasKeyword = prop.keywords.some(k => searchText.includes(k.toUpperCase()));
-      if (hasKeyword) {
-        return { id: prop.id, method: "address" };
-      }
-      // Zip code fallback
-      if (searchText.includes(prop.zip)) {
-        return { id: prop.id, method: "zip" };
-      }
-    }
-  }
-  
-  // 3. Keyword-only match (lower confidence)
-  for (const prop of PROPERTIES) {
-    const matchCount = prop.keywords.filter(k => searchText.includes(k.toUpperCase())).length;
-    if (matchCount >= 2) {
-      return { id: prop.id, method: "keywords" };
-    }
-  }
-  
-  return null;
-}
-
-function isBillEmail(subject: string): boolean {
-  const s = subject.toLowerCase();
-  const billKeywords = ["bill", "invoice", "statement", "payment due", "amount due", "ready to view", "balance"];
-  const skipKeywords = ["offer", "giveaway", "tips", "newsletter", "survey", "welcome", "confirm", "outage"];
-  
-  if (skipKeywords.some(k => s.includes(k))) return false;
-  return billKeywords.some(k => s.includes(k));
-}
-
 async function refreshToken(refreshToken: string): Promise<string> {
   const response = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
@@ -122,6 +73,29 @@ async function refreshToken(refreshToken: string): Promise<string> {
   const data = await response.json();
   if (data.error) throw new Error(data.error_description || data.error);
   return data.access_token;
+}
+
+// Find property ID from Gmail labels
+function matchPropertyFromLabels(labelIds: string[], labelMap: Map<string, string>): { id: string; name: string; method: string } | null {
+  for (const labelId of labelIds) {
+    const labelName = labelMap.get(labelId);
+    if (labelName) {
+      // Check direct match first
+      for (const [key, prop] of Object.entries(LABEL_PROPERTY_MAP)) {
+        if (labelName.includes(key) || key.includes(labelName.split("/").pop() || "")) {
+          return { ...prop, method: "label" };
+        }
+      }
+      // Check if label name contains any street number
+      for (const [key, prop] of Object.entries(LABEL_PROPERTY_MAP)) {
+        const streetNum = key.split(" ")[0];
+        if (labelName.includes(streetNum)) {
+          return { ...prop, method: "label" };
+        }
+      }
+    }
+  }
+  return null;
 }
 
 serve(async (req) => {
@@ -156,6 +130,47 @@ serve(async (req) => {
 
     const accessToken = await refreshToken(tokenData.refresh_token);
 
+    // Step 1: Fetch ALL Gmail labels to build a map
+    console.log("Fetching Gmail labels...");
+    const labelsRes = await fetch(
+      "https://gmail.googleapis.com/gmail/v1/users/me/labels",
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+    
+    if (!labelsRes.ok) throw new Error("Failed to fetch Gmail labels");
+    
+    const labelsData = await labelsRes.json();
+    const labelMap = new Map<string, string>();
+    const utilityLabels: { id: string; name: string; propertyId: string; propertyName: string }[] = [];
+    
+    // Build label ID to name map and find Utilities sub-labels
+    for (const label of labelsData.labels || []) {
+      labelMap.set(label.id, label.name);
+      
+      // Check if this is a Utilities sub-label
+      if (label.name?.startsWith("Utilities/")) {
+        const subLabelName = label.name.replace("Utilities/", "");
+        console.log(`Found Utilities label: ${subLabelName}`);
+        
+        // Match to property
+        for (const [key, prop] of Object.entries(LABEL_PROPERTY_MAP)) {
+          const streetNum = key.split(" ")[0];
+          if (subLabelName.includes(streetNum) || subLabelName.includes(key)) {
+            utilityLabels.push({
+              id: label.id,
+              name: subLabelName,
+              propertyId: prop.id,
+              propertyName: prop.name,
+            });
+            console.log(`  -> Mapped to: ${prop.name} (${prop.id})`);
+            break;
+          }
+        }
+      }
+    }
+
+    console.log(`Found ${utilityLabels.length} utility labels mapped to properties`);
+
     // Get existing message IDs
     const { data: existing } = await supabase
       .from("utility_readings")
@@ -164,126 +179,133 @@ serve(async (req) => {
     
     const existingIds = new Set(existing?.map(r => r.gmail_message_id) || []);
 
-    // Search for utility emails
-    const searchQuery = `newer_than:${months * 30}d (from:gassouth OR from:scanaenergy OR from:georgiapower OR from:cobbcounty OR from:smyrnaga OR from:dekalb)`;
-    
-    console.log("Search:", searchQuery);
-    
-    const searchRes = await fetch(
-      `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent(searchQuery)}&maxResults=100`,
-      { headers: { Authorization: `Bearer ${accessToken}` } }
-    );
-    
-    if (!searchRes.ok) throw new Error("Gmail search failed");
-    
-    const { messages = [] } = await searchRes.json();
-    console.log(`Found ${messages.length} emails`);
-
     let newReadings = 0;
     let matched = 0;
+    let totalProcessed = 0;
 
-    // Process messages (limit to 30 to prevent timeout)
-    for (const msg of messages.slice(0, 30)) {
-      if (existingIds.has(msg.id)) continue;
-      
-      // Check time - stop if approaching timeout
+    // Step 2: For each utility label, fetch emails and create readings
+    for (const utilLabel of utilityLabels) {
       if (Date.now() - startTime > 25000) {
         console.log("Approaching timeout, stopping");
         break;
       }
 
-      try {
-        const msgRes = await fetch(
-          `https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}?format=full`,
-          { headers: { Authorization: `Bearer ${accessToken}` } }
-        );
-        
-        if (!msgRes.ok) continue;
-        
-        const msgData = await msgRes.json();
-        const headers = msgData.payload?.headers || [];
-        
-        const subject = headers.find((h: any) => h.name.toLowerCase() === "subject")?.value || "";
-        const from = headers.find((h: any) => h.name.toLowerCase() === "from")?.value || "";
-        const date = headers.find((h: any) => h.name.toLowerCase() === "date")?.value || "";
-        
-        if (!isBillEmail(subject)) {
-          console.log(`Skip (not bill): ${subject.substring(0, 50)}`);
-          continue;
-        }
+      console.log(`\nScanning label: ${utilLabel.name} -> ${utilLabel.propertyName}`);
+      
+      // Search emails with this label
+      const searchRes = await fetch(
+        `https://gmail.googleapis.com/gmail/v1/users/me/messages?labelIds=${utilLabel.id}&maxResults=50`,
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
+      
+      if (!searchRes.ok) {
+        console.log(`  Failed to fetch emails for ${utilLabel.name}`);
+        continue;
+      }
+      
+      const { messages = [] } = await searchRes.json();
+      console.log(`  Found ${messages.length} emails`);
 
-        // Extract body
-        let body = "";
-        const extractBody = (payload: any): string => {
-          if (payload.body?.data) {
-            try {
-              return atob(payload.body.data.replace(/-/g, "+").replace(/_/g, "/"));
-            } catch { return ""; }
-          }
-          if (payload.parts) {
-            for (const part of payload.parts) {
-              const result = extractBody(part);
-              if (result) return result;
-            }
-          }
-          return "";
-        };
-        body = extractBody(msgData.payload);
-
-        const fullText = `${subject} ${from} ${body}`;
+      // Process each email
+      for (const msg of messages) {
+        if (existingIds.has(msg.id)) continue;
         
-        // Detect provider
-        const provider = detectProvider(fullText);
-        if (!provider) {
-          console.log(`Skip (no provider): ${subject.substring(0, 50)}`);
-          continue;
-        }
+        if (Date.now() - startTime > 25000) break;
 
-        // Extract data
-        const amount = extractAmount(fullText);
-        if (!amount) {
-          console.log(`Skip (no amount): ${subject.substring(0, 50)}`);
-          continue;
-        }
-
-        const accountNum = extractAccountNumber(fullText);
-        const propMatch = matchProperty(fullText, accountNum);
-        
-        // Parse bill date
-        let billDate = new Date().toISOString().split("T")[0];
         try {
-          const d = new Date(date);
-          if (!isNaN(d.getTime())) billDate = d.toISOString().split("T")[0];
-        } catch {}
+          const msgRes = await fetch(
+            `https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}?format=full`,
+            { headers: { Authorization: `Bearer ${accessToken}` } }
+          );
+          
+          if (!msgRes.ok) continue;
+          
+          const msgData = await msgRes.json();
+          const headers = msgData.payload?.headers || [];
+          
+          const subject = headers.find((h: any) => h.name.toLowerCase() === "subject")?.value || "";
+          const from = headers.find((h: any) => h.name.toLowerCase() === "from")?.value || "";
+          const date = headers.find((h: any) => h.name.toLowerCase() === "date")?.value || "";
 
-        // Insert reading
-        const { error: insertErr } = await supabase.from("utility_readings").insert({
-          property_id: propMatch?.id || null,
-          utility_type: provider.type,
-          provider: provider.name,
-          account_number: accountNum,
-          bill_date: billDate,
-          amount_due: amount,
-          gmail_message_id: msg.id,
-          match_method: propMatch?.method || "unmatched",
-          raw_email_data: { subject, from, date, extracted_at: new Date().toISOString() },
-        });
+          // Extract body
+          let body = "";
+          const extractBody = (payload: any): string => {
+            if (payload.body?.data) {
+              try {
+                return atob(payload.body.data.replace(/-/g, "+").replace(/_/g, "/"));
+              } catch { return ""; }
+            }
+            if (payload.parts) {
+              for (const part of payload.parts) {
+                const result = extractBody(part);
+                if (result) return result;
+              }
+            }
+            return "";
+          };
+          body = extractBody(msgData.payload);
 
-        if (!insertErr) {
-          newReadings++;
-          if (propMatch) matched++;
-          console.log(`Added: ${provider.name} $${amount} - ${propMatch ? `MATCHED (${propMatch.method})` : "UNMATCHED"}`);
+          const fullText = `${subject} ${from} ${body}`;
+          
+          // Detect provider
+          const provider = detectProvider(fullText);
+          if (!provider) {
+            console.log(`  Skip (no provider): ${subject.substring(0, 40)}`);
+            continue;
+          }
+
+          // Extract amount
+          const amount = extractAmount(fullText);
+          if (!amount) {
+            console.log(`  Skip (no amount): ${subject.substring(0, 40)}`);
+            continue;
+          }
+
+          const accountNum = extractAccountNumber(fullText);
+          
+          // Parse bill date
+          let billDate = new Date().toISOString().split("T")[0];
+          try {
+            const d = new Date(date);
+            if (!isNaN(d.getTime())) billDate = d.toISOString().split("T")[0];
+          } catch {}
+
+          // Insert reading - property ID comes from the label!
+          const { error: insertErr } = await supabase.from("utility_readings").insert({
+            property_id: utilLabel.propertyId,
+            utility_type: provider.type,
+            provider: provider.name,
+            account_number: accountNum,
+            bill_date: billDate,
+            amount_due: amount,
+            gmail_message_id: msg.id,
+            match_method: "label",
+            raw_email_data: { subject, from, date, label: utilLabel.name },
+          });
+
+          if (!insertErr) {
+            newReadings++;
+            matched++;
+            totalProcessed++;
+            console.log(`  Added: ${provider.name} $${amount} on ${billDate}`);
+          }
+          
+        } catch (e) {
+          console.error("  Error processing message:", e);
         }
-        
-      } catch (e) {
-        console.error("Error processing message:", e);
       }
     }
 
-    console.log(`Done: ${newReadings} new, ${matched} matched`);
+    console.log(`\nDone: ${newReadings} new readings, all ${matched} matched via labels`);
 
     return new Response(
-      JSON.stringify({ success: true, newReadings, matched, totalEmails: messages.length }),
+      JSON.stringify({ 
+        success: true, 
+        newReadings, 
+        matched, 
+        labelsFound: utilityLabels.length,
+        properties: utilityLabels.map(l => l.propertyName),
+      }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
     
