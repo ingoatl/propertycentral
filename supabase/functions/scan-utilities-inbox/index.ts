@@ -34,21 +34,34 @@ const UTILITY_PROVIDERS = [
   { domain: 'georgiapower.com', type: 'electric', name: 'Georgia Power' },
   { domain: 'duke-energy.com', type: 'electric', name: 'Duke Energy' },
   { domain: 'fpl.com', type: 'electric', name: 'Florida Power & Light' },
+  { domain: 'sawnee.com', type: 'electric', name: 'Sawnee EMC' },
+  { domain: 'jacksonemc.com', type: 'electric', name: 'Jackson EMC' },
   // Gas
   { domain: 'gassouth.com', type: 'gas', name: 'Gas South' },
   { domain: 'scanaenergy.com', type: 'gas', name: 'SCANA Energy' },
   { domain: 'southerncompanygas.com', type: 'gas', name: 'Southern Company Gas' },
+  { domain: 'atlantagaslight.com', type: 'gas', name: 'Atlanta Gas Light' },
+  { domain: 'nicor.com', type: 'gas', name: 'Nicor Gas' },
   // Water
   { domain: 'dekalbcountyga.gov', type: 'water', name: 'DeKalb County Water' },
   { domain: 'cobbcounty.org', type: 'water', name: 'Cobb County Water' },
   { domain: 'fultoncountyga.gov', type: 'water', name: 'Fulton County Water' },
+  { domain: 'gwinnettcounty.com', type: 'water', name: 'Gwinnett County Water' },
+  { domain: 'forsythco.com', type: 'water', name: 'Forsyth County Water' },
   // Trash
   { domain: 'wm.com', type: 'trash', name: 'Waste Management' },
   { domain: 'republicservices.com', type: 'trash', name: 'Republic Services' },
+  { domain: 'wasteconnections.com', type: 'trash', name: 'Waste Connections' },
   // Internet
   { domain: 'comcast.com', type: 'internet', name: 'Comcast/Xfinity' },
   { domain: 'xfinity.com', type: 'internet', name: 'Xfinity' },
   { domain: 'att.com', type: 'internet', name: 'AT&T' },
+  { domain: 'spectrum.com', type: 'internet', name: 'Spectrum' },
+  { domain: 'charter.com', type: 'internet', name: 'Charter/Spectrum' },
+  { domain: 'google.com', type: 'internet', name: 'Google Fiber' },
+  { domain: 'fiber.google.com', type: 'internet', name: 'Google Fiber' },
+  { domain: 'verizon.com', type: 'internet', name: 'Verizon' },
+  { domain: 'tmobile.com', type: 'internet', name: 'T-Mobile Home Internet' },
 ];
 
 serve(async (req) => {
@@ -207,19 +220,70 @@ serve(async (req) => {
 
       const utilityData = extractResult.data;
 
-      // Try to match to a property based on address hints
+      // Enhanced property matching
       let matchedPropertyId: string | null = null;
-      if (utilityData.property_address_hint && properties) {
-        const hint = utilityData.property_address_hint.toLowerCase();
+      
+      // First, try to match by account number from utility_accounts table
+      if (utilityData.account_number) {
+        const { data: accountMatch } = await supabase
+          .from('utility_accounts')
+          .select('property_id')
+          .eq('account_number', utilityData.account_number)
+          .eq('is_active', true)
+          .single();
+        
+        if (accountMatch) {
+          matchedPropertyId = accountMatch.property_id;
+          console.log(`Matched property by account number: ${utilityData.account_number}`);
+        }
+      }
+
+      // If no account match, try address matching with improved logic
+      if (!matchedPropertyId && properties) {
+        const hint = (utilityData.property_address_hint || '').toLowerCase();
+        const emailBody = body.toLowerCase();
+        
         for (const prop of properties) {
-          if (prop.address.toLowerCase().includes(hint) || hint.includes(prop.address.toLowerCase())) {
-            matchedPropertyId = prop.id;
-            break;
+          const propAddress = prop.address.toLowerCase();
+          const propName = prop.name.toLowerCase();
+          
+          // Extract street number and name from property address
+          const propStreetMatch = propAddress.match(/^(\d+)\s+(.+?)(?:,|$)/);
+          const propStreetNumber = propStreetMatch?.[1];
+          const propStreetName = propStreetMatch?.[2]?.split(/[,\s]+/)[0];
+          
+          // Check if hint contains property address components
+          if (hint) {
+            // Direct address match
+            if (hint.includes(propAddress) || propAddress.includes(hint)) {
+              matchedPropertyId = prop.id;
+              console.log(`Matched property by direct address: ${prop.name}`);
+              break;
+            }
+            
+            // Street number + partial street name match
+            if (propStreetNumber && propStreetName) {
+              if (hint.includes(propStreetNumber) && hint.includes(propStreetName)) {
+                matchedPropertyId = prop.id;
+                console.log(`Matched property by street components: ${prop.name}`);
+                break;
+              }
+            }
           }
-          // Also try matching street numbers
-          const streetNumber = hint.match(/\d+/)?.[0];
-          if (streetNumber && prop.address.includes(streetNumber)) {
+          
+          // Also check the full email body for address mentions
+          if (propStreetNumber && propStreetName) {
+            if (emailBody.includes(propStreetNumber) && emailBody.includes(propStreetName)) {
+              matchedPropertyId = prop.id;
+              console.log(`Matched property by email body address: ${prop.name}`);
+              break;
+            }
+          }
+          
+          // Check if property name is mentioned
+          if (propName.length > 5 && emailBody.includes(propName)) {
             matchedPropertyId = prop.id;
+            console.log(`Matched property by name: ${prop.name}`);
             break;
           }
         }
