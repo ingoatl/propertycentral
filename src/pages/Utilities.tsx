@@ -5,7 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useState } from "react";
-import { Zap, Flame, Droplets, Trash2, Wifi, AlertTriangle, TrendingUp, RefreshCw, Building2, CheckCircle, Info, MapPin } from "lucide-react";
+import { Zap, Flame, Droplets, Trash2, Wifi, AlertTriangle, TrendingUp, RefreshCw, Building2, CheckCircle, Info, MapPin, Lightbulb, Clock, DollarSign } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, Legend, Area, AreaChart } from "recharts";
 import { toast } from "sonner";
 import { format, subMonths } from "date-fns";
@@ -40,6 +40,7 @@ const UTILITY_LABELS: Record<string, string> = {
 
 export default function Utilities() {
   const [isScanning, setIsScanning] = useState(false);
+  const [isAnalyzingProviders, setIsAnalyzingProviders] = useState(false);
   const [alertInfoOpen, setAlertInfoOpen] = useState(false);
 
   const { data: readings, refetch: refetchReadings, isLoading } = useQuery({
@@ -81,6 +82,26 @@ export default function Utilities() {
     },
   });
 
+  const { data: recommendations, refetch: refetchRecommendations } = useQuery({
+    queryKey: ["utility-recommendations"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("utility_provider_recommendations")
+        .select(`
+          *,
+          properties:property_id (
+            id,
+            name,
+            address
+          )
+        `)
+        .eq("status", "pending")
+        .order("estimated_savings", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+  });
+
   const handleScanInbox = async () => {
     setIsScanning(true);
     try {
@@ -105,6 +126,33 @@ export default function Utilities() {
       refetchAlerts();
     } catch (error: any) {
       toast.error("Failed to run detection: " + error.message);
+    }
+  };
+
+  const handleAnalyzeProviders = async () => {
+    setIsAnalyzingProviders(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("utility-provider-recommendations");
+      if (error) throw error;
+      toast.success(`Analysis complete: ${data.recommendationsFound} savings opportunities found`);
+      refetchRecommendations();
+    } catch (error: any) {
+      toast.error("Failed to analyze providers: " + error.message);
+    } finally {
+      setIsAnalyzingProviders(false);
+    }
+  };
+
+  const handleDismissRecommendation = async (id: string) => {
+    const { error } = await supabase
+      .from("utility_provider_recommendations")
+      .update({ status: "dismissed" })
+      .eq("id", id);
+    if (error) {
+      toast.error("Failed to dismiss");
+    } else {
+      toast.success("Recommendation dismissed");
+      refetchRecommendations();
     }
   };
 
@@ -191,6 +239,8 @@ export default function Utilities() {
   const criticalAlerts = alerts?.filter(a => a.severity === "critical").length || 0;
   const warningAlerts = alerts?.filter(a => a.severity === "warning").length || 0;
   const unassignedCount = unassignedData?.readings?.length || 0;
+  const recommendationsCount = recommendations?.length || 0;
+  const totalSavings = recommendations?.reduce((sum, r) => sum + (Number(r.estimated_savings) || 0), 0) || 0;
 
   // Get chart data for a property
   const getPropertyChartData = (monthlyData: Record<string, Record<string, number>>) => {
@@ -215,6 +265,10 @@ export default function Utilities() {
             <Info className="h-4 w-4 mr-2" />
             How Alerts Work
           </Button>
+          <Button variant="outline" onClick={handleAnalyzeProviders} disabled={isAnalyzingProviders}>
+            <Lightbulb className={`h-4 w-4 mr-2 ${isAnalyzingProviders ? "animate-pulse" : ""}`} />
+            {isAnalyzingProviders ? "Analyzing..." : "Find Savings"}
+          </Button>
           <Button variant="outline" onClick={handleRunAnomalyDetection}>
             <AlertTriangle className="h-4 w-4 mr-2" />
             Run Detection
@@ -225,6 +279,37 @@ export default function Utilities() {
           </Button>
         </div>
       </div>
+
+      {/* Automation Status Banner */}
+      <Card className="bg-gradient-to-r from-primary/5 to-primary/10 border-primary/20">
+        <CardContent className="py-4">
+          <div className="flex items-center justify-between flex-wrap gap-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-full bg-primary/10">
+                <Clock className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <p className="font-medium">Automatic Monitoring Active</p>
+                <p className="text-sm text-muted-foreground">
+                  Scans run on the 1st and 15th of each month • Anomaly detection • Provider analysis
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-4 text-sm">
+              <div className="flex items-center gap-2">
+                <Badge variant="secondary" className="gap-1">
+                  <RefreshCw className="h-3 w-3" /> 2x/month
+                </Badge>
+              </div>
+              {recommendationsCount > 0 && (
+                <Badge variant="default" className="gap-1 bg-green-600">
+                  <DollarSign className="h-3 w-3" /> ${totalSavings.toFixed(0)}/mo savings available
+                </Badge>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
@@ -298,6 +383,12 @@ export default function Utilities() {
             Alerts
             {(criticalAlerts + warningAlerts) > 0 && (
               <Badge variant="destructive" className="ml-2">{criticalAlerts + warningAlerts}</Badge>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="savings">
+            Savings
+            {recommendationsCount > 0 && (
+              <Badge className="ml-2 bg-green-600">{recommendationsCount}</Badge>
             )}
           </TabsTrigger>
         </TabsList>
@@ -479,6 +570,49 @@ export default function Utilities() {
                 <CheckCircle className="h-12 w-12 mx-auto text-green-500 mb-4" />
                 <h3 className="text-lg font-semibold">All Bills Assigned</h3>
                 <p className="text-muted-foreground">Every utility bill has been matched to a property.</p>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        <TabsContent value="savings" className="space-y-4">
+          {recommendations && recommendations.length > 0 ? (
+            recommendations.map((rec: any) => (
+              <Card key={rec.id} className="border-green-500">
+                <CardContent className="py-4">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-start gap-3">
+                      <Lightbulb className="h-5 w-5 mt-0.5 text-green-500" />
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">{rec.properties?.name || "Property"}</span>
+                          <Badge variant="outline">{rec.utility_type?.toUpperCase()}</Badge>
+                          <Badge className="bg-green-600">${Number(rec.estimated_savings).toFixed(0)}/mo savings</Badge>
+                        </div>
+                        <p className="text-sm mt-1">
+                          Switch from <span className="font-medium">{rec.current_provider}</span> to{" "}
+                          <span className="font-medium text-green-600">{rec.recommended_provider}</span>
+                        </p>
+                        <p className="text-sm text-muted-foreground mt-1">{rec.reason}</p>
+                      </div>
+                    </div>
+                    <Button size="sm" variant="outline" onClick={() => handleDismissRecommendation(rec.id)}>
+                      Dismiss
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          ) : (
+            <Card>
+              <CardContent className="py-12 text-center">
+                <CheckCircle className="h-12 w-12 mx-auto text-green-500 mb-4" />
+                <h3 className="text-lg font-semibold">No Savings Opportunities</h3>
+                <p className="text-muted-foreground mb-4">Click "Find Savings" to analyze your utility providers.</p>
+                <Button onClick={handleAnalyzeProviders} disabled={isAnalyzingProviders}>
+                  <Lightbulb className="h-4 w-4 mr-2" />
+                  {isAnalyzingProviders ? "Analyzing..." : "Find Savings"}
+                </Button>
               </CardContent>
             </Card>
           )}

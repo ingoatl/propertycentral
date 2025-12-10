@@ -110,3 +110,9 @@ verify_jwt = true
 
 [functions.utility-anomaly-detector]
 verify_jwt = true
+
+[functions.utility-provider-recommendations]
+verify_jwt = true
+
+[functions.schedule-utility-tasks]
+verify_jwt = false
