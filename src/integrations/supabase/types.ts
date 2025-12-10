@@ -2779,6 +2779,7 @@ export type Database = {
           created_at: string | null
           due_date: string | null
           email_insight_id: string | null
+          gmail_message_id: string | null
           id: string
           is_anomaly: boolean | null
           previous_amount: number | null
@@ -2802,6 +2803,7 @@ export type Database = {
           created_at?: string | null
           due_date?: string | null
           email_insight_id?: string | null
+          gmail_message_id?: string | null
           id?: string
           is_anomaly?: boolean | null
           previous_amount?: number | null
@@ -2825,6 +2827,7 @@ export type Database = {
           created_at?: string | null
           due_date?: string | null
           email_insight_id?: string | null
+          gmail_message_id?: string | null
           id?: string
           is_anomaly?: boolean | null
           previous_amount?: number | null
