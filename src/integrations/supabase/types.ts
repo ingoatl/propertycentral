@@ -2787,6 +2787,7 @@ export type Database = {
           property_id: string | null
           provider: string | null
           raw_email_data: Json | null
+          service_address: string | null
           service_period_end: string | null
           service_period_start: string | null
           updated_at: string | null
@@ -2811,6 +2812,7 @@ export type Database = {
           property_id?: string | null
           provider?: string | null
           raw_email_data?: Json | null
+          service_address?: string | null
           service_period_end?: string | null
           service_period_start?: string | null
           updated_at?: string | null
@@ -2835,6 +2837,7 @@ export type Database = {
           property_id?: string | null
           provider?: string | null
           raw_email_data?: Json | null
+          service_address?: string | null
           service_period_end?: string | null
           service_period_start?: string | null
           updated_at?: string | null
