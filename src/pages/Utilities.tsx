@@ -123,9 +123,18 @@ export default function Utilities() {
         body: { months: 6 }
       });
       if (error) throw error;
-      const matched = data.matched || 0;
-      const unmatched = (data.newReadings || 0) - matched;
-      toast.success(`Scan complete: ${data.newReadings || 0} bills found, ${matched} matched, ${unmatched} unassigned`);
+      
+      const newReadings = data.newReadings || 0;
+      const skipped = data.skippedDuplicates || 0;
+      const properties = data.properties || [];
+      
+      if (newReadings > 0) {
+        toast.success(`Scan complete: ${newReadings} new bills added from ${properties.length} properties`);
+      } else if (skipped > 0) {
+        toast.info(`No new bills found (${skipped} already imported)`);
+      } else {
+        toast.info("Scan complete. No new bills found.");
+      }
       refetchReadings();
     } catch (error: any) {
       console.error("Scan error:", error);
