@@ -2703,6 +2703,72 @@ export type Database = {
           },
         ]
       }
+      utility_provider_recommendations: {
+        Row: {
+          actioned_at: string | null
+          actioned_by: string | null
+          created_at: string | null
+          current_avg_cost: number | null
+          current_provider: string | null
+          estimated_savings: number
+          id: string
+          property_id: string | null
+          reason: string | null
+          recommended_provider: string
+          savings_percentage: number | null
+          status: string | null
+          updated_at: string | null
+          utility_type: string
+        }
+        Insert: {
+          actioned_at?: string | null
+          actioned_by?: string | null
+          created_at?: string | null
+          current_avg_cost?: number | null
+          current_provider?: string | null
+          estimated_savings: number
+          id?: string
+          property_id?: string | null
+          reason?: string | null
+          recommended_provider: string
+          savings_percentage?: number | null
+          status?: string | null
+          updated_at?: string | null
+          utility_type: string
+        }
+        Update: {
+          actioned_at?: string | null
+          actioned_by?: string | null
+          created_at?: string | null
+          current_avg_cost?: number | null
+          current_provider?: string | null
+          estimated_savings?: number
+          id?: string
+          property_id?: string | null
+          reason?: string | null
+          recommended_provider?: string
+          savings_percentage?: number | null
+          status?: string | null
+          updated_at?: string | null
+          utility_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "utility_provider_recommendations_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "comprehensive_property_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "utility_provider_recommendations_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       utility_readings: {
         Row: {
           account_number: string | null
