@@ -57,6 +57,40 @@ function parseToISODate(dateStr: string | null | undefined, fallbackDate: string
   return fallbackDate;
 }
 
+// Search for property address patterns in email body
+function findAddressInBody(emailBody: string, properties: any[]): { id: string; address: string } | null {
+  const bodyLower = emailBody.toLowerCase();
+  
+  for (const prop of properties) {
+    if (!prop.address) continue;
+    
+    // Extract street number and name from property address
+    const addrMatch = prop.address.match(/^(\d+)\s+(.+?)(?:,|$)/i);
+    if (!addrMatch) continue;
+    
+    const streetNum = addrMatch[1];
+    const streetName = addrMatch[2].toLowerCase()
+      .replace(/\s+(st|rd|ave|dr|ct|ln|pl|way|blvd|cir|ter|pkwy|hwy)\.?$/i, '')
+      .trim();
+    
+    // Search for street number followed by street name
+    const searchPattern = new RegExp(`${streetNum}\\s+${streetName.split(' ')[0]}`, 'i');
+    if (searchPattern.test(emailBody)) {
+      console.log(`Found address pattern for ${prop.name}: ${streetNum} ${streetName}`);
+      return { id: prop.id, address: prop.address };
+    }
+    
+    // Also try just the street number with any partial match on street name
+    const streetNumPattern = new RegExp(`\\b${streetNum}\\s+\\w+\\s*${streetName.split(' ')[0].substring(0, 4)}`, 'i');
+    if (streetNumPattern.test(emailBody)) {
+      console.log(`Found partial address pattern for ${prop.name}: ${streetNum}`);
+      return { id: prop.id, address: prop.address };
+    }
+  }
+  
+  return null;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -71,6 +105,9 @@ serve(async (req) => {
 
     const emailDateParsed = parseToISODate(emailDate, new Date().toISOString().split('T')[0]);
 
+    // First, try to find property address directly in email body
+    const bodyMatch = findAddressInBody(emailBody, properties || []);
+    
     // Build detailed property list for matching
     const propertyList = properties?.map((p: any) => {
       const addr = p.address || '';
@@ -96,7 +133,15 @@ CRITICAL RULES:
 - Extract ONLY data you can see - NEVER guess or make up values
 - The amount_due MUST be a positive number > 0. If you can't find a bill amount, return 0.
 - bill_date is REQUIRED - use email date "${emailDateParsed}" if bill date not shown
-- service_address is CRITICAL - look for it in headers, body, "Service Location", "Service Address", "Account Location"
+- service_address is CRITICAL - search the ENTIRE email for ANY street address
+
+WHERE TO FIND SERVICE ADDRESS:
+- Look for "Service Location", "Service Address", "Account Location"
+- Look for addresses in the format "1234 Street Name"
+- Look for addresses after labels like "Address:", "Location:", "Service at:"
+- Look in email headers, footers, and body text
+- Gas South often includes address after "Service Address" or in account details
+- If you find multiple addresses, pick the one that looks like a residential service address
 
 UTILITY TYPE MAPPING:
 - Georgia Power, Duke Energy, EMC → electric
@@ -135,6 +180,8 @@ RETURN FORMAT (valid JSON only):
 AVAILABLE PROPERTIES TO MATCH:
 ${propertyList}
 
+${bodyMatch ? `\nHINT: A property address was found in the email body. Property "${properties?.find((p: any) => p.id === bodyMatch.id)?.name}" (${bodyMatch.address}) may be the match.` : ''}
+
 EMAIL DETAILS:
 From: ${senderEmail}
 Date: ${emailDate} (use "${emailDateParsed}" as bill_date if not found)
@@ -144,7 +191,7 @@ BODY:
 ${emailBody}
 
 INSTRUCTIONS:
-1. Find the SERVICE ADDRESS in the email (look for "Service Location", "Service Address", street addresses)
+1. Find the SERVICE ADDRESS in the email - search everywhere including headers and footers
 2. Extract the amount due (look for "Amount Due", "Total Due", "Balance", dollar amounts)
 3. Match the service address to one of the properties above by street number and name
 4. Return JSON only, no other text`;
@@ -226,6 +273,13 @@ INSTRUCTIONS:
         console.log(`Invalid property ID "${utilityData.matched_property_id}" - not in provided list`);
         utilityData.matched_property_id = null;
       }
+    }
+
+    // If AI didn't find a match but we found one in body search, use that
+    if (!utilityData.matched_property_id && bodyMatch) {
+      console.log(`Using body search match: ${bodyMatch.id}`);
+      utilityData.matched_property_id = bodyMatch.id;
+      utilityData.service_address = utilityData.service_address || bodyMatch.address;
     }
 
     // Default confidence
