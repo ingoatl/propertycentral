@@ -101,3 +101,12 @@ verify_jwt = false
 
 [functions.get-public-properties]
 verify_jwt = false
+
+[functions.extract-utility-data]
+verify_jwt = true
+
+[functions.scan-utilities-inbox]
+verify_jwt = true
+
+[functions.utility-anomaly-detector]
+verify_jwt = true
