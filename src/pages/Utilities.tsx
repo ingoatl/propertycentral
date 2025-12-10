@@ -106,7 +106,7 @@ export default function Utilities() {
     setIsScanning(true);
     try {
       const { data, error } = await supabase.functions.invoke("scan-utilities-inbox", {
-        body: { months: 12 }
+        body: { months: 6 }
       });
       if (error) throw error;
       toast.success(`Scan complete: ${data.newReadings} new readings found`);
@@ -275,7 +275,7 @@ export default function Utilities() {
           </Button>
           <Button onClick={handleScanInbox} disabled={isScanning}>
             <RefreshCw className={`h-4 w-4 mr-2 ${isScanning ? "animate-spin" : ""}`} />
-            {isScanning ? "Scanning 12 months..." : "Scan Inbox (12 months)"}
+            {isScanning ? "Scanning 6 months..." : "Scan Inbox (6 months)"}
           </Button>
         </div>
       </div>

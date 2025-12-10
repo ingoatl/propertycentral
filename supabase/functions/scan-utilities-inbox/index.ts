@@ -244,11 +244,11 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Get parameters from request body
-    let monthsToScan = 12;
+    let monthsToScan = 6;
     try {
       const body = await req.json();
       if (body.months && typeof body.months === 'number') {
-        monthsToScan = Math.min(body.months, 24);
+        monthsToScan = Math.min(body.months, 12);
       }
     } catch {}
 
