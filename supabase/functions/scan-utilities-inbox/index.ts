@@ -37,6 +37,7 @@ const UTILITY_PROVIDERS = [
   { domain: 'sawnee.com', type: 'electric', name: 'Sawnee EMC' },
   { domain: 'jacksonemc.com', type: 'electric', name: 'Jackson EMC' },
   { domain: 'cobbelectric.com', type: 'electric', name: 'Cobb EMC' },
+  { domain: 'cobb-emc.com', type: 'electric', name: 'Cobb EMC' },
   // Gas
   { domain: 'gassouth.com', type: 'gas', name: 'Gas South' },
   { domain: 'scanaenergy.com', type: 'gas', name: 'SCANA Energy' },
@@ -44,6 +45,7 @@ const UTILITY_PROVIDERS = [
   { domain: 'atlantagaslight.com', type: 'gas', name: 'Atlanta Gas Light' },
   { domain: 'nicor.com', type: 'gas', name: 'Nicor Gas' },
   { domain: 'speedpay.com', type: 'gas', name: 'Georgia Natural Gas' },
+  { domain: 'infinite-energy.com', type: 'gas', name: 'Infinite Energy' },
   // Water
   { domain: 'dekalbcountyga.gov', type: 'water', name: 'DeKalb County Water' },
   { domain: 'cobbcounty.org', type: 'water', name: 'Cobb County Water' },
@@ -51,6 +53,10 @@ const UTILITY_PROVIDERS = [
   { domain: 'gwinnettcounty.com', type: 'water', name: 'Gwinnett County Water' },
   { domain: 'forsythco.com', type: 'water', name: 'Forsyth County Water' },
   { domain: 'cityofsouthfulton', type: 'water', name: 'City of South Fulton Water' },
+  { domain: 'roswellgov.com', type: 'water', name: 'City of Roswell Water' },
+  { domain: 'cityofatlanta', type: 'water', name: 'City of Atlanta Water' },
+  { domain: 'smyrnaga.gov', type: 'water', name: 'City of Smyrna Water' },
+  { domain: 'kennesaw-ga.gov', type: 'water', name: 'City of Kennesaw Water' },
   // Trash
   { domain: 'wm.com', type: 'trash', name: 'Waste Management' },
   { domain: 'republicservices.com', type: 'trash', name: 'Republic Services' },
@@ -83,7 +89,7 @@ serve(async (req) => {
     try {
       const body = await req.json();
       if (body.months && typeof body.months === 'number') {
-        monthsToScan = Math.min(body.months, 24); // Cap at 24 months
+        monthsToScan = Math.min(body.months, 24);
       }
     } catch {
       // Use default
@@ -126,11 +132,13 @@ serve(async (req) => {
       throw new Error('Failed to refresh Gmail access token');
     }
 
-    // Get properties for matching
+    // Get ALL properties for AI matching
     const { data: properties } = await supabase
       .from('properties')
       .select('id, name, address')
-      .neq('property_type', 'Inactive');
+      .in('property_type', ['Client-Managed', 'Company-Owned']);
+
+    console.log(`Loaded ${properties?.length || 0} properties for matching`);
 
     // Get utility accounts for matching by account number
     const { data: utilityAccounts } = await supabase
@@ -138,13 +146,13 @@ serve(async (req) => {
       .select('*')
       .eq('is_active', true);
 
-    // Build search query for utility emails with extended date range
+    // Build search query for utility emails
     const providerQueries = UTILITY_PROVIDERS.map(p => `from:${p.domain}`).join(' OR ');
     const searchQuery = `(${providerQueries}) newer_than:${monthsToScan * 30}d`;
 
     console.log('Search query:', searchQuery);
 
-    // Fetch emails from Gmail (get more results for historical scan)
+    // Fetch emails from Gmail
     const gmailResponse = await fetch(
       `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent(searchQuery)}&maxResults=500`,
       {
@@ -166,6 +174,7 @@ serve(async (req) => {
     let processedCount = 0;
     let newReadingsCount = 0;
     let skippedCount = 0;
+    let matchedCount = 0;
 
     for (const message of messages) {
       // Check if we've already processed this email
@@ -199,23 +208,37 @@ serve(async (req) => {
 
       // Extract email body
       let body = '';
-      const parts = emailData.payload?.parts || [emailData.payload];
-      for (const part of parts) {
-        if (part?.mimeType === 'text/plain' && part?.body?.data) {
-          body = atob(part.body.data.replace(/-/g, '+').replace(/_/g, '/'));
-          break;
+      const extractBody = (payload: any): string => {
+        if (payload.body?.data) {
+          return atob(payload.body.data.replace(/-/g, '+').replace(/_/g, '/'));
         }
-        if (part?.mimeType === 'text/html' && part?.body?.data && !body) {
-          const html = atob(part.body.data.replace(/-/g, '+').replace(/_/g, '/'));
-          body = html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ');
+        if (payload.parts) {
+          for (const part of payload.parts) {
+            if (part.mimeType === 'text/plain' && part.body?.data) {
+              return atob(part.body.data.replace(/-/g, '+').replace(/_/g, '/'));
+            }
+            const nested = extractBody(part);
+            if (nested) return nested;
+          }
+          // If no plain text, try HTML
+          for (const part of payload.parts) {
+            if (part.mimeType === 'text/html' && part.body?.data) {
+              const html = atob(part.body.data.replace(/-/g, '+').replace(/_/g, '/'));
+              return html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+            }
+          }
         }
+        return '';
+      };
+      
+      body = extractBody(emailData.payload);
+
+      if (!body) {
+        console.log(`No body found for email ${message.id}, skipping`);
+        continue;
       }
 
-      if (!body && emailData.payload?.body?.data) {
-        body = atob(emailData.payload.body.data.replace(/-/g, '+').replace(/_/g, '/'));
-      }
-
-      // Call extract-utility-data function
+      // Call extract-utility-data function with properties list for AI matching
       const extractResponse = await fetch(`${supabaseUrl}/functions/v1/extract-utility-data`, {
         method: 'POST',
         headers: {
@@ -224,9 +247,10 @@ serve(async (req) => {
         },
         body: JSON.stringify({
           emailSubject: subject,
-          emailBody: body.substring(0, 15000), // Increase body size for better extraction
+          emailBody: body.substring(0, 20000),
           senderEmail: from,
           emailDate: date,
+          properties: properties, // Pass properties to AI for matching
         }),
       });
 
@@ -243,15 +267,12 @@ serve(async (req) => {
 
       const utilityData = extractResult.data;
 
-      // Enhanced property matching - Priority order:
-      // 1. Account number match in utility_accounts table
-      // 2. Service address from bill matching property address
-      // 3. Property name mentioned in email
-      let matchedPropertyId: string | null = null;
-      let matchMethod = '';
-      
-      // 1. Try to match by account number
-      if (utilityData.account_number && utilityAccounts) {
+      // Determine property ID - prefer AI match, then fallback to account number
+      let matchedPropertyId: string | null = utilityData.matched_property_id || null;
+      let matchMethod = utilityData.matched_property_id ? 'ai_match' : '';
+
+      // If AI didn't match, try account number lookup
+      if (!matchedPropertyId && utilityData.account_number && utilityAccounts) {
         const accountMatch = utilityAccounts.find(
           acc => acc.account_number === utilityData.account_number && 
                  acc.utility_type === utilityData.utility_type
@@ -259,57 +280,10 @@ serve(async (req) => {
         if (accountMatch) {
           matchedPropertyId = accountMatch.property_id;
           matchMethod = 'account_number';
-          console.log(`Matched by account number: ${utilityData.account_number} -> ${accountMatch.property_id}`);
         }
       }
 
-      // 2. Try address matching with improved logic
-      if (!matchedPropertyId && properties) {
-        const searchText = `${utilityData.property_address_hint || ''} ${body}`.toLowerCase();
-        
-        for (const prop of properties) {
-          const propAddress = prop.address.toLowerCase();
-          const propName = prop.name.toLowerCase();
-          
-          // Extract street number and name from property address
-          const propStreetMatch = propAddress.match(/^(\d+)\s+([a-zA-Z\s]+?)(?:\s+(?:st|street|ave|avenue|rd|road|dr|drive|ln|lane|way|blvd|boulevard|ct|court|pl|place|cir|circle))?/i);
-          const propStreetNumber = propStreetMatch?.[1];
-          const propStreetName = propStreetMatch?.[2]?.trim().split(/\s+/)[0]; // First word of street name
-          
-          if (propStreetNumber && propStreetName) {
-            // Check for street number + street name in email
-            const streetPattern = new RegExp(`${propStreetNumber}\\s+${propStreetName}`, 'i');
-            if (streetPattern.test(searchText)) {
-              matchedPropertyId = prop.id;
-              matchMethod = 'street_address';
-              console.log(`Matched by street address: ${propStreetNumber} ${propStreetName} -> ${prop.name}`);
-              break;
-            }
-          }
-          
-          // Check if property name (if distinctive enough) is mentioned
-          if (propName.length > 8 && searchText.includes(propName)) {
-            matchedPropertyId = prop.id;
-            matchMethod = 'property_name';
-            console.log(`Matched by property name: ${prop.name}`);
-            break;
-          }
-          
-          // Check for city + zip combination if available in address
-          const zipMatch = propAddress.match(/(\d{5})/);
-          const cityMatch = propAddress.match(/,\s*([a-zA-Z\s]+?),?\s*(?:ga|georgia)/i);
-          if (zipMatch && cityMatch) {
-            const zip = zipMatch[1];
-            const city = cityMatch[1].trim().toLowerCase();
-            if (searchText.includes(zip) && searchText.includes(city)) {
-              matchedPropertyId = prop.id;
-              matchMethod = 'city_zip';
-              console.log(`Matched by city/zip: ${city} ${zip} -> ${prop.name}`);
-              break;
-            }
-          }
-        }
-      }
+      if (matchedPropertyId) matchedCount++;
 
       // Insert utility reading
       const { error: insertError } = await supabase
@@ -325,7 +299,7 @@ serve(async (req) => {
           due_date: utilityData.due_date,
           usage_amount: utilityData.usage_amount,
           usage_unit: utilityData.usage_unit,
-          amount_due: utilityData.amount_due,
+          amount_due: Math.abs(utilityData.amount_due), // Ensure positive
           raw_email_data: {
             gmail_message_id: message.id,
             subject,
@@ -333,7 +307,8 @@ serve(async (req) => {
             date,
             extracted_at: new Date().toISOString(),
             match_method: matchMethod || 'unmatched',
-            property_address_hint: utilityData.property_address_hint,
+            service_address: utilityData.service_address,
+            confidence: utilityData.confidence,
           },
         });
 
@@ -341,23 +316,24 @@ serve(async (req) => {
         console.error('Failed to insert utility reading:', insertError);
       } else {
         newReadingsCount++;
-        console.log(`Created reading: ${utilityData.provider} - $${utilityData.amount_due} (${matchMethod || 'unmatched'})`);
+        console.log(`Created: ${utilityData.provider} $${utilityData.amount_due} → ${matchMethod || 'unmatched'}`);
       }
 
       processedCount++;
       
-      // Rate limit to avoid hitting Gmail API limits
-      if (processedCount % 10 === 0) {
-        await new Promise(resolve => setTimeout(resolve, 100));
+      // Rate limit
+      if (processedCount % 5 === 0) {
+        await new Promise(resolve => setTimeout(resolve, 200));
       }
     }
 
-    console.log(`Processed ${processedCount} new emails, created ${newReadingsCount} readings, skipped ${skippedCount} existing`);
+    console.log(`Done: ${processedCount} processed, ${newReadingsCount} created, ${matchedCount} matched, ${skippedCount} skipped`);
 
     return new Response(JSON.stringify({ 
       success: true,
       processed: processedCount,
       newReadings: newReadingsCount,
+      matched: matchedCount,
       skipped: skippedCount,
       totalFound: messages.length,
     }), {
