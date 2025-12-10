@@ -28,8 +28,16 @@ async function refreshAccessToken(refreshToken: string): Promise<string> {
   return data.access_token;
 }
 
-// Utility providers to look for in emails
+// Utility providers - Gas providers first as requested
 const UTILITY_PROVIDERS = [
+  // Gas (prioritized)
+  { domain: 'gassouth.com', type: 'gas', name: 'Gas South' },
+  { domain: 'scanaenergy.com', type: 'gas', name: 'SCANA Energy' },
+  { domain: 'southerncompanygas.com', type: 'gas', name: 'Southern Company Gas' },
+  { domain: 'atlantagaslight.com', type: 'gas', name: 'Atlanta Gas Light' },
+  { domain: 'nicor.com', type: 'gas', name: 'Nicor Gas' },
+  { domain: 'speedpay.com', type: 'gas', name: 'Georgia Natural Gas' },
+  { domain: 'infinite-energy.com', type: 'gas', name: 'Infinite Energy' },
   // Electric
   { domain: 'georgiapower.com', type: 'electric', name: 'Georgia Power' },
   { domain: 'duke-energy.com', type: 'electric', name: 'Duke Energy' },
@@ -38,23 +46,13 @@ const UTILITY_PROVIDERS = [
   { domain: 'jacksonemc.com', type: 'electric', name: 'Jackson EMC' },
   { domain: 'cobbelectric.com', type: 'electric', name: 'Cobb EMC' },
   { domain: 'cobb-emc.com', type: 'electric', name: 'Cobb EMC' },
-  // Gas
-  { domain: 'gassouth.com', type: 'gas', name: 'Gas South' },
-  { domain: 'scanaenergy.com', type: 'gas', name: 'SCANA Energy' },
-  { domain: 'southerncompanygas.com', type: 'gas', name: 'Southern Company Gas' },
-  { domain: 'atlantagaslight.com', type: 'gas', name: 'Atlanta Gas Light' },
-  { domain: 'nicor.com', type: 'gas', name: 'Nicor Gas' },
-  { domain: 'speedpay.com', type: 'gas', name: 'Georgia Natural Gas' },
-  { domain: 'infinite-energy.com', type: 'gas', name: 'Infinite Energy' },
   // Water
   { domain: 'dekalbcountyga.gov', type: 'water', name: 'DeKalb County Water' },
   { domain: 'cobbcounty.org', type: 'water', name: 'Cobb County Water' },
   { domain: 'fultoncountyga.gov', type: 'water', name: 'Fulton County Water' },
   { domain: 'gwinnettcounty.com', type: 'water', name: 'Gwinnett County Water' },
   { domain: 'forsythco.com', type: 'water', name: 'Forsyth County Water' },
-  { domain: 'cityofsouthfulton', type: 'water', name: 'City of South Fulton Water' },
   { domain: 'roswellgov.com', type: 'water', name: 'City of Roswell Water' },
-  { domain: 'cityofatlanta', type: 'water', name: 'City of Atlanta Water' },
   { domain: 'smyrnaga.gov', type: 'water', name: 'City of Smyrna Water' },
   { domain: 'kennesaw-ga.gov', type: 'water', name: 'City of Kennesaw Water' },
   // Trash
@@ -66,13 +64,80 @@ const UTILITY_PROVIDERS = [
   { domain: 'xfinity.com', type: 'internet', name: 'Xfinity' },
   { domain: 'att.com', type: 'internet', name: 'AT&T' },
   { domain: 'spectrum.com', type: 'internet', name: 'Spectrum' },
+  { domain: 'spectrum.net', type: 'internet', name: 'Spectrum' },
   { domain: 'charter.com', type: 'internet', name: 'Charter/Spectrum' },
   { domain: 'google.com', type: 'internet', name: 'Google Fiber' },
   { domain: 'fiber.google.com', type: 'internet', name: 'Google Fiber' },
   { domain: 'verizon.com', type: 'internet', name: 'Verizon' },
   { domain: 'tmobile.com', type: 'internet', name: 'T-Mobile Home Internet' },
-  { domain: 'earthlink.net', type: 'internet', name: 'EarthLink' },
 ];
+
+// Parse email date to ISO format
+function parseEmailDate(dateStr: string): string {
+  try {
+    const d = new Date(dateStr);
+    if (!isNaN(d.getTime())) {
+      return d.toISOString().split('T')[0];
+    }
+  } catch {}
+  return new Date().toISOString().split('T')[0];
+}
+
+// Match service address to property using street number + name
+function matchPropertyByAddress(serviceAddress: string, properties: any[]): string | null {
+  if (!serviceAddress || !properties?.length) return null;
+  
+  const svcAddr = serviceAddress.toLowerCase().trim();
+  
+  // Extract street number and name from service address
+  const svcStreetMatch = svcAddr.match(/^(\d+)\s+(.+?)(?:,|\s+(?:apt|unit|#|suite)|\s+(?:[a-z]{2}\s+\d{5}))/i);
+  if (!svcStreetMatch) return null;
+  
+  const svcStreetNum = svcStreetMatch[1];
+  const svcStreetName = svcStreetMatch[2].toLowerCase()
+    .replace(/\s+(st|rd|ave|dr|ct|ln|pl|way|blvd|cir|ter|pkwy|hwy)\.?$/i, '')
+    .trim();
+  
+  console.log(`Matching: "${svcStreetNum} ${svcStreetName}" from "${serviceAddress}"`);
+  
+  for (const prop of properties) {
+    const propAddr = (prop.address || '').toLowerCase();
+    
+    // Extract property street number and name
+    const propStreetMatch = propAddr.match(/^(\d+)\s+(.+?)(?:,|$)/);
+    if (!propStreetMatch) continue;
+    
+    const propStreetNum = propStreetMatch[1];
+    const propStreetName = propStreetMatch[2].toLowerCase()
+      .replace(/\s+(st|rd|ave|dr|ct|ln|pl|way|blvd|cir|ter|pkwy|hwy)\.?$/i, '')
+      .trim();
+    
+    // Match by street number first
+    if (svcStreetNum !== propStreetNum) continue;
+    
+    // Then check if street names are similar
+    if (propStreetName.includes(svcStreetName) || svcStreetName.includes(propStreetName)) {
+      console.log(`  MATCHED to: ${prop.name} (${prop.address})`);
+      return prop.id;
+    }
+    
+    // Check for partial word match
+    const svcWords = svcStreetName.split(/\s+/).filter((w: string) => w.length > 2);
+    const propWords = propStreetName.split(/\s+/).filter((w: string) => w.length > 2);
+    
+    const hasWordMatch = svcWords.some((sw: string) => 
+      propWords.some((pw: string) => pw.includes(sw) || sw.includes(pw))
+    );
+    
+    if (hasWordMatch) {
+      console.log(`  MATCHED (word) to: ${prop.name} (${prop.address})`);
+      return prop.id;
+    }
+  }
+  
+  console.log(`  NO MATCH found for address`);
+  return null;
+}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -84,18 +149,16 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Get months parameter from request body (default to 12 months)
+    // Get parameters from request body
     let monthsToScan = 12;
     try {
       const body = await req.json();
       if (body.months && typeof body.months === 'number') {
         monthsToScan = Math.min(body.months, 24);
       }
-    } catch {
-      // Use default
-    }
+    } catch {}
 
-    console.log(`Scanning utility inbox for last ${monthsToScan} months`);
+    console.log(`Scanning utility inbox for last ${monthsToScan} months - Company-Owned properties ONLY`);
 
     // Get OAuth tokens
     const { data: tokenData, error: tokenError } = await supabase
@@ -132,13 +195,18 @@ serve(async (req) => {
       throw new Error('Failed to refresh Gmail access token');
     }
 
-    // Get ALL properties for AI matching
-    const { data: properties } = await supabase
+    // Get ONLY Company-Owned properties (not managed or mid-term)
+    const { data: properties, error: propError } = await supabase
       .from('properties')
       .select('id, name, address')
-      .in('property_type', ['Client-Managed', 'Company-Owned']);
+      .eq('property_type', 'Company-Owned');
 
-    console.log(`Loaded ${properties?.length || 0} properties for matching`);
+    if (propError) {
+      console.error('Error fetching properties:', propError);
+    }
+
+    console.log(`Loaded ${properties?.length || 0} Company-Owned properties for matching:`);
+    properties?.forEach(p => console.log(`  - ${p.name}: ${p.address}`));
 
     // Get utility accounts for matching by account number
     const { data: utilityAccounts } = await supabase
@@ -146,11 +214,11 @@ serve(async (req) => {
       .select('*')
       .eq('is_active', true);
 
-    // Build search query for utility emails
+    // Build search query for utility emails - Gas first
     const providerQueries = UTILITY_PROVIDERS.map(p => `from:${p.domain}`).join(' OR ');
     const searchQuery = `(${providerQueries}) newer_than:${monthsToScan * 30}d`;
 
-    console.log('Search query:', searchQuery);
+    console.log('Gmail search query:', searchQuery);
 
     // Fetch emails from Gmail
     const gmailResponse = await fetch(
@@ -175,13 +243,14 @@ serve(async (req) => {
     let newReadingsCount = 0;
     let skippedCount = 0;
     let matchedCount = 0;
+    let errorCount = 0;
 
     for (const message of messages) {
       // Check if we've already processed this email
       const { data: existingReading } = await supabase
         .from('utility_readings')
         .select('id')
-        .eq('raw_email_data->>gmail_message_id', message.id)
+        .eq('gmail_message_id', message.id)
         .single();
 
       if (existingReading) {
@@ -205,6 +274,7 @@ serve(async (req) => {
       const subject = headers.find((h: any) => h.name === 'Subject')?.value || '';
       const from = headers.find((h: any) => h.name === 'From')?.value || '';
       const date = headers.find((h: any) => h.name === 'Date')?.value || '';
+      const emailDateISO = parseEmailDate(date);
 
       // Extract email body
       let body = '';
@@ -220,7 +290,6 @@ serve(async (req) => {
             const nested = extractBody(part);
             if (nested) return nested;
           }
-          // If no plain text, try HTML
           for (const part of payload.parts) {
             if (part.mimeType === 'text/html' && part.body?.data) {
               const html = atob(part.body.data.replace(/-/g, '+').replace(/_/g, '/'));
@@ -238,7 +307,7 @@ serve(async (req) => {
         continue;
       }
 
-      // Call extract-utility-data function with properties list for AI matching
+      // Call extract-utility-data function with Company-Owned properties only
       const extractResponse = await fetch(`${supabaseUrl}/functions/v1/extract-utility-data`, {
         method: 'POST',
         headers: {
@@ -247,29 +316,37 @@ serve(async (req) => {
         },
         body: JSON.stringify({
           emailSubject: subject,
-          emailBody: body.substring(0, 20000),
+          emailBody: body.substring(0, 15000),
           senderEmail: from,
           emailDate: date,
-          properties: properties, // Pass properties to AI for matching
+          properties: properties || [],
         }),
       });
 
       if (!extractResponse.ok) {
         console.error(`Failed to extract utility data for email ${message.id}`);
+        errorCount++;
         continue;
       }
 
       const extractResult = await extractResponse.json();
-      if (!extractResult.success) {
+      if (!extractResult.success || !extractResult.data) {
         console.error(`Extraction failed for email ${message.id}:`, extractResult.error);
+        errorCount++;
         continue;
       }
 
       const utilityData = extractResult.data;
 
-      // Determine property ID - prefer AI match, then fallback to account number
+      // Ensure bill_date is never null
+      let billDate = utilityData.bill_date;
+      if (!billDate || billDate === 'null' || billDate === 'undefined') {
+        billDate = emailDateISO;
+      }
+
+      // Determine property ID
       let matchedPropertyId: string | null = utilityData.matched_property_id || null;
-      let matchMethod = utilityData.matched_property_id ? 'ai_match' : '';
+      let matchMethod = matchedPropertyId ? 'ai_match' : '';
 
       // If AI didn't match, try account number lookup
       if (!matchedPropertyId && utilityData.account_number && utilityAccounts) {
@@ -278,14 +355,26 @@ serve(async (req) => {
                  acc.utility_type === utilityData.utility_type
         );
         if (accountMatch) {
-          matchedPropertyId = accountMatch.property_id;
-          matchMethod = 'account_number';
+          // Only assign if property is Company-Owned
+          const isOwnedProperty = properties?.some(p => p.id === accountMatch.property_id);
+          if (isOwnedProperty) {
+            matchedPropertyId = accountMatch.property_id;
+            matchMethod = 'account_number';
+          }
+        }
+      }
+
+      // If still no match, try manual address matching
+      if (!matchedPropertyId && utilityData.service_address && properties) {
+        matchedPropertyId = matchPropertyByAddress(utilityData.service_address, properties);
+        if (matchedPropertyId) {
+          matchMethod = 'address_match';
         }
       }
 
       if (matchedPropertyId) matchedCount++;
 
-      // Insert utility reading
+      // Insert utility reading with guaranteed bill_date
       const { error: insertError } = await supabase
         .from('utility_readings')
         .insert({
@@ -293,30 +382,34 @@ serve(async (req) => {
           utility_type: utilityData.utility_type,
           provider: utilityData.provider,
           account_number: utilityData.account_number,
-          bill_date: utilityData.bill_date,
-          service_period_start: utilityData.service_period_start,
-          service_period_end: utilityData.service_period_end,
-          due_date: utilityData.due_date,
-          usage_amount: utilityData.usage_amount,
-          usage_unit: utilityData.usage_unit,
-          amount_due: Math.abs(utilityData.amount_due), // Ensure positive
+          bill_date: billDate, // Now guaranteed to have a value
+          service_period_start: utilityData.service_period_start || null,
+          service_period_end: utilityData.service_period_end || null,
+          due_date: utilityData.due_date || null,
+          usage_amount: utilityData.usage_amount || null,
+          usage_unit: utilityData.usage_unit || null,
+          amount_due: Math.abs(utilityData.amount_due || 0),
+          service_address: utilityData.service_address || null,
+          gmail_message_id: message.id,
           raw_email_data: {
-            gmail_message_id: message.id,
             subject,
             from,
             date,
             extracted_at: new Date().toISOString(),
             match_method: matchMethod || 'unmatched',
-            service_address: utilityData.service_address,
             confidence: utilityData.confidence,
           },
         });
 
       if (insertError) {
         console.error('Failed to insert utility reading:', insertError);
+        errorCount++;
       } else {
         newReadingsCount++;
-        console.log(`Created: ${utilityData.provider} $${utilityData.amount_due} → ${matchMethod || 'unmatched'}`);
+        const propName = matchedPropertyId 
+          ? properties?.find(p => p.id === matchedPropertyId)?.name || 'Unknown'
+          : 'UNASSIGNED';
+        console.log(`Created: ${utilityData.provider} $${utilityData.amount_due} → ${propName} (${matchMethod || 'none'})`);
       }
 
       processedCount++;
@@ -327,7 +420,7 @@ serve(async (req) => {
       }
     }
 
-    console.log(`Done: ${processedCount} processed, ${newReadingsCount} created, ${matchedCount} matched, ${skippedCount} skipped`);
+    console.log(`Done: ${processedCount} processed, ${newReadingsCount} created, ${matchedCount} matched, ${skippedCount} skipped, ${errorCount} errors`);
 
     return new Response(JSON.stringify({ 
       success: true,
@@ -335,7 +428,9 @@ serve(async (req) => {
       newReadings: newReadingsCount,
       matched: matchedCount,
       skipped: skippedCount,
+      errors: errorCount,
       totalFound: messages.length,
+      propertiesScanned: properties?.map(p => p.name) || [],
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
