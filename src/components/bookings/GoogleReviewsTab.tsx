@@ -416,13 +416,24 @@ const GoogleReviewsTab = () => {
 
         {/* Campaign Paused Warning */}
         {campaignPaused && (
-          <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg p-4 flex items-center gap-3">
-            <Pause className="w-5 h-5 text-amber-600" />
-            <div>
-              <p className="font-medium text-amber-800 dark:text-amber-400">Campaign is Paused</p>
-              <p className="text-sm text-amber-600 dark:text-amber-500">
-                Waiting for Twilio configuration. Click "Campaign Paused" to activate once Twilio webhook is set up.
-              </p>
+          <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
+            <div className="flex items-center gap-3 mb-3">
+              <Pause className="w-5 h-5 text-amber-600" />
+              <div>
+                <p className="font-medium text-amber-800 dark:text-amber-400">🛑 Campaign is PAUSED — No SMS will be sent automatically</p>
+                <p className="text-sm text-amber-600 dark:text-amber-500">
+                  The "Ask" buttons are disabled. No guest messages will go out until you unpause.
+                </p>
+              </div>
+            </div>
+            <div className="bg-white dark:bg-background rounded-md p-3 border border-amber-300 dark:border-amber-700">
+              <p className="text-sm font-medium text-foreground mb-2">🧪 To test the full workflow:</p>
+              <ol className="text-sm text-muted-foreground space-y-1 list-decimal list-inside">
+                <li>Click <strong>"Create Test Guest"</strong> → Creates a test entry with phone <strong>(770) 906-5022</strong></li>
+                <li>Find "Test Guest (Campaign Test)" in the Queue tab below</li>
+                <li>Click the <strong>"Force"</strong> button → This bypasses the pause and sends the SMS immediately</li>
+                <li>Reply to the SMS from your phone to test the full conversation flow</li>
+              </ol>
             </div>
           </div>
         )}
@@ -644,8 +655,10 @@ const GoogleReviewsTab = () => {
                           <TableCell>
                             <div>
                               <p className="font-medium">{review.guest_name || "Unknown"}</p>
-                              {review.guest_phone ? (
-                                <p className="text-xs text-muted-foreground">{review.guest_phone}</p>
+                            {review.guest_phone ? (
+                                <p className="text-xs text-muted-foreground font-mono">
+                                  {review.guest_phone.replace(/^\+1/, '').replace(/(\d{3})(\d{3})(\d{4})/, '($1) $2-$3')}
+                                </p>
                               ) : (
                                 <p className="text-xs text-amber-600 flex items-center gap-1">
                                   <AlertTriangle className="w-3 h-3" /> No phone
