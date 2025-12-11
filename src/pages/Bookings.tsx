@@ -13,10 +13,10 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { z } from "zod";
-import { ChevronLeft, ChevronRight, RefreshCw, Calendar as CalendarIcon, Plus, Trash2, Edit, User, Mail, DollarSign, Home } from "lucide-react";
+import { ChevronLeft, ChevronRight, RefreshCw, Calendar as CalendarIcon, Plus, Trash2, Edit, User, Mail, DollarSign, Home, Star } from "lucide-react";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths, isSameDay, isWithinInterval } from "date-fns";
 import { cn } from "@/lib/utils";
-
+import GoogleReviewsTab from "@/components/bookings/GoogleReviewsTab";
 // Mid-term booking schema
 const bookingSchema = z.object({
   propertyId: z.string().uuid("Please select a property"),
@@ -443,6 +443,10 @@ const Bookings = () => {
         <TabsList>
           <TabsTrigger value="mid-term">Mid-Term Bookings</TabsTrigger>
           <TabsTrigger value="ownerrez">OwnerRez Calendar</TabsTrigger>
+          <TabsTrigger value="google-reviews" className="gap-1">
+            <Star className="w-4 h-4" />
+            Google Reviews
+          </TabsTrigger>
         </TabsList>
 
         {/* Mid-Term Bookings Tab */}
@@ -894,6 +898,11 @@ const Bookings = () => {
               </CardContent>
             </Card>
           )}
+        </TabsContent>
+
+        {/* Google Reviews Tab */}
+        <TabsContent value="google-reviews">
+          <GoogleReviewsTab />
         </TabsContent>
       </Tabs>
     </div>

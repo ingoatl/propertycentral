@@ -116,3 +116,12 @@ verify_jwt = true
 
 [functions.schedule-utility-tasks]
 verify_jwt = false
+
+[functions.sync-ownerrez-reviews]
+verify_jwt = true
+
+[functions.send-review-sms]
+verify_jwt = true
+
+[functions.twilio-webhook]
+verify_jwt = false

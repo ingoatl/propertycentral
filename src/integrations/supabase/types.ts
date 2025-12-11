@@ -884,6 +884,62 @@ export type Database = {
         }
         Relationships: []
       }
+      google_review_requests: {
+        Row: {
+          completed_at: string | null
+          created_at: string | null
+          guest_phone: string
+          id: string
+          last_nudge_at: string | null
+          link_clicked_at: string | null
+          link_sent_at: string | null
+          nudge_count: number | null
+          permission_asked_at: string | null
+          permission_granted_at: string | null
+          review_id: string | null
+          updated_at: string | null
+          workflow_status: string | null
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string | null
+          guest_phone: string
+          id?: string
+          last_nudge_at?: string | null
+          link_clicked_at?: string | null
+          link_sent_at?: string | null
+          nudge_count?: number | null
+          permission_asked_at?: string | null
+          permission_granted_at?: string | null
+          review_id?: string | null
+          updated_at?: string | null
+          workflow_status?: string | null
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string | null
+          guest_phone?: string
+          id?: string
+          last_nudge_at?: string | null
+          link_clicked_at?: string | null
+          link_sent_at?: string | null
+          nudge_count?: number | null
+          permission_asked_at?: string | null
+          permission_granted_at?: string | null
+          review_id?: string | null
+          updated_at?: string | null
+          workflow_status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "google_review_requests_review_id_fkey"
+            columns: ["review_id"]
+            isOneToOne: false
+            referencedRelation: "ownerrez_reviews"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       listing_templates: {
         Row: {
           available_variables: string[] | null
@@ -1512,6 +1568,66 @@ export type Database = {
           },
           {
             foreignKeyName: "ownerrez_bookings_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ownerrez_reviews: {
+        Row: {
+          booking_id: string
+          created_at: string | null
+          guest_email: string | null
+          guest_name: string | null
+          guest_phone: string | null
+          id: string
+          ownerrez_review_id: string | null
+          property_id: string | null
+          review_date: string | null
+          review_source: string | null
+          review_text: string | null
+          star_rating: number | null
+        }
+        Insert: {
+          booking_id: string
+          created_at?: string | null
+          guest_email?: string | null
+          guest_name?: string | null
+          guest_phone?: string | null
+          id?: string
+          ownerrez_review_id?: string | null
+          property_id?: string | null
+          review_date?: string | null
+          review_source?: string | null
+          review_text?: string | null
+          star_rating?: number | null
+        }
+        Update: {
+          booking_id?: string
+          created_at?: string | null
+          guest_email?: string | null
+          guest_name?: string | null
+          guest_phone?: string | null
+          id?: string
+          ownerrez_review_id?: string | null
+          property_id?: string | null
+          review_date?: string | null
+          review_source?: string | null
+          review_text?: string | null
+          star_rating?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ownerrez_reviews_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "comprehensive_property_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ownerrez_reviews_property_id_fkey"
             columns: ["property_id"]
             isOneToOne: false
             referencedRelation: "properties"
@@ -2354,6 +2470,47 @@ export type Database = {
             columns: ["owner_id"]
             isOneToOne: false
             referencedRelation: "property_owners"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sms_log: {
+        Row: {
+          created_at: string | null
+          id: string
+          message_body: string | null
+          message_type: string | null
+          phone_number: string
+          request_id: string | null
+          status: string | null
+          twilio_sid: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          message_body?: string | null
+          message_type?: string | null
+          phone_number: string
+          request_id?: string | null
+          status?: string | null
+          twilio_sid?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          message_body?: string | null
+          message_type?: string | null
+          phone_number?: string
+          request_id?: string | null
+          status?: string | null
+          twilio_sid?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sms_log_request_id_fkey"
+            columns: ["request_id"]
+            isOneToOne: false
+            referencedRelation: "google_review_requests"
             referencedColumns: ["id"]
           },
         ]
