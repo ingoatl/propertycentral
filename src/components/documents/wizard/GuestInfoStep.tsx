@@ -53,6 +53,7 @@ const GuestInfoStep = ({ data, updateData }: Props) => {
             value={data.guestName}
             onChange={(e) => {
               const newName = e.target.value;
+              // Update guest name field values
               updateData({ 
                 guestName: newName,
                 fieldValues: {
@@ -64,6 +65,18 @@ const GuestInfoStep = ({ data, updateData }: Props) => {
                   guest_full_name: newName,
                 }
               });
+              
+              // Immediately update document name with guest name
+              const templateName = data.templateName || "Document";
+              const propertyName = data.propertyName || "";
+              const parts = [templateName];
+              if (newName.trim()) {
+                parts.push(newName.trim());
+              }
+              if (propertyName.trim()) {
+                parts.push(propertyName.trim());
+              }
+              updateData({ documentName: parts.join(" - ") });
             }}
             placeholder="Enter guest's full legal name"
             required

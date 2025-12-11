@@ -71,6 +71,76 @@ serve(async (req) => {
         updateData.completed_at = new Date().toISOString();
         auditAction = 'completed';
         performedBy = 'System';
+        
+        // Auto-create mid-term booking when document is fully signed
+        if (bookingDoc.property_id && !bookingDoc.booking_id) {
+          try {
+            // Extract booking details from the document's field configuration
+            const fieldConfig = bookingDoc.field_configuration || {};
+            const preFillData = fieldConfig.preFillData || {};
+            
+            // Parse dates from pre-fill data
+            const leaseStartDate = preFillData.lease_start_date || preFillData.check_in_date;
+            const leaseEndDate = preFillData.lease_end_date || preFillData.check_out_date;
+            const monthlyRent = parseFloat(preFillData.monthly_rent?.replace(/[^0-9.]/g, '') || '0');
+            const securityDeposit = parseFloat(preFillData.security_deposit_amount?.replace(/[^0-9.]/g, '') || '0');
+            
+            if (leaseStartDate && leaseEndDate && monthlyRent > 0) {
+              console.log('Creating mid-term booking from completed document:', {
+                property_id: bookingDoc.property_id,
+                tenant_name: bookingDoc.recipient_name,
+                start_date: leaseStartDate,
+                end_date: leaseEndDate,
+                monthly_rent: monthlyRent,
+              });
+              
+              // Check if booking already exists for this guest/property/dates
+              const { data: existingBooking } = await supabase
+                .from('mid_term_bookings')
+                .select('id')
+                .eq('property_id', bookingDoc.property_id)
+                .eq('tenant_name', bookingDoc.recipient_name)
+                .eq('start_date', leaseStartDate)
+                .single();
+              
+              if (!existingBooking) {
+                const { data: newBooking, error: bookingError } = await supabase
+                  .from('mid_term_bookings')
+                  .insert({
+                    property_id: bookingDoc.property_id,
+                    tenant_name: bookingDoc.recipient_name || 'Guest',
+                    tenant_email: bookingDoc.recipient_email,
+                    start_date: leaseStartDate,
+                    end_date: leaseEndDate,
+                    monthly_rent: monthlyRent,
+                    deposit_amount: securityDeposit,
+                    status: 'active',
+                    notes: `Auto-created from signed document: ${bookingDoc.document_name}`,
+                  })
+                  .select('id')
+                  .single();
+                
+                if (bookingError) {
+                  console.error('Error creating mid-term booking:', bookingError);
+                } else {
+                  console.log('Mid-term booking created:', newBooking.id);
+                  
+                  // Link the booking to the document
+                  await supabase
+                    .from('booking_documents')
+                    .update({ booking_id: newBooking.id })
+                    .eq('id', bookingDoc.id);
+                }
+              } else {
+                console.log('Booking already exists, skipping creation');
+              }
+            } else {
+              console.log('Missing required booking data, skipping mid-term booking creation');
+            }
+          } catch (bookingCreateError) {
+            console.error('Error in mid-term booking creation:', bookingCreateError);
+          }
+        }
         break;
 
       case 'document_declined':
