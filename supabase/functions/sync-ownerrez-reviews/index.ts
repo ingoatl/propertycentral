@@ -19,12 +19,113 @@ serve(async (req) => {
     const ownerrezUsername = Deno.env.get("OWNERREZ_USERNAME")!;
 
     const supabase = createClient(supabaseUrl, supabaseKey);
-
-    console.log("Starting OwnerRez reviews sync...");
-
-    // Create auth header for OwnerRez - use username:apiKey (matching sync-ownerrez pattern)
+    
+    // Create auth header for OwnerRez
     const credentials = btoa(`${ownerrezUsername}:${ownerrezApiKey}`);
     const authHeader = `Basic ${credentials}`;
+
+    // Check for action parameter
+    const body = await req.json().catch(() => ({}));
+    const action = body.action || "sync";
+
+    if (action === "backfill_phones") {
+      // Backfill phone numbers for existing reviews
+      console.log("Starting phone number backfill...");
+      
+      const { data: reviewsNeedingPhone } = await supabase
+        .from("ownerrez_reviews")
+        .select("*")
+        .is("guest_phone", null);
+      
+      console.log(`Found ${reviewsNeedingPhone?.length || 0} reviews without phone numbers`);
+      
+      let updated = 0;
+      for (const review of reviewsNeedingPhone || []) {
+        const bookingId = review.booking_id;
+        if (!bookingId) continue;
+        
+        try {
+          // Fetch booking to get guest_id
+          const bookingResponse = await fetch(
+            `https://api.ownerrez.com/v2/bookings/${bookingId}`,
+            { headers: { Authorization: authHeader, "Content-Type": "application/json" } }
+          );
+          
+          if (!bookingResponse.ok) {
+            console.log(`Booking ${bookingId} not found`);
+            continue;
+          }
+          
+          const bookingData = await bookingResponse.json();
+          const guestId = bookingData.guest?.id || bookingData.guest_id;
+          
+          let guestPhone = bookingData.guest?.phone;
+          let guestEmail = bookingData.guest?.email;
+          let guestName = bookingData.guest?.name || bookingData.guest?.first_name;
+          
+          // Fetch from guest endpoint if needed
+          if (guestId && !guestPhone) {
+            const guestResponse = await fetch(
+              `https://api.ownerrez.com/v2/guests/${guestId}`,
+              { headers: { Authorization: authHeader, "Content-Type": "application/json" } }
+            );
+            
+            if (guestResponse.ok) {
+              const guestData = await guestResponse.json();
+              console.log(`Guest ${guestId} data:`, JSON.stringify(guestData, null, 2));
+              guestPhone = guestData.phone || guestData.phones?.[0]?.number || guestData.primary_phone;
+              guestEmail = guestEmail || guestData.email || guestData.emails?.[0]?.address;
+              guestName = guestName || guestData.name || guestData.first_name;
+            }
+          }
+          
+          if (guestPhone || guestEmail || guestName) {
+            const updates: any = {};
+            if (guestPhone) updates.guest_phone = guestPhone;
+            if (guestEmail && !review.guest_email) updates.guest_email = guestEmail;
+            if (guestName && !review.guest_name) updates.guest_name = guestName;
+            
+            if (Object.keys(updates).length > 0) {
+              await supabase
+                .from("ownerrez_reviews")
+                .update(updates)
+                .eq("id", review.id);
+              
+              console.log(`Updated review ${review.id} with:`, updates);
+              updated++;
+              
+              // Create workflow request if phone found and none exists
+              if (guestPhone) {
+                const { data: existingRequest } = await supabase
+                  .from("google_review_requests")
+                  .select("id")
+                  .eq("review_id", review.id)
+                  .maybeSingle();
+                
+                if (!existingRequest) {
+                  await supabase.from("google_review_requests").insert({
+                    review_id: review.id,
+                    guest_phone: guestPhone,
+                    workflow_status: "pending",
+                  });
+                  console.log(`Created workflow request for review ${review.id}`);
+                }
+              }
+            }
+          }
+        } catch (e) {
+          console.error(`Error processing review ${review.id}:`, e);
+        }
+      }
+      
+      return new Response(
+        JSON.stringify({ success: true, action: "backfill_phones", updated }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Standard sync action
+    console.log("Starting OwnerRez reviews sync...");
 
     // Fetch reviews from OwnerRez
     const reviewsResponse = await fetch(
