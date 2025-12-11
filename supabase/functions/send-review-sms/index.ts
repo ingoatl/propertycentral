@@ -6,6 +6,19 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Helper to check if current time is within send window (11am-3pm EST)
+const isWithinSendWindow = (): boolean => {
+  const now = new Date();
+  // Convert to EST (UTC-5, or UTC-4 during DST)
+  const estOffset = -5 * 60; // EST in minutes
+  const utcMinutes = now.getUTCHours() * 60 + now.getUTCMinutes();
+  const estMinutes = utcMinutes + estOffset;
+  const estHour = Math.floor(((estMinutes % 1440) + 1440) % 1440 / 60);
+  
+  // Send window: 11am (11) to 3pm (15) EST
+  return estHour >= 11 && estHour < 15;
+};
+
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
@@ -13,7 +26,7 @@ serve(async (req) => {
   }
 
   try {
-    const { reviewId, action, requestId } = await req.json();
+    const { reviewId, action, requestId, forceTime } = await req.json();
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -25,6 +38,19 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     console.log(`Processing SMS action: ${action} for review: ${reviewId || requestId}`);
+
+    // Check time window for non-test messages (skip if forceTime is true)
+    if (action !== "test" && !forceTime && !isWithinSendWindow()) {
+      console.log("Outside send window (11am-3pm EST), SMS queued");
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: "Outside send window (11am-3pm EST). Use 'Force Send' to override or try again later.",
+          outsideWindow: true 
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     // Helper function to send SMS via Twilio with error handling
     const sendSms = async (to: string, body: string, contactId?: string): Promise<{ success: boolean; sid?: string; error?: string; optedOut?: boolean }> => {
