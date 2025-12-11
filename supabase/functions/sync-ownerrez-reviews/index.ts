@@ -17,14 +17,14 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const ownerrezApiKey = Deno.env.get("OWNERREZ_API_KEY")!;
     const ownerrezUsername = Deno.env.get("OWNERREZ_USERNAME")!;
-    const ownerrezPassword = Deno.env.get("OWNERREZ_PASSWORD")!;
 
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     console.log("Starting OwnerRez reviews sync...");
 
-    // Create auth header for OwnerRez
-    const authHeader = `Basic ${btoa(`${ownerrezUsername}:${ownerrezPassword}`)}`;
+    // Create auth header for OwnerRez - use username:apiKey (matching sync-ownerrez pattern)
+    const credentials = btoa(`${ownerrezUsername}:${ownerrezApiKey}`);
+    const authHeader = `Basic ${credentials}`;
 
     // Fetch reviews from OwnerRez
     const reviewsResponse = await fetch(
@@ -32,8 +32,7 @@ serve(async (req) => {
       {
         headers: {
           Authorization: authHeader,
-          "X-ApiKey": ownerrezApiKey,
-          Accept: "application/json",
+          "Content-Type": "application/json",
         },
       }
     );
@@ -87,8 +86,7 @@ serve(async (req) => {
             {
               headers: {
                 Authorization: authHeader,
-                "X-ApiKey": ownerrezApiKey,
-                Accept: "application/json",
+                "Content-Type": "application/json",
               },
             }
           );
