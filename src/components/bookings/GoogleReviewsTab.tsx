@@ -9,7 +9,7 @@ import { toast } from "sonner";
 import { 
   RefreshCw, Star, MessageSquare, Send, CheckCircle, Clock, XCircle, Eye, 
   ArrowRight, UserX, Phone, AlertTriangle, TrendingUp, Users, Inbox,
-  Ban, RotateCcw
+  Ban, RotateCcw, Pause, Play
 } from "lucide-react";
 import { format } from "date-fns";
 import {
@@ -85,6 +85,7 @@ const GoogleReviewsTab = () => {
   const [activeTab, setActiveTab] = useState("strategy");
   const [optOutConfirm, setOptOutConfirm] = useState<string | null>(null);
   const [resubscribeConfirm, setResubscribeConfirm] = useState<string | null>(null);
+  const [campaignPaused, setCampaignPaused] = useState(true); // Paused by default until Twilio ready
 
   useEffect(() => {
     loadData();
@@ -248,7 +249,7 @@ const GoogleReviewsTab = () => {
         .insert({
           booking_id: testBookingId,
           guest_name: "Test Guest (Campaign Test)",
-          guest_phone: "+14044174582", // Admin phone for testing
+          guest_phone: "+17709065022", // Test phone for campaign testing
           guest_email: "test@peachhausgroup.com",
           review_source: "Airbnb",
           star_rating: 5,
@@ -265,7 +266,7 @@ const GoogleReviewsTab = () => {
         .from("google_review_requests")
         .insert({
           review_id: review.id,
-          guest_phone: "+14044174582",
+          guest_phone: "+17709065022",
           workflow_status: "pending",
         });
       
@@ -376,6 +377,24 @@ const GoogleReviewsTab = () => {
           </TabsList>
           
           <div className="flex gap-2 flex-wrap">
+            <Button 
+              variant={campaignPaused ? "destructive" : "default"}
+              onClick={() => setCampaignPaused(!campaignPaused)} 
+              size="sm"
+              className={campaignPaused ? "" : "bg-emerald-600 hover:bg-emerald-700"}
+            >
+              {campaignPaused ? (
+                <>
+                  <Pause className="w-4 h-4 mr-1" />
+                  Campaign Paused
+                </>
+              ) : (
+                <>
+                  <Play className="w-4 h-4 mr-1" />
+                  Campaign Active
+                </>
+              )}
+            </Button>
             <Button variant="outline" onClick={createTestGuest} size="sm" className="bg-amber-50 border-amber-300 text-amber-700 hover:bg-amber-100 dark:bg-amber-950/30 dark:border-amber-700 dark:text-amber-400">
               <Users className="w-4 h-4 mr-1" />
               Create Test Guest
@@ -394,6 +413,19 @@ const GoogleReviewsTab = () => {
             </Button>
           </div>
         </div>
+
+        {/* Campaign Paused Warning */}
+        {campaignPaused && (
+          <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-lg p-4 flex items-center gap-3">
+            <Pause className="w-5 h-5 text-amber-600" />
+            <div>
+              <p className="font-medium text-amber-800 dark:text-amber-400">Campaign is Paused</p>
+              <p className="text-sm text-amber-600 dark:text-amber-500">
+                Waiting for Twilio configuration. Click "Campaign Paused" to activate once Twilio webhook is set up.
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* STRATEGY DASHBOARD TAB */}
         <TabsContent value="strategy" className="space-y-6">
@@ -646,6 +678,8 @@ const GoogleReviewsTab = () => {
                                   <Button
                                     size="sm"
                                     onClick={() => sendPermissionSms(review.id, false)}
+                                    disabled={campaignPaused}
+                                    title={campaignPaused ? "Campaign is paused" : "Send permission request"}
                                   >
                                     <Send className="w-4 h-4 mr-1" />
                                     Ask
@@ -654,7 +688,7 @@ const GoogleReviewsTab = () => {
                                     size="sm"
                                     variant="outline"
                                     onClick={() => sendPermissionSms(review.id, true)}
-                                    title="Send immediately (ignores 11am-3pm EST window)"
+                                    title="Force send (ignores pause & time window for testing)"
                                   >
                                     Force
                                   </Button>
