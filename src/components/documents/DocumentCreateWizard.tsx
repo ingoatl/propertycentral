@@ -2,14 +2,13 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { ChevronLeft, ChevronRight, FileText, Building, User, Edit, CheckCircle, PenTool, ToggleLeft } from "lucide-react";
+import { ChevronLeft, ChevronRight, FileText, Building, User, Edit, CheckCircle, ToggleLeft, Send } from "lucide-react";
 import TemplateSelectStep from "./wizard/TemplateSelectStep";
 import PropertyLinkStep from "./wizard/PropertyLinkStep";
 import GuestInfoStep from "./wizard/GuestInfoStep";
 import AssignFieldsStep from "./wizard/AssignFieldsStep";
 import PreFillFieldsStep from "./wizard/PreFillFieldsStep";
-import VisualEditorStep from "./wizard/VisualEditorStep";
-import ReviewCreateStep from "./wizard/ReviewCreateStep";
+import CreateAndSendStep from "./wizard/CreateAndSendStep";
 
 export interface DetectedField {
   api_id: string;
@@ -50,8 +49,7 @@ const STEPS = [
   { id: 3, title: "Guest Info", icon: User },
   { id: 4, title: "Assign Fields", icon: ToggleLeft },
   { id: 5, title: "Fill Values", icon: Edit },
-  { id: 6, title: "Place Fields", icon: PenTool },
-  { id: 7, title: "Review & Send", icon: CheckCircle },
+  { id: 6, title: "Create & Send", icon: Send },
 ];
 
 const DocumentCreateWizard = () => {
@@ -93,9 +91,7 @@ const DocumentCreateWizard = () => {
       case 5:
         return true; // Pre-fill is optional
       case 6:
-        return !!wizardData.signwellDocumentId; // Place Fields - need draft
-      case 7:
-        return true;
+        return true; // Create & Send step - handled internally
       default:
         return false;
     }
@@ -114,9 +110,7 @@ const DocumentCreateWizard = () => {
       case 5:
         return <PreFillFieldsStep data={wizardData} updateData={updateWizardData} />;
       case 6:
-        return <VisualEditorStep data={wizardData} updateData={updateWizardData} />;
-      case 7:
-        return <ReviewCreateStep data={wizardData} updateData={updateWizardData} onComplete={() => setCurrentStep(1)} />;
+        return <CreateAndSendStep data={wizardData} updateData={updateWizardData} onComplete={() => setCurrentStep(1)} />;
       default:
         return null;
     }
