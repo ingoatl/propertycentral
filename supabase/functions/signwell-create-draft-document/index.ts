@@ -270,8 +270,9 @@ serve(async (req) => {
     // Build SignWell payload
     // with_signature_page: true auto-generates a signature page at the end
     // This eliminates the need for visual field placement or text tags for signatures
+    // test_mode: true - uses test API which doesn't count against document limits
     const signwellPayload: Record<string, unknown> = {
-      test_mode: false,
+      test_mode: true,
       draft: false, // Set to false to skip visual editor - auto signature page handles it
       with_signature_page: true, // Auto-generate signature page at end of document
       reminders: true, // Enable email reminders
