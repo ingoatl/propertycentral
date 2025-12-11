@@ -45,6 +45,11 @@ serve(async (req) => {
     const reviewsData = await reviewsResponse.json();
     console.log(`Fetched ${reviewsData.items?.length || 0} reviews from OwnerRez`);
     
+    // Log first review structure to understand the data
+    if (reviewsData.items?.[0]) {
+      console.log("Sample review structure:", JSON.stringify(reviewsData.items[0], null, 2));
+    }
+    
     // Filter for 5-star Airbnb/VRBO reviews
     // OwnerRez uses "listing_site" field (e.g., "Vrbo", "Airbnb")
     const eligibleReviews = (reviewsData.items || []).filter((review: any) => {
@@ -52,8 +57,11 @@ serve(async (req) => {
       const isEligibleSource = listingSite.includes("airbnb") || listingSite.includes("vrbo") || listingSite.includes("homeaway");
       const isFiveStar = review.stars >= 5;
       
+      // Try multiple fields for guest name
+      const guestName = review.display_name || review.guest_name || review.reviewer_name || review.name;
+      
       if (isFiveStar) {
-        console.log(`5-star review from ${review.listing_site}, guest: ${review.display_name}, eligible: ${isEligibleSource}`);
+        console.log(`5-star review from ${review.listing_site}, guest: ${guestName}, booking_id: ${review.booking_id}, eligible: ${isEligibleSource}`);
       }
       
       return isEligibleSource && isFiveStar;
@@ -79,16 +87,17 @@ serve(async (req) => {
         continue;
       }
 
-      // Use display_name from review (OwnerRez format)
-      let guestName = review.display_name || null;
+      // Try multiple fields for guest name from review
+      let guestName = review.display_name || review.guest_name || review.reviewer_name || review.name || null;
       let guestPhone = null;
       let guestEmail = null;
       let propertyId = null;
 
       if (bookingId) {
         try {
+          // Fetch booking with guest expansion
           const bookingResponse = await fetch(
-            `https://api.ownerrez.com/v2/bookings/${bookingId}`,
+            `https://api.ownerrez.com/v2/bookings/${bookingId}?expand=guest`,
             {
               headers: {
                 Authorization: authHeader,
@@ -99,11 +108,13 @@ serve(async (req) => {
 
           if (bookingResponse.ok) {
             const bookingData = await bookingResponse.json();
-            console.log(`Booking ${bookingId} data:`, JSON.stringify(bookingData, null, 2));
+            console.log(`Booking ${bookingId} response:`, JSON.stringify(bookingData, null, 2));
             
-            guestName = guestName || bookingData.guest?.name || bookingData.guest_name;
-            guestPhone = bookingData.guest?.phone || bookingData.guest_phone;
-            guestEmail = bookingData.guest?.email || bookingData.guest_email;
+            // Extract guest info - try various paths
+            const guest = bookingData.guest || {};
+            guestName = guestName || guest.name || guest.first_name || bookingData.guest_name;
+            guestPhone = guest.phone || guest.primary_phone || guest.cell_phone || guest.phones?.[0]?.number || bookingData.guest_phone;
+            guestEmail = guest.email || guest.primary_email || guest.emails?.[0]?.address || bookingData.guest_email;
 
             // If guest phone not in booking, try fetching from guest endpoint
             const guestId = bookingData.guest?.id || bookingData.guest_id || review.guest_id;

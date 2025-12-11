@@ -264,43 +264,86 @@ const GoogleReviewsTab = () => {
         </Button>
       </div>
 
-      {/* Inbound Messages Card */}
-      {allInboundMessages.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <MessageSquare className="w-5 h-5" />
-              Recent Guest Replies
-            </CardTitle>
-            <CardDescription>
-              Inbound SMS responses from guests
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3 max-h-64 overflow-y-auto">
-              {allInboundMessages.map((msg) => (
-                <div key={msg.id} className="border rounded-lg p-3 bg-muted/30">
-                  <div className="flex justify-between items-start mb-2">
-                    <div className="flex items-center gap-2">
-                      <Badge variant={
-                        msg.message_type === "inbound_opt_out" ? "destructive" :
-                        msg.message_type === "inbound_reply" ? "default" : "secondary"
-                      }>
-                        {msg.message_type.replace("inbound_", "").replace(/_/g, " ")}
-                      </Badge>
-                      <span className="text-xs text-muted-foreground">{msg.phone_number}</span>
-                    </div>
-                    <span className="text-xs text-muted-foreground">
-                      {format(new Date(msg.created_at), "MMM d, h:mm a")}
-                    </span>
-                  </div>
-                  <p className="text-sm">{msg.message_body}</p>
-                </div>
-              ))}
+      {/* SMS Inbox Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <MessageSquare className="w-5 h-5" />
+            SMS Inbox
+          </CardTitle>
+          <CardDescription>
+            Inbound messages from guests · {allInboundMessages.length} messages
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {allInboundMessages.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <MessageSquare className="w-12 h-12 mx-auto mb-4 opacity-30" />
+              <p>No inbound messages yet</p>
+              <p className="text-sm">Guest replies will appear here</p>
             </div>
-          </CardContent>
-        </Card>
-      )}
+          ) : (
+            <div className="space-y-3 max-h-96 overflow-y-auto">
+              {allInboundMessages.map((msg) => {
+                // Find associated review/request for this phone number
+                const associatedReview = reviews.find(r => r.guest_phone === msg.phone_number);
+                const associatedRequest = requests.find(r => r.guest_phone === msg.phone_number);
+                
+                return (
+                  <div 
+                    key={msg.id} 
+                    className={`border rounded-lg p-4 transition-colors ${
+                      msg.message_type === "inbound_opt_out" ? "bg-destructive/5 border-destructive/20" :
+                      msg.message_type === "inbound_reply" ? "bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800" :
+                      "bg-muted/30"
+                    }`}
+                  >
+                    <div className="flex justify-between items-start mb-3">
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">
+                            {associatedReview?.guest_name || "Unknown Guest"}
+                          </span>
+                          <Badge variant={
+                            msg.message_type === "inbound_opt_out" ? "destructive" :
+                            msg.message_type === "inbound_reply" ? "default" : "secondary"
+                          } className="text-xs">
+                            {msg.message_type === "inbound_reply" ? "Reply" :
+                             msg.message_type === "inbound_opt_out" ? "Opted Out" :
+                             msg.message_type === "inbound_resubscribe" ? "Resubscribed" :
+                             "Unmatched"}
+                          </Badge>
+                        </div>
+                        <span className="text-xs text-muted-foreground">{msg.phone_number}</span>
+                      </div>
+                      <span className="text-xs text-muted-foreground">
+                        {format(new Date(msg.created_at), "MMM d, h:mm a")}
+                      </span>
+                    </div>
+                    <div className="bg-background rounded-md p-3 border">
+                      <p className="text-sm">{msg.message_body}</p>
+                    </div>
+                    {associatedRequest && (
+                      <div className="mt-2 flex items-center gap-2">
+                        <span className="text-xs text-muted-foreground">Status:</span>
+                        {getStatusBadge(associatedRequest.workflow_status)}
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-6 text-xs"
+                          onClick={() => viewSmsHistory(associatedRequest.id)}
+                        >
+                          View Thread
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Reviews Table */}
       <Card>
