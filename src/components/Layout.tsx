@@ -92,7 +92,6 @@ const Layout = ({ children }: LayoutProps) => {
       { path: "/visits", label: "Log Visit", icon: Calendar },
       { path: "/expenses", label: "Expenses", icon: DollarSign },
       { path: "/bookings", label: "Bookings", icon: CalendarDays },
-      { path: "/mid-term-bookings", label: "Mid-term Bookings", icon: FileText },
       { path: "/documents", label: "Documents", icon: FileSignature },
     ] : []),
     ...(isAdmin ? [

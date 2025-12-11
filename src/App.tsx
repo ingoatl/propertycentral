@@ -13,7 +13,7 @@ import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import PropertyOwners from "./pages/PropertyOwners";
 import MonthlyCharges from "./pages/MonthlyCharges";
-import MidTermBookings from "./pages/MidTermBookings";
+import { Navigate } from "react-router-dom";
 import Bookings from "./pages/Bookings";
 import LeaveReview from "./pages/LeaveReview";
 import PublicReview from "./pages/PublicReview";
@@ -42,7 +42,7 @@ const App = () => (
                 <Route path="/admin" element={<Admin />} />
                 <Route path="/owners" element={<PropertyOwners />} />
                 <Route path="/charges" element={<MonthlyCharges />} />
-                <Route path="/mid-term-bookings" element={<MidTermBookings />} />
+                <Route path="/mid-term-bookings" element={<Navigate to="/bookings" replace />} />
                 <Route path="/bookings" element={<Bookings />} />
                 <Route path="/documents" element={<Documents />} />
                 <Route path="/utilities" element={<Utilities />} />
