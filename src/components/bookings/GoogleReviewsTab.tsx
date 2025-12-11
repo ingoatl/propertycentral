@@ -58,6 +58,7 @@ const GoogleReviewsTab = () => {
   const [requests, setRequests] = useState<GoogleReviewRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const [backfilling, setBackfilling] = useState(false);
   const [selectedReview, setSelectedReview] = useState<OwnerrezReview | null>(null);
   const [smsLogs, setSmsLogs] = useState<SmsLog[]>([]);
   const [smsDialogOpen, setSmsDialogOpen] = useState(false);
@@ -120,6 +121,29 @@ const GoogleReviewsTab = () => {
       toast.error("Failed to sync reviews");
     } finally {
       setSyncing(false);
+    }
+  };
+
+  const backfillPhones = async () => {
+    try {
+      setBackfilling(true);
+      toast.loading("Fetching phone numbers from OwnerRez...");
+
+      const { data, error } = await supabase.functions.invoke("sync-ownerrez-reviews", {
+        body: { action: "backfill_phones" },
+      });
+
+      if (error) throw error;
+
+      toast.dismiss();
+      toast.success(`Updated ${data?.updated || 0} reviews with phone numbers`);
+      await loadData();
+    } catch (error: any) {
+      console.error("Backfill error:", error);
+      toast.dismiss();
+      toast.error("Failed to backfill phone numbers");
+    } finally {
+      setBackfilling(false);
     }
   };
 
@@ -248,7 +272,7 @@ const GoogleReviewsTab = () => {
       </div>
 
       {/* Actions */}
-      <div className="flex gap-2 justify-end">
+      <div className="flex gap-2 justify-end flex-wrap">
         <Button 
           variant="outline" 
           onClick={sendTestSms} 
@@ -258,9 +282,18 @@ const GoogleReviewsTab = () => {
           <Send className={`w-4 h-4 ${sendingTest ? "animate-pulse" : ""}`} />
           {sendingTest ? "Sending..." : "Test SMS"}
         </Button>
+        <Button 
+          variant="outline" 
+          onClick={backfillPhones} 
+          disabled={backfilling}
+          className="gap-2"
+        >
+          <RefreshCw className={`w-4 h-4 ${backfilling ? "animate-spin" : ""}`} />
+          {backfilling ? "Fetching..." : "Fetch Phone Numbers"}
+        </Button>
         <Button onClick={syncReviews} disabled={syncing} className="gap-2">
           <RefreshCw className={`w-4 h-4 ${syncing ? "animate-spin" : ""}`} />
-          {syncing ? "Syncing..." : "Sync Reviews from OwnerRez"}
+          {syncing ? "Syncing..." : "Sync Reviews"}
         </Button>
       </div>
 
