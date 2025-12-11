@@ -99,9 +99,36 @@ serve(async (req) => {
 
           if (bookingResponse.ok) {
             const bookingData = await bookingResponse.json();
+            console.log(`Booking ${bookingId} data:`, JSON.stringify(bookingData, null, 2));
+            
             guestName = guestName || bookingData.guest?.name || bookingData.guest_name;
             guestPhone = bookingData.guest?.phone || bookingData.guest_phone;
             guestEmail = bookingData.guest?.email || bookingData.guest_email;
+
+            // If guest phone not in booking, try fetching from guest endpoint
+            const guestId = bookingData.guest?.id || bookingData.guest_id || review.guest_id;
+            if (!guestPhone && guestId) {
+              try {
+                const guestResponse = await fetch(
+                  `https://api.ownerrez.com/v2/guests/${guestId}`,
+                  {
+                    headers: {
+                      Authorization: authHeader,
+                      "Content-Type": "application/json",
+                    },
+                  }
+                );
+                if (guestResponse.ok) {
+                  const guestData = await guestResponse.json();
+                  console.log(`Guest ${guestId} data:`, JSON.stringify(guestData, null, 2));
+                  guestPhone = guestData.phone || guestData.phones?.[0]?.number;
+                  guestEmail = guestEmail || guestData.email || guestData.emails?.[0]?.address;
+                  guestName = guestName || guestData.name || guestData.first_name;
+                }
+              } catch (guestErr) {
+                console.error(`Failed to fetch guest ${guestId}:`, guestErr);
+              }
+            }
 
             // Try to map property
             const propertyListingId = bookingData.property_id || bookingData.propertyId;

@@ -362,7 +362,7 @@ serve(async (req) => {
 
     if (action === "test") {
       // Send test SMS to admin phone
-      const adminPhone = "+14044295422"; // PeachHaus admin phone
+      const adminPhone = "+17709065022";
       const testMessage = "Test SMS from PeachHaus Google Review system. If you received this, the SMS integration is working correctly!";
       
       const testResult = await sendSms(adminPhone, testMessage);
