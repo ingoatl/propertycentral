@@ -268,10 +268,12 @@ serve(async (req) => {
     }
 
     // Build SignWell payload
+    // with_signature_page: true auto-generates a signature page at the end
+    // This eliminates the need for visual field placement or text tags for signatures
     const signwellPayload: Record<string, unknown> = {
       test_mode: false,
-      draft: true,
-      with_signature_page: false,
+      draft: false, // Set to false to skip visual editor - auto signature page handles it
+      with_signature_page: true, // Auto-generate signature page at end of document
       reminders: true, // Enable email reminders
       apply_signing_order: false, // Allow parallel signing - both can sign at the same time
       embedded_signing: true,
@@ -282,13 +284,13 @@ serve(async (req) => {
           id: "guest",
           email: recipientEmail,
           name: recipientName,
-          send_email: true, // Send email to guest
+          send_email: true, // Send email to guest automatically
         },
         {
           id: "host",
           email: "anja@peachhausgroup.com",
-          name: "PeachHaus Group",
-          send_email: true, // Send email to host
+          name: "PeachHaus Group LLC",
+          send_email: true, // Send email to host automatically
         },
       ],
     };
@@ -362,8 +364,10 @@ serve(async (req) => {
         recipient_email: recipientEmail,
         signwell_document_id: signwellData.id,
         embedded_edit_url: signwellData.embedded_edit_url,
-        is_draft: true,
-        status: "draft",
+        is_draft: false, // No longer a draft - auto signature page is used
+        status: "pending", // Ready for signatures
+        guest_signing_url: signwellData.recipients?.find((r: any) => r.id === "guest")?.embedded_signing_url,
+        host_signing_url: signwellData.recipients?.find((r: any) => r.id === "host")?.embedded_signing_url,
         field_configuration: { preFillData, guestFields, detectedFields, replacementsApplied: Object.keys(replacements) },
         created_by: userId,
       })
@@ -378,14 +382,19 @@ serve(async (req) => {
     // Log audit entry
     await supabase.from("document_audit_log").insert({
       document_id: docRecord.id,
-      action: "draft_created",
+      action: "document_created",
       performed_by: userId || "system",
       metadata: { 
         signwellDocumentId: signwellData.id, 
         fieldsReplaced: Object.keys(replacements).length,
         wasDocxProcessed: !!processedFileBase64,
+        withSignaturePage: true,
       },
     });
+
+    // Extract signing URLs from recipients
+    const guestSigningUrl = signwellData.recipients?.find((r: any) => r.id === "guest")?.embedded_signing_url;
+    const hostSigningUrl = signwellData.recipients?.find((r: any) => r.id === "host")?.embedded_signing_url;
 
     return new Response(
       JSON.stringify({
@@ -393,6 +402,9 @@ serve(async (req) => {
         documentId: docRecord.id,
         signwellDocumentId: signwellData.id,
         embeddedEditUrl: signwellData.embedded_edit_url,
+        guestSigningUrl,
+        hostSigningUrl,
+        status: "pending",
       }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
