@@ -237,6 +237,50 @@ const GoogleReviewsTab = () => {
     setResubscribeConfirm(null);
   };
 
+  const createTestGuest = async () => {
+    try {
+      toast.loading("Creating test guest...");
+      
+      // Create a test review
+      const testBookingId = `TEST_${Date.now()}`;
+      const { data: review, error: reviewError } = await supabase
+        .from("ownerrez_reviews")
+        .insert({
+          booking_id: testBookingId,
+          guest_name: "Test Guest (Campaign Test)",
+          guest_phone: "+14044174582", // Admin phone for testing
+          guest_email: "test@peachhausgroup.com",
+          review_source: "Airbnb",
+          star_rating: 5,
+          review_text: "This was an amazing stay! The property was spotless, beautifully decorated, and had everything we needed. The hosts were incredibly responsive and helpful. We will definitely be back and highly recommend this place to anyone looking for a comfortable and stylish home away from home. Five stars all around!",
+          review_date: new Date().toISOString(),
+        })
+        .select()
+        .single();
+      
+      if (reviewError) throw reviewError;
+      
+      // Create a workflow request for this test review
+      const { error: requestError } = await supabase
+        .from("google_review_requests")
+        .insert({
+          review_id: review.id,
+          guest_phone: "+14044174582",
+          workflow_status: "pending",
+        });
+      
+      if (requestError) throw requestError;
+      
+      toast.dismiss();
+      toast.success("Test guest created! Use 'Force' button to start the workflow.");
+      await loadData();
+    } catch (error: any) {
+      console.error("Create test guest error:", error);
+      toast.dismiss();
+      toast.error(error.message || "Failed to create test guest");
+    }
+  };
+
   const viewSmsHistory = async (requestId: string) => {
     try {
       const { data, error } = await supabase
@@ -332,6 +376,10 @@ const GoogleReviewsTab = () => {
           </TabsList>
           
           <div className="flex gap-2 flex-wrap">
+            <Button variant="outline" onClick={createTestGuest} size="sm" className="bg-amber-50 border-amber-300 text-amber-700 hover:bg-amber-100 dark:bg-amber-950/30 dark:border-amber-700 dark:text-amber-400">
+              <Users className="w-4 h-4 mr-1" />
+              Create Test Guest
+            </Button>
             <Button variant="outline" onClick={sendTestSms} disabled={sendingTest} size="sm">
               <Send className={`w-4 h-4 mr-1 ${sendingTest ? "animate-pulse" : ""}`} />
               Test SMS
