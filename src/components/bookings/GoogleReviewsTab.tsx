@@ -165,14 +165,20 @@ const GoogleReviewsTab = () => {
     }
   };
 
-  const sendPermissionSms = async (reviewId: string) => {
+  const sendPermissionSms = async (reviewId: string, forceTime: boolean = false) => {
     try {
       toast.loading("Sending permission SMS...");
       const { data, error } = await supabase.functions.invoke("send-review-sms", {
-        body: { reviewId, action: "permission_ask" },
+        body: { reviewId, action: "permission_ask", forceTime },
       });
       if (error) throw error;
       toast.dismiss();
+      
+      if (data?.outsideWindow) {
+        toast.error("Outside send window (11am-3pm EST). Use 'Force Send' to override.");
+        return;
+      }
+      
       toast.success("Permission SMS sent successfully");
       await loadData();
     } catch (error: any) {
@@ -486,29 +492,29 @@ const GoogleReviewsTab = () => {
                 <div className="flex gap-4 items-start">
                   <div className="w-8 h-8 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center text-amber-600 font-bold shrink-0">1</div>
                   <div>
-                    <h4 className="font-medium">Review Detection</h4>
-                    <p className="text-sm text-muted-foreground">System syncs 5-star Airbnb/VRBO reviews from OwnerRez and extracts guest phone numbers.</p>
+                    <h4 className="font-medium">Wait 30 Minutes + Time Window</h4>
+                    <p className="text-sm text-muted-foreground">After 5-star review is received, wait to avoid looking robotic. SMS only sent between <strong>11am-3pm EST</strong> to feel personal.</p>
                   </div>
                 </div>
                 <div className="flex gap-4 items-start">
                   <div className="w-8 h-8 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center text-purple-600 font-bold shrink-0">2</div>
                   <div>
                     <h4 className="font-medium">Permission Request (SMS #1)</h4>
-                    <p className="text-sm text-muted-foreground">"Thanks for the wonderful review! Would you be open to leaving a Google review? I can send you the link + your original review text."</p>
+                    <p className="text-sm text-muted-foreground italic">"Thanks again for the wonderful {'{'}ReviewSource{'}'} review — it truly means a lot. Google reviews help future guests trust us when booking directly. If you're open to it, I can send you a link plus a copy of your original review so you can paste it in seconds. Would that be okay?"</p>
                   </div>
                 </div>
                 <div className="flex gap-4 items-start">
                   <div className="w-8 h-8 rounded-full bg-cyan-100 dark:bg-cyan-900/30 flex items-center justify-center text-cyan-600 font-bold shrink-0">3</div>
                   <div>
-                    <h4 className="font-medium">Review Delivery (SMS #2 & #3)</h4>
-                    <p className="text-sm text-muted-foreground">Once guest replies (any response = yes), send Google review link + their original Airbnb review text for easy copy/paste.</p>
+                    <h4 className="font-medium">Permission Granted → Deliver Package (SMS #2 & #3)</h4>
+                    <p className="text-sm text-muted-foreground">Any reply = YES. Send: <span className="italic">"Amazing — thank you! Here's the direct link to leave the Google review: {'{'}GoogleURL{'}'}"</span> + <span className="italic">"And here's the text of your {'{'}Source{'}'} review so you can copy/paste..."</span></p>
                   </div>
                 </div>
                 <div className="flex gap-4 items-start">
                   <div className="w-8 h-8 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-600 font-bold shrink-0">4</div>
                   <div>
-                    <h4 className="font-medium">Follow-up & Completion</h4>
-                    <p className="text-sm text-muted-foreground">Monitor for link clicks. One gentle nudge if no action in 48h. Max 3 messages total. Guests can reply STOP to opt out anytime.</p>
+                    <h4 className="font-medium">Nudge & Final Reminder</h4>
+                    <p className="text-sm text-muted-foreground">If no reply in 48h: <span className="italic">"Just checking in real quick — no pressure at all..."</span> After another 48h silence: tag as ignored. If link sent but not clicked in 72h: <span className="italic">"Just a friendly bump in case life got busy..."</span> Max 3 outbound messages total. Guests can reply STOP anytime.</p>
                   </div>
                 </div>
               </div>
@@ -588,13 +594,23 @@ const GoogleReviewsTab = () => {
                                 <Eye className="w-4 h-4" />
                               </Button>
                               {!request && hasPhone && (
-                                <Button
-                                  size="sm"
-                                  onClick={() => sendPermissionSms(review.id)}
-                                >
-                                  <Send className="w-4 h-4 mr-1" />
-                                  Ask
-                                </Button>
+                                <div className="flex gap-1">
+                                  <Button
+                                    size="sm"
+                                    onClick={() => sendPermissionSms(review.id, false)}
+                                  >
+                                    <Send className="w-4 h-4 mr-1" />
+                                    Ask
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => sendPermissionSms(review.id, true)}
+                                    title="Send immediately (ignores 11am-3pm EST window)"
+                                  >
+                                    Force
+                                  </Button>
+                                </div>
                               )}
                               {!hasPhone && !request && (
                                 <Badge variant="outline" className="text-amber-600 border-amber-300">No Phone</Badge>
