@@ -45,7 +45,7 @@ interface GoogleReviewRequest {
 
 interface SmsLog {
   id: string;
-  request_id: string;
+  request_id: string | null;
   phone_number: string;
   message_type: string;
   message_body: string;
@@ -61,6 +61,8 @@ const GoogleReviewsTab = () => {
   const [selectedReview, setSelectedReview] = useState<OwnerrezReview | null>(null);
   const [smsLogs, setSmsLogs] = useState<SmsLog[]>([]);
   const [smsDialogOpen, setSmsDialogOpen] = useState(false);
+  const [sendingTest, setSendingTest] = useState(false);
+  const [allInboundMessages, setAllInboundMessages] = useState<SmsLog[]>([]);
 
   useEffect(() => {
     loadData();
@@ -69,7 +71,7 @@ const GoogleReviewsTab = () => {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [reviewsResult, requestsResult] = await Promise.all([
+      const [reviewsResult, requestsResult, inboundResult] = await Promise.all([
         supabase
           .from("ownerrez_reviews")
           .select("*")
@@ -78,6 +80,12 @@ const GoogleReviewsTab = () => {
           .from("google_review_requests")
           .select("*")
           .order("created_at", { ascending: false }),
+        supabase
+          .from("sms_log")
+          .select("*")
+          .in("message_type", ["inbound_reply", "inbound_opt_out", "inbound_resubscribe", "inbound_unmatched"])
+          .order("created_at", { ascending: false })
+          .limit(50),
       ]);
 
       if (reviewsResult.error) throw reviewsResult.error;
@@ -85,6 +93,7 @@ const GoogleReviewsTab = () => {
 
       setReviews(reviewsResult.data || []);
       setRequests(requestsResult.data || []);
+      setAllInboundMessages(inboundResult.data || []);
     } catch (error: any) {
       console.error("Error loading Google reviews data:", error);
       toast.error("Failed to load reviews data");
@@ -131,6 +140,28 @@ const GoogleReviewsTab = () => {
       console.error("SMS error:", error);
       toast.dismiss();
       toast.error(error.message || "Failed to send SMS");
+    }
+  };
+
+  const sendTestSms = async () => {
+    try {
+      setSendingTest(true);
+      toast.loading("Sending test SMS...");
+
+      const { data, error } = await supabase.functions.invoke("send-review-sms", {
+        body: { action: "test" },
+      });
+
+      if (error) throw error;
+
+      toast.dismiss();
+      toast.success("Test SMS sent to admin phone");
+    } catch (error: any) {
+      console.error("Test SMS error:", error);
+      toast.dismiss();
+      toast.error(error.message || "Failed to send test SMS");
+    } finally {
+      setSendingTest(false);
     }
   };
 
@@ -217,12 +248,59 @@ const GoogleReviewsTab = () => {
       </div>
 
       {/* Actions */}
-      <div className="flex justify-end">
+      <div className="flex gap-2 justify-end">
+        <Button 
+          variant="outline" 
+          onClick={sendTestSms} 
+          disabled={sendingTest}
+          className="gap-2"
+        >
+          <Send className={`w-4 h-4 ${sendingTest ? "animate-pulse" : ""}`} />
+          {sendingTest ? "Sending..." : "Test SMS"}
+        </Button>
         <Button onClick={syncReviews} disabled={syncing} className="gap-2">
           <RefreshCw className={`w-4 h-4 ${syncing ? "animate-spin" : ""}`} />
           {syncing ? "Syncing..." : "Sync Reviews from OwnerRez"}
         </Button>
       </div>
+
+      {/* Inbound Messages Card */}
+      {allInboundMessages.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <MessageSquare className="w-5 h-5" />
+              Recent Guest Replies
+            </CardTitle>
+            <CardDescription>
+              Inbound SMS responses from guests
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3 max-h-64 overflow-y-auto">
+              {allInboundMessages.map((msg) => (
+                <div key={msg.id} className="border rounded-lg p-3 bg-muted/30">
+                  <div className="flex justify-between items-start mb-2">
+                    <div className="flex items-center gap-2">
+                      <Badge variant={
+                        msg.message_type === "inbound_opt_out" ? "destructive" :
+                        msg.message_type === "inbound_reply" ? "default" : "secondary"
+                      }>
+                        {msg.message_type.replace("inbound_", "").replace(/_/g, " ")}
+                      </Badge>
+                      <span className="text-xs text-muted-foreground">{msg.phone_number}</span>
+                    </div>
+                    <span className="text-xs text-muted-foreground">
+                      {format(new Date(msg.created_at), "MMM d, h:mm a")}
+                    </span>
+                  </div>
+                  <p className="text-sm">{msg.message_body}</p>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Reviews Table */}
       <Card>
