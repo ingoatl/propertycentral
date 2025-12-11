@@ -44,12 +44,25 @@ serve(async (req) => {
 
     const reviewsData = await reviewsResponse.json();
     console.log(`Fetched ${reviewsData.items?.length || 0} reviews from OwnerRez`);
+    
+    // Debug: Log first review to see structure
+    if (reviewsData.items?.length > 0) {
+      console.log("Sample review structure:", JSON.stringify(reviewsData.items[0], null, 2));
+    }
 
     // Filter for 5-star Airbnb/VRBO reviews
     const eligibleReviews = (reviewsData.items || []).filter((review: any) => {
-      const source = review.source?.toLowerCase() || "";
+      const source = (review.source || review.channel || review.source_name || "").toLowerCase();
       const isEligibleSource = source.includes("airbnb") || source.includes("vrbo") || source.includes("homeaway");
-      const isFiveStar = review.stars >= 5 || review.rating >= 5;
+      // OwnerRez uses overall_rating or stars or rating
+      const rating = review.overall_rating || review.stars || review.rating || 0;
+      const isFiveStar = rating >= 5;
+      
+      // Debug logging for filtering
+      if (rating >= 5) {
+        console.log(`Review from ${source}, rating: ${rating}, eligible source: ${isEligibleSource}`);
+      }
+      
       return isEligibleSource && isFiveStar;
     });
 
