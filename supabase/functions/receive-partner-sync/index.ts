@@ -1,10 +1,94 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { Resend } from "https://esm.sh/resend@2.0.0";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-api-key',
 };
+
+const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
+
+async function sendNewPropertyAlert(property: any) {
+  try {
+    const fullAddress = [property.address, property.city, property.state, property.zip_code]
+      .filter(Boolean)
+      .join(', ');
+
+    const emailHtml = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <style>
+          body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background: linear-gradient(135deg, #2D5A27 0%, #4A7C43 100%); color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
+          .header h1 { margin: 0; font-size: 24px; }
+          .content { background: #f9f9f9; padding: 30px; border: 1px solid #e0e0e0; }
+          .property-card { background: white; border-radius: 8px; padding: 20px; margin: 20px 0; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+          .property-title { font-size: 20px; font-weight: bold; color: #2D5A27; margin-bottom: 10px; }
+          .property-detail { margin: 8px 0; }
+          .property-detail strong { color: #555; }
+          .cta-button { display: inline-block; background: #2D5A27; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin-top: 20px; }
+          .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
+          .badge { display: inline-block; background: #FFA500; color: white; padding: 4px 12px; border-radius: 4px; font-size: 12px; font-weight: bold; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>🏠 New Partner Property Alert</h1>
+            <p style="margin: 10px 0 0 0; opacity: 0.9;">A new property has been synced to Property Central</p>
+          </div>
+          <div class="content">
+            <p>Hi Chris,</p>
+            <p>A new partner property from MidTermNation has been added to Property Central and needs to be listed on all platforms.</p>
+            
+            <div class="property-card">
+              <span class="badge">NEW PROPERTY</span>
+              <div class="property-title">${property.property_title || 'Untitled Property'}</div>
+              <div class="property-detail"><strong>📍 Address:</strong> ${fullAddress || 'Not provided'}</div>
+              <div class="property-detail"><strong>🏠 Type:</strong> ${property.property_type || 'Not specified'}</div>
+              <div class="property-detail"><strong>🛏️ Bedrooms:</strong> ${property.bedrooms || 'N/A'}</div>
+              <div class="property-detail"><strong>🚿 Bathrooms:</strong> ${property.bathrooms || 'N/A'}</div>
+              <div class="property-detail"><strong>📐 Sq Ft:</strong> ${property.square_footage ? property.square_footage.toLocaleString() : 'N/A'}</div>
+              <div class="property-detail"><strong>💰 Monthly Price:</strong> ${property.monthly_price ? '$' + property.monthly_price.toLocaleString() : 'Not set'}</div>
+              <div class="property-detail"><strong>👤 Owner Contact:</strong> ${property.contact_name || 'Not provided'}</div>
+              ${property.existing_listing_url ? `<div class="property-detail"><strong>🔗 Existing Listing:</strong> <a href="${property.existing_listing_url}">${property.existing_listing_url}</a></div>` : ''}
+            </div>
+
+            <p><strong>Action Required:</strong></p>
+            <ul>
+              <li>Add this property to all listing platforms (Airbnb, VRBO, Furnished Finder, etc.)</li>
+              <li>Complete the onboarding tasks in Property Central</li>
+              <li>Update listing URLs once created</li>
+            </ul>
+
+            <a href="https://preview--peachhaus-property-central.lovable.app/properties" class="cta-button">View in Property Central →</a>
+          </div>
+          <div class="footer">
+            <p>This is an automated notification from PeachHaus Property Central</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    const result = await resend.emails.send({
+      from: "PeachHaus Property Central <onboarding@resend.dev>",
+      to: ["chris@peachhausgroup.com"],
+      cc: ["info@peachhausgroup.com"],
+      subject: `🏠 New Property Alert: ${property.property_title || 'New Partner Property'} - Action Required`,
+      html: emailHtml,
+    });
+
+    console.log(`New property alert email sent to Chris:`, result);
+    return true;
+  } catch (error) {
+    console.error('Failed to send new property alert email:', error);
+    return false;
+  }
+}
 
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -70,10 +154,21 @@ serve(async (req) => {
 
     let successCount = 0;
     let errorCount = 0;
+    let newPropertyCount = 0;
     const errors: { source_id: string; error: string }[] = [];
 
     for (const property of properties) {
       console.log(`Processing property: ${property.property_title} (source_id: ${property.source_id})`);
+      
+      // Check if this is a NEW property (doesn't exist yet)
+      const { data: existingProperty } = await supabase
+        .from('partner_properties')
+        .select('id')
+        .eq('source_id', property.source_id)
+        .eq('source_system', property.source_system || 'midtermnation')
+        .single();
+
+      const isNewProperty = !existingProperty;
       
       const { data: upsertedProperty, error } = await supabase
         .from('partner_properties')
@@ -131,6 +226,13 @@ serve(async (req) => {
       } else {
         successCount++;
         console.log(`Successfully synced property: ${property.property_title}`);
+        
+        // Send email alert for NEW properties only
+        if (isNewProperty) {
+          newPropertyCount++;
+          console.log(`NEW PROPERTY DETECTED: ${property.property_title} - Sending alert to Chris`);
+          await sendNewPropertyAlert(property);
+        }
         
         // Auto-fill existing onboarding tasks with synced data
         if (upsertedProperty?.id) {
@@ -195,17 +297,18 @@ serve(async (req) => {
       if (updateError) {
         console.error('Failed to update sync log:', updateError);
       } else {
-        console.log(`Updated sync log: ${successCount} synced, ${errorCount} failed`);
+        console.log(`Updated sync log: ${successCount} synced, ${errorCount} failed, ${newPropertyCount} new`);
       }
     }
 
-    console.log(`=== Sync Complete: ${successCount} succeeded, ${errorCount} failed ===`);
+    console.log(`=== Sync Complete: ${successCount} succeeded, ${errorCount} failed, ${newPropertyCount} new properties ===`);
 
     return new Response(
       JSON.stringify({
         success: true,
         synced: successCount,
         failed: errorCount,
+        newProperties: newPropertyCount,
         errors: errors.length > 0 ? errors : undefined,
         timestamp: new Date().toISOString()
       }),
