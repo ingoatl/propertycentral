@@ -40,28 +40,55 @@ serve(async (req) => {
       console.log(`Found ${reviewsNeedingPhone?.length || 0} reviews without phone numbers`);
       
       let updated = 0;
+      let deleted = 0;
+      
       for (const review of reviewsNeedingPhone || []) {
         const bookingId = review.booking_id;
+        const ownerrezReviewId = review.ownerrez_review_id;
         if (!bookingId) continue;
         
         try {
-          // Fetch booking to get guest_id
+          // First try the review endpoint directly
+          let guestPhone = null;
+          let guestEmail = null;
+          let guestName = null;
+          
+          if (ownerrezReviewId) {
+            try {
+              const reviewResponse = await fetch(
+                `https://api.ownerrez.com/v2/reviews/${ownerrezReviewId}`,
+                { headers: { Authorization: authHeader, "Content-Type": "application/json" } }
+              );
+              if (reviewResponse.ok) {
+                const reviewData = await reviewResponse.json();
+                guestName = reviewData.display_name || reviewData.guest_name || reviewData.reviewer_name;
+                console.log(`Review ${ownerrezReviewId}: guest name = ${guestName}`);
+              }
+            } catch (e) {
+              console.log(`Review endpoint failed for ${ownerrezReviewId}`);
+            }
+          }
+          
+          // Then try booking endpoint
           const bookingResponse = await fetch(
             `https://api.ownerrez.com/v2/bookings/${bookingId}`,
             { headers: { Authorization: authHeader, "Content-Type": "application/json" } }
           );
           
           if (!bookingResponse.ok) {
-            console.log(`Booking ${bookingId} not found`);
+            console.log(`Booking ${bookingId} not found - removing orphaned review`);
+            // Delete reviews that reference non-existent bookings
+            await supabase.from("ownerrez_reviews").delete().eq("id", review.id);
+            deleted++;
             continue;
           }
           
           const bookingData = await bookingResponse.json();
           const guestId = bookingData.guest?.id || bookingData.guest_id;
           
-          let guestPhone = bookingData.guest?.phone;
-          let guestEmail = bookingData.guest?.email;
-          let guestName = bookingData.guest?.name || bookingData.guest?.first_name;
+          guestPhone = bookingData.guest?.phone;
+          guestEmail = bookingData.guest?.email;
+          guestName = guestName || bookingData.guest?.name || bookingData.guest?.first_name;
           
           // Fetch from guest endpoint if needed
           if (guestId && !guestPhone) {
@@ -72,7 +99,6 @@ serve(async (req) => {
             
             if (guestResponse.ok) {
               const guestData = await guestResponse.json();
-              console.log(`Guest ${guestId} data:`, JSON.stringify(guestData, null, 2));
               guestPhone = guestData.phone || guestData.phones?.[0]?.number || guestData.primary_phone;
               guestEmail = guestEmail || guestData.email || guestData.emails?.[0]?.address;
               guestName = guestName || guestData.name || guestData.first_name;
@@ -119,7 +145,7 @@ serve(async (req) => {
       }
       
       return new Response(
-        JSON.stringify({ success: true, action: "backfill_phones", updated }),
+        JSON.stringify({ success: true, action: "backfill_phones", updated, deleted }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }

@@ -136,7 +136,10 @@ const GoogleReviewsTab = () => {
       if (error) throw error;
 
       toast.dismiss();
-      toast.success(`Updated ${data?.updated || 0} reviews with phone numbers`);
+      const msg = data?.deleted > 0 
+        ? `Updated ${data?.updated || 0} reviews, removed ${data?.deleted} invalid records`
+        : `Updated ${data?.updated || 0} reviews with phone numbers`;
+      toast.success(msg);
       await loadData();
     } catch (error: any) {
       console.error("Backfill error:", error);
