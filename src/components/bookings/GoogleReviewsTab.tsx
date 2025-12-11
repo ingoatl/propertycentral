@@ -242,38 +242,25 @@ const GoogleReviewsTab = () => {
     try {
       toast.loading("Creating test guest...");
       
-      // Create a test review
+      // Create a test review ONLY - don't create request record so Force button appears
       const testBookingId = `TEST_${Date.now()}`;
-      const { data: review, error: reviewError } = await supabase
+      const { error: reviewError } = await supabase
         .from("ownerrez_reviews")
         .insert({
           booking_id: testBookingId,
           guest_name: "Test Guest (Campaign Test)",
-          guest_phone: "+17709065022", // Test phone for campaign testing
+          guest_phone: "+17709065022", // Test phone (770) 906-5022
           guest_email: "test@peachhausgroup.com",
           review_source: "Airbnb",
           star_rating: 5,
           review_text: "This was an amazing stay! The property was spotless, beautifully decorated, and had everything we needed. The hosts were incredibly responsive and helpful. We will definitely be back and highly recommend this place to anyone looking for a comfortable and stylish home away from home. Five stars all around!",
           review_date: new Date().toISOString(),
-        })
-        .select()
-        .single();
+        });
       
       if (reviewError) throw reviewError;
       
-      // Create a workflow request for this test review
-      const { error: requestError } = await supabase
-        .from("google_review_requests")
-        .insert({
-          review_id: review.id,
-          guest_phone: "+17709065022",
-          workflow_status: "pending",
-        });
-      
-      if (requestError) throw requestError;
-      
       toast.dismiss();
-      toast.success("Test guest created! Use 'Force' button to start the workflow.");
+      toast.success("Test guest created! Find them in Queue tab and click 'Force' button.");
       await loadData();
     } catch (error: any) {
       console.error("Create test guest error:", error);
