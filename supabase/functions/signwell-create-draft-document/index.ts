@@ -272,42 +272,9 @@ serve(async (req) => {
     // This eliminates the need for visual field placement or text tags for signatures
     // test_mode: true - uses test API which doesn't count against document limits
     
-    // Build guest text fields for the signature page
-    // These are fields the guest needs to fill in (not pre-filled by admin)
-    const guestTextFields: Array<{
-      type: string;
-      required: boolean;
-      label: string;
-      recipient_id: string;
-      x?: number;
-      y?: number;
-      page?: string;
-      width?: number;
-      height?: number;
-    }> = [];
-    
-    if (guestFields && Array.isArray(guestFields)) {
-      // Add text fields for guest to complete on the signature page
-      // Filter to only text fields (not signatures - those are handled by with_signature_page)
-      const textFieldsToAdd = guestFields.filter((f: any) => 
-        f.type === 'text' && 
-        f.api_id !== 'guest_signature' && 
-        f.api_id !== 'guest_name_print' // guest_name_print is typically auto-added
-      );
-      
-      console.log("Guest text fields to add:", JSON.stringify(textFieldsToAdd, null, 2));
-      
-      // Add each guest text field - SignWell will place them on signature page
-      for (const field of textFieldsToAdd) {
-        guestTextFields.push({
-          type: "textbox",
-          required: false, // Make optional so guest can proceed
-          label: field.label || field.api_id,
-          recipient_id: "guest",
-          page: "last", // Place on last/signature page
-        });
-      }
-    }
+    // Note: When using with_signature_page: true, SignWell auto-generates signature fields
+    // Custom fields array is not supported with this mode - guest-fillable text fields
+    // must be handled via placeholder replacement in the DOCX or manual visual editor
     
     const signwellPayload: Record<string, unknown> = {
       test_mode: true,
@@ -334,12 +301,7 @@ serve(async (req) => {
       ],
     };
     
-    // Add guest text fields if any
-    if (guestTextFields.length > 0) {
-      signwellPayload.fields = guestTextFields;
-      console.log("Adding guest text fields to SignWell:", JSON.stringify(guestTextFields, null, 2));
-    }
-    
+    // Note: fields array removed - not compatible with with_signature_page mode
     // Use processed file or original URL
     if (processedFileBase64) {
       signwellPayload.files = [
