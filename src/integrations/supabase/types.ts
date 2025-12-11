@@ -894,6 +894,8 @@ export type Database = {
           link_clicked_at: string | null
           link_sent_at: string | null
           nudge_count: number | null
+          opted_out: boolean | null
+          opted_out_at: string | null
           permission_asked_at: string | null
           permission_granted_at: string | null
           review_id: string | null
@@ -909,6 +911,8 @@ export type Database = {
           link_clicked_at?: string | null
           link_sent_at?: string | null
           nudge_count?: number | null
+          opted_out?: boolean | null
+          opted_out_at?: string | null
           permission_asked_at?: string | null
           permission_granted_at?: string | null
           review_id?: string | null
@@ -924,6 +928,8 @@ export type Database = {
           link_clicked_at?: string | null
           link_sent_at?: string | null
           nudge_count?: number | null
+          opted_out?: boolean | null
+          opted_out_at?: string | null
           permission_asked_at?: string | null
           permission_granted_at?: string | null
           review_id?: string | null
@@ -2477,32 +2483,38 @@ export type Database = {
       sms_log: {
         Row: {
           created_at: string | null
+          error_message: string | null
           id: string
           message_body: string | null
           message_type: string | null
           phone_number: string
           request_id: string | null
           status: string | null
+          twilio_message_sid: string | null
           twilio_sid: string | null
         }
         Insert: {
           created_at?: string | null
+          error_message?: string | null
           id?: string
           message_body?: string | null
           message_type?: string | null
           phone_number: string
           request_id?: string | null
           status?: string | null
+          twilio_message_sid?: string | null
           twilio_sid?: string | null
         }
         Update: {
           created_at?: string | null
+          error_message?: string | null
           id?: string
           message_body?: string | null
           message_type?: string | null
           phone_number?: string
           request_id?: string | null
           status?: string | null
+          twilio_message_sid?: string | null
           twilio_sid?: string | null
         }
         Relationships: [

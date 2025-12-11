@@ -22,8 +22,10 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Parse form data from Twilio webhook
-    const formData = await req.formData();
+    // CRITICAL: Parse form data using URLSearchParams, NOT req.formData()
+    const formDataText = await req.text();
+    const formData = new URLSearchParams(formDataText);
+    
     const from = formData.get("From") as string;
     const body = formData.get("Body") as string;
     const messageSid = formData.get("MessageSid") as string;
@@ -34,47 +36,110 @@ serve(async (req) => {
       throw new Error("No 'From' number in webhook");
     }
 
-    // Normalize phone number (remove any formatting)
-    const normalizedPhone = from.replace(/[^\d+]/g, "");
+    // CRITICAL: Clean phone number and match on last 10 digits only
+    const cleanPhone = from.replace(/[\s\-\(\)\+]/g, "");
+    const phoneDigits = cleanPhone.slice(-10);
 
-    // Find the most recent pending request for this phone
+    console.log(`Matching phone digits: ${phoneDigits}`);
+
+    // Check for opt-out keywords FIRST
+    const optOutKeywords = ["stop", "unsubscribe", "opt out", "opt-out", "cancel", "quit", "end"];
+    const isOptOut = optOutKeywords.some(kw => body.toLowerCase().trim() === kw || body.toLowerCase().includes(kw));
+
+    if (isOptOut) {
+      console.log(`Opt-out detected from ${from}`);
+      
+      // Update any matching requests to opted_out
+      await supabase
+        .from("google_review_requests")
+        .update({
+          opted_out: true,
+          opted_out_at: new Date().toISOString(),
+          workflow_status: "ignored",
+          updated_at: new Date().toISOString(),
+        })
+        .ilike("guest_phone", `%${phoneDigits}`);
+
+      // Log the opt-out message
+      await supabase.from("sms_log").insert({
+        phone_number: from,
+        message_type: "inbound_opt_out",
+        message_body: body,
+        status: "received",
+      });
+
+      // Send opt-out confirmation
+      await sendSms(twilioSid, twilioAuth, twilioPhone, from, 
+        "You've been unsubscribed from PeachHaus review requests. Reply START to resubscribe.");
+
+      return new Response(
+        '<?xml version="1.0" encoding="UTF-8"?><Response></Response>',
+        { headers: { "Content-Type": "text/xml" } }
+      );
+    }
+
+    // Check for re-subscribe keywords
+    const resubKeywords = ["start", "yes", "unstop"];
+    const isResubscribe = resubKeywords.some(kw => body.toLowerCase().trim() === kw);
+
+    if (isResubscribe) {
+      console.log(`Re-subscribe detected from ${from}`);
+      
+      await supabase
+        .from("google_review_requests")
+        .update({
+          opted_out: false,
+          opted_out_at: null,
+          updated_at: new Date().toISOString(),
+        })
+        .ilike("guest_phone", `%${phoneDigits}`);
+
+      await supabase.from("sms_log").insert({
+        phone_number: from,
+        message_type: "inbound_resubscribe",
+        message_body: body,
+        status: "received",
+      });
+
+      await sendSms(twilioSid, twilioAuth, twilioPhone, from,
+        "You've been re-subscribed to PeachHaus messages. Thank you!");
+
+      return new Response(
+        '<?xml version="1.0" encoding="UTF-8"?><Response></Response>',
+        { headers: { "Content-Type": "text/xml" } }
+      );
+    }
+
+    // Find the most recent pending request for this phone using last 10 digits
     const { data: request, error: findError } = await supabase
       .from("google_review_requests")
       .select("*, ownerrez_reviews(*)")
-      .eq("guest_phone", normalizedPhone)
+      .ilike("guest_phone", `%${phoneDigits}`)
       .in("workflow_status", ["permission_asked"])
+      .eq("opted_out", false)
       .order("permission_asked_at", { ascending: false })
       .limit(1)
       .single();
 
     if (findError || !request) {
-      // Try alternative phone format
-      const altPhone = normalizedPhone.startsWith("+1") 
-        ? normalizedPhone.slice(2) 
-        : `+1${normalizedPhone}`;
+      console.log(`No pending request found for phone digits ${phoneDigits}`);
       
-      const { data: altRequest } = await supabase
-        .from("google_review_requests")
-        .select("*, ownerrez_reviews(*)")
-        .eq("guest_phone", altPhone)
-        .in("workflow_status", ["permission_asked"])
-        .order("permission_asked_at", { ascending: false })
-        .limit(1)
-        .single();
+      // Log unmatched inbound message
+      await supabase.from("sms_log").insert({
+        phone_number: from,
+        message_type: "inbound_unmatched",
+        message_body: body,
+        status: "received",
+      });
 
-      if (!altRequest) {
-        console.log(`No pending request found for ${from}`);
-        return new Response(
-          '<?xml version="1.0" encoding="UTF-8"?><Response></Response>',
-          { headers: { "Content-Type": "text/xml" } }
-        );
-      }
-
-      // Use altRequest
-      await processReply(supabase, altRequest, body, googleReviewUrl, twilioSid, twilioAuth, twilioPhone);
-    } else {
-      await processReply(supabase, request, body, googleReviewUrl, twilioSid, twilioAuth, twilioPhone);
+      return new Response(
+        '<?xml version="1.0" encoding="UTF-8"?><Response></Response>',
+        { headers: { "Content-Type": "text/xml" } }
+      );
     }
+
+    // Process the reply - any reply counts as permission granted
+    await processReply(supabase, request, body, googleReviewUrl, twilioSid, twilioAuth, twilioPhone);
 
     // Return TwiML response (empty, no auto-reply needed - we send manually)
     return new Response(
@@ -126,27 +191,29 @@ async function processReply(
 
   // Send the Google link
   const linkMessage = `Amazing — thank you! Here's the direct link to leave the Google review: ${googleReviewUrl}`;
-  await sendSms(twilioSid, twilioAuth, twilioPhone, request.guest_phone, linkMessage);
+  const linkResult = await sendSms(twilioSid, twilioAuth, twilioPhone, request.guest_phone, linkMessage);
 
   await supabase.from("sms_log").insert({
     request_id: request.id,
     phone_number: request.guest_phone,
     message_type: "link_delivery",
     message_body: linkMessage,
-    status: "sent",
+    status: linkResult.success ? "sent" : "failed",
+    twilio_message_sid: linkResult.sid,
   });
 
   // Send review text if available
   if (reviewText) {
     const reviewMessage = `And here's the text of your ${source} review so you can copy/paste:\n\n"${reviewText}"`;
-    await sendSms(twilioSid, twilioAuth, twilioPhone, request.guest_phone, reviewMessage);
+    const reviewResult = await sendSms(twilioSid, twilioAuth, twilioPhone, request.guest_phone, reviewMessage);
 
     await supabase.from("sms_log").insert({
       request_id: request.id,
       phone_number: request.guest_phone,
       message_type: "review_text",
       message_body: reviewMessage,
-      status: "sent",
+      status: reviewResult.success ? "sent" : "failed",
+      twilio_message_sid: reviewResult.sid,
     });
   }
 
@@ -169,24 +236,34 @@ async function sendSms(
   twilioPhone: string,
   to: string,
   body: string
-) {
+): Promise<{ success: boolean; sid?: string; error?: string }> {
   const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${twilioSid}/Messages.json`;
 
-  const response = await fetch(twilioUrl, {
-    method: "POST",
-    headers: {
-      Authorization: `Basic ${btoa(`${twilioSid}:${twilioAuth}`)}`,
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
-    body: new URLSearchParams({
-      To: to,
-      From: twilioPhone,
-      Body: body,
-    }),
-  });
+  try {
+    const response = await fetch(twilioUrl, {
+      method: "POST",
+      headers: {
+        Authorization: `Basic ${btoa(`${twilioSid}:${twilioAuth}`)}`,
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: new URLSearchParams({
+        To: to,
+        From: twilioPhone,
+        Body: body,
+      }),
+    });
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error("Twilio send error:", errorText);
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("Twilio send error:", errorText);
+      return { success: false, error: errorText };
+    }
+
+    const data = await response.json();
+    console.log(`SMS sent successfully, SID: ${data.sid}`);
+    return { success: true, sid: data.sid };
+  } catch (error) {
+    console.error("Twilio send exception:", error);
+    return { success: false, error: String(error) };
   }
 }
