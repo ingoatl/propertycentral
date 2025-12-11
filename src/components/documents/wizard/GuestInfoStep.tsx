@@ -10,26 +10,28 @@ interface Props {
 }
 
 const GuestInfoStep = ({ data, updateData }: Props) => {
-  // Check if template name contains "innkeeper"
-  const isInnkeeperTemplate = data.templateName?.toLowerCase().includes("innkeeper");
-  
-  // Auto-generate document name when guest name or property changes
+  // Auto-generate document name when guest name, property, or template changes
   useEffect(() => {
-    if (!isInnkeeperTemplate) return;
-    
-    const propertyAddress = data.fieldValues.property_address as string || "";
+    const templateName = data.templateName || "Document";
     const guestName = data.guestName || "";
+    const propertyAddress = data.propertyName || data.fieldValues.property_address as string || "";
     
-    // Generate name with placeholders or actual values
-    const displayGuestName = guestName || "(Guest Name)";
-    const displayAddress = propertyAddress || "(Property Address)";
-    const generatedName = `Innkeeper Agreement - ${displayGuestName} - ${displayAddress}`;
+    // Build document name: Template - Guest Name - Property
+    const parts = [templateName];
+    if (guestName.trim()) {
+      parts.push(guestName.trim());
+    }
+    if (propertyAddress.trim()) {
+      parts.push(propertyAddress.trim());
+    }
+    
+    const generatedName = parts.join(" - ");
     
     // Update if the name is empty or still matches a previously generated format
-    if (!data.documentName || data.documentName.startsWith("Innkeeper Agreement - ")) {
+    if (!data.documentName || data.documentName.includes(" - ") || data.documentName === data.templateName) {
       updateData({ documentName: generatedName });
     }
-  }, [data.guestName, data.fieldValues.property_address, isInnkeeperTemplate]);
+  }, [data.guestName, data.propertyName, data.fieldValues.property_address, data.templateName]);
 
   return (
     <div className="space-y-6">
