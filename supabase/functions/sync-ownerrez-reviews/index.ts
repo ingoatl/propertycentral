@@ -45,22 +45,15 @@ serve(async (req) => {
     const reviewsData = await reviewsResponse.json();
     console.log(`Fetched ${reviewsData.items?.length || 0} reviews from OwnerRez`);
     
-    // Debug: Log first review to see structure
-    if (reviewsData.items?.length > 0) {
-      console.log("Sample review structure:", JSON.stringify(reviewsData.items[0], null, 2));
-    }
-
     // Filter for 5-star Airbnb/VRBO reviews
+    // OwnerRez uses "listing_site" field (e.g., "Vrbo", "Airbnb")
     const eligibleReviews = (reviewsData.items || []).filter((review: any) => {
-      const source = (review.source || review.channel || review.source_name || "").toLowerCase();
-      const isEligibleSource = source.includes("airbnb") || source.includes("vrbo") || source.includes("homeaway");
-      // OwnerRez uses overall_rating or stars or rating
-      const rating = review.overall_rating || review.stars || review.rating || 0;
-      const isFiveStar = rating >= 5;
+      const listingSite = (review.listing_site || "").toLowerCase();
+      const isEligibleSource = listingSite.includes("airbnb") || listingSite.includes("vrbo") || listingSite.includes("homeaway");
+      const isFiveStar = review.stars >= 5;
       
-      // Debug logging for filtering
-      if (rating >= 5) {
-        console.log(`Review from ${source}, rating: ${rating}, eligible source: ${isEligibleSource}`);
+      if (isFiveStar) {
+        console.log(`5-star review from ${review.listing_site}, guest: ${review.display_name}, eligible: ${isEligibleSource}`);
       }
       
       return isEligibleSource && isFiveStar;
@@ -72,7 +65,7 @@ serve(async (req) => {
     let reviewsSkipped = 0;
 
     for (const review of eligibleReviews) {
-      const bookingId = review.booking_id || review.bookingId;
+      const bookingId = review.booking_id;
 
       // Check if already exists
       const { data: existing } = await supabase
@@ -86,8 +79,8 @@ serve(async (req) => {
         continue;
       }
 
-      // Fetch guest details from booking
-      let guestName = review.guest_name || review.guestName || null;
+      // Use display_name from review (OwnerRez format)
+      let guestName = review.display_name || null;
       let guestPhone = null;
       let guestEmail = null;
       let propertyId = null;
@@ -136,10 +129,10 @@ serve(async (req) => {
         guest_phone: guestPhone,
         guest_email: guestEmail,
         property_id: propertyId,
-        review_source: review.source || "Unknown",
-        star_rating: review.stars || review.rating || 5,
-        review_text: review.body || review.text || review.review_text || null,
-        review_date: review.created_at || review.date || new Date().toISOString(),
+        review_source: review.listing_site || "Unknown",
+        star_rating: review.stars || 5,
+        review_text: review.body || null,
+        review_date: review.date || review.created_utc || new Date().toISOString(),
       });
 
       if (insertError) {

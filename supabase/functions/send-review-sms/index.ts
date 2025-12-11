@@ -360,6 +360,34 @@ serve(async (req) => {
       );
     }
 
+    if (action === "test") {
+      // Send test SMS to admin phone
+      const adminPhone = "+14044295422"; // PeachHaus admin phone
+      const testMessage = "Test SMS from PeachHaus Google Review system. If you received this, the SMS integration is working correctly!";
+      
+      const testResult = await sendSms(adminPhone, testMessage);
+      
+      await supabase.from("sms_log").insert({
+        phone_number: adminPhone,
+        message_type: "test",
+        message_body: testMessage,
+        twilio_message_sid: testResult.sid,
+        status: testResult.success ? "sent" : "failed",
+        error_message: testResult.error,
+      });
+
+      if (!testResult.success) {
+        throw new Error(testResult.error || "Failed to send test SMS");
+      }
+
+      console.log(`Test SMS sent to admin`);
+
+      return new Response(
+        JSON.stringify({ success: true, action: "test" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     throw new Error(`Unknown action: ${action}`);
   } catch (error: unknown) {
     console.error("SMS error:", error);
