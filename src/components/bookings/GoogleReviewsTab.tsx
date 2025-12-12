@@ -89,6 +89,32 @@ const GoogleReviewsTab = () => {
 
   useEffect(() => {
     loadData();
+    
+    // Real-time subscription for SMS inbox auto-refresh
+    const channel = supabase
+      .channel('sms-log-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'sms_log'
+        },
+        (payload) => {
+          console.log('New SMS received:', payload);
+          // Check if it's an inbound message type
+          const newMessage = payload.new as SmsLog;
+          if (newMessage.message_type?.startsWith('inbound')) {
+            setAllInboundMessages(prev => [newMessage, ...prev]);
+            toast.info(`New SMS from ${newMessage.phone_number}`);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const loadData = async () => {
