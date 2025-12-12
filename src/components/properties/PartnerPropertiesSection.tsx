@@ -568,6 +568,7 @@ export const PartnerPropertiesSection = () => {
         property={selectedProperty}
         open={detailsModalOpen}
         onOpenChange={setDetailsModalOpen}
+        onPropertyUpdated={loadPartnerProperties}
       />
 
       <PartnerListingDataModal
