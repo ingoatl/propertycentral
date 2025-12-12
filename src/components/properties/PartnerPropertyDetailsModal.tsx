@@ -2,13 +2,15 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
+import { Input } from "@/components/ui/input";
 import { 
   Bed, Bath, Square, Users, Car, Building, DollarSign, 
-  Mail, Phone, User, PawPrint, ExternalLink, MapPin, Download, Image as ImageIcon, Calendar
+  Mail, Phone, User, PawPrint, ExternalLink, MapPin, Download, Image as ImageIcon, Calendar, Pencil, Check, X
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 interface PartnerProperty {
   id: string;
@@ -51,14 +53,19 @@ interface PartnerPropertyDetailsModalProps {
   property: PartnerProperty | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onPropertyUpdated?: () => void;
 }
 
 export function PartnerPropertyDetailsModal({ 
   property, 
   open, 
-  onOpenChange
+  onOpenChange,
+  onPropertyUpdated
 }: PartnerPropertyDetailsModalProps) {
   const [downloading, setDownloading] = useState(false);
+  const [editingAddress, setEditingAddress] = useState(false);
+  const [editedAddress, setEditedAddress] = useState("");
+  const [savingAddress, setSavingAddress] = useState(false);
   
   if (!property) return null;
 
@@ -140,21 +147,96 @@ export function PartnerPropertyDetailsModal({
     }
   };
 
+  const handleEditAddress = () => {
+    setEditedAddress(property.address || "");
+    setEditingAddress(true);
+  };
+
+  const handleSaveAddress = async () => {
+    if (!editedAddress.trim()) {
+      toast.error("Address cannot be empty");
+      return;
+    }
+
+    setSavingAddress(true);
+    try {
+      const { error } = await supabase
+        .from("partner_properties")
+        .update({ address: editedAddress.trim() })
+        .eq("id", property.id);
+
+      if (error) throw error;
+
+      toast.success("Address updated successfully");
+      setEditingAddress(false);
+      onPropertyUpdated?.();
+    } catch (error: any) {
+      console.error("Error updating address:", error);
+      toast.error(error.message || "Failed to update address");
+    } finally {
+      setSavingAddress(false);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditingAddress(false);
+    setEditedAddress("");
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh] p-0">
         <DialogHeader className="p-6 pb-4">
           <div className="flex items-start justify-between">
-            <div>
+            <div className="flex-1">
               <DialogTitle className="text-xl font-semibold">
                 {property.property_title || "Partner Property Details"}
               </DialogTitle>
-              <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
-                <MapPin className="w-4 h-4" />
-                {property.address || [property.city, property.state, property.zip_code].filter(Boolean).join(", ") || "No address"}
-              </div>
+              {editingAddress ? (
+                <div className="flex items-center gap-2 mt-2">
+                  <MapPin className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                  <Input
+                    value={editedAddress}
+                    onChange={(e) => setEditedAddress(e.target.value)}
+                    className="flex-1 h-8 text-sm"
+                    placeholder="Enter address..."
+                    autoFocus
+                  />
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={handleSaveAddress}
+                    disabled={savingAddress}
+                    className="h-8 px-2"
+                  >
+                    <Check className="w-4 h-4 text-green-600" />
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={handleCancelEdit}
+                    disabled={savingAddress}
+                    className="h-8 px-2"
+                  >
+                    <X className="w-4 h-4 text-destructive" />
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1 group">
+                  <MapPin className="w-4 h-4" />
+                  <span>{property.address || [property.city, property.state, property.zip_code].filter(Boolean).join(", ") || "No address"}</span>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={handleEditAddress}
+                    className="h-6 px-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    <Pencil className="w-3 h-3" />
+                  </Button>
+                </div>
+              )}
             </div>
-            <Badge className="bg-orange-500 text-white">Partner Property</Badge>
+            <Badge className="bg-orange-500 text-white flex-shrink-0">Partner Property</Badge>
           </div>
         </DialogHeader>
         
