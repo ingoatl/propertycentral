@@ -9,7 +9,198 @@ const corsHeaders = {
 
 const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
 
-async function sendNewPropertyAlert(property: any) {
+// Comprehensive field mappings from MidTermNation to onboarding phases
+const FIELD_MAPPINGS = [
+  // Phase 1 - Owner Intake & Legal
+  { phase: 1, titlePattern: '%Owner Name%', field: 'contact_name' },
+  { phase: 1, titlePattern: '%Owner Email%', field: 'contact_email' },
+  { phase: 1, titlePattern: '%Owner Phone%', field: 'contact_phone' },
+  
+  // Phase 7 - Listings & Booking Platforms
+  { phase: 7, titlePattern: '%Airbnb%', field: 'existing_listing_url' },
+  { phase: 7, titlePattern: '%Direct Booking%', field: 'virtual_tour_url' },
+  { phase: 7, titlePattern: '%Virtual Tour%', field: 'virtual_tour_url' },
+  { phase: 7, titlePattern: '%PeachHaus Website%', field: 'virtual_tour_url' },
+  
+  // Phase 8 - Marketing and Guest Experience
+  { phase: 8, titlePattern: '%Pet policy%', field: 'pet_policy', transform: (v: string) => v?.toLowerCase() === 'allowed' ? 'Yes' : 'No' },
+  { phase: 8, titlePattern: '%Unique selling%', field: 'property_description' },
+  { phase: 8, titlePattern: '%Property Description%', field: 'property_description' },
+  
+  // Phase 10 - Property Specifications
+  { phase: 10, titlePattern: '%Year Built%', field: 'year_built', transform: (v: any) => v?.toString() },
+  { phase: 10, titlePattern: '%Max Occupancy%', field: 'max_guests', transform: (v: any) => v?.toString() },
+  { phase: 10, titlePattern: '%Square Footage%', field: 'square_footage', transform: (v: any) => v?.toString() },
+  { phase: 10, titlePattern: '%Bedrooms%', field: 'bedrooms', transform: (v: any) => v?.toString() },
+  { phase: 10, titlePattern: '%Bathrooms%', field: 'bathrooms', transform: (v: any) => v?.toString() },
+  { phase: 10, titlePattern: '%Parking Capacity%', field: 'parking_spaces', transform: (v: any) => v?.toString() },
+  { phase: 10, titlePattern: '%Parking Type%', field: 'parking_type' },
+  { phase: 10, titlePattern: '%Stories%', field: 'stories', transform: (v: any) => v?.toString() },
+  { phase: 10, titlePattern: '%Property Type%', field: 'property_type' },
+  
+  // Phase 11 - Financial Terms & Pricing
+  { phase: 11, titlePattern: '%Monthly Rent%', field: 'monthly_price', transform: (v: any) => 
+    v ? `⚠️ MidTermNation price: $${Number(v).toLocaleString()}/mo. For listing sites, calculate long-term rent: Zillow Rent Zestimate × 2.3` : null 
+  },
+  { phase: 11, titlePattern: '%Security Deposit%', field: 'security_deposit', transform: (v: any) => v ? `$${Number(v).toLocaleString()}` : null },
+  { phase: 11, titlePattern: '%Cleaning Fee%', field: 'cleaning_fee', transform: (v: any) => v ? `$${Number(v).toLocaleString()}` : null },
+  
+  // Phase 12 - Pet & Lease Policies
+  { phase: 12, titlePattern: '%Pets Allowed%', field: 'pet_policy', transform: (v: string) => v?.toLowerCase() === 'allowed' ? 'Yes' : 'No' },
+  { phase: 12, titlePattern: '%Pet Policy Details%', field: 'pet_policy_details' },
+];
+
+async function createOnboardingProjectIfNeeded(supabase: any, partnerPropertyId: string, property: any): Promise<string | null> {
+  // Check if project already exists
+  const { data: existingProject } = await supabase
+    .from('onboarding_projects')
+    .select('id')
+    .eq('partner_property_id', partnerPropertyId)
+    .single();
+
+  if (existingProject) {
+    console.log(`Onboarding project already exists: ${existingProject.id}`);
+    return existingProject.id;
+  }
+
+  // Create new onboarding project
+  const fullAddress = [property.address, property.city, property.state, property.zip_code]
+    .filter(Boolean)
+    .join(', ');
+
+  const { data: newProject, error } = await supabase
+    .from('onboarding_projects')
+    .insert({
+      owner_name: property.contact_name || 'Partner Owner',
+      property_address: fullAddress || property.property_title || 'Partner Property',
+      partner_property_id: partnerPropertyId,
+      status: 'in_progress',
+      progress: 0,
+    })
+    .select('id')
+    .single();
+
+  if (error) {
+    console.error('Failed to create onboarding project:', error);
+    return null;
+  }
+
+  console.log(`Created new onboarding project: ${newProject.id}`);
+
+  // Create Phase 7 tasks for partner properties (per memory: partner properties only show Phase 7)
+  const phase7Tasks = [
+    { title: 'Airbnb', field_type: 'url' },
+    { title: 'VRBO', field_type: 'url' },
+    { title: 'Booking.com', field_type: 'url' },
+    { title: 'Furnished Finder', field_type: 'url' },
+    { title: 'Direct Booking Page', field_type: 'url' },
+    { title: 'PeachHaus Website', field_type: 'url' },
+  ];
+
+  // Also create tasks for other phases to store synced data
+  const otherPhaseTasks = [
+    // Phase 1
+    { phase: 1, title: 'Owner Name', field_type: 'text' },
+    { phase: 1, title: 'Owner Email', field_type: 'email' },
+    { phase: 1, title: 'Owner Phone', field_type: 'phone' },
+    // Phase 10
+    { phase: 10, title: 'Year Built', field_type: 'text' },
+    { phase: 10, title: 'Max Occupancy', field_type: 'number' },
+    { phase: 10, title: 'Square Footage', field_type: 'number' },
+    { phase: 10, title: 'Bedrooms', field_type: 'number' },
+    { phase: 10, title: 'Bathrooms', field_type: 'number' },
+    { phase: 10, title: 'Parking Capacity', field_type: 'number' },
+    { phase: 10, title: 'Parking Type', field_type: 'text' },
+    { phase: 10, title: 'Stories', field_type: 'number' },
+    { phase: 10, title: 'Property Type Detail', field_type: 'text' },
+    // Phase 11
+    { phase: 11, title: 'Monthly Rent', field_type: 'text' },
+    { phase: 11, title: 'Security Deposit', field_type: 'text' },
+    { phase: 11, title: 'Cleaning Fee', field_type: 'text' },
+    // Phase 12
+    { phase: 12, title: 'Pets Allowed', field_type: 'checkbox' },
+    { phase: 12, title: 'Pet Policy Details', field_type: 'textarea' },
+    // Phase 8
+    { phase: 8, title: 'Unique selling points of property', field_type: 'textarea' },
+    { phase: 8, title: 'Pet policy (Allowed/Not Allowed)', field_type: 'text' },
+  ];
+
+  // Insert Phase 7 tasks
+  for (const task of phase7Tasks) {
+    await supabase.from('onboarding_tasks').insert({
+      project_id: newProject.id,
+      phase_number: 7,
+      phase_title: 'Listings & Booking Platforms',
+      title: task.title,
+      field_type: task.field_type,
+      status: 'pending',
+    });
+  }
+
+  // Insert other phase tasks (hidden in UI but store synced data)
+  for (const task of otherPhaseTasks) {
+    await supabase.from('onboarding_tasks').insert({
+      project_id: newProject.id,
+      phase_number: task.phase,
+      phase_title: getPhaseTitle(task.phase),
+      title: task.title,
+      field_type: task.field_type,
+      status: 'pending',
+    });
+  }
+
+  console.log(`Created ${phase7Tasks.length + otherPhaseTasks.length} tasks for project ${newProject.id}`);
+  return newProject.id;
+}
+
+function getPhaseTitle(phaseNumber: number): string {
+  const titles: Record<number, string> = {
+    1: 'Owner Intake & Legal',
+    7: 'Listings & Booking Platforms',
+    8: 'Marketing and Guest Experience',
+    10: 'Property Specifications',
+    11: 'Financial Terms & Pricing',
+    12: 'Pet & Lease Policies',
+  };
+  return titles[phaseNumber] || `Phase ${phaseNumber}`;
+}
+
+async function populateOnboardingFields(supabase: any, projectId: string, property: any): Promise<number> {
+  let updatedCount = 0;
+
+  for (const mapping of FIELD_MAPPINGS) {
+    let value = property[mapping.field];
+    
+    // Apply transformation if defined
+    if (value !== null && value !== undefined && mapping.transform) {
+      value = mapping.transform(value);
+    }
+    
+    if (value) {
+      const { data, error } = await supabase
+        .from('onboarding_tasks')
+        .update({ 
+          field_value: value,
+          status: 'completed'
+        })
+        .eq('project_id', projectId)
+        .ilike('title', mapping.titlePattern)
+        .or('field_value.is.null,field_value.eq.""')
+        .select('id');
+      
+      if (error) {
+        console.error(`Failed to update ${mapping.titlePattern}:`, error);
+      } else if (data && data.length > 0) {
+        updatedCount++;
+        console.log(`✓ Populated "${mapping.titlePattern}" with: ${value.substring(0, 50)}${value.length > 50 ? '...' : ''}`);
+      }
+    }
+  }
+
+  return updatedCount;
+}
+
+async function sendNewPropertyAlert(property: any, projectId: string, fieldsPopulated: number) {
   try {
     const fullAddress = [property.address, property.city, property.state, property.zip_code]
       .filter(Boolean)
@@ -32,6 +223,9 @@ async function sendNewPropertyAlert(property: any) {
           .cta-button { display: inline-block; background: #2D5A27; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin-top: 20px; }
           .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
           .badge { display: inline-block; background: #FFA500; color: white; padding: 4px 12px; border-radius: 4px; font-size: 12px; font-weight: bold; }
+          .success-badge { background: #22c55e; }
+          .alert-box { background: #FFF3CD; border: 1px solid #FFECB5; border-radius: 8px; padding: 15px; margin: 15px 0; }
+          .alert-box strong { color: #856404; }
         </style>
       </head>
       <body>
@@ -42,29 +236,45 @@ async function sendNewPropertyAlert(property: any) {
           </div>
           <div class="content">
             <p>Hi Chris,</p>
-            <p>A new partner property from MidTermNation has been added to Property Central and needs to be listed on all platforms.</p>
+            <p>A new partner property from MidTermNation has been added to Property Central.</p>
             
             <div class="property-card">
               <span class="badge">NEW PROPERTY</span>
+              <span class="badge success-badge" style="margin-left: 8px;">${fieldsPopulated} FIELDS PRE-POPULATED</span>
               <div class="property-title">${property.property_title || 'Untitled Property'}</div>
               <div class="property-detail"><strong>📍 Address:</strong> ${fullAddress || 'Not provided'}</div>
               <div class="property-detail"><strong>🏠 Type:</strong> ${property.property_type || 'Not specified'}</div>
               <div class="property-detail"><strong>🛏️ Bedrooms:</strong> ${property.bedrooms || 'N/A'}</div>
               <div class="property-detail"><strong>🚿 Bathrooms:</strong> ${property.bathrooms || 'N/A'}</div>
               <div class="property-detail"><strong>📐 Sq Ft:</strong> ${property.square_footage ? property.square_footage.toLocaleString() : 'N/A'}</div>
-              <div class="property-detail"><strong>💰 Monthly Price:</strong> ${property.monthly_price ? '$' + property.monthly_price.toLocaleString() : 'Not set'}</div>
-              <div class="property-detail"><strong>👤 Owner Contact:</strong> ${property.contact_name || 'Not provided'}</div>
+              <div class="property-detail"><strong>👤 Owner:</strong> ${property.contact_name || 'Not provided'} ${property.contact_email ? `(${property.contact_email})` : ''}</div>
+              <div class="property-detail"><strong>📞 Phone:</strong> ${property.contact_phone || 'Not provided'}</div>
               ${property.existing_listing_url ? `<div class="property-detail"><strong>🔗 Existing Listing:</strong> <a href="${property.existing_listing_url}">${property.existing_listing_url}</a></div>` : ''}
             </div>
 
-            <p><strong>Action Required:</strong></p>
+            <div class="alert-box">
+              <strong>⚠️ Monthly Rent Calculation Required:</strong><br>
+              MidTermNation sent: <strong>$${property.monthly_price ? property.monthly_price.toLocaleString() : 'N/A'}/mo</strong><br>
+              For listing sites, calculate: <strong>Zillow Rent Zestimate × 2.3</strong>
+            </div>
+
+            <p><strong>✅ Property Details Pre-Populated:</strong></p>
             <ul>
-              <li>Add this property to all listing platforms (Airbnb, VRBO, Furnished Finder, etc.)</li>
-              <li>Complete the onboarding tasks in Property Central</li>
+              <li>Owner contact information (Name, Email, Phone)</li>
+              <li>Property specifications (Beds, Baths, Sq Ft, etc.)</li>
+              <li>Financial terms (Security Deposit, Cleaning Fee)</li>
+              <li>Pet policy details</li>
+              ${property.existing_listing_url ? '<li>Existing Airbnb listing URL</li>' : ''}
+            </ul>
+
+            <p><strong>🎯 Action Required:</strong></p>
+            <ul>
+              <li><strong>Complete Phase 7 (Listings & Booking Platforms)</strong> - Add this property to all listing platforms</li>
+              <li>Calculate listing rent using Zillow Zestimate × 2.3</li>
               <li>Update listing URLs once created</li>
             </ul>
 
-            <a href="https://preview--peachhaus-property-central.lovable.app/properties" class="cta-button">View in Property Central →</a>
+            <a href="https://preview--peachhaus-property-central.lovable.app/properties" class="cta-button">Complete Phase 7 in Property Central →</a>
           </div>
           <div class="footer">
             <p>This is an automated notification from PeachHaus Property Central</p>
@@ -78,7 +288,7 @@ async function sendNewPropertyAlert(property: any) {
       from: "PeachHaus Property Central <onboarding@resend.dev>",
       to: ["chris@peachhausgroup.com"],
       cc: ["info@peachhausgroup.com"],
-      subject: `🏠 New Property Alert: ${property.property_title || 'New Partner Property'} - Action Required`,
+      subject: `🏠 New Property: ${property.property_title || 'Partner Property'} - Complete Phase 7`,
       html: emailHtml,
     });
 
@@ -155,6 +365,7 @@ serve(async (req) => {
     let successCount = 0;
     let errorCount = 0;
     let newPropertyCount = 0;
+    let totalFieldsPopulated = 0;
     const errors: { source_id: string; error: string }[] = [];
 
     for (const property of properties) {
@@ -227,54 +438,21 @@ serve(async (req) => {
         successCount++;
         console.log(`Successfully synced property: ${property.property_title}`);
         
-        // Send email alert for NEW properties only
-        if (isNewProperty) {
-          newPropertyCount++;
-          console.log(`NEW PROPERTY DETECTED: ${property.property_title} - Sending alert to Chris`);
-          await sendNewPropertyAlert(property);
-        }
-        
-        // Auto-fill existing onboarding tasks with synced data
         if (upsertedProperty?.id) {
-          // Find onboarding project linked to this partner property
-          const { data: linkedProject } = await supabase
-            .from('onboarding_projects')
-            .select('id')
-            .eq('partner_property_id', upsertedProperty.id)
-            .single();
+          // Step 1: Create or find onboarding project
+          const projectId = await createOnboardingProjectIfNeeded(supabase, upsertedProperty.id, property);
           
-          if (linkedProject) {
-            // Define field mappings: task title pattern -> property value
-            const fieldMappings = [
-              { titlePattern: '%Airbnb%', value: property.existing_listing_url },
-              { titlePattern: '%Year Built%', value: property.year_built?.toString() },
-              { titlePattern: '%Max Occupancy%', value: property.max_guests?.toString() },
-              { titlePattern: '%Square Footage%', value: property.square_footage?.toString() },
-              { titlePattern: '%Bedrooms%', value: property.bedrooms?.toString() },
-              { titlePattern: '%Bathrooms%', value: property.bathrooms?.toString() },
-              { titlePattern: '%Parking Capacity%', value: property.parking_spaces?.toString() },
-              { titlePattern: '%Parking Type%', value: property.parking_type },
-              { titlePattern: '%Stories%', value: property.stories?.toString() },
-            ];
-
-            for (const mapping of fieldMappings) {
-              if (mapping.value) {
-                const { error: updateError } = await supabase
-                  .from('onboarding_tasks')
-                  .update({ 
-                    field_value: mapping.value,
-                    status: 'completed'
-                  })
-                  .eq('project_id', linkedProject.id)
-                  .ilike('title', mapping.titlePattern)
-                  .or('field_value.is.null,field_value.eq.""');
-                
-                if (updateError) {
-                  console.error(`Failed to update ${mapping.titlePattern} task:`, updateError);
-                } else {
-                  console.log(`Auto-filled ${mapping.titlePattern} with: ${mapping.value}`);
-                }
-              }
+          if (projectId) {
+            // Step 2: Populate ALL onboarding fields from synced data
+            const fieldsPopulated = await populateOnboardingFields(supabase, projectId, property);
+            totalFieldsPopulated += fieldsPopulated;
+            console.log(`Populated ${fieldsPopulated} fields for project ${projectId}`);
+            
+            // Step 3: ONLY THEN send email alert for NEW properties
+            if (isNewProperty) {
+              newPropertyCount++;
+              console.log(`NEW PROPERTY DETECTED: ${property.property_title} - Sending alert to Chris (after populating ${fieldsPopulated} fields)`);
+              await sendNewPropertyAlert(property, projectId, fieldsPopulated);
             }
           }
         }
@@ -288,7 +466,7 @@ serve(async (req) => {
         .update({
           properties_synced: successCount,
           properties_failed: errorCount,
-          error_details: errors,
+          error_details: errors.length > 0 ? errors : null,
           sync_status: errorCount > 0 && successCount === 0 ? 'failed' : 'completed',
           completed_at: new Date().toISOString(),
         })
@@ -297,11 +475,11 @@ serve(async (req) => {
       if (updateError) {
         console.error('Failed to update sync log:', updateError);
       } else {
-        console.log(`Updated sync log: ${successCount} synced, ${errorCount} failed, ${newPropertyCount} new`);
+        console.log(`Updated sync log: ${successCount} synced, ${errorCount} failed, ${newPropertyCount} new, ${totalFieldsPopulated} fields populated`);
       }
     }
 
-    console.log(`=== Sync Complete: ${successCount} succeeded, ${errorCount} failed, ${newPropertyCount} new properties ===`);
+    console.log(`=== Sync Complete: ${successCount} succeeded, ${errorCount} failed, ${newPropertyCount} new properties, ${totalFieldsPopulated} fields populated ===`);
 
     return new Response(
       JSON.stringify({
@@ -309,6 +487,7 @@ serve(async (req) => {
         synced: successCount,
         failed: errorCount,
         newProperties: newPropertyCount,
+        fieldsPopulated: totalFieldsPopulated,
         errors: errors.length > 0 ? errors : undefined,
         timestamp: new Date().toISOString()
       }),
