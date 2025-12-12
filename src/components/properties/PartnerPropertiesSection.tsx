@@ -424,23 +424,40 @@ export const PartnerPropertiesSection = () => {
                     <MapPin className="w-3 h-3 flex-shrink-0" />
                     <span className="line-clamp-1">{displayAddress}</span>
                   </CardDescription>
-                  {/* Property specs like bed/bath */}
-                  <div className="flex items-center gap-3 pt-1 text-xs text-muted-foreground">
+                  
+                  {/* Property specs */}
+                  <div className="flex flex-wrap items-center gap-2 pt-1.5 text-xs text-muted-foreground">
                     {property.bedrooms && (
-                      <span className="flex items-center gap-1">
+                      <span className="flex items-center gap-1 bg-muted px-1.5 py-0.5 rounded">
                         <Bed className="w-3 h-3" />
-                        {property.bedrooms} bed
+                        {property.bedrooms}
                       </span>
                     )}
                     {property.bathrooms && (
-                      <span className="flex items-center gap-1">
+                      <span className="flex items-center gap-1 bg-muted px-1.5 py-0.5 rounded">
                         <Bath className="w-3 h-3" />
-                        {property.bathrooms} bath
+                        {property.bathrooms}
                       </span>
                     )}
-                    {property.monthly_price && (
-                      <span className="font-medium text-primary">
+                    {property.square_footage && (
+                      <span className="bg-muted px-1.5 py-0.5 rounded">
+                        {property.square_footage.toLocaleString()} sqft
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Pricing row */}
+                  <div className="flex items-center justify-between pt-1.5 border-t border-border/30 mt-1.5">
+                    {property.monthly_price ? (
+                      <span className="font-semibold text-sm text-green-600">
                         ${property.monthly_price.toLocaleString()}/mo
+                      </span>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">No price</span>
+                    )}
+                    {property.security_deposit && (
+                      <span className="text-[10px] text-muted-foreground">
+                        Deposit: ${property.security_deposit.toLocaleString()}
                       </span>
                     )}
                   </div>
@@ -524,11 +541,20 @@ export const PartnerPropertiesSection = () => {
                     </Button>
                   )}
 
-                  {/* Owner info from API */}
-                  {property.contact_name && (
-                    <div className="flex items-center gap-1 text-xs text-muted-foreground truncate pt-1 border-t">
-                      <User className="w-3 h-3 flex-shrink-0" />
-                      <span className="truncate">Owner: {property.contact_name}</span>
+                  {/* Owner info from API - enhanced display */}
+                  {(property.contact_name || property.contact_email) && (
+                    <div className="space-y-0.5 pt-1.5 border-t">
+                      {property.contact_name && (
+                        <div className="flex items-center gap-1 text-xs text-muted-foreground truncate">
+                          <User className="w-3 h-3 flex-shrink-0 text-primary" />
+                          <span className="font-medium truncate">{property.contact_name}</span>
+                        </div>
+                      )}
+                      {property.contact_email && (
+                        <div className="flex items-center gap-1 text-[10px] text-muted-foreground truncate">
+                          <span className="truncate">{property.contact_email}</span>
+                        </div>
+                      )}
                     </div>
                   )}
                 </CardContent>
