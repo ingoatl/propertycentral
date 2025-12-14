@@ -289,8 +289,8 @@ const handler = async (req: Request): Promise<Response> => {
 
         console.log(`User ${user.email}: ${dataEntered.length} data entries found`);
 
-        // Only include users who had activity today
-        if (userCompletedTasks.length > 0 || dataEntered.length > 0) {
+        // Include users who had activity OR have overdue tasks
+        if (userCompletedTasks.length > 0 || dataEntered.length > 0 || userOverdueTasks.length > 0) {
           teamPerformance.push({
             name: user.first_name || user.email.split('@')[0],
             email: user.email,
@@ -323,8 +323,16 @@ const handler = async (req: Request): Promise<Response> => {
       }
     }
 
-    // Sort team members by activity (most active first)
+    // Sort team members: prioritize those with overdue tasks, then by overdue count, then by activity
     teamPerformance.sort((a, b) => {
+      // First, prioritize members with overdue tasks
+      if (a.overdueTasks.length > 0 && b.overdueTasks.length === 0) return -1;
+      if (b.overdueTasks.length > 0 && a.overdueTasks.length === 0) return 1;
+      // Then sort by overdue count (most overdue first)
+      if (a.overdueTasks.length !== b.overdueTasks.length) {
+        return b.overdueTasks.length - a.overdueTasks.length;
+      }
+      // Finally by activity
       const aTotal = a.tasksCompleted + a.dataEntered.length;
       const bTotal = b.tasksCompleted + b.dataEntered.length;
       return bTotal - aTotal;
@@ -624,6 +632,48 @@ function generateTeamPerformanceEmail(teamPerformance: TeamMemberPerformance[], 
                   </table>
                 </td>
               </tr>
+              
+              <!-- All Overdue Tasks Summary -->
+              ${totalOverdue > 0 ? `
+              <tr>
+                <td style="padding: 40px; background-color: #fef2f2;">
+                  <h2 style="margin: 0 0 30px 0; color: #dc2626; font-size: 26px; font-weight: bold; text-align: center; padding-bottom: 15px; border-bottom: 3px solid #dc2626;">
+                    ⚠️ ALL OVERDUE TASKS (${totalOverdue})
+                  </h2>
+                  
+                  ${teamPerformance.filter(m => m.overdueTasks.length > 0).map(member => `
+                    <div style="margin-bottom: 25px;">
+                      <h3 style="margin: 0 0 15px 0; color: #991b1b; font-size: 18px; font-weight: 700; background-color: #fee2e2; padding: 12px 16px; border-radius: 8px;">
+                        👤 ${member.name} (${member.overdueTasks.length} overdue)
+                      </h3>
+                      ${member.overdueTasks.map(task => `
+                        <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 12px; background: #ffffff; border-left: 4px solid #dc2626; border-radius: 8px; padding: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+                          <tr>
+                            <td>
+                              <div style="font-weight: 700; color: #991b1b; margin-bottom: 6px; font-size: 15px;">${task.title}</div>
+                              <div style="font-size: 13px; color: #666; margin-bottom: 6px;">
+                                📍 ${task.property_address}${task.owner_name ? ` (Owner: ${task.owner_name})` : ''}
+                              </div>
+                              <div style="font-size: 12px; color: #666; margin-bottom: 6px;">
+                                📋 Phase ${task.phase_number}
+                              </div>
+                              <div style="display: inline-block;">
+                                <div style="background-color: #dc2626; color: white; padding: 6px 12px; border-radius: 6px; font-size: 12px; font-weight: 700; margin-right: 8px; display: inline-block;">
+                                  ${task.days_overdue} day${task.days_overdue !== 1 ? 's' : ''} overdue
+                                </div>
+                                <span style="font-size: 12px; color: #991b1b; font-weight: 600;">
+                                  📅 Due: ${new Date(task.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                </span>
+                              </div>
+                            </td>
+                          </tr>
+                        </table>
+                      `).join('')}
+                    </div>
+                  `).join('')}
+                </td>
+              </tr>
+              ` : ''}
               
               <!-- Team Members Content -->
               <tr>
