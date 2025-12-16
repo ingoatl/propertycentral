@@ -1,7 +1,7 @@
 import { NewSTROnboardingFormData } from "@/types/new-str-onboarding";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { User, Home, Target, Zap, Package, Wrench, FileText, Upload, Globe, ScrollText, Lightbulb, CheckCircle } from "lucide-react";
+import { User, Home, Target, Zap, Package, Wrench, FileText, Upload, Sparkles, ScrollText, Lightbulb, CheckCircle, Droplets, Palette } from "lucide-react";
 
 interface ReviewStepProps {
   formData: NewSTROnboardingFormData;
@@ -41,7 +41,6 @@ export const ReviewStep = ({ formData, updateFormData }: ReviewStepProps) => {
         { label: 'Expected ADR', value: formData.expectedAdr ? `$${formData.expectedAdr}` : null },
         { label: 'Minimum Stay', value: formData.minimumStay ? `${formData.minimumStay} nights` : null },
         { label: 'Max Guests', value: formData.maxGuests },
-        { label: 'Peak Months', value: formatList(formData.peakSeasonMonths) },
       ],
     },
     {
@@ -52,6 +51,15 @@ export const ReviewStep = ({ formData, updateFormData }: ReviewStepProps) => {
         { label: 'Smart Lock', value: formatBoolean(formData.smartLockInstalled) },
         { label: 'Smart Lock Brand', value: formData.smartLockBrand },
         { label: 'Utilities Setup', value: formatBoolean(formData.utilitiesSetup) },
+      ],
+    },
+    {
+      icon: Droplets,
+      title: 'Septic System',
+      items: [
+        { label: 'Has Septic Tank', value: formatBoolean(formData.hasSepticTank) },
+        { label: 'Last Flushed', value: formData.septicLastFlushed },
+        { label: 'Service Company', value: formData.septicServiceCompany },
       ],
     },
     {
@@ -74,7 +82,6 @@ export const ReviewStep = ({ formData, updateFormData }: ReviewStepProps) => {
         { label: 'Cleaner Name', value: formData.cleanerName },
         { label: 'Needs Referral', value: formatBoolean(formData.needsCleanerReferral) },
         { label: 'Laundry Setup', value: formData.laundrySetup },
-        { label: 'Turnover Time', value: formData.preferredTurnoverTime },
       ],
     },
     {
@@ -103,24 +110,28 @@ export const ReviewStep = ({ formData, updateFormData }: ReviewStepProps) => {
       ],
     },
     {
-      icon: Globe,
+      icon: Sparkles,
       title: 'Listing Preferences',
       items: [
-        { label: 'Platforms', value: formatList(formData.listingPlatforms) },
         { label: 'Photography', value: formData.photographyNeeds },
         { label: 'Title Ideas', value: formData.listingTitleIdeas },
         { label: 'Unique Features', value: formData.uniqueSellingPoints },
       ],
     },
     {
+      icon: Palette,
+      title: 'Design Services',
+      items: [
+        { label: 'Design Consultation', value: formData.needsDesignConsultation ? 'Yes - Interested' : 'No' },
+      ],
+    },
+    {
       icon: ScrollText,
       title: 'House Rules',
       items: [
+        { label: 'House Rules', value: formData.houseRules ? 'Provided' : null },
         { label: 'Pet Policy', value: formData.petPolicy },
         { label: 'Pet Fee', value: formData.petDeposit ? `$${formData.petDeposit}` : null },
-        { label: 'Noise Policy', value: formData.noisePolicy },
-        { label: 'Smoking Policy', value: formData.smokingPolicy },
-        { label: 'Party Policy', value: formData.partyPolicy },
       ],
     },
     {
@@ -160,7 +171,7 @@ export const ReviewStep = ({ formData, updateFormData }: ReviewStepProps) => {
         {sections.map((section) => {
           const Icon = section.icon;
           const filledItems = section.items.filter(item => 
-            item.value && item.value !== 'None selected' && item.value !== 'Not uploaded'
+            item.value && item.value !== 'None selected' && item.value !== 'Not uploaded' && item.value !== 'No'
           );
 
           return (
