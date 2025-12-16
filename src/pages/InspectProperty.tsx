@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Check, AlertTriangle, Loader2 } from 'lucide-react';
+import { Check, AlertTriangle, Loader2, Camera } from 'lucide-react';
 import { MobileAppLayout, ScrollbarHideStyle } from '@/components/inspect/MobileAppLayout';
 import { InspectTopBar } from '@/components/inspect/InspectTopBar';
 import { YesNoToggle } from '@/components/inspect/YesNoToggle';
 import { IssueCaptureDrawer } from '@/components/inspect/IssueCaptureDrawer';
+import { PhotoCaptureField } from '@/components/inspect/PhotoCaptureField';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
@@ -14,7 +15,8 @@ import {
   INSPECTION_SECTIONS, 
   getTotalFields, 
   InspectionField,
-  InspectionResponse 
+  InspectionResponse,
+  InspectionPhoto
 } from '@/types/inspection';
 import { toast } from 'sonner';
 
@@ -25,6 +27,7 @@ const InspectProperty: React.FC = () => {
   
   const [currentSectionIndex, setCurrentSectionIndex] = useState(0);
   const [responses, setResponses] = useState<Record<string, boolean | null>>({});
+  const [fieldPhotos, setFieldPhotos] = useState<Record<string, string>>({});
   const [issueDrawerOpen, setIssueDrawerOpen] = useState(false);
   const [pendingIssueField, setPendingIssueField] = useState<InspectionField | null>(null);
   
@@ -59,6 +62,21 @@ const InspectProperty: React.FC = () => {
     },
     enabled: !!inspectionId
   });
+
+  // Fetch existing field photos (not issue photos)
+  const { data: existingPhotos } = useQuery({
+    queryKey: ['inspection-field-photos', inspectionId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('inspection_photos')
+        .select('*')
+        .eq('inspection_id', inspectionId)
+        .is('issue_id', null); // Only field photos, not issue photos
+      if (error) throw error;
+      return data as InspectionPhoto[];
+    },
+    enabled: !!inspectionId
+  });
   
   // Load existing responses into state
   useEffect(() => {
@@ -70,6 +88,19 @@ const InspectProperty: React.FC = () => {
       setResponses(responseMap);
     }
   }, [existingResponses]);
+
+  // Load existing field photos into state
+  useEffect(() => {
+    if (existingPhotos) {
+      const photoMap: Record<string, string> = {};
+      existingPhotos.forEach(p => {
+        if (p.field_key) {
+          photoMap[p.field_key] = p.photo_url;
+        }
+      });
+      setFieldPhotos(photoMap);
+    }
+  }, [existingPhotos]);
   
   // Save response mutation
   const saveResponseMutation = useMutation({
@@ -213,6 +244,11 @@ const InspectProperty: React.FC = () => {
     
     setPendingIssueField(null);
   };
+
+  const handlePhotoUploaded = (fieldKey: string, url: string) => {
+    setFieldPhotos(prev => ({ ...prev, [fieldKey]: url }));
+    queryClient.invalidateQueries({ queryKey: ['inspection-field-photos', inspectionId] });
+  };
   
   const handleNext = () => {
     if (currentSectionIndex < INSPECTION_SECTIONS.length - 1) {
@@ -269,6 +305,12 @@ const InspectProperty: React.FC = () => {
             <span className="text-sm text-muted-foreground">
               {currentSection?.fields.length} items
             </span>
+            {currentSection?.fields.some(f => f.requiresPhoto) && (
+              <Badge variant="secondary" className="rounded-full text-xs">
+                <Camera className="h-3 w-3 mr-1" />
+                Photos required
+              </Badge>
+            )}
           </div>
           
           {/* Questions */}
@@ -294,12 +336,23 @@ const InspectProperty: React.FC = () => {
                           Critical
                         </Badge>
                       )}
+                      {field.requiresPhoto && (
+                        <Badge variant="outline" className="text-[10px] h-5 rounded-full">
+                          <Camera className="h-3 w-3 mr-0.5" />
+                          Photo
+                        </Badge>
+                      )}
                       <span className="text-xs text-muted-foreground capitalize">
                         {field.responsibleParty === 'pm' ? 'PM' : field.responsibleParty}
                       </span>
                     </div>
                   </div>
-                  {responses[field.key] === true && (
+                  {responses[field.key] === true && fieldPhotos[field.key] && (
+                    <div className="p-1 bg-green-500 rounded-full">
+                      <Check className="h-4 w-4 text-white" />
+                    </div>
+                  )}
+                  {responses[field.key] === true && !field.requiresPhoto && (
                     <div className="p-1 bg-green-500 rounded-full">
                       <Check className="h-4 w-4 text-white" />
                     </div>
@@ -310,6 +363,18 @@ const InspectProperty: React.FC = () => {
                   value={responses[field.key] ?? null}
                   onChange={(value) => handleAnswer(field, value)}
                 />
+
+                {/* Photo Capture for fields that require it */}
+                {field.requiresPhoto && inspectionId && (
+                  <PhotoCaptureField
+                    inspectionId={inspectionId}
+                    fieldKey={field.key}
+                    photoLabel={field.photoLabel || 'Capture photo'}
+                    photoType={field.photoType || 'both'}
+                    existingPhotoUrl={fieldPhotos[field.key]}
+                    onPhotoUploaded={(url) => handlePhotoUploaded(field.key, url)}
+                  />
+                )}
               </div>
             ))}
           </div>

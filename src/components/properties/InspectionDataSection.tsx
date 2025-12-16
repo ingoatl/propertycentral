@@ -89,6 +89,20 @@ export const InspectionDataSection: React.FC<InspectionDataSectionProps> = ({ pr
     },
     enabled: !!inspection?.id
   });
+
+  // Separate field photos from issue photos
+  const { fieldPhotos, issuePhotos } = React.useMemo(() => {
+    const field: InspectionPhoto[] = [];
+    const issue: InspectionPhoto[] = [];
+    photos?.forEach(p => {
+      if (p.issue_id) {
+        issue.push(p);
+      } else {
+        field.push(p);
+      }
+    });
+    return { fieldPhotos: field, issuePhotos: issue };
+  }, [photos]);
   
   const responseMap = React.useMemo(() => {
     const map: Record<string, boolean | null> = {};
@@ -97,6 +111,17 @@ export const InspectionDataSection: React.FC<InspectionDataSectionProps> = ({ pr
     });
     return map;
   }, [responses]);
+
+  // Map field_key to photo URL for display
+  const fieldPhotoMap = React.useMemo(() => {
+    const map: Record<string, string> = {};
+    fieldPhotos?.forEach(p => {
+      if (p.field_key) {
+        map[p.field_key] = p.photo_url;
+      }
+    });
+    return map;
+  }, [fieldPhotos]);
   
   const openIssues = issues?.filter(i => i.status === 'open') || [];
   
@@ -198,13 +223,51 @@ export const InspectionDataSection: React.FC<InspectionDataSectionProps> = ({ pr
           </div>
         </div>
       )}
+
+      {/* Serial Number & Required Photos */}
+      {fieldPhotos.length > 0 && (
+        <div className="space-y-3">
+          <h5 className="font-medium flex items-center gap-2">
+            <ImageIcon className="h-4 w-4 text-primary" />
+            Serial Numbers & Required Photos ({fieldPhotos.length})
+          </h5>
+          <div className="grid grid-cols-2 gap-3">
+            {fieldPhotos.map(photo => {
+              const field = getFieldByKey(photo.field_key || '');
+              return (
+                <a
+                  key={photo.id}
+                  href={photo.photo_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="group relative rounded-xl overflow-hidden bg-muted hover:ring-2 hover:ring-primary transition-all"
+                >
+                  <div className="aspect-[4/3]">
+                    <img
+                      src={photo.photo_url}
+                      alt={photo.caption || field?.label || 'Photo'}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                    />
+                  </div>
+                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-2">
+                    <p className="text-xs text-white font-medium truncate">
+                      {field?.label?.replace(' - capture nameplate/serial', '') || photo.caption || 'Photo'}
+                    </p>
+                  </div>
+                </a>
+              );
+            })}
+          </div>
+        </div>
+      )}
       
       {/* Inspection Responses by Section */}
       <div className="space-y-4">
         {INSPECTION_SECTIONS.map(section => {
           const sectionResponses = section.fields.map(f => ({
             field: f,
-            value: responseMap[f.key]
+            value: responseMap[f.key],
+            photo: fieldPhotoMap[f.key]
           }));
           const answered = sectionResponses.filter(r => r.value !== undefined && r.value !== null);
           const passed = answered.filter(r => r.value === true).length;
@@ -228,35 +291,60 @@ export const InspectionDataSection: React.FC<InspectionDataSectionProps> = ({ pr
                 </div>
               </div>
               <div className="divide-y">
-                {sectionResponses.map(({ field, value }) => (
+                {sectionResponses.map(({ field, value, photo }) => (
                   <div 
                     key={field.key}
                     className={cn(
-                      "px-4 py-3 flex items-center justify-between gap-3",
+                      "px-4 py-3",
                       value === true && "bg-green-50/50 dark:bg-green-950/10",
                       value === false && "bg-red-50/50 dark:bg-red-950/10"
                     )}
                   >
-                    <div className="flex-1">
-                      <span className="text-sm">{field.label}</span>
-                      {field.critical && (
-                        <Badge variant="outline" className="ml-2 text-[9px] h-4 border-red-300 text-red-600">
-                          Critical
-                        </Badge>
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex-1">
+                        <span className="text-sm">{field.label}</span>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          {field.critical && (
+                            <Badge variant="outline" className="text-[9px] h-4 border-red-300 text-red-600">
+                              Critical
+                            </Badge>
+                          )}
+                          {field.requiresPhoto && (
+                            <Badge variant="outline" className="text-[9px] h-4">
+                              <ImageIcon className="h-2.5 w-2.5 mr-0.5" />
+                              Photo
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                      {value === true && (
+                        <div className="p-1 bg-green-500 rounded-full">
+                          <Check className="h-3 w-3 text-white" />
+                        </div>
+                      )}
+                      {value === false && (
+                        <div className="p-1 bg-red-500 rounded-full">
+                          <X className="h-3 w-3 text-white" />
+                        </div>
+                      )}
+                      {value === undefined && (
+                        <span className="text-xs text-muted-foreground">Not checked</span>
                       )}
                     </div>
-                    {value === true && (
-                      <div className="p-1 bg-green-500 rounded-full">
-                        <Check className="h-3 w-3 text-white" />
-                      </div>
-                    )}
-                    {value === false && (
-                      <div className="p-1 bg-red-500 rounded-full">
-                        <X className="h-3 w-3 text-white" />
-                      </div>
-                    )}
-                    {value === undefined && (
-                      <span className="text-xs text-muted-foreground">Not checked</span>
+                    {/* Show thumbnail if photo exists */}
+                    {photo && (
+                      <a
+                        href={photo}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-2 block"
+                      >
+                        <img
+                          src={photo}
+                          alt={field.label}
+                          className="h-16 w-24 object-cover rounded-lg border hover:ring-2 hover:ring-primary transition-all"
+                        />
+                      </a>
                     )}
                   </div>
                 ))}
@@ -267,14 +355,14 @@ export const InspectionDataSection: React.FC<InspectionDataSectionProps> = ({ pr
       </div>
       
       {/* Issue Photos */}
-      {photos && photos.length > 0 && (
+      {issuePhotos.length > 0 && (
         <div className="space-y-3">
           <h5 className="font-medium flex items-center gap-2">
-            <ImageIcon className="h-4 w-4" />
-            Issue Photos ({photos.length})
+            <AlertTriangle className="h-4 w-4 text-red-500" />
+            Issue Photos ({issuePhotos.length})
           </h5>
           <div className="grid grid-cols-3 gap-2">
-            {photos.map(photo => (
+            {issuePhotos.map(photo => (
               <a
                 key={photo.id}
                 href={photo.photo_url}
