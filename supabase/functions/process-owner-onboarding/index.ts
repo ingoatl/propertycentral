@@ -28,6 +28,11 @@ const TASK_MAPPINGS: Record<string, { phase: number; title: string }> = {
   trash_pickup_day: { phase: 2, title: 'Trash day' },
   trash_bin_location: { phase: 2, title: 'Trash Bin Location' },
   maids_closet_code: { phase: 2, title: 'Maids closet code' },
+  // Utility mappings - Phase 3
+  wastewater_system: { phase: 3, title: 'Wastewater System' },
+  septic_company: { phase: 3, title: 'Septic Company' },
+  septic_last_pumped: { phase: 3, title: 'Septic Last Pumped' },
+  // Operations
   primary_cleaner: { phase: 4, title: 'Primary cleaner name' },
   backup_cleaner: { phase: 4, title: 'Backup Cleaner' },
   cleaner_payment: { phase: 4, title: 'Cleaner Payment Rate' },
@@ -58,6 +63,20 @@ const TASK_MAPPINGS: Record<string, { phase: number; title: string }> = {
   average_daily_rate: { phase: 11, title: 'Nightly Rate' },
   average_monthly_revenue: { phase: 11, title: 'Monthly Rent' },
 };
+
+// Utility type to task title mapping for Phase 3
+const UTILITY_TASK_MAPPINGS: Record<string, string> = {
+  'Electric': 'Electric Provider',
+  'Gas': 'Gas Provider',
+  'Water': 'Water Provider',
+  'Sewer': 'Sewer Provider',
+  'Trash': 'Trash Provider',
+  'Internet': 'Internet Provider',
+  'Cable/TV': 'Cable/TV Provider',
+};
+
+// Email validation regex
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 async function sendAdminEmail(formData: any) {
   if (!RESEND_API_KEY) {
@@ -171,6 +190,12 @@ async function sendOwnerEmail(formData: any) {
     return;
   }
 
+  // Validate email format before sending
+  if (!EMAIL_REGEX.test(formData.owner_email)) {
+    console.error("Invalid owner email format, skipping owner email:", formData.owner_email);
+    return;
+  }
+
   const emailHtml = `
     <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background: linear-gradient(to bottom, #fff7ed, #ffffff);">
       <div style="text-align: center; margin-bottom: 30px;">
@@ -226,22 +251,26 @@ async function sendOwnerEmail(formData: any) {
     </div>
   `;
 
-  const response = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${RESEND_API_KEY}`,
-    },
-    body: JSON.stringify({
-      from: "PeachHaus <onboarding@peachhausgroup.com>",
-      to: [formData.owner_email],
-      subject: "Thank You for Choosing PeachHaus! 🍑",
-      html: emailHtml,
-    }),
-  });
+  try {
+    const response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${RESEND_API_KEY}`,
+      },
+      body: JSON.stringify({
+        from: "PeachHaus <onboarding@peachhausgroup.com>",
+        to: [formData.owner_email],
+        subject: "Thank You for Choosing PeachHaus! 🍑",
+        html: emailHtml,
+      }),
+    });
 
-  if (!response.ok) {
-    console.error("Failed to send owner email:", await response.text());
+    if (!response.ok) {
+      console.error("Failed to send owner email:", await response.text());
+    }
+  } catch (error) {
+    console.error("Failed to send owner email:", error);
   }
 }
 
@@ -258,6 +287,55 @@ const toText = (value: any): string | null => {
   return String(value);
 };
 
+// Helper function to create or update a task
+async function createOrUpdateTask(
+  projectId: string, 
+  phase: number, 
+  title: string, 
+  value: string,
+  phaseTitle?: string
+): Promise<boolean> {
+  try {
+    // Check if task exists
+    const { data: existingTask } = await supabase
+      .from('onboarding_tasks')
+      .select('id')
+      .eq('project_id', projectId)
+      .eq('title', title)
+      .single();
+
+    if (existingTask) {
+      // Update existing task
+      await supabase
+        .from('onboarding_tasks')
+        .update({
+          field_value: value,
+          status: 'completed',
+          completed_date: new Date().toISOString(),
+        })
+        .eq('id', existingTask.id);
+    } else {
+      // Create new task with value
+      await supabase
+        .from('onboarding_tasks')
+        .insert({
+          project_id: projectId,
+          phase_number: phase,
+          phase_title: phaseTitle || `Phase ${phase}`,
+          title: title,
+          field_type: 'text',
+          field_value: value,
+          status: 'completed',
+          completed_date: new Date().toISOString(),
+        });
+    }
+    return true;
+  } catch (error) {
+    console.error(`Failed to create/update task ${title}:`, error);
+    return false;
+  }
+}
+
 const handler = async (req: Request): Promise<Response> => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -265,7 +343,12 @@ const handler = async (req: Request): Promise<Response> => {
 
   try {
     const formData = await req.json();
-    console.log("Processing owner onboarding submission for:", formData.property_address);
+    console.log("Processing owner onboarding submission for:", formData.property_address, formData.owner_name);
+
+    // Validate required fields
+    if (!formData.owner_email || !EMAIL_REGEX.test(formData.owner_email)) {
+      console.error("Invalid or missing owner email:", formData.owner_email);
+    }
 
     // 1. Save raw submission - only include valid database columns with proper type handling
     const submissionData = {
@@ -446,7 +529,38 @@ const handler = async (req: Request): Promise<Response> => {
         });
     }
 
-    // 6. Create onboarding project
+    // 5b. Create property financial data
+    const financialData = {
+      property_id: property.id,
+      submission_id: submission.id,
+      last_year_revenue: toNumber(formData.last_year_revenue),
+      average_daily_rate: toNumber(formData.average_daily_rate),
+      occupancy_rate: toNumber(formData.occupancy_rate),
+      average_booking_window: toNumber(formData.average_booking_window),
+      average_monthly_revenue: toNumber(formData.average_monthly_revenue),
+      peak_season: toText(formData.peak_season),
+      peak_season_adr: toNumber(formData.peak_season_adr),
+      revenue_statement_url: toText(formData.revenue_statement_url),
+      expense_report_url: toText(formData.expense_report_url),
+      airbnb_revenue_export_url: toText(formData.airbnb_revenue_export_url),
+      vrbo_revenue_export_url: toText(formData.vrbo_revenue_export_url),
+      ownerrez_revenue_export_url: toText(formData.ownerrez_revenue_export_url),
+      pricing_revenue_goals: toText(formData.pricing_revenue_goals),
+      competitor_insights: toText(formData.competitor_insights),
+    };
+
+    const { error: financialError } = await supabase
+      .from('property_financial_data')
+      .insert(financialData);
+
+    if (financialError) {
+      console.error("Failed to create financial data:", financialError);
+      // Don't throw - this is not critical
+    } else {
+      console.log("Financial data saved for property:", property.id);
+    }
+
+    // 6. Create onboarding project - status is 'in-progress', progress starts at 0
     const { data: project, error: projectError } = await supabase
       .from('onboarding_projects')
       .insert({
@@ -466,64 +580,79 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log("Project created:", project.id);
 
-    // 7. Pre-populate onboarding tasks
+    // 7. Pre-populate onboarding tasks from field mappings
     let tasksPopulated = 0;
     for (const [field, taskInfo] of Object.entries(TASK_MAPPINGS)) {
       const value = formData[field];
       if (value && value !== '') {
-        // Check if task exists
-        const { data: existingTask } = await supabase
-          .from('onboarding_tasks')
-          .select('id')
-          .eq('project_id', project.id)
-          .eq('title', taskInfo.title)
-          .single();
+        const success = await createOrUpdateTask(
+          project.id,
+          taskInfo.phase,
+          taskInfo.title,
+          String(value)
+        );
+        if (success) tasksPopulated++;
+      }
+    }
 
-        if (existingTask) {
-          // Update existing task
-          await supabase
-            .from('onboarding_tasks')
-            .update({
-              field_value: String(value),
-              status: 'completed',
-              completed_date: new Date().toISOString(),
-            })
-            .eq('id', existingTask.id);
-          tasksPopulated++;
-        } else {
-          // Create new task with value
-          await supabase
-            .from('onboarding_tasks')
-            .insert({
-              project_id: project.id,
-              phase_number: taskInfo.phase,
-              phase_title: `Phase ${taskInfo.phase}`,
-              title: taskInfo.title,
-              field_type: 'text',
-              field_value: String(value),
-              status: 'completed',
-              completed_date: new Date().toISOString(),
-            });
-          tasksPopulated++;
+    // 7b. Process utilities array into individual tasks
+    if (formData.utilities && Array.isArray(formData.utilities)) {
+      for (const utility of formData.utilities) {
+        if (utility.type && (utility.provider || utility.account_number)) {
+          const taskTitle = UTILITY_TASK_MAPPINGS[utility.type] || `${utility.type} Provider`;
+          const value = utility.provider 
+            ? `Provider: ${utility.provider}${utility.account_number ? ` | Account: ${utility.account_number}` : ''}`
+            : `Account: ${utility.account_number}`;
+          
+          const success = await createOrUpdateTask(
+            project.id,
+            3, // Phase 3 for utilities
+            taskTitle,
+            value,
+            'Utilities'
+          );
+          if (success) tasksPopulated++;
         }
       }
     }
 
     console.log("Tasks populated:", tasksPopulated);
 
-    // 8. Update submission with created IDs
+    // 8. Calculate actual progress based on tasks
+    // Get total tasks and completed tasks
+    const { data: allTasks } = await supabase
+      .from('onboarding_tasks')
+      .select('id, status')
+      .eq('project_id', project.id);
+
+    const totalTasks = allTasks?.length || 0;
+    const completedTasks = allTasks?.filter(t => t.status === 'completed').length || 0;
+    const progress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+
+    console.log(`Progress: ${completedTasks}/${totalTasks} = ${progress}%`);
+
+    // 9. Update submission with created IDs - keep status as 'processing' until manually verified
     await supabase
       .from('owner_onboarding_submissions')
       .update({
         property_id: property.id,
         owner_id: ownerId,
         project_id: project.id,
-        status: 'completed',
+        status: 'processed', // Not 'completed' - just processed
         processed_at: new Date().toISOString(),
       })
       .eq('id', submission.id);
 
-    // 9. Send emails
+    // 10. Update project progress
+    await supabase
+      .from('onboarding_projects')
+      .update({
+        progress: progress,
+        status: progress >= 100 ? 'completed' : 'in-progress',
+      })
+      .eq('id', project.id);
+
+    // 11. Send emails
     await Promise.all([
       sendAdminEmail(formData),
       sendOwnerEmail(formData),
@@ -537,6 +666,7 @@ const handler = async (req: Request): Promise<Response> => {
         message: "Onboarding submitted successfully",
         propertyId: property.id,
         projectId: project.id,
+        progress: progress,
       }),
       {
         status: 200,
