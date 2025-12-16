@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { ClipboardCheck, ChevronRight, Building2, Loader2 } from 'lucide-react';
+import { ClipboardCheck, ChevronRight, Building2, Loader2, Search } from 'lucide-react';
 import { MobileAppLayout, ScrollbarHideStyle } from '@/components/inspect/MobileAppLayout';
 import { InspectTopBar } from '@/components/inspect/InspectTopBar';
 import { InspectMenuBar } from '@/components/inspect/InspectMenuBar';
@@ -15,6 +15,7 @@ const Inspect: React.FC = () => {
   const navigate = useNavigate();
   const [inspectorName, setInspectorName] = useState('');
   const [selectedPropertyId, setSelectedPropertyId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
   
   // Fetch properties (exclude offboarded)
   const { data: properties, isLoading } = useQuery({
@@ -29,6 +30,17 @@ const Inspect: React.FC = () => {
       return data;
     }
   });
+
+  // Filter properties by search
+  const filteredProperties = useMemo(() => {
+    if (!properties) return [];
+    if (!searchQuery.trim()) return properties;
+    const query = searchQuery.toLowerCase();
+    return properties.filter(p => 
+      p.name?.toLowerCase().includes(query) || 
+      p.address?.toLowerCase().includes(query)
+    );
+  }, [properties, searchQuery]);
 
   // Fetch existing inspection for selected property
   const { data: existingInspection } = useQuery({
@@ -87,21 +99,23 @@ const Inspect: React.FC = () => {
         topBar={<InspectTopBar title="Property Inspection" />}
         menuBar={<InspectMenuBar />}
       >
-        <div className="p-4 space-y-6">
-          {/* Hero */}
-          <div className="text-center py-6">
-            <div className="inline-flex p-4 bg-primary/10 rounded-3xl mb-4">
-              <ClipboardCheck className="h-12 w-12 text-primary" />
+        <div className="p-4 space-y-4">
+          {/* Compact Hero */}
+          <div className="flex items-center gap-3 py-2">
+            <div className="p-2.5 bg-primary/10 rounded-2xl">
+              <ClipboardCheck className="h-7 w-7 text-primary" />
             </div>
-            <h2 className="text-2xl font-bold mb-2">STR Inspection</h2>
-            <p className="text-muted-foreground">
-              Quick property check before guest arrival
-            </p>
+            <div>
+              <h2 className="text-xl font-bold">STR Inspection</h2>
+              <p className="text-sm text-muted-foreground">
+                Quick check before guest arrival
+              </p>
+            </div>
           </div>
           
           {/* Inspector Name */}
-          <div className="space-y-2">
-            <Label className="text-base font-medium">
+          <div className="space-y-1.5">
+            <Label className="text-sm font-medium">
               Your Name <span className="text-destructive">*</span>
             </Label>
             <Input
@@ -109,67 +123,84 @@ const Inspect: React.FC = () => {
               onChange={(e) => setInspectorName(e.target.value)}
               placeholder="Enter your name"
               className={cn(
-                "h-14 rounded-2xl text-base px-4",
+                "h-12 rounded-xl text-base px-4",
                 !inspectorName.trim() && selectedPropertyId && "border-destructive"
               )}
             />
           </div>
           
           {/* Property Selection */}
-          <div className="space-y-3">
-            <Label className="text-base font-medium">Select Property</Label>
+          <div className="space-y-2 flex-1">
+            <Label className="text-sm font-medium">Select Property</Label>
+            
+            {/* Search Field */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search properties..."
+                className="h-10 rounded-xl pl-9 text-sm"
+              />
+            </div>
             
             {isLoading ? (
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
               </div>
             ) : (
-              <div className="space-y-2 max-h-[300px] overflow-y-auto scrollbar-hide">
-                {properties?.map((property) => (
-                  <button
-                    key={property.id}
-                    onClick={() => setSelectedPropertyId(property.id)}
-                    className={cn(
-                      "w-full flex items-center gap-3 p-4 rounded-2xl border-2 transition-all",
-                      "active:scale-[0.98]",
-                      selectedPropertyId === property.id
-                        ? "border-primary bg-primary/5"
-                        : "border-border bg-card hover:border-primary/50"
-                    )}
-                  >
-                    <div className={cn(
-                      "p-2 rounded-xl",
-                      selectedPropertyId === property.id
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-muted"
-                    )}>
-                      <Building2 className="h-5 w-5" />
-                    </div>
-                    <div className="flex-1 text-left">
-                      <p className="font-medium">{property.name}</p>
-                      <p className="text-sm text-muted-foreground truncate">
-                        {property.address}
-                      </p>
-                    </div>
-                    <ChevronRight className={cn(
-                      "h-5 w-5 transition-colors",
-                      selectedPropertyId === property.id
-                        ? "text-primary"
-                        : "text-muted-foreground"
-                    )} />
-                  </button>
-                ))}
+              <div className="space-y-2 max-h-[calc(100vh-420px)] min-h-[200px] overflow-y-auto scrollbar-hide">
+                {filteredProperties.length === 0 ? (
+                  <p className="text-center text-sm text-muted-foreground py-4">
+                    {searchQuery ? 'No properties match your search' : 'No properties available'}
+                  </p>
+                ) : (
+                  filteredProperties.map((property) => (
+                    <button
+                      key={property.id}
+                      onClick={() => setSelectedPropertyId(property.id)}
+                      className={cn(
+                        "w-full flex items-center gap-3 p-3 rounded-xl border-2 transition-all",
+                        "active:scale-[0.98]",
+                        selectedPropertyId === property.id
+                          ? "border-primary bg-primary/5"
+                          : "border-border bg-card hover:border-primary/50"
+                      )}
+                    >
+                      <div className={cn(
+                        "p-2 rounded-lg",
+                        selectedPropertyId === property.id
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-muted"
+                      )}>
+                        <Building2 className="h-4 w-4" />
+                      </div>
+                      <div className="flex-1 text-left min-w-0">
+                        <p className="font-medium text-sm">{property.name}</p>
+                        <p className="text-xs text-muted-foreground truncate">
+                          {property.address}
+                        </p>
+                      </div>
+                      <ChevronRight className={cn(
+                        "h-4 w-4 flex-shrink-0 transition-colors",
+                        selectedPropertyId === property.id
+                          ? "text-primary"
+                          : "text-muted-foreground"
+                      )} />
+                    </button>
+                  ))
+                )}
               </div>
             )}
           </div>
           
           {/* Start/Edit Button */}
-          <div className="space-y-2">
+          <div className="space-y-2 pt-2">
             <Button
               onClick={handleStartOrEditInspection}
               disabled={!selectedPropertyId || !inspectorName.trim()}
               className={cn(
-                "w-full h-14 rounded-2xl text-lg font-semibold",
+                "w-full h-12 rounded-xl text-base font-semibold",
                 hasExistingInspection 
                   ? "bg-amber-600 hover:bg-amber-700" 
                   : "bg-primary hover:bg-primary/90",
@@ -182,25 +213,20 @@ const Inspect: React.FC = () => {
             
             {/* Existing inspection info */}
             {hasExistingInspection && (
-              <p className="text-center text-sm text-amber-600 dark:text-amber-400">
+              <p className="text-center text-xs text-amber-600 dark:text-amber-400">
                 {existingInspection.status === 'completed' ? 'Completed' : 'In Progress'} inspection exists
               </p>
             )}
             
             {/* Validation hint */}
             {(!selectedPropertyId || !inspectorName.trim()) && (
-              <p className="text-center text-sm text-muted-foreground">
+              <p className="text-center text-xs text-muted-foreground">
                 {!inspectorName.trim() && !selectedPropertyId && "Enter your name and select a property"}
                 {!inspectorName.trim() && selectedPropertyId && "Enter your name to continue"}
                 {inspectorName.trim() && !selectedPropertyId && "Select a property to continue"}
               </p>
             )}
           </div>
-          
-          {/* Info */}
-          <p className="text-center text-sm text-muted-foreground">
-            ~15 quick checks • Takes 5-10 minutes
-          </p>
         </div>
       </MobileAppLayout>
     </>
