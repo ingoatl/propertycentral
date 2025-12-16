@@ -26,6 +26,7 @@ import InspectProperty from "./pages/InspectProperty";
 import InspectionsList from "./pages/InspectionsList";
 import InspectIssues from "./pages/InspectIssues";
 import InspectSettings from "./pages/InspectSettings";
+import JobApplication from "./pages/JobApplication";
 
 const queryClient = new QueryClient();
 
@@ -47,6 +48,8 @@ const App = () => (
           <Route path="/inspect/list" element={<InspectionsList />} />
           <Route path="/inspect/issues" element={<InspectIssues />} />
           <Route path="/inspect/settings" element={<InspectSettings />} />
+          {/* Public job application page */}
+          <Route path="/careers/property-inspector" element={<JobApplication />} />
           <Route path="*" element={
             <Layout>
               <Routes>

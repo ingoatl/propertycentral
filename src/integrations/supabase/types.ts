@@ -1147,6 +1147,45 @@ export type Database = {
           },
         ]
       }
+      job_applications: {
+        Row: {
+          availability: string[] | null
+          created_at: string
+          detail_oriented_example: string | null
+          email: string
+          full_name: string
+          has_technical_skills: boolean | null
+          id: string
+          phone: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          availability?: string[] | null
+          created_at?: string
+          detail_oriented_example?: string | null
+          email: string
+          full_name: string
+          has_technical_skills?: boolean | null
+          id?: string
+          phone: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          availability?: string[] | null
+          created_at?: string
+          detail_oriented_example?: string | null
+          email?: string
+          full_name?: string
+          has_technical_skills?: boolean | null
+          id?: string
+          phone?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       listing_templates: {
         Row: {
           available_variables: string[] | null
