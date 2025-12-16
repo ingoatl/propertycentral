@@ -23,6 +23,9 @@ import OwnerOnboarding from "./pages/OwnerOnboarding";
 import NewSTROnboarding from "./pages/NewSTROnboarding";
 import Inspect from "./pages/Inspect";
 import InspectProperty from "./pages/InspectProperty";
+import InspectionsList from "./pages/InspectionsList";
+import InspectIssues from "./pages/InspectIssues";
+import InspectSettings from "./pages/InspectSettings";
 
 const queryClient = new QueryClient();
 
@@ -41,6 +44,9 @@ const App = () => (
           {/* Mobile-first inspection app routes - outside Layout for full-screen mobile experience */}
           <Route path="/inspect" element={<Inspect />} />
           <Route path="/inspect/property/:inspectionId" element={<InspectProperty />} />
+          <Route path="/inspect/list" element={<InspectionsList />} />
+          <Route path="/inspect/issues" element={<InspectIssues />} />
+          <Route path="/inspect/settings" element={<InspectSettings />} />
           <Route path="*" element={
             <Layout>
               <Routes>

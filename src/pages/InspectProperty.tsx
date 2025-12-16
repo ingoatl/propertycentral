@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Check, Loader2, Camera } from 'lucide-react';
+import { Check, Loader2, Camera, MessageSquare } from 'lucide-react';
 import { MobileAppLayout, ScrollbarHideStyle } from '@/components/inspect/MobileAppLayout';
 import { InspectTopBar } from '@/components/inspect/InspectTopBar';
 import { YesNoToggle } from '@/components/inspect/YesNoToggle';
@@ -9,6 +9,8 @@ import { IssueCaptureDrawer } from '@/components/inspect/IssueCaptureDrawer';
 import { PhotoCaptureField } from '@/components/inspect/PhotoCaptureField';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { 
@@ -28,6 +30,7 @@ const InspectProperty: React.FC = () => {
   const [currentSectionIndex, setCurrentSectionIndex] = useState(0);
   const [responses, setResponses] = useState<Record<string, boolean | null>>({});
   const [fieldPhotos, setFieldPhotos] = useState<Record<string, string>>({});
+  const [remarks, setRemarks] = useState('');
   const [issueDrawerOpen, setIssueDrawerOpen] = useState(false);
   const [pendingIssueField, setPendingIssueField] = useState<InspectionField | null>(null);
   
@@ -78,7 +81,7 @@ const InspectProperty: React.FC = () => {
     enabled: !!inspectionId
   });
   
-  // Load existing responses into state
+  // Load existing responses and remarks into state
   useEffect(() => {
     if (existingResponses) {
       const responseMap: Record<string, boolean | null> = {};
@@ -88,6 +91,13 @@ const InspectProperty: React.FC = () => {
       setResponses(responseMap);
     }
   }, [existingResponses]);
+
+  // Load existing remarks
+  useEffect(() => {
+    if (inspection?.notes) {
+      setRemarks(inspection.notes);
+    }
+  }, [inspection]);
 
   // Load existing field photos into state
   useEffect(() => {
@@ -185,20 +195,56 @@ const InspectProperty: React.FC = () => {
     }
   });
   
+  // Save remarks mutation
+  const saveRemarksMutation = useMutation({
+    mutationFn: async (notes: string) => {
+      const { error } = await supabase
+        .from('inspections')
+        .update({ notes, updated_at: new Date().toISOString() })
+        .eq('id', inspectionId);
+      if (error) throw error;
+    }
+  });
+
+  // Send inspection report email
+  const sendReportMutation = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke('send-inspection-report', {
+        body: { inspectionId }
+      });
+      if (error) throw error;
+      return data;
+    }
+  });
+
   // Complete inspection mutation
   const completeInspectionMutation = useMutation({
     mutationFn: async () => {
+      // Save remarks first
+      if (remarks.trim()) {
+        await saveRemarksMutation.mutateAsync(remarks);
+      }
+      
       const { error } = await supabase
         .from('inspections')
         .update({ 
           status: 'completed',
+          notes: remarks,
           updated_at: new Date().toISOString()
         })
         .eq('id', inspectionId);
       if (error) throw error;
+
+      // Send email report
+      await sendReportMutation.mutateAsync();
     },
     onSuccess: () => {
-      toast.success('Inspection completed!');
+      toast.success('Inspection completed & email sent!');
+      navigate('/inspect');
+    },
+    onError: (error) => {
+      console.error('Error completing inspection:', error);
+      toast.error('Inspection saved but email failed to send');
       navigate('/inspect');
     }
   });
@@ -372,6 +418,25 @@ const InspectProperty: React.FC = () => {
               </div>
             ))}
           </div>
+
+          {/* Remarks Section - Show on last section */}
+          {isLastSection && (
+            <div className="mt-6 p-4 rounded-2xl border-2 border-border bg-card">
+              <div className="flex items-center gap-2 mb-3">
+                <MessageSquare className="h-5 w-5 text-primary" />
+                <Label className="text-base font-semibold">Inspector Remarks</Label>
+              </div>
+              <Textarea
+                value={remarks}
+                onChange={(e) => setRemarks(e.target.value)}
+                placeholder="Add any additional notes, observations, or recommendations..."
+                className="min-h-[120px] rounded-xl resize-none"
+              />
+              <p className="text-xs text-muted-foreground mt-2">
+                These remarks will be included in the inspection report email.
+              </p>
+            </div>
+          )}
         </div>
         
         {/* Fixed Bottom Actions */}
