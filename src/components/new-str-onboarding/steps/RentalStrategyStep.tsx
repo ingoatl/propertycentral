@@ -1,10 +1,9 @@
-import { NewSTROnboardingFormData, RENTAL_STRATEGY_OPTIONS, TARGET_GUEST_OPTIONS, PRICING_GOAL_OPTIONS, PEAK_SEASON_OPTIONS } from "@/types/new-str-onboarding";
+import { NewSTROnboardingFormData, RENTAL_STRATEGY_OPTIONS, TARGET_GUEST_OPTIONS, PRICING_GOAL_OPTIONS } from "@/types/new-str-onboarding";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Target, DollarSign, Calendar, Users } from "lucide-react";
+import { Target, DollarSign, Users } from "lucide-react";
 
 interface RentalStrategyStepProps {
   formData: NewSTROnboardingFormData;
@@ -12,14 +11,6 @@ interface RentalStrategyStepProps {
 }
 
 export const RentalStrategyStep = ({ formData, updateFormData }: RentalStrategyStepProps) => {
-  const togglePeakMonth = (month: string) => {
-    const current = formData.peakSeasonMonths || [];
-    const updated = current.includes(month)
-      ? current.filter(m => m !== month)
-      : [...current, month];
-    updateFormData({ peakSeasonMonths: updated });
-  };
-
   return (
     <div className="space-y-6">
       <div className="text-center mb-8">
@@ -146,32 +137,6 @@ export const RentalStrategyStep = ({ formData, updateFormData }: RentalStrategyS
         </CardContent>
       </Card>
 
-      {/* Peak Season */}
-      <Card className="rounded-2xl border-[hsl(25,30%,90%)] shadow-sm">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg text-[hsl(25,40%,25%)]">
-            <Calendar className="w-5 h-5 text-[hsl(25,95%,50%)]" />
-            Peak Season Months
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-[hsl(25,20%,50%)] mb-4">Select the months you expect to be busiest</p>
-          <div className="grid grid-cols-3 md:grid-cols-4 gap-3">
-            {PEAK_SEASON_OPTIONS.map((month) => (
-              <div key={month} className="flex items-center space-x-2">
-                <Checkbox
-                  id={`month-${month}`}
-                  checked={formData.peakSeasonMonths?.includes(month)}
-                  onCheckedChange={() => togglePeakMonth(month)}
-                />
-                <Label htmlFor={`month-${month}`} className="text-sm cursor-pointer">
-                  {month}
-                </Label>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 };
