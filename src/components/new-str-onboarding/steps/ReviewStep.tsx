@@ -138,17 +138,17 @@ export const ReviewStep = ({ formData, updateFormData }: ReviewStepProps) => {
   return (
     <div className="space-y-6">
       <div className="text-center mb-8">
-        <h2 className="text-2xl font-bold text-foreground">Review Your Information</h2>
-        <p className="text-muted-foreground mt-2">Please review all details before submitting</p>
+        <h2 className="text-2xl font-bold text-[hsl(25,40%,25%)]">Review Your Information</h2>
+        <p className="text-[hsl(25,20%,50%)] mt-2">Please review all details before submitting</p>
       </div>
 
-      <Card className="bg-primary/5 border-primary/20">
+      <Card className="bg-gradient-to-r from-[hsl(25,100%,97%)] to-[hsl(30,100%,96%)] rounded-2xl border-[hsl(25,50%,85%)]">
         <CardContent className="pt-6">
           <div className="flex items-center gap-3">
-            <CheckCircle className="w-6 h-6 text-primary" />
+            <CheckCircle className="w-6 h-6 text-[hsl(25,95%,50%)]" />
             <div>
-              <p className="font-medium">Almost Done!</p>
-              <p className="text-sm text-muted-foreground">
+              <p className="font-medium text-[hsl(25,40%,25%)]">Almost Done!</p>
+              <p className="text-sm text-[hsl(25,20%,50%)]">
                 Review your information below. You can go back to any step to make changes.
               </p>
             </div>
@@ -164,14 +164,14 @@ export const ReviewStep = ({ formData, updateFormData }: ReviewStepProps) => {
           );
 
           return (
-            <Card key={section.title}>
+            <Card key={section.title} className="rounded-2xl border-[hsl(25,30%,90%)] shadow-sm">
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center justify-between text-base">
-                  <span className="flex items-center gap-2">
-                    <Icon className="w-4 h-4 text-primary" />
+                  <span className="flex items-center gap-2 text-[hsl(25,40%,25%)]">
+                    <Icon className="w-4 h-4 text-[hsl(25,95%,50%)]" />
                     {section.title}
                   </span>
-                  <Badge variant="secondary" className="text-xs">
+                  <Badge variant="secondary" className="text-xs bg-[hsl(25,100%,95%)] text-[hsl(25,70%,40%)]">
                     {filledItems.length}/{section.items.length}
                   </Badge>
                 </CardTitle>
@@ -181,15 +181,15 @@ export const ReviewStep = ({ formData, updateFormData }: ReviewStepProps) => {
                   {section.items.map((item) => (
                     item.value && item.value !== 'None selected' && item.value !== 'Not uploaded' && (
                       <div key={item.label} className="flex justify-between gap-2">
-                        <span className="text-muted-foreground">{item.label}:</span>
-                        <span className="font-medium text-right truncate max-w-[60%]">
+                        <span className="text-[hsl(25,20%,50%)]">{item.label}:</span>
+                        <span className="font-medium text-[hsl(25,40%,30%)] text-right truncate max-w-[60%]">
                           {item.value}
                         </span>
                       </div>
                     )
                   ))}
                   {filledItems.length === 0 && (
-                    <p className="text-muted-foreground italic">No information provided</p>
+                    <p className="text-[hsl(25,20%,55%)] italic">No information provided</p>
                   )}
                 </div>
               </CardContent>
