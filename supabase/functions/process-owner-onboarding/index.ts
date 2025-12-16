@@ -395,7 +395,7 @@ const handler = async (req: Request): Promise<Response> => {
           name: formData.owner_name,
           email: formData.owner_email,
           phone: toText(formData.owner_phone),
-          payment_method: 'check',
+          payment_method: 'ach',
         })
         .select()
         .single();
