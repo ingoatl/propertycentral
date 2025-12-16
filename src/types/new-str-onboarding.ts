@@ -16,7 +16,6 @@ export interface NewSTROnboardingFormData {
   expectedAdr: number | null;
   minimumStay: number | null;
   maxGuests: number | null;
-  peakSeasonMonths: string[];
 
   // Step 3: Infrastructure & Utilities
   wifiReady: boolean;
@@ -32,6 +31,10 @@ export interface NewSTROnboardingFormData {
     trash: { provider: string; accountNumber: string };
     internet: { provider: string; accountNumber: string };
   };
+  // Septic System
+  hasSepticTank: boolean;
+  septicLastFlushed: string;
+  septicServiceCompany: string;
 
   // Step 4: Setup Status
   furnitureStatus: string;
@@ -56,8 +59,6 @@ export interface NewSTROnboardingFormData {
   laundrySetup: string;
   laundryNotes: string;
   supplyStorageLocation: string;
-  preferredTurnoverTime: string;
-  turnoverNotes: string;
 
   // Step 6: Legal Compliance
   strPermitStatus: string;
@@ -82,22 +83,17 @@ export interface NewSTROnboardingFormData {
   hoaRulesFile: File | null;
 
   // Step 8: Listing Preferences
-  listingPlatforms: string[];
   photographyNeeds: string;
   photographyNotes: string;
   listingTitleIdeas: string;
   uniqueSellingPoints: string;
-  competitorLinks: string;
+  needsDesignConsultation: boolean;
 
   // Step 9: Marketing & Rules
   houseRules: string;
   petPolicy: string;
   petDeposit: number | null;
   petSizeRestrictions: string;
-  checkoutProcedures: string;
-  noisePolicy: string;
-  smokingPolicy: string;
-  partyPolicy: string;
 
   // Step 10: House Quirks & Details
   propertyFeatures: string[];
@@ -129,7 +125,6 @@ export const initialNewSTRFormData: NewSTROnboardingFormData = {
   expectedAdr: null,
   minimumStay: null,
   maxGuests: null,
-  peakSeasonMonths: [],
 
   // Step 3
   wifiReady: false,
@@ -145,6 +140,9 @@ export const initialNewSTRFormData: NewSTROnboardingFormData = {
     trash: { provider: '', accountNumber: '' },
     internet: { provider: '', accountNumber: '' },
   },
+  hasSepticTank: false,
+  septicLastFlushed: '',
+  septicServiceCompany: '',
 
   // Step 4
   furnitureStatus: '',
@@ -169,8 +167,6 @@ export const initialNewSTRFormData: NewSTROnboardingFormData = {
   laundrySetup: '',
   laundryNotes: '',
   supplyStorageLocation: '',
-  preferredTurnoverTime: '',
-  turnoverNotes: '',
 
   // Step 6
   strPermitStatus: '',
@@ -195,22 +191,17 @@ export const initialNewSTRFormData: NewSTROnboardingFormData = {
   hoaRulesFile: null,
 
   // Step 8
-  listingPlatforms: [],
   photographyNeeds: '',
   photographyNotes: '',
   listingTitleIdeas: '',
   uniqueSellingPoints: '',
-  competitorLinks: '',
+  needsDesignConsultation: false,
 
   // Step 9
   houseRules: '',
   petPolicy: '',
   petDeposit: null,
   petSizeRestrictions: '',
-  checkoutProcedures: '',
-  noisePolicy: '',
-  smokingPolicy: '',
-  partyPolicy: '',
 
   // Step 10
   propertyFeatures: [],
@@ -275,14 +266,6 @@ export const LAUNDRY_SETUP_OPTIONS = [
   'Planning to Add',
 ];
 
-export const TURNOVER_TIME_OPTIONS = [
-  '2 Hours',
-  '3 Hours',
-  '4 Hours',
-  'Same Day Flexible',
-  'Next Day',
-];
-
 export const STR_PERMIT_STATUS_OPTIONS = [
   'Already Have Permit',
   'Application In Progress',
@@ -305,18 +288,6 @@ export const PHOTOGRAPHY_NEEDS_OPTIONS = [
   'Have Quality Photos Ready',
   'Have Photos but Need Updates',
   'Will Take My Own Photos',
-];
-
-export const LISTING_PLATFORM_OPTIONS = [
-  'Airbnb',
-  'VRBO',
-  'Furnished Finder',
-  'Booking.com',
-  'CHBO',
-  'June Homes',
-  'Direct Booking Website',
-  'Zillow',
-  'Facebook Marketplace',
 ];
 
 export const PET_POLICY_OPTIONS = [
@@ -345,19 +316,4 @@ export const PROPERTY_FEATURE_OPTIONS = [
   'Mountain View',
   'Lake/Water View',
   'City View',
-];
-
-export const PEAK_SEASON_OPTIONS = [
-  'January',
-  'February',
-  'March',
-  'April',
-  'May',
-  'June',
-  'July',
-  'August',
-  'September',
-  'October',
-  'November',
-  'December',
 ];

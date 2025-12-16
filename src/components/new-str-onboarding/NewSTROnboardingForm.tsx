@@ -149,7 +149,6 @@ export const NewSTROnboardingForm = () => {
         expected_adr: formData.expectedAdr,
         minimum_stay: formData.minimumStay,
         max_guests: formData.maxGuests,
-        peak_season_months: formData.peakSeasonMonths,
         
         // Infrastructure
         wifi_ready: formData.wifiReady,
@@ -159,6 +158,9 @@ export const NewSTROnboardingForm = () => {
         smart_lock_brand: formData.smartLockBrand,
         utilities_setup: formData.utilitiesSetup,
         utilities: formData.utilities,
+        has_septic_tank: formData.hasSepticTank,
+        septic_last_flushed: formData.septicLastFlushed,
+        septic_service_company: formData.septicServiceCompany,
         
         // Setup status
         setup_status: {
@@ -179,8 +181,6 @@ export const NewSTROnboardingForm = () => {
         laundry_setup: formData.laundrySetup,
         laundry_notes: formData.laundryNotes,
         supply_storage_location: formData.supplyStorageLocation,
-        preferred_turnover_time: formData.preferredTurnoverTime,
-        turnover_notes: formData.turnoverNotes,
         
         // Legal
         str_permit_status: formData.strPermitStatus,
@@ -200,22 +200,17 @@ export const NewSTROnboardingForm = () => {
         ...fileUrls,
         
         // Listing preferences
-        listing_platforms: formData.listingPlatforms,
         photography_needs: formData.photographyNeeds,
         photography_notes: formData.photographyNotes,
         listing_title_ideas: formData.listingTitleIdeas,
         unique_selling_points: formData.uniqueSellingPoints,
-        competitor_links: formData.competitorLinks,
+        needs_design_consultation: formData.needsDesignConsultation,
         
         // House rules
         house_rules: formData.houseRules,
         pet_policy: formData.petPolicy,
         pet_deposit: formData.petDeposit,
         pet_size_restrictions: formData.petSizeRestrictions,
-        checkout_procedures: formData.checkoutProcedures,
-        noise_policy: formData.noisePolicy,
-        smoking_policy: formData.smokingPolicy,
-        party_policy: formData.partyPolicy,
         
         // Property details
         property_features: formData.propertyFeatures,

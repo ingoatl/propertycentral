@@ -42,12 +42,13 @@ const TASK_MAPPINGS: Record<string, { phase: number; title: string }> = {
 
   // Phase 3: Utilities
   utilities_setup: { phase: 3, title: 'Utilities Setup Status' },
-
   electric_provider: { phase: 3, title: 'Electric Provider' },
   gas_provider: { phase: 3, title: 'Gas Provider' },
   water_provider: { phase: 3, title: 'Water Provider' },
   trash_provider: { phase: 3, title: 'Trash Provider' },
   internet_provider: { phase: 3, title: 'Internet Provider' },
+  has_septic_tank: { phase: 3, title: 'Has Septic Tank' },
+  septic_last_flushed: { phase: 3, title: 'Septic Last Flushed' },
 
   // Phase 4: Cleaning & Operations
   has_existing_cleaner: { phase: 4, title: 'Has Existing Cleaner' },
@@ -58,12 +59,11 @@ const TASK_MAPPINGS: Record<string, { phase: number; title: string }> = {
   laundry_setup: { phase: 4, title: 'Laundry Setup' },
   laundry_notes: { phase: 4, title: 'Laundry Notes' },
   supply_storage_location: { phase: 4, title: 'Supply Closet Location' },
-  preferred_turnover_time: { phase: 4, title: 'Preferred Turnover Time' },
-  turnover_notes: { phase: 4, title: 'Turnover Notes' },
 
-  // Phase 5: Photography
+  // Phase 5: Photography & Design
   photography_needs: { phase: 5, title: 'Photography Status' },
   photography_notes: { phase: 5, title: 'Photography Notes' },
+  needs_design_consultation: { phase: 5, title: 'Needs Design Consultation' },
 
   // Phase 6: Setup & Furnishing
   furniture_status: { phase: 6, title: 'Furniture Setup Status' },
@@ -80,13 +80,10 @@ const TASK_MAPPINGS: Record<string, { phase: number; title: string }> = {
   cleaning_supplies_notes: { phase: 6, title: 'Cleaning Supplies Notes' },
 
   // Phase 7: Listings & Platforms
-  listing_platforms: { phase: 7, title: 'Selected Listing Platforms' },
   listing_title_ideas: { phase: 7, title: 'Listing Title Ideas' },
   unique_selling_points: { phase: 7, title: 'Unique Selling Points' },
-  competitor_links: { phase: 7, title: 'Competitor Listings' },
 
   // Phase 8: Guest Materials
-  checkout_procedures: { phase: 8, title: 'Checkout Instructions' },
   special_instructions: { phase: 8, title: 'House Quirks & Special Instructions' },
 
   // Phase 9: Vendors & Maintenance
@@ -94,6 +91,7 @@ const TASK_MAPPINGS: Record<string, { phase: number; title: string }> = {
   emergency_contact: { phase: 9, title: 'Emergency Contact (24/7)' },
   known_issues: { phase: 9, title: 'Known Maintenance Issues' },
   pool_hot_tub_info: { phase: 9, title: 'Pool/Hot Tub Information' },
+  septic_service_company: { phase: 9, title: 'Septic Service Company' },
 
   // Phase 10: Property Specs
   property_type: { phase: 10, title: 'Property Type' },
@@ -110,16 +108,12 @@ const TASK_MAPPINGS: Record<string, { phase: number; title: string }> = {
   expected_adr: { phase: 11, title: 'Expected Nightly Rate' },
   minimum_stay: { phase: 11, title: 'Minimum Stay' },
   max_guests: { phase: 11, title: 'Maximum Guests' },
-  peak_season_months: { phase: 11, title: 'Peak Season Months' },
 
   // Phase 12: House Rules & Policies
   house_rules: { phase: 12, title: 'House Rules' },
   pet_policy: { phase: 12, title: 'Pet Policy' },
   pet_deposit: { phase: 12, title: 'Pet Fee' },
   pet_size_restrictions: { phase: 12, title: 'Pet Size Restrictions' },
-  noise_policy: { phase: 12, title: 'Noise Policy' },
-  smoking_policy: { phase: 12, title: 'Smoking Policy' },
-  party_policy: { phase: 12, title: 'Party/Events Policy' },
 };
 
 const PHASE_TITLES: Record<number, string> = {
@@ -354,6 +348,8 @@ serve(async (req) => {
           <p><strong>Rental Strategy:</strong> ${formData.rental_strategy}</p>
           <p><strong>Photography Needs:</strong> ${formData.photography_needs || 'Not specified'}</p>
           <p><strong>Needs Cleaner Referral:</strong> ${formData.needs_cleaner_referral ? 'Yes' : 'No'}</p>
+          <p><strong>Needs Design Consultation:</strong> ${formData.needs_design_consultation ? 'Yes' : 'No'}</p>
+          <p><strong>Has Septic Tank:</strong> ${formData.has_septic_tank ? 'Yes' : 'No'}</p>
           <hr>
           <p>View the full onboarding project in Property Central.</p>
         `,

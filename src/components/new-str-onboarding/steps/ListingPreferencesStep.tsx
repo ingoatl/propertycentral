@@ -1,10 +1,10 @@
-import { NewSTROnboardingFormData, LISTING_PLATFORM_OPTIONS, PHOTOGRAPHY_NEEDS_OPTIONS } from "@/types/new-str-onboarding";
+import { NewSTROnboardingFormData, PHOTOGRAPHY_NEEDS_OPTIONS } from "@/types/new-str-onboarding";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Globe, Camera, Sparkles, Link2 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Camera, Sparkles, Palette } from "lucide-react";
 
 interface ListingPreferencesStepProps {
   formData: NewSTROnboardingFormData;
@@ -12,64 +12,29 @@ interface ListingPreferencesStepProps {
 }
 
 export const ListingPreferencesStep = ({ formData, updateFormData }: ListingPreferencesStepProps) => {
-  const togglePlatform = (platform: string) => {
-    const current = formData.listingPlatforms || [];
-    const updated = current.includes(platform)
-      ? current.filter(p => p !== platform)
-      : [...current, platform];
-    updateFormData({ listingPlatforms: updated });
-  };
-
   return (
     <div className="space-y-6">
       <div className="text-center mb-8">
         <h2 className="text-2xl font-bold text-[hsl(25,40%,25%)]">Listing Preferences</h2>
-        <p className="text-[hsl(25,20%,50%)] mt-2">Where and how would you like to list your property?</p>
+        <p className="text-[hsl(25,20%,50%)] mt-2">Help us create the perfect listing for your property</p>
       </div>
 
-      {/* Platforms */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <Globe className="w-5 h-5 text-primary" />
-            Listing Platforms
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground mb-4">Select all platforms you'd like us to list on</p>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            {LISTING_PLATFORM_OPTIONS.map((platform) => (
-              <div key={platform} className="flex items-center space-x-2">
-                <Checkbox
-                  id={`platform-${platform}`}
-                  checked={formData.listingPlatforms?.includes(platform)}
-                  onCheckedChange={() => togglePlatform(platform)}
-                />
-                <Label htmlFor={`platform-${platform}`} className="text-sm cursor-pointer">
-                  {platform}
-                </Label>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-
       {/* Photography */}
-      <Card>
+      <Card className="rounded-2xl border-[hsl(25,30%,90%)] shadow-sm">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <Camera className="w-5 h-5 text-primary" />
+          <CardTitle className="flex items-center gap-2 text-lg text-[hsl(25,40%,25%)]">
+            <Camera className="w-5 h-5 text-[hsl(25,95%,50%)]" />
             Photography
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="photographyNeeds">Photography Status</Label>
+            <Label htmlFor="photographyNeeds" className="text-[hsl(25,30%,30%)]">Photography Status</Label>
             <Select
               value={formData.photographyNeeds}
               onValueChange={(value) => updateFormData({ photographyNeeds: value })}
             >
-              <SelectTrigger>
+              <SelectTrigger className="h-12 rounded-xl border-[hsl(25,30%,85%)]">
                 <SelectValue placeholder="What's your photography situation?" />
               </SelectTrigger>
               <SelectContent>
@@ -82,71 +47,77 @@ export const ListingPreferencesStep = ({ formData, updateFormData }: ListingPref
             </Select>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="photographyNotes">Photography Notes</Label>
+            <Label htmlFor="photographyNotes" className="text-[hsl(25,30%,30%)]">Photography Notes</Label>
             <Textarea
               id="photographyNotes"
               value={formData.photographyNotes}
               onChange={(e) => updateFormData({ photographyNotes: e.target.value })}
               placeholder="Any specific shots you want? Areas to highlight or avoid?"
               rows={2}
+              className="rounded-xl border-[hsl(25,30%,85%)]"
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Design Consultation */}
+      <Card className="rounded-2xl border-[hsl(25,50%,85%)] shadow-sm bg-gradient-to-r from-[hsl(25,100%,97%)] to-[hsl(30,100%,96%)]">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg text-[hsl(25,40%,25%)]">
+            <Palette className="w-5 h-5 text-[hsl(25,95%,50%)]" />
+            Design Services
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between">
+            <div className="flex-1 pr-4">
+              <Label htmlFor="needsDesignConsultation" className="text-[hsl(25,30%,30%)]">Would you like a design consultation?</Label>
+              <p className="text-sm text-[hsl(25,20%,55%)] mt-1">
+                Our professional designers can help style your property for maximum guest appeal and higher bookings.
+              </p>
+              <p className="text-sm font-medium text-[hsl(25,80%,45%)] mt-2">
+                (Additional fee applies)
+              </p>
+            </div>
+            <Switch
+              id="needsDesignConsultation"
+              checked={formData.needsDesignConsultation}
+              onCheckedChange={(checked) => updateFormData({ needsDesignConsultation: checked })}
             />
           </div>
         </CardContent>
       </Card>
 
       {/* Listing Content */}
-      <Card>
+      <Card className="rounded-2xl border-[hsl(25,30%,90%)] shadow-sm">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <Sparkles className="w-5 h-5 text-primary" />
+          <CardTitle className="flex items-center gap-2 text-lg text-[hsl(25,40%,25%)]">
+            <Sparkles className="w-5 h-5 text-[hsl(25,95%,50%)]" />
             Listing Content Ideas
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="listingTitleIdeas">Listing Title Ideas</Label>
+            <Label htmlFor="listingTitleIdeas" className="text-[hsl(25,30%,30%)]">Listing Title Ideas</Label>
             <Textarea
               id="listingTitleIdeas"
               value={formData.listingTitleIdeas}
               onChange={(e) => updateFormData({ listingTitleIdeas: e.target.value })}
               placeholder="Any ideas for your listing title? e.g., 'Cozy Midtown Retreat', 'Modern Buckhead Hideaway'"
               rows={2}
+              className="rounded-xl border-[hsl(25,30%,85%)]"
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="uniqueSellingPoints">What makes your property special?</Label>
+            <Label htmlFor="uniqueSellingPoints" className="text-[hsl(25,30%,30%)]">What makes your property special?</Label>
             <Textarea
               id="uniqueSellingPoints"
               value={formData.uniqueSellingPoints}
               onChange={(e) => updateFormData({ uniqueSellingPoints: e.target.value })}
               placeholder="Unique features, location benefits, views, amenities that stand out..."
               rows={3}
+              className="rounded-xl border-[hsl(25,30%,85%)]"
             />
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Competitor Research */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <Link2 className="w-5 h-5 text-primary" />
-            Competitor Listings
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-2">
-            <Label htmlFor="competitorLinks">Links to listings you like</Label>
-            <Textarea
-              id="competitorLinks"
-              value={formData.competitorLinks}
-              onChange={(e) => updateFormData({ competitorLinks: e.target.value })}
-              placeholder="Paste Airbnb/VRBO links to listings you admire (one per line)"
-              rows={3}
-            />
-            <p className="text-xs text-muted-foreground">
-              This helps us understand the style and positioning you're aiming for
-            </p>
           </div>
         </CardContent>
       </Card>
