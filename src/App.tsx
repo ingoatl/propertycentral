@@ -19,6 +19,7 @@ import LeaveReview from "./pages/LeaveReview";
 import PublicReview from "./pages/PublicReview";
 import Documents from "./pages/Documents";
 import Utilities from "./pages/Utilities";
+import OwnerOnboarding from "./pages/OwnerOnboarding";
 
 const queryClient = new QueryClient();
 
@@ -32,6 +33,7 @@ const App = () => (
           <Route path="/auth" element={<Auth />} />
           <Route path="/leave-review" element={<LeaveReview />} />
           <Route path="/review" element={<PublicReview />} />
+          <Route path="/onboard/existing-str" element={<OwnerOnboarding />} />
           <Route path="*" element={
             <Layout>
               <Routes>

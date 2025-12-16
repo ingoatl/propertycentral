@@ -1500,6 +1500,353 @@ export type Database = {
           },
         ]
       }
+      owner_onboarding_submissions: {
+        Row: {
+          airbnb_link: string | null
+          airbnb_revenue_export_url: string | null
+          alarm_code: string | null
+          average_booking_window: number | null
+          average_daily_rate: number | null
+          average_monthly_revenue: number | null
+          backup_cleaner: string | null
+          backup_key_location: string | null
+          breaker_panel_location: string | null
+          camera_locations: string | null
+          camera_login_credentials: string | null
+          camera_login_website: string | null
+          cleaner_payment: string | null
+          cleaner_quality: string | null
+          cleaner_satisfaction: string | null
+          competitor_insights: string | null
+          created_at: string
+          emergency_contact_24_7: string | null
+          entity_documents_url: string | null
+          entity_ownership: string | null
+          error_message: string | null
+          existing_photos_link: string | null
+          expense_report_url: string | null
+          file_urls: Json | null
+          fire_extinguisher_locations: string | null
+          garage_code: string | null
+          gas_shutoff_location: string | null
+          gate_code: string | null
+          government_id_url: string | null
+          guest_avatar: string | null
+          guide_book_url: string | null
+          has_cameras: boolean | null
+          has_hoa: boolean | null
+          has_security_system: boolean | null
+          has_thermostat: boolean | null
+          hoa_contact_name: string | null
+          hoa_contact_phone: string | null
+          hoa_rules_url: string | null
+          house_manual_url: string | null
+          house_quirks: string | null
+          hvac_service: string | null
+          id: string
+          insurance_corporate_contacts: string | null
+          insurance_policy_number: string | null
+          insurance_provider: string | null
+          known_maintenance_issues: string | null
+          last_year_revenue: number | null
+          laundry_notes: string | null
+          lawncare_provider: string | null
+          lockbox_code: string | null
+          maids_closet_code: string | null
+          maintenance_contact: string | null
+          max_vehicles: number | null
+          mortgage_statement_url: string | null
+          occupancy_rate: number | null
+          other_listing_links: string | null
+          owner_email: string
+          owner_id: string | null
+          owner_name: string
+          owner_phone: string | null
+          ownerrez_revenue_export_url: string | null
+          parking_instructions: string | null
+          parking_map_url: string | null
+          peak_season: string | null
+          peak_season_adr: number | null
+          permit_number: string | null
+          pest_control_provider: string | null
+          pet_deposit: number | null
+          pet_size_restrictions: string | null
+          pets_allowed: boolean | null
+          pool_hot_tub_info: string | null
+          pricing_revenue_goals: string | null
+          primary_cleaner: string | null
+          processed_at: string | null
+          project_id: string | null
+          property_address: string
+          property_deed_url: string | null
+          property_id: string | null
+          property_tax_statement_url: string | null
+          recent_renovations: string | null
+          revenue_statement_url: string | null
+          security_brand: string | null
+          sensitive_neighbor_notes: string | null
+          septic_company: string | null
+          septic_last_pumped: string | null
+          smart_lock_brand: string | null
+          smart_lock_code: string | null
+          smoke_co_detector_status: string | null
+          status: string
+          str_permit_status: string | null
+          supply_closet_location: string | null
+          thermostat_login: string | null
+          trash_bin_location: string | null
+          trash_pickup_day: string | null
+          unique_selling_points: string | null
+          updated_at: string
+          utilities: Json | null
+          vrbo_link: string | null
+          vrbo_revenue_export_url: string | null
+          wastewater_system: string | null
+          water_shutoff_location: string | null
+          wifi_password: string | null
+          wifi_ssid: string | null
+        }
+        Insert: {
+          airbnb_link?: string | null
+          airbnb_revenue_export_url?: string | null
+          alarm_code?: string | null
+          average_booking_window?: number | null
+          average_daily_rate?: number | null
+          average_monthly_revenue?: number | null
+          backup_cleaner?: string | null
+          backup_key_location?: string | null
+          breaker_panel_location?: string | null
+          camera_locations?: string | null
+          camera_login_credentials?: string | null
+          camera_login_website?: string | null
+          cleaner_payment?: string | null
+          cleaner_quality?: string | null
+          cleaner_satisfaction?: string | null
+          competitor_insights?: string | null
+          created_at?: string
+          emergency_contact_24_7?: string | null
+          entity_documents_url?: string | null
+          entity_ownership?: string | null
+          error_message?: string | null
+          existing_photos_link?: string | null
+          expense_report_url?: string | null
+          file_urls?: Json | null
+          fire_extinguisher_locations?: string | null
+          garage_code?: string | null
+          gas_shutoff_location?: string | null
+          gate_code?: string | null
+          government_id_url?: string | null
+          guest_avatar?: string | null
+          guide_book_url?: string | null
+          has_cameras?: boolean | null
+          has_hoa?: boolean | null
+          has_security_system?: boolean | null
+          has_thermostat?: boolean | null
+          hoa_contact_name?: string | null
+          hoa_contact_phone?: string | null
+          hoa_rules_url?: string | null
+          house_manual_url?: string | null
+          house_quirks?: string | null
+          hvac_service?: string | null
+          id?: string
+          insurance_corporate_contacts?: string | null
+          insurance_policy_number?: string | null
+          insurance_provider?: string | null
+          known_maintenance_issues?: string | null
+          last_year_revenue?: number | null
+          laundry_notes?: string | null
+          lawncare_provider?: string | null
+          lockbox_code?: string | null
+          maids_closet_code?: string | null
+          maintenance_contact?: string | null
+          max_vehicles?: number | null
+          mortgage_statement_url?: string | null
+          occupancy_rate?: number | null
+          other_listing_links?: string | null
+          owner_email: string
+          owner_id?: string | null
+          owner_name: string
+          owner_phone?: string | null
+          ownerrez_revenue_export_url?: string | null
+          parking_instructions?: string | null
+          parking_map_url?: string | null
+          peak_season?: string | null
+          peak_season_adr?: number | null
+          permit_number?: string | null
+          pest_control_provider?: string | null
+          pet_deposit?: number | null
+          pet_size_restrictions?: string | null
+          pets_allowed?: boolean | null
+          pool_hot_tub_info?: string | null
+          pricing_revenue_goals?: string | null
+          primary_cleaner?: string | null
+          processed_at?: string | null
+          project_id?: string | null
+          property_address: string
+          property_deed_url?: string | null
+          property_id?: string | null
+          property_tax_statement_url?: string | null
+          recent_renovations?: string | null
+          revenue_statement_url?: string | null
+          security_brand?: string | null
+          sensitive_neighbor_notes?: string | null
+          septic_company?: string | null
+          septic_last_pumped?: string | null
+          smart_lock_brand?: string | null
+          smart_lock_code?: string | null
+          smoke_co_detector_status?: string | null
+          status?: string
+          str_permit_status?: string | null
+          supply_closet_location?: string | null
+          thermostat_login?: string | null
+          trash_bin_location?: string | null
+          trash_pickup_day?: string | null
+          unique_selling_points?: string | null
+          updated_at?: string
+          utilities?: Json | null
+          vrbo_link?: string | null
+          vrbo_revenue_export_url?: string | null
+          wastewater_system?: string | null
+          water_shutoff_location?: string | null
+          wifi_password?: string | null
+          wifi_ssid?: string | null
+        }
+        Update: {
+          airbnb_link?: string | null
+          airbnb_revenue_export_url?: string | null
+          alarm_code?: string | null
+          average_booking_window?: number | null
+          average_daily_rate?: number | null
+          average_monthly_revenue?: number | null
+          backup_cleaner?: string | null
+          backup_key_location?: string | null
+          breaker_panel_location?: string | null
+          camera_locations?: string | null
+          camera_login_credentials?: string | null
+          camera_login_website?: string | null
+          cleaner_payment?: string | null
+          cleaner_quality?: string | null
+          cleaner_satisfaction?: string | null
+          competitor_insights?: string | null
+          created_at?: string
+          emergency_contact_24_7?: string | null
+          entity_documents_url?: string | null
+          entity_ownership?: string | null
+          error_message?: string | null
+          existing_photos_link?: string | null
+          expense_report_url?: string | null
+          file_urls?: Json | null
+          fire_extinguisher_locations?: string | null
+          garage_code?: string | null
+          gas_shutoff_location?: string | null
+          gate_code?: string | null
+          government_id_url?: string | null
+          guest_avatar?: string | null
+          guide_book_url?: string | null
+          has_cameras?: boolean | null
+          has_hoa?: boolean | null
+          has_security_system?: boolean | null
+          has_thermostat?: boolean | null
+          hoa_contact_name?: string | null
+          hoa_contact_phone?: string | null
+          hoa_rules_url?: string | null
+          house_manual_url?: string | null
+          house_quirks?: string | null
+          hvac_service?: string | null
+          id?: string
+          insurance_corporate_contacts?: string | null
+          insurance_policy_number?: string | null
+          insurance_provider?: string | null
+          known_maintenance_issues?: string | null
+          last_year_revenue?: number | null
+          laundry_notes?: string | null
+          lawncare_provider?: string | null
+          lockbox_code?: string | null
+          maids_closet_code?: string | null
+          maintenance_contact?: string | null
+          max_vehicles?: number | null
+          mortgage_statement_url?: string | null
+          occupancy_rate?: number | null
+          other_listing_links?: string | null
+          owner_email?: string
+          owner_id?: string | null
+          owner_name?: string
+          owner_phone?: string | null
+          ownerrez_revenue_export_url?: string | null
+          parking_instructions?: string | null
+          parking_map_url?: string | null
+          peak_season?: string | null
+          peak_season_adr?: number | null
+          permit_number?: string | null
+          pest_control_provider?: string | null
+          pet_deposit?: number | null
+          pet_size_restrictions?: string | null
+          pets_allowed?: boolean | null
+          pool_hot_tub_info?: string | null
+          pricing_revenue_goals?: string | null
+          primary_cleaner?: string | null
+          processed_at?: string | null
+          project_id?: string | null
+          property_address?: string
+          property_deed_url?: string | null
+          property_id?: string | null
+          property_tax_statement_url?: string | null
+          recent_renovations?: string | null
+          revenue_statement_url?: string | null
+          security_brand?: string | null
+          sensitive_neighbor_notes?: string | null
+          septic_company?: string | null
+          septic_last_pumped?: string | null
+          smart_lock_brand?: string | null
+          smart_lock_code?: string | null
+          smoke_co_detector_status?: string | null
+          status?: string
+          str_permit_status?: string | null
+          supply_closet_location?: string | null
+          thermostat_login?: string | null
+          trash_bin_location?: string | null
+          trash_pickup_day?: string | null
+          unique_selling_points?: string | null
+          updated_at?: string
+          utilities?: Json | null
+          vrbo_link?: string | null
+          vrbo_revenue_export_url?: string | null
+          wastewater_system?: string | null
+          water_shutoff_location?: string | null
+          wifi_password?: string | null
+          wifi_ssid?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "owner_onboarding_submissions_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "property_owners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "owner_onboarding_submissions_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "owner_onboarding_submissions_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "comprehensive_property_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "owner_onboarding_submissions_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ownerrez_bookings: {
         Row: {
           accommodation_revenue: number | null
