@@ -119,6 +119,9 @@ export default function JobApplication() {
         {/* Hero Section */}
         <div className="bg-gradient-to-br from-primary/10 via-primary/5 to-background p-6 border-b border-border/50">
           <div className="max-w-md mx-auto">
+            <div className="inline-flex items-center gap-1.5 bg-amber-500/10 text-amber-600 text-xs font-medium px-2.5 py-1 rounded-full mb-3">
+              Independent Contractor
+            </div>
             <h2 className="text-xl font-bold mb-2">Property Inspector & Maintenance Tech</h2>
             <p className="text-sm text-muted-foreground mb-4">
               We're looking for someone detail-oriented who takes pride in a home running perfectly.
