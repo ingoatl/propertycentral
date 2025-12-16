@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { CheckCircle, XCircle, Clock, Shield, UserPlus, Key, Users, MessageCircleQuestion, UserCog, Bug, Mail, Database } from "lucide-react";
+import { CheckCircle, XCircle, Clock, Shield, UserPlus, Key, Users, MessageCircleQuestion, UserCog, Bug, Mail, Database, Briefcase } from "lucide-react";
 import { RescheduleLogsTab } from "@/components/admin/RescheduleLogsTab";
 import { z } from "zod";
 import { TeamMatrixTab } from "@/components/admin/TeamMatrixTab";
@@ -17,6 +17,7 @@ import { AssignUnassignedTasksButton } from "@/components/onboarding/AssignUnass
 import { BugTrackerCard } from "@/components/admin/BugTrackerCard";
 import { EmailAIPromptsManager } from "@/components/admin/EmailAIPromptsManager";
 import { DataCleanupPanel } from "@/components/reconciliation/DataCleanupPanel";
+import { JobApplicationsCard } from "@/components/admin/JobApplicationsCard";
 
 const createUserSchema = z.object({
   email: z.string().email("Invalid email address").max(255),
@@ -387,11 +388,15 @@ const Admin = () => {
       </div>
 
       <Tabs defaultValue="users" className="w-full">
-        <TabsList className="grid w-full grid-cols-7">
+        <TabsList className="grid w-full grid-cols-8">
           <TabsTrigger value="users">User Management</TabsTrigger>
           <TabsTrigger value="team-matrix">
             <Users className="w-4 h-4 mr-2" />
             Team Matrix
+          </TabsTrigger>
+          <TabsTrigger value="job-applications">
+            <Briefcase className="w-4 h-4 mr-2" />
+            Applications
           </TabsTrigger>
           <TabsTrigger value="faqs">
             <MessageCircleQuestion className="w-4 h-4 mr-2" />
@@ -723,6 +728,10 @@ const Admin = () => {
 
         <TabsContent value="team-matrix" className="mt-8">
           <TeamMatrixTab />
+        </TabsContent>
+
+        <TabsContent value="job-applications" className="mt-8">
+          <JobApplicationsCard />
         </TabsContent>
 
         <TabsContent value="faqs" className="mt-8">
