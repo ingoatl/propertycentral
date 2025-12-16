@@ -3,6 +3,9 @@ export interface InspectionField {
   label: string;
   critical?: boolean;
   responsibleParty: 'owner' | 'pm' | 'cleaner';
+  requiresPhoto?: boolean;
+  photoLabel?: string;
+  photoType?: 'capture' | 'upload' | 'both';
 }
 
 export interface InspectionSection {
@@ -58,7 +61,7 @@ export interface InspectionPhoto {
   uploaded_at: string;
 }
 
-// Ultra-minimal inspection checklist (~15 fields)
+// Inspection checklist with photo requirements for serial numbers
 export const INSPECTION_SECTIONS: InspectionSection[] = [
   {
     id: "safety-security",
@@ -68,7 +71,7 @@ export const INSPECTION_SECTIONS: InspectionSection[] = [
       { key: "gas_detector_kitchen", label: "Gas detector present in kitchen (if gas appliances)", critical: true, responsibleParty: "owner" },
       { key: "fire_extinguisher_kitchen", label: "Fire extinguisher present in kitchen", critical: true, responsibleParty: "owner" },
       { key: "first_aid_kit_present", label: "First Aid Kit present", critical: true, responsibleParty: "owner" },
-      { key: "water_main_shutoff_accessible", label: "Water main shutoff accessible and labeled", critical: true, responsibleParty: "owner" }
+      { key: "water_main_shutoff_accessible", label: "Water main shutoff accessible and labeled", critical: true, responsibleParty: "owner", requiresPhoto: true, photoLabel: "Take photo of water shutoff location", photoType: "capture" }
     ]
   },
   {
@@ -78,7 +81,19 @@ export const INSPECTION_SECTIONS: InspectionSection[] = [
       { key: "lockbox_smart_lock_functional", label: "Lockbox/smart lock functional", responsibleParty: "pm" },
       { key: "keys_available_tested", label: "Keys available and tested", responsibleParty: "pm" },
       { key: "wifi_qr_code_posted", label: "WiFi QR code posted", responsibleParty: "pm" },
-      { key: "emergency_contact_info_posted", label: "Emergency contact info posted", responsibleParty: "pm" }
+      { key: "emergency_contact_info_posted", label: "Emergency contact info posted", responsibleParty: "pm" },
+      { key: "wifi_speed_test", label: "WiFi speed test completed", responsibleParty: "pm", requiresPhoto: true, photoLabel: "Upload speed test screenshot", photoType: "upload" }
+    ]
+  },
+  {
+    id: "appliances-serial-numbers",
+    title: "Appliances & Serial Numbers",
+    fields: [
+      { key: "water_heater_serial", label: "Water Heater - capture nameplate/serial", responsibleParty: "owner", requiresPhoto: true, photoLabel: "Take photo of water heater nameplate", photoType: "capture" },
+      { key: "hvac_system_serial", label: "HVAC System - capture nameplate/serial", responsibleParty: "owner", requiresPhoto: true, photoLabel: "Take photo of HVAC nameplate", photoType: "capture" },
+      { key: "refrigerator_serial", label: "Refrigerator - capture nameplate/serial", responsibleParty: "owner", requiresPhoto: true, photoLabel: "Take photo of refrigerator nameplate", photoType: "capture" },
+      { key: "washer_serial", label: "Washer - capture nameplate/serial", responsibleParty: "owner", requiresPhoto: true, photoLabel: "Take photo of washer nameplate", photoType: "capture" },
+      { key: "dryer_serial", label: "Dryer - capture nameplate/serial", responsibleParty: "owner", requiresPhoto: true, photoLabel: "Take photo of dryer nameplate", photoType: "capture" }
     ]
   },
   {
