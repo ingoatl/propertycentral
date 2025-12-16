@@ -12,56 +12,101 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-// Task mapping from form fields to onboarding tasks
-const TASK_MAPPINGS: Record<string, { phase: number; title: string }> = {
-  owner_name: { phase: 1, title: 'Owner Name' },
-  owner_email: { phase: 1, title: 'Owner Email' },
-  owner_phone: { phase: 1, title: 'Owner Phone' },
-  wifi_ssid: { phase: 2, title: 'WiFi SSID' },
-  wifi_password: { phase: 2, title: 'WiFi password' },
-  smart_lock_brand: { phase: 2, title: 'Smart lock brand' },
-  smart_lock_code: { phase: 2, title: 'Smart lock master PIN code' },
-  lockbox_code: { phase: 2, title: 'Lockbox code' },
-  backup_key_location: { phase: 2, title: 'Backup Key Location' },
-  garage_code: { phase: 2, title: 'Garage code' },
-  gate_code: { phase: 2, title: 'Gate code' },
-  trash_pickup_day: { phase: 2, title: 'Trash day' },
-  trash_bin_location: { phase: 2, title: 'Trash Bin Location' },
-  maids_closet_code: { phase: 2, title: 'Maids closet code' },
-  // Utility mappings - Phase 3
-  wastewater_system: { phase: 3, title: 'Wastewater System' },
-  septic_company: { phase: 3, title: 'Septic Company' },
-  septic_last_pumped: { phase: 3, title: 'Septic Last Pumped' },
-  // Operations
-  primary_cleaner: { phase: 4, title: 'Primary cleaner name' },
-  backup_cleaner: { phase: 4, title: 'Backup Cleaner' },
-  cleaner_payment: { phase: 4, title: 'Cleaner Payment Rate' },
-  supply_closet_location: { phase: 4, title: 'Supply Closet Location' },
-  laundry_notes: { phase: 4, title: 'Laundry Notes' },
-  lawncare_provider: { phase: 9, title: 'Lawn care provider' },
-  pest_control_provider: { phase: 9, title: 'Pest control provider' },
-  hvac_service: { phase: 9, title: 'HVAC provider' },
-  maintenance_contact: { phase: 9, title: 'Maintenance handyman' },
-  emergency_contact_24_7: { phase: 9, title: 'Emergency Contact Name' },
-  water_shutoff_location: { phase: 9, title: 'Water shut-off location' },
-  breaker_panel_location: { phase: 9, title: 'Breaker panel location' },
-  gas_shutoff_location: { phase: 9, title: 'Gas shut-off location' },
-  fire_extinguisher_locations: { phase: 9, title: 'Fire extinguisher locations' },
-  security_brand: { phase: 9, title: 'Security system brand' },
-  alarm_code: { phase: 9, title: 'Alarm code' },
-  camera_locations: { phase: 9, title: 'Camera locations' },
-  camera_login_website: { phase: 9, title: 'Camera login website' },
-  camera_login_credentials: { phase: 9, title: 'Camera login credentials' },
-  insurance_provider: { phase: 1, title: 'Insurance Provider' },
-  insurance_policy_number: { phase: 1, title: 'Insurance Policy Number' },
-  unique_selling_points: { phase: 10, title: 'Unique Selling Points' },
-  guest_avatar: { phase: 10, title: 'Primary Guest Avatar' },
-  house_quirks: { phase: 10, title: 'House Quirks' },
-  airbnb_link: { phase: 7, title: 'Airbnb' },
-  vrbo_link: { phase: 7, title: 'VRBO' },
-  existing_photos_link: { phase: 5, title: 'Existing Photos Link' },
-  average_daily_rate: { phase: 11, title: 'Nightly Rate' },
-  average_monthly_revenue: { phase: 11, title: 'Monthly Rent' },
+// Complete task mapping from form fields to onboarding tasks
+const TASK_MAPPINGS: Record<string, { phase: number; title: string; phaseTitle?: string }> = {
+  // Phase 1 - Owner/Legal Information
+  owner_name: { phase: 1, title: 'Owner Name', phaseTitle: 'Owner Information' },
+  owner_email: { phase: 1, title: 'Owner Email', phaseTitle: 'Owner Information' },
+  owner_phone: { phase: 1, title: 'Owner Phone', phaseTitle: 'Owner Information' },
+  insurance_provider: { phase: 1, title: 'Insurance Provider', phaseTitle: 'Owner Information' },
+  insurance_policy_number: { phase: 1, title: 'Insurance Policy Number', phaseTitle: 'Owner Information' },
+  insurance_corporate_contacts: { phase: 1, title: 'Insurance Corporate Contacts', phaseTitle: 'Owner Information' },
+  str_permit_status: { phase: 1, title: 'STR Permit Status', phaseTitle: 'Owner Information' },
+  permit_number: { phase: 1, title: 'STR Permit Number', phaseTitle: 'Owner Information' },
+  entity_ownership: { phase: 1, title: 'Entity Ownership', phaseTitle: 'Owner Information' },
+  
+  // Phase 1 - Document URLs
+  government_id_url: { phase: 1, title: 'Government ID', phaseTitle: 'Owner Information' },
+  property_deed_url: { phase: 1, title: 'Property Deed', phaseTitle: 'Owner Information' },
+  property_tax_statement_url: { phase: 1, title: 'Property Tax Statement', phaseTitle: 'Owner Information' },
+  mortgage_statement_url: { phase: 1, title: 'Mortgage Statement', phaseTitle: 'Owner Information' },
+  entity_documents_url: { phase: 1, title: 'Entity Documents', phaseTitle: 'Owner Information' },
+  hoa_rules_url: { phase: 1, title: 'HOA Rules Document', phaseTitle: 'Owner Information' },
+  
+  // Phase 2 - Access Details
+  wifi_ssid: { phase: 2, title: 'WiFi SSID', phaseTitle: 'Access Details' },
+  wifi_password: { phase: 2, title: 'WiFi password', phaseTitle: 'Access Details' },
+  smart_lock_brand: { phase: 2, title: 'Smart lock brand', phaseTitle: 'Access Details' },
+  smart_lock_code: { phase: 2, title: 'Smart lock master PIN code', phaseTitle: 'Access Details' },
+  lockbox_code: { phase: 2, title: 'Lockbox code', phaseTitle: 'Access Details' },
+  backup_key_location: { phase: 2, title: 'Backup Key Location', phaseTitle: 'Access Details' },
+  garage_code: { phase: 2, title: 'Garage code', phaseTitle: 'Access Details' },
+  gate_code: { phase: 2, title: 'Gate code', phaseTitle: 'Access Details' },
+  trash_pickup_day: { phase: 2, title: 'Trash day', phaseTitle: 'Access Details' },
+  trash_bin_location: { phase: 2, title: 'Trash Bin Location', phaseTitle: 'Access Details' },
+  maids_closet_code: { phase: 2, title: 'Maids closet code', phaseTitle: 'Access Details' },
+  thermostat_login: { phase: 2, title: 'Thermostat Login', phaseTitle: 'Access Details' },
+  parking_instructions: { phase: 2, title: 'Parking Instructions', phaseTitle: 'Access Details' },
+  parking_map_url: { phase: 2, title: 'Parking Map', phaseTitle: 'Access Details' },
+  
+  // Phase 3 - Utilities
+  wastewater_system: { phase: 3, title: 'Wastewater System', phaseTitle: 'Utilities' },
+  septic_company: { phase: 3, title: 'Septic Company', phaseTitle: 'Utilities' },
+  septic_last_pumped: { phase: 3, title: 'Septic Last Pumped', phaseTitle: 'Utilities' },
+  
+  // Phase 4 - Operations/Cleaning
+  primary_cleaner: { phase: 4, title: 'Primary cleaner name', phaseTitle: 'Cleaning Operations' },
+  backup_cleaner: { phase: 4, title: 'Backup Cleaner', phaseTitle: 'Cleaning Operations' },
+  cleaner_payment: { phase: 4, title: 'Cleaner Payment Rate', phaseTitle: 'Cleaning Operations' },
+  cleaner_satisfaction: { phase: 4, title: 'Owner Satisfaction with Cleaner', phaseTitle: 'Cleaning Operations' },
+  cleaner_quality: { phase: 4, title: 'Cleaner Quality Notes', phaseTitle: 'Cleaning Operations' },
+  supply_closet_location: { phase: 4, title: 'Supply Closet Location', phaseTitle: 'Cleaning Operations' },
+  laundry_notes: { phase: 4, title: 'Laundry Notes', phaseTitle: 'Cleaning Operations' },
+  
+  // Phase 7 - Listings
+  airbnb_link: { phase: 7, title: 'Airbnb', phaseTitle: 'Listings & Booking Platforms' },
+  vrbo_link: { phase: 7, title: 'VRBO', phaseTitle: 'Listings & Booking Platforms' },
+  other_listing_links: { phase: 7, title: 'Other Listing Links', phaseTitle: 'Listings & Booking Platforms' },
+  
+  // Phase 8 - Guest Materials
+  guide_book_url: { phase: 8, title: 'Guest Guide Book', phaseTitle: 'Guest Experience' },
+  house_manual_url: { phase: 8, title: 'House Manual', phaseTitle: 'Guest Experience' },
+  
+  // Phase 9 - Vendors/Maintenance
+  lawncare_provider: { phase: 9, title: 'Lawn care provider', phaseTitle: 'Vendors & Maintenance' },
+  pest_control_provider: { phase: 9, title: 'Pest control provider', phaseTitle: 'Vendors & Maintenance' },
+  hvac_service: { phase: 9, title: 'HVAC provider', phaseTitle: 'Vendors & Maintenance' },
+  maintenance_contact: { phase: 9, title: 'Maintenance handyman', phaseTitle: 'Vendors & Maintenance' },
+  emergency_contact_24_7: { phase: 9, title: 'Emergency Contact Name', phaseTitle: 'Vendors & Maintenance' },
+  water_shutoff_location: { phase: 9, title: 'Water shut-off location', phaseTitle: 'Vendors & Maintenance' },
+  breaker_panel_location: { phase: 9, title: 'Breaker panel location', phaseTitle: 'Vendors & Maintenance' },
+  gas_shutoff_location: { phase: 9, title: 'Gas shut-off location', phaseTitle: 'Vendors & Maintenance' },
+  fire_extinguisher_locations: { phase: 9, title: 'Fire extinguisher locations', phaseTitle: 'Vendors & Maintenance' },
+  security_brand: { phase: 9, title: 'Security system brand', phaseTitle: 'Vendors & Maintenance' },
+  alarm_code: { phase: 9, title: 'Alarm code', phaseTitle: 'Vendors & Maintenance' },
+  camera_locations: { phase: 9, title: 'Camera locations', phaseTitle: 'Vendors & Maintenance' },
+  camera_login_website: { phase: 9, title: 'Camera login website', phaseTitle: 'Vendors & Maintenance' },
+  camera_login_credentials: { phase: 9, title: 'Camera login credentials', phaseTitle: 'Vendors & Maintenance' },
+  known_maintenance_issues: { phase: 9, title: 'Known Maintenance Issues', phaseTitle: 'Vendors & Maintenance' },
+  smoke_co_detector_status: { phase: 9, title: 'Smoke/CO Detector Status', phaseTitle: 'Vendors & Maintenance' },
+  
+  // Phase 10 - Property Details
+  unique_selling_points: { phase: 10, title: 'Unique Selling Points', phaseTitle: 'Property Details' },
+  guest_avatar: { phase: 10, title: 'Primary Guest Avatar', phaseTitle: 'Property Details' },
+  house_quirks: { phase: 10, title: 'House Quirks', phaseTitle: 'Property Details' },
+  pool_hot_tub_info: { phase: 10, title: 'Pool/Hot Tub Information', phaseTitle: 'Property Details' },
+  max_vehicles: { phase: 10, title: 'Parking Capacity', phaseTitle: 'Property Details' },
+  sensitive_neighbor_notes: { phase: 10, title: 'Neighbor Notes', phaseTitle: 'Property Details' },
+  recent_renovations: { phase: 10, title: 'Recent Renovations', phaseTitle: 'Property Details' },
+  existing_photos_link: { phase: 5, title: 'Existing Photos Link', phaseTitle: 'Photos & Media' },
+  
+  // Phase 11 - Pricing
+  average_daily_rate: { phase: 11, title: 'Nightly Rate', phaseTitle: 'Pricing & Revenue' },
+  average_monthly_revenue: { phase: 11, title: 'Monthly Rent', phaseTitle: 'Pricing & Revenue' },
+  
+  // Phase 12 - Pets
+  pet_size_restrictions: { phase: 12, title: 'Pet Rules', phaseTitle: 'Pet Policy' },
+  pet_deposit: { phase: 11, title: 'Pet Fee', phaseTitle: 'Pricing & Revenue' },
 };
 
 // Utility type to task title mapping for Phase 3
@@ -296,6 +341,11 @@ async function createOrUpdateTask(
   phaseTitle?: string
 ): Promise<boolean> {
   try {
+    // Skip if value is empty or just whitespace
+    if (!value || value.trim() === '') {
+      return false;
+    }
+    
     // Check if task exists
     const { data: existingTask } = await supabase
       .from('onboarding_tasks')
@@ -511,23 +561,35 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log("Property created:", property.id);
 
-    // 4. Create property details
+    // 4. Create property details with all available data
+    const propertyDetailsData: any = {
+      property_id: property.id,
+      pets_allowed: formData.pets_allowed ?? false,
+    };
+    
+    // Add parking spaces if provided
+    if (formData.max_vehicles) {
+      propertyDetailsData.parking_spaces = String(formData.max_vehicles);
+    }
+
     await supabase
       .from('property_details')
-      .insert({
-        property_id: property.id,
-        pets_allowed: formData.pets_allowed,
-      });
+      .insert(propertyDetailsData);
 
-    // 5. Create property policies
-    if (formData.pets_allowed) {
-      await supabase
-        .from('property_policies')
-        .insert({
-          property_id: property.id,
-          pets_allowed: formData.pets_allowed,
-        });
+    // 5. Create property policies with pet data
+    const propertyPoliciesData: any = {
+      property_id: property.id,
+      pets_allowed: formData.pets_allowed ?? false,
+    };
+    
+    // Add pet rules if provided
+    if (formData.pet_size_restrictions) {
+      propertyPoliciesData.pet_rules = formData.pet_size_restrictions;
     }
+
+    await supabase
+      .from('property_policies')
+      .insert(propertyPoliciesData);
 
     // 5b. Create property financial data
     const financialData = {
@@ -584,12 +646,13 @@ const handler = async (req: Request): Promise<Response> => {
     let tasksPopulated = 0;
     for (const [field, taskInfo] of Object.entries(TASK_MAPPINGS)) {
       const value = formData[field];
-      if (value && value !== '') {
+      if (value && value !== '' && String(value).trim() !== '') {
         const success = await createOrUpdateTask(
           project.id,
           taskInfo.phase,
           taskInfo.title,
-          String(value)
+          String(value),
+          taskInfo.phaseTitle
         );
         if (success) tasksPopulated++;
       }
@@ -616,17 +679,48 @@ const handler = async (req: Request): Promise<Response> => {
       }
     }
 
+    // 7c. Handle HOA info as combined field
+    if (formData.has_hoa && (formData.hoa_contact_name || formData.hoa_contact_phone)) {
+      const hoaInfo = `Contact: ${formData.hoa_contact_name || 'N/A'} | Phone: ${formData.hoa_contact_phone || 'N/A'}`;
+      const success = await createOrUpdateTask(
+        project.id,
+        1, // Phase 1 for owner info
+        'HOA Contact Information',
+        hoaInfo,
+        'Owner Information'
+      );
+      if (success) tasksPopulated++;
+    }
+
+    // 7d. Handle pets_allowed as a task
+    if (formData.pets_allowed !== undefined) {
+      const success = await createOrUpdateTask(
+        project.id,
+        12,
+        'Pets Allowed',
+        formData.pets_allowed ? 'Yes' : 'No',
+        'Pet Policy'
+      );
+      if (success) tasksPopulated++;
+    }
+
     console.log("Tasks populated:", tasksPopulated);
 
     // 8. Calculate actual progress based on tasks
-    // Get total tasks and completed tasks
+    // Only count tasks with actual values as completed
     const { data: allTasks } = await supabase
       .from('onboarding_tasks')
-      .select('id, status')
+      .select('id, status, field_value')
       .eq('project_id', project.id);
 
     const totalTasks = allTasks?.length || 0;
-    const completedTasks = allTasks?.filter(t => t.status === 'completed').length || 0;
+    // Only count tasks as completed if they have a real value
+    const completedTasks = allTasks?.filter(t => 
+      t.status === 'completed' && 
+      t.field_value && 
+      t.field_value.trim() !== ''
+    ).length || 0;
+    
     const progress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
     console.log(`Progress: ${completedTasks}/${totalTasks} = ${progress}%`);
@@ -643,12 +737,14 @@ const handler = async (req: Request): Promise<Response> => {
       })
       .eq('id', submission.id);
 
-    // 10. Update project progress
+    // 10. Update project progress - NEVER set to 100% automatically
+    // Always cap at 95% max to indicate human review needed
+    const cappedProgress = Math.min(progress, 95);
     await supabase
       .from('onboarding_projects')
       .update({
-        progress: progress,
-        status: progress >= 100 ? 'completed' : 'in-progress',
+        progress: cappedProgress,
+        status: 'in-progress', // Always in-progress after form submission
       })
       .eq('id', project.id);
 
@@ -666,7 +762,7 @@ const handler = async (req: Request): Promise<Response> => {
         message: "Onboarding submitted successfully",
         propertyId: property.id,
         projectId: project.id,
-        progress: progress,
+        progress: cappedProgress,
       }),
       {
         status: 200,
