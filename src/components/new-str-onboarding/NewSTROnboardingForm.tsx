@@ -2,9 +2,8 @@ import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { NewSTROnboardingFormData, initialNewSTRFormData } from "@/types/new-str-onboarding";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
-import { ArrowLeft, ArrowRight, Loader2, Send } from "lucide-react";
+import { ArrowLeft, ArrowRight, Loader2, Send, Check } from "lucide-react";
 import { PropertyBasicsStep } from "./steps/PropertyBasicsStep";
 import { RentalStrategyStep } from "./steps/RentalStrategyStep";
 import { InfrastructureStep } from "./steps/InfrastructureStep";
@@ -19,15 +18,15 @@ import { ReviewStep } from "./steps/ReviewStep";
 import { NewSTRSuccessScreen } from "./NewSTRSuccessScreen";
 
 const STEPS = [
-  { number: 1, title: "Property Basics" },
-  { number: 2, title: "Rental Strategy" },
+  { number: 1, title: "Basics" },
+  { number: 2, title: "Strategy" },
   { number: 3, title: "Infrastructure" },
-  { number: 4, title: "Setup Status" },
+  { number: 4, title: "Setup" },
   { number: 5, title: "Operations" },
   { number: 6, title: "Legal" },
   { number: 7, title: "Documents" },
   { number: 8, title: "Listings" },
-  { number: 9, title: "House Rules" },
+  { number: 9, title: "Rules" },
   { number: 10, title: "Details" },
   { number: 11, title: "Review" },
 ];
@@ -280,52 +279,101 @@ export const NewSTROnboardingForm = () => {
     }
   };
 
-  const progress = (currentStep / STEPS.length) * 100;
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background to-muted">
-      {/* Header */}
-      <div className="sticky top-0 z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
-        <div className="max-w-4xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
+    <div className="min-h-screen bg-gradient-to-br from-[hsl(25,100%,98%)] via-[hsl(30,100%,97%)] to-[hsl(20,100%,96%)]">
+      {/* Premium Header */}
+      <div className="sticky top-0 z-50 bg-white/90 backdrop-blur-xl border-b border-[hsl(25,40%,90%)] shadow-sm">
+        <div className="max-w-5xl mx-auto px-4 py-4">
+          {/* Logo and Title */}
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-4">
               <img 
                 src="/peachhaus-logo.png" 
                 alt="PeachHaus" 
-                className="h-8 w-auto"
+                className="h-10 w-auto"
               />
               <div>
-                <h1 className="font-semibold text-foreground">New Property Onboarding</h1>
-                <p className="text-xs text-muted-foreground">
-                  Step {currentStep} of {STEPS.length}: {STEPS[currentStep - 1]?.title}
-                </p>
+                <h1 className="text-lg font-semibold text-[hsl(25,40%,25%)]">New Property Onboarding</h1>
+                <p className="text-xs font-medium text-[hsl(25,95%,50%)]">Brand New STR/MTR Properties</p>
               </div>
             </div>
+            <div className="text-right hidden sm:block">
+              <p className="text-sm font-medium text-[hsl(25,40%,35%)]">Step {currentStep} of {STEPS.length}</p>
+              <p className="text-xs text-[hsl(25,20%,55%)]">{STEPS[currentStep - 1]?.title}</p>
+            </div>
           </div>
-          <Progress value={progress} className="h-2" />
+
+          {/* Circular Step Indicators */}
+          <div className="flex items-center justify-center gap-1 sm:gap-2 overflow-x-auto pb-2">
+            {STEPS.map((step, index) => {
+              const isCompleted = currentStep > step.number;
+              const isCurrent = currentStep === step.number;
+              const isPending = currentStep < step.number;
+
+              return (
+                <div key={step.number} className="flex items-center">
+                  {/* Step Circle */}
+                  <div className="flex flex-col items-center">
+                    <div
+                      className={`
+                        w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-xs sm:text-sm font-semibold transition-all duration-300
+                        ${isCompleted 
+                          ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-200' 
+                          : isCurrent 
+                            ? 'bg-gradient-to-br from-[hsl(25,95%,60%)] to-[hsl(20,90%,50%)] text-white shadow-lg shadow-orange-200 ring-4 ring-orange-100' 
+                            : 'bg-gray-100 text-gray-400 border-2 border-gray-200'
+                        }
+                      `}
+                    >
+                      {isCompleted ? <Check className="w-4 h-4" /> : step.number}
+                    </div>
+                    <span className={`
+                      text-[10px] mt-1 hidden sm:block font-medium
+                      ${isCurrent ? 'text-[hsl(25,95%,45%)]' : isCompleted ? 'text-emerald-600' : 'text-gray-400'}
+                    `}>
+                      {step.title}
+                    </span>
+                  </div>
+                  
+                  {/* Connector Line */}
+                  {index < STEPS.length - 1 && (
+                    <div className={`
+                      w-3 sm:w-6 h-0.5 mx-0.5 sm:mx-1 transition-all duration-300
+                      ${currentStep > step.number ? 'bg-emerald-400' : 'bg-gray-200'}
+                    `} />
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
 
       {/* Content */}
       <div className="max-w-4xl mx-auto px-4 py-8">
-        {renderStep()}
+        <div className="bg-white rounded-3xl shadow-xl shadow-[hsl(25,30%,85%)]/30 border border-[hsl(25,30%,94%)] p-6 sm:p-10">
+          {renderStep()}
+        </div>
       </div>
 
-      {/* Navigation */}
-      <div className="sticky bottom-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-t">
-        <div className="max-w-4xl mx-auto px-4 py-4 flex justify-between">
+      {/* Premium Navigation */}
+      <div className="sticky bottom-0 bg-white/95 backdrop-blur-xl border-t border-[hsl(25,40%,90%)] shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
+        <div className="max-w-4xl mx-auto px-4 py-4 flex justify-between items-center">
           <Button
             variant="outline"
             onClick={handleBack}
             disabled={currentStep === 1}
-            className="gap-2"
+            className="gap-2 h-12 px-6 rounded-xl border-2 border-[hsl(25,30%,85%)] hover:bg-[hsl(25,100%,97%)] hover:border-[hsl(25,60%,70%)] transition-all duration-200"
           >
             <ArrowLeft className="w-4 h-4" />
             Back
           </Button>
 
           {currentStep < STEPS.length ? (
-            <Button onClick={handleNext} className="gap-2">
+            <Button 
+              onClick={handleNext} 
+              className="gap-2 h-12 px-8 rounded-xl bg-gradient-to-r from-[hsl(25,95%,60%)] to-[hsl(20,90%,50%)] hover:from-[hsl(25,95%,55%)] hover:to-[hsl(20,90%,45%)] shadow-lg shadow-orange-200/50 transition-all duration-200 hover:shadow-xl hover:shadow-orange-200/60"
+            >
               Continue
               <ArrowRight className="w-4 h-4" />
             </Button>
@@ -333,7 +381,7 @@ export const NewSTROnboardingForm = () => {
             <Button 
               onClick={handleSubmit} 
               disabled={isSubmitting}
-              className="gap-2 bg-primary hover:bg-primary/90"
+              className="gap-2 h-12 px-8 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 shadow-lg shadow-emerald-200/50 transition-all duration-200 hover:shadow-xl hover:shadow-emerald-200/60"
             >
               {isSubmitting ? (
                 <>

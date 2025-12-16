@@ -23,15 +23,15 @@ export const RentalStrategyStep = ({ formData, updateFormData }: RentalStrategyS
   return (
     <div className="space-y-6">
       <div className="text-center mb-8">
-        <h2 className="text-2xl font-bold text-foreground">Rental Strategy</h2>
-        <p className="text-muted-foreground mt-2">Help us understand your goals and target market</p>
+        <h2 className="text-2xl font-bold text-[hsl(25,40%,25%)]">Rental Strategy</h2>
+        <p className="text-[hsl(25,20%,50%)] mt-2">Help us understand your goals and target market</p>
       </div>
 
       {/* Strategy Selection */}
-      <Card>
+      <Card className="rounded-2xl border-[hsl(25,30%,90%)] shadow-sm">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <Target className="w-5 h-5 text-primary" />
+          <CardTitle className="flex items-center gap-2 text-lg text-[hsl(25,40%,25%)]">
+            <Target className="w-5 h-5 text-[hsl(25,95%,50%)]" />
             Rental Approach
           </CardTitle>
         </CardHeader>
@@ -96,10 +96,10 @@ export const RentalStrategyStep = ({ formData, updateFormData }: RentalStrategyS
       </Card>
 
       {/* Capacity & Rates */}
-      <Card>
+      <Card className="rounded-2xl border-[hsl(25,30%,90%)] shadow-sm">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <DollarSign className="w-5 h-5 text-primary" />
+          <CardTitle className="flex items-center gap-2 text-lg text-[hsl(25,40%,25%)]">
+            <DollarSign className="w-5 h-5 text-[hsl(25,95%,50%)]" />
             Capacity & Rate Expectations
           </CardTitle>
         </CardHeader>
@@ -130,7 +130,7 @@ export const RentalStrategyStep = ({ formData, updateFormData }: RentalStrategyS
             <div className="space-y-2">
               <Label htmlFor="maxGuests">Maximum Guests</Label>
               <div className="relative">
-                <Users className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Users className="absolute left-3 top-3 h-4 w-4 text-[hsl(25,30%,60%)]" />
                 <Input
                   id="maxGuests"
                   type="number"
@@ -147,15 +147,15 @@ export const RentalStrategyStep = ({ formData, updateFormData }: RentalStrategyS
       </Card>
 
       {/* Peak Season */}
-      <Card>
+      <Card className="rounded-2xl border-[hsl(25,30%,90%)] shadow-sm">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <Calendar className="w-5 h-5 text-primary" />
+          <CardTitle className="flex items-center gap-2 text-lg text-[hsl(25,40%,25%)]">
+            <Calendar className="w-5 h-5 text-[hsl(25,95%,50%)]" />
             Peak Season Months
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-muted-foreground mb-4">Select the months you expect to be busiest</p>
+          <p className="text-sm text-[hsl(25,20%,50%)] mb-4">Select the months you expect to be busiest</p>
           <div className="grid grid-cols-3 md:grid-cols-4 gap-3">
             {PEAK_SEASON_OPTIONS.map((month) => (
               <div key={month} className="flex items-center space-x-2">

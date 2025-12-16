@@ -32,13 +32,17 @@ const TASK_MAPPINGS: Record<string, { phase: number; title: string }> = {
   hoa_rules_url: { phase: 1, title: 'HOA Rules Document' },
 
   // Phase 2: Property Access & Infrastructure
+  wifi_ready: { phase: 2, title: 'WiFi Ready' },
   wifi_ssid: { phase: 2, title: 'WiFi Network Name' },
   wifi_password: { phase: 2, title: 'WiFi Password' },
+  smart_lock_installed: { phase: 2, title: 'Smart Lock Installed' },
   smart_lock_brand: { phase: 2, title: 'Smart Lock Brand' },
   parking_instructions: { phase: 2, title: 'Parking Instructions' },
   max_vehicles: { phase: 2, title: 'Maximum Vehicles' },
 
   // Phase 3: Utilities
+  utilities_setup: { phase: 3, title: 'Utilities Setup Status' },
+
   electric_provider: { phase: 3, title: 'Electric Provider' },
   gas_provider: { phase: 3, title: 'Gas Provider' },
   water_provider: { phase: 3, title: 'Water Provider' },
@@ -46,6 +50,7 @@ const TASK_MAPPINGS: Record<string, { phase: number; title: string }> = {
   internet_provider: { phase: 3, title: 'Internet Provider' },
 
   // Phase 4: Cleaning & Operations
+  has_existing_cleaner: { phase: 4, title: 'Has Existing Cleaner' },
   cleaner_name: { phase: 4, title: 'Primary Cleaner Name' },
   cleaner_phone: { phase: 4, title: 'Primary Cleaner Phone' },
   cleaner_rate: { phase: 4, title: 'Cleaner Rate' },

@@ -59,21 +59,21 @@ export const SetupStatusStep = ({ formData, updateFormData }: SetupStatusStepPro
   return (
     <div className="space-y-6">
       <div className="text-center mb-8">
-        <h2 className="text-2xl font-bold text-foreground">Setup Status</h2>
-        <p className="text-muted-foreground mt-2">What's already ready vs. what needs to be set up?</p>
+        <h2 className="text-2xl font-bold text-[hsl(25,40%,25%)]">Setup Status</h2>
+        <p className="text-[hsl(25,20%,50%)] mt-2">What's already ready vs. what needs to be set up?</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {setupItems.map((item) => {
           const Icon = item.icon;
           return (
-            <Card key={item.statusField}>
+            <Card key={item.statusField} className="rounded-2xl border-[hsl(25,30%,90%)] shadow-sm">
               <CardHeader className="pb-3">
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <Icon className="w-5 h-5 text-primary" />
+                <CardTitle className="flex items-center gap-2 text-base text-[hsl(25,40%,25%)]">
+                  <Icon className="w-5 h-5 text-[hsl(25,95%,50%)]" />
                   {item.title}
                 </CardTitle>
-                <p className="text-sm text-muted-foreground">{item.description}</p>
+                <p className="text-sm text-[hsl(25,20%,50%)]">{item.description}</p>
               </CardHeader>
               <CardContent className="space-y-3">
                 <div className="space-y-2">
@@ -109,9 +109,9 @@ export const SetupStatusStep = ({ formData, updateFormData }: SetupStatusStepPro
         })}
       </div>
 
-      <Card className="bg-muted/50">
+      <Card className="bg-gradient-to-r from-[hsl(25,100%,97%)] to-[hsl(30,100%,96%)] rounded-2xl border-[hsl(25,50%,90%)]">
         <CardContent className="pt-6">
-          <p className="text-sm text-muted-foreground">
+          <p className="text-sm text-[hsl(25,30%,40%)]">
             <strong>Note:</strong> PeachHaus can help with furniture procurement, staging, and 
             professional setup if needed. We'll discuss options during onboarding based on your 
             selections above.

@@ -23,8 +23,8 @@ export const ListingPreferencesStep = ({ formData, updateFormData }: ListingPref
   return (
     <div className="space-y-6">
       <div className="text-center mb-8">
-        <h2 className="text-2xl font-bold text-foreground">Listing Preferences</h2>
-        <p className="text-muted-foreground mt-2">Where and how would you like to list your property?</p>
+        <h2 className="text-2xl font-bold text-[hsl(25,40%,25%)]">Listing Preferences</h2>
+        <p className="text-[hsl(25,20%,50%)] mt-2">Where and how would you like to list your property?</p>
       </div>
 
       {/* Platforms */}

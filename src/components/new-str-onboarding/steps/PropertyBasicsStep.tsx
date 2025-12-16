@@ -14,15 +14,15 @@ export const PropertyBasicsStep = ({ formData, updateFormData }: PropertyBasicsS
   return (
     <div className="space-y-6">
       <div className="text-center mb-8">
-        <h2 className="text-2xl font-bold text-foreground">Property Basics</h2>
-        <p className="text-muted-foreground mt-2">Let's start with the essentials about you and your property</p>
+        <h2 className="text-2xl font-bold text-[hsl(25,40%,25%)]">Property Basics</h2>
+        <p className="text-[hsl(25,20%,50%)] mt-2">Let's start with the essentials about you and your property</p>
       </div>
 
       {/* Owner Information */}
-      <Card>
+      <Card className="rounded-2xl border-[hsl(25,30%,90%)] shadow-sm">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <User className="w-5 h-5 text-primary" />
+          <CardTitle className="flex items-center gap-2 text-lg text-[hsl(25,40%,25%)]">
+            <User className="w-5 h-5 text-[hsl(25,95%,50%)]" />
             Owner Information
           </CardTitle>
         </CardHeader>
@@ -40,7 +40,7 @@ export const PropertyBasicsStep = ({ formData, updateFormData }: PropertyBasicsS
             <div className="space-y-2">
               <Label htmlFor="ownerEmail">Email Address *</Label>
               <div className="relative">
-                <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Mail className="absolute left-3 top-3 h-4 w-4 text-[hsl(25,30%,60%)]" />
                 <Input
                   id="ownerEmail"
                   type="email"
@@ -55,7 +55,7 @@ export const PropertyBasicsStep = ({ formData, updateFormData }: PropertyBasicsS
           <div className="space-y-2">
             <Label htmlFor="ownerPhone">Phone Number *</Label>
             <div className="relative">
-              <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+              <Phone className="absolute left-3 top-3 h-4 w-4 text-[hsl(25,30%,60%)]" />
               <Input
                 id="ownerPhone"
                 type="tel"
@@ -70,10 +70,10 @@ export const PropertyBasicsStep = ({ formData, updateFormData }: PropertyBasicsS
       </Card>
 
       {/* Property Details */}
-      <Card>
+      <Card className="rounded-2xl border-[hsl(25,30%,90%)] shadow-sm">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <Home className="w-5 h-5 text-primary" />
+          <CardTitle className="flex items-center gap-2 text-lg text-[hsl(25,40%,25%)]">
+            <Home className="w-5 h-5 text-[hsl(25,95%,50%)]" />
             Property Details
           </CardTitle>
         </CardHeader>
@@ -81,7 +81,7 @@ export const PropertyBasicsStep = ({ formData, updateFormData }: PropertyBasicsS
           <div className="space-y-2">
             <Label htmlFor="propertyAddress">Property Address *</Label>
             <div className="relative">
-              <MapPin className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+              <MapPin className="absolute left-3 top-3 h-4 w-4 text-[hsl(25,30%,60%)]" />
               <Input
                 id="propertyAddress"
                 className="pl-10"
