@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { 
   ClipboardCheck, 
@@ -11,7 +11,6 @@ import {
   ImageIcon
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
@@ -24,12 +23,15 @@ import {
   InspectionPhoto
 } from '@/types/inspection';
 import { format } from 'date-fns';
+import { PhotoLightbox } from '@/components/inspect/PhotoLightbox';
 
 interface InspectionDataSectionProps {
   propertyId: string;
 }
 
 export const InspectionDataSection: React.FC<InspectionDataSectionProps> = ({ propertyId }) => {
+  const [lightboxImage, setLightboxImage] = useState<string | null>(null);
+
   // Fetch latest inspection
   const { data: inspection, isLoading: loadingInspection } = useQuery({
     queryKey: ['property-inspection', propertyId],
@@ -235,12 +237,10 @@ export const InspectionDataSection: React.FC<InspectionDataSectionProps> = ({ pr
             {fieldPhotos.map(photo => {
               const field = getFieldByKey(photo.field_key || '');
               return (
-                <a
+                <button
                   key={photo.id}
-                  href={photo.photo_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="group relative rounded-xl overflow-hidden bg-muted hover:ring-2 hover:ring-primary transition-all"
+                  onClick={() => setLightboxImage(photo.photo_url)}
+                  className="group relative rounded-xl overflow-hidden bg-muted hover:ring-2 hover:ring-primary transition-all text-left"
                 >
                   <div className="aspect-[4/3]">
                     <img
@@ -254,7 +254,7 @@ export const InspectionDataSection: React.FC<InspectionDataSectionProps> = ({ pr
                       {field?.label?.replace(' - capture nameplate/serial', '') || photo.caption || 'Photo'}
                     </p>
                   </div>
-                </a>
+                </button>
               );
             })}
           </div>
@@ -304,11 +304,6 @@ export const InspectionDataSection: React.FC<InspectionDataSectionProps> = ({ pr
                       <div className="flex-1">
                         <span className="text-sm">{field.label}</span>
                         <div className="flex items-center gap-1.5 mt-0.5">
-                          {field.critical && (
-                            <Badge variant="outline" className="text-[9px] h-4 border-red-300 text-red-600">
-                              Critical
-                            </Badge>
-                          )}
                           {field.requiresPhoto && (
                             <Badge variant="outline" className="text-[9px] h-4">
                               <ImageIcon className="h-2.5 w-2.5 mr-0.5" />
@@ -333,18 +328,16 @@ export const InspectionDataSection: React.FC<InspectionDataSectionProps> = ({ pr
                     </div>
                     {/* Show thumbnail if photo exists */}
                     {photo && (
-                      <a
-                        href={photo}
-                        target="_blank"
-                        rel="noopener noreferrer"
+                      <button
+                        onClick={() => setLightboxImage(photo)}
                         className="mt-2 block"
                       >
                         <img
                           src={photo}
                           alt={field.label}
-                          className="h-16 w-24 object-cover rounded-lg border hover:ring-2 hover:ring-primary transition-all"
+                          className="h-16 w-24 object-cover rounded-lg border hover:ring-2 hover:ring-primary transition-all cursor-pointer"
                         />
-                      </a>
+                      </button>
                     )}
                   </div>
                 ))}
@@ -363,23 +356,28 @@ export const InspectionDataSection: React.FC<InspectionDataSectionProps> = ({ pr
           </h5>
           <div className="grid grid-cols-3 gap-2">
             {issuePhotos.map(photo => (
-              <a
+              <button
                 key={photo.id}
-                href={photo.photo_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="aspect-square rounded-lg overflow-hidden bg-muted hover:opacity-80 transition-opacity"
+                onClick={() => setLightboxImage(photo.photo_url)}
+                className="aspect-square rounded-lg overflow-hidden bg-muted hover:opacity-80 transition-opacity cursor-pointer"
               >
                 <img
                   src={photo.photo_url}
                   alt={photo.caption || 'Issue photo'}
                   className="w-full h-full object-cover"
                 />
-              </a>
+              </button>
             ))}
           </div>
         </div>
       )}
+
+      {/* Photo Lightbox */}
+      <PhotoLightbox
+        isOpen={!!lightboxImage}
+        imageUrl={lightboxImage}
+        onClose={() => setLightboxImage(null)}
+      />
     </div>
   );
 };

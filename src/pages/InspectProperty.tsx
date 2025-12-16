@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Check, AlertTriangle, Loader2, Camera } from 'lucide-react';
+import { Check, Loader2, Camera } from 'lucide-react';
 import { MobileAppLayout, ScrollbarHideStyle } from '@/components/inspect/MobileAppLayout';
 import { InspectTopBar } from '@/components/inspect/InspectTopBar';
 import { YesNoToggle } from '@/components/inspect/YesNoToggle';
@@ -330,12 +330,6 @@ const InspectProperty: React.FC = () => {
                   <div className="flex-1">
                     <p className="font-medium leading-snug">{field.label}</p>
                     <div className="flex items-center gap-2 mt-1">
-                      {field.critical && (
-                        <Badge variant="destructive" className="text-[10px] h-5 rounded-full">
-                          <AlertTriangle className="h-3 w-3 mr-0.5" />
-                          Critical
-                        </Badge>
-                      )}
                       {field.requiresPhoto && (
                         <Badge variant="outline" className="text-[10px] h-5 rounded-full">
                           <Camera className="h-3 w-3 mr-0.5" />

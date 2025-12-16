@@ -1,7 +1,6 @@
 export interface InspectionField {
   key: string;
   label: string;
-  critical?: boolean;
   responsibleParty: 'owner' | 'pm' | 'cleaner';
   requiresPhoto?: boolean;
   photoLabel?: string;
@@ -67,11 +66,11 @@ export const INSPECTION_SECTIONS: InspectionSection[] = [
     id: "safety-security",
     title: "Safety & Security",
     fields: [
-      { key: "smoke_carbon_detectors_working", label: "Smoke & CO detectors present and working", critical: true, responsibleParty: "owner" },
-      { key: "gas_detector_kitchen", label: "Gas detector present in kitchen (if gas appliances)", critical: true, responsibleParty: "owner" },
-      { key: "fire_extinguisher_kitchen", label: "Fire extinguisher present in kitchen", critical: true, responsibleParty: "owner" },
-      { key: "first_aid_kit_present", label: "First Aid Kit present", critical: true, responsibleParty: "owner" },
-      { key: "water_main_shutoff_accessible", label: "Water main shutoff accessible and labeled", critical: true, responsibleParty: "owner", requiresPhoto: true, photoLabel: "Take photo of water shutoff location", photoType: "capture" }
+      { key: "smoke_carbon_detectors_working", label: "Smoke & CO detectors present and working", responsibleParty: "owner" },
+      { key: "gas_detector_kitchen", label: "Gas detector present in kitchen (if gas appliances)", responsibleParty: "owner" },
+      { key: "fire_extinguisher_kitchen", label: "Fire extinguisher present in kitchen", responsibleParty: "owner" },
+      { key: "first_aid_kit_present", label: "First Aid Kit present", responsibleParty: "owner" },
+      { key: "water_main_shutoff_accessible", label: "Water main shutoff accessible and labeled", responsibleParty: "owner", requiresPhoto: true, photoLabel: "Take photo of water shutoff location", photoType: "capture" }
     ]
   },
   {
@@ -100,7 +99,7 @@ export const INSPECTION_SECTIONS: InspectionSection[] = [
     id: "essentials",
     title: "Essentials",
     fields: [
-      { key: "hot_water_working", label: "Hot water working", critical: true, responsibleParty: "owner" },
+      { key: "hot_water_working", label: "Hot water working", responsibleParty: "owner" },
       { key: "lighting_functional", label: "All lighting functional", responsibleParty: "owner" },
       { key: "internet_working", label: "Internet/WiFi working", responsibleParty: "pm" },
       { key: "washer_dryer_functional", label: "Washer/dryer functional", responsibleParty: "owner" }
