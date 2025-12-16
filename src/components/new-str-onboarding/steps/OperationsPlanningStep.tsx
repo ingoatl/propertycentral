@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { SprayCan, WashingMachine, Package } from "lucide-react";
+import { SprayCan, WashingMachine, Package, Wrench } from "lucide-react";
 
 interface OperationsPlanningStepProps {
   formData: NewSTROnboardingFormData;
@@ -90,6 +90,40 @@ export const OperationsPlanningStep = ({ formData, updateFormData }: OperationsP
               />
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      {/* Immediate Repairs & Vendors */}
+      <Card className="rounded-2xl border-[hsl(25,30%,90%)] shadow-sm">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg text-[hsl(25,40%,25%)]">
+            <Wrench className="w-5 h-5 text-[hsl(25,95%,50%)]" />
+            Repairs & Vendor Relationships
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="immediateRepairs" className="text-[hsl(25,30%,30%)]">Immediate Repairs Needed</Label>
+            <Textarea
+              id="immediateRepairs"
+              value={formData.immediateRepairs}
+              onChange={(e) => updateFormData({ immediateRepairs: e.target.value })}
+              placeholder="What needs to be fixed before guests can stay? (e.g., broken faucet, damaged flooring, HVAC repair)"
+              rows={3}
+              className="rounded-xl border-[hsl(25,30%,85%)]"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="existingVendorRelationships" className="text-[hsl(25,30%,30%)]">Existing Vendor Relationships</Label>
+            <Textarea
+              id="existingVendorRelationships"
+              value={formData.existingVendorRelationships}
+              onChange={(e) => updateFormData({ existingVendorRelationships: e.target.value })}
+              placeholder="List any trusted vendors you already work with (HVAC, plumber, electrician, handyman, lawn care, pool service, etc.)"
+              rows={3}
+              className="rounded-xl border-[hsl(25,30%,85%)]"
+            />
+          </div>
         </CardContent>
       </Card>
 

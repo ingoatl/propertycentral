@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScrollText, PawPrint } from "lucide-react";
 
@@ -54,49 +55,83 @@ export const MarketingRulesStep = ({ formData, updateFormData }: MarketingRulesS
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="petPolicy" className="text-[hsl(25,30%,30%)]">Pet Policy</Label>
-            <Select
-              value={formData.petPolicy}
-              onValueChange={(value) => updateFormData({ petPolicy: value })}
-            >
-              <SelectTrigger className="h-12 rounded-xl border-[hsl(25,30%,85%)]">
-                <SelectValue placeholder="Select your pet policy" />
-              </SelectTrigger>
-              <SelectContent>
-                {PET_POLICY_OPTIONS.map((policy) => (
-                  <SelectItem key={policy} value={policy}>
-                    {policy}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="flex items-center justify-between">
+            <div>
+              <Label htmlFor="petsAllowed" className="text-[hsl(25,30%,30%)]">Allow Pets?</Label>
+              <p className="text-sm text-[hsl(25,20%,55%)]">Will you accept guests with pets?</p>
+            </div>
+            <Switch
+              id="petsAllowed"
+              checked={formData.petsAllowed}
+              onCheckedChange={(checked) => updateFormData({ petsAllowed: checked })}
+            />
           </div>
 
-          {formData.petPolicy && formData.petPolicy !== 'No Pets Allowed' && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-[hsl(25,30%,90%)]">
+          {formData.petsAllowed && (
+            <div className="space-y-4 pt-4 border-t border-[hsl(25,30%,90%)]">
               <div className="space-y-2">
-                <Label htmlFor="petDeposit" className="text-[hsl(25,30%,30%)]">Pet Fee ($)</Label>
-                <Input
-                  id="petDeposit"
-                  type="number"
-                  min="0"
-                  value={formData.petDeposit || ''}
-                  onChange={(e) => updateFormData({ petDeposit: e.target.value ? parseInt(e.target.value) : null })}
-                  placeholder="50"
-                  className="h-12 rounded-xl border-[hsl(25,30%,85%)]"
+                <Label htmlFor="petPolicy" className="text-[hsl(25,30%,30%)]">Pet Policy Details</Label>
+                <Select
+                  value={formData.petPolicy}
+                  onValueChange={(value) => updateFormData({ petPolicy: value })}
+                >
+                  <SelectTrigger className="h-12 rounded-xl border-[hsl(25,30%,85%)]">
+                    <SelectValue placeholder="Select your pet policy" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PET_POLICY_OPTIONS.filter(p => p !== 'No Pets Allowed').map((policy) => (
+                      <SelectItem key={policy} value={policy}>
+                        {policy}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="petDeposit" className="text-[hsl(25,30%,30%)]">Pet Fee ($)</Label>
+                  <Input
+                    id="petDeposit"
+                    type="number"
+                    min="0"
+                    value={formData.petDeposit || ''}
+                    onChange={(e) => updateFormData({ petDeposit: e.target.value ? parseInt(e.target.value) : null })}
+                    placeholder="50"
+                    className="h-12 rounded-xl border-[hsl(25,30%,85%)]"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="petSizeRestrictions" className="text-[hsl(25,30%,30%)]">Size/Breed Restrictions</Label>
+                  <Input
+                    id="petSizeRestrictions"
+                    value={formData.petSizeRestrictions}
+                    onChange={(e) => updateFormData({ petSizeRestrictions: e.target.value })}
+                    placeholder="e.g., No aggressive breeds"
+                    className="h-12 rounded-xl border-[hsl(25,30%,85%)]"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="petDepositRules" className="text-[hsl(25,30%,30%)]">Additional Pet Rules</Label>
+                <Textarea
+                  id="petDepositRules"
+                  value={formData.petDepositRules}
+                  onChange={(e) => updateFormData({ petDepositRules: e.target.value })}
+                  placeholder="Any specific rules for pets? (e.g., must be crated when alone, no pets on furniture, etc.)"
+                  rows={3}
+                  className="rounded-xl border-[hsl(25,30%,85%)]"
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="petSizeRestrictions" className="text-[hsl(25,30%,30%)]">Size/Breed Restrictions</Label>
-                <Input
-                  id="petSizeRestrictions"
-                  value={formData.petSizeRestrictions}
-                  onChange={(e) => updateFormData({ petSizeRestrictions: e.target.value })}
-                  placeholder="e.g., No aggressive breeds"
-                  className="h-12 rounded-xl border-[hsl(25,30%,85%)]"
-                />
-              </div>
+            </div>
+          )}
+
+          {!formData.petsAllowed && (
+            <div className="p-3 bg-[hsl(25,100%,97%)] rounded-xl border border-[hsl(25,50%,85%)]">
+              <p className="text-sm text-[hsl(25,40%,35%)]">
+                No pets will be allowed at this property. This will be clearly stated in your listings.
+              </p>
             </div>
           )}
         </CardContent>

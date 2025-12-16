@@ -35,6 +35,16 @@ export interface NewSTROnboardingFormData {
   hasSepticTank: boolean;
   septicLastFlushed: string;
   septicServiceCompany: string;
+  // Gas Kitchen & Safety
+  hasGasKitchen: boolean;
+  naturalGasDetectorInstalled: boolean;
+  // Shutoff Locations
+  waterShutoffLocation: string;
+  breakerPanelLocation: string;
+  gasShutoffLocation: string;
+  // HVAC
+  hvacType: string;
+  hvacServiceNeeds: string;
 
   // Step 4: Setup Status
   furnitureStatus: string;
@@ -59,6 +69,8 @@ export interface NewSTROnboardingFormData {
   laundrySetup: string;
   laundryNotes: string;
   supplyStorageLocation: string;
+  immediateRepairs: string;
+  existingVendorRelationships: string;
 
   // Step 6: Legal Compliance
   strPermitStatus: string;
@@ -73,6 +85,9 @@ export interface NewSTROnboardingFormData {
   entityOwnership: string;
   entityName: string;
   taxId: string;
+  insuranceStatus: string;
+  hoaApprovalStatus: string;
+  hoaRules: string;
 
   // Step 7: Documents & Ownership
   governmentIdFile: File | null;
@@ -94,6 +109,8 @@ export interface NewSTROnboardingFormData {
   petPolicy: string;
   petDeposit: number | null;
   petSizeRestrictions: string;
+  petsAllowed: boolean;
+  petDepositRules: string;
 
   // Step 10: House Quirks & Details
   propertyFeatures: string[];
@@ -103,8 +120,29 @@ export interface NewSTROnboardingFormData {
   maxVehicles: number | null;
   maintenanceContact: string;
   emergencyContact: string;
+  emergencyContactPhone: string;
   poolHotTubInfo: string;
   specialInstructions: string;
+  // Access Codes
+  alarmSystemCode: string;
+  gateCode: string;
+  garageCode: string;
+  lockboxLocation: string;
+  lockboxCode: string;
+  backupEntryMethod: string;
+  securitySystemStatus: string;
+  // Parking Details
+  parkingSpaces: string;
+  parkingType: string;
+  parkingHoaRules: string;
+  // Trash Collection
+  trashBinLocation: string;
+  trashPickupDay: string;
+  // Safety Equipment
+  smokeDetectorStatus: string;
+  fireExtinguisherPresent: boolean;
+  fireExtinguisherLocation: string;
+  poolHotTubPresent: boolean;
 }
 
 export const initialNewSTRFormData: NewSTROnboardingFormData = {
@@ -143,6 +181,13 @@ export const initialNewSTRFormData: NewSTROnboardingFormData = {
   hasSepticTank: false,
   septicLastFlushed: '',
   septicServiceCompany: '',
+  hasGasKitchen: false,
+  naturalGasDetectorInstalled: false,
+  waterShutoffLocation: '',
+  breakerPanelLocation: '',
+  gasShutoffLocation: '',
+  hvacType: '',
+  hvacServiceNeeds: '',
 
   // Step 4
   furnitureStatus: '',
@@ -167,6 +212,8 @@ export const initialNewSTRFormData: NewSTROnboardingFormData = {
   laundrySetup: '',
   laundryNotes: '',
   supplyStorageLocation: '',
+  immediateRepairs: '',
+  existingVendorRelationships: '',
 
   // Step 6
   strPermitStatus: '',
@@ -181,6 +228,9 @@ export const initialNewSTRFormData: NewSTROnboardingFormData = {
   entityOwnership: '',
   entityName: '',
   taxId: '',
+  insuranceStatus: '',
+  hoaApprovalStatus: '',
+  hoaRules: '',
 
   // Step 7
   governmentIdFile: null,
@@ -202,6 +252,8 @@ export const initialNewSTRFormData: NewSTROnboardingFormData = {
   petPolicy: '',
   petDeposit: null,
   petSizeRestrictions: '',
+  petsAllowed: false,
+  petDepositRules: '',
 
   // Step 10
   propertyFeatures: [],
@@ -211,8 +263,25 @@ export const initialNewSTRFormData: NewSTROnboardingFormData = {
   maxVehicles: null,
   maintenanceContact: '',
   emergencyContact: '',
+  emergencyContactPhone: '',
   poolHotTubInfo: '',
   specialInstructions: '',
+  alarmSystemCode: '',
+  gateCode: '',
+  garageCode: '',
+  lockboxLocation: '',
+  lockboxCode: '',
+  backupEntryMethod: '',
+  securitySystemStatus: '',
+  parkingSpaces: '',
+  parkingType: '',
+  parkingHoaRules: '',
+  trashBinLocation: '',
+  trashPickupDay: '',
+  smokeDetectorStatus: '',
+  fireExtinguisherPresent: false,
+  fireExtinguisherLocation: '',
+  poolHotTubPresent: false,
 };
 
 // Option constants
@@ -316,4 +385,60 @@ export const PROPERTY_FEATURE_OPTIONS = [
   'Mountain View',
   'Lake/Water View',
   'City View',
+];
+
+export const HVAC_TYPE_OPTIONS = [
+  'Central AC/Heat',
+  'Mini-Split/Ductless',
+  'Window Units',
+  'Heat Pump',
+  'Radiator/Baseboard',
+  'None/Fans Only',
+];
+
+export const PARKING_TYPE_OPTIONS = [
+  'Private Driveway',
+  'Garage',
+  'Street Parking',
+  'Carport',
+  'Shared Lot',
+];
+
+export const SECURITY_STATUS_OPTIONS = [
+  'Active - Monitored',
+  'Active - Not Monitored',
+  'Inactive',
+  'Not Installed',
+];
+
+export const SMOKE_DETECTOR_OPTIONS = [
+  'All Working',
+  'Some Need Batteries',
+  'Need to Install More',
+  'Not Sure',
+];
+
+export const TRASH_DAY_OPTIONS = [
+  'Monday',
+  'Tuesday',
+  'Wednesday',
+  'Thursday',
+  'Friday',
+  'Saturday',
+  'Varies',
+];
+
+export const INSURANCE_STATUS_OPTIONS = [
+  'Active - STR Coverage',
+  'Active - Standard Homeowners',
+  'Need to Get Coverage',
+  'Switching Providers',
+];
+
+export const HOA_APPROVAL_OPTIONS = [
+  'Approved for STR',
+  'Approval Pending',
+  'Need to Apply',
+  'No HOA',
+  'Not Sure',
 ];

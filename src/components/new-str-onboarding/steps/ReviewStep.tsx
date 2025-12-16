@@ -1,7 +1,7 @@
 import { NewSTROnboardingFormData } from "@/types/new-str-onboarding";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { User, Home, Target, Zap, Package, Wrench, FileText, Upload, Sparkles, ScrollText, Lightbulb, CheckCircle, Droplets, Palette } from "lucide-react";
+import { User, Home, Target, Zap, Package, Wrench, FileText, Upload, Sparkles, ScrollText, Lightbulb, CheckCircle, Droplets, Palette, KeyRound, Shield, Car, Trash2, Thermometer } from "lucide-react";
 
 interface ReviewStepProps {
   formData: NewSTROnboardingFormData;
@@ -51,6 +51,19 @@ export const ReviewStep = ({ formData, updateFormData }: ReviewStepProps) => {
         { label: 'Smart Lock', value: formatBoolean(formData.smartLockInstalled) },
         { label: 'Smart Lock Brand', value: formData.smartLockBrand },
         { label: 'Utilities Setup', value: formatBoolean(formData.utilitiesSetup) },
+        { label: 'Gas Kitchen', value: formatBoolean(formData.hasGasKitchen) },
+        { label: 'Gas Detector', value: formData.hasGasKitchen ? formatBoolean(formData.naturalGasDetectorInstalled) : null },
+      ],
+    },
+    {
+      icon: Thermometer,
+      title: 'HVAC & Shutoffs',
+      items: [
+        { label: 'HVAC Type', value: formData.hvacType },
+        { label: 'HVAC Service Needs', value: formData.hvacServiceNeeds },
+        { label: 'Water Shutoff', value: formData.waterShutoffLocation },
+        { label: 'Breaker Panel', value: formData.breakerPanelLocation },
+        { label: 'Gas Shutoff', value: formData.gasShutoffLocation },
       ],
     },
     {
@@ -82,6 +95,8 @@ export const ReviewStep = ({ formData, updateFormData }: ReviewStepProps) => {
         { label: 'Cleaner Name', value: formData.cleanerName },
         { label: 'Needs Referral', value: formatBoolean(formData.needsCleanerReferral) },
         { label: 'Laundry Setup', value: formData.laundrySetup },
+        { label: 'Immediate Repairs', value: formData.immediateRepairs ? 'Provided' : null },
+        { label: 'Existing Vendors', value: formData.existingVendorRelationships ? 'Provided' : null },
       ],
     },
     {
@@ -90,11 +105,12 @@ export const ReviewStep = ({ formData, updateFormData }: ReviewStepProps) => {
       items: [
         { label: 'STR Permit Status', value: formData.strPermitStatus },
         { label: 'Permit Number', value: formData.permitNumber },
+        { label: 'HOA Approval', value: formData.hoaApprovalStatus },
         { label: 'HOA Restrictions', value: formatBoolean(formData.hoaRestrictions) },
+        { label: 'Insurance Status', value: formData.insuranceStatus },
         { label: 'Insurance Provider', value: formData.insuranceProvider },
         { label: 'STR Insurance', value: formatBoolean(formData.hasStrInsurance) },
         { label: 'Entity Type', value: formData.entityOwnership },
-        { label: 'Entity Name', value: formData.entityName },
       ],
     },
     {
@@ -127,11 +143,52 @@ export const ReviewStep = ({ formData, updateFormData }: ReviewStepProps) => {
     },
     {
       icon: ScrollText,
-      title: 'House Rules',
+      title: 'House Rules & Pets',
       items: [
         { label: 'House Rules', value: formData.houseRules ? 'Provided' : null },
+        { label: 'Pets Allowed', value: formatBoolean(formData.petsAllowed) },
         { label: 'Pet Policy', value: formData.petPolicy },
         { label: 'Pet Fee', value: formData.petDeposit ? `$${formData.petDeposit}` : null },
+        { label: 'Pet Rules', value: formData.petDepositRules ? 'Provided' : null },
+      ],
+    },
+    {
+      icon: KeyRound,
+      title: 'Access & Security',
+      items: [
+        { label: 'Alarm Code', value: formData.alarmSystemCode ? '••••' : null },
+        { label: 'Security Status', value: formData.securitySystemStatus },
+        { label: 'Gate Code', value: formData.gateCode ? '••••' : null },
+        { label: 'Garage Code', value: formData.garageCode ? '••••' : null },
+        { label: 'Lockbox Location', value: formData.lockboxLocation },
+        { label: 'Backup Entry', value: formData.backupEntryMethod },
+      ],
+    },
+    {
+      icon: Shield,
+      title: 'Safety Equipment',
+      items: [
+        { label: 'Smoke Detectors', value: formData.smokeDetectorStatus },
+        { label: 'Fire Extinguisher', value: formatBoolean(formData.fireExtinguisherPresent) },
+        { label: 'Extinguisher Location', value: formData.fireExtinguisherLocation },
+      ],
+    },
+    {
+      icon: Car,
+      title: 'Parking',
+      items: [
+        { label: 'Parking Spaces', value: formData.parkingSpaces },
+        { label: 'Parking Type', value: formData.parkingType },
+        { label: 'Max Vehicles', value: formData.maxVehicles },
+        { label: 'HOA Parking Rules', value: formData.parkingHoaRules ? 'Provided' : null },
+      ],
+    },
+    {
+      icon: Trash2,
+      title: 'Trash Collection',
+      items: [
+        { label: 'Pickup Day', value: formData.trashPickupDay },
+        { label: 'Bin Location', value: formData.trashBinLocation },
       ],
     },
     {
@@ -139,8 +196,9 @@ export const ReviewStep = ({ formData, updateFormData }: ReviewStepProps) => {
       title: 'Property Details',
       items: [
         { label: 'Features', value: formatList(formData.propertyFeatures) },
-        { label: 'Max Vehicles', value: formData.maxVehicles },
+        { label: 'Pool/Hot Tub', value: formatBoolean(formData.poolHotTubPresent) },
         { label: 'Emergency Contact', value: formData.emergencyContact },
+        { label: 'Emergency Phone', value: formData.emergencyContactPhone },
         { label: 'Maintenance Contact', value: formData.maintenanceContact },
       ],
     },
