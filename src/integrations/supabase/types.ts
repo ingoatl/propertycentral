@@ -946,6 +946,207 @@ export type Database = {
           },
         ]
       }
+      inspection_issues: {
+        Row: {
+          created_at: string
+          detail: string | null
+          field_key: string
+          id: string
+          inspection_id: string | null
+          property_id: string
+          resolved_at: string | null
+          resolved_by: string | null
+          responsible_party: string
+          severity: string
+          status: string
+          title: string
+        }
+        Insert: {
+          created_at?: string
+          detail?: string | null
+          field_key: string
+          id?: string
+          inspection_id?: string | null
+          property_id: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          responsible_party?: string
+          severity?: string
+          status?: string
+          title: string
+        }
+        Update: {
+          created_at?: string
+          detail?: string | null
+          field_key?: string
+          id?: string
+          inspection_id?: string | null
+          property_id?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          responsible_party?: string
+          severity?: string
+          status?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inspection_issues_inspection_id_fkey"
+            columns: ["inspection_id"]
+            isOneToOne: false
+            referencedRelation: "inspections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inspection_issues_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "comprehensive_property_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inspection_issues_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inspection_photos: {
+        Row: {
+          caption: string | null
+          field_key: string | null
+          id: string
+          inspection_id: string
+          issue_id: string | null
+          photo_url: string
+          uploaded_at: string
+        }
+        Insert: {
+          caption?: string | null
+          field_key?: string | null
+          id?: string
+          inspection_id: string
+          issue_id?: string | null
+          photo_url: string
+          uploaded_at?: string
+        }
+        Update: {
+          caption?: string | null
+          field_key?: string | null
+          id?: string
+          inspection_id?: string
+          issue_id?: string | null
+          photo_url?: string
+          uploaded_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inspection_photos_inspection_id_fkey"
+            columns: ["inspection_id"]
+            isOneToOne: false
+            referencedRelation: "inspections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inspection_photos_issue_id_fkey"
+            columns: ["issue_id"]
+            isOneToOne: false
+            referencedRelation: "inspection_issues"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inspection_responses: {
+        Row: {
+          answered_at: string
+          field_key: string
+          id: string
+          inspection_id: string
+          section_id: string
+          value_bool: boolean | null
+          value_text: string | null
+        }
+        Insert: {
+          answered_at?: string
+          field_key: string
+          id?: string
+          inspection_id: string
+          section_id: string
+          value_bool?: boolean | null
+          value_text?: string | null
+        }
+        Update: {
+          answered_at?: string
+          field_key?: string
+          id?: string
+          inspection_id?: string
+          section_id?: string
+          value_bool?: boolean | null
+          value_text?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inspection_responses_inspection_id_fkey"
+            columns: ["inspection_id"]
+            isOneToOne: false
+            referencedRelation: "inspections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inspections: {
+        Row: {
+          created_at: string
+          id: string
+          inspection_date: string | null
+          inspector_name: string | null
+          notes: string | null
+          phase: string
+          property_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          inspection_date?: string | null
+          inspector_name?: string | null
+          notes?: string | null
+          phase?: string
+          property_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          inspection_date?: string | null
+          inspector_name?: string | null
+          notes?: string | null
+          phase?: string
+          property_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inspections_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "comprehensive_property_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inspections_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       listing_templates: {
         Row: {
           available_variables: string[] | null
