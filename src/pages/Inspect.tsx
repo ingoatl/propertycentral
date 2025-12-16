@@ -29,13 +29,38 @@ const Inspect: React.FC = () => {
       return data;
     }
   });
+
+  // Fetch existing inspection for selected property
+  const { data: existingInspection } = useQuery({
+    queryKey: ['existing-inspection', selectedPropertyId],
+    queryFn: async () => {
+      if (!selectedPropertyId) return null;
+      const { data, error } = await supabase
+        .from('inspections')
+        .select('id, status, inspector_name, created_at')
+        .eq('property_id', selectedPropertyId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!selectedPropertyId
+  });
   
   const selectedProperty = properties?.find(p => p.id === selectedPropertyId);
+  const hasExistingInspection = !!existingInspection;
   
-  const handleStartInspection = async () => {
+  const handleStartOrEditInspection = async () => {
     if (!selectedPropertyId || !inspectorName.trim()) return;
     
-    // Create inspection record
+    // If there's an existing inspection, navigate to it
+    if (existingInspection) {
+      navigate(`/inspect/property/${existingInspection.id}`);
+      return;
+    }
+    
+    // Create new inspection record
     const { data: inspection, error } = await supabase
       .from('inspections')
       .insert({
@@ -138,20 +163,29 @@ const Inspect: React.FC = () => {
             )}
           </div>
           
-          {/* Start Button */}
+          {/* Start/Edit Button */}
           <div className="space-y-2">
             <Button
-              onClick={handleStartInspection}
+              onClick={handleStartOrEditInspection}
               disabled={!selectedPropertyId || !inspectorName.trim()}
               className={cn(
                 "w-full h-14 rounded-2xl text-lg font-semibold",
-                "bg-primary hover:bg-primary/90 transition-all",
-                "disabled:opacity-50"
+                hasExistingInspection 
+                  ? "bg-amber-600 hover:bg-amber-700" 
+                  : "bg-primary hover:bg-primary/90",
+                "transition-all disabled:opacity-50"
               )}
             >
-              Start Inspection
+              {hasExistingInspection ? 'Edit Inspection' : 'Start Inspection'}
               <ChevronRight className="h-5 w-5 ml-2" />
             </Button>
+            
+            {/* Existing inspection info */}
+            {hasExistingInspection && (
+              <p className="text-center text-sm text-amber-600 dark:text-amber-400">
+                {existingInspection.status === 'completed' ? 'Completed' : 'In Progress'} inspection exists
+              </p>
+            )}
             
             {/* Validation hint */}
             {(!selectedPropertyId || !inspectorName.trim()) && (
