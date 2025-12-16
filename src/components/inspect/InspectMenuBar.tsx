@@ -8,38 +8,41 @@ interface MenuTab {
   label: string;
   icon: React.ReactNode;
   path: string;
+  disabled?: boolean;
 }
 
 const tabs: MenuTab[] = [
   { id: 'home', label: 'Home', icon: <Home className="h-6 w-6" />, path: '/inspect' },
-  { id: 'inspections', label: 'Inspections', icon: <ClipboardCheck className="h-6 w-6" />, path: '/inspect/history' },
-  { id: 'issues', label: 'Issues', icon: <AlertTriangle className="h-6 w-6" />, path: '/inspect/issues' },
-  { id: 'settings', label: 'Settings', icon: <Settings className="h-6 w-6" />, path: '/inspect/settings' },
+  { id: 'inspections', label: 'Inspections', icon: <ClipboardCheck className="h-6 w-6" />, path: '/inspect', disabled: true },
+  { id: 'issues', label: 'Issues', icon: <AlertTriangle className="h-6 w-6" />, path: '/inspect', disabled: true },
+  { id: 'settings', label: 'Settings', icon: <Settings className="h-6 w-6" />, path: '/inspect', disabled: true },
 ];
 
 export const InspectMenuBar: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   
-  const isActive = (path: string) => {
-    if (path === '/inspect') {
+  const isActive = (tab: MenuTab) => {
+    if (tab.id === 'home') {
       return location.pathname === '/inspect' || location.pathname.startsWith('/inspect/property/');
     }
-    return location.pathname.startsWith(path);
+    return false;
   };
 
   return (
     <div className="bg-background/95 backdrop-blur-xl border-t border-border/50">
       <div className="flex items-center justify-around py-2 px-4">
         {tabs.map((tab) => {
-          const active = isActive(tab.path);
+          const active = isActive(tab);
           return (
             <button
               key={tab.id}
-              onClick={() => navigate(tab.path)}
+              onClick={() => !tab.disabled && navigate(tab.path)}
+              disabled={tab.disabled}
               className={cn(
                 "flex flex-col items-center gap-0.5 py-1 px-3 rounded-xl transition-all duration-200",
                 "active:scale-95",
+                tab.disabled && "opacity-40 cursor-not-allowed",
                 active 
                   ? "text-primary" 
                   : "text-muted-foreground hover:text-foreground"
