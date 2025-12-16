@@ -18,7 +18,8 @@ import {
   AlertTriangle,
   Clock,
   Image as ImageIcon,
-  User
+  User,
+  Download
 } from "lucide-react";
 import { toast } from "sonner";
 import { format, addDays } from "date-fns";
@@ -492,15 +493,51 @@ export const PartnerPropertiesSection = () => {
                   </Button>
 
                   {/* Show Listing Data button */}
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => openListingData(property)}
-                    className="w-full h-8 text-xs"
-                  >
-                    <Database className="w-3 h-3 mr-1.5" />
-                    Show Listing Data
-                  </Button>
+                  <div className="flex gap-1">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => openListingData(property)}
+                      className="flex-1 h-8 text-xs"
+                    >
+                      <Database className="w-3 h-3 mr-1.5" />
+                      Listing Data
+                    </Button>
+                    {(property.featured_image_url || (property.gallery_images && property.gallery_images.length > 0)) && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={async () => {
+                          const allImages = [
+                            ...(property.featured_image_url ? [property.featured_image_url] : []),
+                            ...(property.gallery_images || [])
+                          ];
+                          toast.info(`Downloading ${allImages.length} images...`);
+                          for (let i = 0; i < allImages.length; i++) {
+                            try {
+                              const response = await fetch(allImages[i]);
+                              const blob = await response.blob();
+                              const url = window.URL.createObjectURL(blob);
+                              const a = document.createElement('a');
+                              a.href = url;
+                              const extension = blob.type.split('/')[1] || 'jpg';
+                              a.download = `${property.property_title?.replace(/[^a-zA-Z0-9]/g, '_') || 'property'}_${i + 1}.${extension}`;
+                              document.body.appendChild(a);
+                              a.click();
+                              document.body.removeChild(a);
+                              window.URL.revokeObjectURL(url);
+                              if (i < allImages.length - 1) await new Promise(r => setTimeout(r, 300));
+                            } catch (e) { console.error(e); }
+                          }
+                          toast.success(`Downloaded ${allImages.length} images`);
+                        }}
+                        className="h-8 px-2"
+                        title="Download All Images"
+                      >
+                        <Download className="w-3 h-3" />
+                      </Button>
+                    )}
+                  </div>
 
                   {/* Create Listings / View Tasks button */}
                   {projectInfo ? (
