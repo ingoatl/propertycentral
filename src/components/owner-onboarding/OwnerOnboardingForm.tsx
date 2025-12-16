@@ -173,74 +173,101 @@ export function OwnerOnboardingForm() {
   };
 
   return (
-    <div className="min-h-screen bg-[hsl(25,100%,98%)]">
+    <div className="min-h-screen bg-gradient-to-br from-[hsl(25,100%,98%)] via-[hsl(30,100%,97%)] to-[hsl(20,100%,96%)]">
       {/* Header */}
-      <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-[hsl(25,30%,90%)] shadow-sm">
-        <div className="max-w-4xl mx-auto px-4 py-4">
+      <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-xl border-b border-[hsl(25,40%,90%)]">
+        <div className="max-w-4xl mx-auto px-4 py-5">
           <div className="flex items-center justify-between">
-            <img src="/peachhaus-logo.png" alt="PeachHaus" className="h-10" />
+            <div className="flex items-center gap-3">
+              <img src="/peachhaus-logo.png" alt="PeachHaus" className="h-12" />
+              <div className="hidden sm:block">
+                <h1 className="text-lg font-semibold text-[hsl(25,40%,25%)]">Property Onboarding</h1>
+                <p className="text-xs text-[hsl(25,20%,50%)]">Existing STR/MTR Properties</p>
+              </div>
+            </div>
             {formData.property_address && (
-              <p className="text-sm text-muted-foreground truncate max-w-[200px]">
-                {formData.property_address}
-              </p>
+              <div className="text-right">
+                <p className="text-xs text-[hsl(25,20%,60%)]">Property</p>
+                <p className="text-sm font-medium text-[hsl(25,30%,35%)] truncate max-w-[180px] sm:max-w-[280px]">
+                  {formData.property_address}
+                </p>
+              </div>
             )}
           </div>
         </div>
       </header>
 
       {/* Progress Bar */}
-      <div className="sticky top-[73px] z-40 bg-white/90 backdrop-blur-sm border-b border-[hsl(25,30%,90%)] py-3">
+      <div className="sticky top-[85px] z-40 bg-white/95 backdrop-blur-lg border-b border-[hsl(25,30%,92%)] py-4 shadow-sm">
         <div className="max-w-4xl mx-auto px-4">
-          <div className="flex justify-between items-center overflow-x-auto pb-2">
-            {STEPS.map((step) => (
-              <button
-                key={step.number}
-                onClick={() => handleStepClick(step.number)}
-                className={`flex flex-col items-center min-w-[60px] transition-all ${
-                  step.number <= currentStep || completedSteps.includes(step.number)
-                    ? 'cursor-pointer'
-                    : 'cursor-not-allowed opacity-50'
-                }`}
-              >
-                <div
-                  className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-all ${
-                    completedSteps.includes(step.number)
-                      ? 'bg-green-500 text-white'
-                      : step.number === currentStep
-                      ? 'bg-[hsl(25,95%,65%)] text-white'
-                      : 'bg-gray-200 text-gray-500'
+          <div className="flex justify-between items-center overflow-x-auto pb-2 gap-1">
+            {STEPS.map((step, index) => (
+              <div key={step.number} className="flex items-center">
+                <button
+                  onClick={() => handleStepClick(step.number)}
+                  className={`flex flex-col items-center min-w-[56px] transition-all duration-300 ${
+                    step.number <= currentStep || completedSteps.includes(step.number)
+                      ? 'cursor-pointer'
+                      : 'cursor-not-allowed opacity-40'
                   }`}
                 >
-                  {completedSteps.includes(step.number) ? (
-                    <Check className="w-4 h-4" />
-                  ) : (
-                    step.number
-                  )}
-                </div>
-                <span className="text-xs mt-1 text-center hidden sm:block">{step.title}</span>
-              </button>
+                  <div
+                    className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-semibold transition-all duration-300 shadow-sm ${
+                      completedSteps.includes(step.number)
+                        ? 'bg-gradient-to-br from-emerald-400 to-emerald-500 text-white shadow-emerald-200'
+                        : step.number === currentStep
+                        ? 'bg-gradient-to-br from-[hsl(25,95%,65%)] to-[hsl(20,90%,55%)] text-white shadow-orange-200'
+                        : 'bg-[hsl(25,20%,94%)] text-[hsl(25,15%,50%)]'
+                    }`}
+                  >
+                    {completedSteps.includes(step.number) ? (
+                      <Check className="w-4 h-4" />
+                    ) : (
+                      step.number
+                    )}
+                  </div>
+                  <span className={`text-[10px] mt-1.5 text-center font-medium hidden sm:block transition-colors ${
+                    step.number === currentStep ? 'text-[hsl(25,60%,45%)]' : 'text-[hsl(25,15%,55%)]'
+                  }`}>
+                    {step.title}
+                  </span>
+                </button>
+                {index < STEPS.length - 1 && (
+                  <div className={`w-4 sm:w-8 h-0.5 mx-1 rounded-full transition-colors ${
+                    completedSteps.includes(step.number) ? 'bg-emerald-400' : 'bg-[hsl(25,20%,90%)]'
+                  }`} />
+                )}
+              </div>
             ))}
           </div>
         </div>
       </div>
 
       {/* Form Content */}
-      <main className="max-w-4xl mx-auto px-4 py-8 pb-32">
-        <div className="bg-white rounded-2xl shadow-lg p-6 sm:p-8">
+      <main className="max-w-4xl mx-auto px-4 py-8 pb-36">
+        <div className="bg-white rounded-3xl shadow-xl shadow-[hsl(25,30%,85%)]/30 p-6 sm:p-10 border border-[hsl(25,30%,94%)]">
+          <div className="mb-6">
+            <h2 className="text-2xl sm:text-3xl font-bold text-[hsl(25,35%,25%)] mb-2">
+              {STEPS[currentStep - 1].title}
+            </h2>
+            <p className="text-[hsl(25,15%,55%)]">
+              Step {currentStep} of {STEPS.length}
+            </p>
+          </div>
           {renderStep()}
         </div>
       </main>
 
       {/* Fixed Navigation */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 shadow-lg">
+      <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-xl border-t border-[hsl(25,30%,92%)] p-4 shadow-2xl shadow-black/5">
         <div className="max-w-4xl mx-auto flex justify-between gap-4">
           <button
             onClick={handleBack}
             disabled={currentStep === 1}
-            className={`px-6 py-3 rounded-xl font-medium transition-all ${
+            className={`px-6 py-3.5 rounded-2xl font-semibold transition-all duration-300 ${
               currentStep === 1
-                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                ? 'bg-[hsl(25,15%,95%)] text-[hsl(25,10%,70%)] cursor-not-allowed'
+                : 'bg-[hsl(25,15%,94%)] text-[hsl(25,25%,40%)] hover:bg-[hsl(25,20%,90%)] active:scale-[0.98]'
             }`}
           >
             Back
@@ -250,16 +277,23 @@ export function OwnerOnboardingForm() {
             <button
               onClick={handleSubmit}
               disabled={isSubmitting}
-              className="flex-1 px-6 py-3 bg-[hsl(25,95%,65%)] text-white rounded-xl font-medium hover:bg-[hsl(25,95%,55%)] transition-all disabled:opacity-50"
+              className="flex-1 px-6 py-3.5 bg-gradient-to-r from-[hsl(25,95%,65%)] to-[hsl(20,90%,55%)] text-white rounded-2xl font-semibold hover:from-[hsl(25,95%,60%)] hover:to-[hsl(20,90%,50%)] transition-all duration-300 disabled:opacity-50 shadow-lg shadow-orange-200/50 active:scale-[0.98]"
             >
-              {isSubmitting ? 'Submitting...' : 'Submit Onboarding'}
+              {isSubmitting ? (
+                <span className="flex items-center justify-center gap-2">
+                  <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  Submitting...
+                </span>
+              ) : (
+                'Submit Onboarding'
+              )}
             </button>
           ) : (
             <button
               onClick={handleNext}
-              className="flex-1 px-6 py-3 bg-[hsl(25,95%,65%)] text-white rounded-xl font-medium hover:bg-[hsl(25,95%,55%)] transition-all"
+              className="flex-1 px-6 py-3.5 bg-gradient-to-r from-[hsl(25,95%,65%)] to-[hsl(20,90%,55%)] text-white rounded-2xl font-semibold hover:from-[hsl(25,95%,60%)] hover:to-[hsl(20,90%,50%)] transition-all duration-300 shadow-lg shadow-orange-200/50 active:scale-[0.98]"
             >
-              Next
+              Continue
             </button>
           )}
         </div>
