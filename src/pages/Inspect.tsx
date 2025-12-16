@@ -16,13 +16,14 @@ const Inspect: React.FC = () => {
   const [inspectorName, setInspectorName] = useState('');
   const [selectedPropertyId, setSelectedPropertyId] = useState<string | null>(null);
   
-  // Fetch properties
+  // Fetch properties (exclude offboarded)
   const { data: properties, isLoading } = useQuery({
     queryKey: ['inspect-properties'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('properties')
         .select('id, name, address')
+        .is('offboarded_at', null)
         .order('name');
       if (error) throw error;
       return data;
@@ -75,12 +76,17 @@ const Inspect: React.FC = () => {
           
           {/* Inspector Name */}
           <div className="space-y-2">
-            <Label className="text-base font-medium">Your Name</Label>
+            <Label className="text-base font-medium">
+              Your Name <span className="text-destructive">*</span>
+            </Label>
             <Input
               value={inspectorName}
               onChange={(e) => setInspectorName(e.target.value)}
               placeholder="Enter your name"
-              className="h-14 rounded-2xl text-base px-4"
+              className={cn(
+                "h-14 rounded-2xl text-base px-4",
+                !inspectorName.trim() && selectedPropertyId && "border-destructive"
+              )}
             />
           </div>
           
@@ -133,18 +139,29 @@ const Inspect: React.FC = () => {
           </div>
           
           {/* Start Button */}
-          <Button
-            onClick={handleStartInspection}
-            disabled={!selectedPropertyId || !inspectorName.trim()}
-            className={cn(
-              "w-full h-14 rounded-2xl text-lg font-semibold",
-              "bg-primary hover:bg-primary/90 transition-all",
-              "disabled:opacity-50"
+          <div className="space-y-2">
+            <Button
+              onClick={handleStartInspection}
+              disabled={!selectedPropertyId || !inspectorName.trim()}
+              className={cn(
+                "w-full h-14 rounded-2xl text-lg font-semibold",
+                "bg-primary hover:bg-primary/90 transition-all",
+                "disabled:opacity-50"
+              )}
+            >
+              Start Inspection
+              <ChevronRight className="h-5 w-5 ml-2" />
+            </Button>
+            
+            {/* Validation hint */}
+            {(!selectedPropertyId || !inspectorName.trim()) && (
+              <p className="text-center text-sm text-muted-foreground">
+                {!inspectorName.trim() && !selectedPropertyId && "Enter your name and select a property"}
+                {!inspectorName.trim() && selectedPropertyId && "Enter your name to continue"}
+                {inspectorName.trim() && !selectedPropertyId && "Select a property to continue"}
+              </p>
             )}
-          >
-            Start Inspection
-            <ChevronRight className="h-5 w-5 ml-2" />
-          </Button>
+          </div>
           
           {/* Info */}
           <p className="text-center text-sm text-muted-foreground">
