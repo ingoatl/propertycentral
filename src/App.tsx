@@ -21,6 +21,8 @@ import Documents from "./pages/Documents";
 import Utilities from "./pages/Utilities";
 import OwnerOnboarding from "./pages/OwnerOnboarding";
 import NewSTROnboarding from "./pages/NewSTROnboarding";
+import Inspect from "./pages/Inspect";
+import InspectProperty from "./pages/InspectProperty";
 
 const queryClient = new QueryClient();
 
@@ -36,6 +38,9 @@ const App = () => (
           <Route path="/review" element={<PublicReview />} />
           <Route path="/onboard/existing-str" element={<OwnerOnboarding />} />
           <Route path="/onboard/new-str" element={<NewSTROnboarding />} />
+          {/* Mobile-first inspection app routes - outside Layout for full-screen mobile experience */}
+          <Route path="/inspect" element={<Inspect />} />
+          <Route path="/inspect/property/:inspectionId" element={<InspectProperty />} />
           <Route path="*" element={
             <Layout>
               <Routes>

@@ -7,8 +7,9 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { OnboardingTask } from "@/types/onboarding";
-import { Loader2, MapPin, User, Lock, Phone, Link as LinkIcon, Mail, Home, Search, DollarSign, AlertCircle, Clock, Heart, Frown, Meh, Zap, Lightbulb, Copy, Check, TrendingUp, FileText, ExternalLink } from "lucide-react";
+import { Loader2, MapPin, User, Lock, Phone, Link as LinkIcon, Mail, Home, Search, DollarSign, AlertCircle, Clock, Heart, Frown, Meh, Zap, Lightbulb, Copy, Check, TrendingUp, FileText, ExternalLink, ClipboardCheck } from "lucide-react";
 import { toast } from "sonner";
+import { InspectionDataSection } from "@/components/properties/InspectionDataSection";
 
 interface PropertyDetailsModalProps {
   open: boolean;
@@ -1071,6 +1072,21 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
                           </div>
                         </div>
                       ))}
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Inspection Data Section */}
+                {propertyId && (
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                        <ClipboardCheck className="h-4 w-4 text-primary" />
+                        Inspection Data
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <InspectionDataSection propertyId={propertyId} />
                     </CardContent>
                   </Card>
                 )}
