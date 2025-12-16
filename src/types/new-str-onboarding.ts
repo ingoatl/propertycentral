@@ -23,6 +23,7 @@ export interface NewSTROnboardingFormData {
   wifiPassword: string;
   smartLockInstalled: boolean;
   smartLockBrand: string;
+  smartLockCode: string;
   utilitiesSetup: boolean;
   utilities: {
     electric: { provider: string; accountNumber: string };
@@ -100,6 +101,7 @@ export interface NewSTROnboardingFormData {
   // Step 8: Listing Preferences
   photographyNeeds: string;
   photographyNotes: string;
+  existingPhotosLink: string;
   listingTitleIdeas: string;
   uniqueSellingPoints: string;
   needsDesignConsultation: boolean;
@@ -170,6 +172,7 @@ export const initialNewSTRFormData: NewSTROnboardingFormData = {
   wifiPassword: '',
   smartLockInstalled: false,
   smartLockBrand: '',
+  smartLockCode: '',
   utilitiesSetup: false,
   utilities: {
     electric: { provider: '', accountNumber: '' },
@@ -243,6 +246,7 @@ export const initialNewSTRFormData: NewSTROnboardingFormData = {
   // Step 8
   photographyNeeds: '',
   photographyNotes: '',
+  existingPhotosLink: '',
   listingTitleIdeas: '',
   uniqueSellingPoints: '',
   needsDesignConsultation: false,

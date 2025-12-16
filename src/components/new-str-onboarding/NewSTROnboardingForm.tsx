@@ -12,7 +12,6 @@ import { OperationsPlanningStep } from "./steps/OperationsPlanningStep";
 import { LegalComplianceStep } from "./steps/LegalComplianceStep";
 import { DocumentsStep } from "./steps/DocumentsStep";
 import { ListingPreferencesStep } from "./steps/ListingPreferencesStep";
-import { MarketingRulesStep } from "./steps/MarketingRulesStep";
 import { HouseQuirksStep } from "./steps/HouseQuirksStep";
 import { ReviewStep } from "./steps/ReviewStep";
 import { NewSTRSuccessScreen } from "./NewSTRSuccessScreen";
@@ -26,9 +25,8 @@ const STEPS = [
   { number: 6, title: "Legal" },
   { number: 7, title: "Documents" },
   { number: 8, title: "Listings" },
-  { number: 9, title: "Rules" },
-  { number: 10, title: "Details" },
-  { number: 11, title: "Review" },
+  { number: 9, title: "Details" },
+  { number: 10, title: "Review" },
 ];
 
 export const NewSTROnboardingForm = () => {
@@ -303,10 +301,8 @@ export const NewSTROnboardingForm = () => {
       case 8:
         return <ListingPreferencesStep formData={formData} updateFormData={updateFormData} />;
       case 9:
-        return <MarketingRulesStep formData={formData} updateFormData={updateFormData} />;
-      case 10:
         return <HouseQuirksStep formData={formData} updateFormData={updateFormData} />;
-      case 11:
+      case 10:
         return <ReviewStep formData={formData} updateFormData={updateFormData} />;
       default:
         return null;
