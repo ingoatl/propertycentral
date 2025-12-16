@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Trash2, MapPin, Building2, Edit, ClipboardList, FileText, Upload, Image as ImageIcon, Search, Database } from "lucide-react";
+import { Plus, Trash2, MapPin, Building2, Edit, ClipboardList, FileText, Upload, Image as ImageIcon, Search, Database, PowerOff, Archive } from "lucide-react";
 import villa14Image from "@/assets/villa14.jpg";
 import { WorkflowDialog } from "@/components/onboarding/WorkflowDialog";
 import { PropertyDetailsModal } from "@/components/onboarding/PropertyDetailsModal";
@@ -19,6 +19,7 @@ import { useAdminCheck } from "@/hooks/useAdminCheck";
 import { Badge } from "@/components/ui/badge";
 import { BulkUpdateListingURLs } from "@/components/onboarding/BulkUpdateListingURLs";
 import { PartnerPropertiesSection } from "@/components/properties/PartnerPropertiesSection";
+import { OffboardPropertyDialog } from "@/components/properties/OffboardPropertyDialog";
 
 const propertySchema = z.object({
   name: z.string().trim().min(1, "Name is required").max(200, "Name must be less than 200 characters"),
@@ -44,6 +45,7 @@ const Properties = () => {
   const [uploadingImage, setUploadingImage] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [propertyTypeFilter, setPropertyTypeFilter] = useState<"All" | "Client-Managed" | "Company-Owned" | "Inactive">("All");
+  const [offboardingProperty, setOffboardingProperty] = useState<{ id: string; name: string; address: string } | null>(null);
   const [formData, setFormData] = useState({
     name: "",
     address: "",
@@ -112,6 +114,9 @@ const Properties = () => {
         image_path: p.image_path || (p.name.includes("Villa") && p.name.includes("14") ? villa14Image : undefined),
         propertyType: p.property_type as "Client-Managed" | "Company-Owned" | "Inactive" | undefined,
         managementFeePercentage: Number(p.management_fee_percentage),
+        offboardedAt: p.offboarded_at || undefined,
+        offboardingReason: p.offboarding_reason || undefined,
+        offboardingNotes: p.offboarding_notes || undefined,
       })));
     } catch (error: any) {
       if (import.meta.env.DEV) {
@@ -373,6 +378,7 @@ const Properties = () => {
 
   const clientManagedProperties = filteredProperties.filter(p => p.propertyType === "Client-Managed");
   const companyOwnedProperties = filteredProperties.filter(p => p.propertyType === "Company-Owned");
+  const offboardedProperties = properties.filter(p => p.propertyType === "Inactive" && p.offboardedAt);
 
   const getPropertyTypeTag = (type?: string) => {
     if (type === "Client-Managed") return "[Managed]";
@@ -418,8 +424,8 @@ const Properties = () => {
           </div>
         )}
         
-        {/* Hover-only action buttons - Original 3 icons */}
-        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center gap-2">
+        {/* Hover-only action buttons - Original 3 icons + Offboard */}
+        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center gap-2 flex-wrap p-2">
           <Button
             size="sm"
             variant="secondary"
@@ -461,6 +467,24 @@ const Properties = () => {
             <FileText className="w-4 h-4 mr-1" />
             Details
           </Button>
+          {property.propertyType !== "Inactive" && (
+            <Button
+              size="sm"
+              variant="destructive"
+              className="shadow-lg"
+              onClick={(e) => {
+                e.stopPropagation();
+                setOffboardingProperty({
+                  id: property.id,
+                  name: property.name,
+                  address: property.address,
+                });
+              }}
+            >
+              <PowerOff className="w-4 h-4 mr-1" />
+              Offboard
+            </Button>
+          )}
         </div>
         
         {/* Hidden file input */}
@@ -841,6 +865,60 @@ const Properties = () => {
       {/* Partner Properties Section */}
       <PartnerPropertiesSection />
 
+      {/* Offboarded Properties Section */}
+      {offboardedProperties.length > 0 && (
+        <div className="space-y-4 pt-8 mt-8 border-t border-border">
+          <div className="flex items-center gap-2 pb-2 border-b border-border/40">
+            <Archive className="w-5 h-5 text-muted-foreground" />
+            <h2 className="text-xl font-semibold text-muted-foreground">
+              OFFBOARDED PROPERTIES
+            </h2>
+            <span className="text-sm text-muted-foreground">({offboardedProperties.length})</span>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3">
+            {offboardedProperties.map((property, index) => (
+              <Card 
+                key={property.id}
+                className="shadow-card border-border/50 overflow-hidden opacity-60 hover:opacity-80 transition-opacity"
+                style={{ animationDelay: `${index * 0.05}s` }}
+              >
+                <div className="relative w-full aspect-[16/9] bg-muted overflow-hidden">
+                  {property.image_path ? (
+                    <img 
+                      src={property.image_path} 
+                      alt={property.name}
+                      className="w-full h-full object-cover grayscale"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-gradient-subtle">
+                      <ImageIcon className="w-12 h-12 text-muted-foreground/30" />
+                    </div>
+                  )}
+                  <div className="absolute top-2 right-2">
+                    <Badge variant="destructive" className="text-[10px]">Offboarded</Badge>
+                  </div>
+                </div>
+                <CardHeader className="pb-2 pt-3 px-3">
+                  <CardTitle className="text-base text-muted-foreground line-clamp-2">
+                    {property.name}
+                  </CardTitle>
+                  <CardDescription className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
+                    <MapPin className="w-3 h-3 flex-shrink-0" />
+                    <span className="line-clamp-1">{property.address}</span>
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="px-3 pb-3 space-y-2">
+                  <div className="text-xs text-muted-foreground space-y-1">
+                    <p><strong>Reason:</strong> {property.offboardingReason}</p>
+                    <p><strong>Date:</strong> {property.offboardedAt ? new Date(property.offboardedAt).toLocaleDateString() : "N/A"}</p>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      )}
+
       {filteredProperties.length === 0 && (
         <Card className="shadow-card border-border/50">
           <CardContent className="pt-12 pb-12 text-center">
@@ -899,6 +977,16 @@ const Properties = () => {
           propertyId={selectedPropertyForDetails.id}
         />
       )}
+
+      <OffboardPropertyDialog
+        open={!!offboardingProperty}
+        onOpenChange={(open) => !open && setOffboardingProperty(null)}
+        property={offboardingProperty}
+        onSuccess={() => {
+          loadProperties();
+          loadPropertyProjects();
+        }}
+      />
     </div>
   );
 };

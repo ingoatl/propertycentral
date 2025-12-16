@@ -128,3 +128,9 @@ verify_jwt = false
 
 [functions.process-owner-onboarding]
 verify_jwt = false
+
+[functions.send-offboarding-notification]
+verify_jwt = true
+
+[functions.process-new-str-onboarding]
+verify_jwt = false

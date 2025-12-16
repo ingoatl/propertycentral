@@ -10,6 +10,9 @@ export interface Property {
   managementFeePercentage?: number;
   nightlyRate?: number;
   orderMinimumFee?: number;
+  offboardedAt?: string;
+  offboardingReason?: string;
+  offboardingNotes?: string;
 }
 
 export interface PartnerProperty {
