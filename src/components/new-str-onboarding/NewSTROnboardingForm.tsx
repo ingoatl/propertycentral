@@ -1,0 +1,355 @@
+import { useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { NewSTROnboardingFormData, initialNewSTRFormData } from "@/types/new-str-onboarding";
+import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
+import { toast } from "sonner";
+import { ArrowLeft, ArrowRight, Loader2, Send } from "lucide-react";
+import { PropertyBasicsStep } from "./steps/PropertyBasicsStep";
+import { RentalStrategyStep } from "./steps/RentalStrategyStep";
+import { InfrastructureStep } from "./steps/InfrastructureStep";
+import { SetupStatusStep } from "./steps/SetupStatusStep";
+import { OperationsPlanningStep } from "./steps/OperationsPlanningStep";
+import { LegalComplianceStep } from "./steps/LegalComplianceStep";
+import { DocumentsStep } from "./steps/DocumentsStep";
+import { ListingPreferencesStep } from "./steps/ListingPreferencesStep";
+import { MarketingRulesStep } from "./steps/MarketingRulesStep";
+import { HouseQuirksStep } from "./steps/HouseQuirksStep";
+import { ReviewStep } from "./steps/ReviewStep";
+import { NewSTRSuccessScreen } from "./NewSTRSuccessScreen";
+
+const STEPS = [
+  { number: 1, title: "Property Basics" },
+  { number: 2, title: "Rental Strategy" },
+  { number: 3, title: "Infrastructure" },
+  { number: 4, title: "Setup Status" },
+  { number: 5, title: "Operations" },
+  { number: 6, title: "Legal" },
+  { number: 7, title: "Documents" },
+  { number: 8, title: "Listings" },
+  { number: 9, title: "House Rules" },
+  { number: 10, title: "Details" },
+  { number: 11, title: "Review" },
+];
+
+export const NewSTROnboardingForm = () => {
+  const [currentStep, setCurrentStep] = useState(1);
+  const [formData, setFormData] = useState<NewSTROnboardingFormData>(initialNewSTRFormData);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSubmitted, setIsSubmitted] = useState(false);
+
+  const updateFormData = (updates: Partial<NewSTROnboardingFormData>) => {
+    setFormData(prev => ({ ...prev, ...updates }));
+  };
+
+  const validateStep = (step: number): boolean => {
+    switch (step) {
+      case 1:
+        if (!formData.ownerName || !formData.ownerEmail || !formData.ownerPhone || !formData.propertyAddress || !formData.propertyType) {
+          toast.error("Please fill in all required fields");
+          return false;
+        }
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.ownerEmail)) {
+          toast.error("Please enter a valid email address");
+          return false;
+        }
+        return true;
+      case 2:
+        if (!formData.rentalStrategy) {
+          toast.error("Please select a rental strategy");
+          return false;
+        }
+        return true;
+      case 6:
+        if (!formData.strPermitStatus) {
+          toast.error("Please select your STR permit status");
+          return false;
+        }
+        return true;
+      default:
+        return true;
+    }
+  };
+
+  const handleNext = () => {
+    if (validateStep(currentStep)) {
+      setCurrentStep(prev => Math.min(prev + 1, STEPS.length));
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  const handleBack = () => {
+    setCurrentStep(prev => Math.max(prev - 1, 1));
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const uploadFile = async (file: File, fieldName: string): Promise<string | null> => {
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `new-str/${Date.now()}-${fieldName}.${fileExt}`;
+      
+      const { error } = await supabase.storage
+        .from('onboarding-documents')
+        .upload(fileName, file);
+      
+      if (error) throw error;
+      
+      const { data: urlData } = supabase.storage
+        .from('onboarding-documents')
+        .getPublicUrl(fileName);
+      
+      return urlData.publicUrl;
+    } catch (error) {
+      console.error(`Error uploading ${fieldName}:`, error);
+      return null;
+    }
+  };
+
+  const handleSubmit = async () => {
+    if (!validateStep(currentStep)) return;
+
+    setIsSubmitting(true);
+
+    try {
+      // Upload files
+      const fileFields = [
+        'governmentIdFile',
+        'propertyDeedFile',
+        'mortgageStatementFile',
+        'entityDocumentsFile',
+        'insuranceCertificateFile',
+        'hoaRulesFile',
+      ] as const;
+
+      const fileUrls: Record<string, string | null> = {};
+      for (const field of fileFields) {
+        const file = formData[field];
+        if (file) {
+          fileUrls[field.replace('File', '_url')] = await uploadFile(file, field);
+        }
+      }
+
+      // Prepare submission data
+      const submissionData = {
+        // Owner info
+        owner_name: formData.ownerName,
+        owner_email: formData.ownerEmail,
+        owner_phone: formData.ownerPhone,
+        property_address: formData.propertyAddress,
+        
+        // Property basics
+        property_type: formData.propertyType,
+        bedrooms: formData.bedrooms,
+        bathrooms: formData.bathrooms,
+        square_footage: formData.squareFootage,
+        
+        // Rental strategy
+        rental_strategy: formData.rentalStrategy,
+        target_guest_avatar: formData.targetGuestAvatar,
+        pricing_goal: formData.pricingGoal,
+        expected_adr: formData.expectedAdr,
+        minimum_stay: formData.minimumStay,
+        max_guests: formData.maxGuests,
+        peak_season_months: formData.peakSeasonMonths,
+        
+        // Infrastructure
+        wifi_ready: formData.wifiReady,
+        wifi_ssid: formData.wifiSsid,
+        wifi_password: formData.wifiPassword,
+        smart_lock_installed: formData.smartLockInstalled,
+        smart_lock_brand: formData.smartLockBrand,
+        utilities_setup: formData.utilitiesSetup,
+        utilities: formData.utilities,
+        
+        // Setup status
+        setup_status: {
+          furniture: { status: formData.furnitureStatus, notes: formData.furnitureNotes },
+          kitchen: { status: formData.kitchenStatus, notes: formData.kitchenNotes },
+          linens: { status: formData.linensStatus, notes: formData.linensNotes },
+          decor: { status: formData.decorStatus, notes: formData.decorNotes },
+          outdoor: { status: formData.outdoorStatus, notes: formData.outdoorNotes },
+          cleaning_supplies: { status: formData.cleaningSuppliesStatus, notes: formData.cleaningSuppliesNotes },
+        },
+        
+        // Operations
+        has_existing_cleaner: formData.hasExistingCleaner,
+        cleaner_name: formData.cleanerName,
+        cleaner_phone: formData.cleanerPhone,
+        cleaner_rate: formData.cleanerRate,
+        needs_cleaner_referral: formData.needsCleanerReferral,
+        laundry_setup: formData.laundrySetup,
+        laundry_notes: formData.laundryNotes,
+        supply_storage_location: formData.supplyStorageLocation,
+        preferred_turnover_time: formData.preferredTurnoverTime,
+        turnover_notes: formData.turnoverNotes,
+        
+        // Legal
+        str_permit_status: formData.strPermitStatus,
+        permit_number: formData.permitNumber,
+        hoa_restrictions: formData.hoaRestrictions,
+        hoa_notes: formData.hoaNotes,
+        hoa_contact_name: formData.hoaContactName,
+        hoa_contact_phone: formData.hoaContactPhone,
+        insurance_provider: formData.insuranceProvider,
+        insurance_policy_number: formData.insurancePolicyNumber,
+        has_str_insurance: formData.hasStrInsurance,
+        entity_ownership: formData.entityOwnership,
+        entity_name: formData.entityName,
+        tax_id: formData.taxId,
+        
+        // File URLs
+        ...fileUrls,
+        
+        // Listing preferences
+        listing_platforms: formData.listingPlatforms,
+        photography_needs: formData.photographyNeeds,
+        photography_notes: formData.photographyNotes,
+        listing_title_ideas: formData.listingTitleIdeas,
+        unique_selling_points: formData.uniqueSellingPoints,
+        competitor_links: formData.competitorLinks,
+        
+        // House rules
+        house_rules: formData.houseRules,
+        pet_policy: formData.petPolicy,
+        pet_deposit: formData.petDeposit,
+        pet_size_restrictions: formData.petSizeRestrictions,
+        checkout_procedures: formData.checkoutProcedures,
+        noise_policy: formData.noisePolicy,
+        smoking_policy: formData.smokingPolicy,
+        party_policy: formData.partyPolicy,
+        
+        // Property details
+        property_features: formData.propertyFeatures,
+        known_issues: formData.knownIssues,
+        neighbor_notes: formData.neighborNotes,
+        parking_instructions: formData.parkingInstructions,
+        max_vehicles: formData.maxVehicles,
+        maintenance_contact: formData.maintenanceContact,
+        emergency_contact: formData.emergencyContact,
+        pool_hot_tub_info: formData.poolHotTubInfo,
+        special_instructions: formData.specialInstructions,
+      };
+
+      // Call edge function
+      const { data, error } = await supabase.functions.invoke('process-new-str-onboarding', {
+        body: submissionData,
+      });
+
+      if (error) throw error;
+
+      setIsSubmitted(true);
+      toast.success("Your property information has been submitted successfully!");
+    } catch (error: any) {
+      console.error("Error submitting form:", error);
+      toast.error("Failed to submit form: " + (error.message || "Unknown error"));
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  if (isSubmitted) {
+    return <NewSTRSuccessScreen />;
+  }
+
+  const renderStep = () => {
+    switch (currentStep) {
+      case 1:
+        return <PropertyBasicsStep formData={formData} updateFormData={updateFormData} />;
+      case 2:
+        return <RentalStrategyStep formData={formData} updateFormData={updateFormData} />;
+      case 3:
+        return <InfrastructureStep formData={formData} updateFormData={updateFormData} />;
+      case 4:
+        return <SetupStatusStep formData={formData} updateFormData={updateFormData} />;
+      case 5:
+        return <OperationsPlanningStep formData={formData} updateFormData={updateFormData} />;
+      case 6:
+        return <LegalComplianceStep formData={formData} updateFormData={updateFormData} />;
+      case 7:
+        return <DocumentsStep formData={formData} updateFormData={updateFormData} />;
+      case 8:
+        return <ListingPreferencesStep formData={formData} updateFormData={updateFormData} />;
+      case 9:
+        return <MarketingRulesStep formData={formData} updateFormData={updateFormData} />;
+      case 10:
+        return <HouseQuirksStep formData={formData} updateFormData={updateFormData} />;
+      case 11:
+        return <ReviewStep formData={formData} updateFormData={updateFormData} />;
+      default:
+        return null;
+    }
+  };
+
+  const progress = (currentStep / STEPS.length) * 100;
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-background to-muted">
+      {/* Header */}
+      <div className="sticky top-0 z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b">
+        <div className="max-w-4xl mx-auto px-4 py-4">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <img 
+                src="/peachhaus-logo.png" 
+                alt="PeachHaus" 
+                className="h-8 w-auto"
+              />
+              <div>
+                <h1 className="font-semibold text-foreground">New Property Onboarding</h1>
+                <p className="text-xs text-muted-foreground">
+                  Step {currentStep} of {STEPS.length}: {STEPS[currentStep - 1]?.title}
+                </p>
+              </div>
+            </div>
+          </div>
+          <Progress value={progress} className="h-2" />
+        </div>
+      </div>
+
+      {/* Content */}
+      <div className="max-w-4xl mx-auto px-4 py-8">
+        {renderStep()}
+      </div>
+
+      {/* Navigation */}
+      <div className="sticky bottom-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-t">
+        <div className="max-w-4xl mx-auto px-4 py-4 flex justify-between">
+          <Button
+            variant="outline"
+            onClick={handleBack}
+            disabled={currentStep === 1}
+            className="gap-2"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back
+          </Button>
+
+          {currentStep < STEPS.length ? (
+            <Button onClick={handleNext} className="gap-2">
+              Continue
+              <ArrowRight className="w-4 h-4" />
+            </Button>
+          ) : (
+            <Button 
+              onClick={handleSubmit} 
+              disabled={isSubmitting}
+              className="gap-2 bg-primary hover:bg-primary/90"
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Submitting...
+                </>
+              ) : (
+                <>
+                  <Send className="w-4 h-4" />
+                  Submit Application
+                </>
+              )}
+            </Button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};

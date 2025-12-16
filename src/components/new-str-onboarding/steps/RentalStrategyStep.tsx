@@ -1,0 +1,177 @@
+import { NewSTROnboardingFormData, RENTAL_STRATEGY_OPTIONS, TARGET_GUEST_OPTIONS, PRICING_GOAL_OPTIONS, PEAK_SEASON_OPTIONS } from "@/types/new-str-onboarding";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Target, DollarSign, Calendar, Users } from "lucide-react";
+
+interface RentalStrategyStepProps {
+  formData: NewSTROnboardingFormData;
+  updateFormData: (updates: Partial<NewSTROnboardingFormData>) => void;
+}
+
+export const RentalStrategyStep = ({ formData, updateFormData }: RentalStrategyStepProps) => {
+  const togglePeakMonth = (month: string) => {
+    const current = formData.peakSeasonMonths || [];
+    const updated = current.includes(month)
+      ? current.filter(m => m !== month)
+      : [...current, month];
+    updateFormData({ peakSeasonMonths: updated });
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="text-center mb-8">
+        <h2 className="text-2xl font-bold text-foreground">Rental Strategy</h2>
+        <p className="text-muted-foreground mt-2">Help us understand your goals and target market</p>
+      </div>
+
+      {/* Strategy Selection */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <Target className="w-5 h-5 text-primary" />
+            Rental Approach
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="rentalStrategy">Rental Strategy *</Label>
+            <Select
+              value={formData.rentalStrategy}
+              onValueChange={(value) => updateFormData({ rentalStrategy: value })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select your rental strategy" />
+              </SelectTrigger>
+              <SelectContent>
+                {RENTAL_STRATEGY_OPTIONS.map((strategy) => (
+                  <SelectItem key={strategy} value={strategy}>
+                    {strategy}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="targetGuestAvatar">Target Guest Type</Label>
+            <Select
+              value={formData.targetGuestAvatar}
+              onValueChange={(value) => updateFormData({ targetGuestAvatar: value })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Who is your ideal guest?" />
+              </SelectTrigger>
+              <SelectContent>
+                {TARGET_GUEST_OPTIONS.map((guest) => (
+                  <SelectItem key={guest} value={guest}>
+                    {guest}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="pricingGoal">Pricing Goal</Label>
+            <Select
+              value={formData.pricingGoal}
+              onValueChange={(value) => updateFormData({ pricingGoal: value })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="What's your pricing priority?" />
+              </SelectTrigger>
+              <SelectContent>
+                {PRICING_GOAL_OPTIONS.map((goal) => (
+                  <SelectItem key={goal} value={goal}>
+                    {goal}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Capacity & Rates */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <DollarSign className="w-5 h-5 text-primary" />
+            Capacity & Rate Expectations
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="expectedAdr">Expected Nightly Rate ($)</Label>
+              <Input
+                id="expectedAdr"
+                type="number"
+                min="0"
+                value={formData.expectedAdr || ''}
+                onChange={(e) => updateFormData({ expectedAdr: e.target.value ? parseInt(e.target.value) : null })}
+                placeholder="150"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="minimumStay">Minimum Stay (nights)</Label>
+              <Input
+                id="minimumStay"
+                type="number"
+                min="1"
+                value={formData.minimumStay || ''}
+                onChange={(e) => updateFormData({ minimumStay: e.target.value ? parseInt(e.target.value) : null })}
+                placeholder="2"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="maxGuests">Maximum Guests</Label>
+              <div className="relative">
+                <Users className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="maxGuests"
+                  type="number"
+                  min="1"
+                  className="pl-10"
+                  value={formData.maxGuests || ''}
+                  onChange={(e) => updateFormData({ maxGuests: e.target.value ? parseInt(e.target.value) : null })}
+                  placeholder="6"
+                />
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Peak Season */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <Calendar className="w-5 h-5 text-primary" />
+            Peak Season Months
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground mb-4">Select the months you expect to be busiest</p>
+          <div className="grid grid-cols-3 md:grid-cols-4 gap-3">
+            {PEAK_SEASON_OPTIONS.map((month) => (
+              <div key={month} className="flex items-center space-x-2">
+                <Checkbox
+                  id={`month-${month}`}
+                  checked={formData.peakSeasonMonths?.includes(month)}
+                  onCheckedChange={() => togglePeakMonth(month)}
+                />
+                <Label htmlFor={`month-${month}`} className="text-sm cursor-pointer">
+                  {month}
+                </Label>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
