@@ -2285,6 +2285,9 @@ export type Database = {
           management_fee_percentage: number
           name: string
           nightly_rate: number | null
+          offboarded_at: string | null
+          offboarding_notes: string | null
+          offboarding_reason: string | null
           order_minimum_fee: number | null
           owner_id: string | null
           property_type: Database["public"]["Enums"]["property_type"] | null
@@ -2301,6 +2304,9 @@ export type Database = {
           management_fee_percentage?: number
           name: string
           nightly_rate?: number | null
+          offboarded_at?: string | null
+          offboarding_notes?: string | null
+          offboarding_reason?: string | null
           order_minimum_fee?: number | null
           owner_id?: string | null
           property_type?: Database["public"]["Enums"]["property_type"] | null
@@ -2317,6 +2323,9 @@ export type Database = {
           management_fee_percentage?: number
           name?: string
           nightly_rate?: number | null
+          offboarded_at?: string | null
+          offboarding_notes?: string | null
+          offboarding_reason?: string | null
           order_minimum_fee?: number | null
           owner_id?: string | null
           property_type?: Database["public"]["Enums"]["property_type"] | null
