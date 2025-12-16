@@ -28,12 +28,12 @@ serve(async (req: Request): Promise<Response> => {
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Fetch inspection with property
+    // Fetch inspection with property (including image)
     const { data: inspection, error: inspectionError } = await supabase
       .from("inspections")
       .select(`
         *,
-        property:properties(id, name, address)
+        property:properties(id, name, address, image_path)
       `)
       .eq("id", inspectionId)
       .single();
@@ -67,6 +67,7 @@ serve(async (req: Request): Promise<Response> => {
     // Build email HTML
     const propertyName = inspection.property?.name || "Unknown Property";
     const propertyAddress = inspection.property?.address || "N/A";
+    const propertyImage = inspection.property?.image_path || null;
     const inspectorName = inspection.inspector_name || "Unknown";
     const remarks = inspection.notes || "No remarks provided";
     const inspectionDate = new Date(inspection.created_at).toLocaleDateString("en-US", {
@@ -79,6 +80,14 @@ serve(async (req: Request): Promise<Response> => {
     // Group responses by pass/fail
     const passedItems = responses?.filter((r) => r.value_bool === true) || [];
     const failedItems = responses?.filter((r) => r.value_bool === false) || [];
+
+    // Build property image HTML
+    const propertyImageHtml = propertyImage
+      ? `<div style="margin-bottom: 0;">
+          <img src="${propertyImage}" alt="${propertyName} - Exterior" 
+            style="width: 100%; max-height: 300px; object-fit: cover; border-radius: 12px 12px 0 0;" />
+        </div>`
+      : "";
 
     // Build photo HTML
     const photoHtml = photos?.length
@@ -123,7 +132,8 @@ serve(async (req: Request): Promise<Response> => {
         <title>Inspection Report - ${propertyName}</title>
       </head>
       <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #1f2937; max-width: 700px; margin: 0 auto; padding: 20px;">
-        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; border-radius: 12px 12px 0 0;">
+        ${propertyImageHtml}
+        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; ${propertyImage ? 'border-radius: 0;' : 'border-radius: 12px 12px 0 0;'}">
           <h1 style="margin: 0; font-size: 24px;">🏠 Inspection Report</h1>
           <p style="margin: 8px 0 0; opacity: 0.9;">${propertyName}</p>
         </div>
