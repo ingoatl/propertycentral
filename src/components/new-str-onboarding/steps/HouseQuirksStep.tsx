@@ -1,10 +1,12 @@
-import { NewSTROnboardingFormData, PROPERTY_FEATURE_OPTIONS } from "@/types/new-str-onboarding";
+import { NewSTROnboardingFormData, PROPERTY_FEATURE_OPTIONS, SECURITY_STATUS_OPTIONS, PARKING_TYPE_OPTIONS, TRASH_DAY_OPTIONS, SMOKE_DETECTOR_OPTIONS } from "@/types/new-str-onboarding";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Lightbulb, AlertTriangle, Users, Car, Wrench, Phone, Waves } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Lightbulb, AlertTriangle, Users, Car, Wrench, Phone, Waves, KeyRound, Trash2, Shield, Flame } from "lucide-react";
 
 interface HouseQuirksStepProps {
   formData: NewSTROnboardingFormData;
@@ -55,17 +57,28 @@ export const HouseQuirksStep = ({ formData, updateFormData }: HouseQuirksStepPro
       </Card>
 
       {/* Pool/Hot Tub */}
-      {(formData.propertyFeatures?.includes('Pool') || formData.propertyFeatures?.includes('Hot Tub')) && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <Waves className="w-5 h-5 text-primary" />
-              Pool / Hot Tub Details
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              <Label htmlFor="poolHotTubInfo">Pool/Hot Tub Information</Label>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <Waves className="w-5 h-5 text-primary" />
+            Pool / Hot Tub
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <Label htmlFor="poolHotTubPresent">Does the property have a pool or hot tub?</Label>
+              <p className="text-sm text-muted-foreground">Important for listings and maintenance</p>
+            </div>
+            <Switch
+              id="poolHotTubPresent"
+              checked={formData.poolHotTubPresent}
+              onCheckedChange={(checked) => updateFormData({ poolHotTubPresent: checked })}
+            />
+          </div>
+          {formData.poolHotTubPresent && (
+            <div className="space-y-2 pt-4 border-t">
+              <Label htmlFor="poolHotTubInfo">Pool/Hot Tub Details</Label>
               <Textarea
                 id="poolHotTubInfo"
                 value={formData.poolHotTubInfo}
@@ -74,9 +87,148 @@ export const HouseQuirksStep = ({ formData, updateFormData }: HouseQuirksStepPro
                 rows={3}
               />
             </div>
-          </CardContent>
-        </Card>
-      )}
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Access Codes */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <KeyRound className="w-5 h-5 text-primary" />
+            Access Codes & Entry
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="alarmSystemCode">Alarm System Code</Label>
+              <Input
+                id="alarmSystemCode"
+                value={formData.alarmSystemCode}
+                onChange={(e) => updateFormData({ alarmSystemCode: e.target.value })}
+                placeholder="e.g., 1234"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="securitySystemStatus">Security System Status</Label>
+              <Select
+                value={formData.securitySystemStatus}
+                onValueChange={(value) => updateFormData({ securitySystemStatus: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select status" />
+                </SelectTrigger>
+                <SelectContent>
+                  {SECURITY_STATUS_OPTIONS.map((option) => (
+                    <SelectItem key={option} value={option}>
+                      {option}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="gateCode">Gate Code</Label>
+              <Input
+                id="gateCode"
+                value={formData.gateCode}
+                onChange={(e) => updateFormData({ gateCode: e.target.value })}
+                placeholder="Community or driveway gate code"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="garageCode">Garage Code</Label>
+              <Input
+                id="garageCode"
+                value={formData.garageCode}
+                onChange={(e) => updateFormData({ garageCode: e.target.value })}
+                placeholder="Garage door keypad code"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="lockboxLocation">Lockbox Location</Label>
+              <Input
+                id="lockboxLocation"
+                value={formData.lockboxLocation}
+                onChange={(e) => updateFormData({ lockboxLocation: e.target.value })}
+                placeholder="e.g., Front door handle"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="lockboxCode">Lockbox Code</Label>
+              <Input
+                id="lockboxCode"
+                value={formData.lockboxCode}
+                onChange={(e) => updateFormData({ lockboxCode: e.target.value })}
+                placeholder="Lockbox combination"
+              />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="backupEntryMethod">Backup Entry Method</Label>
+            <Input
+              id="backupEntryMethod"
+              value={formData.backupEntryMethod}
+              onChange={(e) => updateFormData({ backupEntryMethod: e.target.value })}
+              placeholder="e.g., Spare key under mat, neighbor has key"
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Safety Equipment */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <Shield className="w-5 h-5 text-primary" />
+            Safety Equipment
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="smokeDetectorStatus">Smoke Detector Status</Label>
+              <Select
+                value={formData.smokeDetectorStatus}
+                onValueChange={(value) => updateFormData({ smokeDetectorStatus: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select status" />
+                </SelectTrigger>
+                <SelectContent>
+                  {SMOKE_DETECTOR_OPTIONS.map((option) => (
+                    <SelectItem key={option} value={option}>
+                      {option}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-center justify-between">
+              <div>
+                <Label htmlFor="fireExtinguisherPresent">Fire Extinguisher Present?</Label>
+              </div>
+              <Switch
+                id="fireExtinguisherPresent"
+                checked={formData.fireExtinguisherPresent}
+                onCheckedChange={(checked) => updateFormData({ fireExtinguisherPresent: checked })}
+              />
+            </div>
+          </div>
+          {formData.fireExtinguisherPresent && (
+            <div className="space-y-2">
+              <Label htmlFor="fireExtinguisherLocation">Fire Extinguisher Location</Label>
+              <Input
+                id="fireExtinguisherLocation"
+                value={formData.fireExtinguisherLocation}
+                onChange={(e) => updateFormData({ fireExtinguisherLocation: e.target.value })}
+                placeholder="e.g., Kitchen pantry, garage"
+              />
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Known Issues */}
       <Card>
@@ -141,9 +293,36 @@ export const HouseQuirksStep = ({ formData, updateFormData }: HouseQuirksStepPro
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="maxVehicles">Maximum Vehicles</Label>
+              <Label htmlFor="parkingSpaces">Number of Parking Spaces</Label>
+              <Input
+                id="parkingSpaces"
+                value={formData.parkingSpaces}
+                onChange={(e) => updateFormData({ parkingSpaces: e.target.value })}
+                placeholder="2"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="parkingType">Parking Type</Label>
+              <Select
+                value={formData.parkingType}
+                onValueChange={(value) => updateFormData({ parkingType: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {PARKING_TYPE_OPTIONS.map((option) => (
+                    <SelectItem key={option} value={option}>
+                      {option}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="maxVehicles">Max Vehicles Allowed</Label>
               <Input
                 id="maxVehicles"
                 type="number"
@@ -164,6 +343,57 @@ export const HouseQuirksStep = ({ formData, updateFormData }: HouseQuirksStepPro
               rows={2}
             />
           </div>
+          <div className="space-y-2">
+            <Label htmlFor="parkingHoaRules">HOA Parking Rules</Label>
+            <Textarea
+              id="parkingHoaRules"
+              value={formData.parkingHoaRules}
+              onChange={(e) => updateFormData({ parkingHoaRules: e.target.value })}
+              placeholder="Any HOA rules about parking, guest vehicles, etc."
+              rows={2}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Trash Collection */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <Trash2 className="w-5 h-5 text-primary" />
+            Trash Collection
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="trashPickupDay">Trash Pickup Day</Label>
+              <Select
+                value={formData.trashPickupDay}
+                onValueChange={(value) => updateFormData({ trashPickupDay: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select day" />
+                </SelectTrigger>
+                <SelectContent>
+                  {TRASH_DAY_OPTIONS.map((option) => (
+                    <SelectItem key={option} value={option}>
+                      {option}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="trashBinLocation">Trash Bin Location</Label>
+              <Input
+                id="trashBinLocation"
+                value={formData.trashBinLocation}
+                onChange={(e) => updateFormData({ trashBinLocation: e.target.value })}
+                placeholder="e.g., Side of garage, backyard"
+              />
+            </div>
+          </div>
         </CardContent>
       </Card>
 
@@ -178,21 +408,31 @@ export const HouseQuirksStep = ({ formData, updateFormData }: HouseQuirksStepPro
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="emergencyContact">Emergency Contact</Label>
+              <Label htmlFor="emergencyContact">Emergency Contact Name</Label>
               <Input
                 id="emergencyContact"
                 value={formData.emergencyContact}
                 onChange={(e) => updateFormData({ emergencyContact: e.target.value })}
-                placeholder="Name & phone for emergencies"
+                placeholder="Name for emergencies"
               />
             </div>
             <div className="space-y-2">
+              <Label htmlFor="emergencyContactPhone">Emergency Contact Phone</Label>
+              <Input
+                id="emergencyContactPhone"
+                type="tel"
+                value={formData.emergencyContactPhone}
+                onChange={(e) => updateFormData({ emergencyContactPhone: e.target.value })}
+                placeholder="(555) 123-4567"
+              />
+            </div>
+            <div className="space-y-2 md:col-span-2">
               <Label htmlFor="maintenanceContact">Maintenance Contact</Label>
               <Input
                 id="maintenanceContact"
                 value={formData.maintenanceContact}
                 onChange={(e) => updateFormData({ maintenanceContact: e.target.value })}
-                placeholder="Handyman or maintenance person"
+                placeholder="Handyman or maintenance person name & phone"
               />
             </div>
           </div>

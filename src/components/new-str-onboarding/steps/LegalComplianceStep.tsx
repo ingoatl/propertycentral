@@ -1,4 +1,4 @@
-import { NewSTROnboardingFormData, STR_PERMIT_STATUS_OPTIONS, ENTITY_OWNERSHIP_OPTIONS } from "@/types/new-str-onboarding";
+import { NewSTROnboardingFormData, STR_PERMIT_STATUS_OPTIONS, ENTITY_OWNERSHIP_OPTIONS, INSURANCE_STATUS_OPTIONS, HOA_APPROVAL_OPTIONS } from "@/types/new-str-onboarding";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -71,6 +71,25 @@ export const LegalComplianceStep = ({ formData, updateFormData }: LegalComplianc
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="hoaApprovalStatus">HOA STR Approval Status</Label>
+            <Select
+              value={formData.hoaApprovalStatus}
+              onValueChange={(value) => updateFormData({ hoaApprovalStatus: value })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select HOA approval status" />
+              </SelectTrigger>
+              <SelectContent>
+                {HOA_APPROVAL_OPTIONS.map((status) => (
+                  <SelectItem key={status} value={status}>
+                    {status}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           <div className="flex items-center justify-between">
             <div>
               <Label htmlFor="hoaRestrictions">Does your HOA have STR restrictions?</Label>
@@ -118,6 +137,17 @@ export const LegalComplianceStep = ({ formData, updateFormData }: LegalComplianc
               </div>
             </div>
           )}
+
+          <div className="space-y-2">
+            <Label htmlFor="hoaRules">HOA Rules Summary</Label>
+            <Textarea
+              id="hoaRules"
+              value={formData.hoaRules}
+              onChange={(e) => updateFormData({ hoaRules: e.target.value })}
+              placeholder="Summarize any important HOA rules guests should know about (noise, parking, pool hours, etc.)"
+              rows={2}
+            />
+          </div>
         </CardContent>
       </Card>
 
@@ -130,6 +160,25 @@ export const LegalComplianceStep = ({ formData, updateFormData }: LegalComplianc
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="insuranceStatus">Insurance Status</Label>
+            <Select
+              value={formData.insuranceStatus}
+              onValueChange={(value) => updateFormData({ insuranceStatus: value })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select insurance status" />
+              </SelectTrigger>
+              <SelectContent>
+                {INSURANCE_STATUS_OPTIONS.map((status) => (
+                  <SelectItem key={status} value={status}>
+                    {status}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="insuranceProvider">Insurance Provider</Label>

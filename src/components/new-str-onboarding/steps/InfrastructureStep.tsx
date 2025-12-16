@@ -1,9 +1,11 @@
-import { NewSTROnboardingFormData } from "@/types/new-str-onboarding";
+import { NewSTROnboardingFormData, HVAC_TYPE_OPTIONS } from "@/types/new-str-onboarding";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Wifi, Lock, Zap, Flame, Droplets, Trash2, Globe, AlertCircle } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Wifi, Lock, Zap, Flame, Droplets, Trash2, Globe, AlertCircle, Thermometer, MapPin } from "lucide-react";
 
 interface InfrastructureStepProps {
   formData: NewSTROnboardingFormData;
@@ -118,6 +120,131 @@ export const InfrastructureStep = ({ formData, updateFormData }: InfrastructureS
               </div>
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      {/* Gas Kitchen & Safety */}
+      <Card className="rounded-2xl border-[hsl(25,30%,90%)] shadow-sm">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg text-[hsl(25,40%,25%)]">
+            <Flame className="w-5 h-5 text-[hsl(25,95%,50%)]" />
+            Gas Kitchen & Safety
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <Label htmlFor="hasGasKitchen" className="text-[hsl(25,30%,30%)]">Does the property have a gas kitchen?</Label>
+              <p className="text-sm text-[hsl(25,20%,55%)]">Gas stove, oven, or cooktop</p>
+            </div>
+            <Switch
+              id="hasGasKitchen"
+              checked={formData.hasGasKitchen}
+              onCheckedChange={(checked) => updateFormData({ hasGasKitchen: checked })}
+            />
+          </div>
+
+          {formData.hasGasKitchen && (
+            <div className="flex items-center justify-between pt-4 border-t border-[hsl(25,30%,90%)]">
+              <div>
+                <Label htmlFor="naturalGasDetectorInstalled" className="text-[hsl(25,30%,30%)]">Natural Gas Detector Installed?</Label>
+                <p className="text-sm text-[hsl(25,20%,55%)]">Required safety equipment for gas appliances</p>
+              </div>
+              <Switch
+                id="naturalGasDetectorInstalled"
+                checked={formData.naturalGasDetectorInstalled}
+                onCheckedChange={(checked) => updateFormData({ naturalGasDetectorInstalled: checked })}
+              />
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Shutoff Locations */}
+      <Card className="rounded-2xl border-[hsl(25,30%,90%)] shadow-sm">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg text-[hsl(25,40%,25%)]">
+            <MapPin className="w-5 h-5 text-[hsl(25,95%,50%)]" />
+            Emergency Shutoff Locations
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-[hsl(25,20%,55%)]">Important for emergencies and maintenance</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="waterShutoffLocation" className="text-[hsl(25,30%,30%)]">Water Shutoff Location</Label>
+              <Input
+                id="waterShutoffLocation"
+                value={formData.waterShutoffLocation}
+                onChange={(e) => updateFormData({ waterShutoffLocation: e.target.value })}
+                placeholder="e.g., Basement near water heater"
+                className="h-12 rounded-xl border-[hsl(25,30%,85%)]"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="breakerPanelLocation" className="text-[hsl(25,30%,30%)]">Breaker Panel Location</Label>
+              <Input
+                id="breakerPanelLocation"
+                value={formData.breakerPanelLocation}
+                onChange={(e) => updateFormData({ breakerPanelLocation: e.target.value })}
+                placeholder="e.g., Garage, left wall"
+                className="h-12 rounded-xl border-[hsl(25,30%,85%)]"
+              />
+            </div>
+            {formData.hasGasKitchen && (
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="gasShutoffLocation" className="text-[hsl(25,30%,30%)]">Gas Shutoff Location</Label>
+                <Input
+                  id="gasShutoffLocation"
+                  value={formData.gasShutoffLocation}
+                  onChange={(e) => updateFormData({ gasShutoffLocation: e.target.value })}
+                  placeholder="e.g., Behind stove, or exterior meter"
+                  className="h-12 rounded-xl border-[hsl(25,30%,85%)]"
+                />
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* HVAC */}
+      <Card className="rounded-2xl border-[hsl(25,30%,90%)] shadow-sm">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg text-[hsl(25,40%,25%)]">
+            <Thermometer className="w-5 h-5 text-[hsl(25,95%,50%)]" />
+            HVAC System
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="hvacType" className="text-[hsl(25,30%,30%)]">HVAC Type</Label>
+            <Select
+              value={formData.hvacType}
+              onValueChange={(value) => updateFormData({ hvacType: value })}
+            >
+              <SelectTrigger className="h-12 rounded-xl border-[hsl(25,30%,85%)]">
+                <SelectValue placeholder="Select HVAC type" />
+              </SelectTrigger>
+              <SelectContent>
+                {HVAC_TYPE_OPTIONS.map((option) => (
+                  <SelectItem key={option} value={option}>
+                    {option}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="hvacServiceNeeds" className="text-[hsl(25,30%,30%)]">HVAC Service Needs</Label>
+            <Textarea
+              id="hvacServiceNeeds"
+              value={formData.hvacServiceNeeds}
+              onChange={(e) => updateFormData({ hvacServiceNeeds: e.target.value })}
+              placeholder="Any known issues, recent maintenance, or service needed?"
+              rows={2}
+              className="rounded-xl border-[hsl(25,30%,85%)]"
+            />
+          </div>
         </CardContent>
       </Card>
 

@@ -161,6 +161,13 @@ export const NewSTROnboardingForm = () => {
         has_septic_tank: formData.hasSepticTank,
         septic_last_flushed: formData.septicLastFlushed,
         septic_service_company: formData.septicServiceCompany,
+        has_gas_kitchen: formData.hasGasKitchen,
+        natural_gas_detector_installed: formData.naturalGasDetectorInstalled,
+        water_shutoff_location: formData.waterShutoffLocation,
+        breaker_panel_location: formData.breakerPanelLocation,
+        gas_shutoff_location: formData.gasShutoffLocation,
+        hvac_type: formData.hvacType,
+        hvac_service_needs: formData.hvacServiceNeeds,
         
         // Setup status
         setup_status: {
@@ -181,6 +188,8 @@ export const NewSTROnboardingForm = () => {
         laundry_setup: formData.laundrySetup,
         laundry_notes: formData.laundryNotes,
         supply_storage_location: formData.supplyStorageLocation,
+        immediate_repairs: formData.immediateRepairs,
+        existing_vendor_relationships: formData.existingVendorRelationships,
         
         // Legal
         str_permit_status: formData.strPermitStatus,
@@ -195,6 +204,9 @@ export const NewSTROnboardingForm = () => {
         entity_ownership: formData.entityOwnership,
         entity_name: formData.entityName,
         tax_id: formData.taxId,
+        insurance_status: formData.insuranceStatus,
+        hoa_approval_status: formData.hoaApprovalStatus,
+        hoa_rules: formData.hoaRules,
         
         // File URLs
         ...fileUrls,
@@ -206,11 +218,13 @@ export const NewSTROnboardingForm = () => {
         unique_selling_points: formData.uniqueSellingPoints,
         needs_design_consultation: formData.needsDesignConsultation,
         
-        // House rules
+        // House rules & pets
         house_rules: formData.houseRules,
         pet_policy: formData.petPolicy,
         pet_deposit: formData.petDeposit,
         pet_size_restrictions: formData.petSizeRestrictions,
+        pets_allowed: formData.petsAllowed,
+        pet_deposit_rules: formData.petDepositRules,
         
         // Property details
         property_features: formData.propertyFeatures,
@@ -220,8 +234,33 @@ export const NewSTROnboardingForm = () => {
         max_vehicles: formData.maxVehicles,
         maintenance_contact: formData.maintenanceContact,
         emergency_contact: formData.emergencyContact,
+        emergency_contact_phone: formData.emergencyContactPhone,
         pool_hot_tub_info: formData.poolHotTubInfo,
         special_instructions: formData.specialInstructions,
+        
+        // Access codes
+        alarm_system_code: formData.alarmSystemCode,
+        gate_code: formData.gateCode,
+        garage_code: formData.garageCode,
+        lockbox_location: formData.lockboxLocation,
+        lockbox_code: formData.lockboxCode,
+        backup_entry_method: formData.backupEntryMethod,
+        security_system_status: formData.securitySystemStatus,
+        
+        // Parking details
+        parking_spaces: formData.parkingSpaces,
+        parking_type: formData.parkingType,
+        parking_hoa_rules: formData.parkingHoaRules,
+        
+        // Trash
+        trash_bin_location: formData.trashBinLocation,
+        trash_pickup_day: formData.trashPickupDay,
+        
+        // Safety
+        smoke_detector_status: formData.smokeDetectorStatus,
+        fire_extinguisher_present: formData.fireExtinguisherPresent,
+        fire_extinguisher_location: formData.fireExtinguisherLocation,
+        pool_hot_tub_present: formData.poolHotTubPresent,
       };
 
       // Call edge function
