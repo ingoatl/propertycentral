@@ -394,8 +394,8 @@ const handler = async (req: Request): Promise<Response> => {
         .insert({
           name: formData.owner_name,
           email: formData.owner_email,
-          phone: formData.owner_phone,
-          payment_method: 'pending',
+          phone: toText(formData.owner_phone),
+          payment_method: 'check',
         })
         .select()
         .single();
