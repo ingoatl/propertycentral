@@ -3,7 +3,6 @@ import { Camera, Upload, X, Check, Loader2, Image as ImageIcon } from 'lucide-re
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
-import { toast } from 'sonner';
 
 interface PhotoCaptureFieldProps {
   inspectionId: string;
@@ -33,7 +32,7 @@ export const PhotoCaptureField: React.FC<PhotoCaptureFieldProps> = ({
 
     // Validate file size (max 10MB)
     if (file.size > 10 * 1024 * 1024) {
-      toast.error('File too large. Max 10MB allowed.');
+      console.warn('File too large. Max 10MB allowed.');
       return;
     }
 
@@ -71,10 +70,8 @@ export const PhotoCaptureField: React.FC<PhotoCaptureFieldProps> = ({
       if (dbError) throw dbError;
 
       onPhotoUploaded(urlData.publicUrl);
-      toast.success('Photo saved');
     } catch (error) {
       console.error('Upload error:', error);
-      toast.error('Failed to upload photo');
       setPhotoPreview(null);
     } finally {
       setIsUploading(false);
