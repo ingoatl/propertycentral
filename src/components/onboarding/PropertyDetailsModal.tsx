@@ -7,7 +7,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { OnboardingTask } from "@/types/onboarding";
-import { Loader2, MapPin, User, Lock, Phone, Link as LinkIcon, Mail, Home, Search, DollarSign, AlertCircle, Clock, Heart, Frown, Meh, Zap, Lightbulb, Copy, Check } from "lucide-react";
+import { Loader2, MapPin, User, Lock, Phone, Link as LinkIcon, Mail, Home, Search, DollarSign, AlertCircle, Clock, Heart, Frown, Meh, Zap, Lightbulb, Copy, Check, TrendingUp, FileText, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 
 interface PropertyDetailsModalProps {
@@ -22,6 +22,23 @@ interface CategorizedData {
   [category: string]: { label: string; value: string; icon?: any }[];
 }
 
+interface FinancialData {
+  last_year_revenue: number | null;
+  average_daily_rate: number | null;
+  occupancy_rate: number | null;
+  average_booking_window: number | null;
+  average_monthly_revenue: number | null;
+  peak_season: string | null;
+  peak_season_adr: number | null;
+  revenue_statement_url: string | null;
+  expense_report_url: string | null;
+  airbnb_revenue_export_url: string | null;
+  vrbo_revenue_export_url: string | null;
+  ownerrez_revenue_export_url: string | null;
+  pricing_revenue_goals: string | null;
+  competitor_insights: string | null;
+}
+
 export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyName, propertyId }: PropertyDetailsModalProps) {
   const [tasks, setTasks] = useState<OnboardingTask[]>([]);
   const [loading, setLoading] = useState(true);
@@ -29,6 +46,7 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
   const [propertyInfo, setPropertyInfo] = useState<any>(null);
   const [emailInsights, setEmailInsights] = useState<any[]>([]);
   const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [financialData, setFinancialData] = useState<FinancialData | null>(null);
 
   useEffect(() => {
     if (open) {
@@ -131,6 +149,19 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
           }).slice(0, 10); // Limit to 10 after filtering
           
           setEmailInsights(filteredInsights);
+        }
+
+        // Load financial data for this property
+        const { data: financialInfo, error: financialError } = await supabase
+          .from('property_financial_data')
+          .select('*')
+          .eq('property_id', propertyId)
+          .maybeSingle();
+
+        if (financialError) {
+          console.error('Error loading financial data:', financialError);
+        } else if (financialInfo) {
+          setFinancialData(financialInfo as FinancialData);
         }
       }
     } catch (error: any) {
@@ -628,6 +659,149 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
                               <Copy className="h-3.5 w-3.5 max-md:h-6 max-md:w-6" />
                             )}
                           </Button>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Financial Performance Data - from owner onboarding */}
+                {financialData && (
+                  <Card className="border-2 border-green-500/20">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                        <TrendingUp className="h-4 w-4 text-green-600" />
+                        Owner-Submitted Financial Data
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      {/* Key Metrics */}
+                      <div className="grid grid-cols-2 gap-3">
+                        {financialData.last_year_revenue && (
+                          <div className="bg-muted/50 p-3 rounded-lg">
+                            <p className="text-xs text-muted-foreground">Last Year Revenue</p>
+                            <p className="text-lg font-bold text-green-600">${financialData.last_year_revenue.toLocaleString()}</p>
+                          </div>
+                        )}
+                        {financialData.average_daily_rate && (
+                          <div className="bg-muted/50 p-3 rounded-lg">
+                            <p className="text-xs text-muted-foreground">Average Daily Rate</p>
+                            <p className="text-lg font-bold">${financialData.average_daily_rate}</p>
+                          </div>
+                        )}
+                        {financialData.occupancy_rate && (
+                          <div className="bg-muted/50 p-3 rounded-lg">
+                            <p className="text-xs text-muted-foreground">Occupancy Rate</p>
+                            <p className="text-lg font-bold">{financialData.occupancy_rate}%</p>
+                          </div>
+                        )}
+                        {financialData.average_monthly_revenue && (
+                          <div className="bg-muted/50 p-3 rounded-lg">
+                            <p className="text-xs text-muted-foreground">Avg Monthly Revenue</p>
+                            <p className="text-lg font-bold">${financialData.average_monthly_revenue.toLocaleString()}</p>
+                          </div>
+                        )}
+                        {financialData.average_booking_window && (
+                          <div className="bg-muted/50 p-3 rounded-lg">
+                            <p className="text-xs text-muted-foreground">Avg Booking Window</p>
+                            <p className="text-lg font-bold">{financialData.average_booking_window} days</p>
+                          </div>
+                        )}
+                        {financialData.peak_season && (
+                          <div className="bg-muted/50 p-3 rounded-lg">
+                            <p className="text-xs text-muted-foreground">Peak Season</p>
+                            <p className="text-lg font-bold">{financialData.peak_season}</p>
+                            {financialData.peak_season_adr && (
+                              <p className="text-xs text-muted-foreground">ADR: ${financialData.peak_season_adr}</p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Goals & Insights */}
+                      {(financialData.pricing_revenue_goals || financialData.competitor_insights) && (
+                        <div className="space-y-2 pt-2 border-t border-border/50">
+                          {financialData.pricing_revenue_goals && (
+                            <div>
+                              <p className="text-xs font-semibold text-muted-foreground mb-1">Pricing & Revenue Goals</p>
+                              <p className="text-sm">{financialData.pricing_revenue_goals}</p>
+                            </div>
+                          )}
+                          {financialData.competitor_insights && (
+                            <div>
+                              <p className="text-xs font-semibold text-muted-foreground mb-1">Competitor Insights</p>
+                              <p className="text-sm">{financialData.competitor_insights}</p>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Document Links */}
+                      {(financialData.revenue_statement_url || financialData.expense_report_url || 
+                        financialData.airbnb_revenue_export_url || financialData.vrbo_revenue_export_url || 
+                        financialData.ownerrez_revenue_export_url) && (
+                        <div className="pt-2 border-t border-border/50">
+                          <p className="text-xs font-semibold text-muted-foreground mb-2 flex items-center gap-1">
+                            <FileText className="h-3 w-3" />
+                            Uploaded Documents
+                          </p>
+                          <div className="flex flex-wrap gap-2">
+                            {financialData.revenue_statement_url && (
+                              <a 
+                                href={financialData.revenue_statement_url} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 text-xs px-2 py-1 bg-primary/10 text-primary rounded hover:bg-primary/20"
+                              >
+                                <ExternalLink className="h-3 w-3" />
+                                Revenue Statement
+                              </a>
+                            )}
+                            {financialData.expense_report_url && (
+                              <a 
+                                href={financialData.expense_report_url} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 text-xs px-2 py-1 bg-primary/10 text-primary rounded hover:bg-primary/20"
+                              >
+                                <ExternalLink className="h-3 w-3" />
+                                Expense Report
+                              </a>
+                            )}
+                            {financialData.airbnb_revenue_export_url && (
+                              <a 
+                                href={financialData.airbnb_revenue_export_url} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 text-xs px-2 py-1 bg-primary/10 text-primary rounded hover:bg-primary/20"
+                              >
+                                <ExternalLink className="h-3 w-3" />
+                                Airbnb Revenue Export
+                              </a>
+                            )}
+                            {financialData.vrbo_revenue_export_url && (
+                              <a 
+                                href={financialData.vrbo_revenue_export_url} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 text-xs px-2 py-1 bg-primary/10 text-primary rounded hover:bg-primary/20"
+                              >
+                                <ExternalLink className="h-3 w-3" />
+                                VRBO Revenue Export
+                              </a>
+                            )}
+                            {financialData.ownerrez_revenue_export_url && (
+                              <a 
+                                href={financialData.ownerrez_revenue_export_url} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 text-xs px-2 py-1 bg-primary/10 text-primary rounded hover:bg-primary/20"
+                              >
+                                <ExternalLink className="h-3 w-3" />
+                                OwnerRez Revenue Export
+                              </a>
+                            )}
+                          </div>
                         </div>
                       )}
                     </CardContent>

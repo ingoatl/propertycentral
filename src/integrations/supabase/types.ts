@@ -2448,6 +2448,94 @@ export type Database = {
           },
         ]
       }
+      property_financial_data: {
+        Row: {
+          airbnb_revenue_export_url: string | null
+          average_booking_window: number | null
+          average_daily_rate: number | null
+          average_monthly_revenue: number | null
+          competitor_insights: string | null
+          created_at: string
+          expense_report_url: string | null
+          id: string
+          last_year_revenue: number | null
+          occupancy_rate: number | null
+          ownerrez_revenue_export_url: string | null
+          peak_season: string | null
+          peak_season_adr: number | null
+          pricing_revenue_goals: string | null
+          property_id: string
+          revenue_statement_url: string | null
+          submission_id: string | null
+          updated_at: string
+          vrbo_revenue_export_url: string | null
+        }
+        Insert: {
+          airbnb_revenue_export_url?: string | null
+          average_booking_window?: number | null
+          average_daily_rate?: number | null
+          average_monthly_revenue?: number | null
+          competitor_insights?: string | null
+          created_at?: string
+          expense_report_url?: string | null
+          id?: string
+          last_year_revenue?: number | null
+          occupancy_rate?: number | null
+          ownerrez_revenue_export_url?: string | null
+          peak_season?: string | null
+          peak_season_adr?: number | null
+          pricing_revenue_goals?: string | null
+          property_id: string
+          revenue_statement_url?: string | null
+          submission_id?: string | null
+          updated_at?: string
+          vrbo_revenue_export_url?: string | null
+        }
+        Update: {
+          airbnb_revenue_export_url?: string | null
+          average_booking_window?: number | null
+          average_daily_rate?: number | null
+          average_monthly_revenue?: number | null
+          competitor_insights?: string | null
+          created_at?: string
+          expense_report_url?: string | null
+          id?: string
+          last_year_revenue?: number | null
+          occupancy_rate?: number | null
+          ownerrez_revenue_export_url?: string | null
+          peak_season?: string | null
+          peak_season_adr?: number | null
+          pricing_revenue_goals?: string | null
+          property_id?: string
+          revenue_statement_url?: string | null
+          submission_id?: string | null
+          updated_at?: string
+          vrbo_revenue_export_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "property_financial_data_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "comprehensive_property_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "property_financial_data_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "property_financial_data_submission_id_fkey"
+            columns: ["submission_id"]
+            isOneToOne: false
+            referencedRelation: "owner_onboarding_submissions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       property_owners: {
         Row: {
           created_at: string
