@@ -107,7 +107,7 @@ export const InfrastructureStep = ({ formData, updateFormData }: InfrastructureS
           </div>
 
           {formData.smartLockInstalled && (
-            <div className="pt-4 border-t border-[hsl(25,30%,90%)]">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-[hsl(25,30%,90%)]">
               <div className="space-y-2">
                 <Label htmlFor="smartLockBrand" className="text-[hsl(25,30%,30%)]">Smart Lock Brand/Model</Label>
                 <Input
@@ -115,6 +115,16 @@ export const InfrastructureStep = ({ formData, updateFormData }: InfrastructureS
                   value={formData.smartLockBrand}
                   onChange={(e) => updateFormData({ smartLockBrand: e.target.value })}
                   placeholder="e.g., Schlage Encode, August, Yale"
+                  className="h-12 rounded-xl border-[hsl(25,30%,85%)]"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="smartLockCode" className="text-[hsl(25,30%,30%)]">Smart Lock Code</Label>
+                <Input
+                  id="smartLockCode"
+                  value={formData.smartLockCode || ''}
+                  onChange={(e) => updateFormData({ smartLockCode: e.target.value })}
+                  placeholder="e.g., 1234"
                   className="h-12 rounded-xl border-[hsl(25,30%,85%)]"
                 />
               </div>
@@ -134,7 +144,7 @@ export const InfrastructureStep = ({ formData, updateFormData }: InfrastructureS
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <Label htmlFor="hasGasKitchen" className="text-[hsl(25,30%,30%)]">Does the property have a gas kitchen?</Label>
+              <Label htmlFor="hasGasKitchen" className="text-[hsl(25,30%,30%)]">Do you have a gas stove in the kitchen?</Label>
               <p className="text-sm text-[hsl(25,20%,55%)]">Gas stove, oven, or cooktop</p>
             </div>
             <Switch
@@ -257,26 +267,12 @@ export const InfrastructureStep = ({ formData, updateFormData }: InfrastructureS
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <Label htmlFor="utilitiesSetup" className="text-[hsl(25,30%,30%)]">Utilities Already Set Up?</Label>
-              <p className="text-sm text-[hsl(25,20%,55%)]">Are all utilities active in your name?</p>
-            </div>
-            <Switch
-              id="utilitiesSetup"
-              checked={formData.utilitiesSetup}
-              onCheckedChange={(checked) => updateFormData({ utilitiesSetup: checked })}
-            />
+          <div className="flex items-center gap-2 p-3 bg-[hsl(25,100%,97%)] rounded-xl border border-[hsl(25,50%,85%)] mb-4">
+            <AlertCircle className="w-4 h-4 text-[hsl(25,95%,50%)]" />
+            <p className="text-sm text-[hsl(25,40%,35%)]">
+              Provider names are required for all utilities
+            </p>
           </div>
-
-          {formData.utilitiesSetup && (
-            <div className="space-y-4 pt-4 border-t border-[hsl(25,30%,90%)]">
-              <div className="flex items-center gap-2 p-3 bg-[hsl(25,100%,97%)] rounded-xl border border-[hsl(25,50%,85%)]">
-                <AlertCircle className="w-4 h-4 text-[hsl(25,95%,50%)]" />
-                <p className="text-sm text-[hsl(25,40%,35%)]">
-                  Provider names are required for all utilities
-                </p>
-              </div>
 
               {/* Electric */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -417,8 +413,6 @@ export const InfrastructureStep = ({ formData, updateFormData }: InfrastructureS
                   />
                 </div>
               </div>
-            </div>
-          )}
         </CardContent>
       </Card>
 
@@ -446,7 +440,7 @@ export const InfrastructureStep = ({ formData, updateFormData }: InfrastructureS
           {formData.hasSepticTank && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-[hsl(25,30%,90%)]">
               <div className="space-y-2">
-                <Label htmlFor="septicLastFlushed" className="text-[hsl(25,30%,30%)]">When was it last flushed?</Label>
+                <Label htmlFor="septicLastFlushed" className="text-[hsl(25,30%,30%)]">When was it last pumped?</Label>
                 <Input
                   id="septicLastFlushed"
                   value={formData.septicLastFlushed}

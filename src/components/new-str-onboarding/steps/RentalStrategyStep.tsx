@@ -85,58 +85,6 @@ export const RentalStrategyStep = ({ formData, updateFormData }: RentalStrategyS
           </div>
         </CardContent>
       </Card>
-
-      {/* Capacity & Rates */}
-      <Card className="rounded-2xl border-[hsl(25,30%,90%)] shadow-sm">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg text-[hsl(25,40%,25%)]">
-            <DollarSign className="w-5 h-5 text-[hsl(25,95%,50%)]" />
-            Capacity & Rate Expectations
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="expectedAdr">Expected Nightly Rate ($)</Label>
-              <Input
-                id="expectedAdr"
-                type="number"
-                min="0"
-                value={formData.expectedAdr || ''}
-                onChange={(e) => updateFormData({ expectedAdr: e.target.value ? parseInt(e.target.value) : null })}
-                placeholder="150"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="minimumStay">Minimum Stay (nights)</Label>
-              <Input
-                id="minimumStay"
-                type="number"
-                min="1"
-                value={formData.minimumStay || ''}
-                onChange={(e) => updateFormData({ minimumStay: e.target.value ? parseInt(e.target.value) : null })}
-                placeholder="2"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="maxGuests">Maximum Guests</Label>
-              <div className="relative">
-                <Users className="absolute left-3 top-3 h-4 w-4 text-[hsl(25,30%,60%)]" />
-                <Input
-                  id="maxGuests"
-                  type="number"
-                  min="1"
-                  className="pl-10"
-                  value={formData.maxGuests || ''}
-                  onChange={(e) => updateFormData({ maxGuests: e.target.value ? parseInt(e.target.value) : null })}
-                  placeholder="6"
-                />
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
     </div>
   );
 };

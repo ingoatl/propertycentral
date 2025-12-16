@@ -1,10 +1,11 @@
 import { NewSTROnboardingFormData, PHOTOGRAPHY_NEEDS_OPTIONS } from "@/types/new-str-onboarding";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Camera, Sparkles, Palette } from "lucide-react";
+import { Camera, Sparkles, Palette, Link } from "lucide-react";
 
 interface ListingPreferencesStepProps {
   formData: NewSTROnboardingFormData;
@@ -56,6 +57,31 @@ export const ListingPreferencesStep = ({ formData, updateFormData }: ListingPref
               rows={2}
               className="rounded-xl border-[hsl(25,30%,85%)]"
             />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Existing Photos Link */}
+      <Card className="rounded-2xl border-[hsl(25,30%,90%)] shadow-sm">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg text-[hsl(25,40%,25%)]">
+            <Link className="w-5 h-5 text-[hsl(25,95%,50%)]" />
+            Existing Photos
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-2">
+            <Label htmlFor="existingPhotosLink" className="text-[hsl(25,30%,30%)]">Link to Existing Photos</Label>
+            <Input
+              id="existingPhotosLink"
+              value={formData.existingPhotosLink || ''}
+              onChange={(e) => updateFormData({ existingPhotosLink: e.target.value })}
+              placeholder="e.g., Google Drive, Dropbox, or other link"
+              className="h-12 rounded-xl border-[hsl(25,30%,85%)]"
+            />
+            <p className="text-xs text-[hsl(25,20%,55%)]">
+              If you have existing property photos, share a link to where they're stored
+            </p>
           </div>
         </CardContent>
       </Card>
