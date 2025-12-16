@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { CheckCircle2, DollarSign, Clock, Wrench, Eye, ChevronLeft } from "lucide-react";
+import { CheckCircle2, DollarSign, Clock, Wrench, Eye, Home, Users, Sparkles, MapPin } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const availabilityOptions = [
@@ -46,6 +46,7 @@ export default function JobApplication() {
 
     setIsSubmitting(true);
     try {
+      // Save to database
       const { error } = await supabase
         .from("job_applications")
         .insert({
@@ -58,6 +59,26 @@ export default function JobApplication() {
         });
 
       if (error) throw error;
+
+      // Send email notification
+      try {
+        await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-job-application-notification`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            fullName: formData.fullName,
+            email: formData.email,
+            phone: formData.phone,
+            availability: formData.availability,
+            hasTechnicalSkills: formData.hasTechnicalSkills,
+            detailOrientedExample: formData.detailOrientedExample,
+          }),
+        });
+      } catch (emailError) {
+        console.error("Email notification failed:", emailError);
+        // Don't fail the submission if email fails
+      }
+
       setIsSubmitted(true);
     } catch (error: any) {
       console.error("Error submitting application:", error);
@@ -82,8 +103,11 @@ export default function JobApplication() {
             <CheckCircle2 className="w-10 h-10 text-green-500" />
           </div>
           <h2 className="text-2xl font-bold mb-2">Thank You!</h2>
-          <p className="text-muted-foreground mb-6 max-w-sm">
-            Your application has been received. We'll review it and contact you within 48 hours.
+          <p className="text-muted-foreground mb-4 max-w-sm">
+            Your application has been received. We review every application personally and will reach out within 48 hours.
+          </p>
+          <p className="text-sm text-muted-foreground mb-6 max-w-sm">
+            In the meantime, feel free to check out our properties on <a href="https://peachhausgroup.com" target="_blank" rel="noopener" className="text-primary underline">peachhausgroup.com</a>
           </p>
           <Button
             variant="outline"
@@ -111,7 +135,7 @@ export default function JobApplication() {
       {/* iOS Header */}
       <div className="sticky top-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border/50">
         <div className="flex items-center justify-center h-14 px-4">
-          <h1 className="text-base font-semibold">Apply Now</h1>
+          <h1 className="text-base font-semibold">Join Our Team</h1>
         </div>
       </div>
 
@@ -119,16 +143,22 @@ export default function JobApplication() {
         {/* Hero Section */}
         <div className="bg-gradient-to-br from-primary/10 via-primary/5 to-background p-6 border-b border-border/50">
           <div className="max-w-md mx-auto">
-            <div className="inline-flex items-center gap-1.5 bg-amber-500/10 text-amber-600 text-xs font-medium px-2.5 py-1 rounded-full mb-3">
-              Independent Contractor
+            <div className="flex gap-2 mb-3">
+              <span className="inline-flex items-center gap-1.5 bg-amber-500/10 text-amber-600 text-xs font-medium px-2.5 py-1 rounded-full">
+                Independent Contractor
+              </span>
+              <span className="inline-flex items-center gap-1.5 bg-green-500/10 text-green-600 text-xs font-medium px-2.5 py-1 rounded-full">
+                <MapPin className="w-3 h-3" />
+                Atlanta Area
+              </span>
             </div>
             <h2 className="text-xl font-bold mb-2">Property Inspector & Maintenance Tech</h2>
             <p className="text-sm text-muted-foreground mb-4">
-              We're looking for someone detail-oriented who takes pride in a home running perfectly.
+              Join PeachHaus — a growing short-term rental management company in Atlanta. We take pride in keeping our properties running perfectly.
             </p>
             
             {/* Job highlights */}
-            <div className="flex gap-3">
+            <div className="flex flex-wrap gap-2">
               <div className="flex items-center gap-2 bg-background/80 rounded-full px-3 py-1.5">
                 <DollarSign className="w-4 h-4 text-green-500" />
                 <span className="text-sm font-medium">$25-30/hr</span>
@@ -141,12 +171,62 @@ export default function JobApplication() {
           </div>
         </div>
 
+        {/* About the Role */}
+        <div className="p-4 max-w-md mx-auto">
+          <div className="bg-card rounded-xl border border-border overflow-hidden mb-6">
+            <div className="px-4 py-3 bg-muted/30 border-b border-border">
+              <h3 className="text-sm font-semibold">About the Role</h3>
+            </div>
+            <div className="p-4 space-y-4 text-sm">
+              <p className="text-muted-foreground">
+                We are looking for someone who is <strong className="text-foreground">naturally detail-oriented</strong>. You notice a loose handle or a slow WiFi connection before anyone else does. You take pride in a home running perfectly.
+              </p>
+              <p className="text-muted-foreground">
+                You are not afraid to <strong className="text-foreground">get your hands dirty</strong>. You can troubleshoot a smart lock, swap out a thermostat, or fix minor issues without needing to call a pro.
+              </p>
+              
+              <div className="pt-2 border-t border-border">
+                <p className="font-medium text-foreground mb-2">What you will do:</p>
+                <ul className="space-y-2 text-muted-foreground">
+                  <li className="flex items-start gap-2">
+                    <Home className="w-4 h-4 text-primary mt-0.5 shrink-0" />
+                    <span>Conduct property inspections before & after guest stays</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <Wrench className="w-4 h-4 text-primary mt-0.5 shrink-0" />
+                    <span>Handle minor repairs: smart locks, light fixtures, appliances, HVAC filters</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <Sparkles className="w-4 h-4 text-primary mt-0.5 shrink-0" />
+                    <span>Restock supplies and ensure properties are guest-ready</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <Users className="w-4 h-4 text-primary mt-0.5 shrink-0" />
+                    <span>Coordinate with cleaners and report issues promptly</span>
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          {/* Why PeachHaus */}
+          <div className="bg-gradient-to-r from-primary/5 to-primary/10 rounded-xl p-4 mb-6 border border-primary/20">
+            <h4 className="font-semibold text-sm mb-2">Why Work With PeachHaus?</h4>
+            <ul className="text-sm text-muted-foreground space-y-1.5">
+              <li>✓ Flexible schedule — work when it suits you</li>
+              <li>✓ Consistent, reliable work in the Atlanta area</li>
+              <li>✓ Opportunity to grow as we expand our portfolio</li>
+              <li>✓ Supportive team that values quality over speed</li>
+            </ul>
+          </div>
+        </div>
+
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-4 max-w-md mx-auto space-y-6">
           {/* Contact Info Section */}
           <div className="bg-card rounded-xl border border-border overflow-hidden">
             <div className="px-4 py-3 bg-muted/30 border-b border-border">
-              <h3 className="text-sm font-semibold">Contact Information</h3>
+              <h3 className="text-sm font-semibold">Your Information</h3>
             </div>
             <div className="divide-y divide-border">
               <div className="px-4 py-3">
@@ -196,7 +276,7 @@ export default function JobApplication() {
           {/* Availability Section */}
           <div className="bg-card rounded-xl border border-border overflow-hidden">
             <div className="px-4 py-3 bg-muted/30 border-b border-border">
-              <h3 className="text-sm font-semibold">Availability</h3>
+              <h3 className="text-sm font-semibold">When are you available?</h3>
             </div>
             <div className="p-4">
               <div className="flex flex-wrap gap-2">
@@ -232,7 +312,7 @@ export default function JobApplication() {
                     <Wrench className="w-4 h-4 text-orange-500" />
                   </div>
                   <div>
-                    <p className="text-sm font-medium">Technical Skills</p>
+                    <p className="text-sm font-medium">Handy with tools?</p>
                     <p className="text-xs text-muted-foreground">Smart locks, minor repairs, etc.</p>
                   </div>
                 </div>
@@ -261,18 +341,25 @@ export default function JobApplication() {
                   </div>
                   <div>
                     <p className="text-sm font-medium">What makes you detail-oriented?</p>
-                    <p className="text-xs text-muted-foreground">Give us an example</p>
+                    <p className="text-xs text-muted-foreground">Give us an example (optional but helps!)</p>
                   </div>
                 </div>
                 <Textarea
                   value={formData.detailOrientedExample}
                   onChange={(e) => setFormData(prev => ({ ...prev, detailOrientedExample: e.target.value }))}
-                  placeholder="I once noticed a slow WiFi connection and traced it to..."
+                  placeholder="I once noticed a slow WiFi connection and traced it to a misconfigured router..."
                   className="min-h-[100px] text-sm resize-none"
                   rows={4}
                 />
               </div>
             </div>
+          </div>
+
+          {/* Important Note */}
+          <div className="bg-amber-50 dark:bg-amber-950/30 rounded-xl p-4 border border-amber-200 dark:border-amber-900">
+            <p className="text-xs text-amber-800 dark:text-amber-200">
+              <strong>Note:</strong> This is an independent contractor position (1099). You will set your own schedule and be responsible for your own taxes. Must have reliable transportation and basic tools.
+            </p>
           </div>
 
           {/* Submit Button */}
@@ -285,7 +372,7 @@ export default function JobApplication() {
               {isSubmitting ? "Submitting..." : "Submit Application"}
             </Button>
             <p className="text-xs text-center text-muted-foreground mt-3">
-              We'll review your application and get back to you within 48 hours.
+              We personally review every application and will reach out within 48 hours.
             </p>
           </div>
         </form>
