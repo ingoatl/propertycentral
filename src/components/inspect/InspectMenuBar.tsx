@@ -13,9 +13,9 @@ interface MenuTab {
 
 const tabs: MenuTab[] = [
   { id: 'home', label: 'Home', icon: <Home className="h-6 w-6" />, path: '/inspect' },
-  { id: 'inspections', label: 'Inspections', icon: <ClipboardCheck className="h-6 w-6" />, path: '/inspect', disabled: true },
-  { id: 'issues', label: 'Issues', icon: <AlertTriangle className="h-6 w-6" />, path: '/inspect', disabled: true },
-  { id: 'settings', label: 'Settings', icon: <Settings className="h-6 w-6" />, path: '/inspect', disabled: true },
+  { id: 'inspections', label: 'Inspections', icon: <ClipboardCheck className="h-6 w-6" />, path: '/inspect/list' },
+  { id: 'issues', label: 'Issues', icon: <AlertTriangle className="h-6 w-6" />, path: '/inspect/issues' },
+  { id: 'settings', label: 'Settings', icon: <Settings className="h-6 w-6" />, path: '/inspect/settings' },
 ];
 
 export const InspectMenuBar: React.FC = () => {
@@ -26,7 +26,16 @@ export const InspectMenuBar: React.FC = () => {
     if (tab.id === 'home') {
       return location.pathname === '/inspect' || location.pathname.startsWith('/inspect/property/');
     }
-    return false;
+    if (tab.id === 'inspections') {
+      return location.pathname === '/inspect/list';
+    }
+    if (tab.id === 'issues') {
+      return location.pathname === '/inspect/issues';
+    }
+    if (tab.id === 'settings') {
+      return location.pathname === '/inspect/settings';
+    }
+    return location.pathname === tab.path;
   };
 
   return (

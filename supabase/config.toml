@@ -134,3 +134,6 @@ verify_jwt = true
 
 [functions.process-new-str-onboarding]
 verify_jwt = false
+
+[functions.send-inspection-report]
+verify_jwt = true
