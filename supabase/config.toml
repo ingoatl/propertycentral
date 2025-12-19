@@ -143,3 +143,6 @@ verify_jwt = false
 
 [functions.analyze-owner-conversation]
 verify_jwt = true
+
+[functions.send-owner-setup-status]
+verify_jwt = true

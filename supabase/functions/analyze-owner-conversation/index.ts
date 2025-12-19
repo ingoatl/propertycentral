@@ -163,6 +163,7 @@ Analyze the content and return a JSON object with this exact structure:
       "description": "What needs to happen",
       "priority": "urgent|high|medium|low",
       "category": "Setup|Maintenance|Purchase|Admin",
+      "assignedTo": "peachhaus|owner",
       "phaseNumber": 2,
       "phaseTitle": "Property Setup"
     }
@@ -172,7 +173,11 @@ Analyze the content and return a JSON object with this exact structure:
 ONLY include tasks for items that genuinely require ACTION (installing something, buying something, fixing something, contacting someone). 
 Property information, procedures, and rules should go in propertyInfo, NOT tasks.
 Be generous with propertyInfo categories and formatting - make it beautiful and useful.
-For Excel/CSV data, be thorough - extract EVERYTHING that could be useful for property management.`;
+For Excel/CSV data, be thorough - extract EVERYTHING that could be useful for property management.
+
+TASK ASSIGNMENT RULES for "assignedTo" field:
+- "owner" = Things the owner must do: provide access codes/keys, approve purchases, grant app access, confirm decisions, send permits/documents
+- "peachhaus" = Things the team must do: install equipment, purchase supplies, schedule contractors, set up systems, coordinate vendors`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -355,6 +360,7 @@ For Excel/CSV data, be thorough - extract EVERYTHING that could be useful for pr
         priority: task.priority || "medium",
         content: task,
         status: "suggested",
+        assigned_to: task.assignedTo || "peachhaus",
       });
     }
 

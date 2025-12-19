@@ -1743,7 +1743,10 @@ export type Database = {
       owner_conversation_actions: {
         Row: {
           action_type: string
+          assigned_to: string | null
           category: string | null
+          completed_at: string | null
+          completed_by: string | null
           content: Json | null
           conversation_id: string | null
           created_at: string
@@ -1759,7 +1762,10 @@ export type Database = {
         }
         Insert: {
           action_type: string
+          assigned_to?: string | null
           category?: string | null
+          completed_at?: string | null
+          completed_by?: string | null
           content?: Json | null
           conversation_id?: string | null
           created_at?: string
@@ -1775,7 +1781,10 @@ export type Database = {
         }
         Update: {
           action_type?: string
+          assigned_to?: string | null
           category?: string | null
+          completed_at?: string | null
+          completed_by?: string | null
           content?: Json | null
           conversation_id?: string | null
           created_at?: string
