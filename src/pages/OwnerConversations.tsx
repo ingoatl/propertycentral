@@ -10,9 +10,22 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { MessageSquare, FileText, Upload, Loader2, Sparkles, CheckCircle, AlertCircle, Home, HelpCircle, ClipboardList, Wrench, X, Eye } from "lucide-react";
+import { MessageSquare, FileText, Upload, Loader2, Sparkles, CheckCircle, AlertCircle, Home, HelpCircle, ClipboardList, Wrench, X, Eye, Table } from "lucide-react";
 import { AnalysisResults } from "@/components/owner-conversations/AnalysisResults";
 import { ConversationHistory } from "@/components/owner-conversations/ConversationHistory";
+
+// Simple CSV parser function
+function parseCSV(text: string): { headers: string[]; rows: string[][] } {
+  const lines = text.split('\n').filter(line => line.trim());
+  if (lines.length === 0) return { headers: [], rows: [] };
+  
+  const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+  const rows = lines.slice(1).map(line => 
+    line.split(',').map(cell => cell.trim().replace(/^"|"$/g, ''))
+  );
+  
+  return { headers, rows };
+}
 
 interface Property {
   id: string;
@@ -116,7 +129,7 @@ export default function OwnerConversations() {
       }
 
       // Process and upload client documents
-      const documentContents: Array<{ fileName: string; content: string }> = [];
+      const documentContents: Array<{ fileName: string; content: string; isStructured?: boolean; structuredData?: any }> = [];
       
       for (const doc of clientDocs) {
         const docPath = `${property?.address || 'unknown'}/conversations/${conversation.id}/${doc.name}`;
@@ -126,13 +139,36 @@ export default function OwnerConversations() {
           .from("onboarding-documents")
           .upload(docPath, doc);
 
-        // For text files, read content directly
+        // Check if it's an Excel or CSV file
+        const isExcel = doc.name.endsWith('.xlsx') || doc.name.endsWith('.xls');
+        const isCsv = doc.name.endsWith('.csv');
+        
         let extractedContent = "";
-        if (doc.type === "text/plain" || doc.name.endsWith(".txt") || doc.name.endsWith(".md")) {
+        let isStructured = false;
+        let structuredData = null;
+        
+        if (isExcel || isCsv) {
+          // For Excel/CSV, we'll parse it client-side and send structured data
+          isStructured = true;
+          try {
+            if (isCsv) {
+              const text = await doc.text();
+              structuredData = parseCSV(text);
+              extractedContent = `[Structured CSV Data: ${doc.name}] - ${Object.keys(structuredData).length} sheets/sections`;
+            } else {
+              // For Excel, read as text and send raw - the AI will interpret it
+              const text = await doc.text();
+              extractedContent = `[Excel Document: ${doc.name}] - Structured data file`;
+              // We'll send the raw content and let AI interpret
+              structuredData = { rawContent: text, fileName: doc.name };
+            }
+          } catch (e) {
+            extractedContent = `[Excel/CSV Document: ${doc.name}] - Please process manually`;
+            isStructured = false;
+          }
+        } else if (doc.type === "text/plain" || doc.name.endsWith(".txt") || doc.name.endsWith(".md")) {
           extractedContent = await doc.text();
         } else if (doc.type === "application/pdf") {
-          // For PDFs, we'll use the edge function to extract text
-          // For now, note that it's a PDF that needs processing
           extractedContent = `[PDF Document: ${doc.name}] - Content extraction pending`;
         } else {
           extractedContent = `[Document: ${doc.name}] - ${doc.type}`;
@@ -153,6 +189,8 @@ export default function OwnerConversations() {
         documentContents.push({
           fileName: doc.name,
           content: extractedContent,
+          isStructured,
+          structuredData,
         });
       }
 
@@ -164,7 +202,7 @@ export default function OwnerConversations() {
             conversationId: conversation.id,
             transcript: finalTranscript,
             documentContents,
-            propertyContext: property ? { name: property.name, address: property.address } : undefined,
+            propertyContext: property ? { id: property.id, name: property.name, address: property.address } : undefined,
           },
         }
       );
@@ -333,7 +371,7 @@ export default function OwnerConversations() {
                     Client Documents
                   </Label>
                   <p className="text-xs text-muted-foreground">
-                    Upload cleaning manuals, house rules, HOA documents, etc.
+                    Upload cleaning manuals, house rules, property summaries, Excel files, etc.
                   </p>
                   <div className="border-2 border-dashed border-border rounded-lg p-4 text-center">
                     <Label htmlFor="client-docs" className="cursor-pointer block">
@@ -342,13 +380,13 @@ export default function OwnerConversations() {
                         Click to upload or drag and drop
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        PDF, TXT, DOCX supported
+                        PDF, TXT, DOCX, Excel (.xlsx), CSV supported
                       </p>
                     </Label>
                     <Input
                       id="client-docs"
                       type="file"
-                      accept=".pdf,.txt,.docx,.doc,.md"
+                      accept=".pdf,.txt,.docx,.doc,.md,.xlsx,.xls,.csv"
                       multiple
                       className="hidden"
                       onChange={(e) => handleFileUpload(e, "docs")}

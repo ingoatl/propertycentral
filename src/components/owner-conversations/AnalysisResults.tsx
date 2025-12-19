@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { toast } from "sonner";
-import { Loader2, Home, HelpCircle, ClipboardList, Wrench, CheckCircle, XCircle, Sparkles, FileText } from "lucide-react";
+import { Loader2, Home, HelpCircle, ClipboardList, Wrench, CheckCircle, XCircle, Sparkles, FileText, Key, Zap, Phone, Settings } from "lucide-react";
 
 interface Action {
   id: string;
@@ -29,12 +29,13 @@ interface AnalysisResultsProps {
     extracted_items: any;
     owner_conversation_actions: Action[];
     owner_conversation_documents: any[];
+    property_id?: string;
   };
   property?: { id: string; name: string; address: string };
   isLoading: boolean;
 }
 
-const actionTypeConfig = {
+const actionTypeConfig: Record<string, { icon: any; label: string; color: string; bgColor: string }> = {
   property_info: {
     icon: Home,
     label: "Property Info",
@@ -59,6 +60,30 @@ const actionTypeConfig = {
     color: "text-orange-500",
     bgColor: "bg-orange-500/10",
   },
+  credential: {
+    icon: Key,
+    label: "Credential",
+    color: "text-purple-500",
+    bgColor: "bg-purple-500/10",
+  },
+  utility: {
+    icon: Zap,
+    label: "Utility Account",
+    color: "text-yellow-600",
+    bgColor: "bg-yellow-600/10",
+  },
+  appliance: {
+    icon: Settings,
+    label: "Appliance",
+    color: "text-gray-500",
+    bgColor: "bg-gray-500/10",
+  },
+  contact: {
+    icon: Phone,
+    label: "Service Contact",
+    color: "text-green-500",
+    bgColor: "bg-green-500/10",
+  },
 };
 
 const priorityColors: Record<string, string> = {
@@ -74,13 +99,37 @@ export function AnalysisResults({ conversation, property, isLoading }: AnalysisR
     new Set(conversation.owner_conversation_actions?.filter(a => a.status === "suggested").map(a => a.id) || [])
   );
 
+  const propertyId = property?.id || conversation.property_id;
+
+  // Fetch the onboarding project for this property to create tasks
+  const { data: onboardingProject } = useQuery({
+    queryKey: ["onboarding-project-for-property", propertyId],
+    queryFn: async () => {
+      if (!propertyId) return null;
+      const { data, error } = await supabase
+        .from("onboarding_projects")
+        .select("id")
+        .eq("property_id", propertyId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!propertyId,
+  });
+
   const actions = conversation.owner_conversation_actions || [];
-  const groupedActions = {
-    property_info: actions.filter(a => a.action_type === "property_info"),
-    faq: actions.filter(a => a.action_type === "faq"),
-    setup_note: actions.filter(a => a.action_type === "setup_note"),
-    task: actions.filter(a => a.action_type === "task"),
-  };
+  const groupedActions: Record<string, Action[]> = {};
+  
+  // Group actions by type
+  actions.forEach(action => {
+    const type = action.action_type;
+    if (!groupedActions[type]) {
+      groupedActions[type] = [];
+    }
+    groupedActions[type].push(action);
+  });
 
   const toggleAction = (id: string) => {
     setSelectedActions(prev => {
@@ -95,7 +144,7 @@ export function AnalysisResults({ conversation, property, isLoading }: AnalysisR
   };
 
   const selectAll = (type: string) => {
-    const typeActions = groupedActions[type as keyof typeof groupedActions] || [];
+    const typeActions = groupedActions[type] || [];
     setSelectedActions(prev => {
       const next = new Set(prev);
       typeActions.forEach(a => {
@@ -106,7 +155,7 @@ export function AnalysisResults({ conversation, property, isLoading }: AnalysisR
   };
 
   const deselectAll = (type: string) => {
-    const typeActions = groupedActions[type as keyof typeof groupedActions] || [];
+    const typeActions = groupedActions[type] || [];
     setSelectedActions(prev => {
       const next = new Set(prev);
       typeActions.forEach(a => next.delete(a.id));
@@ -119,37 +168,157 @@ export function AnalysisResults({ conversation, property, isLoading }: AnalysisR
     mutationFn: async () => {
       const selectedList = Array.from(selectedActions);
       const actionsToCreate = actions.filter(a => selectedList.includes(a.id));
-
-      // Update all selected actions to "created" status
-      for (const action of actionsToCreate) {
-        // For FAQs, create the FAQ entry
-        if (action.action_type === "faq" && property) {
-          await supabase.from("frequently_asked_questions").insert({
-            property_id: property.id,
-            question: action.title,
-            answer: action.description,
-            category: action.category,
-          });
-        }
-
-        // Update action status
-        await supabase
-          .from("owner_conversation_actions")
-          .update({ status: "created" })
-          .eq("id", action.id);
+      
+      if (!propertyId) {
+        throw new Error("No property ID available");
       }
 
-      // Update conversation status to completed
-      await supabase
-        .from("owner_conversations")
-        .update({ status: "completed" })
-        .eq("id", conversation.id);
+      let createdCount = 0;
 
-      return actionsToCreate.length;
+      for (const action of actionsToCreate) {
+        try {
+          // Handle each action type
+          switch (action.action_type) {
+            case "faq":
+              await supabase.from("frequently_asked_questions").insert({
+                property_id: propertyId,
+                question: action.title,
+                answer: action.description,
+                category: action.category,
+              });
+              createdCount++;
+              break;
+
+            case "property_info":
+            case "setup_note":
+              await supabase.from("property_intel_items").insert({
+                property_id: propertyId,
+                source_type: "conversation",
+                source_id: conversation.id,
+                category: action.category || "Other",
+                title: action.title,
+                description: action.description,
+                content: action.content,
+              });
+              createdCount++;
+              break;
+
+            case "credential":
+              const credContent = action.content || {};
+              await supabase.from("property_credentials").insert({
+                property_id: propertyId,
+                service_name: credContent.serviceName || action.title,
+                username: credContent.username,
+                password: credContent.password,
+                url: credContent.url,
+                notes: credContent.notes,
+              });
+              createdCount++;
+              break;
+
+            case "appliance":
+              const appContent = action.content || {};
+              await supabase.from("property_appliances").insert({
+                property_id: propertyId,
+                appliance_type: appContent.type || action.title,
+                brand: appContent.brand,
+                model: appContent.model,
+                serial_number: appContent.serialNumber,
+                year: appContent.year ? parseInt(appContent.year) : null,
+                warranty_info: appContent.warranty,
+                location: appContent.location,
+              });
+              createdCount++;
+              break;
+
+            case "utility":
+            case "contact":
+              // Store as property intel items
+              await supabase.from("property_intel_items").insert({
+                property_id: propertyId,
+                source_type: "conversation",
+                source_id: conversation.id,
+                category: action.action_type === "utility" ? "Utilities" : "Contacts",
+                title: action.title,
+                description: action.description,
+                content: action.content,
+              });
+              createdCount++;
+              break;
+
+            case "task":
+              // Create an actual onboarding task if we have a project
+              if (onboardingProject?.id) {
+                const taskContent = action.content || {};
+                await supabase.from("onboarding_tasks").insert({
+                  project_id: onboardingProject.id,
+                  title: action.title,
+                  description: action.description,
+                  phase_number: taskContent.phaseNumber || 2,
+                  phase_title: taskContent.phaseTitle || "Property Setup",
+                  field_type: "checkbox",
+                  status: "pending",
+                });
+                createdCount++;
+              } else {
+                // If no project, store as intel item with task category
+                await supabase.from("property_intel_items").insert({
+                  property_id: propertyId,
+                  source_type: "conversation",
+                  source_id: conversation.id,
+                  category: "Tasks",
+                  title: action.title,
+                  description: action.description,
+                  content: { ...action.content, isActionItem: true },
+                });
+                createdCount++;
+              }
+              break;
+
+            default:
+              // Store anything else as intel item
+              await supabase.from("property_intel_items").insert({
+                property_id: propertyId,
+                source_type: "conversation",
+                source_id: conversation.id,
+                category: action.category || "Other",
+                title: action.title,
+                description: action.description,
+                content: action.content,
+              });
+              createdCount++;
+          }
+
+          // Update action status
+          await supabase
+            .from("owner_conversation_actions")
+            .update({ status: "created" })
+            .eq("id", action.id);
+        } catch (error) {
+          console.error(`Failed to create ${action.action_type}:`, error);
+        }
+      }
+
+      // Update conversation status to completed if all suggested items are processed
+      const remainingSuggested = actions.filter(
+        a => a.status === "suggested" && !selectedList.includes(a.id)
+      ).length;
+
+      if (remainingSuggested === 0) {
+        await supabase
+          .from("owner_conversations")
+          .update({ status: "completed" })
+          .eq("id", conversation.id);
+      }
+
+      return createdCount;
     },
     onSuccess: (count) => {
       toast.success(`Created ${count} items successfully!`);
       queryClient.invalidateQueries({ queryKey: ["owner-conversation", conversation.id] });
+      queryClient.invalidateQueries({ queryKey: ["property-intel-items"] });
+      queryClient.invalidateQueries({ queryKey: ["property-credentials"] });
+      queryClient.invalidateQueries({ queryKey: ["property-appliances"] });
       setSelectedActions(new Set());
     },
     onError: (error: Error) => {
@@ -189,6 +358,9 @@ export function AnalysisResults({ conversation, property, isLoading }: AnalysisR
 
   const suggestedCount = actions.filter(a => a.status === "suggested").length;
   const selectedCount = selectedActions.size;
+
+  // Order of display
+  const displayOrder = ["property_info", "credential", "utility", "appliance", "contact", "faq", "setup_note", "task"];
 
   return (
     <div className="space-y-6">
@@ -252,11 +424,17 @@ export function AnalysisResults({ conversation, property, isLoading }: AnalysisR
           )}
         </CardHeader>
         <CardContent>
-          <Accordion type="multiple" defaultValue={["property_info", "faq", "setup_note", "task"]} className="space-y-2">
-            {Object.entries(groupedActions).map(([type, typeActions]) => {
-              if (typeActions.length === 0) return null;
+          <Accordion type="multiple" defaultValue={displayOrder} className="space-y-2">
+            {displayOrder.map((type) => {
+              const typeActions = groupedActions[type];
+              if (!typeActions || typeActions.length === 0) return null;
               
-              const config = actionTypeConfig[type as keyof typeof actionTypeConfig];
+              const config = actionTypeConfig[type] || {
+                icon: ClipboardList,
+                label: type,
+                color: "text-gray-500",
+                bgColor: "bg-gray-500/10",
+              };
               const Icon = config.icon;
               const suggestedInType = typeActions.filter(a => a.status === "suggested").length;
               const selectedInType = typeActions.filter(a => selectedActions.has(a.id)).length;
