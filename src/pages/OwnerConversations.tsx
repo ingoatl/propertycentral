@@ -13,6 +13,29 @@ import { toast } from "sonner";
 import { MessageSquare, FileText, Upload, Loader2, Sparkles, CheckCircle, AlertCircle, Home, HelpCircle, ClipboardList, Wrench, X, Eye, Table } from "lucide-react";
 import { AnalysisResults } from "@/components/owner-conversations/AnalysisResults";
 import { ConversationHistory } from "@/components/owner-conversations/ConversationHistory";
+import * as XLSX from "xlsx";
+
+// Parse Excel file to structured data
+async function parseExcelFile(file: File): Promise<{ sheets: Record<string, any[]>; rawText: string }> {
+  const arrayBuffer = await file.arrayBuffer();
+  const workbook = XLSX.read(arrayBuffer, { type: "array" });
+  
+  const sheets: Record<string, any[]> = {};
+  let rawText = "";
+  
+  workbook.SheetNames.forEach(sheetName => {
+    const worksheet = workbook.Sheets[sheetName];
+    const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+    sheets[sheetName] = jsonData;
+    
+    // Convert to readable text format
+    rawText += `\n=== Sheet: ${sheetName} ===\n`;
+    const textData = XLSX.utils.sheet_to_csv(worksheet);
+    rawText += textData + "\n";
+  });
+  
+  return { sheets, rawText };
+}
 
 // Simple CSV parser function
 function parseCSV(text: string): { headers: string[]; rows: string[][] } {
@@ -147,23 +170,30 @@ export default function OwnerConversations() {
         let isStructured = false;
         let structuredData = null;
         
-        if (isExcel || isCsv) {
-          // For Excel/CSV, we'll parse it client-side and send structured data
+        if (isExcel) {
+          // Parse Excel using xlsx library
           isStructured = true;
           try {
-            if (isCsv) {
-              const text = await doc.text();
-              structuredData = parseCSV(text);
-              extractedContent = `[Structured CSV Data: ${doc.name}] - ${Object.keys(structuredData).length} sheets/sections`;
-            } else {
-              // For Excel, read as text and send raw - the AI will interpret it
-              const text = await doc.text();
-              extractedContent = `[Excel Document: ${doc.name}] - Structured data file`;
-              // We'll send the raw content and let AI interpret
-              structuredData = { rawContent: text, fileName: doc.name };
-            }
+            const { sheets, rawText } = await parseExcelFile(doc);
+            structuredData = { sheets, fileName: doc.name };
+            extractedContent = rawText;
+            console.log(`Parsed Excel file ${doc.name}:`, Object.keys(sheets).length, "sheets");
           } catch (e) {
-            extractedContent = `[Excel/CSV Document: ${doc.name}] - Please process manually`;
+            console.error("Failed to parse Excel:", e);
+            extractedContent = `[Excel Document: ${doc.name}] - Failed to parse, please process manually`;
+            isStructured = false;
+          }
+        } else if (isCsv) {
+          isStructured = true;
+          try {
+            const text = await doc.text();
+            const parsed = parseCSV(text);
+            structuredData = { sheets: { "Sheet1": parsed.rows }, headers: parsed.headers, fileName: doc.name };
+            extractedContent = text; // Send raw CSV text for AI to read
+            console.log(`Parsed CSV file ${doc.name}:`, parsed.rows.length, "rows");
+          } catch (e) {
+            console.error("Failed to parse CSV:", e);
+            extractedContent = `[CSV Document: ${doc.name}] - Failed to parse`;
             isStructured = false;
           }
         } else if (doc.type === "text/plain" || doc.name.endsWith(".txt") || doc.name.endsWith(".md")) {
