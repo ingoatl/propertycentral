@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Trash2, MapPin, Building2, Edit, ClipboardList, FileText, Upload, Image as ImageIcon, Search, Database, PowerOff, Archive } from "lucide-react";
+import { Plus, Trash2, MapPin, Building2, Edit, ClipboardList, FileText, Upload, Image as ImageIcon, Search, Database, PowerOff, Archive, ListChecks } from "lucide-react";
 import villa14Image from "@/assets/villa14.jpg";
 import { WorkflowDialog } from "@/components/onboarding/WorkflowDialog";
 import { PropertyDetailsModal } from "@/components/onboarding/PropertyDetailsModal";
@@ -20,6 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { BulkUpdateListingURLs } from "@/components/onboarding/BulkUpdateListingURLs";
 import { PartnerPropertiesSection } from "@/components/properties/PartnerPropertiesSection";
 import { OffboardPropertyDialog } from "@/components/properties/OffboardPropertyDialog";
+import { InitialSetupTasksModal } from "@/components/properties/InitialSetupTasksModal";
 
 const propertySchema = z.object({
   name: z.string().trim().min(1, "Name is required").max(200, "Name must be less than 200 characters"),
@@ -46,6 +47,7 @@ const Properties = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [propertyTypeFilter, setPropertyTypeFilter] = useState<"All" | "Client-Managed" | "Company-Owned" | "Inactive">("All");
   const [offboardingProperty, setOffboardingProperty] = useState<{ id: string; name: string; address: string } | null>(null);
+  const [selectedPropertyForSetupTasks, setSelectedPropertyForSetupTasks] = useState<{ id: string; name: string; ownerEmail?: string | null } | null>(null);
   const [formData, setFormData] = useState({
     name: "",
     address: "",
@@ -563,6 +565,22 @@ const Properties = () => {
         </Button>
 
         <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            setSelectedPropertyForSetupTasks({
+              id: property.id,
+              name: property.name,
+              ownerEmail: null, // Will be fetched from owner
+            });
+          }}
+          className="w-full h-8 text-xs"
+        >
+          <ListChecks className="w-3 h-3 mr-1.5" />
+          Initial Setup Tasks
+        </Button>
+
+        <Button
           variant="secondary"
           size="sm"
           onClick={() => {
@@ -987,6 +1005,16 @@ const Properties = () => {
           loadPropertyProjects();
         }}
       />
+
+      {selectedPropertyForSetupTasks && (
+        <InitialSetupTasksModal
+          open={!!selectedPropertyForSetupTasks}
+          onOpenChange={(open) => !open && setSelectedPropertyForSetupTasks(null)}
+          propertyId={selectedPropertyForSetupTasks.id}
+          propertyName={selectedPropertyForSetupTasks.name}
+          ownerEmail={selectedPropertyForSetupTasks.ownerEmail}
+        />
+      )}
     </div>
   );
 };
