@@ -905,6 +905,79 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
                   </Card>
                 )}
 
+                {/* Mapped Data from Documents - Show completed tasks with values */}
+                {(() => {
+                  const mappedTasks = tasks.filter(t => 
+                    t.status === 'completed' && 
+                    t.field_value && 
+                    t.field_value.trim() !== '' &&
+                    // Exclude listing URLs as they're shown above
+                    !t.title.toLowerCase().includes('airbnb') &&
+                    !t.title.toLowerCase().includes('vrbo') &&
+                    !t.title.toLowerCase().includes('booking.com') &&
+                    !t.title.toLowerCase().includes('zillow') &&
+                    !t.title.toLowerCase().includes('direct booking')
+                  );
+                  
+                  if (mappedTasks.length === 0) return null;
+                  
+                  // Group by phase
+                  const groupedByPhase: Record<string, typeof mappedTasks> = {};
+                  mappedTasks.forEach(task => {
+                    const phase = task.phase_title || 'Other';
+                    if (!groupedByPhase[phase]) groupedByPhase[phase] = [];
+                    groupedByPhase[phase].push(task);
+                  });
+                  
+                  return (
+                    <Card className="border-2 border-green-500/30 bg-green-50/30 dark:bg-green-950/20">
+                      <CardHeader className="pb-3">
+                        <div className="flex items-center justify-between">
+                          <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                            <ClipboardCheck className="h-4 w-4 text-green-600" />
+                            Extracted Data from Documents
+                            <Badge variant="secondary" className="bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300">
+                              {mappedTasks.length} fields populated
+                            </Badge>
+                          </CardTitle>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        {Object.entries(groupedByPhase).map(([phase, phaseTasks]) => (
+                          <div key={phase} className="space-y-2">
+                            <p className="text-xs font-semibold text-muted-foreground border-b border-border/50 pb-1">{phase}</p>
+                            <div className="grid gap-2">
+                              {phaseTasks.map(task => (
+                                <div key={task.id} className="flex items-start justify-between gap-2 bg-background/50 p-2 rounded-md">
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-xs font-medium text-muted-foreground">{task.title}</p>
+                                    <p className="text-sm font-medium break-words">{task.field_value}</p>
+                                    {task.notes && (
+                                      <p className="text-xs text-muted-foreground mt-1 italic">{task.notes}</p>
+                                    )}
+                                  </div>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-7 w-7 flex-shrink-0"
+                                    onClick={() => copyToClipboard(task.field_value!, task.title)}
+                                  >
+                                    {copiedField === task.title ? (
+                                      <Check className="h-3.5 w-3.5 text-green-600" />
+                                    ) : (
+                                      <Copy className="h-3.5 w-3.5" />
+                                    )}
+                                  </Button>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </CardContent>
+                    </Card>
+                  );
+                })()}
+
                 {/* Financial Performance Data - from owner onboarding */}
                 {financialData && (
                   <Card className="border-2 border-green-500/20">
