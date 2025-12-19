@@ -140,3 +140,6 @@ verify_jwt = true
 
 [functions.send-job-application-notification]
 verify_jwt = false
+
+[functions.analyze-owner-conversation]
+verify_jwt = true

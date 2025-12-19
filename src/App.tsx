@@ -27,6 +27,7 @@ import InspectionsList from "./pages/InspectionsList";
 import InspectIssues from "./pages/InspectIssues";
 import InspectSettings from "./pages/InspectSettings";
 import JobApplication from "./pages/JobApplication";
+import OwnerConversations from "./pages/OwnerConversations";
 
 const queryClient = new QueryClient();
 
@@ -64,6 +65,7 @@ const App = () => (
                 <Route path="/bookings" element={<Bookings />} />
                 <Route path="/documents" element={<Documents />} />
                 <Route path="/utilities" element={<Utilities />} />
+                <Route path="/owner-conversations" element={<OwnerConversations />} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>
