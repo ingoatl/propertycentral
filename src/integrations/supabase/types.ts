@@ -1740,6 +1740,186 @@ export type Database = {
           },
         ]
       }
+      owner_conversation_actions: {
+        Row: {
+          action_type: string
+          category: string | null
+          content: Json | null
+          conversation_id: string | null
+          created_at: string
+          description: string | null
+          id: string
+          linked_faq_id: string | null
+          linked_task_id: string | null
+          priority: string | null
+          property_field: string | null
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          action_type: string
+          category?: string | null
+          content?: Json | null
+          conversation_id?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          linked_faq_id?: string | null
+          linked_task_id?: string | null
+          priority?: string | null
+          property_field?: string | null
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          action_type?: string
+          category?: string | null
+          content?: Json | null
+          conversation_id?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          linked_faq_id?: string | null
+          linked_task_id?: string | null
+          priority?: string | null
+          property_field?: string | null
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "owner_conversation_actions_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "owner_conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "owner_conversation_actions_linked_faq_id_fkey"
+            columns: ["linked_faq_id"]
+            isOneToOne: false
+            referencedRelation: "frequently_asked_questions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "owner_conversation_actions_linked_task_id_fkey"
+            columns: ["linked_task_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      owner_conversation_documents: {
+        Row: {
+          ai_analysis: Json | null
+          ai_extracted_content: string | null
+          conversation_id: string | null
+          created_at: string
+          file_name: string
+          file_path: string
+          file_size: number | null
+          file_type: string | null
+          id: string
+        }
+        Insert: {
+          ai_analysis?: Json | null
+          ai_extracted_content?: string | null
+          conversation_id?: string | null
+          created_at?: string
+          file_name: string
+          file_path: string
+          file_size?: number | null
+          file_type?: string | null
+          id?: string
+        }
+        Update: {
+          ai_analysis?: Json | null
+          ai_extracted_content?: string | null
+          conversation_id?: string | null
+          created_at?: string
+          file_name?: string
+          file_path?: string
+          file_size?: number | null
+          file_type?: string | null
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "owner_conversation_documents_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "owner_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      owner_conversations: {
+        Row: {
+          ai_summary: string | null
+          conversation_date: string | null
+          created_at: string
+          created_by: string | null
+          extracted_items: Json | null
+          id: string
+          participants: string | null
+          property_id: string | null
+          status: string
+          title: string
+          transcript_file_path: string | null
+          transcript_text: string | null
+          updated_at: string
+        }
+        Insert: {
+          ai_summary?: string | null
+          conversation_date?: string | null
+          created_at?: string
+          created_by?: string | null
+          extracted_items?: Json | null
+          id?: string
+          participants?: string | null
+          property_id?: string | null
+          status?: string
+          title: string
+          transcript_file_path?: string | null
+          transcript_text?: string | null
+          updated_at?: string
+        }
+        Update: {
+          ai_summary?: string | null
+          conversation_date?: string | null
+          created_at?: string
+          created_by?: string | null
+          extracted_items?: Json | null
+          id?: string
+          participants?: string | null
+          property_id?: string | null
+          status?: string
+          title?: string
+          transcript_file_path?: string | null
+          transcript_text?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "owner_conversations_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "comprehensive_property_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "owner_conversations_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       owner_onboarding_submissions: {
         Row: {
           airbnb_link: string | null
