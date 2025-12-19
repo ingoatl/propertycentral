@@ -6,8 +6,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { OnboardingTask } from "@/types/onboarding";
-import { Loader2, MapPin, User, Lock, Phone, Link as LinkIcon, Mail, Home, Search, DollarSign, AlertCircle, Clock, Heart, Frown, Meh, Zap, Lightbulb, Copy, Check, TrendingUp, FileText, ExternalLink, ClipboardCheck, Key, Settings } from "lucide-react";
+import { Loader2, MapPin, User, Lock, Phone, Link as LinkIcon, Mail, Home, Search, DollarSign, AlertCircle, Clock, Heart, Frown, Meh, Zap, Lightbulb, Copy, Check, TrendingUp, FileText, ExternalLink, ClipboardCheck, Key, Settings, Car, Bed, ChevronDown, ChevronUp, Download, MessageSquare } from "lucide-react";
 import { toast } from "sonner";
 import { InspectionDataSection } from "@/components/properties/InspectionDataSection";
 
@@ -51,6 +52,9 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
   const [intelItems, setIntelItems] = useState<any[]>([]);
   const [credentials, setCredentials] = useState<any[]>([]);
   const [appliances, setAppliances] = useState<any[]>([]);
+  const [ownerActions, setOwnerActions] = useState<any[]>([]);
+  const [ownerDocuments, setOwnerDocuments] = useState<any[]>([]);
+  const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     if (open) {
@@ -190,6 +194,28 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
           .select('*')
           .eq('property_id', propertyId);
         setAppliances(appData || []);
+
+        // Load owner conversation actions (the main intel data!)
+        const { data: actionsData } = await supabase
+          .from('owner_conversation_actions')
+          .select(`
+            *,
+            owner_conversations!inner(property_id, title)
+          `)
+          .eq('owner_conversations.property_id', propertyId)
+          .eq('status', 'created')
+          .order('category', { ascending: true });
+        setOwnerActions(actionsData || []);
+
+        // Load documents from owner conversations
+        const { data: docsData } = await supabase
+          .from('owner_conversation_documents')
+          .select(`
+            *,
+            owner_conversations!inner(property_id, title)
+          `)
+          .eq('owner_conversations.property_id', propertyId);
+        setOwnerDocuments(docsData || []);
       }
     } catch (error: any) {
       console.error('Error loading property details:', error);
@@ -355,6 +381,75 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
 
   const categorizedData = useMemo(() => organizeTasksByCategory(), [tasks, propertyInfo]);
   const phasedData = useMemo(() => organizeTasksByPhase(), [tasks]);
+
+  // Organize owner actions by category
+  const organizedOwnerIntel = useMemo(() => {
+    const categoryMap: Record<string, any[]> = {};
+    const categoryIcons: Record<string, any> = {
+      'Access': Lock,
+      'Parking': Car,
+      'Amenities': Bed,
+      'Safety': AlertCircle,
+      'Cleaning': Home,
+      'Maintenance': Settings,
+      'Policies': FileText,
+      'Operations': ClipboardCheck,
+      'Utilities': Zap,
+    };
+    const categoryOrder = ['Access', 'Parking', 'Amenities', 'Safety', 'Cleaning', 'Utilities', 'Maintenance', 'Operations', 'Policies'];
+    
+    ownerActions.forEach(action => {
+      const cat = action.category || 'Other';
+      if (!categoryMap[cat]) {
+        categoryMap[cat] = [];
+      }
+      categoryMap[cat].push(action);
+    });
+
+    // Sort categories by predefined order
+    const sortedCategories = Object.keys(categoryMap).sort((a, b) => {
+      const aIndex = categoryOrder.indexOf(a);
+      const bIndex = categoryOrder.indexOf(b);
+      if (aIndex === -1 && bIndex === -1) return a.localeCompare(b);
+      if (aIndex === -1) return 1;
+      if (bIndex === -1) return -1;
+      return aIndex - bIndex;
+    });
+
+    return { categoryMap, categoryIcons, sortedCategories };
+  }, [ownerActions]);
+
+  // Filter owner intel based on search
+  const filteredOwnerIntel = useMemo(() => {
+    if (!searchQuery) return organizedOwnerIntel;
+    
+    const query = searchQuery.toLowerCase();
+    const filteredMap: Record<string, any[]> = {};
+    
+    organizedOwnerIntel.sortedCategories.forEach(cat => {
+      const items = organizedOwnerIntel.categoryMap[cat].filter((item: any) => 
+        item.title?.toLowerCase().includes(query) ||
+        item.description?.toLowerCase().includes(query) ||
+        JSON.stringify(item.content)?.toLowerCase().includes(query)
+      );
+      if (items.length > 0) {
+        filteredMap[cat] = items;
+      }
+    });
+
+    return {
+      ...organizedOwnerIntel,
+      categoryMap: filteredMap,
+      sortedCategories: Object.keys(filteredMap)
+    };
+  }, [organizedOwnerIntel, searchQuery]);
+
+  const toggleCategory = (category: string) => {
+    setExpandedCategories(prev => ({
+      ...prev,
+      [category]: !prev[category]
+    }));
+  };
 
   const filteredData = useMemo(() => {
     if (!searchQuery) return categorizedData;
@@ -831,6 +926,131 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
                           </div>
                         </div>
                       )}
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Owner Intel Section - Data from Owner Conversations */}
+                {filteredOwnerIntel.sortedCategories.length > 0 && (
+                  <Card className="border-2 border-amber-500/20">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                        <MessageSquare className="h-4 w-4 text-amber-600" />
+                        Owner Intel ({ownerActions.length} items)
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      {filteredOwnerIntel.sortedCategories.map(category => {
+                        const IconComponent = filteredOwnerIntel.categoryIcons[category] || FileText;
+                        const items = filteredOwnerIntel.categoryMap[category];
+                        const isExpanded = expandedCategories[category] !== false; // Default expanded
+                        
+                        return (
+                          <Collapsible key={category} open={isExpanded} onOpenChange={() => toggleCategory(category)}>
+                            <CollapsibleTrigger asChild>
+                              <div className="flex items-center justify-between cursor-pointer p-2 rounded-lg bg-muted/50 hover:bg-muted transition-colors">
+                                <div className="flex items-center gap-2">
+                                  <IconComponent className="h-4 w-4 text-muted-foreground" />
+                                  <span className="font-medium text-sm">{category}</span>
+                                  <Badge variant="secondary" className="text-xs">{items.length}</Badge>
+                                </div>
+                                {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                              </div>
+                            </CollapsibleTrigger>
+                            <CollapsibleContent className="pt-2 space-y-2">
+                              {items.map((item: any) => (
+                                <div key={item.id} className="ml-6 p-2 border-l-2 border-primary/30 space-y-1">
+                                  <div className="flex items-start justify-between gap-2">
+                                    <p className="font-medium text-sm">{item.title}</p>
+                                    <Badge 
+                                      variant="outline" 
+                                      className={`text-xs ${
+                                        item.priority === 'high' ? 'border-red-300 text-red-700' :
+                                        item.priority === 'medium' ? 'border-amber-300 text-amber-700' :
+                                        'border-gray-300 text-gray-700'
+                                      }`}
+                                    >
+                                      {item.priority}
+                                    </Badge>
+                                  </div>
+                                  <p className="text-xs text-muted-foreground whitespace-pre-wrap">{item.description}</p>
+                                  {item.content?.items && Array.isArray(item.content.items) && (
+                                    <ul className="text-xs text-muted-foreground space-y-0.5 mt-1">
+                                      {item.content.items.map((bullet: string, idx: number) => (
+                                        <li key={idx} className="flex items-start gap-1">
+                                          <span className="text-primary">•</span>
+                                          <span>{bullet}</span>
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  )}
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-6 text-xs"
+                                    onClick={() => copyToClipboard(item.description || item.title, item.title)}
+                                  >
+                                    {copiedField === item.title ? (
+                                      <><Check className="h-3 w-3 mr-1 text-green-600" /> Copied</>
+                                    ) : (
+                                      <><Copy className="h-3 w-3 mr-1" /> Copy</>
+                                    )}
+                                  </Button>
+                                </div>
+                              ))}
+                            </CollapsibleContent>
+                          </Collapsible>
+                        );
+                      })}
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Uploaded Documents from Owner Conversations */}
+                {ownerDocuments.length > 0 && (
+                  <Card className="border-2 border-blue-500/20">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                        <FileText className="h-4 w-4 text-blue-600" />
+                        Uploaded Documents ({ownerDocuments.length})
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-2">
+                        {ownerDocuments.map((doc: any) => (
+                          <div key={doc.id} className="flex items-center justify-between gap-2 p-2 rounded-lg bg-muted/50">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <FileText className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                              <div className="min-w-0">
+                                <p className="text-sm font-medium truncate">{doc.file_name}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  From: {doc.owner_conversations?.title || 'Unknown'} • {new Date(doc.created_at).toLocaleDateString()}
+                                </p>
+                              </div>
+                            </div>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="flex-shrink-0"
+                              onClick={async () => {
+                                try {
+                                  const { data } = await supabase.storage
+                                    .from('onboarding-documents')
+                                    .createSignedUrl(doc.file_path, 3600);
+                                  if (data?.signedUrl) {
+                                    window.open(data.signedUrl, '_blank');
+                                  }
+                                } catch (error) {
+                                  toast.error('Failed to open document');
+                                }
+                              }}
+                            >
+                              <Download className="h-3 w-3 mr-1" />
+                              View
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
                     </CardContent>
                   </Card>
                 )}
