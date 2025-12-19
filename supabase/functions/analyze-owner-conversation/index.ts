@@ -387,75 +387,109 @@ Extract ALL available information. Use null only if truly not found.`;
     const fieldValues = analysisResult.fieldValues || {};
 
     // Define exact mappings from extracted fields to task titles
-    const fieldToTaskMapping: Record<string, { title: string; format?: (v: any) => string }> = {
-      owner_name: { title: 'Owner Name' },
-      owner_email: { title: 'Owner Email' },
-      owner_phone: { title: 'Owner Phone' },
+    // Multiple possible task titles to handle variations
+    const fieldToTaskMapping: Record<string, { titles: string[]; format?: (v: any) => string }> = {
+      owner_name: { titles: ['Owner Name'] },
+      owner_email: { titles: ['Owner Email'] },
+      owner_phone: { titles: ['Owner Phone'] },
       water_provider: { 
-        title: 'Water Details',
+        titles: ['Water Details', 'Water Utility', 'Water Provider'],
         format: (v) => {
           const account = fieldValues.water_account;
           return account ? `${v} - Account: ${account}` : v;
         }
       },
       electric_provider: {
-        title: 'Electric Details',
+        titles: ['Electric Details', 'Electric Utility', 'Electricity Details', 'Power Provider'],
         format: (v) => {
           const account = fieldValues.electric_account;
           return account ? `${v} - Account: ${account}` : v;
         }
       },
       gas_provider: {
-        title: 'Gas Details',
+        titles: ['Gas Details', 'Gas Utility', 'Natural Gas Provider'],
         format: (v) => {
           const account = fieldValues.gas_account;
           return account ? `${v} - Account: ${account}` : v;
         }
       },
       internet_provider: {
-        title: 'Internet Details',
+        titles: ['Internet Details', 'Internet Utility', 'Internet Provider', 'Internet/Cable'],
         format: (v) => {
           const account = fieldValues.internet_account;
           return account ? `${v} - Account: ${account}` : v;
         }
       },
-      trash_provider: { title: 'Trash Service Provider' },
+      trash_provider: { titles: ['Trash Service Provider', 'Trash Utility', 'Garbage Service'] },
       wifi_network: {
-        title: 'WiFi Details',
+        titles: ['WiFi Details', 'WiFi SSID', 'WiFi Network Name'],
         format: (v) => {
           const password = fieldValues.wifi_password;
-          return password ? `${v} / ${password}` : v;
+          return password ? `Network: ${v} | Password: ${password}` : `Network: ${v}`;
         }
       },
-      smart_lock_code: { title: 'Smart lock master PIN code' },
-      gate_code: { title: 'Gate code' },
-      garage_code: { title: 'Garage code' },
-      lockbox_code: { title: 'Lockbox Code for Emergencies' },
-      security_system_brand: { title: 'Security System Brand' },
-      security_alarm_code: { title: 'Security Alarm Code' },
-      camera_locations: { title: 'Camera Locations' },
+      smart_lock_code: { titles: ['Smart lock master PIN code', 'Smart Lock Code', 'Lock Code', 'Door Code'] },
+      gate_code: { titles: ['Gate code', 'Gate Code', 'Gate Access Code'] },
+      garage_code: { titles: ['Garage code', 'Garage Code', 'Garage Door Code'] },
+      lockbox_code: { titles: ['Lockbox Code for Emergencies', 'Lockbox Code', 'Backup Key Location'] },
+      security_system_brand: { titles: ['Security System Brand', 'Security Provider', 'Alarm System Brand'] },
+      security_alarm_code: { titles: ['Security Alarm Code', 'Alarm Code'] },
+      camera_locations: { titles: ['Camera Locations', 'Camera Location'] },
       has_cameras: { 
-        title: 'Cameras Present',
+        titles: ['Cameras Present', 'Has Cameras', 'Security Cameras'],
         format: (v) => v === true ? 'Yes' : v === false ? 'No' : String(v)
       },
       has_security_system: {
-        title: 'Security System Present',
+        titles: ['Security System Present', 'Has Security System'],
         format: (v) => v === true ? 'Yes' : v === false ? 'No' : String(v)
       },
       insurance_provider: {
-        title: 'Insurance Provider & Policy Number',
+        titles: ['Insurance Provider & Policy Number', 'Insurance Provider', 'Insurance Details'],
         format: (v) => {
           const policy = fieldValues.insurance_policy_number;
           return policy ? `${v} - Policy #${policy}` : v;
         }
       },
-      primary_cleaner_name: { title: 'Primary cleaner name' },
-      primary_cleaner_phone: { title: 'Primary cleaner phone number' },
-      cleaning_price: { title: 'Negotiated price per cleaning' },
-      hoa_contact_info: { title: 'HOA Contact Information' },
-      parking_type: { title: 'Parking Type' },
-      parking_capacity: { title: 'Parking Capacity' },
-      water_shutoff_location: { title: 'Water Main Shutoff Location' },
+      primary_cleaner_name: { titles: ['Primary cleaner name', 'Primary Cleaner Name', 'Cleaner Name'] },
+      primary_cleaner_phone: { titles: ['Primary cleaner phone number', 'Primary Cleaner Phone', 'Cleaner Phone'] },
+      cleaning_price: { titles: ['Negotiated price per cleaning', 'Cleaning Price', 'Cleaning Fee'] },
+      hoa_contact_info: { 
+        titles: ['HOA Contact Information', 'HOA Information', 'HOA Details'],
+        format: (v) => {
+          const url = fieldValues.hoa_portal_url;
+          const username = fieldValues.hoa_portal_username;
+          let result = v;
+          if (url) result += `\nPortal: ${url}`;
+          if (username) result += `\nUsername: ${username}`;
+          return result;
+        }
+      },
+      parking_type: { titles: ['Parking Type', 'Parking Details'] },
+      parking_capacity: { titles: ['Parking Capacity', 'Parking Spaces', 'Number of Parking Spaces'] },
+      water_shutoff_location: { titles: ['Water Main Shutoff Location', 'Water Shutoff Location', 'Main Water Valve'] },
+      gas_shutoff_location: { titles: ['Gas Shutoff Location', 'Gas Main Location', 'Gas Valve Location'] },
+      hvac_provider: { titles: ['HVAC Service Provider', 'HVAC Contact', 'HVAC Provider'] },
+      plumber_contact: { titles: ['Plumber Contact', 'Plumber', 'Plumber Information'] },
+      electrician_contact: { titles: ['Electrician Contact', 'Electrician', 'Electrician Information'] },
+      handyman_contact: { titles: ['Handyman Contact', 'Handyman', 'Handyman Information'] },
+      thermostat_brand: { titles: ['Thermostat Brand', 'Thermostat Login', 'Smart Thermostat'] },
+      school_district: { titles: ['School District'] },
+      property_type: { titles: ['Property Type Detail', 'Property Type'] },
+    };
+    
+    // Helper to find task by checking multiple possible titles
+    const findMatchingTask = (titles: string[]): any | null => {
+      for (const title of titles) {
+        const task = tasksByTitle.get(title.toLowerCase());
+        if (task) return task;
+        // Also try partial match
+        for (const [taskTitle, taskObj] of tasksByTitle) {
+          if (taskTitle.includes(title.toLowerCase()) || title.toLowerCase().includes(taskTitle)) {
+            return taskObj;
+          }
+        }
+      }
+      return null;
     };
 
     // Process each extracted field and update the corresponding task
@@ -463,15 +497,15 @@ Extract ALL available information. Use null only if truly not found.`;
       for (const [fieldKey, mapping] of Object.entries(fieldToTaskMapping)) {
         const value = fieldValues[fieldKey];
         if (value !== null && value !== undefined && value !== '') {
-          const task = tasksByTitle.get(mapping.title.toLowerCase());
+          const task = findMatchingTask(mapping.titles);
           if (task) {
             const formattedValue = mapping.format ? mapping.format(value) : String(value);
             const updated = await updateTask(task, formattedValue, `Extracted from owner documents`);
             if (updated) {
-              tasksUpdated.push(mapping.title);
+              tasksUpdated.push(task.title);
             }
           } else {
-            console.log(`No task found for field "${fieldKey}" (looking for "${mapping.title}")`);
+            console.log(`No task found for field "${fieldKey}" (looking for: ${mapping.titles.join(', ')})`);
           }
         }
       }
