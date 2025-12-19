@@ -1121,74 +1121,7 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
                   </Card>
                 )}
 
-                {/* Admin Tasks & To-Dos - Separate Section */}
-                {separatedOwnerActions.taskActions.length > 0 && (
-                  <Card className="border-2 border-orange-500/20">
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                        <ListTodo className="h-4 w-4 text-orange-600" />
-                        Admin Tasks & To-Dos ({separatedOwnerActions.taskActions.length})
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                      {separatedOwnerActions.taskActions.map((task: any) => (
-                        <div key={task.id} className="p-3 border rounded-lg bg-orange-50/50 dark:bg-orange-950/20 space-y-2">
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="flex items-start gap-2 flex-1">
-                              <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${
-                                task.priority === 'high' ? 'bg-red-500' :
-                                task.priority === 'medium' ? 'bg-amber-500' :
-                                'bg-gray-400'
-                              }`} />
-                              <div className="flex-1 min-w-0">
-                                <p className="font-medium text-sm">{task.title}</p>
-                                {task.description && (
-                                  <p className="text-xs text-muted-foreground mt-1">{task.description}</p>
-                                )}
-                                {task.category && (
-                                  <Badge variant="outline" className="text-xs mt-1">{task.category}</Badge>
-                                )}
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-2 flex-shrink-0">
-                              <Badge 
-                                variant="outline" 
-                                className={`text-xs ${
-                                  task.priority === 'high' ? 'border-red-300 text-red-700' :
-                                  task.priority === 'medium' ? 'border-amber-300 text-amber-700' :
-                                  'border-gray-300 text-gray-700'
-                                }`}
-                              >
-                                {task.priority}
-                              </Badge>
-                            </div>
-                          </div>
-                          
-                          {task.linked_task_id ? (
-                            <Badge variant="secondary" className="text-xs bg-green-100 text-green-700">
-                              <Check className="h-3 w-3 mr-1" />
-                              Converted to Task
-                            </Badge>
-                          ) : (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="h-7 text-xs"
-                              onClick={() => convertToOnboardingTask(task)}
-                              disabled={convertingTaskId === task.id}
-                            >
-                              {convertingTaskId === task.id ? (
-                                <><Loader2 className="h-3 w-3 mr-1 animate-spin" /> Converting...</>
-                              ) : (
-                                <><ArrowRight className="h-3 w-3 mr-1" /> Convert to Task</>
-                              )}
-                            </Button>
-                          )}
-                        </div>
-                      ))}
-                    </CardContent>
-                  </Card>
-                )}
+                {/* Admin Tasks removed - now shown in Initial Setup Tasks modal on Properties page */}
 
                 {/* Setup Notes - Pending Actions */}
                 {separatedOwnerActions.setupNotes.length > 0 && (

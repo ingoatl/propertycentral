@@ -43,6 +43,7 @@ const Properties = () => {
   const [selectedPropertyForListingData, setSelectedPropertyForListingData] = useState<{ id: string; name: string } | null>(null);
   const [propertyProjects, setPropertyProjects] = useState<Record<string, string>>({});
   const [propertyProjectsProgress, setPropertyProjectsProgress] = useState<Record<string, number>>({});
+  const [propertySetupTaskCounts, setPropertySetupTaskCounts] = useState<Record<string, number>>({});
   const [uploadingImage, setUploadingImage] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [propertyTypeFilter, setPropertyTypeFilter] = useState<"All" | "Client-Managed" | "Company-Owned" | "Inactive">("All");
@@ -66,6 +67,7 @@ const Properties = () => {
   useEffect(() => {
     loadProperties();
     loadPropertyProjects();
+    loadPropertySetupTaskCounts();
   }, []);
 
   useEffect(() => {
@@ -178,6 +180,50 @@ const Properties = () => {
       setPropertyProjectsProgress(progressMap);
     } catch (error: any) {
       console.error("Error loading projects:", error);
+    }
+  };
+
+  const loadPropertySetupTaskCounts = async () => {
+    try {
+      // Get all property IDs that have owner conversations with tasks
+      const { data: conversations, error } = await supabase
+        .from("owner_conversations")
+        .select("property_id");
+      
+      if (error) throw error;
+      
+      const propertyIds = [...new Set((conversations || []).map(c => c.property_id).filter(Boolean))];
+      
+      const taskCounts: Record<string, number> = {};
+      
+      for (const propId of propertyIds) {
+        if (!propId) continue;
+        
+        // Get conversation IDs for this property
+        const { data: propConvs } = await supabase
+          .from("owner_conversations")
+          .select("id")
+          .eq("property_id", propId);
+        
+        if (propConvs && propConvs.length > 0) {
+          const convIds = propConvs.map(c => c.id);
+          
+          // Count task actions for these conversations
+          const { count } = await supabase
+            .from("owner_conversation_actions")
+            .select("*", { count: "exact", head: true })
+            .in("conversation_id", convIds)
+            .eq("action_type", "task");
+          
+          if (count && count > 0) {
+            taskCounts[propId] = count;
+          }
+        }
+      }
+      
+      setPropertySetupTaskCounts(taskCounts);
+    } catch (error) {
+      console.error("Error loading setup task counts:", error);
     }
   };
 
@@ -396,6 +442,17 @@ const Properties = () => {
     return "";
   };
 
+  // Helper to highlight matching text
+  const highlightText = (text: string, query: string) => {
+    if (!query.trim()) return text;
+    const parts = text.split(new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi'));
+    return parts.map((part, i) => 
+      part.toLowerCase() === query.toLowerCase() ? 
+        <mark key={i} className="bg-yellow-200 dark:bg-yellow-800 text-foreground px-0.5 rounded">{part}</mark> : 
+        part
+    );
+  };
+
   const renderPropertyCard = (property: Property, index: number) => (
     <Card 
       key={property.id}
@@ -505,7 +562,7 @@ const Properties = () => {
       <CardHeader className="pb-2 pt-3 px-3">
         <div className="flex items-start justify-between gap-2">
           <CardTitle className="text-base text-foreground group-hover:text-primary transition-colors line-clamp-2 flex-1">
-            {property.name}
+            {searchQuery.trim() ? highlightText(property.name, searchQuery) : property.name}
           </CardTitle>
           {property.propertyType && (
             <Badge variant={property.propertyType === "Client-Managed" ? "default" : "secondary"} className="flex-shrink-0 text-[10px] px-2 py-0.5">
@@ -515,7 +572,7 @@ const Properties = () => {
         </div>
         <CardDescription className="flex items-center gap-1 text-xs text-muted-foreground mt-1">
           <MapPin className="w-3 h-3 flex-shrink-0" />
-          <span className="line-clamp-1">{property.address}</span>
+          <span className="line-clamp-1">{searchQuery.trim() ? highlightText(property.address, searchQuery) : property.address}</span>
         </CardDescription>
         {property.rentalType && (
           <div className="pt-1">
@@ -564,21 +621,23 @@ const Properties = () => {
           Property Details
         </Button>
 
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => {
-            setSelectedPropertyForSetupTasks({
-              id: property.id,
-              name: property.name,
-              ownerEmail: null, // Will be fetched from owner
-            });
-          }}
-          className="w-full h-8 text-xs"
-        >
-          <ListChecks className="w-3 h-3 mr-1.5" />
-          Initial Setup Tasks
-        </Button>
+        {propertySetupTaskCounts[property.id] > 0 && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setSelectedPropertyForSetupTasks({
+                id: property.id,
+                name: property.name,
+                ownerEmail: null,
+              });
+            }}
+            className="w-full h-8 text-xs"
+          >
+            <ListChecks className="w-3 h-3 mr-1.5" />
+            Initial Setup Tasks ({propertySetupTaskCounts[property.id]})
+          </Button>
+        )}
 
         <Button
           variant="secondary"
