@@ -55,6 +55,7 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
   const [appliances, setAppliances] = useState<any[]>([]);
   const [ownerActions, setOwnerActions] = useState<any[]>([]);
   const [ownerDocuments, setOwnerDocuments] = useState<any[]>([]);
+  const [propertyDocuments, setPropertyDocuments] = useState<any[]>([]);
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
   const [convertingTaskId, setConvertingTaskId] = useState<string | null>(null);
   const [onboardingProject, setOnboardingProject] = useState<any>(null);
@@ -220,6 +221,14 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
           `)
           .eq('owner_conversations.property_id', propertyId);
         setOwnerDocuments(docsData || []);
+
+        // Load property documents (owner-provided files)
+        const { data: propDocsData } = await supabase
+          .from('property_documents')
+          .select('*')
+          .eq('property_id', propertyId)
+          .order('created_at', { ascending: false });
+        setPropertyDocuments(propDocsData || []);
       }
     } catch (error: any) {
       console.error('Error loading property details:', error);
@@ -901,6 +910,74 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
                           </Button>
                         </div>
                       )}
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Owner-Provided Documents Section */}
+                {propertyDocuments.length > 0 && (
+                  <Card className="border-2 border-amber-500/30 bg-amber-50/30 dark:bg-amber-950/20">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                        <FileText className="h-4 w-4 text-amber-600" />
+                        Owner-Provided Documents
+                        <Badge variant="secondary" className="bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300">
+                          {propertyDocuments.length} {propertyDocuments.length === 1 ? 'file' : 'files'}
+                        </Badge>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2">
+                      {propertyDocuments.map((doc) => (
+                        <div 
+                          key={doc.id} 
+                          className="flex items-start justify-between gap-3 bg-background/50 p-3 rounded-md border border-amber-200/50"
+                        >
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              {doc.file_type?.includes('pdf') ? (
+                                <FileText className="h-4 w-4 text-red-500 flex-shrink-0" />
+                              ) : doc.file_type?.includes('sheet') || doc.file_type?.includes('excel') || doc.file_name?.includes('.xlsx') ? (
+                                <FileText className="h-4 w-4 text-green-600 flex-shrink-0" />
+                              ) : (
+                                <FileText className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                              )}
+                              <p className="text-sm font-medium">{doc.file_name}</p>
+                            </div>
+                            {doc.description && (
+                              <p className="text-xs text-muted-foreground mt-1 ml-6">{doc.description}</p>
+                            )}
+                            <div className="flex items-center gap-2 mt-1 ml-6">
+                              <Badge variant="outline" className="text-xs bg-amber-50 border-amber-200 text-amber-700">
+                                Owner Provided
+                              </Badge>
+                              <span className="text-xs text-muted-foreground">
+                                {new Date(doc.created_at).toLocaleDateString()}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              onClick={() => window.open(doc.file_path, '_blank')}
+                              title="Open document"
+                            >
+                              <ExternalLink className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                              asChild
+                            >
+                              <a href={doc.file_path} download={doc.file_name} title="Download document">
+                                <Download className="h-4 w-4" />
+                              </a>
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
                     </CardContent>
                   </Card>
                 )}
