@@ -8,9 +8,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { OnboardingTask } from "@/types/onboarding";
-import { Loader2, MapPin, User, Lock, Phone, Link as LinkIcon, Mail, Home, Search, DollarSign, AlertCircle, Clock, Heart, Frown, Meh, Zap, Lightbulb, Copy, Check, TrendingUp, FileText, ExternalLink, ClipboardCheck, Key, Settings, Car, Bed, ChevronDown, ChevronUp, Download, MessageSquare } from "lucide-react";
+import { Loader2, MapPin, User, Lock, Phone, Link as LinkIcon, Mail, Home, Search, DollarSign, AlertCircle, Clock, Heart, Frown, Meh, Zap, Lightbulb, Copy, Check, TrendingUp, FileText, ExternalLink, ClipboardCheck, Key, Settings, Car, Bed, ChevronDown, ChevronUp, Download, MessageSquare, Plus, ArrowRight, ListTodo, Info, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { InspectionDataSection } from "@/components/properties/InspectionDataSection";
+import { ONBOARDING_PHASES } from "@/context/onboardingPhases";
 
 interface PropertyDetailsModalProps {
   open: boolean;
@@ -55,6 +56,8 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
   const [ownerActions, setOwnerActions] = useState<any[]>([]);
   const [ownerDocuments, setOwnerDocuments] = useState<any[]>([]);
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
+  const [convertingTaskId, setConvertingTaskId] = useState<string | null>(null);
+  const [onboardingProject, setOnboardingProject] = useState<any>(null);
 
   useEffect(() => {
     if (open) {
@@ -72,7 +75,7 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
       if (!projectId && propertyId) {
         const { data: projectData, error: projectError } = await supabase
           .from('onboarding_projects')
-          .select('id')
+          .select('*')
           .eq('property_id', propertyId)
           .order('created_at', { ascending: false })
           .limit(1)
@@ -80,6 +83,17 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
         
         if (!projectError && projectData) {
           effectiveProjectId = projectData.id;
+          setOnboardingProject(projectData);
+        }
+      } else if (projectId) {
+        // Load the project details
+        const { data: projectData } = await supabase
+          .from('onboarding_projects')
+          .select('*')
+          .eq('id', projectId)
+          .single();
+        if (projectData) {
+          setOnboardingProject(projectData);
         }
       }
       
@@ -94,15 +108,6 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
         if (tasksError) throw tasksError;
         
         console.log('PropertyDetailsModal - All tasks loaded:', tasksData?.length);
-        console.log('PropertyDetailsModal - Listing URL tasks:', 
-          tasksData?.filter(t => 
-            t.title.toLowerCase().includes('airbnb') || 
-            t.title.toLowerCase().includes('vrbo') || 
-            t.title.toLowerCase().includes('direct booking') ||
-            t.title.toLowerCase().includes('booking.com') ||
-            t.title.toLowerCase().includes('zillow')
-          )
-        );
         
         setTasks((tasksData || []) as OnboardingTask[]);
       }
@@ -152,9 +157,8 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
               return false;
             }
             
-            // Include all other emails (transactional, organizational, vendor emails)
             return true;
-          }).slice(0, 10); // Limit to 10 after filtering
+          }).slice(0, 10);
           
           setEmailInsights(filteredInsights);
         }
@@ -203,8 +207,8 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
             owner_conversations!inner(property_id, title)
           `)
           .eq('owner_conversations.property_id', propertyId)
-          .eq('status', 'created')
-          .order('category', { ascending: true });
+          .in('status', ['created', 'suggested'])
+          .order('action_type', { ascending: true });
         setOwnerActions(actionsData || []);
 
         // Load documents from owner conversations
@@ -224,6 +228,120 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
       setLoading(false);
     }
   };
+
+  // Function to auto-create onboarding project if missing
+  const ensureOnboardingProject = async (): Promise<string | null> => {
+    if (onboardingProject?.id) return onboardingProject.id;
+    
+    if (!propertyId) {
+      toast.error('Property ID is required to create an onboarding project');
+      return null;
+    }
+
+    try {
+      // Create new project
+      const { data: newProject, error: createError } = await supabase
+        .from('onboarding_projects')
+        .insert({
+          property_id: propertyId,
+          owner_name: propertyName || 'Unknown Owner',
+          property_address: propertyInfo?.address || propertyName,
+          status: 'pending',
+          progress: 0
+        })
+        .select()
+        .single();
+
+      if (createError) throw createError;
+
+      // Create default tasks from ONBOARDING_PHASES
+      const tasksToInsert = ONBOARDING_PHASES.flatMap(phase => 
+        phase.tasks.map(task => ({
+          project_id: newProject.id,
+          phase_number: phase.id,
+          phase_title: phase.title,
+          title: task.title,
+          description: task.description || '',
+          field_type: task.field_type,
+          status: 'pending'
+        }))
+      );
+
+      if (tasksToInsert.length > 0) {
+        await supabase.from('onboarding_tasks').insert(tasksToInsert);
+      }
+
+      setOnboardingProject(newProject);
+      toast.success('Created onboarding project');
+      return newProject.id;
+    } catch (error) {
+      console.error('Error creating onboarding project:', error);
+      toast.error('Failed to create onboarding project');
+      return null;
+    }
+  };
+
+  // Function to convert an owner action to an onboarding task
+  const convertToOnboardingTask = async (action: any) => {
+    setConvertingTaskId(action.id);
+    
+    try {
+      const projectIdToUse = await ensureOnboardingProject();
+      if (!projectIdToUse) {
+        setConvertingTaskId(null);
+        return;
+      }
+
+      // Create the onboarding task
+      const { data: newTask, error: taskError } = await supabase
+        .from('onboarding_tasks')
+        .insert({
+          project_id: projectIdToUse,
+          phase_number: 1,
+          phase_title: 'Setup & Configuration',
+          title: action.title,
+          description: action.description || '',
+          field_type: 'checkbox',
+          status: 'pending'
+        })
+        .select()
+        .single();
+
+      if (taskError) throw taskError;
+
+      // Update the action status to indicate it's been converted
+      await supabase
+        .from('owner_conversation_actions')
+        .update({ 
+          status: 'created',
+          linked_task_id: newTask.id 
+        })
+        .eq('id', action.id);
+
+      // Refresh the data
+      loadData();
+      toast.success(`Task "${action.title}" created successfully`);
+    } catch (error) {
+      console.error('Error converting to task:', error);
+      toast.error('Failed to create task');
+    } finally {
+      setConvertingTaskId(null);
+    }
+  };
+
+  // Separate owner actions by type
+  const separatedOwnerActions = useMemo(() => {
+    const propertyInfoActions = ownerActions.filter(a => a.action_type === 'property_info');
+    const taskActions = ownerActions.filter(a => a.action_type === 'task');
+    const setupNotes = ownerActions.filter(a => a.action_type === 'setup_note');
+    const credentialActions = ownerActions.filter(a => a.action_type === 'credential');
+    const faqActions = ownerActions.filter(a => a.action_type === 'faq');
+    const otherActions = ownerActions.filter(a => 
+      !['property_info', 'task', 'setup_note', 'credential', 'faq'].includes(a.action_type)
+    );
+    
+    return { propertyInfoActions, taskActions, setupNotes, credentialActions, faqActions, otherActions };
+  }, [ownerActions]);
 
   const getCategoryIcon = (category: string) => {
     switch (category) {
@@ -930,78 +1048,193 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
                   </Card>
                 )}
 
-                {/* Owner Intel Section - Data from Owner Conversations */}
-                {filteredOwnerIntel.sortedCategories.length > 0 && (
-                  <Card className="border-2 border-amber-500/20">
+                {/* Property Information from Owner Intel */}
+                {separatedOwnerActions.propertyInfoActions.length > 0 && (
+                  <Card className="border-2 border-emerald-500/20">
                     <CardHeader className="pb-3">
                       <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                        <MessageSquare className="h-4 w-4 text-amber-600" />
-                        Owner Intel ({ownerActions.length} items)
+                        <Info className="h-4 w-4 text-emerald-600" />
+                        Property Information ({separatedOwnerActions.propertyInfoActions.length} items)
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-3">
-                      {filteredOwnerIntel.sortedCategories.map(category => {
-                        const IconComponent = filteredOwnerIntel.categoryIcons[category] || FileText;
-                        const items = filteredOwnerIntel.categoryMap[category];
-                        const isExpanded = expandedCategories[category] !== false; // Default expanded
+                      {(() => {
+                        // Group property info by category
+                        const categoryMap: Record<string, any[]> = {};
+                        separatedOwnerActions.propertyInfoActions.forEach(action => {
+                          const cat = action.category || 'General';
+                          if (!categoryMap[cat]) categoryMap[cat] = [];
+                          categoryMap[cat].push(action);
+                        });
                         
-                        return (
-                          <Collapsible key={category} open={isExpanded} onOpenChange={() => toggleCategory(category)}>
-                            <CollapsibleTrigger asChild>
-                              <div className="flex items-center justify-between cursor-pointer p-2 rounded-lg bg-muted/50 hover:bg-muted transition-colors">
-                                <div className="flex items-center gap-2">
-                                  <IconComponent className="h-4 w-4 text-muted-foreground" />
-                                  <span className="font-medium text-sm">{category}</span>
-                                  <Badge variant="secondary" className="text-xs">{items.length}</Badge>
-                                </div>
-                                {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                              </div>
-                            </CollapsibleTrigger>
-                            <CollapsibleContent className="pt-2 space-y-2">
-                              {items.map((item: any) => (
-                                <div key={item.id} className="ml-6 p-2 border-l-2 border-primary/30 space-y-1">
-                                  <div className="flex items-start justify-between gap-2">
-                                    <p className="font-medium text-sm">{item.title}</p>
-                                    <Badge 
-                                      variant="outline" 
-                                      className={`text-xs ${
-                                        item.priority === 'high' ? 'border-red-300 text-red-700' :
-                                        item.priority === 'medium' ? 'border-amber-300 text-amber-700' :
-                                        'border-gray-300 text-gray-700'
-                                      }`}
-                                    >
-                                      {item.priority}
-                                    </Badge>
+                        return Object.entries(categoryMap).map(([category, items]) => {
+                          const IconComponent = filteredOwnerIntel.categoryIcons[category] || Info;
+                          const isExpanded = expandedCategories[`info_${category}`] !== false;
+                          
+                          return (
+                            <Collapsible key={category} open={isExpanded} onOpenChange={() => toggleCategory(`info_${category}`)}>
+                              <CollapsibleTrigger asChild>
+                                <div className="flex items-center justify-between cursor-pointer p-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 hover:bg-emerald-100 dark:hover:bg-emerald-950/50 transition-colors">
+                                  <div className="flex items-center gap-2">
+                                    <IconComponent className="h-4 w-4 text-emerald-600" />
+                                    <span className="font-medium text-sm">{category}</span>
+                                    <Badge variant="secondary" className="text-xs bg-emerald-100 text-emerald-700">{items.length}</Badge>
                                   </div>
-                                  <p className="text-xs text-muted-foreground whitespace-pre-wrap">{item.description}</p>
-                                  {item.content?.items && Array.isArray(item.content.items) && (
-                                    <ul className="text-xs text-muted-foreground space-y-0.5 mt-1">
-                                      {item.content.items.map((bullet: string, idx: number) => (
-                                        <li key={idx} className="flex items-start gap-1">
-                                          <span className="text-primary">•</span>
-                                          <span>{bullet}</span>
-                                        </li>
-                                      ))}
-                                    </ul>
-                                  )}
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-6 text-xs"
-                                    onClick={() => copyToClipboard(item.description || item.title, item.title)}
-                                  >
-                                    {copiedField === item.title ? (
-                                      <><Check className="h-3 w-3 mr-1 text-green-600" /> Copied</>
-                                    ) : (
-                                      <><Copy className="h-3 w-3 mr-1" /> Copy</>
-                                    )}
-                                  </Button>
+                                  {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                                 </div>
-                              ))}
-                            </CollapsibleContent>
-                          </Collapsible>
-                        );
-                      })}
+                              </CollapsibleTrigger>
+                              <CollapsibleContent className="pt-2 space-y-2">
+                                {items.map((item: any) => (
+                                  <div key={item.id} className="ml-6 p-2 border-l-2 border-emerald-300 space-y-1">
+                                    <p className="font-medium text-sm">{item.title}</p>
+                                    <p className="text-xs text-muted-foreground whitespace-pre-wrap">{item.description}</p>
+                                    {item.content?.items && Array.isArray(item.content.items) && (
+                                      <ul className="text-xs text-muted-foreground space-y-0.5 mt-1">
+                                        {item.content.items.map((bullet: string, idx: number) => (
+                                          <li key={idx} className="flex items-start gap-1">
+                                            <span className="text-emerald-600">•</span>
+                                            <span>{bullet}</span>
+                                          </li>
+                                        ))}
+                                      </ul>
+                                    )}
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-6 text-xs"
+                                      onClick={() => copyToClipboard(item.description || item.title, item.title)}
+                                    >
+                                      {copiedField === item.title ? (
+                                        <><Check className="h-3 w-3 mr-1 text-green-600" /> Copied</>
+                                      ) : (
+                                        <><Copy className="h-3 w-3 mr-1" /> Copy</>
+                                      )}
+                                    </Button>
+                                  </div>
+                                ))}
+                              </CollapsibleContent>
+                            </Collapsible>
+                          );
+                        });
+                      })()}
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Admin Tasks & To-Dos - Separate Section */}
+                {separatedOwnerActions.taskActions.length > 0 && (
+                  <Card className="border-2 border-orange-500/20">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                        <ListTodo className="h-4 w-4 text-orange-600" />
+                        Admin Tasks & To-Dos ({separatedOwnerActions.taskActions.length})
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      {separatedOwnerActions.taskActions.map((task: any) => (
+                        <div key={task.id} className="p-3 border rounded-lg bg-orange-50/50 dark:bg-orange-950/20 space-y-2">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex items-start gap-2 flex-1">
+                              <div className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${
+                                task.priority === 'high' ? 'bg-red-500' :
+                                task.priority === 'medium' ? 'bg-amber-500' :
+                                'bg-gray-400'
+                              }`} />
+                              <div className="flex-1 min-w-0">
+                                <p className="font-medium text-sm">{task.title}</p>
+                                {task.description && (
+                                  <p className="text-xs text-muted-foreground mt-1">{task.description}</p>
+                                )}
+                                {task.category && (
+                                  <Badge variant="outline" className="text-xs mt-1">{task.category}</Badge>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2 flex-shrink-0">
+                              <Badge 
+                                variant="outline" 
+                                className={`text-xs ${
+                                  task.priority === 'high' ? 'border-red-300 text-red-700' :
+                                  task.priority === 'medium' ? 'border-amber-300 text-amber-700' :
+                                  'border-gray-300 text-gray-700'
+                                }`}
+                              >
+                                {task.priority}
+                              </Badge>
+                            </div>
+                          </div>
+                          
+                          {task.linked_task_id ? (
+                            <Badge variant="secondary" className="text-xs bg-green-100 text-green-700">
+                              <Check className="h-3 w-3 mr-1" />
+                              Converted to Task
+                            </Badge>
+                          ) : (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-7 text-xs"
+                              onClick={() => convertToOnboardingTask(task)}
+                              disabled={convertingTaskId === task.id}
+                            >
+                              {convertingTaskId === task.id ? (
+                                <><Loader2 className="h-3 w-3 mr-1 animate-spin" /> Converting...</>
+                              ) : (
+                                <><ArrowRight className="h-3 w-3 mr-1" /> Convert to Task</>
+                              )}
+                            </Button>
+                          )}
+                        </div>
+                      ))}
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Setup Notes - Pending Actions */}
+                {separatedOwnerActions.setupNotes.length > 0 && (
+                  <Card className="border-2 border-yellow-500/20">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                        <AlertTriangle className="h-4 w-4 text-yellow-600" />
+                        Setup Notes ({separatedOwnerActions.setupNotes.length})
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      {separatedOwnerActions.setupNotes.map((note: any) => (
+                        <div key={note.id} className="p-3 border rounded-lg bg-yellow-50/50 dark:bg-yellow-950/20 space-y-2">
+                          <div className="flex items-start gap-2">
+                            <AlertTriangle className="h-4 w-4 text-yellow-600 flex-shrink-0 mt-0.5" />
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-sm">{note.title}</p>
+                              {note.description && (
+                                <p className="text-xs text-muted-foreground mt-1 whitespace-pre-wrap">{note.description}</p>
+                              )}
+                              {note.content?.items && Array.isArray(note.content.items) && (
+                                <ul className="text-xs text-muted-foreground space-y-0.5 mt-2">
+                                  {note.content.items.map((bullet: string, idx: number) => (
+                                    <li key={idx} className="flex items-start gap-1">
+                                      <span className="text-yellow-600">•</span>
+                                      <span>{bullet}</span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              )}
+                            </div>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 text-xs"
+                            onClick={() => copyToClipboard(note.description || note.title, note.title)}
+                          >
+                            {copiedField === note.title ? (
+                              <><Check className="h-3 w-3 mr-1 text-green-600" /> Copied</>
+                            ) : (
+                              <><Copy className="h-3 w-3 mr-1" /> Copy</>
+                            )}
+                          </Button>
+                        </div>
+                      ))}
                     </CardContent>
                   </Card>
                 )}
