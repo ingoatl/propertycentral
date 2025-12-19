@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { ONBOARDING_PHASES } from "@/context/onboardingPhases";
 import { Plus } from "lucide-react";
 import { addWeeks, format } from "date-fns";
+import { sanitizeTasks, logWatchdogWarnings } from "@/lib/taskWatchdog";
 
 interface CreateProjectDialogProps {
   open: boolean;
@@ -232,6 +233,14 @@ export const CreateProjectDialog = ({
           };
         })
       });
+
+      // WATCHDOG: Validate tasks before insertion (log warnings but use original typed tasks)
+      const { removed, warnings } = sanitizeTasks(allTasks);
+      logWatchdogWarnings(warnings);
+      
+      if (removed.length > 0) {
+        console.warn(`[Task Watchdog] Detected ${removed.length} potential issues:`, removed);
+      }
 
       const { error: tasksError } = await supabase
         .from("onboarding_tasks")
