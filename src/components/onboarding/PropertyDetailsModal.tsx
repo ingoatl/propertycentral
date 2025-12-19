@@ -7,8 +7,9 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { OnboardingTask } from "@/types/onboarding";
-import { Loader2, MapPin, User, Lock, Phone, Link as LinkIcon, Mail, Home, Search, DollarSign, AlertCircle, Clock, Heart, Frown, Meh, Zap, Lightbulb, Copy, Check, TrendingUp, FileText, ExternalLink, ClipboardCheck, Key, Settings, Car, Bed, ChevronDown, ChevronUp, Download, MessageSquare, Plus, ArrowRight, ListTodo, Info, AlertTriangle } from "lucide-react";
+import { Loader2, MapPin, User, Lock, Phone, Link as LinkIcon, Mail, Home, Search, DollarSign, AlertCircle, Clock, Heart, Frown, Meh, Zap, Lightbulb, Copy, Check, TrendingUp, FileText, ExternalLink, ClipboardCheck, Key, Settings, Car, Bed, ChevronDown, ChevronUp, Download, MessageSquare, Plus, ArrowRight, ListTodo, Info, AlertTriangle, FolderOpen } from "lucide-react";
 import { toast } from "sonner";
 import { InspectionDataSection } from "@/components/properties/InspectionDataSection";
 import { ONBOARDING_PHASES } from "@/context/onboardingPhases";
@@ -59,6 +60,7 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
   const [convertingTaskId, setConvertingTaskId] = useState<string | null>(null);
   const [onboardingProject, setOnboardingProject] = useState<any>(null);
+  const [activeTab, setActiveTab] = useState("details");
 
   useEffect(() => {
     if (open) {
@@ -644,9 +646,27 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
               <Loader2 className="h-6 w-6 animate-spin text-primary max-md:h-8 max-md:w-8" />
             </div>
            ) : (
-            <ScrollArea className="flex-1 min-h-0">
-              <div className="space-y-4 pr-4 max-md:pr-2 max-md:space-y-3">
-                {/* Property Information - Always show at top */}
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
+              <TabsList className="grid w-full grid-cols-2 flex-shrink-0">
+                <TabsTrigger value="details" className="flex items-center gap-2">
+                  <Home className="h-4 w-4" />
+                  Details
+                </TabsTrigger>
+                <TabsTrigger value="documents" className="flex items-center gap-2">
+                  <FolderOpen className="h-4 w-4" />
+                  Documents
+                  {propertyDocuments.length > 0 && (
+                    <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-xs">
+                      {propertyDocuments.length}
+                    </Badge>
+                  )}
+                </TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="details" className="flex-1 min-h-0 mt-4">
+                <ScrollArea className="h-full">
+                  <div className="space-y-4 pr-4 max-md:pr-2 max-md:space-y-3">
+                    {/* Property Information - Always show at top */}
                 {propertyInfo && (
                   <Card className="border-2 border-primary/20">
                     <CardHeader className="pb-3">
@@ -910,74 +930,6 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
                           </Button>
                         </div>
                       )}
-                    </CardContent>
-                  </Card>
-                )}
-
-                {/* Owner-Provided Documents Section */}
-                {propertyDocuments.length > 0 && (
-                  <Card className="border-2 border-amber-500/30 bg-amber-50/30 dark:bg-amber-950/20">
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                        <FileText className="h-4 w-4 text-amber-600" />
-                        Owner-Provided Documents
-                        <Badge variant="secondary" className="bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300">
-                          {propertyDocuments.length} {propertyDocuments.length === 1 ? 'file' : 'files'}
-                        </Badge>
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-2">
-                      {propertyDocuments.map((doc) => (
-                        <div 
-                          key={doc.id} 
-                          className="flex items-start justify-between gap-3 bg-background/50 p-3 rounded-md border border-amber-200/50"
-                        >
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              {doc.file_type?.includes('pdf') ? (
-                                <FileText className="h-4 w-4 text-red-500 flex-shrink-0" />
-                              ) : doc.file_type?.includes('sheet') || doc.file_type?.includes('excel') || doc.file_name?.includes('.xlsx') ? (
-                                <FileText className="h-4 w-4 text-green-600 flex-shrink-0" />
-                              ) : (
-                                <FileText className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                              )}
-                              <p className="text-sm font-medium">{doc.file_name}</p>
-                            </div>
-                            {doc.description && (
-                              <p className="text-xs text-muted-foreground mt-1 ml-6">{doc.description}</p>
-                            )}
-                            <div className="flex items-center gap-2 mt-1 ml-6">
-                              <Badge variant="outline" className="text-xs bg-amber-50 border-amber-200 text-amber-700">
-                                Owner Provided
-                              </Badge>
-                              <span className="text-xs text-muted-foreground">
-                                {new Date(doc.created_at).toLocaleDateString()}
-                              </span>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8"
-                              onClick={() => window.open(doc.file_path, '_blank')}
-                              title="Open document"
-                            >
-                              <ExternalLink className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8"
-                              asChild
-                            >
-                              <a href={doc.file_path} download={doc.file_name} title="Download document">
-                                <Download className="h-4 w-4" />
-                              </a>
-                            </Button>
-                          </div>
-                        </div>
-                      ))}
                     </CardContent>
                   </Card>
                 )}
@@ -1652,8 +1604,129 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
                     </CardContent>
                   </Card>
                 )}
-              </div>
-            </ScrollArea>
+                  </div>
+                </ScrollArea>
+              </TabsContent>
+              
+              <TabsContent value="documents" className="flex-1 min-h-0 mt-4">
+                <ScrollArea className="h-full">
+                  <div className="space-y-4 pr-4">
+                    {/* Owner-Provided Documents */}
+                    <Card className="border-2 border-amber-500/30 bg-amber-50/30 dark:bg-amber-950/20">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                          <FolderOpen className="h-4 w-4 text-amber-600" />
+                          Owner-Provided Documents
+                          <Badge variant="secondary" className="bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300">
+                            {propertyDocuments.length} {propertyDocuments.length === 1 ? 'file' : 'files'}
+                          </Badge>
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        {propertyDocuments.length === 0 ? (
+                          <p className="text-sm text-muted-foreground text-center py-4">
+                            No documents uploaded yet
+                          </p>
+                        ) : (
+                          propertyDocuments.map((doc) => (
+                            <div 
+                              key={doc.id} 
+                              className="flex items-start justify-between gap-3 bg-background/50 p-4 rounded-lg border border-amber-200/50"
+                            >
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2">
+                                  {doc.file_type?.includes('pdf') ? (
+                                    <FileText className="h-5 w-5 text-red-500 flex-shrink-0" />
+                                  ) : doc.file_type?.includes('sheet') || doc.file_type?.includes('excel') || doc.file_name?.includes('.xlsx') ? (
+                                    <FileText className="h-5 w-5 text-green-600 flex-shrink-0" />
+                                  ) : (
+                                    <FileText className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                                  )}
+                                  <p className="font-medium">{doc.file_name}</p>
+                                </div>
+                                {doc.description && (
+                                  <p className="text-sm text-muted-foreground mt-2 ml-7">{doc.description}</p>
+                                )}
+                                <div className="flex items-center gap-2 mt-2 ml-7">
+                                  <Badge variant="outline" className="text-xs bg-amber-50 border-amber-200 text-amber-700">
+                                    Owner Provided
+                                  </Badge>
+                                  <span className="text-xs text-muted-foreground">
+                                    Added {new Date(doc.created_at).toLocaleDateString()}
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="gap-1"
+                                  onClick={() => window.open(doc.file_path, '_blank')}
+                                >
+                                  <ExternalLink className="h-4 w-4" />
+                                  Open
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  asChild
+                                >
+                                  <a href={doc.file_path} download={doc.file_name} title="Download document">
+                                    <Download className="h-4 w-4" />
+                                  </a>
+                                </Button>
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </CardContent>
+                    </Card>
+
+                    {/* Conversation Documents */}
+                    {ownerDocuments.length > 0 && (
+                      <Card>
+                        <CardHeader className="pb-3">
+                          <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                            <MessageSquare className="h-4 w-4 text-blue-600" />
+                            Conversation Attachments
+                            <Badge variant="secondary">
+                              {ownerDocuments.length}
+                            </Badge>
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                          {ownerDocuments.map((doc) => (
+                            <div 
+                              key={doc.id} 
+                              className="flex items-start justify-between gap-3 bg-muted/50 p-3 rounded-md"
+                            >
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <FileText className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                                  <p className="text-sm font-medium">{doc.file_name}</p>
+                                </div>
+                                <p className="text-xs text-muted-foreground mt-1 ml-6">
+                                  From: {doc.owner_conversations?.title || 'Conversation'}
+                                </p>
+                              </div>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() => window.open(doc.file_path, '_blank')}
+                              >
+                                <ExternalLink className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          ))}
+                        </CardContent>
+                      </Card>
+                    )}
+                  </div>
+                </ScrollArea>
+              </TabsContent>
+            </Tabs>
           )}
         </div>
       </DialogContent>
