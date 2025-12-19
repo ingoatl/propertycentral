@@ -7,7 +7,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { OnboardingTask } from "@/types/onboarding";
-import { Loader2, MapPin, User, Lock, Phone, Link as LinkIcon, Mail, Home, Search, DollarSign, AlertCircle, Clock, Heart, Frown, Meh, Zap, Lightbulb, Copy, Check, TrendingUp, FileText, ExternalLink, ClipboardCheck } from "lucide-react";
+import { Loader2, MapPin, User, Lock, Phone, Link as LinkIcon, Mail, Home, Search, DollarSign, AlertCircle, Clock, Heart, Frown, Meh, Zap, Lightbulb, Copy, Check, TrendingUp, FileText, ExternalLink, ClipboardCheck, Key, Settings } from "lucide-react";
 import { toast } from "sonner";
 import { InspectionDataSection } from "@/components/properties/InspectionDataSection";
 
@@ -48,6 +48,9 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
   const [emailInsights, setEmailInsights] = useState<any[]>([]);
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const [financialData, setFinancialData] = useState<FinancialData | null>(null);
+  const [intelItems, setIntelItems] = useState<any[]>([]);
+  const [credentials, setCredentials] = useState<any[]>([]);
+  const [appliances, setAppliances] = useState<any[]>([]);
 
   useEffect(() => {
     if (open) {
@@ -164,6 +167,29 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
         } else if (financialInfo) {
           setFinancialData(financialInfo as FinancialData);
         }
+
+        // Load property intel items from owner conversations
+        const { data: intelData } = await supabase
+          .from('property_intel_items')
+          .select('*')
+          .eq('property_id', propertyId)
+          .eq('is_visible', true)
+          .order('category', { ascending: true });
+        setIntelItems(intelData || []);
+
+        // Load credentials
+        const { data: credData } = await supabase
+          .from('property_credentials')
+          .select('*')
+          .eq('property_id', propertyId);
+        setCredentials(credData || []);
+
+        // Load appliances
+        const { data: appData } = await supabase
+          .from('property_appliances')
+          .select('*')
+          .eq('property_id', propertyId);
+        setAppliances(appData || []);
       }
     } catch (error: any) {
       console.error('Error loading property details:', error);

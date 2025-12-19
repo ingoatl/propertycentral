@@ -2763,6 +2763,66 @@ export type Database = {
           },
         ]
       }
+      property_appliances: {
+        Row: {
+          appliance_type: string
+          brand: string | null
+          created_at: string
+          id: string
+          location: string | null
+          model: string | null
+          notes: string | null
+          property_id: string
+          serial_number: string | null
+          updated_at: string
+          warranty_info: string | null
+          year: number | null
+        }
+        Insert: {
+          appliance_type: string
+          brand?: string | null
+          created_at?: string
+          id?: string
+          location?: string | null
+          model?: string | null
+          notes?: string | null
+          property_id: string
+          serial_number?: string | null
+          updated_at?: string
+          warranty_info?: string | null
+          year?: number | null
+        }
+        Update: {
+          appliance_type?: string
+          brand?: string | null
+          created_at?: string
+          id?: string
+          location?: string | null
+          model?: string | null
+          notes?: string | null
+          property_id?: string
+          serial_number?: string | null
+          updated_at?: string
+          warranty_info?: string | null
+          year?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "property_appliances_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "comprehensive_property_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "property_appliances_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       property_contact_info: {
         Row: {
           contact_email: string | null
@@ -2803,6 +2863,57 @@ export type Database = {
             foreignKeyName: "property_contact_info_property_id_fkey"
             columns: ["property_id"]
             isOneToOne: true
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      property_credentials: {
+        Row: {
+          created_at: string
+          id: string
+          notes: string | null
+          password: string | null
+          property_id: string
+          service_name: string
+          updated_at: string
+          url: string | null
+          username: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          notes?: string | null
+          password?: string | null
+          property_id: string
+          service_name: string
+          updated_at?: string
+          url?: string | null
+          username?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          notes?: string | null
+          password?: string | null
+          property_id?: string
+          service_name?: string
+          updated_at?: string
+          url?: string | null
+          username?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "property_credentials_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "comprehensive_property_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "property_credentials_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
             referencedRelation: "properties"
             referencedColumns: ["id"]
           },
@@ -2961,6 +3072,63 @@ export type Database = {
             columns: ["submission_id"]
             isOneToOne: false
             referencedRelation: "owner_onboarding_submissions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      property_intel_items: {
+        Row: {
+          category: string
+          content: Json | null
+          created_at: string
+          description: string | null
+          id: string
+          is_visible: boolean | null
+          property_id: string
+          source_id: string | null
+          source_type: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          category: string
+          content?: Json | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_visible?: boolean | null
+          property_id: string
+          source_id?: string | null
+          source_type?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          content?: Json | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_visible?: boolean | null
+          property_id?: string
+          source_id?: string | null
+          source_type?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "property_intel_items_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "comprehensive_property_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "property_intel_items_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
             referencedColumns: ["id"]
           },
         ]
