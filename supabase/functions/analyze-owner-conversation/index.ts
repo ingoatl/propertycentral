@@ -22,6 +22,62 @@ interface AnalysisRequest {
   };
 }
 
+// Helper function to normalize strings for matching
+function normalizeString(str: string): string {
+  return str.toLowerCase()
+    .replace(/[^a-z0-9\s]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// Helper function to check if two strings are similar enough to match
+function stringsMatch(a: string, b: string): boolean {
+  const normA = normalizeString(a);
+  const normB = normalizeString(b);
+  
+  // Exact match
+  if (normA === normB) return true;
+  
+  // One contains the other
+  if (normA.includes(normB) || normB.includes(normA)) return true;
+  
+  // Check word overlap
+  const wordsA = normA.split(' ');
+  const wordsB = normB.split(' ');
+  const commonWords = wordsA.filter(w => wordsB.includes(w) && w.length > 2);
+  
+  // If more than half the words match, consider it a match
+  if (commonWords.length >= Math.min(wordsA.length, wordsB.length) * 0.5) return true;
+  
+  return false;
+}
+
+// Map extracted data types to task matching keywords
+const dataTypeToTaskKeywords: Record<string, string[]> = {
+  'wifi': ['wifi', 'internet', 'network'],
+  'electric': ['electric', 'electricity', 'power'],
+  'gas': ['gas'],
+  'water': ['water'],
+  'trash': ['trash', 'garbage', 'waste'],
+  'internet': ['internet', 'wifi', 'network'],
+  'hoa': ['hoa', 'homeowner'],
+  'security': ['security', 'alarm', 'camera'],
+  'cleaner': ['cleaner', 'cleaning', 'maid'],
+  'handyman': ['handyman', 'maintenance'],
+  'plumber': ['plumber', 'plumbing'],
+  'electrician': ['electrician'],
+  'hvac': ['hvac', 'heating', 'cooling', 'ac', 'air conditioning'],
+  'lockbox': ['lockbox', 'lock box'],
+  'gate': ['gate'],
+  'garage': ['garage'],
+  'smart lock': ['smart lock', 'keyless'],
+  'parking': ['parking'],
+  'pet': ['pet'],
+  'owner': ['owner'],
+  'insurance': ['insurance'],
+  'permit': ['permit', 'str', 'license'],
+};
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -59,6 +115,31 @@ serve(async (req) => {
     const existingTitles = new Set((existingActions || []).map(a => `${a.action_type}:${a.title.toLowerCase()}`));
     console.log("Existing actions count:", existingTitles.size);
 
+    // Get existing onboarding project and tasks for this property
+    let existingProject: any = null;
+    let existingTasks: any[] = [];
+    
+    if (propertyContext?.id) {
+      const { data: projectData } = await supabase
+        .from("onboarding_projects")
+        .select("*")
+        .eq("property_id", propertyContext.id)
+        .maybeSingle();
+      
+      existingProject = projectData;
+      
+      if (existingProject) {
+        const { data: tasksData } = await supabase
+          .from("onboarding_tasks")
+          .select("*")
+          .eq("project_id", existingProject.id)
+          .order("phase_number", { ascending: true });
+        
+        existingTasks = tasksData || [];
+        console.log(`Found ${existingTasks.length} existing tasks for property`);
+      }
+    }
+
     // Build the content for analysis
     let contentToAnalyze = "";
     
@@ -71,7 +152,6 @@ serve(async (req) => {
         if (doc.isStructured && doc.structuredData) {
           contentToAnalyze += `## STRUCTURED DATA FROM: ${doc.fileName}\n\n`;
           contentToAnalyze += `This is parsed Excel/CSV data. Extract all relevant property information:\n\n`;
-          // Include the raw text content which is more readable
           contentToAnalyze += doc.content;
           contentToAnalyze += `\n\n`;
         } else {
@@ -80,7 +160,7 @@ serve(async (req) => {
       }
     }
 
-    // Enhanced system prompt with better task assignment logic
+    // Enhanced system prompt
     const systemPrompt = `You are an expert property management assistant. Your job is to analyze owner conversations, property documents, and structured data (Excel/CSV) to extract actionable information.
 
 IMPORTANT RULES:
@@ -179,41 +259,7 @@ Analyze the content and return a JSON object with this exact structure:
   ]
 }
 
-CRITICAL TASK ASSIGNMENT RULES for "assignedTo" field - BE VERY SPECIFIC:
-
-**OWNER TASKS** (assignedTo: "owner") - Things ONLY the owner can do:
-- Provide access codes, keys, gate codes, lockbox codes
-- Approve purchases or expenses over a certain amount
-- Grant access to apps, portals, or systems (HOA portal, utility accounts)
-- Confirm decisions about property changes
-- Send permits, deeds, legal documents
-- Provide insurance information or documents
-- Share vendor contacts they have relationships with
-- Approve contractor work or bids
-- Transfer utility accounts to their name
-- Provide WiFi passwords or security codes
-
-**PEACHHAUS TASKS** (assignedTo: "peachhaus") - Things the management team does:
-- Install equipment (lockbox, smart locks, smoke detectors, CO detectors)
-- Purchase supplies (cleaning supplies, linens, toiletries)
-- Schedule contractors (photographer, handyman, cleaner)
-- Set up systems and accounts (channel manager, PMS, calendar)
-- Create listings on booking platforms
-- Coordinate with vendors
-- Physical property setup (staging, organizing)
-- Take photos or arrange photography
-- Install signage or welcome materials
-- Set up smart home devices
-- Program or configure equipment
-
-**DETECTING COMPLETED ITEMS:**
-If the document indicates something is ALREADY DONE (e.g., "Installed new smoke detectors", "WiFi password is XYZ", "Gate code has been set to 1234"), mark that task as:
-- isCompleted: true
-
-ONLY include tasks for items that genuinely require ACTION (installing something, buying something, fixing something, contacting someone). 
-Property information, procedures, and rules should go in propertyInfo, NOT tasks.
-Be generous with propertyInfo categories and formatting - make it beautiful and useful.
-For Excel/CSV data, be thorough - extract EVERYTHING that could be useful for property management.`;
+CRITICAL: Only extract tasks for NEW action items. Extract property information, credentials, utilities, and contacts thoroughly.`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -260,7 +306,6 @@ For Excel/CSV data, be thorough - extract EVERYTHING that could be useful for pr
     // Parse the JSON from the response
     let analysisResult;
     try {
-      // Extract JSON from potential markdown code blocks
       const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/) || [null, content];
       const jsonStr = jsonMatch[1].trim();
       analysisResult = JSON.parse(jsonStr);
@@ -285,9 +330,162 @@ For Excel/CSV data, be thorough - extract EVERYTHING that could be useful for pr
       throw updateError;
     }
 
-    // Create suggested actions from the analysis (with duplicate check)
-    const actionsToInsert = [];
+    // Track task updates and property info
+    const tasksUpdated: string[] = [];
+    const propertyInfoToStore: any[] = [];
 
+    // Helper to find matching task
+    const findMatchingTask = (searchTerms: string[]) => {
+      for (const task of existingTasks) {
+        const taskTitle = normalizeString(task.title);
+        for (const term of searchTerms) {
+          if (taskTitle.includes(normalizeString(term))) {
+            return task;
+          }
+        }
+      }
+      return null;
+    };
+
+    // Process utilities - try to map to existing tasks
+    for (const utility of analysisResult.utilities || []) {
+      const utilType = utility.type?.toLowerCase() || '';
+      const searchTerms = dataTypeToTaskKeywords[utilType] || [utilType];
+      searchTerms.push(utility.type, utility.provider);
+      
+      const matchingTask = findMatchingTask(searchTerms);
+      
+      if (matchingTask && existingProject) {
+        // Update the existing task with utility info
+        const valueToSet = `${utility.provider}${utility.accountNumber ? ` - Account: ${utility.accountNumber}` : ''}${utility.phone ? ` - Phone: ${utility.phone}` : ''}`;
+        const notesToAdd = utility.notes || '';
+        
+        const { error } = await supabase
+          .from("onboarding_tasks")
+          .update({
+            field_value: valueToSet,
+            notes: matchingTask.notes ? `${matchingTask.notes}\n${notesToAdd}` : notesToAdd,
+            status: 'completed',
+            completed_date: new Date().toISOString()
+          })
+          .eq("id", matchingTask.id);
+        
+        if (!error) {
+          tasksUpdated.push(matchingTask.title);
+          console.log(`Updated task "${matchingTask.title}" with utility info`);
+        }
+      } else {
+        // Store as property info
+        propertyInfoToStore.push({
+          type: 'utility',
+          title: `Utility: ${utility.type} - ${utility.provider}`,
+          description: `Account: ${utility.accountNumber || 'N/A'}\nPhone: ${utility.phone || 'N/A'}`,
+          category: 'Utilities',
+          content: utility
+        });
+      }
+    }
+
+    // Process credentials - try to map to existing tasks
+    for (const cred of analysisResult.credentials || []) {
+      const credName = cred.serviceName?.toLowerCase() || '';
+      const searchTerms = Object.entries(dataTypeToTaskKeywords)
+        .filter(([key]) => credName.includes(key))
+        .flatMap(([, terms]) => terms);
+      searchTerms.push(cred.serviceName);
+      
+      const matchingTask = findMatchingTask(searchTerms);
+      
+      if (matchingTask && existingProject) {
+        const valueToSet = cred.username || '';
+        const notesToAdd = `URL: ${cred.url || 'N/A'}\nNotes: ${cred.notes || 'N/A'}`;
+        
+        const { error } = await supabase
+          .from("onboarding_tasks")
+          .update({
+            field_value: valueToSet,
+            notes: matchingTask.notes ? `${matchingTask.notes}\n${notesToAdd}` : notesToAdd,
+            status: 'completed',
+            completed_date: new Date().toISOString()
+          })
+          .eq("id", matchingTask.id);
+        
+        if (!error) {
+          tasksUpdated.push(matchingTask.title);
+          console.log(`Updated task "${matchingTask.title}" with credential info`);
+        }
+      } else {
+        propertyInfoToStore.push({
+          type: 'credential',
+          title: `Credential: ${cred.serviceName}`,
+          description: `Username: ${cred.username || 'N/A'}\nURL: ${cred.url || 'N/A'}`,
+          category: 'Access',
+          content: cred
+        });
+      }
+    }
+
+    // Process contacts - try to map to existing tasks
+    for (const contact of analysisResult.contacts || []) {
+      const role = contact.role?.toLowerCase() || '';
+      const searchTerms = dataTypeToTaskKeywords[role] || [role];
+      searchTerms.push(contact.role, contact.name);
+      
+      const matchingTask = findMatchingTask(searchTerms);
+      
+      if (matchingTask && existingProject) {
+        const valueToSet = `${contact.name}${contact.phone ? ` - ${contact.phone}` : ''}`;
+        const notesToAdd = `Company: ${contact.company || 'N/A'}\nEmail: ${contact.email || 'N/A'}\nNotes: ${contact.notes || 'N/A'}`;
+        
+        const { error } = await supabase
+          .from("onboarding_tasks")
+          .update({
+            field_value: valueToSet,
+            notes: matchingTask.notes ? `${matchingTask.notes}\n${notesToAdd}` : notesToAdd,
+            status: 'completed',
+            completed_date: new Date().toISOString()
+          })
+          .eq("id", matchingTask.id);
+        
+        if (!error) {
+          tasksUpdated.push(matchingTask.title);
+          console.log(`Updated task "${matchingTask.title}" with contact info`);
+        }
+      } else {
+        propertyInfoToStore.push({
+          type: 'contact',
+          title: `Contact: ${contact.role} - ${contact.name}`,
+          description: `Phone: ${contact.phone || 'N/A'}\nEmail: ${contact.email || 'N/A'}\nCompany: ${contact.company || 'N/A'}`,
+          category: 'Contacts',
+          content: contact
+        });
+      }
+    }
+
+    // Process appliances - store as property info
+    for (const appliance of analysisResult.appliances || []) {
+      propertyInfoToStore.push({
+        type: 'appliance',
+        title: `Appliance: ${appliance.type}${appliance.brand ? ` - ${appliance.brand}` : ''}`,
+        description: `Model: ${appliance.model || 'N/A'}\nSerial: ${appliance.serialNumber || 'N/A'}\nLocation: ${appliance.location || 'N/A'}`,
+        category: 'Equipment',
+        content: appliance
+      });
+    }
+
+    // Process property info
+    for (const info of analysisResult.propertyInfo || []) {
+      propertyInfoToStore.push({
+        type: 'property_info',
+        title: info.title,
+        description: info.items.join("\n• "),
+        category: info.category,
+        content: info
+      });
+    }
+
+    // Store all unmapped property info as owner_conversation_actions
+    const actionsToInsert = [];
     const isDuplicate = (type: string, title: string) => {
       const key = `${type}:${title.toLowerCase()}`;
       if (existingTitles.has(key)) {
@@ -298,80 +496,16 @@ For Excel/CSV data, be thorough - extract EVERYTHING that could be useful for pr
       return false;
     };
 
-    // Add property info as actions
-    for (const info of analysisResult.propertyInfo || []) {
+    for (const info of propertyInfoToStore) {
       if (isDuplicate("property_info", info.title)) continue;
       actionsToInsert.push({
         conversation_id: conversationId,
         action_type: "property_info",
         title: info.title,
-        description: info.items.join("\n• "),
+        description: info.description,
         category: info.category,
-        priority: info.importance || "medium",
-        content: info,
-        status: "suggested",
-      });
-    }
-
-    // Add credentials as property_info (since credential is not a valid action_type)
-    for (const cred of analysisResult.credentials || []) {
-      if (isDuplicate("property_info", `Credential: ${cred.serviceName}`)) continue;
-      actionsToInsert.push({
-        conversation_id: conversationId,
-        action_type: "property_info",
-        title: `Credential: ${cred.serviceName}`,
-        description: `Username: ${cred.username || 'N/A'}\nURL: ${cred.url || 'N/A'}`,
-        category: "Access",
-        priority: "high",
-        content: cred,
-        status: "suggested",
-      });
-    }
-
-    // Add appliances as property_info
-    for (const appliance of analysisResult.appliances || []) {
-      const title = `Appliance: ${appliance.type}${appliance.brand ? ` - ${appliance.brand}` : ''}`;
-      if (isDuplicate("property_info", title)) continue;
-      actionsToInsert.push({
-        conversation_id: conversationId,
-        action_type: "property_info",
-        title,
-        description: `Model: ${appliance.model || 'N/A'}\nSerial: ${appliance.serialNumber || 'N/A'}\nLocation: ${appliance.location || 'N/A'}`,
-        category: "Equipment",
         priority: "medium",
-        content: appliance,
-        status: "suggested",
-      });
-    }
-
-    // Add utilities as property_info
-    for (const utility of analysisResult.utilities || []) {
-      const title = `Utility: ${utility.type} - ${utility.provider}`;
-      if (isDuplicate("property_info", title)) continue;
-      actionsToInsert.push({
-        conversation_id: conversationId,
-        action_type: "property_info",
-        title,
-        description: `Account: ${utility.accountNumber || 'N/A'}\nPhone: ${utility.phone || 'N/A'}`,
-        category: "Utilities",
-        priority: "medium",
-        content: utility,
-        status: "suggested",
-      });
-    }
-
-    // Add contacts as property_info
-    for (const contact of analysisResult.contacts || []) {
-      const title = `Contact: ${contact.role} - ${contact.name}`;
-      if (isDuplicate("property_info", title)) continue;
-      actionsToInsert.push({
-        conversation_id: conversationId,
-        action_type: "property_info",
-        title,
-        description: `Phone: ${contact.phone || 'N/A'}\nEmail: ${contact.email || 'N/A'}\nCompany: ${contact.company || 'N/A'}`,
-        category: "Contacts",
-        priority: "medium",
-        content: contact,
+        content: info.content,
         status: "suggested",
       });
     }
@@ -405,25 +539,45 @@ For Excel/CSV data, be thorough - extract EVERYTHING that could be useful for pr
       });
     }
 
-    // Add tasks as actions - with smart assignment and completion status
+    // Process AI-detected tasks - try to map to existing tasks first
     for (const task of analysisResult.tasks || []) {
-      if (isDuplicate("task", task.title)) continue;
+      // Try to find a matching existing task
+      let matchedExistingTask = existingTasks.find(t => stringsMatch(t.title, task.title));
       
-      // Determine if task is already completed
-      const isCompleted = task.isCompleted === true;
-      
-      actionsToInsert.push({
-        conversation_id: conversationId,
-        action_type: "task",
-        title: task.title,
-        description: task.description,
-        category: task.category,
-        priority: task.priority || "medium",
-        content: task,
-        status: isCompleted ? "completed" : "suggested",
-        assigned_to: task.assignedTo || "peachhaus",
-        completed_at: isCompleted ? new Date().toISOString() : null,
-      });
+      if (matchedExistingTask && existingProject) {
+        // Update the existing task
+        const { error } = await supabase
+          .from("onboarding_tasks")
+          .update({
+            description: task.description || matchedExistingTask.description,
+            notes: matchedExistingTask.notes 
+              ? `${matchedExistingTask.notes}\n\nFrom analysis: ${task.description || ''}`
+              : `From analysis: ${task.description || ''}`,
+            status: task.isCompleted ? 'completed' : matchedExistingTask.status,
+            completed_date: task.isCompleted ? new Date().toISOString() : matchedExistingTask.completed_date
+          })
+          .eq("id", matchedExistingTask.id);
+        
+        if (!error) {
+          tasksUpdated.push(matchedExistingTask.title);
+          console.log(`Updated existing task "${matchedExistingTask.title}" with new info`);
+        }
+      } else {
+        // Only create as action if no matching task found
+        if (isDuplicate("task", task.title)) continue;
+        actionsToInsert.push({
+          conversation_id: conversationId,
+          action_type: "task",
+          title: task.title,
+          description: task.description,
+          category: task.category,
+          priority: task.priority || "medium",
+          content: task,
+          status: task.isCompleted ? "completed" : "suggested",
+          assigned_to: task.assignedTo || "peachhaus",
+          completed_at: task.isCompleted ? new Date().toISOString() : null,
+        });
+      }
     }
 
     if (actionsToInsert.length > 0) {
@@ -436,89 +590,19 @@ For Excel/CSV data, be thorough - extract EVERYTHING that could be useful for pr
       }
     }
 
-    // Auto-create onboarding project if property exists and has tasks
-    if (propertyContext?.id && (analysisResult.tasks?.length > 0)) {
-      // Check if onboarding project exists
-      const { data: existingProject } = await supabase
-        .from("onboarding_projects")
-        .select("id")
-        .eq("property_id", propertyContext.id)
-        .maybeSingle();
-
-      if (!existingProject) {
-        console.log("Creating onboarding project for property:", propertyContext.id);
-        
-        // Get property owner info
-        const { data: property } = await supabase
-          .from("properties")
-          .select("owner_id, property_owners(name)")
-          .eq("id", propertyContext.id)
-          .single();
-
-        const ownerData = property?.property_owners as unknown as { name: string } | null;
-        const ownerName = ownerData?.name || "Unknown Owner";
-
-        // Create the onboarding project
-        const { data: newProject, error: projectError } = await supabase
-          .from("onboarding_projects")
-          .insert({
-            property_id: propertyContext.id,
-            property_address: propertyContext.address,
-            owner_name: ownerName,
-            status: "in-progress",
-            progress: 0,
-          })
-          .select()
-          .single();
-
-        if (projectError) {
-          console.error("Failed to create onboarding project:", projectError);
-        } else if (newProject) {
-          console.log("Created onboarding project:", newProject.id);
-
-          // Create onboarding_tasks from the AI-generated tasks
-          const onboardingTasks = (analysisResult.tasks || []).map((task: any) => ({
-            project_id: newProject.id,
-            title: task.title,
-            description: task.description,
-            phase_number: task.phaseNumber || 2,
-            phase_title: task.phaseTitle || "Property Setup",
-            field_type: "checkbox",
-            status: task.isCompleted ? "completed" : "pending",
-            assigned_to: task.assignedTo === "owner" ? "Owner" : "PeachHaus",
-          }));
-
-          if (onboardingTasks.length > 0) {
-            const { error: tasksError } = await supabase
-              .from("onboarding_tasks")
-              .insert(onboardingTasks);
-
-            if (tasksError) {
-              console.error("Failed to create onboarding tasks:", tasksError);
-            } else {
-              console.log("Created", onboardingTasks.length, "onboarding tasks");
-            }
-          }
-        }
-      }
-    }
-
-    console.log(`Analysis complete. Created ${actionsToInsert.length} suggested actions.`);
+    console.log(`Analysis complete. Updated ${tasksUpdated.length} existing tasks, created ${actionsToInsert.length} property info items.`);
 
     return new Response(
       JSON.stringify({
         success: true,
         summary: analysisResult.summary,
         contentType: analysisResult.contentType,
-        actionsCount: actionsToInsert.length,
-        propertyInfoCount: analysisResult.propertyInfo?.length || 0,
-        credentialsCount: analysisResult.credentials?.length || 0,
-        appliancesCount: analysisResult.appliances?.length || 0,
-        utilitiesCount: analysisResult.utilities?.length || 0,
-        contactsCount: analysisResult.contacts?.length || 0,
-        faqCount: analysisResult.faqs?.length || 0,
-        setupNotesCount: analysisResult.setupNotes?.length || 0,
-        tasksCount: analysisResult.tasks?.length || 0,
+        tasksUpdated: tasksUpdated.length,
+        tasksUpdatedList: tasksUpdated,
+        propertyInfoCount: actionsToInsert.filter(a => a.action_type === 'property_info').length,
+        faqCount: actionsToInsert.filter(a => a.action_type === 'faq').length,
+        setupNotesCount: actionsToInsert.filter(a => a.action_type === 'setup_note').length,
+        newTasksCount: actionsToInsert.filter(a => a.action_type === 'task').length,
       }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
