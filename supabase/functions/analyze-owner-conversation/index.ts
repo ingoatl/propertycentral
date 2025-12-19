@@ -545,6 +545,64 @@ Extract ALL available information. Use null only if truly not found.`;
       }
     }
 
+    // === DATA VALIDATION WATCHDOG ===
+    // Verify that data was properly extracted and mapped
+    const validationIssues: string[] = [];
+    const expectedFields = [
+      'owner_name', 'owner_email', 'owner_phone',
+      'water_provider', 'electric_provider', 'gas_provider', 'internet_provider',
+      'wifi_network', 'security_system_brand'
+    ];
+    
+    // Check for empty or null critical fields
+    for (const field of expectedFields) {
+      const value = fieldValues[field];
+      if (value === null || value === undefined || value === '') {
+        validationIssues.push(`Missing or empty: ${field}`);
+      }
+    }
+    
+    // Validate data formats
+    if (fieldValues.owner_email && !fieldValues.owner_email.includes('@')) {
+      validationIssues.push(`Invalid email format: ${fieldValues.owner_email}`);
+    }
+    if (fieldValues.owner_phone && fieldValues.owner_phone.replace(/\D/g, '').length < 10) {
+      validationIssues.push(`Invalid phone format: ${fieldValues.owner_phone}`);
+    }
+    
+    // Log validation results
+    if (validationIssues.length > 0) {
+      console.warn('=== DATA VALIDATION WATCHDOG WARNINGS ===');
+      validationIssues.forEach(issue => console.warn(`  ⚠️ ${issue}`));
+      console.warn('=========================================');
+    } else {
+      console.log('✅ Data validation passed - all critical fields extracted');
+    }
+    
+    // Verify tasks were actually updated in the database
+    if (tasksUpdated.length > 0 && existingProject) {
+      const { data: verifyTasks, error: verifyError } = await supabase
+        .from("onboarding_tasks")
+        .select("id, title, field_value, status")
+        .eq("project_id", existingProject.id)
+        .not("field_value", "is", null);
+      
+      if (verifyError) {
+        console.error("Failed to verify task updates:", verifyError);
+      } else {
+        console.log(`✅ Verified ${verifyTasks?.length || 0} tasks have field_value set`);
+        
+        // Double-check the tasks we claimed to update
+        const actuallyUpdated = verifyTasks?.filter(t => 
+          tasksUpdated.some(title => t.title.toLowerCase() === title.toLowerCase())
+        ) || [];
+        
+        if (actuallyUpdated.length !== tasksUpdated.length) {
+          console.warn(`⚠️ Mismatch: Claimed ${tasksUpdated.length} updates but verified ${actuallyUpdated.length}`);
+        }
+      }
+    }
+
     console.log(`Analysis complete. Updated ${tasksUpdated.length} tasks: ${tasksUpdated.join(', ')}`);
     console.log(`Stored ${actionsToInsert.length} property info items`);
 
@@ -555,6 +613,8 @@ Extract ALL available information. Use null only if truly not found.`;
         tasksUpdated: tasksUpdated.length,
         tasksUpdatedList: tasksUpdated,
         propertyInfoCount: actionsToInsert.length,
+        validationIssues: validationIssues.length > 0 ? validationIssues : null,
+        extractedFields: Object.keys(fieldValues).filter(k => fieldValues[k] !== null && fieldValues[k] !== undefined && fieldValues[k] !== ''),
       }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
