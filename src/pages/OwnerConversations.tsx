@@ -441,7 +441,7 @@ export default function OwnerConversations() {
                 {/* Analyze Button */}
                 <Button
                   onClick={() => analyzeMutation.mutate()}
-                  disabled={analyzeMutation.isPending || !selectedPropertyId}
+                  disabled={analyzeMutation.isPending || !selectedPropertyId || (!transcript && clientDocs.length === 0 && !transcriptFile)}
                   className="w-full"
                   size="lg"
                 >
@@ -453,7 +453,7 @@ export default function OwnerConversations() {
                   ) : (
                     <>
                       <Sparkles className="h-4 w-4 mr-2" />
-                      Analyze Content
+                      Analyze Content & Create Tasks
                     </>
                   )}
                 </Button>
