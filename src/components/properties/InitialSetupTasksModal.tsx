@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { 
@@ -12,11 +12,10 @@ import {
   User, 
   CheckCircle2, 
   Mail, 
-  ChevronDown, 
-  ChevronUp,
   Loader2,
   AlertCircle,
-  Clock
+  Clock,
+  ArrowRight
 } from "lucide-react";
 
 interface Task {
@@ -50,7 +49,7 @@ export function InitialSetupTasksModal({
   const [loading, setLoading] = useState(true);
   const [sendingEmail, setSendingEmail] = useState(false);
   const [completingTask, setCompletingTask] = useState<string | null>(null);
-  const [showCompleted, setShowCompleted] = useState(false);
+  const [activeTab, setActiveTab] = useState("peachhaus");
 
   useEffect(() => {
     if (open && propertyId) {
@@ -170,11 +169,9 @@ export function InitialSetupTasksModal({
   };
 
   // Separate tasks by assignee and status
-  const pendingTasks = tasks.filter(t => t.status !== "completed");
   const completedTasks = tasks.filter(t => t.status === "completed");
-  
-  const peachHausTasks = pendingTasks.filter(t => t.assigned_to !== "owner");
-  const ownerTasks = pendingTasks.filter(t => t.assigned_to === "owner");
+  const peachHausTasks = tasks.filter(t => t.status !== "completed" && t.assigned_to !== "owner");
+  const ownerTasks = tasks.filter(t => t.status !== "completed" && t.assigned_to === "owner");
 
   const getPriorityColor = (priority: string | null) => {
     switch (priority) {
@@ -191,7 +188,7 @@ export function InitialSetupTasksModal({
     }
   };
 
-  const TaskItem = ({ task }: { task: Task }) => (
+  const TaskItem = ({ task, showReassign = true }: { task: Task; showReassign?: boolean }) => (
     <div className="flex items-start gap-3 p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors">
       <Checkbox
         checked={task.status === "completed"}
@@ -218,26 +215,28 @@ export function InitialSetupTasksModal({
         {task.description && (
           <p className="text-xs text-muted-foreground line-clamp-2">{task.description}</p>
         )}
-        {task.status !== "completed" && (
+        {showReassign && task.status !== "completed" && (
           <div className="flex gap-1 pt-1">
             {task.assigned_to !== "owner" && (
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-6 text-[10px] px-2"
+                className="h-6 text-[10px] px-2 gap-1"
                 onClick={() => handleReassignTask(task.id, "owner")}
               >
-                → Move to Owner
+                <ArrowRight className="h-3 w-3" />
+                Move to Owner
               </Button>
             )}
             {task.assigned_to === "owner" && (
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-6 text-[10px] px-2"
+                className="h-6 text-[10px] px-2 gap-1"
                 onClick={() => handleReassignTask(task.id, "peachhaus")}
               >
-                → Move to PeachHaus
+                <ArrowRight className="h-3 w-3" />
+                Move to PeachHaus
               </Button>
             )}
           </div>
@@ -247,46 +246,63 @@ export function InitialSetupTasksModal({
     </div>
   );
 
+  const TaskList = ({ taskList, emptyMessage }: { taskList: Task[]; emptyMessage: string }) => (
+    <ScrollArea className="h-[50vh]">
+      {taskList.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-12 text-center">
+          <CheckCircle2 className="w-10 h-10 text-green-500/50 mb-3" />
+          <p className="text-sm text-muted-foreground">{emptyMessage}</p>
+        </div>
+      ) : (
+        <div className="space-y-2 pr-4">
+          {taskList.map((task) => (
+            <TaskItem key={task.id} task={task} showReassign={task.status !== "completed"} />
+          ))}
+        </div>
+      )}
+    </ScrollArea>
+  );
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
-        <DialogHeader className="flex-shrink-0">
+      <DialogContent className="max-w-2xl h-[80vh] flex flex-col p-0">
+        <DialogHeader className="flex-shrink-0 px-6 pt-6 pb-4 border-b">
           <DialogTitle className="flex items-center gap-2 text-xl">
             <Clock className="w-5 h-5 text-primary" />
             Initial Setup Tasks
           </DialogTitle>
           <p className="text-sm text-muted-foreground">{propertyName}</p>
+          
+          <div className="flex items-center justify-between pt-2">
+            <div className="flex items-center gap-4 text-sm">
+              <span className="text-muted-foreground">
+                {peachHausTasks.length + ownerTasks.length} pending • {completedTasks.length} completed
+              </span>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleSendOwnerEmail}
+              disabled={sendingEmail || ownerTasks.length === 0}
+              className="gap-2"
+            >
+              {sendingEmail ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Mail className="w-4 h-4" />
+              )}
+              Send Owner Status Email
+            </Button>
+          </div>
         </DialogHeader>
 
-        <div className="flex-shrink-0 flex items-center justify-between border-b pb-3">
-          <div className="flex items-center gap-4 text-sm">
-            <span className="text-muted-foreground">
-              {pendingTasks.length} pending • {completedTasks.length} completed
-            </span>
-          </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleSendOwnerEmail}
-            disabled={sendingEmail || ownerTasks.length === 0}
-            className="gap-2"
-          >
-            {sendingEmail ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <Mail className="w-4 h-4" />
-            )}
-            Send Owner Status Email
-          </Button>
-        </div>
-
-        <ScrollArea className="flex-1 -mx-6 px-6">
+        <div className="flex-1 overflow-hidden px-6 py-4">
           {loading ? (
-            <div className="flex items-center justify-center py-12">
+            <div className="flex items-center justify-center h-full">
               <Loader2 className="w-6 h-6 animate-spin text-primary" />
             </div>
           ) : tasks.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-center">
+            <div className="flex flex-col items-center justify-center h-full text-center">
               <AlertCircle className="w-12 h-12 text-muted-foreground/50 mb-3" />
               <p className="text-muted-foreground">No setup tasks found for this property.</p>
               <p className="text-xs text-muted-foreground mt-1">
@@ -294,78 +310,54 @@ export function InitialSetupTasksModal({
               </p>
             </div>
           ) : (
-            <div className="space-y-6 py-4">
-              {/* PeachHaus Tasks Section */}
-              <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <Building2 className="w-4 h-4 text-primary" />
-                  <h3 className="font-semibold text-sm">PeachHaus Tasks</h3>
-                  <Badge variant="secondary" className="text-[10px]">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
+              <TabsList className="grid grid-cols-3 mb-4 flex-shrink-0">
+                <TabsTrigger value="peachhaus" className="gap-2">
+                  <Building2 className="w-4 h-4" />
+                  PeachHaus
+                  <Badge variant="secondary" className="ml-1 text-[10px] px-1.5">
                     {peachHausTasks.length}
                   </Badge>
-                </div>
-                {peachHausTasks.length === 0 ? (
-                  <p className="text-sm text-muted-foreground pl-6">No pending tasks</p>
-                ) : (
-                  <div className="space-y-2 pl-6">
-                    {peachHausTasks.map((task) => (
-                      <TaskItem key={task.id} task={task} />
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Owner Tasks Section */}
-              <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <User className="w-4 h-4 text-orange-500" />
-                  <h3 className="font-semibold text-sm">Owner Tasks</h3>
-                  <Badge variant="secondary" className="text-[10px]">
+                </TabsTrigger>
+                <TabsTrigger value="owner" className="gap-2">
+                  <User className="w-4 h-4" />
+                  Owner
+                  <Badge variant="secondary" className="ml-1 text-[10px] px-1.5">
                     {ownerTasks.length}
                   </Badge>
-                </div>
-                {ownerTasks.length === 0 ? (
-                  <p className="text-sm text-muted-foreground pl-6">No pending owner tasks</p>
-                ) : (
-                  <div className="space-y-2 pl-6">
-                    {ownerTasks.map((task) => (
-                      <TaskItem key={task.id} task={task} />
-                    ))}
-                  </div>
-                )}
-              </div>
+                </TabsTrigger>
+                <TabsTrigger value="completed" className="gap-2">
+                  <CheckCircle2 className="w-4 h-4" />
+                  Completed
+                  <Badge variant="secondary" className="ml-1 text-[10px] px-1.5">
+                    {completedTasks.length}
+                  </Badge>
+                </TabsTrigger>
+              </TabsList>
 
-              {/* Completed Tasks Section */}
-              {completedTasks.length > 0 && (
-                <Collapsible open={showCompleted} onOpenChange={setShowCompleted}>
-                  <CollapsibleTrigger asChild>
-                    <Button variant="ghost" className="w-full justify-between h-9 px-2">
-                      <div className="flex items-center gap-2">
-                        <CheckCircle2 className="w-4 h-4 text-green-500" />
-                        <span className="text-sm font-medium">Completed Tasks</span>
-                        <Badge variant="secondary" className="text-[10px]">
-                          {completedTasks.length}
-                        </Badge>
-                      </div>
-                      {showCompleted ? (
-                        <ChevronUp className="w-4 h-4" />
-                      ) : (
-                        <ChevronDown className="w-4 h-4" />
-                      )}
-                    </Button>
-                  </CollapsibleTrigger>
-                  <CollapsibleContent>
-                    <div className="space-y-2 pl-6 pt-2">
-                      {completedTasks.map((task) => (
-                        <TaskItem key={task.id} task={task} />
-                      ))}
-                    </div>
-                  </CollapsibleContent>
-                </Collapsible>
-              )}
-            </div>
+              <div className="flex-1 overflow-hidden">
+                <TabsContent value="peachhaus" className="h-full mt-0">
+                  <TaskList 
+                    taskList={peachHausTasks} 
+                    emptyMessage="No pending PeachHaus tasks" 
+                  />
+                </TabsContent>
+                <TabsContent value="owner" className="h-full mt-0">
+                  <TaskList 
+                    taskList={ownerTasks} 
+                    emptyMessage="No pending owner tasks" 
+                  />
+                </TabsContent>
+                <TabsContent value="completed" className="h-full mt-0">
+                  <TaskList 
+                    taskList={completedTasks} 
+                    emptyMessage="No completed tasks yet" 
+                  />
+                </TabsContent>
+              </div>
+            </Tabs>
           )}
-        </ScrollArea>
+        </div>
       </DialogContent>
     </Dialog>
   );
