@@ -313,13 +313,13 @@ For Excel/CSV data, be thorough - extract EVERYTHING that could be useful for pr
       });
     }
 
-    // Add credentials as actions
+    // Add credentials as property_info (since credential is not a valid action_type)
     for (const cred of analysisResult.credentials || []) {
-      if (isDuplicate("credential", cred.serviceName)) continue;
+      if (isDuplicate("property_info", `Credential: ${cred.serviceName}`)) continue;
       actionsToInsert.push({
         conversation_id: conversationId,
-        action_type: "credential",
-        title: cred.serviceName,
+        action_type: "property_info",
+        title: `Credential: ${cred.serviceName}`,
         description: `Username: ${cred.username || 'N/A'}\nURL: ${cred.url || 'N/A'}`,
         category: "Access",
         priority: "high",
@@ -328,13 +328,13 @@ For Excel/CSV data, be thorough - extract EVERYTHING that could be useful for pr
       });
     }
 
-    // Add appliances as actions
+    // Add appliances as property_info
     for (const appliance of analysisResult.appliances || []) {
-      const title = `${appliance.type}${appliance.brand ? ` - ${appliance.brand}` : ''}`;
-      if (isDuplicate("appliance", title)) continue;
+      const title = `Appliance: ${appliance.type}${appliance.brand ? ` - ${appliance.brand}` : ''}`;
+      if (isDuplicate("property_info", title)) continue;
       actionsToInsert.push({
         conversation_id: conversationId,
-        action_type: "appliance",
+        action_type: "property_info",
         title,
         description: `Model: ${appliance.model || 'N/A'}\nSerial: ${appliance.serialNumber || 'N/A'}\nLocation: ${appliance.location || 'N/A'}`,
         category: "Equipment",
@@ -344,13 +344,13 @@ For Excel/CSV data, be thorough - extract EVERYTHING that could be useful for pr
       });
     }
 
-    // Add utilities as actions
+    // Add utilities as property_info
     for (const utility of analysisResult.utilities || []) {
-      const title = `${utility.type} - ${utility.provider}`;
-      if (isDuplicate("utility", title)) continue;
+      const title = `Utility: ${utility.type} - ${utility.provider}`;
+      if (isDuplicate("property_info", title)) continue;
       actionsToInsert.push({
         conversation_id: conversationId,
-        action_type: "utility",
+        action_type: "property_info",
         title,
         description: `Account: ${utility.accountNumber || 'N/A'}\nPhone: ${utility.phone || 'N/A'}`,
         category: "Utilities",
@@ -360,13 +360,13 @@ For Excel/CSV data, be thorough - extract EVERYTHING that could be useful for pr
       });
     }
 
-    // Add contacts as actions
+    // Add contacts as property_info
     for (const contact of analysisResult.contacts || []) {
-      const title = `${contact.role} - ${contact.name}`;
-      if (isDuplicate("contact", title)) continue;
+      const title = `Contact: ${contact.role} - ${contact.name}`;
+      if (isDuplicate("property_info", title)) continue;
       actionsToInsert.push({
         conversation_id: conversationId,
-        action_type: "contact",
+        action_type: "property_info",
         title,
         description: `Phone: ${contact.phone || 'N/A'}\nEmail: ${contact.email || 'N/A'}\nCompany: ${contact.company || 'N/A'}`,
         category: "Contacts",
@@ -465,7 +465,7 @@ For Excel/CSV data, be thorough - extract EVERYTHING that could be useful for pr
             property_id: propertyContext.id,
             property_address: propertyContext.address,
             owner_name: ownerName,
-            status: "in_progress",
+            status: "in-progress",
             progress: 0,
           })
           .select()
