@@ -9,11 +9,11 @@ import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { OnboardingTask } from "@/types/onboarding";
-import { Loader2, MapPin, User, Lock, Phone, Link as LinkIcon, Mail, Home, Search, DollarSign, AlertCircle, Clock, Heart, Frown, Meh, Zap, Lightbulb, Copy, Check, TrendingUp, FileText, ExternalLink, ClipboardCheck, Key, Settings, Car, Bed, ChevronDown, ChevronUp, Download, MessageSquare, Plus, ArrowRight, ListTodo, Info, AlertTriangle, FolderOpen } from "lucide-react";
+import { Loader2, MapPin, User, Lock, Phone, Link as LinkIcon, Mail, Home, Search, DollarSign, AlertCircle, Clock, Heart, Frown, Meh, Zap, Lightbulb, Copy, Check, TrendingUp, FileText, ExternalLink, ClipboardCheck, Key, Settings, Car, Bed, ChevronDown, ChevronUp, Download, MessageSquare, Plus, ArrowRight, ListTodo, Info, AlertTriangle, FolderOpen, Eye, FileSpreadsheet } from "lucide-react";
 import { toast } from "sonner";
 import { InspectionDataSection } from "@/components/properties/InspectionDataSection";
 import { ONBOARDING_PHASES } from "@/context/onboardingPhases";
-
+import { DocumentViewer } from "@/components/documents/DocumentViewer";
 interface PropertyDetailsModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -61,6 +61,7 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
   const [convertingTaskId, setConvertingTaskId] = useState<string | null>(null);
   const [onboardingProject, setOnboardingProject] = useState<any>(null);
   const [activeTab, setActiveTab] = useState("details");
+  const [viewerDoc, setViewerDoc] = useState<{ path: string; name: string; type?: string } | null>(null);
 
   useEffect(() => {
     if (open) {
@@ -1631,14 +1632,15 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
                           propertyDocuments.map((doc) => (
                             <div 
                               key={doc.id} 
-                              className="flex items-start justify-between gap-3 bg-background/50 p-4 rounded-lg border border-amber-200/50"
+                              className="flex items-start justify-between gap-3 bg-background/50 p-4 rounded-lg border border-amber-200/50 hover:border-amber-300 transition-colors cursor-pointer"
+                              onClick={() => setViewerDoc({ path: doc.file_path, name: doc.file_name, type: doc.file_type })}
                             >
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2">
-                                  {doc.file_type?.includes('pdf') ? (
+                                  {doc.file_type?.includes('pdf') || doc.file_name?.toLowerCase().endsWith('.pdf') ? (
                                     <FileText className="h-5 w-5 text-red-500 flex-shrink-0" />
-                                  ) : doc.file_type?.includes('sheet') || doc.file_type?.includes('excel') || doc.file_name?.includes('.xlsx') ? (
-                                    <FileText className="h-5 w-5 text-green-600 flex-shrink-0" />
+                                  ) : doc.file_type?.includes('sheet') || doc.file_type?.includes('excel') || doc.file_name?.toLowerCase().includes('.xlsx') ? (
+                                    <FileSpreadsheet className="h-5 w-5 text-green-600 flex-shrink-0" />
                                   ) : (
                                     <FileText className="h-5 w-5 text-muted-foreground flex-shrink-0" />
                                   )}
@@ -1656,15 +1658,24 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
                                   </span>
                                 </div>
                               </div>
-                              <div className="flex items-center gap-1">
+                              <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                                 <Button
                                   variant="outline"
                                   size="sm"
                                   className="gap-1"
+                                  onClick={() => setViewerDoc({ path: doc.file_path, name: doc.file_name, type: doc.file_type })}
+                                >
+                                  <Eye className="h-4 w-4" />
+                                  View
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8"
                                   onClick={() => window.open(doc.file_path, '_blank')}
+                                  title="Open in new tab"
                                 >
                                   <ExternalLink className="h-4 w-4" />
-                                  Open
                                 </Button>
                                 <Button
                                   variant="ghost"
@@ -1699,7 +1710,8 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
                           {ownerDocuments.map((doc) => (
                             <div 
                               key={doc.id} 
-                              className="flex items-start justify-between gap-3 bg-muted/50 p-3 rounded-md"
+                              className="flex items-start justify-between gap-3 bg-muted/50 p-3 rounded-md hover:bg-muted transition-colors cursor-pointer"
+                              onClick={() => setViewerDoc({ path: doc.file_path, name: doc.file_name, type: doc.file_type })}
                             >
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2">
@@ -1710,14 +1722,26 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
                                   From: {doc.owner_conversations?.title || 'Conversation'}
                                 </p>
                               </div>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8"
-                                onClick={() => window.open(doc.file_path, '_blank')}
-                              >
-                                <ExternalLink className="h-4 w-4" />
-                              </Button>
+                              <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  onClick={() => setViewerDoc({ path: doc.file_path, name: doc.file_name, type: doc.file_type })}
+                                  title="View document"
+                                >
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  onClick={() => window.open(doc.file_path, '_blank')}
+                                  title="Open in new tab"
+                                >
+                                  <ExternalLink className="h-4 w-4" />
+                                </Button>
+                              </div>
                             </div>
                           ))}
                         </CardContent>
@@ -1729,6 +1753,15 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
             </Tabs>
           )}
         </div>
+
+        {/* Document Viewer Modal */}
+        <DocumentViewer
+          open={!!viewerDoc}
+          onOpenChange={(open) => !open && setViewerDoc(null)}
+          filePath={viewerDoc?.path || ''}
+          fileName={viewerDoc?.name || ''}
+          fileType={viewerDoc?.type}
+        />
       </DialogContent>
     </Dialog>
   );
