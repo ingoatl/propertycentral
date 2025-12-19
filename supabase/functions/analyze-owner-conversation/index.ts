@@ -22,60 +22,38 @@ interface AnalysisRequest {
   };
 }
 
-// Helper function to normalize strings for matching
-function normalizeString(str: string): string {
-  return str.toLowerCase()
-    .replace(/[^a-z0-9\s]/g, '')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-// Helper function to check if two strings are similar enough to match
-function stringsMatch(a: string, b: string): boolean {
-  const normA = normalizeString(a);
-  const normB = normalizeString(b);
+// Direct mapping from utility/data types to exact task titles
+const directTaskMappings: Record<string, string[]> = {
+  // Utilities
+  'electric': ['Electric Details'],
+  'electricity': ['Electric Details'],
+  'power': ['Electric Details'],
+  'gas': ['Gas Details'],
+  'water': ['Water Details'],
+  'internet': ['Internet Details'],
+  'wifi': ['WiFi Details'],
+  'trash': ['Trash Service Provider'],
+  'garbage': ['Trash Service Provider'],
+  'hoa': ['HOA Contact Information', 'HOA Information'],
   
-  // Exact match
-  if (normA === normB) return true;
+  // Security
+  'security': ['Security System Brand', 'Security System Present'],
+  'alarm': ['Security Alarm Code', 'Security System Brand'],
+  'camera': ['Camera Locations', 'Cameras Present'],
   
-  // One contains the other
-  if (normA.includes(normB) || normB.includes(normA)) return true;
+  // Contacts
+  'cleaner': ['Primary cleaner name', 'Primary cleaner phone number'],
+  'cleaning': ['Primary cleaner name', 'Negotiated price per cleaning'],
   
-  // Check word overlap
-  const wordsA = normA.split(' ');
-  const wordsB = normB.split(' ');
-  const commonWords = wordsA.filter(w => wordsB.includes(w) && w.length > 2);
+  // Owner info
+  'owner': ['Owner Name', 'Owner Email', 'Owner Phone'],
   
-  // If more than half the words match, consider it a match
-  if (commonWords.length >= Math.min(wordsA.length, wordsB.length) * 0.5) return true;
+  // Insurance
+  'insurance': ['Insurance Provider & Policy Number', 'Upload Insurance Policy'],
   
-  return false;
-}
-
-// Map extracted data types to task matching keywords
-const dataTypeToTaskKeywords: Record<string, string[]> = {
-  'wifi': ['wifi', 'internet', 'network'],
-  'electric': ['electric', 'electricity', 'power'],
-  'gas': ['gas'],
-  'water': ['water'],
-  'trash': ['trash', 'garbage', 'waste'],
-  'internet': ['internet', 'wifi', 'network'],
-  'hoa': ['hoa', 'homeowner'],
-  'security': ['security', 'alarm', 'camera'],
-  'cleaner': ['cleaner', 'cleaning', 'maid'],
-  'handyman': ['handyman', 'maintenance'],
-  'plumber': ['plumber', 'plumbing'],
-  'electrician': ['electrician'],
-  'hvac': ['hvac', 'heating', 'cooling', 'ac', 'air conditioning'],
-  'lockbox': ['lockbox', 'lock box'],
-  'gate': ['gate'],
-  'garage': ['garage'],
-  'smart lock': ['smart lock', 'keyless'],
-  'parking': ['parking'],
-  'pet': ['pet'],
-  'owner': ['owner'],
-  'insurance': ['insurance'],
-  'permit': ['permit', 'str', 'license'],
+  // Property
+  'parking': ['Parking Type', 'Parking Capacity'],
+  'pet': ['Pet policy', 'Pets Allowed', 'Pet Rules'],
 };
 
 serve(async (req) => {
@@ -118,6 +96,7 @@ serve(async (req) => {
     // Get existing onboarding project and tasks for this property
     let existingProject: any = null;
     let existingTasks: any[] = [];
+    const tasksByTitle: Map<string, any> = new Map();
     
     if (propertyContext?.id) {
       const { data: projectData } = await supabase
@@ -136,9 +115,55 @@ serve(async (req) => {
           .order("phase_number", { ascending: true });
         
         existingTasks = tasksData || [];
+        
+        // Build a map of task titles for fast lookup
+        for (const task of existingTasks) {
+          tasksByTitle.set(task.title.toLowerCase(), task);
+        }
+        
         console.log(`Found ${existingTasks.length} existing tasks for property`);
       }
     }
+
+    // Helper to find task by exact or partial title match
+    const findTaskByTitle = (searchTerms: string[]): any | null => {
+      for (const term of searchTerms) {
+        const termLower = term.toLowerCase();
+        // Exact match first
+        if (tasksByTitle.has(termLower)) {
+          return tasksByTitle.get(termLower);
+        }
+        // Partial match
+        for (const [title, task] of tasksByTitle) {
+          if (title.includes(termLower) || termLower.includes(title)) {
+            return task;
+          }
+        }
+      }
+      return null;
+    };
+
+    // Helper to update a task
+    const updateTask = async (task: any, fieldValue: string, notes: string) => {
+      if (!task) return false;
+      
+      const { error } = await supabase
+        .from("onboarding_tasks")
+        .update({
+          field_value: fieldValue,
+          notes: task.notes ? `${task.notes}\n${notes}` : notes,
+          status: 'completed',
+          completed_date: new Date().toISOString()
+        })
+        .eq("id", task.id);
+      
+      if (!error) {
+        console.log(`✓ Updated task "${task.title}" with value: ${fieldValue.substring(0, 50)}...`);
+        return true;
+      }
+      console.error(`✗ Failed to update task "${task.title}":`, error);
+      return false;
+    };
 
     // Build the content for analysis
     let contentToAnalyze = "";
@@ -160,106 +185,132 @@ serve(async (req) => {
       }
     }
 
-    // Enhanced system prompt
-    const systemPrompt = `You are an expert property management assistant. Your job is to analyze owner conversations, property documents, and structured data (Excel/CSV) to extract actionable information.
+    // Enhanced system prompt with explicit field extraction
+    const systemPrompt = `You are an expert property management assistant. Your job is to analyze owner conversations, property documents, and structured data to extract property information.
 
-IMPORTANT RULES:
-1. For DOCUMENTS (cleaning manuals, house rules, operational guides): Focus on EXTRACTING and STRUCTURING information beautifully. Do NOT create tasks unless there's a specific action item that requires someone to DO something.
-2. For TRANSCRIPTS (conversations): Identify action items, follow-ups, and property updates that were discussed.
-3. For STRUCTURED DATA (Excel/CSV): Extract ALL relevant property information including:
-   - Utility accounts (electric, gas, water, internet, etc.)
-   - Login credentials (HOA portal, mortgage, security systems, etc.)
-   - Appliance information (brand, model, serial numbers, warranty)
-   - Service provider contacts (plumber, electrician, HVAC, handyman)
-   - Property taxes and financial information
-   - Any other relevant property data
-4. Be SMART about what becomes a task vs what becomes property info. "Install lockbox" = task. "Parking is in the garage" = property info.
-5. Create well-structured, formatted property information that can be easily referenced.
-6. For credentials/logins, mark them as type "credential" so they can be stored securely.
-7. For appliances, mark them as type "appliance" so they can be tracked.
+CRITICAL: Extract specific field values that map to these EXACT onboarding task fields:
+
+OWNER INFORMATION:
+- owner_name: Full name of the property owner
+- owner_email: Owner's email address
+- owner_phone: Owner's phone number
+
+UTILITIES (extract provider AND account number):
+- water_provider: Water utility provider name
+- water_account: Water account number
+- electric_provider: Electric utility provider name  
+- electric_account: Electric account number
+- gas_provider: Gas utility provider name
+- gas_account: Gas account number
+- internet_provider: Internet/WiFi provider name
+- internet_account: Internet account number
+- trash_provider: Trash service provider
+
+ACCESS & WIFI:
+- wifi_network: WiFi network name (SSID)
+- wifi_password: WiFi password
+- smart_lock_code: Smart lock PIN code
+- gate_code: Gate access code
+- garage_code: Garage door code
+- lockbox_code: Lockbox code
+
+SECURITY:
+- security_system_brand: Security system brand/company
+- security_alarm_code: Alarm code
+- camera_locations: Where cameras are located
+- has_cameras: true/false
+- has_security_system: true/false
+
+INSURANCE:
+- insurance_provider: Insurance company name
+- insurance_policy_number: Policy number
+
+CONTACTS (extract name, phone, company):
+- primary_cleaner_name: Cleaner's name
+- primary_cleaner_phone: Cleaner's phone
+- cleaning_price: Negotiated cleaning price
+
+HOA:
+- hoa_contact_info: HOA contact details
+- hoa_portal_url: HOA portal login URL
+- hoa_portal_username: Portal username
+
+PROPERTY SPECS:
+- parking_type: Type of parking
+- parking_capacity: Number of vehicles
+- water_shutoff_location: Where main water shutoff is
+- gas_shutoff_location: Where gas shutoff is
 
 Property Context: ${propertyContext ? `${propertyContext.name} at ${propertyContext.address}` : 'Unknown property'}
 
-Analyze the content and return a JSON object with this exact structure:
+Return a JSON object with this structure:
 {
-  "summary": "2-3 paragraph summary of the content",
-  "contentType": "transcript" | "document" | "excel" | "mixed",
-  "propertyInfo": [
-    {
-      "category": "Cleaning|Parking|Access|Trash|Pets|Checkout|Safety|Utilities|Amenities|Contacts|Financial|Other",
-      "title": "Short title",
-      "items": ["Bullet point 1", "Bullet point 2"],
-      "importance": "high|medium|low"
-    }
-  ],
+  "summary": "Brief summary of extracted information",
+  "fieldValues": {
+    "owner_name": "value or null",
+    "owner_email": "value or null",
+    "owner_phone": "value or null",
+    "water_provider": "value or null",
+    "water_account": "value or null",
+    "electric_provider": "value or null",
+    "electric_account": "value or null",
+    "gas_provider": "value or null",
+    "gas_account": "value or null",
+    "internet_provider": "value or null",
+    "internet_account": "value or null",
+    "trash_provider": "value or null",
+    "wifi_network": "value or null",
+    "wifi_password": "value or null",
+    "smart_lock_code": "value or null",
+    "gate_code": "value or null",
+    "garage_code": "value or null",
+    "lockbox_code": "value or null",
+    "security_system_brand": "value or null",
+    "security_alarm_code": "value or null",
+    "camera_locations": "value or null",
+    "has_cameras": true/false/null,
+    "has_security_system": true/false/null,
+    "insurance_provider": "value or null",
+    "insurance_policy_number": "value or null",
+    "primary_cleaner_name": "value or null",
+    "primary_cleaner_phone": "value or null",
+    "cleaning_price": "value or null",
+    "hoa_contact_info": "value or null",
+    "hoa_portal_url": "value or null",
+    "hoa_portal_username": "value or null",
+    "parking_type": "value or null",
+    "parking_capacity": "value or null",
+    "water_shutoff_location": "value or null",
+    "gas_shutoff_location": "value or null"
+  },
   "credentials": [
     {
-      "serviceName": "Service name (e.g., HOA Portal, Security System)",
-      "username": "Username if available",
-      "password": "Password if available",
-      "url": "Login URL if available",
-      "notes": "Any additional notes"
+      "serviceName": "Service name",
+      "username": "Username",
+      "password": "Password",
+      "url": "Login URL",
+      "notes": "Additional notes"
     }
   ],
   "appliances": [
     {
-      "type": "Appliance type (e.g., Washer, HVAC, Water Heater)",
-      "brand": "Brand name",
-      "model": "Model number",
-      "serialNumber": "Serial number",
-      "year": "Year if known",
-      "location": "Where in property",
-      "warranty": "Warranty info if available"
+      "type": "Appliance type",
+      "brand": "Brand",
+      "model": "Model",
+      "serialNumber": "Serial",
+      "location": "Location"
     }
   ],
-  "utilities": [
+  "additionalInfo": [
     {
-      "type": "Electric|Gas|Water|Internet|Trash|HOA|Other",
-      "provider": "Provider name",
-      "accountNumber": "Account number",
-      "phone": "Contact phone if available",
-      "notes": "Any additional notes"
-    }
-  ],
-  "contacts": [
-    {
-      "role": "Handyman|Plumber|Electrician|HVAC|Cleaner|Other",
-      "name": "Contact name",
-      "company": "Company name if applicable",
-      "phone": "Phone number",
-      "email": "Email if available",
-      "notes": "Any additional notes"
-    }
-  ],
-  "faqs": [
-    {
-      "question": "Question guests might ask",
-      "answer": "The answer based on the content",
-      "category": "Access|Amenities|Policies|Operations"
-    }
-  ],
-  "setupNotes": [
-    {
-      "title": "Important operational note",
-      "description": "Detailed description",
-      "priority": "high|medium|low"
-    }
-  ],
-  "tasks": [
-    {
-      "title": "Action item that needs to be done",
-      "description": "What needs to happen",
-      "priority": "urgent|high|medium|low",
-      "category": "Setup|Maintenance|Purchase|Admin",
-      "assignedTo": "peachhaus|owner",
-      "isCompleted": false,
-      "phaseNumber": 2,
-      "phaseTitle": "Property Setup"
+      "category": "Category name",
+      "title": "Info title",
+      "details": "Detailed information"
     }
   ]
 }
 
-CRITICAL: Only extract tasks for NEW action items. Extract property information, credentials, utilities, and contacts thoroughly.`;
+Extract ALL available information. Use null only if truly not found.`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -330,139 +381,114 @@ CRITICAL: Only extract tasks for NEW action items. Extract property information,
       throw updateError;
     }
 
-    // Track task updates and property info
+    // Track updates
     const tasksUpdated: string[] = [];
     const propertyInfoToStore: any[] = [];
+    const fieldValues = analysisResult.fieldValues || {};
 
-    // Helper to find matching task
-    const findMatchingTask = (searchTerms: string[]) => {
-      for (const task of existingTasks) {
-        const taskTitle = normalizeString(task.title);
-        for (const term of searchTerms) {
-          if (taskTitle.includes(normalizeString(term))) {
-            return task;
+    // Define exact mappings from extracted fields to task titles
+    const fieldToTaskMapping: Record<string, { title: string; format?: (v: any) => string }> = {
+      owner_name: { title: 'Owner Name' },
+      owner_email: { title: 'Owner Email' },
+      owner_phone: { title: 'Owner Phone' },
+      water_provider: { 
+        title: 'Water Details',
+        format: (v) => {
+          const account = fieldValues.water_account;
+          return account ? `${v} - Account: ${account}` : v;
+        }
+      },
+      electric_provider: {
+        title: 'Electric Details',
+        format: (v) => {
+          const account = fieldValues.electric_account;
+          return account ? `${v} - Account: ${account}` : v;
+        }
+      },
+      gas_provider: {
+        title: 'Gas Details',
+        format: (v) => {
+          const account = fieldValues.gas_account;
+          return account ? `${v} - Account: ${account}` : v;
+        }
+      },
+      internet_provider: {
+        title: 'Internet Details',
+        format: (v) => {
+          const account = fieldValues.internet_account;
+          return account ? `${v} - Account: ${account}` : v;
+        }
+      },
+      trash_provider: { title: 'Trash Service Provider' },
+      wifi_network: {
+        title: 'WiFi Details',
+        format: (v) => {
+          const password = fieldValues.wifi_password;
+          return password ? `${v} / ${password}` : v;
+        }
+      },
+      smart_lock_code: { title: 'Smart lock master PIN code' },
+      gate_code: { title: 'Gate code' },
+      garage_code: { title: 'Garage code' },
+      lockbox_code: { title: 'Lockbox Code for Emergencies' },
+      security_system_brand: { title: 'Security System Brand' },
+      security_alarm_code: { title: 'Security Alarm Code' },
+      camera_locations: { title: 'Camera Locations' },
+      has_cameras: { 
+        title: 'Cameras Present',
+        format: (v) => v === true ? 'Yes' : v === false ? 'No' : String(v)
+      },
+      has_security_system: {
+        title: 'Security System Present',
+        format: (v) => v === true ? 'Yes' : v === false ? 'No' : String(v)
+      },
+      insurance_provider: {
+        title: 'Insurance Provider & Policy Number',
+        format: (v) => {
+          const policy = fieldValues.insurance_policy_number;
+          return policy ? `${v} - Policy #${policy}` : v;
+        }
+      },
+      primary_cleaner_name: { title: 'Primary cleaner name' },
+      primary_cleaner_phone: { title: 'Primary cleaner phone number' },
+      cleaning_price: { title: 'Negotiated price per cleaning' },
+      hoa_contact_info: { title: 'HOA Contact Information' },
+      parking_type: { title: 'Parking Type' },
+      parking_capacity: { title: 'Parking Capacity' },
+      water_shutoff_location: { title: 'Water Main Shutoff Location' },
+    };
+
+    // Process each extracted field and update the corresponding task
+    if (existingProject) {
+      for (const [fieldKey, mapping] of Object.entries(fieldToTaskMapping)) {
+        const value = fieldValues[fieldKey];
+        if (value !== null && value !== undefined && value !== '') {
+          const task = tasksByTitle.get(mapping.title.toLowerCase());
+          if (task) {
+            const formattedValue = mapping.format ? mapping.format(value) : String(value);
+            const updated = await updateTask(task, formattedValue, `Extracted from owner documents`);
+            if (updated) {
+              tasksUpdated.push(mapping.title);
+            }
+          } else {
+            console.log(`No task found for field "${fieldKey}" (looking for "${mapping.title}")`);
           }
         }
       }
-      return null;
-    };
-
-    // Process utilities - try to map to existing tasks
-    for (const utility of analysisResult.utilities || []) {
-      const utilType = utility.type?.toLowerCase() || '';
-      const searchTerms = dataTypeToTaskKeywords[utilType] || [utilType];
-      searchTerms.push(utility.type, utility.provider);
-      
-      const matchingTask = findMatchingTask(searchTerms);
-      
-      if (matchingTask && existingProject) {
-        // Update the existing task with utility info
-        const valueToSet = `${utility.provider}${utility.accountNumber ? ` - Account: ${utility.accountNumber}` : ''}${utility.phone ? ` - Phone: ${utility.phone}` : ''}`;
-        const notesToAdd = utility.notes || '';
-        
-        const { error } = await supabase
-          .from("onboarding_tasks")
-          .update({
-            field_value: valueToSet,
-            notes: matchingTask.notes ? `${matchingTask.notes}\n${notesToAdd}` : notesToAdd,
-            status: 'completed',
-            completed_date: new Date().toISOString()
-          })
-          .eq("id", matchingTask.id);
-        
-        if (!error) {
-          tasksUpdated.push(matchingTask.title);
-          console.log(`Updated task "${matchingTask.title}" with utility info`);
-        }
-      } else {
-        // Store as property info
-        propertyInfoToStore.push({
-          type: 'utility',
-          title: `Utility: ${utility.type} - ${utility.provider}`,
-          description: `Account: ${utility.accountNumber || 'N/A'}\nPhone: ${utility.phone || 'N/A'}`,
-          category: 'Utilities',
-          content: utility
-        });
-      }
     }
 
-    // Process credentials - try to map to existing tasks
+    // Store credentials as property info
     for (const cred of analysisResult.credentials || []) {
-      const credName = cred.serviceName?.toLowerCase() || '';
-      const searchTerms = Object.entries(dataTypeToTaskKeywords)
-        .filter(([key]) => credName.includes(key))
-        .flatMap(([, terms]) => terms);
-      searchTerms.push(cred.serviceName);
-      
-      const matchingTask = findMatchingTask(searchTerms);
-      
-      if (matchingTask && existingProject) {
-        const valueToSet = cred.username || '';
-        const notesToAdd = `URL: ${cred.url || 'N/A'}\nNotes: ${cred.notes || 'N/A'}`;
-        
-        const { error } = await supabase
-          .from("onboarding_tasks")
-          .update({
-            field_value: valueToSet,
-            notes: matchingTask.notes ? `${matchingTask.notes}\n${notesToAdd}` : notesToAdd,
-            status: 'completed',
-            completed_date: new Date().toISOString()
-          })
-          .eq("id", matchingTask.id);
-        
-        if (!error) {
-          tasksUpdated.push(matchingTask.title);
-          console.log(`Updated task "${matchingTask.title}" with credential info`);
-        }
-      } else {
-        propertyInfoToStore.push({
-          type: 'credential',
-          title: `Credential: ${cred.serviceName}`,
-          description: `Username: ${cred.username || 'N/A'}\nURL: ${cred.url || 'N/A'}`,
-          category: 'Access',
-          content: cred
-        });
-      }
+      propertyInfoToStore.push({
+        type: 'credential',
+        title: `Credential: ${cred.serviceName}`,
+        description: `Username: ${cred.username || 'N/A'}\nPassword: ${cred.password ? '****' : 'N/A'}\nURL: ${cred.url || 'N/A'}`,
+        category: 'Access',
+        content: cred
+      });
     }
 
-    // Process contacts - try to map to existing tasks
-    for (const contact of analysisResult.contacts || []) {
-      const role = contact.role?.toLowerCase() || '';
-      const searchTerms = dataTypeToTaskKeywords[role] || [role];
-      searchTerms.push(contact.role, contact.name);
-      
-      const matchingTask = findMatchingTask(searchTerms);
-      
-      if (matchingTask && existingProject) {
-        const valueToSet = `${contact.name}${contact.phone ? ` - ${contact.phone}` : ''}`;
-        const notesToAdd = `Company: ${contact.company || 'N/A'}\nEmail: ${contact.email || 'N/A'}\nNotes: ${contact.notes || 'N/A'}`;
-        
-        const { error } = await supabase
-          .from("onboarding_tasks")
-          .update({
-            field_value: valueToSet,
-            notes: matchingTask.notes ? `${matchingTask.notes}\n${notesToAdd}` : notesToAdd,
-            status: 'completed',
-            completed_date: new Date().toISOString()
-          })
-          .eq("id", matchingTask.id);
-        
-        if (!error) {
-          tasksUpdated.push(matchingTask.title);
-          console.log(`Updated task "${matchingTask.title}" with contact info`);
-        }
-      } else {
-        propertyInfoToStore.push({
-          type: 'contact',
-          title: `Contact: ${contact.role} - ${contact.name}`,
-          description: `Phone: ${contact.phone || 'N/A'}\nEmail: ${contact.email || 'N/A'}\nCompany: ${contact.company || 'N/A'}`,
-          category: 'Contacts',
-          content: contact
-        });
-      }
-    }
-
-    // Process appliances - store as property info
+    // Store appliances as property info
     for (const appliance of analysisResult.appliances || []) {
       propertyInfoToStore.push({
         type: 'appliance',
@@ -473,23 +499,22 @@ CRITICAL: Only extract tasks for NEW action items. Extract property information,
       });
     }
 
-    // Process property info
-    for (const info of analysisResult.propertyInfo || []) {
+    // Store additional info
+    for (const info of analysisResult.additionalInfo || []) {
       propertyInfoToStore.push({
         type: 'property_info',
         title: info.title,
-        description: info.items.join("\n• "),
+        description: info.details,
         category: info.category,
         content: info
       });
     }
 
-    // Store all unmapped property info as owner_conversation_actions
+    // Insert property info as actions
     const actionsToInsert = [];
     const isDuplicate = (type: string, title: string) => {
       const key = `${type}:${title.toLowerCase()}`;
       if (existingTitles.has(key)) {
-        console.log("Skipping duplicate:", key);
         return true;
       }
       existingTitles.add(key);
@@ -510,76 +535,6 @@ CRITICAL: Only extract tasks for NEW action items. Extract property information,
       });
     }
 
-    // Add FAQs as actions
-    for (const faq of analysisResult.faqs || []) {
-      if (isDuplicate("faq", faq.question)) continue;
-      actionsToInsert.push({
-        conversation_id: conversationId,
-        action_type: "faq",
-        title: faq.question,
-        description: faq.answer,
-        category: faq.category,
-        priority: "medium",
-        content: faq,
-        status: "suggested",
-      });
-    }
-
-    // Add setup notes as actions
-    for (const note of analysisResult.setupNotes || []) {
-      if (isDuplicate("setup_note", note.title)) continue;
-      actionsToInsert.push({
-        conversation_id: conversationId,
-        action_type: "setup_note",
-        title: note.title,
-        description: note.description,
-        priority: note.priority || "medium",
-        content: note,
-        status: "suggested",
-      });
-    }
-
-    // Process AI-detected tasks - try to map to existing tasks first
-    for (const task of analysisResult.tasks || []) {
-      // Try to find a matching existing task
-      let matchedExistingTask = existingTasks.find(t => stringsMatch(t.title, task.title));
-      
-      if (matchedExistingTask && existingProject) {
-        // Update the existing task
-        const { error } = await supabase
-          .from("onboarding_tasks")
-          .update({
-            description: task.description || matchedExistingTask.description,
-            notes: matchedExistingTask.notes 
-              ? `${matchedExistingTask.notes}\n\nFrom analysis: ${task.description || ''}`
-              : `From analysis: ${task.description || ''}`,
-            status: task.isCompleted ? 'completed' : matchedExistingTask.status,
-            completed_date: task.isCompleted ? new Date().toISOString() : matchedExistingTask.completed_date
-          })
-          .eq("id", matchedExistingTask.id);
-        
-        if (!error) {
-          tasksUpdated.push(matchedExistingTask.title);
-          console.log(`Updated existing task "${matchedExistingTask.title}" with new info`);
-        }
-      } else {
-        // Only create as action if no matching task found
-        if (isDuplicate("task", task.title)) continue;
-        actionsToInsert.push({
-          conversation_id: conversationId,
-          action_type: "task",
-          title: task.title,
-          description: task.description,
-          category: task.category,
-          priority: task.priority || "medium",
-          content: task,
-          status: task.isCompleted ? "completed" : "suggested",
-          assigned_to: task.assignedTo || "peachhaus",
-          completed_at: task.isCompleted ? new Date().toISOString() : null,
-        });
-      }
-    }
-
     if (actionsToInsert.length > 0) {
       const { error: actionsError } = await supabase
         .from("owner_conversation_actions")
@@ -590,19 +545,16 @@ CRITICAL: Only extract tasks for NEW action items. Extract property information,
       }
     }
 
-    console.log(`Analysis complete. Updated ${tasksUpdated.length} existing tasks, created ${actionsToInsert.length} property info items.`);
+    console.log(`Analysis complete. Updated ${tasksUpdated.length} tasks: ${tasksUpdated.join(', ')}`);
+    console.log(`Stored ${actionsToInsert.length} property info items`);
 
     return new Response(
       JSON.stringify({
         success: true,
         summary: analysisResult.summary,
-        contentType: analysisResult.contentType,
         tasksUpdated: tasksUpdated.length,
         tasksUpdatedList: tasksUpdated,
-        propertyInfoCount: actionsToInsert.filter(a => a.action_type === 'property_info').length,
-        faqCount: actionsToInsert.filter(a => a.action_type === 'faq').length,
-        setupNotesCount: actionsToInsert.filter(a => a.action_type === 'setup_note').length,
-        newTasksCount: actionsToInsert.filter(a => a.action_type === 'task').length,
+        propertyInfoCount: actionsToInsert.length,
       }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -610,6 +562,23 @@ CRITICAL: Only extract tasks for NEW action items. Extract property information,
     );
   } catch (error) {
     console.error("Error in analyze-owner-conversation:", error);
+
+    // Update conversation status to error
+    try {
+      const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+      const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+      const supabase = createClient(supabaseUrl, supabaseKey);
+      
+      const body = await new Response(req.clone().body).json().catch(() => ({}));
+      if (body.conversationId) {
+        await supabase
+          .from("owner_conversations")
+          .update({ status: "error" })
+          .eq("id", body.conversationId);
+      }
+    } catch (e) {
+      console.error("Failed to update conversation status:", e);
+    }
 
     return new Response(
       JSON.stringify({
