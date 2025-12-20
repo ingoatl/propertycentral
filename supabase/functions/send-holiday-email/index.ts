@@ -354,14 +354,14 @@ async function sendHolidayEmail({
     ownerFirstName,
     holidayEmoji: template.emoji,
     imageUrl: generatedImageUrl,
-    isTest,
   });
 
-  // Send email via Resend
+  // Send email via Resend - CC anja@peachhausgroup.com on all emails
   const emailResult = await resend.emails.send({
     from: 'PeachHaus Group <info@peachhausgroup.com>',
     to: [owner.email],
-    subject: isTest ? `[TEST] ${personalizedSubject}` : personalizedSubject,
+    cc: ['anja@peachhausgroup.com'],
+    subject: personalizedSubject,
     html: htmlContent,
   });
 
@@ -388,14 +388,12 @@ function buildHolidayEmailHtml({
   ownerFirstName,
   holidayEmoji,
   imageUrl,
-  isTest,
 }: {
   subject: string;
   message: string;
   ownerFirstName: string;
   holidayEmoji: string;
   imageUrl: string | null;
-  isTest: boolean;
 }) {
   // Get current year for footer
   const currentYear = new Date().getFullYear();
@@ -418,16 +416,6 @@ function buildHolidayEmailHtml({
   <![endif]-->
 </head>
 <body style="margin: 0; padding: 0; background-color: #f5f3ef; -webkit-font-smoothing: antialiased;">
-  
-  ${isTest ? `
-  <table cellpadding="0" cellspacing="0" width="100%" style="background-color: #fef3c7;">
-    <tr>
-      <td style="padding: 14px 20px; text-align: center; font-family: Georgia, serif; font-size: 13px; color: #92400e; letter-spacing: 0.5px;">
-        ⚠️ This is a TEST email – not sent to property owners
-      </td>
-    </tr>
-  </table>
-  ` : ''}
   
   <!-- Outer Container -->
   <table cellpadding="0" cellspacing="0" width="100%" style="background-color: #f5f3ef;">
