@@ -285,6 +285,11 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
         .update(updateData)
         .eq("id", task.id);
 
+      // Sync owner email/phone to property_owners table when relevant tasks are saved
+      if (normalizedValue && (task.title.toLowerCase().includes("owner email") || task.title.toLowerCase().includes("owner phone"))) {
+        await syncOwnerInfoToPropertyOwners(normalizedValue, task.title);
+      }
+
       // Update local status without triggering parent update
       setTaskStatus(newStatus);
       setHasUnsavedChanges(false);
@@ -306,6 +311,50 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
           position: "top-right",
         });
       }
+    }
+  };
+
+  // Sync owner email/phone to property_owners table
+  const syncOwnerInfoToPropertyOwners = async (value: string, taskTitle: string) => {
+    try {
+      // Get the project to find the property_id
+      const { data: project } = await supabase
+        .from("onboarding_projects")
+        .select("property_id")
+        .eq("id", task.project_id)
+        .maybeSingle();
+
+      if (!project?.property_id) return;
+
+      // Get the property to find the owner_id
+      const { data: property } = await supabase
+        .from("properties")
+        .select("owner_id")
+        .eq("id", project.property_id)
+        .maybeSingle();
+
+      if (!property?.owner_id) return;
+
+      // Determine which field to update
+      const isEmail = taskTitle.toLowerCase().includes("email");
+      const isPhone = taskTitle.toLowerCase().includes("phone");
+
+      if (isEmail) {
+        await supabase
+          .from("property_owners")
+          .update({ email: value.toLowerCase() })
+          .eq("id", property.owner_id);
+        console.log("Synced owner email:", value);
+      } else if (isPhone) {
+        await supabase
+          .from("property_owners")
+          .update({ phone: value })
+          .eq("id", property.owner_id);
+        console.log("Synced owner phone:", value);
+      }
+    } catch (error) {
+      console.error("Failed to sync owner info:", error);
+      // Don't throw - this is a background sync
     }
   };
 

@@ -28,38 +28,118 @@ serve(async (req) => {
       promptTemplate 
     } = await req.json();
 
-    console.log('Generating holiday image for:', { ownerFirstName, propertyName });
+    console.log('Generating holiday image for:', { ownerFirstName, propertyName, hasPropertyImage: !!propertyImageUrl });
 
-    // Build the prompt with personalization
-    let prompt = promptTemplate
+    // Build the text prompt with personalization
+    let textPrompt = promptTemplate
       .replace(/{owner_first_name}/g, ownerFirstName || 'Friend')
       .replace(/{property_name}/g, propertyName || 'your property');
 
-    // If we have a property image, include it in the prompt for reference
+    // Enhance the prompt to transform the property photo
+    const enhancedPrompt = `Transform this property photo into a beautiful festive holiday scene. ${textPrompt}. 
+    Keep the property recognizable but add tasteful holiday decorations like:
+    - Warm string lights around the roofline and windows
+    - A light dusting of snow on the roof and landscape
+    - A decorated wreath on the door
+    - Warm golden light glowing from the windows
+    - A cozy winter evening atmosphere
+    Make it feel magical, warm, and inviting while keeping the property as the main focus.`;
+
+    console.log('Enhanced prompt:', enhancedPrompt.substring(0, 200) + '...');
+
+    let response;
+    
+    // If we have a property image URL, fetch it and pass as image input
     if (propertyImageUrl) {
-      prompt = `Using this property as inspiration and reference: ${propertyImageUrl}\n\n${prompt}`;
+      console.log('Fetching property image from:', propertyImageUrl);
+      
+      try {
+        // Fetch the property image
+        const imageResponse = await fetch(propertyImageUrl);
+        if (!imageResponse.ok) {
+          throw new Error(`Failed to fetch property image: ${imageResponse.status}`);
+        }
+        
+        const imageBuffer = await imageResponse.arrayBuffer();
+        const base64Image = btoa(String.fromCharCode(...new Uint8Array(imageBuffer)));
+        
+        // Determine content type from URL or response
+        const contentType = imageResponse.headers.get('content-type') || 'image/jpeg';
+        const imageDataUrl = `data:${contentType};base64,${base64Image}`;
+        
+        console.log('Property image fetched and converted to base64, size:', base64Image.length);
+
+        // Call AI with the property image as input for transformation
+        response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${LOVABLE_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "google/gemini-2.5-flash-image-preview",
+            messages: [
+              {
+                role: "user",
+                content: [
+                  {
+                    type: "text",
+                    text: enhancedPrompt
+                  },
+                  {
+                    type: "image_url",
+                    image_url: {
+                      url: imageDataUrl
+                    }
+                  }
+                ]
+              }
+            ],
+            modalities: ["image", "text"]
+          }),
+        });
+      } catch (imageError) {
+        console.error('Error fetching property image, falling back to text-only:', imageError);
+        // Fall back to text-only generation
+        response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${LOVABLE_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "google/gemini-2.5-flash-image-preview",
+            messages: [
+              {
+                role: "user",
+                content: `Generate a beautiful holiday greeting image for a property. ${textPrompt}`
+              }
+            ],
+            modalities: ["image", "text"]
+          }),
+        });
+      }
+    } else {
+      // No property image, generate from text prompt only
+      console.log('No property image provided, generating from text prompt');
+      response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "google/gemini-2.5-flash-image-preview",
+          messages: [
+            {
+              role: "user",
+              content: `Generate a beautiful holiday greeting image for a property. ${textPrompt}`
+            }
+          ],
+          modalities: ["image", "text"]
+        }),
+      });
     }
-
-    console.log('Final prompt:', prompt.substring(0, 200) + '...');
-
-    // Call Lovable AI with Google Nano Banana for image generation
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash-image-preview",
-        messages: [
-          {
-            role: "user",
-            content: prompt
-          }
-        ],
-        modalities: ["image", "text"]
-      }),
-    });
 
     if (!response.ok) {
       const errorText = await response.text();
