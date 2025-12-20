@@ -389,6 +389,10 @@ function buildHolidayEmailHtml({
   // Get current year for footer
   const currentYear = new Date().getFullYear();
   
+  // Hosted image URLs
+  const hostsPhotoUrl = "https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/anja-ingo-hosts.jpg";
+  const signatureUrl = "https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/anja-signature.png";
+  
   return `
 <!DOCTYPE html>
 <html>
@@ -397,30 +401,30 @@ function buildHolidayEmailHtml({
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${subject}</title>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600&family=Lato:wght@300;400&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600&family=Cormorant+Garamond:wght@300;400;500&family=Lato:wght@300;400&display=swap');
   </style>
 </head>
-<body style="margin: 0; padding: 0; font-family: 'Lato', 'Helvetica Neue', Arial, sans-serif; background-color: #f5f3ef;">
+<body style="margin: 0; padding: 0; font-family: 'Lato', 'Helvetica Neue', Arial, sans-serif; background-color: #f8f6f3;">
   ${isTest ? `
   <div style="background-color: #fef3c7; padding: 12px; text-align: center; font-family: sans-serif; font-size: 14px; color: #92400e;">
     ⚠️ This is a TEST email - not sent to property owners
   </div>
   ` : ''}
   
-  <!-- Outer wrapper with gold accent border -->
-  <table cellpadding="0" cellspacing="0" width="100%" style="max-width: 640px; margin: 20px auto; background-color: #ffffff; border-radius: 4px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.08);">
+  <!-- Outer wrapper with sophisticated styling -->
+  <table cellpadding="0" cellspacing="0" width="100%" style="max-width: 640px; margin: 24px auto; background-color: #ffffff; overflow: hidden; box-shadow: 0 8px 40px rgba(0,0,0,0.06);">
     
-    <!-- Gold accent top border -->
+    <!-- Refined gold accent top border -->
     <tr>
-      <td style="height: 4px; background: linear-gradient(90deg, #d4a574 0%, #c9a66c 25%, #b8956a 50%, #c9a66c 75%, #d4a574 100%);"></td>
+      <td style="height: 3px; background: linear-gradient(90deg, #c5a47e 0%, #d4b896 50%, #c5a47e 100%);"></td>
     </tr>
     
     <!-- Elegant Header -->
     <tr>
-      <td style="padding: 32px 40px 24px 40px; text-align: center; background-color: #1a1a2e;">
+      <td style="padding: 36px 48px 28px 48px; text-align: left; background-color: #1a1a2e;">
         <img src="https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/peachhaus-logo.png" 
              alt="PeachHaus Group" 
-             style="height: 44px; width: auto; margin-bottom: 8px;"
+             style="height: 40px; width: auto;"
              onerror="this.style.display='none'">
       </td>
     </tr>
@@ -428,68 +432,81 @@ function buildHolidayEmailHtml({
     <!-- Holiday Image with elegant frame -->
     ${imageUrl ? `
     <tr>
-      <td style="padding: 0 24px; background-color: #ffffff;">
-        <div style="border: 1px solid #e8e4df; border-radius: 3px; overflow: hidden; margin-top: -12px; box-shadow: 0 2px 12px rgba(0,0,0,0.06);">
-          <img src="${imageUrl}" 
-               alt="Season's Greetings" 
-               style="width: 100%; max-width: 600px; height: auto; display: block;">
-        </div>
+      <td style="padding: 0; background-color: #ffffff;">
+        <img src="${imageUrl}" 
+             alt="Season's Greetings" 
+             style="width: 100%; height: auto; display: block;">
       </td>
     </tr>
     ` : ''}
     
-    <!-- Personal Greeting -->
+    <!-- Personal Greeting - Left aligned -->
     <tr>
-      <td style="padding: 32px 40px 8px 40px; text-align: center;">
-        <p style="margin: 0; font-family: 'Playfair Display', Georgia, serif; font-size: 26px; color: #1a1a2e; letter-spacing: 0.5px;">
+      <td style="padding: 40px 48px 12px 48px; text-align: left;">
+        <p style="margin: 0; font-family: 'Cormorant Garamond', Georgia, serif; font-size: 28px; color: #2d2d2d; font-weight: 400; letter-spacing: 0.3px;">
           Dear ${ownerFirstName},
         </p>
       </td>
     </tr>
     
-    <!-- Message Content with refined typography -->
+    <!-- Message Content - Left aligned with refined typography -->
     <tr>
-      <td style="padding: 16px 40px 32px 40px; color: #3d3d3d; font-size: 15px; line-height: 1.9; text-align: center;">
-        ${message.split('\n\n').map(para => `<p style="margin: 0 0 18px 0; font-weight: 300;">${para.replace(/\n/g, '<br>')}</p>`).join('')}
+      <td style="padding: 8px 48px 36px 48px; color: #4a4a4a; font-size: 15px; line-height: 1.85; text-align: left;">
+        ${message.split('\n\n').map(para => `<p style="margin: 0 0 20px 0; font-weight: 300; letter-spacing: 0.2px;">${para.replace(/\n/g, '<br>')}</p>`).join('')}
       </td>
     </tr>
     
-    <!-- Elegant Divider -->
+    <!-- Subtle Divider -->
     <tr>
-      <td style="padding: 0 60px;">
-        <div style="height: 1px; background: linear-gradient(90deg, transparent 0%, #d4a574 50%, transparent 100%);"></div>
+      <td style="padding: 0 48px;">
+        <div style="height: 1px; background: linear-gradient(90deg, #d4b896 0%, #e8ddd0 50%, transparent 100%); width: 60%;"></div>
       </td>
     </tr>
     
-    <!-- Signature with subtle styling -->
+    <!-- Signature Section with Photo and Handwritten Signature -->
     <tr>
-      <td style="padding: 28px 40px 36px 40px; text-align: center;">
-        <p style="margin: 0; color: #6b6b6b; font-size: 13px; font-weight: 300; letter-spacing: 1px; text-transform: uppercase;">With Warmest Regards</p>
-        <p style="margin: 12px 0 4px 0; font-family: 'Playfair Display', Georgia, serif; color: #1a1a2e; font-size: 22px;">Anja & Ingo</p>
-        <p style="margin: 0; color: #8b8b8b; font-size: 12px; letter-spacing: 2px; text-transform: uppercase;">PeachHaus Group</p>
+      <td style="padding: 32px 48px 40px 48px;">
+        <table cellpadding="0" cellspacing="0" width="100%">
+          <tr>
+            <!-- Hosts Photo -->
+            <td style="width: 140px; vertical-align: top; padding-right: 24px;">
+              <img src="${hostsPhotoUrl}" 
+                   alt="Anja & Ingo" 
+                   style="width: 130px; height: 130px; border-radius: 50%; object-fit: cover; border: 3px solid #f0ebe4; box-shadow: 0 4px 16px rgba(0,0,0,0.08);">
+            </td>
+            <!-- Signature and closing -->
+            <td style="vertical-align: middle; text-align: left;">
+              <p style="margin: 0 0 8px 0; color: #7a7a7a; font-size: 12px; font-weight: 400; letter-spacing: 1.5px; text-transform: uppercase;">With Warmest Regards</p>
+              <img src="${signatureUrl}" 
+                   alt="Anja & Ingo Schaer" 
+                   style="height: 52px; width: auto; margin: 8px 0 12px 0;">
+              <p style="margin: 0; color: #9a9a9a; font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase;">PeachHaus Group</p>
+            </td>
+          </tr>
+        </table>
       </td>
     </tr>
     
     <!-- Footer with refined styling -->
     <tr>
-      <td style="padding: 24px 40px; background-color: #faf9f7; text-align: center; border-top: 1px solid #ebe8e4;">
+      <td style="padding: 28px 48px; background-color: #faf9f7; border-top: 1px solid #f0ebe4;">
         <table cellpadding="0" cellspacing="0" width="100%">
           <tr>
-            <td style="text-align: center; padding-bottom: 12px;">
-              <span style="display: inline-block; width: 28px; height: 1px; background-color: #d4a574; vertical-align: middle;"></span>
-              <span style="display: inline-block; margin: 0 12px; color: #d4a574; font-size: 16px;">${holidayEmoji || '✨'}</span>
-              <span style="display: inline-block; width: 28px; height: 1px; background-color: #d4a574; vertical-align: middle;"></span>
+            <td style="text-align: left; padding-bottom: 16px;">
+              <span style="display: inline-block; width: 24px; height: 1px; background-color: #d4b896; vertical-align: middle;"></span>
+              <span style="display: inline-block; margin: 0 10px; color: #d4b896; font-size: 14px;">${holidayEmoji || '✨'}</span>
+              <span style="display: inline-block; width: 24px; height: 1px; background-color: #d4b896; vertical-align: middle;"></span>
             </td>
           </tr>
           <tr>
-            <td style="text-align: center;">
-              <p style="margin: 0 0 6px 0; color: #8b8b8b; font-size: 11px; letter-spacing: 1px;">
-                PREMIUM PROPERTY MANAGEMENT
+            <td style="text-align: left;">
+              <p style="margin: 0 0 4px 0; color: #9a9a9a; font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase;">
+                Premium Property Management
               </p>
-              <p style="margin: 0; color: #a8a8a8; font-size: 10px;">
-                info@peachhausgroup.com • peachhausgroup.com
+              <p style="margin: 0; color: #b8b8b8; font-size: 10px;">
+                info@peachhausgroup.com · peachhausgroup.com
               </p>
-              <p style="margin: 12px 0 0 0; color: #c8c8c8; font-size: 9px;">
+              <p style="margin: 16px 0 0 0; color: #d0d0d0; font-size: 9px;">
                 © ${currentYear} PeachHaus Group. All rights reserved.
               </p>
             </td>
