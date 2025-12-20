@@ -152,3 +152,6 @@ verify_jwt = true
 
 [functions.send-holiday-email]
 verify_jwt = true
+
+[functions.schedule-holiday-emails]
+verify_jwt = false
