@@ -29,7 +29,9 @@ import {
   AlertTriangle,
   User,
   Phone,
-  Home
+  Home,
+  Edit,
+  UserPlus
 } from "lucide-react";
 
 interface HolidayTemplate {
@@ -67,7 +69,17 @@ interface PropertyWithOwner {
     name: string;
     email: string;
     phone: string | null;
+    second_owner_name: string | null;
+    second_owner_email: string | null;
   } | null;
+}
+
+interface EditOwnerForm {
+  name: string;
+  email: string;
+  phone: string;
+  second_owner_name: string;
+  second_owner_email: string;
 }
 
 export function HolidayEmailManager() {
@@ -82,6 +94,15 @@ export function HolidayEmailManager() {
   const [sendingToOwnerId, setSendingToOwnerId] = useState<string | null>(null);
   const [ownerSearchQuery, setOwnerSearchQuery] = useState("");
   const [ownersTabTemplateId, setOwnersTabTemplateId] = useState<string | null>(null);
+  const [editingOwner, setEditingOwner] = useState<PropertyWithOwner | null>(null);
+  const [editForm, setEditForm] = useState<EditOwnerForm>({
+    name: "",
+    email: "",
+    phone: "",
+    second_owner_name: "",
+    second_owner_email: "",
+  });
+  const [isUpdatingOwner, setIsUpdatingOwner] = useState(false);
 
   // Fetch holiday templates
   const { data: templates, isLoading: templatesLoading } = useQuery({
@@ -127,7 +148,7 @@ export function HolidayEmailManager() {
           address,
           image_path,
           owner_id,
-          property_owners(id, name, email, phone)
+          property_owners(id, name, email, phone, second_owner_name, second_owner_email)
         `)
         .is('offboarded_at', null)
         .order('name');
@@ -294,6 +315,52 @@ export function HolidayEmailManager() {
       });
     } finally {
       setIsGeneratingPreview(false);
+    }
+  };
+
+  // Edit owner handler
+  const handleEditOwner = (property: PropertyWithOwner) => {
+    setEditingOwner(property);
+    setEditForm({
+      name: property.property_owners?.name || "",
+      email: property.property_owners?.email || "",
+      phone: property.property_owners?.phone || "",
+      second_owner_name: property.property_owners?.second_owner_name || "",
+      second_owner_email: property.property_owners?.second_owner_email || "",
+    });
+  };
+
+  // Update owner mutation
+  const handleUpdateOwner = async () => {
+    if (!editingOwner?.property_owners?.id) return;
+
+    setIsUpdatingOwner(true);
+    try {
+      const { error } = await supabase
+        .from('property_owners')
+        .update({
+          name: editForm.name.trim(),
+          email: editForm.email.trim(),
+          phone: editForm.phone.trim() || null,
+          second_owner_name: editForm.second_owner_name.trim() || null,
+          second_owner_email: editForm.second_owner_email.trim() || null,
+        })
+        .eq('id', editingOwner.property_owners.id);
+
+      if (error) throw error;
+
+      toast({ title: "Owner Updated", description: "Owner information saved successfully" });
+      setEditingOwner(null);
+      queryClient.invalidateQueries({ queryKey: ['properties-with-owners'] });
+    } catch (error) {
+      console.error('Error updating owner:', error);
+      toast({ 
+        title: "Error", 
+        description: error instanceof Error ? error.message : "Failed to update owner", 
+        variant: "destructive" 
+      });
+    } finally {
+      setIsUpdatingOwner(false);
     }
   };
 
@@ -528,9 +595,8 @@ export function HolidayEmailManager() {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Property</TableHead>
-                        <TableHead>Owner</TableHead>
-                        <TableHead>Email</TableHead>
-                        <TableHead>Phone</TableHead>
+                        <TableHead>Primary Owner</TableHead>
+                        <TableHead>Second Owner</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead>Actions</TableHead>
                       </TableRow>
@@ -544,14 +610,16 @@ export function HolidayEmailManager() {
                             p.name.toLowerCase().includes(query) ||
                             p.address.toLowerCase().includes(query) ||
                             p.property_owners?.name?.toLowerCase().includes(query) ||
-                            p.property_owners?.email?.toLowerCase().includes(query)
+                            p.property_owners?.email?.toLowerCase().includes(query) ||
+                            p.property_owners?.second_owner_name?.toLowerCase().includes(query) ||
+                            p.property_owners?.second_owner_email?.toLowerCase().includes(query)
                           );
                         })
                         .map((property) => {
                           const owner = property.property_owners;
                           const hasOwner = !!owner;
                           const hasEmail = !!owner?.email;
-                          const hasPhone = !!owner?.phone;
+                          const hasSecondOwner = !!owner?.second_owner_name || !!owner?.second_owner_email;
                           const isComplete = hasOwner && hasEmail;
 
                           return (
@@ -579,9 +647,21 @@ export function HolidayEmailManager() {
                               </TableCell>
                               <TableCell>
                                 {hasOwner ? (
-                                  <div className="flex items-center gap-1">
-                                    <User className="h-3 w-3 text-muted-foreground" />
-                                    {owner.name}
+                                  <div className="space-y-1">
+                                    <div className="flex items-center gap-1 font-medium text-sm">
+                                      <User className="h-3 w-3 text-muted-foreground" />
+                                      {owner.name}
+                                    </div>
+                                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                      <Mail className="h-3 w-3" />
+                                      {owner.email || <span className="text-orange-500">Missing</span>}
+                                    </div>
+                                    {owner.phone && (
+                                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                        <Phone className="h-3 w-3" />
+                                        {owner.phone}
+                                      </div>
+                                    )}
                                   </div>
                                 ) : (
                                   <Badge variant="destructive" className="text-xs">
@@ -590,22 +670,20 @@ export function HolidayEmailManager() {
                                 )}
                               </TableCell>
                               <TableCell>
-                                {hasEmail ? (
-                                  <div className="flex items-center gap-1 text-sm">
-                                    <Mail className="h-3 w-3 text-muted-foreground" />
-                                    {owner.email}
-                                  </div>
-                                ) : (
-                                  <Badge variant="outline" className="text-xs text-orange-600">
-                                    Missing
-                                  </Badge>
-                                )}
-                              </TableCell>
-                              <TableCell>
-                                {hasPhone ? (
-                                  <div className="flex items-center gap-1 text-sm">
-                                    <Phone className="h-3 w-3 text-muted-foreground" />
-                                    {owner.phone}
+                                {hasSecondOwner ? (
+                                  <div className="space-y-1">
+                                    {owner?.second_owner_name && (
+                                      <div className="flex items-center gap-1 font-medium text-sm">
+                                        <UserPlus className="h-3 w-3 text-muted-foreground" />
+                                        {owner.second_owner_name}
+                                      </div>
+                                    )}
+                                    {owner?.second_owner_email && (
+                                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                        <Mail className="h-3 w-3" />
+                                        {owner.second_owner_email}
+                                      </div>
+                                    )}
                                   </div>
                                 ) : (
                                   <span className="text-xs text-muted-foreground">—</span>
@@ -613,10 +691,17 @@ export function HolidayEmailManager() {
                               </TableCell>
                               <TableCell>
                                 {isComplete ? (
-                                  <Badge variant="default" className="bg-green-500 text-xs">
-                                    <CheckCircle2 className="h-3 w-3 mr-1" />
-                                    Ready
-                                  </Badge>
+                                  <div className="space-y-1">
+                                    <Badge variant="default" className="bg-green-500 text-xs">
+                                      <CheckCircle2 className="h-3 w-3 mr-1" />
+                                      Ready
+                                    </Badge>
+                                    {hasSecondOwner && (
+                                      <Badge variant="secondary" className="text-xs">
+                                        +1 recipient
+                                      </Badge>
+                                    )}
+                                  </div>
                                 ) : (
                                   <Badge variant="destructive" className="text-xs">
                                     <XCircle className="h-3 w-3 mr-1" />
@@ -625,27 +710,37 @@ export function HolidayEmailManager() {
                                 )}
                               </TableCell>
                               <TableCell>
-                                {isComplete && ownersTabTemplateId ? (
-                                  <Button
-                                    size="sm"
-                                    variant="secondary"
-                                    onClick={() => sendTestToOwner(owner.id, owner.name)}
-                                    disabled={sendingToOwnerId === owner.id}
-                                  >
-                                    {sendingToOwnerId === owner.id ? (
-                                      <Loader2 className="h-3 w-3 animate-spin" />
-                                    ) : (
-                                      <>
-                                        <TestTube className="h-3 w-3 mr-1" />
-                                        Test
-                                      </>
-                                    )}
-                                  </Button>
-                                ) : !ownersTabTemplateId ? (
-                                  <span className="text-xs text-muted-foreground">Select template</span>
-                                ) : (
-                                  <span className="text-xs text-muted-foreground">—</span>
-                                )}
+                                <div className="flex items-center gap-1">
+                                  {hasOwner && (
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => handleEditOwner(property)}
+                                    >
+                                      <Edit className="h-3 w-3" />
+                                    </Button>
+                                  )}
+                                  {isComplete && ownersTabTemplateId && (
+                                    <Button
+                                      size="sm"
+                                      variant="secondary"
+                                      onClick={() => sendTestToOwner(owner!.id, owner!.name)}
+                                      disabled={sendingToOwnerId === owner!.id}
+                                    >
+                                      {sendingToOwnerId === owner!.id ? (
+                                        <Loader2 className="h-3 w-3 animate-spin" />
+                                      ) : (
+                                        <>
+                                          <TestTube className="h-3 w-3 mr-1" />
+                                          Test
+                                        </>
+                                      )}
+                                    </Button>
+                                  )}
+                                  {!hasOwner && (
+                                    <span className="text-xs text-muted-foreground">No owner to edit</span>
+                                  )}
+                                </div>
                               </TableCell>
                             </TableRow>
                           );
@@ -987,6 +1082,107 @@ export function HolidayEmailManager() {
               </div>
             )}
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Owner Dialog */}
+      <Dialog open={!!editingOwner} onOpenChange={(open) => !open && setEditingOwner(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Edit className="h-5 w-5" />
+              Edit Owner for {editingOwner?.name}
+            </DialogTitle>
+            <DialogDescription>
+              Update owner contact information for holiday emails
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div className="border-b pb-3">
+              <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
+                <User className="h-4 w-4" />
+                Primary Owner
+              </h4>
+              <div className="space-y-3">
+                <div className="space-y-1">
+                  <Label htmlFor="edit-name">Name</Label>
+                  <Input
+                    id="edit-name"
+                    value={editForm.name}
+                    onChange={(e) => setEditForm(f => ({ ...f, name: e.target.value }))}
+                    placeholder="Owner name"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="edit-email">Email</Label>
+                  <Input
+                    id="edit-email"
+                    type="email"
+                    value={editForm.email}
+                    onChange={(e) => setEditForm(f => ({ ...f, email: e.target.value }))}
+                    placeholder="owner@example.com"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="edit-phone">Phone</Label>
+                  <Input
+                    id="edit-phone"
+                    value={editForm.phone}
+                    onChange={(e) => setEditForm(f => ({ ...f, phone: e.target.value }))}
+                    placeholder="(555) 123-4567"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
+                <UserPlus className="h-4 w-4" />
+                Second Owner (Optional)
+              </h4>
+              <div className="space-y-3">
+                <div className="space-y-1">
+                  <Label htmlFor="edit-second-name">Name</Label>
+                  <Input
+                    id="edit-second-name"
+                    value={editForm.second_owner_name}
+                    onChange={(e) => setEditForm(f => ({ ...f, second_owner_name: e.target.value }))}
+                    placeholder="Second owner name"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="edit-second-email">Email</Label>
+                  <Input
+                    id="edit-second-email"
+                    type="email"
+                    value={editForm.second_owner_email}
+                    onChange={(e) => setEditForm(f => ({ ...f, second_owner_email: e.target.value }))}
+                    placeholder="second@example.com"
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                Second owner will receive their own personalized holiday email
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingOwner(null)}>
+              Cancel
+            </Button>
+            <Button onClick={handleUpdateOwner} disabled={isUpdatingOwner || !editForm.name || !editForm.email}>
+              {isUpdatingOwner ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                  Saving...
+                </>
+              ) : (
+                "Save Changes"
+              )}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
