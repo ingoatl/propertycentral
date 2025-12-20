@@ -81,6 +81,7 @@ export function HolidayEmailManager() {
   const [isGeneratingPreview, setIsGeneratingPreview] = useState(false);
   const [sendingToOwnerId, setSendingToOwnerId] = useState<string | null>(null);
   const [ownerSearchQuery, setOwnerSearchQuery] = useState("");
+  const [ownersTabTemplateId, setOwnersTabTemplateId] = useState<string | null>(null);
 
   // Fetch holiday templates
   const { data: templates, isLoading: templatesLoading } = useQuery({
@@ -191,9 +192,11 @@ export function HolidayEmailManager() {
     }
   };
 
-  // Send test to specific owner
-  const sendTestToOwner = async (ownerId: string, ownerEmail: string) => {
-    if (!selectedTemplate) {
+  // Send test to specific owner (always sends to test email, not owner)
+  const TEST_EMAIL_ADDRESS = "ingo@peachhausgroup.com";
+  
+  const sendTestToOwner = async (ownerId: string, ownerName: string) => {
+    if (!ownersTabTemplateId) {
       toast({ title: "Error", description: "Please select a template first", variant: "destructive" });
       return;
     }
@@ -202,9 +205,9 @@ export function HolidayEmailManager() {
     try {
       const { data, error } = await supabase.functions.invoke('send-holiday-email', {
         body: {
-          holidayTemplateId: selectedTemplate.id,
+          holidayTemplateId: ownersTabTemplateId,
           ownerIds: [ownerId],
-          testEmail: ownerEmail // Send to the owner's actual email as test
+          testEmail: TEST_EMAIL_ADDRESS // Always send to test email, not the owner
         }
       });
 
@@ -212,7 +215,7 @@ export function HolidayEmailManager() {
 
       toast({ 
         title: "Test Email Sent! 🎉", 
-        description: `Sent to ${ownerEmail}` 
+        description: `Test for ${ownerName} sent to ${TEST_EMAIL_ADDRESS}` 
       });
 
       queryClient.invalidateQueries({ queryKey: ['holiday-email-logs'] });
@@ -464,17 +467,32 @@ export function HolidayEmailManager() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {/* Search and Filter */}
-              <div className="flex gap-4 items-center">
+              {/* Search, Filter and Template Selection */}
+              <div className="flex flex-wrap gap-4 items-center">
                 <Input
                   placeholder="Search by name, email, or property..."
                   value={ownerSearchQuery}
                   onChange={(e) => setOwnerSearchQuery(e.target.value)}
                   className="max-w-sm"
                 />
-                {selectedTemplate && (
+                <div className="flex items-center gap-2">
+                  <Label className="text-sm whitespace-nowrap">Template:</Label>
+                  <select
+                    value={ownersTabTemplateId || ""}
+                    onChange={(e) => setOwnersTabTemplateId(e.target.value || null)}
+                    className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                  >
+                    <option value="">Select template...</option>
+                    {templates?.filter(t => t.is_active).map((template) => (
+                      <option key={template.id} value={template.id}>
+                        {template.emoji} {template.holiday_name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                {ownersTabTemplateId && (
                   <Badge variant="secondary" className="text-xs">
-                    Selected: {selectedTemplate.emoji} {selectedTemplate.holiday_name}
+                    Test emails go to: ingo@peachhausgroup.com
                   </Badge>
                 )}
               </div>
@@ -607,11 +625,11 @@ export function HolidayEmailManager() {
                                 )}
                               </TableCell>
                               <TableCell>
-                                {isComplete && selectedTemplate ? (
+                                {isComplete && ownersTabTemplateId ? (
                                   <Button
                                     size="sm"
                                     variant="secondary"
-                                    onClick={() => sendTestToOwner(owner.id, owner.email)}
+                                    onClick={() => sendTestToOwner(owner.id, owner.name)}
                                     disabled={sendingToOwnerId === owner.id}
                                   >
                                     {sendingToOwnerId === owner.id ? (
@@ -623,8 +641,8 @@ export function HolidayEmailManager() {
                                       </>
                                     )}
                                   </Button>
-                                ) : !selectedTemplate ? (
-                                  <span className="text-xs text-muted-foreground">Select template first</span>
+                                ) : !ownersTabTemplateId ? (
+                                  <span className="text-xs text-muted-foreground">Select template</span>
                                 ) : (
                                   <span className="text-xs text-muted-foreground">—</span>
                                 )}
