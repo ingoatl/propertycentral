@@ -70,8 +70,9 @@ serve(async (req) => {
     const holidayGreeting = getHolidayGreeting(cleanHolidayName);
     console.log('Greeting:', holidayGreeting);
 
-    // Simple, direct prompt
-    const imagePrompt = `Create a festive ${cleanHolidayName} greeting card image. The image MUST prominently display the text "${holidayGreeting}!" in an elegant, readable font. Use warm, inviting colors appropriate for ${cleanHolidayName}. Horizontal banner format, high quality.`;
+    // Personalized prompt with owner's name
+    const ownerName = ownerFirstName || 'Friend';
+    const imagePrompt = `Create a festive ${cleanHolidayName} greeting card image. The image MUST prominently display the text "${holidayGreeting}, ${ownerName}!" in an elegant, readable font. Use warm, inviting colors appropriate for ${cleanHolidayName}. Horizontal banner format, high quality.`;
 
     console.log('Calling Gemini image API...');
 

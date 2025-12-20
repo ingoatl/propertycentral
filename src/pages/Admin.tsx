@@ -19,6 +19,7 @@ import { EmailAIPromptsManager } from "@/components/admin/EmailAIPromptsManager"
 import { DataCleanupPanel } from "@/components/reconciliation/DataCleanupPanel";
 import { JobApplicationsCard } from "@/components/admin/JobApplicationsCard";
 import { HolidayEmailManager } from "@/components/admin/HolidayEmailManager";
+import { HolidayEmailWatchdogCard } from "@/components/admin/HolidayEmailWatchdogCard";
 
 const createUserSchema = z.object({
   email: z.string().email("Invalid email address").max(255),
@@ -763,7 +764,14 @@ const Admin = () => {
         </TabsContent>
 
         <TabsContent value="holiday-emails" className="mt-8">
-          <HolidayEmailManager />
+          <div className="grid gap-6 lg:grid-cols-3">
+            <div className="lg:col-span-2">
+              <HolidayEmailManager />
+            </div>
+            <div>
+              <HolidayEmailWatchdogCard />
+            </div>
+          </div>
         </TabsContent>
       </Tabs>
     </div>
