@@ -48,8 +48,66 @@ serve(async (req) => {
 
     console.log('Using template:', template.holiday_name);
 
-    // If test email, create a mock recipient
-    if (testEmail) {
+    // If test email WITH ownerIds, use real owner data but send to test email
+    if (testEmail && ownerIds && ownerIds.length > 0) {
+      // Fetch the real owner and property data
+      const { data: properties, error: propertiesError } = await supabase
+        .from('properties')
+        .select(`
+          id,
+          name,
+          address,
+          image_path,
+          owner_id,
+          property_owners!inner(
+            id,
+            name,
+            email
+          )
+        `)
+        .in('owner_id', ownerIds)
+        .limit(1);
+
+      if (propertiesError || !properties || properties.length === 0) {
+        throw new Error(`Failed to fetch owner data: ${propertiesError?.message || 'Owner not found'}`);
+      }
+
+      const property = properties[0];
+      const owner = property.property_owners as any;
+
+      console.log(`Sending personalized test email for ${owner.name} to ${testEmail}`);
+
+      const result = await sendHolidayEmail({
+        supabase,
+        resend,
+        template,
+        owner: {
+          id: owner.id,
+          name: owner.name,
+          email: testEmail, // Send to test email, not the owner
+        },
+        property: {
+          id: property.id,
+          name: property.name || property.address,
+          image_path: property.image_path,
+        },
+        isTest: true,
+        lovableApiKey: LOVABLE_API_KEY,
+        supabaseUrl,
+      });
+
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          message: `Personalized test email for ${owner.name} sent to ${testEmail}`,
+          result 
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // If test email only (no ownerIds), create a mock recipient
+    if (testEmail && (!ownerIds || ownerIds.length === 0)) {
       const result = await sendHolidayEmail({
         supabase,
         resend,
