@@ -325,7 +325,7 @@ async function sendHolidayEmail({
     console.error('Error generating image:', error);
   }
 
-  // Personalize the message and remove any greeting lines since we add it in HTML
+  // Personalize the message and remove any greeting/closing lines since we add them in HTML
   let personalizedMessage = template.message_template
     .replace(/{owner_name}/g, owner.name)
     .replace(/{owner_first_name}/g, ownerFirstName)
@@ -334,6 +334,12 @@ async function sendHolidayEmail({
   // Remove greeting line if present (e.g., "Dear John," or "Dear John Smith,")
   personalizedMessage = personalizedMessage
     .replace(/^Dear [^,\n]+,?\s*\n*/i, '')
+    .trim();
+  
+  // Remove closing/sign-off lines since we have a signature section
+  // This handles variations like "With warmest wishes,", "Warmly,", "With love,", etc.
+  personalizedMessage = personalizedMessage
+    .replace(/\n*(With warmest wishes|With warm regards|Warmest regards|Warm regards|Warmly|With love|With gratitude|Cheers|Best wishes|Best regards|Sincerely|Regards),?\s*\n+.*(Anja|Ingo|PeachHaus).*$/gis, '')
     .trim();
 
   const personalizedSubject = template.subject_template
