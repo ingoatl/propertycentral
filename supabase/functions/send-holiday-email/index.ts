@@ -352,7 +352,6 @@ async function sendHolidayEmail({
     subject: personalizedSubject,
     message: personalizedMessage,
     ownerFirstName,
-    holidayName: template.holiday_name,
     holidayEmoji: template.emoji,
     imageUrl: generatedImageUrl,
     isTest,
@@ -383,58 +382,10 @@ async function sendHolidayEmail({
   return { emailId: emailResult.id, imageUrl: generatedImageUrl };
 }
 
-// Map holiday names to their proper greetings
-function getHolidayGreeting(holidayName: string): string {
-  const greetings: Record<string, string> = {
-    'christmas': 'Merry Christmas',
-    'new year': 'Happy New Year',
-    "new year's": 'Happy New Year',
-    "new year's day": 'Happy New Year',
-    'thanksgiving': 'Happy Thanksgiving',
-    'easter': 'Happy Easter',
-    'hanukkah': 'Happy Hanukkah',
-    'chanukah': 'Happy Hanukkah',
-    'diwali': 'Happy Diwali',
-    'kwanzaa': 'Happy Kwanzaa',
-    'valentine': "Happy Valentine's Day",
-    "valentine's day": "Happy Valentine's Day",
-    'mother': "Happy Mother's Day",
-    "mother's day": "Happy Mother's Day",
-    'father': "Happy Father's Day",
-    "father's day": "Happy Father's Day",
-    'independence day': 'Happy Independence Day',
-    '4th of july': 'Happy 4th of July',
-    'fourth of july': 'Happy 4th of July',
-    'labor day': 'Happy Labor Day',
-    'memorial day': 'Happy Memorial Day',
-    'halloween': 'Happy Halloween',
-    'st. patrick': "Happy St. Patrick's Day",
-    "st. patrick's day": "Happy St. Patrick's Day",
-  };
-  
-  const lowerName = holidayName.toLowerCase();
-  
-  // Check for exact match first
-  if (greetings[lowerName]) {
-    return greetings[lowerName];
-  }
-  
-  // Check for partial matches
-  for (const [key, greeting] of Object.entries(greetings)) {
-    if (lowerName.includes(key)) {
-      return greeting;
-    }
-  }
-  
-  // Default: capitalize and add "Happy"
-  return `Happy ${holidayName}`;
-}
-
 function buildHolidayEmailHtml({
   subject,
   message,
   ownerFirstName,
-  holidayName,
   holidayEmoji,
   imageUrl,
   isTest,
@@ -442,13 +393,10 @@ function buildHolidayEmailHtml({
   subject: string;
   message: string;
   ownerFirstName: string;
-  holidayName: string;
   holidayEmoji: string;
   imageUrl: string | null;
   isTest: boolean;
 }) {
-  // Get the proper holiday greeting
-  const holidayGreeting = getHolidayGreeting(holidayName);
   // Get current year for footer
   const currentYear = new Date().getFullYear();
   
@@ -525,13 +473,8 @@ function buildHolidayEmailHtml({
           <tr>
             <td style="padding: 44px 48px 36px 48px;">
               
-              <!-- Holiday Greeting -->
-              <p style="margin: 0 0 12px 0; font-family: 'Cormorant Garamond', Georgia, 'Times New Roman', serif; font-size: 28px; font-weight: 500; color: #b8956a; letter-spacing: 1px; line-height: 1.2;">
-                ${holidayGreeting}!
-              </p>
-              
-              <!-- Personal Greeting -->
-              <p style="margin: 0 0 28px 0; font-family: 'Cormorant Garamond', Georgia, 'Times New Roman', serif; font-size: 24px; font-weight: 400; color: #1a1a1a; letter-spacing: 0.5px; line-height: 1.2;">
+              <!-- Greeting -->
+              <p style="margin: 0 0 28px 0; font-family: 'Cormorant Garamond', Georgia, 'Times New Roman', serif; font-size: 28px; font-weight: 400; color: #1a1a1a; letter-spacing: 0.5px; line-height: 1.2;">
                 Dear ${ownerFirstName},
               </p>
               

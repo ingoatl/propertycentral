@@ -40,30 +40,76 @@ serve(async (req) => {
       .replace(/{owner_name}/g, ownerFirstName || 'Friend')
       .replace(/{property_name}/g, propertyName || 'your property');
 
+    // Map holiday names to their proper greetings
+    const getHolidayGreeting = (name: string): string => {
+      const greetings: Record<string, string> = {
+        'christmas': 'Merry Christmas',
+        'new year': 'Happy New Year',
+        "new year's": 'Happy New Year',
+        "new year's day": 'Happy New Year',
+        'thanksgiving': 'Happy Thanksgiving',
+        'easter': 'Happy Easter',
+        'hanukkah': 'Happy Hanukkah',
+        'chanukah': 'Happy Hanukkah',
+        'diwali': 'Happy Diwali',
+        'kwanzaa': 'Happy Kwanzaa',
+        'valentine': "Happy Valentine's Day",
+        "valentine's day": "Happy Valentine's Day",
+        'mother': "Happy Mother's Day",
+        "mother's day": "Happy Mother's Day",
+        'father': "Happy Father's Day",
+        "father's day": "Happy Father's Day",
+        'independence day': 'Happy Independence Day',
+        '4th of july': 'Happy 4th of July',
+        'fourth of july': 'Happy 4th of July',
+        'labor day': 'Happy Labor Day',
+        'memorial day': 'Happy Memorial Day',
+        'halloween': 'Happy Halloween',
+        'st. patrick': "Happy St. Patrick's Day",
+        "st. patrick's day": "Happy St. Patrick's Day",
+      };
+      
+      const lowerName = name.toLowerCase();
+      
+      // Check for exact match first
+      if (greetings[lowerName]) return greetings[lowerName];
+      
+      // Check for partial matches
+      for (const [key, greeting] of Object.entries(greetings)) {
+        if (lowerName.includes(key)) return greeting;
+      }
+      
+      // Default: capitalize and add "Happy"
+      return `Happy ${name}`;
+    };
+
+    const cleanHolidayName = holidayName || 'Holiday';
+    const holidayGreeting = getHolidayGreeting(cleanHolidayName);
+    
+    console.log('Holiday greeting for image:', holidayGreeting);
+
     // If no prompt template, create a generic one based on holiday name
     if (!personalizedPrompt || personalizedPrompt.trim().length < 20) {
       console.log('WARN: No template provided, using generic prompt');
-      personalizedPrompt = `Create a beautiful ${holidayName || 'holiday'} greeting card image. 
-      A warm, inviting scene with elegant text saying "Happy ${holidayName || 'Holidays'}, ${ownerFirstName || 'Friend'}!" prominently displayed.
+      personalizedPrompt = `Create a beautiful ${cleanHolidayName} greeting card image. 
+      A warm, inviting scene with elegant text saying "${holidayGreeting}!" prominently displayed.
       Style: High quality, warm and inviting, perfect for a greeting card.`;
     }
 
     // Build a clean, simple prompt for image generation
-    const cleanHolidayName = holidayName || 'Holiday';
-    
     const imagePrompt = `Generate a beautiful ${cleanHolidayName} greeting card image.
 
 REQUIREMENTS:
 - Create a stunning, festive ${cleanHolidayName} themed image
-- Include elegant text saying "Happy ${cleanHolidayName}, ${ownerFirstName}!" prominently displayed
+- Include elegant decorative text saying "${holidayGreeting}!" prominently displayed in the image
 - Make it warm, inviting, and visually appealing
-- Style: High-quality greeting card suitable for email
+- Style: High-quality greeting card suitable for email, luxurious and elegant
 - Dimensions: Horizontal banner format (approximately 2:1 ratio)
 
 THEME DETAILS FROM TEMPLATE:
 ${personalizedPrompt}
 
-Create this image now for ${ownerFirstName}.`;
+IMPORTANT: The text "${holidayGreeting}!" must be clearly visible and beautifully rendered in the image.`;
 
     console.log('Full prompt preview:', imagePrompt.substring(0, 300) + '...');
 
