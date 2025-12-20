@@ -398,15 +398,9 @@ function buildHolidayEmailHtml({
         <table cellpadding="0" cellspacing="0" width="100%">
           <tr>
             <td style="border-top: 1px solid #e2e8f0; padding-top: 20px;">
-              <img src="https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/anja-ingo-hosts.jpg" 
-                   alt="Anja & Ingo" 
-                   style="width: 80px; height: 80px; border-radius: 50%; margin-right: 15px; float: left; object-fit: cover;"
-                   onerror="this.style.display='none'">
-              <div style="overflow: hidden;">
-                <p style="margin: 0; color: #4a5568; font-size: 14px;">Warmly,</p>
-                <p style="margin: 5px 0; color: #2d3748; font-size: 18px; font-weight: bold;">Anja & Ingo</p>
-                <p style="margin: 0; color: #718096; font-size: 14px;">PeachHaus Group</p>
-              </div>
+              <p style="margin: 0; color: #4a5568; font-size: 14px;">Warmly,</p>
+              <p style="margin: 5px 0; color: #2d3748; font-size: 18px; font-weight: bold;">Anja & Ingo</p>
+              <p style="margin: 0; color: #718096; font-size: 14px;">PeachHaus Group</p>
             </td>
           </tr>
         </table>
