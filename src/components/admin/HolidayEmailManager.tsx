@@ -25,7 +25,11 @@ import {
   Clock,
   Users,
   Sparkles,
-  Eye
+  Eye,
+  AlertTriangle,
+  User,
+  Phone,
+  Home
 } from "lucide-react";
 
 interface HolidayTemplate {
@@ -52,6 +56,20 @@ interface EmailLog {
   } | null;
 }
 
+interface PropertyWithOwner {
+  id: string;
+  name: string;
+  address: string;
+  image_path: string | null;
+  owner_id: string | null;
+  property_owners: {
+    id: string;
+    name: string;
+    email: string;
+    phone: string | null;
+  } | null;
+}
+
 export function HolidayEmailManager() {
   const queryClient = useQueryClient();
   const [selectedTemplate, setSelectedTemplate] = useState<HolidayTemplate | null>(null);
@@ -61,6 +79,8 @@ export function HolidayEmailManager() {
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
   const [isGeneratingPreview, setIsGeneratingPreview] = useState(false);
+  const [sendingToOwnerId, setSendingToOwnerId] = useState<string | null>(null);
+  const [ownerSearchQuery, setOwnerSearchQuery] = useState("");
 
   // Fetch holiday templates
   const { data: templates, isLoading: templatesLoading } = useQuery({
@@ -94,20 +114,33 @@ export function HolidayEmailManager() {
     }
   });
 
-  // Fetch owner count
-  const { data: ownerCount } = useQuery({
-    queryKey: ['property-owner-count'],
+  // Fetch all properties with owner info
+  const { data: propertiesWithOwners, isLoading: propertiesLoading } = useQuery({
+    queryKey: ['properties-with-owners'],
     queryFn: async () => {
-      const { count, error } = await supabase
+      const { data, error } = await supabase
         .from('properties')
-        .select('owner_id', { count: 'exact', head: true })
+        .select(`
+          id,
+          name,
+          address,
+          image_path,
+          owner_id,
+          property_owners(id, name, email, phone)
+        `)
         .is('offboarded_at', null)
-        .not('owner_id', 'is', null);
+        .order('name');
       
       if (error) throw error;
-      return count || 0;
+      return data as PropertyWithOwner[];
     }
   });
+
+  // Compute owner count and missing info stats
+  const ownerCount = propertiesWithOwners?.filter(p => p.owner_id && p.property_owners).length || 0;
+  const propertiesMissingOwner = propertiesWithOwners?.filter(p => !p.owner_id || !p.property_owners) || [];
+  const propertiesMissingEmail = propertiesWithOwners?.filter(p => p.property_owners && !p.property_owners.email) || [];
+  const propertiesMissingPhone = propertiesWithOwners?.filter(p => p.property_owners && !p.property_owners.phone) || [];
 
   // Toggle template active status
   const toggleActiveMutation = useMutation({
@@ -155,6 +188,43 @@ export function HolidayEmailManager() {
       });
     } finally {
       setIsSending(false);
+    }
+  };
+
+  // Send test to specific owner
+  const sendTestToOwner = async (ownerId: string, ownerEmail: string) => {
+    if (!selectedTemplate) {
+      toast({ title: "Error", description: "Please select a template first", variant: "destructive" });
+      return;
+    }
+
+    setSendingToOwnerId(ownerId);
+    try {
+      const { data, error } = await supabase.functions.invoke('send-holiday-email', {
+        body: {
+          holidayTemplateId: selectedTemplate.id,
+          ownerIds: [ownerId],
+          testEmail: ownerEmail // Send to the owner's actual email as test
+        }
+      });
+
+      if (error) throw error;
+
+      toast({ 
+        title: "Test Email Sent! 🎉", 
+        description: `Sent to ${ownerEmail}` 
+      });
+
+      queryClient.invalidateQueries({ queryKey: ['holiday-email-logs'] });
+    } catch (error) {
+      console.error('Error sending test to owner:', error);
+      toast({ 
+        title: "Error", 
+        description: error instanceof Error ? error.message : "Failed to send test email", 
+        variant: "destructive" 
+      });
+    } finally {
+      setSendingToOwnerId(null);
     }
   };
 
@@ -273,7 +343,7 @@ export function HolidayEmailManager() {
                 <Users className="h-5 w-5 text-blue-500" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Property Owners</p>
+                <p className="text-sm text-muted-foreground">Properties with Owners</p>
                 <p className="text-2xl font-bold">{ownerCount}</p>
               </div>
             </div>
@@ -283,12 +353,12 @@ export function HolidayEmailManager() {
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-purple-500/10 rounded-lg">
-                <Mail className="h-5 w-5 text-purple-500" />
+              <div className={`p-2 rounded-lg ${propertiesMissingOwner.length > 0 ? 'bg-red-500/10' : 'bg-green-500/10'}`}>
+                <AlertTriangle className={`h-5 w-5 ${propertiesMissingOwner.length > 0 ? 'text-red-500' : 'text-green-500'}`} />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Emails Sent</p>
-                <p className="text-2xl font-bold">{emailLogs?.length || 0}</p>
+                <p className="text-sm text-muted-foreground">Missing Owner Info</p>
+                <p className="text-2xl font-bold">{propertiesMissingOwner.length}</p>
               </div>
             </div>
           </CardContent>
@@ -298,6 +368,7 @@ export function HolidayEmailManager() {
       <Tabs defaultValue="calendar" className="space-y-4">
         <TabsList>
           <TabsTrigger value="calendar">🗓️ Holiday Calendar</TabsTrigger>
+          <TabsTrigger value="owners">👤 Owners</TabsTrigger>
           <TabsTrigger value="send">✉️ Send Emails</TabsTrigger>
           <TabsTrigger value="history">📋 Email History</TabsTrigger>
         </TabsList>
@@ -375,6 +446,195 @@ export function HolidayEmailManager() {
                     ))}
                   </TableBody>
                 </Table>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Owners Tab */}
+        <TabsContent value="owners">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Users className="h-5 w-5" />
+                Property Owners
+              </CardTitle>
+              <CardDescription>
+                View all owners and their contact information. Send test emails to specific owners.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Search and Filter */}
+              <div className="flex gap-4 items-center">
+                <Input
+                  placeholder="Search by name, email, or property..."
+                  value={ownerSearchQuery}
+                  onChange={(e) => setOwnerSearchQuery(e.target.value)}
+                  className="max-w-sm"
+                />
+                {selectedTemplate && (
+                  <Badge variant="secondary" className="text-xs">
+                    Selected: {selectedTemplate.emoji} {selectedTemplate.holiday_name}
+                  </Badge>
+                )}
+              </div>
+
+              {/* Missing Owner Info Alert */}
+              {propertiesMissingOwner.length > 0 && (
+                <div className="border border-red-200 bg-red-50 dark:bg-red-950/20 dark:border-red-900 rounded-lg p-4">
+                  <div className="flex items-center gap-2 text-red-700 dark:text-red-400 font-medium mb-2">
+                    <AlertTriangle className="h-4 w-4" />
+                    Properties Missing Owner Assignment ({propertiesMissingOwner.length})
+                  </div>
+                  <div className="text-sm text-red-600 dark:text-red-400 space-y-1">
+                    {propertiesMissingOwner.slice(0, 5).map(p => (
+                      <div key={p.id} className="flex items-center gap-2">
+                        <Home className="h-3 w-3" />
+                        {p.name} - {p.address}
+                      </div>
+                    ))}
+                    {propertiesMissingOwner.length > 5 && (
+                      <div className="text-xs opacity-70">...and {propertiesMissingOwner.length - 5} more</div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {propertiesLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                </div>
+              ) : (
+                <ScrollArea className="h-[500px]">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Property</TableHead>
+                        <TableHead>Owner</TableHead>
+                        <TableHead>Email</TableHead>
+                        <TableHead>Phone</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {propertiesWithOwners
+                        ?.filter(p => {
+                          if (!ownerSearchQuery.trim()) return true;
+                          const query = ownerSearchQuery.toLowerCase();
+                          return (
+                            p.name.toLowerCase().includes(query) ||
+                            p.address.toLowerCase().includes(query) ||
+                            p.property_owners?.name?.toLowerCase().includes(query) ||
+                            p.property_owners?.email?.toLowerCase().includes(query)
+                          );
+                        })
+                        .map((property) => {
+                          const owner = property.property_owners;
+                          const hasOwner = !!owner;
+                          const hasEmail = !!owner?.email;
+                          const hasPhone = !!owner?.phone;
+                          const isComplete = hasOwner && hasEmail;
+
+                          return (
+                            <TableRow key={property.id} className={!isComplete ? 'bg-red-50/50 dark:bg-red-950/10' : ''}>
+                              <TableCell>
+                                <div className="flex items-center gap-2">
+                                  {property.image_path ? (
+                                    <img 
+                                      src={property.image_path} 
+                                      alt={property.name}
+                                      className="w-10 h-10 rounded object-cover"
+                                    />
+                                  ) : (
+                                    <div className="w-10 h-10 rounded bg-muted flex items-center justify-center">
+                                      <Home className="h-4 w-4 text-muted-foreground" />
+                                    </div>
+                                  )}
+                                  <div>
+                                    <div className="font-medium text-sm">{property.name}</div>
+                                    <div className="text-xs text-muted-foreground truncate max-w-[150px]">
+                                      {property.address}
+                                    </div>
+                                  </div>
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                {hasOwner ? (
+                                  <div className="flex items-center gap-1">
+                                    <User className="h-3 w-3 text-muted-foreground" />
+                                    {owner.name}
+                                  </div>
+                                ) : (
+                                  <Badge variant="destructive" className="text-xs">
+                                    No Owner
+                                  </Badge>
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                {hasEmail ? (
+                                  <div className="flex items-center gap-1 text-sm">
+                                    <Mail className="h-3 w-3 text-muted-foreground" />
+                                    {owner.email}
+                                  </div>
+                                ) : (
+                                  <Badge variant="outline" className="text-xs text-orange-600">
+                                    Missing
+                                  </Badge>
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                {hasPhone ? (
+                                  <div className="flex items-center gap-1 text-sm">
+                                    <Phone className="h-3 w-3 text-muted-foreground" />
+                                    {owner.phone}
+                                  </div>
+                                ) : (
+                                  <span className="text-xs text-muted-foreground">—</span>
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                {isComplete ? (
+                                  <Badge variant="default" className="bg-green-500 text-xs">
+                                    <CheckCircle2 className="h-3 w-3 mr-1" />
+                                    Ready
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="destructive" className="text-xs">
+                                    <XCircle className="h-3 w-3 mr-1" />
+                                    Incomplete
+                                  </Badge>
+                                )}
+                              </TableCell>
+                              <TableCell>
+                                {isComplete && selectedTemplate ? (
+                                  <Button
+                                    size="sm"
+                                    variant="secondary"
+                                    onClick={() => sendTestToOwner(owner.id, owner.email)}
+                                    disabled={sendingToOwnerId === owner.id}
+                                  >
+                                    {sendingToOwnerId === owner.id ? (
+                                      <Loader2 className="h-3 w-3 animate-spin" />
+                                    ) : (
+                                      <>
+                                        <TestTube className="h-3 w-3 mr-1" />
+                                        Test
+                                      </>
+                                    )}
+                                  </Button>
+                                ) : !selectedTemplate ? (
+                                  <span className="text-xs text-muted-foreground">Select template first</span>
+                                ) : (
+                                  <span className="text-xs text-muted-foreground">—</span>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                    </TableBody>
+                  </Table>
+                </ScrollArea>
               )}
             </CardContent>
           </Card>
