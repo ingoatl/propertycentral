@@ -150,6 +150,7 @@ serve(async (req) => {
           id,
           name,
           email,
+          second_owner_name,
           second_owner_email
         )
       `)
@@ -207,13 +208,16 @@ serve(async (req) => {
         if (owner.second_owner_email && !processedEmails.has(owner.second_owner_email)) {
           processedEmails.add(owner.second_owner_email);
           
+          // Use second owner's name if available, otherwise use primary owner's name
+          const secondOwnerName = owner.second_owner_name || owner.name;
+          
           const secondResult = await sendHolidayEmail({
             supabase,
             resend,
             template,
             owner: {
               id: owner.id,
-              name: owner.name,
+              name: secondOwnerName,
               email: owner.second_owner_email,
             },
             property: {
