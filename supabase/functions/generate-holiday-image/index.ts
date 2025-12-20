@@ -53,6 +53,8 @@ serve(async (req) => {
 - This is for ${holidayName?.toUpperCase() || 'A HOLIDAY'} - NOT Christmas, NOT winter unless the holiday is in winter
 - DO NOT add Christmas decorations, snow, wreaths, or winter elements unless explicitly mentioned in the template
 - Match the season and theme of ${holidayName} exactly
+- IMAGE SIZE: Create a 600x300 pixel image (email banner format, 2:1 aspect ratio)
+- Keep the image compact and web-optimized
 
 TEMPLATE TO FOLLOW:
 ${personalizedPrompt}
