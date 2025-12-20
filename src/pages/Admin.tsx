@@ -57,20 +57,23 @@ const Admin = () => {
   const checkAdminStatus = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user) {
+        setIsAdmin(false);
+        return;
+      }
 
-      const { data: roles } = await supabase
+      const { data: roles, error } = await supabase
         .from("user_roles")
         .select("role")
         .eq("user_id", user.id)
         .eq("role", "admin")
-        .single();
+        .maybeSingle();
 
+      if (error) throw error;
       setIsAdmin(!!roles);
     } catch (error: any) {
-      if (import.meta.env.DEV) {
-        console.error("Error checking admin status:", error);
-      }
+      console.error("Error checking admin status:", error);
+      setIsAdmin(false);
     }
   };
 
