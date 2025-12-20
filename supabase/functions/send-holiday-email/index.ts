@@ -394,9 +394,9 @@ function buildHolidayEmailHtml({
   // Get current year for footer
   const currentYear = new Date().getFullYear();
   
-  // Hosted image URLs - using publicly accessible URLs from the deployed site
-  const hostsPhotoUrl = "https://peachhausgroup.lovable.app/images/anja-ingo-hosts.jpg";
-  const signatureUrl = "https://peachhausgroup.lovable.app/images/anja-signature.png";
+  // Hosted image URLs - using Supabase storage bucket
+  const hostsPhotoUrl = "https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/anja-ingo-hosts.jpg";
+  const signatureUrl = "https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/anja-signature.png";
   
   return `
 <!DOCTYPE html>
@@ -406,7 +406,7 @@ function buildHolidayEmailHtml({
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${subject}</title>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500&family=Lato:wght@300;400&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600&family=Lato:wght@300;400&display=swap');
   </style>
 </head>
 <body style="margin: 0; padding: 0; font-family: 'Lato', 'Helvetica Neue', Arial, sans-serif; background-color: #f8f6f3;">
@@ -448,7 +448,7 @@ function buildHolidayEmailHtml({
     <!-- Message Content - Left aligned with refined typography, starts with greeting -->
     <tr>
       <td style="padding: 36px 48px 40px 48px; color: #4a4a4a; font-size: 15px; line-height: 1.85; text-align: left;">
-        <p style="margin: 0 0 24px 0; font-family: 'Cormorant Garamond', Georgia, serif; font-size: 26px; color: #2d2d2d; font-weight: 400; letter-spacing: 0.3px;">
+        <p style="margin: 0 0 24px 0; font-family: 'Playfair Display', Georgia, serif; font-size: 28px; color: #2d2d2d; font-weight: 400; letter-spacing: 0.3px;">
           Dear ${ownerFirstName},
         </p>
         ${message.split('\n\n').map(para => `<p style="margin: 0 0 20px 0; font-weight: 300; letter-spacing: 0.2px;">${para.replace(/\n/g, '<br>')}</p>`).join('')}
