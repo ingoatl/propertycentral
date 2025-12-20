@@ -6,47 +6,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Helper function to generate a generic festive image without property reference
-async function generateGenericFestiveImage(
-  apiKey: string, 
-  ownerFirstName: string, 
-  propertyName: string, 
-  textPrompt: string
-): Promise<Response> {
-  const prompt = `Create a stunning, photorealistic holiday greeting image featuring a beautiful vacation rental property.
-
-The image should show:
-- A charming, cozy home decorated for the winter holidays
-- Warm string lights adorning the roofline and windows  
-- Light snow on the roof and ground creating a magical winter scene
-- A festive wreath on the door
-- Warm golden light glowing from inside the windows
-- A magical evening atmosphere with soft snowfall
-- The name "${ownerFirstName}" incorporated elegantly into the scene (perhaps on a welcome sign, mailbox, or holiday banner)
-
-${textPrompt}
-
-Make it feel warm, inviting, and magical - perfect for a holiday greeting card. The style should be photorealistic and high quality. Aspect ratio 16:9.`;
-
-  return await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: "google/gemini-2.5-flash-image-preview",
-      messages: [
-        {
-          role: "user",
-          content: prompt
-        }
-      ],
-      modalities: ["image", "text"]
-    }),
-  });
-}
-
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -63,133 +22,52 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const { 
-      propertyImageUrl, 
       ownerFirstName, 
       propertyName, 
       promptTemplate 
     } = await req.json();
 
-    console.log('Generating holiday image for:', { ownerFirstName, propertyName, hasPropertyImage: !!propertyImageUrl });
+    console.log('Generating festive holiday image for:', { ownerFirstName, propertyName });
 
     // Build the text prompt with personalization
-    let textPrompt = promptTemplate
+    const textPrompt = (promptTemplate || '')
       .replace(/{owner_first_name}/g, ownerFirstName || 'Friend')
       .replace(/{property_name}/g, propertyName || 'your property');
 
-    let response;
-    
-    // If we have a property image URL, analyze it first to understand the property style
-    if (propertyImageUrl) {
-      console.log('Analyzing property image to create inspired festive image:', propertyImageUrl);
-      
-      try {
-        // Fetch the property image
-        const imageResponse = await fetch(propertyImageUrl);
-        if (!imageResponse.ok) {
-          throw new Error(`Failed to fetch property image: ${imageResponse.status}`);
-        }
-        
-        const imageBuffer = await imageResponse.arrayBuffer();
-        const base64Image = btoa(String.fromCharCode(...new Uint8Array(imageBuffer)));
-        
-        // Determine content type from URL or response
-        const contentType = imageResponse.headers.get('content-type') || 'image/jpeg';
-        const imageDataUrl = `data:${contentType};base64,${base64Image}`;
-        
-        console.log('Property image fetched, analyzing style...');
+    // Simple, effective prompt for a beautiful festive holiday image
+    const prompt = `Create a beautiful, warm holiday greeting card image.
 
-        // First, analyze the property image to understand its characteristics
-        const analysisResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${LOVABLE_API_KEY}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            model: "google/gemini-2.5-flash",
-            messages: [
-              {
-                role: "user",
-                content: [
-                  {
-                    type: "text",
-                    text: `Analyze this property image and describe it in detail for creating a similar festive holiday version:
-                    1. Architectural style (modern, traditional, farmhouse, craftsman, etc.)
-                    2. Building colors and materials (brick, wood siding, stucco, etc.)
-                    3. Roof style and color
-                    4. Landscaping features (trees, bushes, lawn, etc.)
-                    5. Notable features (porch, columns, windows style, etc.)
-                    6. Setting (urban, suburban, rural, wooded, etc.)
-                    
-                    Provide a concise description that could be used to generate a similar-looking property decorated for the holidays.`
-                  },
-                  {
-                    type: "image_url",
-                    image_url: {
-                      url: imageDataUrl
-                    }
-                  }
-                ]
-              }
-            ]
-          }),
-        });
+The scene should show:
+- A cozy, charming home decorated for Christmas with warm string lights
+- Evening winter scene with soft snowfall and a magical atmosphere
+- A festive wreath on the door and warm golden light from windows
+- Snow-covered landscape creating a peaceful winter wonderland
+- Elegant text banner or sign that says "Happy Holidays, ${ownerFirstName || 'Friend'}!" prominently displayed
 
-        let propertyDescription = "a beautiful vacation rental property";
-        
-        if (analysisResponse.ok) {
-          const analysisData = await analysisResponse.json();
-          propertyDescription = analysisData.choices?.[0]?.message?.content || propertyDescription;
-          console.log('Property analysis:', propertyDescription.substring(0, 200) + '...');
-        }
+Style: Photorealistic, warm and inviting, high quality. Perfect for a holiday greeting card.
+Aspect ratio: 16:9 landscape orientation.
 
-        // Now generate a NEW festive image inspired by the property
-        const festivePrompt = `Create a stunning, photorealistic holiday greeting image featuring a property similar to this description:
+${textPrompt}`;
 
-${propertyDescription}
+    console.log('Generating image with prompt...');
 
-The image should show:
-- A beautifully decorated home in a winter holiday setting
-- Warm string lights adorning the roofline and windows
-- Light snow on the roof and ground creating a cozy winter scene
-- A festive wreath on the door
-- Warm golden light glowing from inside the windows
-- A magical evening atmosphere with soft snowfall
-- The name "${ownerFirstName}" incorporated elegantly into the scene (perhaps on a welcome sign, mailbox, or holiday banner)
-
-${textPrompt}
-
-Make it feel warm, inviting, and magical - perfect for a holiday greeting card. The style should be photorealistic and high quality. Aspect ratio 16:9.`;
-
-        console.log('Generating festive image...');
-
-        response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${LOVABLE_API_KEY}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            model: "google/gemini-2.5-flash-image-preview",
-            messages: [
-              {
-                role: "user",
-                content: festivePrompt
-              }
-            ],
-            modalities: ["image", "text"]
-          }),
-        });
-      } catch (imageError) {
-        console.error('Error analyzing property image, falling back to generic festive image:', imageError);
-        // Fall back to generic festive generation
-        response = await generateGenericFestiveImage(LOVABLE_API_KEY, ownerFirstName, propertyName, textPrompt);
-      }
-    } else {
-      // No property image, generate a generic festive image with owner's name
-      console.log('No property image provided, generating generic festive image');
-      response = await generateGenericFestiveImage(LOVABLE_API_KEY, ownerFirstName, propertyName, textPrompt);
-    }
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash-image-preview",
+        messages: [
+          {
+            role: "user",
+            content: prompt
+          }
+        ],
+        modalities: ["image", "text"]
+      }),
+    });
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -225,7 +103,7 @@ Make it feel warm, inviting, and magical - perfect for a holiday greeting card. 
     const filePath = `generated/${fileName}`;
 
     // Upload to storage
-    const { data: uploadData, error: uploadError } = await supabase.storage
+    const { error: uploadError } = await supabase.storage
       .from('holiday-images')
       .upload(filePath, imageBuffer, {
         contentType: 'image/png',
@@ -247,8 +125,7 @@ Make it feel warm, inviting, and magical - perfect for a holiday greeting card. 
     return new Response(
       JSON.stringify({ 
         success: true, 
-        imageUrl: publicUrl,
-        base64Image: imageData // Also return base64 for email embedding
+        imageUrl: publicUrl
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

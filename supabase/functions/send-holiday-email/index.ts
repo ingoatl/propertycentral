@@ -235,23 +235,9 @@ async function sendHolidayEmail({
 
   // Generate personalized holiday image
   let generatedImageUrl = null;
-  let base64Image = null;
 
   try {
-    // Build property image URL if available
-    let propertyImageUrl = null;
-    if (property.image_path) {
-      if (property.image_path.startsWith('http')) {
-        propertyImageUrl = property.image_path;
-      } else {
-        const { data: { publicUrl } } = supabase.storage
-          .from('property-images')
-          .getPublicUrl(property.image_path);
-        propertyImageUrl = publicUrl;
-      }
-    }
-
-    // Call generate-holiday-image function
+    // Call generate-holiday-image function (simplified - no property image needed)
     const imageResponse = await fetch(`${supabaseUrl}/functions/v1/generate-holiday-image`, {
       method: 'POST',
       headers: {
@@ -259,7 +245,6 @@ async function sendHolidayEmail({
         'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
       },
       body: JSON.stringify({
-        propertyImageUrl,
         ownerFirstName,
         propertyName: property.name,
         promptTemplate: template.image_prompt_template,
@@ -269,8 +254,7 @@ async function sendHolidayEmail({
     if (imageResponse.ok) {
       const imageData = await imageResponse.json();
       generatedImageUrl = imageData.imageUrl;
-      base64Image = imageData.base64Image;
-      console.log('Image generated successfully');
+      console.log('Image generated successfully:', generatedImageUrl);
     } else {
       console.error('Image generation failed:', await imageResponse.text());
     }
@@ -296,7 +280,6 @@ async function sendHolidayEmail({
     ownerFirstName,
     holidayEmoji: template.emoji,
     imageUrl: generatedImageUrl,
-    base64Image,
     isTest,
   });
 
@@ -331,7 +314,6 @@ function buildHolidayEmailHtml({
   ownerFirstName,
   holidayEmoji,
   imageUrl,
-  base64Image,
   isTest,
 }: {
   subject: string;
@@ -339,10 +321,8 @@ function buildHolidayEmailHtml({
   ownerFirstName: string;
   holidayEmoji: string;
   imageUrl: string | null;
-  base64Image: string | null;
   isTest: boolean;
 }) {
-  const imageSource = base64Image || imageUrl || '';
   
   return `
 <!DOCTYPE html>
@@ -374,13 +354,12 @@ function buildHolidayEmailHtml({
     </tr>
     
     <!-- Holiday Image -->
-    ${imageSource ? `
+    ${imageUrl ? `
     <tr>
       <td style="padding: 0;">
-        <img src="${imageSource}" 
-             alt="Holiday Greeting" 
-             style="width: 100%; height: auto; display: block;"
-             onerror="this.style.display='none'">
+        <img src="${imageUrl}" 
+             alt="Holiday Greeting for ${ownerFirstName}" 
+             style="width: 100%; height: auto; display: block;">
       </td>
     </tr>
     ` : ''}
