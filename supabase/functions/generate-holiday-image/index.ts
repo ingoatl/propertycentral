@@ -70,9 +70,29 @@ serve(async (req) => {
     const holidayGreeting = getHolidayGreeting(cleanHolidayName);
     console.log('Greeting:', holidayGreeting);
 
-    // Personalized prompt with owner's name and cozy house
+    // Build prompt using the holiday-specific template if provided, otherwise use default
     const ownerName = ownerFirstName || 'Friend';
-    const imagePrompt = `Create a beautiful ${cleanHolidayName} greeting card featuring a cozy, elegant house decorated for the holiday. The house should have warm lighting from windows, festive decorations, and a welcoming atmosphere. The image MUST prominently display the text "${holidayGreeting}, ${ownerName}!" in an elegant, easy-to-read script font overlaid on the scene. Use warm, inviting colors appropriate for ${cleanHolidayName}. Professional property management holiday card style. Horizontal banner format, ultra high resolution.`;
+    
+    // Use the custom prompt template if provided, otherwise build a default one
+    let imagePrompt: string;
+    if (promptTemplate && promptTemplate.trim()) {
+      // Replace placeholders in the custom template
+      imagePrompt = promptTemplate
+        .replace(/{owner_first_name}/g, ownerName)
+        .replace(/{owner_name}/g, ownerName)
+        .replace(/{holiday_name}/g, cleanHolidayName)
+        .replace(/{holiday_greeting}/g, holidayGreeting);
+      
+      // Ensure the greeting text is included
+      if (!imagePrompt.toLowerCase().includes(ownerName.toLowerCase())) {
+        imagePrompt += ` The image MUST prominently display "${holidayGreeting}, ${ownerName}!" in elegant text.`;
+      }
+    } else {
+      // Default prompt with cozy house theme
+      imagePrompt = `Create a beautiful ${cleanHolidayName} greeting card featuring a cozy, elegant house decorated for ${cleanHolidayName}. The house should have warm lighting from windows, festive ${cleanHolidayName} decorations appropriate to the holiday, and a welcoming atmosphere. The image MUST prominently display the text "${holidayGreeting}, ${ownerName}!" in an elegant, easy-to-read script font overlaid on the scene. Use warm, inviting colors and imagery specifically appropriate for ${cleanHolidayName}. Professional property management holiday card style. Horizontal banner format, ultra high resolution.`;
+    }
+    
+    console.log('Image prompt:', imagePrompt.substring(0, 200) + '...');
 
     console.log('Calling Gemini image API...');
 
