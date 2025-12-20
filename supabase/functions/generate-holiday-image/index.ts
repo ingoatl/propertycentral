@@ -48,21 +48,24 @@ serve(async (req) => {
       Style: High quality, warm and inviting, perfect for a greeting card.`;
     }
 
-    // CRITICAL: Add explicit instructions to prevent wrong holiday themes
-    const strictPrompt = `CRITICAL INSTRUCTIONS:
-- This is for ${holidayName?.toUpperCase() || 'A HOLIDAY'} - NOT Christmas, NOT winter unless the holiday is in winter
-- DO NOT add Christmas decorations, snow, wreaths, or winter elements unless explicitly mentioned in the template
-- Match the season and theme of ${holidayName} exactly
-- IMAGE SIZE: Create a 600x300 pixel image (email banner format, 2:1 aspect ratio)
-- Keep the image compact and web-optimized
+    // Build a clean, simple prompt for image generation
+    const cleanHolidayName = holidayName || 'Holiday';
+    
+    const imagePrompt = `Generate a beautiful ${cleanHolidayName} greeting card image.
 
-TEMPLATE TO FOLLOW:
+REQUIREMENTS:
+- Create a stunning, festive ${cleanHolidayName} themed image
+- Include elegant text saying "Happy ${cleanHolidayName}, ${ownerFirstName}!" prominently displayed
+- Make it warm, inviting, and visually appealing
+- Style: High-quality greeting card suitable for email
+- Dimensions: Horizontal banner format (approximately 2:1 ratio)
+
+THEME DETAILS FROM TEMPLATE:
 ${personalizedPrompt}
 
-IMPORTANT: The greeting text MUST say something for ${holidayName}, NOT "Happy Holidays" or Christmas greetings.
-Personalize for: ${ownerFirstName}`;
+Create this image now for ${ownerFirstName}.`;
 
-    console.log('Full prompt preview:', strictPrompt.substring(0, 300) + '...');
+    console.log('Full prompt preview:', imagePrompt.substring(0, 300) + '...');
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -75,7 +78,7 @@ Personalize for: ${ownerFirstName}`;
         messages: [
           {
             role: "user",
-            content: strictPrompt
+            content: imagePrompt
           }
         ],
         modalities: ["image", "text"]
