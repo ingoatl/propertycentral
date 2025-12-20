@@ -1014,6 +1014,83 @@ export type Database = {
           },
         ]
       }
+      holiday_email_queue: {
+        Row: {
+          created_at: string | null
+          error_message: string | null
+          generated_image_url: string | null
+          id: string
+          owner_id: string | null
+          property_id: string | null
+          recipient_email: string
+          recipient_name: string
+          scheduled_date: string
+          sent_at: string | null
+          status: string
+          template_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          error_message?: string | null
+          generated_image_url?: string | null
+          id?: string
+          owner_id?: string | null
+          property_id?: string | null
+          recipient_email: string
+          recipient_name: string
+          scheduled_date: string
+          sent_at?: string | null
+          status?: string
+          template_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          error_message?: string | null
+          generated_image_url?: string | null
+          id?: string
+          owner_id?: string | null
+          property_id?: string | null
+          recipient_email?: string
+          recipient_name?: string
+          scheduled_date?: string
+          sent_at?: string | null
+          status?: string
+          template_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "holiday_email_queue_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "property_owners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "holiday_email_queue_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "comprehensive_property_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "holiday_email_queue_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "holiday_email_queue_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "holiday_email_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       holiday_email_templates: {
         Row: {
           created_at: string

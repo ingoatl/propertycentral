@@ -1,261 +1,352 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { supabase } from "@/integrations/supabase/client";
-import { Mail, Calendar, CheckCircle2, XCircle, AlertTriangle, RefreshCw, Send, Play } from "lucide-react";
-import { format, subDays, isToday, parseISO } from "date-fns";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Calendar, Mail, CheckCircle, XCircle, Clock, Eye, Send, RefreshCw } from "lucide-react";
+import { format, parseISO } from "date-fns";
 import { toast } from "sonner";
 
-interface HolidayLog {
+interface QueuedEmail {
   id: string;
-  sent_at: string;
-  status: string;
   recipient_email: string;
-  holiday_template_id: string;
-  generated_image_url: string | null;
+  recipient_name: string;
+  scheduled_date: string;
+  status: string;
+  sent_at: string | null;
   error_message: string | null;
-  holiday_email_templates?: {
+  owner_id: string;
+  property_id: string;
+  template_id: string;
+  holiday_email_templates: {
     holiday_name: string;
-    holiday_date: string;
-  };
-}
-
-interface UpcomingHoliday {
-  id: string;
-  holiday_name: string;
-  holiday_date: string;
-  is_active: boolean;
+    subject_template: string;
+    message_template: string;
+    emoji: string;
+  } | null;
+  properties: {
+    name: string;
+    address: string;
+  } | null;
 }
 
 export function HolidayEmailWatchdogCard() {
-  const [recentLogs, setRecentLogs] = useState<HolidayLog[]>([]);
-  const [upcomingHolidays, setUpcomingHolidays] = useState<UpcomingHoliday[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [testing, setTesting] = useState(false);
-  const [triggeringScheduler, setTriggeringScheduler] = useState(false);
+  const [previewEmail, setPreviewEmail] = useState<QueuedEmail | null>(null);
+  const [sendingTest, setSendingTest] = useState(false);
 
-  const fetchData = async () => {
-    setLoading(true);
-    try {
-      // Fetch recent logs (last 7 days)
-      const sevenDaysAgo = subDays(new Date(), 7).toISOString();
-      const { data: logs } = await supabase
-        .from("holiday_email_logs")
+  // Fetch queued emails
+  const { data: queuedEmails, isLoading, refetch } = useQuery({
+    queryKey: ['holiday-email-queue'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('holiday_email_queue')
         .select(`
-          *,
-          holiday_email_templates(holiday_name, holiday_date)
+          id,
+          recipient_email,
+          recipient_name,
+          scheduled_date,
+          status,
+          sent_at,
+          error_message,
+          owner_id,
+          property_id,
+          template_id,
+          holiday_email_templates(holiday_name, subject_template, message_template, emoji),
+          properties(name, address)
         `)
-        .gte("sent_at", sevenDaysAgo)
-        .order("sent_at", { ascending: false })
-        .limit(20);
-
-      setRecentLogs(logs || []);
-
-      // Fetch upcoming holidays (next 30 days)
-      const today = new Date().toISOString().split("T")[0];
-      const thirtyDaysOut = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
-      
-      const { data: holidays } = await supabase
-        .from("holiday_email_templates")
-        .select("id, holiday_name, holiday_date, is_active")
-        .gte("holiday_date", today)
-        .lte("holiday_date", thirtyDaysOut)
-        .eq("is_active", true)
-        .order("holiday_date", { ascending: true });
-
-      setUpcomingHolidays(holidays || []);
-    } catch (error) {
-      console.error("Error fetching holiday data:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  const triggerScheduler = async () => {
-    setTriggeringScheduler(true);
-    try {
-      const { data, error } = await supabase.functions.invoke("schedule-holiday-emails");
+        .order('scheduled_date', { ascending: true })
+        .limit(200);
       
       if (error) throw error;
-      
-      toast.success(`Scheduler check complete: ${data.message}`);
-      fetchData();
-    } catch (error) {
-      console.error("Scheduler error:", error);
-      toast.error("Failed to trigger scheduler");
-    } finally {
-      setTriggeringScheduler(false);
-    }
-  };
+      return data as QueuedEmail[];
+    },
+    refetchInterval: 30000,
+  });
 
-  const sendTestEmail = async () => {
-    // Find the nearest holiday template
-    if (upcomingHolidays.length === 0) {
-      toast.error("No upcoming holidays configured");
-      return;
-    }
+  // Group emails by status and date
+  const pendingEmails = queuedEmails?.filter(e => e.status === 'pending') || [];
+  const sentEmails = queuedEmails?.filter(e => e.status === 'sent') || [];
+  const failedEmails = queuedEmails?.filter(e => e.status === 'failed') || [];
 
-    setTesting(true);
+  // Group pending by holiday
+  const pendingByHoliday = pendingEmails.reduce((acc, email) => {
+    const holiday = email.holiday_email_templates?.holiday_name || 'Unknown';
+    if (!acc[holiday]) acc[holiday] = [];
+    acc[holiday].push(email);
+    return acc;
+  }, {} as Record<string, QueuedEmail[]>);
+
+  const sendTestEmail = async (email: QueuedEmail) => {
+    setSendingTest(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      const { data: profile } = await supabase.from("profiles").select("email").eq("id", user?.id).single();
+      if (!user?.email) {
+        toast.error("You must be logged in to send test emails");
+        return;
+      }
 
-      const { data, error } = await supabase.functions.invoke("send-holiday-email", {
+      const { error } = await supabase.functions.invoke('send-holiday-email', {
         body: {
-          holidayTemplateId: upcomingHolidays[0].id,
-          testEmail: profile?.email || user?.email,
+          holidayTemplateId: email.template_id,
+          testEmail: user.email,
+          ownerIds: [email.owner_id],
         },
       });
 
       if (error) throw error;
-      
-      toast.success("Test email sent to your inbox");
-      fetchData();
+      toast.success(`Test email sent to ${user.email}`);
     } catch (error) {
-      console.error("Test email error:", error);
-      toast.error("Failed to send test email");
+      toast.error(error instanceof Error ? error.message : "Failed to send test email");
     } finally {
-      setTesting(false);
+      setSendingTest(false);
     }
   };
 
-  const successCount = recentLogs.filter((l) => l.status === "sent").length;
-  const failCount = recentLogs.filter((l) => l.status === "error").length;
-  const hasImages = recentLogs.filter((l) => l.generated_image_url).length;
-
-  const getHealthStatus = () => {
-    if (failCount > successCount) return { color: "destructive", label: "Unhealthy", icon: XCircle };
-    if (failCount > 0) return { color: "warning" as const, label: "Degraded", icon: AlertTriangle };
-    if (successCount === 0 && recentLogs.length === 0) return { color: "secondary", label: "No Activity", icon: Mail };
-    return { color: "default" as const, label: "Healthy", icon: CheckCircle2 };
+  const personalizeContent = (template: string, email: QueuedEmail) => {
+    const firstName = email.recipient_name.split(' ')[0];
+    const propertyName = email.properties?.name || email.properties?.address || 'Your Property';
+    return template
+      .replace(/{owner_name}/g, email.recipient_name)
+      .replace(/{owner_first_name}/g, firstName)
+      .replace(/{property_name}/g, propertyName);
   };
 
-  const health = getHealthStatus();
-  const HealthIcon = health.icon;
+  if (isLoading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Mail className="h-5 w-5" />
+            Holiday Email Automation
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="animate-pulse space-y-2">
+            <div className="h-4 bg-muted rounded w-3/4"></div>
+            <div className="h-4 bg-muted rounded w-1/2"></div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between pb-2">
-        <div className="flex items-center gap-2">
-          <Mail className="h-5 w-5 text-muted-foreground" />
-          <CardTitle className="text-lg">Holiday Email Watchdog</CardTitle>
-        </div>
-        <div className="flex items-center gap-2">
-          <Badge variant={health.color as any} className="flex items-center gap-1">
-            <HealthIcon className="h-3 w-3" />
-            {health.label}
-          </Badge>
-          <Button variant="ghost" size="icon" onClick={fetchData} disabled={loading}>
-            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-          </Button>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {/* Stats Grid */}
-        <div className="grid grid-cols-4 gap-3 text-center">
-          <div className="rounded-lg bg-muted p-3">
-            <div className="text-2xl font-bold text-green-600">{successCount}</div>
-            <div className="text-xs text-muted-foreground">Sent (7d)</div>
-          </div>
-          <div className="rounded-lg bg-muted p-3">
-            <div className="text-2xl font-bold text-red-600">{failCount}</div>
-            <div className="text-xs text-muted-foreground">Failed</div>
-          </div>
-          <div className="rounded-lg bg-muted p-3">
-            <div className="text-2xl font-bold text-blue-600">{hasImages}</div>
-            <div className="text-xs text-muted-foreground">With Images</div>
-          </div>
-          <div className="rounded-lg bg-muted p-3">
-            <div className="text-2xl font-bold text-purple-600">{upcomingHolidays.length}</div>
-            <div className="text-xs text-muted-foreground">Upcoming</div>
-          </div>
-        </div>
-
-        {/* Upcoming Holidays */}
-        {upcomingHolidays.length > 0 && (
-          <div className="space-y-2">
-            <h4 className="text-sm font-medium flex items-center gap-2">
-              <Calendar className="h-4 w-4" />
-              Upcoming Holidays
-            </h4>
-            <div className="space-y-1">
-              {upcomingHolidays.slice(0, 3).map((holiday) => {
-                const holidayDate = parseISO(holiday.holiday_date);
-                const isHolidayToday = isToday(holidayDate);
-                return (
-                  <div
-                    key={holiday.id}
-                    className={`flex justify-between items-center text-sm px-3 py-2 rounded ${
-                      isHolidayToday ? "bg-yellow-100 dark:bg-yellow-900/30" : "bg-muted"
-                    }`}
-                  >
-                    <span className="font-medium">{holiday.holiday_name}</span>
-                    <span className={isHolidayToday ? "font-bold text-yellow-700" : "text-muted-foreground"}>
-                      {isHolidayToday ? "TODAY!" : format(holidayDate, "MMM d, yyyy")}
-                    </span>
-                  </div>
-                );
-              })}
+    <>
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <Mail className="h-5 w-5" />
+              Holiday Email Automation
+            </CardTitle>
+            <div className="flex gap-2 items-center">
+              <Button variant="ghost" size="icon" onClick={() => refetch()}>
+                <RefreshCw className="h-4 w-4" />
+              </Button>
+              <Badge variant="outline" className="gap-1">
+                <Clock className="h-3 w-3" />
+                {pendingEmails.length} Scheduled
+              </Badge>
+              <Badge variant="secondary" className="gap-1">
+                <CheckCircle className="h-3 w-3" />
+                {sentEmails.length} Sent
+              </Badge>
+              {failedEmails.length > 0 && (
+                <Badge variant="destructive" className="gap-1">
+                  <XCircle className="h-3 w-3" />
+                  {failedEmails.length} Failed
+                </Badge>
+              )}
             </div>
           </div>
-        )}
+        </CardHeader>
+        <CardContent>
+          <Tabs defaultValue="scheduled" className="w-full">
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="scheduled">Scheduled ({pendingEmails.length})</TabsTrigger>
+              <TabsTrigger value="sent">Sent ({sentEmails.length})</TabsTrigger>
+              <TabsTrigger value="failed">Failed ({failedEmails.length})</TabsTrigger>
+            </TabsList>
 
-        {/* Recent Sends */}
-        {recentLogs.length > 0 && (
-          <div className="space-y-2">
-            <h4 className="text-sm font-medium">Recent Activity</h4>
-            <div className="space-y-1 max-h-32 overflow-y-auto">
-              {recentLogs.slice(0, 5).map((log) => (
-                <div key={log.id} className="flex justify-between items-center text-xs px-2 py-1 bg-muted rounded">
-                  <div className="flex items-center gap-2">
-                    {log.status === "sent" ? (
-                      <CheckCircle2 className="h-3 w-3 text-green-600" />
-                    ) : (
-                      <XCircle className="h-3 w-3 text-red-600" />
-                    )}
-                    <span className="truncate max-w-[150px]">{log.recipient_email}</span>
+            <TabsContent value="scheduled" className="mt-4">
+              {Object.keys(pendingByHoliday).length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  No emails scheduled. Add holiday templates or new owners to auto-schedule.
+                </p>
+              ) : (
+                <ScrollArea className="h-[400px]">
+                  <div className="space-y-4">
+                    {Object.entries(pendingByHoliday).map(([holiday, emails]) => (
+                      <div key={holiday} className="border rounded-lg p-3">
+                        <div className="flex items-center justify-between mb-2">
+                          <h4 className="font-medium flex items-center gap-2">
+                            <span>{emails[0]?.holiday_email_templates?.emoji}</span>
+                            {holiday}
+                          </h4>
+                          <Badge>
+                            <Calendar className="h-3 w-3 mr-1" />
+                            {format(parseISO(emails[0].scheduled_date), 'MMM d, yyyy')}
+                          </Badge>
+                        </div>
+                        <div className="space-y-1">
+                          {emails.slice(0, 10).map((email) => (
+                            <div key={email.id} className="flex items-center justify-between text-sm py-1 border-b last:border-0">
+                              <div>
+                                <span className="font-medium">{email.recipient_name}</span>
+                                <span className="text-muted-foreground ml-2">{email.recipient_email}</span>
+                              </div>
+                              <div className="flex gap-1">
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => setPreviewEmail(email)}
+                                >
+                                  <Eye className="h-3 w-3" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => sendTestEmail(email)}
+                                  disabled={sendingTest}
+                                >
+                                  <Send className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+                          {emails.length > 10 && (
+                            <p className="text-xs text-muted-foreground pt-1">
+                              +{emails.length - 10} more recipients
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                  <span className="text-muted-foreground">{format(parseISO(log.sent_at), "MMM d, h:mm a")}</span>
+                </ScrollArea>
+              )}
+            </TabsContent>
+
+            <TabsContent value="sent" className="mt-4">
+              <ScrollArea className="h-[400px]">
+                {sentEmails.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">No emails sent yet.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {sentEmails.map((email) => (
+                      <div key={email.id} className="flex items-center justify-between text-sm py-2 border-b">
+                        <div>
+                          <span className="font-medium">{email.recipient_name}</span>
+                          <span className="text-muted-foreground ml-2">{email.recipient_email}</span>
+                          <Badge variant="outline" className="ml-2 text-xs">
+                            {email.holiday_email_templates?.holiday_name}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center gap-2 text-muted-foreground text-xs">
+                          <CheckCircle className="h-3 w-3 text-green-500" />
+                          {email.sent_at && format(parseISO(email.sent_at), 'MMM d, h:mm a')}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </ScrollArea>
+            </TabsContent>
+
+            <TabsContent value="failed" className="mt-4">
+              <ScrollArea className="h-[400px]">
+                {failedEmails.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">No failed emails.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {failedEmails.map((email) => (
+                      <div key={email.id} className="border-b py-2">
+                        <div className="flex items-center justify-between text-sm">
+                          <div>
+                            <span className="font-medium">{email.recipient_name}</span>
+                            <span className="text-muted-foreground ml-2">{email.recipient_email}</span>
+                          </div>
+                          <XCircle className="h-4 w-4 text-destructive" />
+                        </div>
+                        {email.error_message && (
+                          <p className="text-xs text-destructive mt-1">{email.error_message}</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </ScrollArea>
+            </TabsContent>
+          </Tabs>
+
+          <div className="mt-4 pt-4 border-t">
+            <p className="text-xs text-muted-foreground">
+              <strong>Fully automated:</strong> Emails are sent at 9:00 AM UTC on the scheduled holiday date. 
+              New owners are automatically added to the queue. You'll be CC'd on all emails.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Preview Dialog */}
+      <Dialog open={!!previewEmail} onOpenChange={() => setPreviewEmail(null)}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <span>{previewEmail?.holiday_email_templates?.emoji}</span>
+              Email Preview: {previewEmail?.holiday_email_templates?.holiday_name}
+            </DialogTitle>
+          </DialogHeader>
+          {previewEmail && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <span className="font-medium">To:</span> {previewEmail.recipient_email}
                 </div>
-              ))}
+                <div>
+                  <span className="font-medium">Scheduled:</span>{' '}
+                  {format(parseISO(previewEmail.scheduled_date), 'MMMM d, yyyy')}
+                </div>
+              </div>
+              
+              <div className="border rounded-lg p-4 bg-muted/50">
+                <p className="font-medium mb-2">
+                  Subject: {previewEmail.holiday_email_templates && 
+                    personalizeContent(previewEmail.holiday_email_templates.subject_template, previewEmail)}
+                </p>
+                <div className="text-sm whitespace-pre-wrap">
+                  <p className="mb-2">Dear {previewEmail.recipient_name.split(' ')[0]},</p>
+                  {previewEmail.holiday_email_templates && 
+                    personalizeContent(previewEmail.holiday_email_templates.message_template, previewEmail)
+                      .replace(/^Dear [^,\n]+,?\s*\n*/i, '')
+                      .split('\n\n')
+                      .map((para, i) => <p key={i} className="mb-2">{para}</p>)}
+                </div>
+                <p className="text-xs text-muted-foreground mt-4 italic">
+                  Note: AI-generated holiday image with cozy house will be included in the actual email.
+                </p>
+              </div>
+
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setPreviewEmail(null)}>
+                  Close
+                </Button>
+                <Button onClick={() => {
+                  sendTestEmail(previewEmail);
+                  setPreviewEmail(null);
+                }} disabled={sendingTest}>
+                  <Send className="h-4 w-4 mr-2" />
+                  Send Test to Me
+                </Button>
+              </div>
             </div>
-          </div>
-        )}
-
-        {/* Actions */}
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={triggerScheduler}
-            disabled={triggeringScheduler}
-            className="flex-1"
-          >
-            <Play className={`h-4 w-4 mr-1 ${triggeringScheduler ? "animate-spin" : ""}`} />
-            Run Scheduler
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={sendTestEmail}
-            disabled={testing || upcomingHolidays.length === 0}
-            className="flex-1"
-          >
-            <Send className={`h-4 w-4 mr-1 ${testing ? "animate-spin" : ""}`} />
-            Test Email
-          </Button>
-        </div>
-
-        {/* Automation Info */}
-        <div className="text-xs text-muted-foreground bg-muted/50 p-2 rounded">
-          <strong>Automation:</strong> Runs daily at 9:00 AM UTC. On holiday dates, sends personalized AI-generated images to all property owners.
-        </div>
-      </CardContent>
-    </Card>
+          )}
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

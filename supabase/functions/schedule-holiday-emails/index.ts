@@ -16,136 +16,127 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    console.log('Running holiday email scheduler check...');
+    const today = new Date().toISOString().split('T')[0];
+    console.log(`=== HOLIDAY EMAIL SCHEDULER - ${today} ===`);
 
-    // Get today's date in YYYY-MM-DD format
-    const today = new Date();
-    const todayStr = today.toISOString().split('T')[0];
-    
-    // Also check for recurring holidays - match month and day
-    const monthDay = `${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    // Get all pending emails scheduled for today from the queue
+    const { data: pendingEmails, error: queueError } = await supabase
+      .from('holiday_email_queue')
+      .select(`
+        id,
+        owner_id,
+        property_id,
+        template_id,
+        recipient_email,
+        recipient_name,
+        scheduled_date,
+        holiday_email_templates(id, holiday_name, subject_template, message_template, emoji, image_prompt_template)
+      `)
+      .eq('scheduled_date', today)
+      .eq('status', 'pending');
 
-    console.log('Checking for holidays on:', todayStr, 'or matching month-day:', monthDay);
-
-    // Find active holiday templates for today
-    const { data: templates, error: templatesError } = await supabase
-      .from('holiday_email_templates')
-      .select('*')
-      .eq('is_active', true);
-
-    if (templatesError) {
-      throw new Error(`Failed to fetch templates: ${templatesError.message}`);
+    if (queueError) {
+      throw new Error(`Failed to fetch queue: ${queueError.message}`);
     }
 
-    // Filter templates that match today
-    const todaysHolidays = templates?.filter(template => {
-      const templateDate = template.holiday_date;
-      
-      // Exact date match
-      if (templateDate === todayStr) return true;
-      
-      // For recurring holidays, match month-day pattern
-      if (template.recurring) {
-        const templateMonthDay = templateDate.substring(5); // Get MM-DD part
-        return templateMonthDay === monthDay;
-      }
-      
-      return false;
-    }) || [];
+    console.log(`Found ${pendingEmails?.length || 0} emails to send today`);
 
-    if (todaysHolidays.length === 0) {
-      console.log('No holidays scheduled for today');
+    if (!pendingEmails || pendingEmails.length === 0) {
       return new Response(
-        JSON.stringify({ 
-          success: true, 
-          message: 'No holidays scheduled for today',
-          checkedDate: todayStr
-        }),
+        JSON.stringify({ success: true, message: 'No emails scheduled for today', sent: 0 }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    console.log(`Found ${todaysHolidays.length} holiday(s) for today:`, todaysHolidays.map(h => h.holiday_name));
+    // Group by template to batch process
+    const templateGroups = new Map<string, typeof pendingEmails>();
+    for (const email of pendingEmails) {
+      const templateId = email.template_id;
+      if (!templateGroups.has(templateId)) {
+        templateGroups.set(templateId, []);
+      }
+      templateGroups.get(templateId)!.push(email);
+    }
 
-    const results: any[] = [];
+    const results: { sent: number; failed: number; errors: string[] } = { sent: 0, failed: 0, errors: [] };
 
-    for (const holiday of todaysHolidays) {
-      // Check if we already sent emails for this holiday today
-      const { data: existingLogs } = await supabase
-        .from('holiday_email_logs')
-        .select('id')
-        .eq('holiday_template_id', holiday.id)
-        .gte('sent_at', todayStr)
-        .limit(1);
-
-      if (existingLogs && existingLogs.length > 0) {
-        console.log(`Already sent ${holiday.holiday_name} emails today, skipping`);
-        results.push({
-          holiday: holiday.holiday_name,
-          status: 'skipped',
-          reason: 'Already sent today'
-        });
+    // Process each template group
+    for (const [templateId, emails] of templateGroups) {
+      const templateData = emails[0].holiday_email_templates as any;
+      if (!templateData) {
+        console.error(`Template not found for ${templateId}`);
         continue;
       }
 
-      console.log(`Sending ${holiday.holiday_name} emails to all owners...`);
+      console.log(`Processing ${emails.length} emails for ${templateData.holiday_name}`);
 
-      // Call send-holiday-email function for this template
-      try {
-        const sendResponse = await fetch(`${supabaseUrl}/functions/v1/send-holiday-email`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${supabaseServiceKey}`,
-          },
-          body: JSON.stringify({
-            holidayTemplateId: holiday.id
-          }),
-        });
+      // Call send-holiday-email for this batch
+      for (const queueItem of emails) {
+        try {
+          const response = await fetch(`${supabaseUrl}/functions/v1/send-holiday-email`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${supabaseServiceKey}`,
+            },
+            body: JSON.stringify({
+              holidayTemplateId: templateId,
+              ownerIds: [queueItem.owner_id],
+            }),
+          });
 
-        const sendResult = await sendResponse.json();
-        
-        if (sendResponse.ok) {
-          console.log(`${holiday.holiday_name} emails sent:`, sendResult);
-          results.push({
-            holiday: holiday.holiday_name,
-            status: 'sent',
-            ...sendResult
-          });
-        } else {
-          console.error(`Failed to send ${holiday.holiday_name}:`, sendResult);
-          results.push({
-            holiday: holiday.holiday_name,
-            status: 'error',
-            error: sendResult.error
-          });
+          if (response.ok) {
+            // Mark as sent in queue
+            await supabase
+              .from('holiday_email_queue')
+              .update({ status: 'sent', sent_at: new Date().toISOString() })
+              .eq('id', queueItem.id);
+            
+            results.sent++;
+            console.log(`✓ Sent to ${queueItem.recipient_email}`);
+          } else {
+            const errorText = await response.text();
+            await supabase
+              .from('holiday_email_queue')
+              .update({ status: 'failed', error_message: errorText })
+              .eq('id', queueItem.id);
+            
+            results.failed++;
+            results.errors.push(`${queueItem.recipient_email}: ${errorText}`);
+            console.error(`✗ Failed for ${queueItem.recipient_email}: ${errorText}`);
+          }
+
+          // Rate limiting delay
+          await new Promise(resolve => setTimeout(resolve, 200));
+
+        } catch (error) {
+          const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+          await supabase
+            .from('holiday_email_queue')
+            .update({ status: 'failed', error_message: errorMsg })
+            .eq('id', queueItem.id);
+          
+          results.failed++;
+          results.errors.push(`${queueItem.recipient_email}: ${errorMsg}`);
         }
-      } catch (sendError) {
-        console.error(`Error sending ${holiday.holiday_name}:`, sendError);
-        results.push({
-          holiday: holiday.holiday_name,
-          status: 'error',
-          error: sendError instanceof Error ? sendError.message : 'Unknown error'
-        });
       }
     }
+
+    console.log(`=== COMPLETE: ${results.sent} sent, ${results.failed} failed ===`);
 
     return new Response(
       JSON.stringify({ 
         success: true, 
-        message: `Processed ${todaysHolidays.length} holiday(s)`,
-        results
+        message: `Sent ${results.sent} emails, ${results.failed} failed`,
+        ...results 
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
   } catch (error) {
-    console.error('Error in holiday email scheduler:', error);
+    console.error('Scheduler error:', error);
     return new Response(
-      JSON.stringify({ 
-        error: error instanceof Error ? error.message : 'Unknown error',
-        success: false 
-      }),
+      JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error', success: false }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
