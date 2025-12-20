@@ -394,9 +394,9 @@ function buildHolidayEmailHtml({
   // Get current year for footer
   const currentYear = new Date().getFullYear();
   
-  // Hosted image URLs - using Supabase storage bucket
-  const hostsPhotoUrl = "https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/anja-ingo-hosts.jpg";
-  const signatureUrl = "https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/anja-signature.png";
+  // Hosted image URLs - using Supabase storage bucket with actual uploaded filenames
+  const hostsPhotoUrl = "https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/Gemini_Generated_Image_1rel501rel501rel-2.png";
+  const signatureUrl = "https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/Screenshot_41-2.jpg";
   
   return `
 <!DOCTYPE html>
