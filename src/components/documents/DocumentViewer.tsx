@@ -34,6 +34,9 @@ export function DocumentViewer({ open, onOpenChange, filePath, fileName, fileTyp
       } else if (filePath.startsWith('/')) {
         // Local public path
         setSignedUrl(filePath);
+      } else if (filePath.startsWith('public/')) {
+        // Files in public folder - strip 'public/' prefix for browser access
+        setSignedUrl('/' + filePath.replace('public/', ''));
       } else {
         // Supabase storage path - get signed URL
         const bucketName = filePath.includes('property-documents') ? 'property-documents' : 'documents';
