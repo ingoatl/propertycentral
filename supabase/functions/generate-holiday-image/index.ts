@@ -36,7 +36,6 @@ const getHolidayGreeting = (name: string): string => {
   };
   
   const lowerName = name.toLowerCase();
-  
   if (greetings[lowerName]) return greetings[lowerName];
   
   for (const [key, greeting] of Object.entries(greetings)) {
@@ -52,82 +51,96 @@ serve(async (req) => {
   }
 
   try {
-    const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
-    if (!OPENAI_API_KEY) {
-      throw new Error('OPENAI_API_KEY is not configured');
+    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+    if (!LOVABLE_API_KEY) {
+      throw new Error('LOVABLE_API_KEY is not configured');
     }
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { 
-      ownerFirstName, 
-      propertyName, 
-      promptTemplate,
-      holidayName
-    } = await req.json();
+    const { ownerFirstName, propertyName, promptTemplate, holidayName } = await req.json();
 
     console.log('=== HOLIDAY IMAGE GENERATION ===');
     console.log('Holiday:', holidayName);
     console.log('Owner:', ownerFirstName);
-    console.log('Property:', propertyName);
 
     const cleanHolidayName = holidayName || 'Holiday';
     const holidayGreeting = getHolidayGreeting(cleanHolidayName);
+    console.log('Greeting:', holidayGreeting);
+
+    // Simple, direct prompt
+    const imagePrompt = `Create a festive ${cleanHolidayName} greeting card image. The image MUST prominently display the text "${holidayGreeting}!" in an elegant, readable font. Use warm, inviting colors appropriate for ${cleanHolidayName}. Horizontal banner format, high quality.`;
+
+    console.log('Calling Gemini image API...');
+
+    // Try up to 3 times with the Gemini model
+    let imageData: string | null = null;
+    let lastError: string = '';
     
-    console.log('Holiday greeting:', holidayGreeting);
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      console.log(`Attempt ${attempt}/3`);
+      
+      try {
+        const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${LOVABLE_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "google/gemini-2.5-flash-image-preview",
+            messages: [{ role: "user", content: imagePrompt }],
+            modalities: ["image", "text"]
+          }),
+        });
 
-    // Simple, effective prompt for OpenAI image generation
-    const imagePrompt = `A beautiful ${cleanHolidayName} greeting card with the text "${holidayGreeting}!" prominently displayed. Festive, warm, elegant design. Horizontal banner format.`;
+        if (!response.ok) {
+          lastError = `API error: ${response.status}`;
+          console.error(lastError);
+          if (response.status === 429 || response.status === 402) {
+            throw new Error(response.status === 429 ? 'Rate limit exceeded' : 'Credits exhausted');
+          }
+          await new Promise(r => setTimeout(r, 1000));
+          continue;
+        }
 
-    console.log('Generating image with OpenAI...');
-
-    // Use OpenAI's gpt-image-1 for fast, reliable image generation
-    const response = await fetch('https://api.openai.com/v1/images/generations', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${OPENAI_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-image-1',
-        prompt: imagePrompt,
-        n: 1,
-        size: '1536x1024', // Horizontal format
-        quality: 'low', // Faster generation, smaller file
-        output_format: 'png',
-        output_compression: 50, // Reduce file size
-      }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('OpenAI error:', response.status, errorText);
-      throw new Error(`Image generation failed: ${response.status}`);
+        const data = await response.json();
+        imageData = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+        
+        if (imageData) {
+          console.log('Image generated successfully');
+          break;
+        }
+        
+        lastError = 'No image in response';
+        console.log(lastError, '- retrying...');
+        await new Promise(r => setTimeout(r, 500));
+        
+      } catch (e) {
+        lastError = e instanceof Error ? e.message : 'Unknown error';
+        console.error('Attempt failed:', lastError);
+        if (lastError.includes('Rate limit') || lastError.includes('Credits')) {
+          throw e;
+        }
+      }
     }
 
-    const data = await response.json();
-    console.log('Image generated successfully');
-
-    // gpt-image-1 returns base64 data directly
-    const base64Data = data.data?.[0]?.b64_json;
-    if (!base64Data) {
-      throw new Error('No image data in response');
+    if (!imageData) {
+      throw new Error(`Image generation failed after 3 attempts: ${lastError}`);
     }
 
-    // Convert base64 to buffer
-    const imageBuffer = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
+    // Process and upload image
+    const cleanBase64 = imageData.replace(/^data:image\/\w+;base64,/, '');
+    const imageBuffer = Uint8Array.from(atob(cleanBase64), c => c.charCodeAt(0));
     console.log('Image size:', Math.round(imageBuffer.length / 1024), 'KB');
 
-    // Generate filename
     const timestamp = Date.now();
     const holidaySlug = cleanHolidayName.replace(/\s+/g, '-').toLowerCase().replace(/[^a-z0-9-]/g, '');
-    const ownerSlug = (ownerFirstName || 'owner').replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '');
-    const fileName = `${timestamp}-${holidaySlug}-${ownerSlug}.png`;
-    const filePath = `generated/${fileName}`;
+    const ownerSlug = (ownerFirstName || 'owner').replace(/[^a-zA-Z0-9]/g, '');
+    const filePath = `generated/${timestamp}-${holidaySlug}-${ownerSlug}.png`;
 
-    // Upload to storage
     const { error: uploadError } = await supabase.storage
       .from('holiday-images')
       .upload(filePath, imageBuffer, {
@@ -137,8 +150,7 @@ serve(async (req) => {
       });
 
     if (uploadError) {
-      console.error('Upload error:', uploadError);
-      throw new Error(`Failed to save image: ${uploadError.message}`);
+      throw new Error(`Upload failed: ${uploadError.message}`);
     }
 
     const { data: { publicUrl } } = supabase.storage
@@ -148,22 +160,14 @@ serve(async (req) => {
     console.log('SUCCESS:', publicUrl);
 
     return new Response(
-      JSON.stringify({ 
-        success: true, 
-        imageUrl: publicUrl,
-        holidayName,
-        sizeKB: Math.round(imageBuffer.length / 1024)
-      }),
+      JSON.stringify({ success: true, imageUrl: publicUrl, holidayName }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
   } catch (error) {
     console.error('ERROR:', error);
     return new Response(
-      JSON.stringify({ 
-        error: error instanceof Error ? error.message : 'Unknown error',
-        success: false 
-      }),
+      JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error', success: false }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
