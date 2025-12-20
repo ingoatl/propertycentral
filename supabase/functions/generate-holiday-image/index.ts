@@ -25,10 +25,14 @@ serve(async (req) => {
       ownerFirstName, 
       propertyName, 
       promptTemplate,
-      holidayName // Optional: for better context
+      holidayName
     } = await req.json();
 
-    console.log('Generating holiday image for:', { ownerFirstName, propertyName, holidayName });
+    console.log('=== HOLIDAY IMAGE GENERATION ===');
+    console.log('Holiday:', holidayName);
+    console.log('Owner:', ownerFirstName);
+    console.log('Property:', propertyName);
+    console.log('Template length:', promptTemplate?.length || 0);
 
     // Build the personalized prompt from the template
     let personalizedPrompt = (promptTemplate || '')
@@ -38,17 +42,25 @@ serve(async (req) => {
 
     // If no prompt template, create a generic one based on holiday name
     if (!personalizedPrompt || personalizedPrompt.trim().length < 20) {
+      console.log('WARN: No template provided, using generic prompt');
       personalizedPrompt = `Create a beautiful ${holidayName || 'holiday'} greeting card image. 
       A warm, inviting scene with elegant text saying "Happy ${holidayName || 'Holidays'}, ${ownerFirstName || 'Friend'}!" prominently displayed.
       Style: High quality, warm and inviting, perfect for a greeting card.`;
     }
 
-    // Ensure the prompt includes the owner name for personalization
-    if (!personalizedPrompt.includes(ownerFirstName) && ownerFirstName) {
-      personalizedPrompt += `\n\nIMPORTANT: The image MUST include text greeting "${ownerFirstName}" prominently.`;
-    }
+    // CRITICAL: Add explicit instructions to prevent wrong holiday themes
+    const strictPrompt = `CRITICAL INSTRUCTIONS:
+- This is for ${holidayName?.toUpperCase() || 'A HOLIDAY'} - NOT Christmas, NOT winter unless the holiday is in winter
+- DO NOT add Christmas decorations, snow, wreaths, or winter elements unless explicitly mentioned in the template
+- Match the season and theme of ${holidayName} exactly
 
-    console.log('Using prompt:', personalizedPrompt.substring(0, 200) + '...');
+TEMPLATE TO FOLLOW:
+${personalizedPrompt}
+
+IMPORTANT: The greeting text MUST say something for ${holidayName}, NOT "Happy Holidays" or Christmas greetings.
+Personalize for: ${ownerFirstName}`;
+
+    console.log('Full prompt preview:', strictPrompt.substring(0, 300) + '...');
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -61,7 +73,7 @@ serve(async (req) => {
         messages: [
           {
             role: "user",
-            content: personalizedPrompt
+            content: strictPrompt
           }
         ],
         modalities: ["image", "text"]
@@ -82,7 +94,7 @@ serve(async (req) => {
     }
 
     const data = await response.json();
-    console.log('AI response received');
+    console.log('AI response received for', holidayName);
 
     // Extract the generated image
     const imageData = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
@@ -121,18 +133,19 @@ serve(async (req) => {
       .from('holiday-images')
       .getPublicUrl(filePath);
 
-    console.log('Image saved successfully:', publicUrl);
+    console.log('SUCCESS: Image saved for', holidayName, '->', publicUrl);
 
     return new Response(
       JSON.stringify({ 
         success: true, 
-        imageUrl: publicUrl
+        imageUrl: publicUrl,
+        holidayName
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
   } catch (error) {
-    console.error('Error generating holiday image:', error);
+    console.error('ERROR generating holiday image:', error);
     return new Response(
       JSON.stringify({ 
         error: error instanceof Error ? error.message : 'Unknown error',
