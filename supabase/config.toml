@@ -146,3 +146,9 @@ verify_jwt = true
 
 [functions.send-owner-setup-status]
 verify_jwt = true
+
+[functions.generate-holiday-image]
+verify_jwt = true
+
+[functions.send-holiday-email]
+verify_jwt = true
