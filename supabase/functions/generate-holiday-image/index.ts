@@ -37,94 +37,14 @@ const getHolidayGreeting = (name: string): string => {
   
   const lowerName = name.toLowerCase();
   
-  // Check for exact match first
   if (greetings[lowerName]) return greetings[lowerName];
   
-  // Check for partial matches
   for (const [key, greeting] of Object.entries(greetings)) {
     if (lowerName.includes(key)) return greeting;
   }
   
-  // Default: capitalize and add "Happy"
   return `Happy ${name}`;
 };
-
-// Generate image with retry logic
-async function generateImageWithRetry(
-  apiKey: string,
-  prompt: string,
-  maxRetries: number = 2
-): Promise<string> {
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    console.log(`Image generation attempt ${attempt}/${maxRetries}`);
-    
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash-image-preview",
-        messages: [
-          {
-            role: "user",
-            content: prompt
-          }
-        ],
-        modalities: ["image", "text"]
-      }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('AI gateway error:', response.status, errorText);
-      
-      if (response.status === 429) {
-        throw new Error('Rate limit exceeded. Please try again in a moment.');
-      }
-      if (response.status === 402) {
-        throw new Error('AI credits exhausted. Please add funds to continue.');
-      }
-      
-      if (attempt < maxRetries) {
-        console.log('Retrying after API error...');
-        await new Promise(r => setTimeout(r, 1000));
-        continue;
-      }
-      throw new Error(`AI gateway error: ${response.status}`);
-    }
-
-    const data = await response.json();
-    console.log('AI response received');
-
-    // Extract the generated image
-    const imageData = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
-    
-    if (imageData) {
-      return imageData;
-    }
-    
-    console.error('No image in response, attempt', attempt);
-    if (attempt < maxRetries) {
-      console.log('Retrying image generation...');
-      await new Promise(r => setTimeout(r, 500));
-    }
-  }
-  
-  throw new Error('Failed to generate image after multiple attempts');
-}
-
-// Compress and optimize base64 image using canvas-like approach
-function optimizeImageBuffer(base64Data: string): Uint8Array {
-  // Remove data URL prefix if present
-  const cleanBase64 = base64Data.replace(/^data:image\/\w+;base64,/, '');
-  const imageBuffer = Uint8Array.from(atob(cleanBase64), c => c.charCodeAt(0));
-  
-  // The AI generates reasonably sized images, but we can't resize in Deno easily
-  // Just return the buffer - the AI model already generates optimized sizes
-  return imageBuffer;
-}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -132,9 +52,9 @@ serve(async (req) => {
   }
 
   try {
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    if (!LOVABLE_API_KEY) {
-      throw new Error('LOVABLE_API_KEY is not configured');
+    const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
+    if (!OPENAI_API_KEY) {
+      throw new Error('OPENAI_API_KEY is not configured');
     }
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -153,59 +73,66 @@ serve(async (req) => {
     console.log('Owner:', ownerFirstName);
     console.log('Property:', propertyName);
 
-    // Build the personalized prompt from the template
-    let personalizedPrompt = (promptTemplate || '')
-      .replace(/{owner_first_name}/g, ownerFirstName || 'Friend')
-      .replace(/{owner_name}/g, ownerFirstName || 'Friend')
-      .replace(/{property_name}/g, propertyName || 'your property');
-
     const cleanHolidayName = holidayName || 'Holiday';
     const holidayGreeting = getHolidayGreeting(cleanHolidayName);
     
-    console.log('Holiday greeting for image:', holidayGreeting);
+    console.log('Holiday greeting:', holidayGreeting);
 
-    // If no prompt template, create a generic one based on holiday name
-    if (!personalizedPrompt || personalizedPrompt.trim().length < 20) {
-      personalizedPrompt = `A warm, inviting ${cleanHolidayName} scene.`;
+    // Simple, effective prompt for OpenAI image generation
+    const imagePrompt = `A beautiful ${cleanHolidayName} greeting card with the text "${holidayGreeting}!" prominently displayed. Festive, warm, elegant design. Horizontal banner format.`;
+
+    console.log('Generating image with OpenAI...');
+
+    // Use OpenAI's gpt-image-1 for fast, reliable image generation
+    const response = await fetch('https://api.openai.com/v1/images/generations', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${OPENAI_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-image-1',
+        prompt: imagePrompt,
+        n: 1,
+        size: '1536x1024', // Horizontal format
+        quality: 'low', // Faster generation, smaller file
+        output_format: 'png',
+        output_compression: 50, // Reduce file size
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('OpenAI error:', response.status, errorText);
+      throw new Error(`Image generation failed: ${response.status}`);
     }
 
-    // Build optimized prompt - request smaller image dimensions
-    const imagePrompt = `Generate a ${cleanHolidayName} greeting card image.
+    const data = await response.json();
+    console.log('Image generated successfully');
 
-CRITICAL REQUIREMENTS:
-1. Generate a SMALL, optimized image (600x300 pixels maximum)
-2. Include elegant text "${holidayGreeting}!" prominently displayed
-3. Festive ${cleanHolidayName} theme
-4. Warm, inviting, high-quality greeting card style
-5. Horizontal banner format (2:1 ratio)
+    // gpt-image-1 returns base64 data directly
+    const base64Data = data.data?.[0]?.b64_json;
+    if (!base64Data) {
+      throw new Error('No image data in response');
+    }
 
-Theme: ${personalizedPrompt.substring(0, 200)}
-
-Generate the image now with "${holidayGreeting}!" text visible.`;
-
-    console.log('Prompt length:', imagePrompt.length);
-
-    // Generate image with retry logic
-    const imageData = await generateImageWithRetry(LOVABLE_API_KEY, imagePrompt, 2);
-
-    // Optimize and save
-    const imageBuffer = optimizeImageBuffer(imageData);
-    
+    // Convert base64 to buffer
+    const imageBuffer = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
     console.log('Image size:', Math.round(imageBuffer.length / 1024), 'KB');
 
-    // Generate unique filename with holiday context
+    // Generate filename
     const timestamp = Date.now();
-    const holidaySlug = (holidayName || 'holiday').replace(/\s+/g, '-').toLowerCase().replace(/[^a-z0-9-]/g, '');
+    const holidaySlug = cleanHolidayName.replace(/\s+/g, '-').toLowerCase().replace(/[^a-z0-9-]/g, '');
     const ownerSlug = (ownerFirstName || 'owner').replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '');
     const fileName = `${timestamp}-${holidaySlug}-${ownerSlug}.png`;
     const filePath = `generated/${fileName}`;
 
-    // Upload to storage with cache control for faster loading
+    // Upload to storage
     const { error: uploadError } = await supabase.storage
       .from('holiday-images')
       .upload(filePath, imageBuffer, {
         contentType: 'image/png',
-        cacheControl: '31536000', // 1 year cache
+        cacheControl: '31536000',
         upsert: true
       });
 
@@ -214,12 +141,11 @@ Generate the image now with "${holidayGreeting}!" text visible.`;
       throw new Error(`Failed to save image: ${uploadError.message}`);
     }
 
-    // Get public URL
     const { data: { publicUrl } } = supabase.storage
       .from('holiday-images')
       .getPublicUrl(filePath);
 
-    console.log('SUCCESS: Image saved ->', publicUrl);
+    console.log('SUCCESS:', publicUrl);
 
     return new Response(
       JSON.stringify({ 
@@ -232,7 +158,7 @@ Generate the image now with "${holidayGreeting}!" text visible.`;
     );
 
   } catch (error) {
-    console.error('ERROR generating holiday image:', error);
+    console.error('ERROR:', error);
     return new Response(
       JSON.stringify({ 
         error: error instanceof Error ? error.message : 'Unknown error',
