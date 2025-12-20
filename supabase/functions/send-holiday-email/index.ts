@@ -325,11 +325,16 @@ async function sendHolidayEmail({
     console.error('Error generating image:', error);
   }
 
-  // Personalize the message
-  const personalizedMessage = template.message_template
+  // Personalize the message and remove any greeting lines since we add it in HTML
+  let personalizedMessage = template.message_template
     .replace(/{owner_name}/g, owner.name)
     .replace(/{owner_first_name}/g, ownerFirstName)
     .replace(/{property_name}/g, property.name);
+  
+  // Remove greeting line if present (e.g., "Dear John," or "Dear John Smith,")
+  personalizedMessage = personalizedMessage
+    .replace(/^Dear [^,\n]+,?\s*\n*/i, '')
+    .trim();
 
   const personalizedSubject = template.subject_template
     .replace(/{owner_name}/g, owner.name)
@@ -389,9 +394,9 @@ function buildHolidayEmailHtml({
   // Get current year for footer
   const currentYear = new Date().getFullYear();
   
-  // Hosted image URLs
-  const hostsPhotoUrl = "https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/anja-ingo-hosts.jpg";
-  const signatureUrl = "https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/anja-signature.png";
+  // Hosted image URLs - using publicly accessible URLs from the deployed site
+  const hostsPhotoUrl = "https://peachhausgroup.lovable.app/images/anja-ingo-hosts.jpg";
+  const signatureUrl = "https://peachhausgroup.lovable.app/images/anja-signature.png";
   
   return `
 <!DOCTYPE html>
@@ -401,7 +406,7 @@ function buildHolidayEmailHtml({
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${subject}</title>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600&family=Cormorant+Garamond:wght@300;400;500&family=Lato:wght@300;400&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500&family=Lato:wght@300;400&display=swap');
   </style>
 </head>
 <body style="margin: 0; padding: 0; font-family: 'Lato', 'Helvetica Neue', Arial, sans-serif; background-color: #f8f6f3;">
@@ -412,7 +417,7 @@ function buildHolidayEmailHtml({
   ` : ''}
   
   <!-- Outer wrapper with sophisticated styling -->
-  <table cellpadding="0" cellspacing="0" width="100%" style="max-width: 640px; margin: 24px auto; background-color: #ffffff; overflow: hidden; box-shadow: 0 8px 40px rgba(0,0,0,0.06);">
+  <table cellpadding="0" cellspacing="0" width="100%" style="max-width: 680px; margin: 24px auto; background-color: #ffffff; overflow: hidden; box-shadow: 0 8px 40px rgba(0,0,0,0.06);">
     
     <!-- Refined gold accent top border -->
     <tr>
@@ -429,29 +434,23 @@ function buildHolidayEmailHtml({
       </td>
     </tr>
     
-    <!-- Holiday Image with elegant frame -->
+    <!-- Holiday Image - Full width, larger display -->
     ${imageUrl ? `
     <tr>
       <td style="padding: 0; background-color: #ffffff;">
         <img src="${imageUrl}" 
              alt="Season's Greetings" 
-             style="width: 100%; height: auto; display: block;">
+             style="width: 100%; max-width: 680px; height: auto; display: block;">
       </td>
     </tr>
     ` : ''}
     
-    <!-- Personal Greeting - Left aligned -->
+    <!-- Message Content - Left aligned with refined typography, starts with greeting -->
     <tr>
-      <td style="padding: 40px 48px 12px 48px; text-align: left;">
-        <p style="margin: 0; font-family: 'Cormorant Garamond', Georgia, serif; font-size: 28px; color: #2d2d2d; font-weight: 400; letter-spacing: 0.3px;">
+      <td style="padding: 36px 48px 40px 48px; color: #4a4a4a; font-size: 15px; line-height: 1.85; text-align: left;">
+        <p style="margin: 0 0 24px 0; font-family: 'Cormorant Garamond', Georgia, serif; font-size: 26px; color: #2d2d2d; font-weight: 400; letter-spacing: 0.3px;">
           Dear ${ownerFirstName},
         </p>
-      </td>
-    </tr>
-    
-    <!-- Message Content - Left aligned with refined typography -->
-    <tr>
-      <td style="padding: 8px 48px 36px 48px; color: #4a4a4a; font-size: 15px; line-height: 1.85; text-align: left;">
         ${message.split('\n\n').map(para => `<p style="margin: 0 0 20px 0; font-weight: 300; letter-spacing: 0.2px;">${para.replace(/\n/g, '<br>')}</p>`).join('')}
       </td>
     </tr>
@@ -469,18 +468,18 @@ function buildHolidayEmailHtml({
         <table cellpadding="0" cellspacing="0" width="100%">
           <tr>
             <!-- Hosts Photo -->
-            <td style="width: 140px; vertical-align: top; padding-right: 24px;">
+            <td style="width: 120px; vertical-align: middle; padding-right: 20px;">
               <img src="${hostsPhotoUrl}" 
                    alt="Anja & Ingo" 
-                   style="width: 130px; height: 130px; border-radius: 50%; object-fit: cover; border: 3px solid #f0ebe4; box-shadow: 0 4px 16px rgba(0,0,0,0.08);">
+                   style="width: 110px; height: 110px; border-radius: 50%; object-fit: cover; border: 2px solid #f0ebe4; box-shadow: 0 4px 16px rgba(0,0,0,0.08);">
             </td>
             <!-- Signature and closing -->
             <td style="vertical-align: middle; text-align: left;">
-              <p style="margin: 0 0 8px 0; color: #7a7a7a; font-size: 12px; font-weight: 400; letter-spacing: 1.5px; text-transform: uppercase;">With Warmest Regards</p>
+              <p style="margin: 0 0 6px 0; color: #7a7a7a; font-size: 11px; font-weight: 400; letter-spacing: 1.5px; text-transform: uppercase;">With Warmest Regards</p>
               <img src="${signatureUrl}" 
                    alt="Anja & Ingo Schaer" 
-                   style="height: 52px; width: auto; margin: 8px 0 12px 0;">
-              <p style="margin: 0; color: #9a9a9a; font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase;">PeachHaus Group</p>
+                   style="height: 48px; width: auto; margin: 6px 0 10px 0;">
+              <p style="margin: 0; color: #9a9a9a; font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase;">PeachHaus Group</p>
             </td>
           </tr>
         </table>
