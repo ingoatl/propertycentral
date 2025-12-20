@@ -55,6 +55,9 @@ const Properties = () => {
     visitPrice: "",
     rentalType: "" as "hybrid" | "mid_term" | "long_term" | "",
     managementFeePercentage: "",
+    ownerName: "",
+    ownerEmail: "",
+    ownerPhone: "",
   });
   const [editFormData, setEditFormData] = useState({
     name: "",
@@ -290,6 +293,53 @@ const Properties = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
+      let ownerId: string | null = null;
+
+      // If owner information is provided, create or find the owner
+      if (formData.ownerName.trim()) {
+        // Check if owner exists by email (if email provided)
+        if (formData.ownerEmail.trim()) {
+          const { data: existingOwner } = await supabase
+            .from("property_owners")
+            .select("id")
+            .eq("email", formData.ownerEmail.trim().toLowerCase())
+            .maybeSingle();
+          
+          if (existingOwner) {
+            ownerId = existingOwner.id;
+            // Update owner phone if provided and not already set
+            if (formData.ownerPhone.trim()) {
+              await supabase
+                .from("property_owners")
+                .update({ phone: formData.ownerPhone.trim() })
+                .eq("id", ownerId)
+                .is("phone", null);
+            }
+          }
+        }
+
+        // Create new owner if not found
+        if (!ownerId) {
+          const { data: newOwner, error: ownerError } = await supabase
+            .from("property_owners")
+            .insert({
+              name: formData.ownerName.trim(),
+              email: formData.ownerEmail.trim().toLowerCase(),
+              phone: formData.ownerPhone.trim() || null,
+              payment_method: "ach",
+            })
+            .select("id")
+            .single();
+          
+          if (ownerError) {
+            console.error("Error creating owner:", ownerError);
+            // Continue without owner if there's an error
+          } else {
+            ownerId = newOwner.id;
+          }
+        }
+      }
+
       const { error } = await supabase
         .from("properties")
         .insert({
@@ -299,11 +349,12 @@ const Properties = () => {
           rental_type: formData.rentalType,
           management_fee_percentage: managementFeePercentage,
           user_id: user.id,
+          owner_id: ownerId,
         });
 
       if (error) throw error;
 
-      setFormData({ name: "", address: "", visitPrice: "", rentalType: "", managementFeePercentage: "" });
+      setFormData({ name: "", address: "", visitPrice: "", rentalType: "", managementFeePercentage: "", ownerName: "", ownerEmail: "", ownerPhone: "" });
       setShowForm(false);
       await loadProperties();
       toast.success("Property added successfully!");
@@ -802,6 +853,46 @@ const Properties = () => {
                   Percentage charged on gross rental revenue (e.g., 15 for 15%)
                 </p>
               </div>
+
+              {/* Owner Information Section */}
+              <div className="border-t pt-4 mt-4">
+                <h4 className="text-sm font-medium text-muted-foreground mb-3">Owner Information (Optional)</h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="ownerName">Owner Name</Label>
+                    <Input
+                      id="ownerName"
+                      placeholder="John Smith"
+                      value={formData.ownerName}
+                      onChange={(e) => setFormData({ ...formData, ownerName: e.target.value })}
+                      className="text-base"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="ownerEmail">Owner Email</Label>
+                    <Input
+                      id="ownerEmail"
+                      type="email"
+                      placeholder="john@example.com"
+                      value={formData.ownerEmail}
+                      onChange={(e) => setFormData({ ...formData, ownerEmail: e.target.value })}
+                      className="text-base"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="ownerPhone">Owner Phone</Label>
+                    <Input
+                      id="ownerPhone"
+                      type="tel"
+                      placeholder="(555) 123-4567"
+                      value={formData.ownerPhone}
+                      onChange={(e) => setFormData({ ...formData, ownerPhone: e.target.value })}
+                      className="text-base"
+                    />
+                  </div>
+                </div>
+              </div>
+
               <div className="flex gap-2">
                 <Button type="submit" disabled={loading} className="shadow-warm">
                   {loading ? "Adding..." : "Add Property"}
