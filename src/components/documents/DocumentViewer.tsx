@@ -57,6 +57,8 @@ export function DocumentViewer({ open, onOpenChange, filePath, fileName, fileTyp
     }
   };
 
+  const [pdfLoadFailed, setPdfLoadFailed] = useState(false);
+  
   const isPdf = fileName?.toLowerCase().endsWith('.pdf') || fileType?.includes('pdf');
   const isImage = fileType?.includes('image') || 
     /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(fileName || '');
@@ -65,11 +67,21 @@ export function DocumentViewer({ open, onOpenChange, filePath, fileName, fileTyp
     fileType?.includes('spreadsheet') || 
     fileType?.includes('excel');
 
+  // Reset PDF load state when document changes
+  useEffect(() => {
+    setPdfLoadFailed(false);
+  }, [filePath]);
+
   const getFileIcon = () => {
     if (isPdf) return <FileText className="h-16 w-16 text-red-500" />;
     if (isExcel) return <FileSpreadsheet className="h-16 w-16 text-green-600" />;
     if (isImage) return <ImageIcon className="h-16 w-16 text-blue-500" />;
     return <FileText className="h-16 w-16 text-muted-foreground" />;
+  };
+
+  // Handle PDF iframe load error (for browsers like Brave that block iframes)
+  const handlePdfError = () => {
+    setPdfLoadFailed(true);
   };
 
   return (
@@ -131,11 +143,49 @@ export function DocumentViewer({ open, onOpenChange, filePath, fileName, fileTyp
               )}
             </div>
           ) : isPdf && signedUrl ? (
-            <iframe
-              src={`${signedUrl}#view=FitH`}
-              className="w-full h-full border-0"
-              title={fileName}
-            />
+            pdfLoadFailed ? (
+              // Fallback for browsers that block iframe PDFs (like Brave)
+              <div className="flex flex-col items-center justify-center h-full gap-6">
+                <FileText className="h-16 w-16 text-red-500" />
+                <div className="text-center">
+                  <p className="text-lg font-medium">{fileName}</p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    PDF preview is blocked by your browser's privacy settings
+                  </p>
+                </div>
+                <div className="flex gap-3">
+                  <Button variant="outline" onClick={() => window.open(signedUrl, '_blank')}>
+                    <ExternalLink className="h-4 w-4 mr-2" />
+                    Open PDF in New Tab
+                  </Button>
+                  <Button asChild>
+                    <a href={signedUrl} download={fileName}>
+                      <Download className="h-4 w-4 mr-2" />
+                      Download PDF
+                    </a>
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <iframe
+                src={`${signedUrl}#view=FitH`}
+                className="w-full h-full border-0"
+                title={fileName}
+                onError={handlePdfError}
+                onLoad={(e) => {
+                  // Check if iframe loaded empty (blocked by browser)
+                  try {
+                    const iframe = e.target as HTMLIFrameElement;
+                    // If we can't access contentDocument, it's likely blocked
+                    if (!iframe.contentDocument && !iframe.contentWindow) {
+                      handlePdfError();
+                    }
+                  } catch {
+                    // Cross-origin error means it loaded (external URL)
+                  }
+                }}
+              />
+            )
           ) : isImage && signedUrl ? (
             <div className="flex items-center justify-center h-full p-4">
               <img 

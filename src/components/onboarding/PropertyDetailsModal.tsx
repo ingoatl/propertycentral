@@ -90,149 +90,154 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
           setOnboardingProject(projectData);
         }
       } else if (projectId) {
-        // Load the project details
         const { data: projectData } = await supabase
           .from('onboarding_projects')
           .select('*')
           .eq('id', projectId)
-          .single();
+          .maybeSingle();
         if (projectData) {
           setOnboardingProject(projectData);
         }
       }
       
-      // Load tasks if we have a projectId
+      // Run all queries in parallel for much faster loading
+      const promises: Promise<any>[] = [];
+      
+      // Tasks query
       if (effectiveProjectId) {
-        const { data: tasksData, error: tasksError } = await supabase
-          .from('onboarding_tasks')
-          .select('*')
-          .eq('project_id', effectiveProjectId)
-          .order('phase_number', { ascending: true });
-
-        if (tasksError) throw tasksError;
-        
-        console.log('PropertyDetailsModal - All tasks loaded:', tasksData?.length);
-        
-        setTasks((tasksData || []) as OnboardingTask[]);
+        promises.push(
+          (async () => {
+            const { data, error } = await supabase
+              .from('onboarding_tasks')
+              .select('*')
+              .eq('project_id', effectiveProjectId)
+              .order('phase_number', { ascending: true });
+            if (!error) setTasks((data || []) as OnboardingTask[]);
+          })()
+        );
       }
-      // Load property info if propertyId is available
+      
+      // Property-related queries (run in parallel)
       if (propertyId) {
-        const { data: propertyData, error: propertyError } = await supabase
-          .from('properties')
-          .select('*')
-          .eq('id', propertyId)
-          .single();
+        // Property info
+        promises.push(
+          (async () => {
+            const { data } = await supabase
+              .from('properties')
+              .select('*')
+              .eq('id', propertyId)
+              .maybeSingle();
+            if (data) setPropertyInfo(data);
+          })()
+        );
 
-        if (propertyError) {
-          console.error('Error loading property:', propertyError);
-        } else {
-          setPropertyInfo(propertyData);
-        }
+        // Email insights (limited)
+        promises.push(
+          (async () => {
+            const { data } = await supabase
+              .from('email_insights')
+              .select('*')
+              .eq('property_id', propertyId)
+              .order('email_date', { ascending: false })
+              .limit(20);
+            const filteredInsights = (data || []).filter(insight => {
+              const senderEmail = insight.sender_email?.toLowerCase() || '';
+              const category = insight.category?.toLowerCase() || '';
+              if (senderEmail.includes('amazon.com') || senderEmail.includes('amazon.') || senderEmail.includes('amzn.')) return false;
+              if (senderEmail.includes('booking.com') || senderEmail.includes('airbnb.com') || senderEmail.includes('vrbo.com') || senderEmail.includes('expedia.com') || category === 'booking') return false;
+              return true;
+            }).slice(0, 10);
+            setEmailInsights(filteredInsights);
+          })()
+        );
 
-        // Load email insights for this property
-        const { data: insightsData, error: insightsError } = await supabase
-          .from('email_insights')
-          .select('*')
-          .eq('property_id', propertyId)
-          .order('email_date', { ascending: false })
-          .limit(50);
+        // Financial data
+        promises.push(
+          (async () => {
+            const { data } = await supabase
+              .from('property_financial_data')
+              .select('*')
+              .eq('property_id', propertyId)
+              .maybeSingle();
+            if (data) setFinancialData(data as FinancialData);
+          })()
+        );
 
-        if (insightsError) {
-          console.error('Error loading insights:', insightsError);
-        } else {
-          // Filter out Amazon and booking platform emails
-          const filteredInsights = (insightsData || []).filter(insight => {
-            const senderEmail = insight.sender_email?.toLowerCase() || '';
-            const category = insight.category?.toLowerCase() || '';
-            
-            // Exclude Amazon emails
-            if (senderEmail.includes('amazon.com') || 
-                senderEmail.includes('amazon.') ||
-                senderEmail.includes('amzn.')) {
-              return false;
-            }
-            
-            // Exclude booking platform emails
-            if (senderEmail.includes('booking.com') ||
-                senderEmail.includes('airbnb.com') ||
-                senderEmail.includes('vrbo.com') ||
-                senderEmail.includes('expedia.com') ||
-                category === 'booking') {
-              return false;
-            }
-            
-            return true;
-          }).slice(0, 10);
-          
-          setEmailInsights(filteredInsights);
-        }
+        // Property intel items
+        promises.push(
+          (async () => {
+            const { data } = await supabase
+              .from('property_intel_items')
+              .select('*')
+              .eq('property_id', propertyId)
+              .eq('is_visible', true)
+              .order('category', { ascending: true });
+            setIntelItems(data || []);
+          })()
+        );
 
-        // Load financial data for this property
-        const { data: financialInfo, error: financialError } = await supabase
-          .from('property_financial_data')
-          .select('*')
-          .eq('property_id', propertyId)
-          .maybeSingle();
+        // Credentials
+        promises.push(
+          (async () => {
+            const { data } = await supabase
+              .from('property_credentials')
+              .select('*')
+              .eq('property_id', propertyId);
+            setCredentials(data || []);
+          })()
+        );
 
-        if (financialError) {
-          console.error('Error loading financial data:', financialError);
-        } else if (financialInfo) {
-          setFinancialData(financialInfo as FinancialData);
-        }
+        // Appliances
+        promises.push(
+          (async () => {
+            const { data } = await supabase
+              .from('property_appliances')
+              .select('*')
+              .eq('property_id', propertyId);
+            setAppliances(data || []);
+          })()
+        );
 
-        // Load property intel items from owner conversations
-        const { data: intelData } = await supabase
-          .from('property_intel_items')
-          .select('*')
-          .eq('property_id', propertyId)
-          .eq('is_visible', true)
-          .order('category', { ascending: true });
-        setIntelItems(intelData || []);
+        // Owner conversation actions
+        promises.push(
+          (async () => {
+            const { data } = await supabase
+              .from('owner_conversation_actions')
+              .select(`*, owner_conversations!inner(property_id, title)`)
+              .eq('owner_conversations.property_id', propertyId)
+              .in('status', ['created', 'suggested'])
+              .order('action_type', { ascending: true });
+            setOwnerActions(data || []);
+          })()
+        );
 
-        // Load credentials
-        const { data: credData } = await supabase
-          .from('property_credentials')
-          .select('*')
-          .eq('property_id', propertyId);
-        setCredentials(credData || []);
+        // Owner documents
+        promises.push(
+          (async () => {
+            const { data } = await supabase
+              .from('owner_conversation_documents')
+              .select(`*, owner_conversations!inner(property_id, title)`)
+              .eq('owner_conversations.property_id', propertyId);
+            setOwnerDocuments(data || []);
+          })()
+        );
 
-        // Load appliances
-        const { data: appData } = await supabase
-          .from('property_appliances')
-          .select('*')
-          .eq('property_id', propertyId);
-        setAppliances(appData || []);
-
-        // Load owner conversation actions (the main intel data!)
-        const { data: actionsData } = await supabase
-          .from('owner_conversation_actions')
-          .select(`
-            *,
-            owner_conversations!inner(property_id, title)
-          `)
-          .eq('owner_conversations.property_id', propertyId)
-          .in('status', ['created', 'suggested'])
-          .order('action_type', { ascending: true });
-        setOwnerActions(actionsData || []);
-
-        // Load documents from owner conversations
-        const { data: docsData } = await supabase
-          .from('owner_conversation_documents')
-          .select(`
-            *,
-            owner_conversations!inner(property_id, title)
-          `)
-          .eq('owner_conversations.property_id', propertyId);
-        setOwnerDocuments(docsData || []);
-
-        // Load property documents (owner-provided files)
-        const { data: propDocsData } = await supabase
-          .from('property_documents')
-          .select('*')
-          .eq('property_id', propertyId)
-          .order('created_at', { ascending: false });
-        setPropertyDocuments(propDocsData || []);
+        // Property documents
+        promises.push(
+          (async () => {
+            const { data } = await supabase
+              .from('property_documents')
+              .select('*')
+              .eq('property_id', propertyId)
+              .order('created_at', { ascending: false });
+            setPropertyDocuments(data || []);
+          })()
+        );
       }
+      
+      // Wait for all queries to complete
+      await Promise.all(promises);
+      
     } catch (error: any) {
       console.error('Error loading property details:', error);
       toast.error('Failed to load property information');
