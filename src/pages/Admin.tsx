@@ -19,6 +19,7 @@ import { EmailAIPromptsManager } from "@/components/admin/EmailAIPromptsManager"
 import { DataCleanupPanel } from "@/components/reconciliation/DataCleanupPanel";
 import { JobApplicationsCard } from "@/components/admin/JobApplicationsCard";
 import { HolidayEmailManager } from "@/components/admin/HolidayEmailManager";
+import { HolidayEmailWatchdog } from "@/components/admin/HolidayEmailWatchdog";
 
 const createUserSchema = z.object({
   email: z.string().email("Invalid email address").max(255),
@@ -762,7 +763,8 @@ const Admin = () => {
           <RescheduleLogsTab />
         </TabsContent>
 
-        <TabsContent value="holiday-emails" className="mt-8">
+        <TabsContent value="holiday-emails" className="mt-8 space-y-6">
+          <HolidayEmailWatchdog />
           <HolidayEmailManager />
         </TabsContent>
       </Tabs>

@@ -295,7 +295,7 @@ async function sendHolidayEmail({
   let generatedImageUrl = null;
 
   try {
-    // Call generate-holiday-image function (simplified - no property image needed)
+    // Call generate-holiday-image function with proper template
     const imageResponse = await fetch(`${supabaseUrl}/functions/v1/generate-holiday-image`, {
       method: 'POST',
       headers: {
@@ -306,6 +306,7 @@ async function sendHolidayEmail({
         ownerFirstName,
         propertyName: property.name,
         promptTemplate: template.image_prompt_template,
+        holidayName: template.holiday_name,
       }),
     });
 

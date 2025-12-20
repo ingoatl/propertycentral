@@ -24,32 +24,31 @@ serve(async (req) => {
     const { 
       ownerFirstName, 
       propertyName, 
-      promptTemplate 
+      promptTemplate,
+      holidayName // Optional: for better context
     } = await req.json();
 
-    console.log('Generating festive holiday image for:', { ownerFirstName, propertyName });
+    console.log('Generating holiday image for:', { ownerFirstName, propertyName, holidayName });
 
-    // Build the text prompt with personalization
-    const textPrompt = (promptTemplate || '')
+    // Build the personalized prompt from the template
+    let personalizedPrompt = (promptTemplate || '')
       .replace(/{owner_first_name}/g, ownerFirstName || 'Friend')
+      .replace(/{owner_name}/g, ownerFirstName || 'Friend')
       .replace(/{property_name}/g, propertyName || 'your property');
 
-    // Simple, effective prompt for a beautiful festive holiday image
-    const prompt = `Create a beautiful, warm holiday greeting card image.
+    // If no prompt template, create a generic one based on holiday name
+    if (!personalizedPrompt || personalizedPrompt.trim().length < 20) {
+      personalizedPrompt = `Create a beautiful ${holidayName || 'holiday'} greeting card image. 
+      A warm, inviting scene with elegant text saying "Happy ${holidayName || 'Holidays'}, ${ownerFirstName || 'Friend'}!" prominently displayed.
+      Style: High quality, warm and inviting, perfect for a greeting card.`;
+    }
 
-The scene should show:
-- A cozy, charming home decorated for Christmas with warm string lights
-- Evening winter scene with soft snowfall and a magical atmosphere
-- A festive wreath on the door and warm golden light from windows
-- Snow-covered landscape creating a peaceful winter wonderland
-- Elegant text banner or sign that says "Happy Holidays, ${ownerFirstName || 'Friend'}!" prominently displayed
+    // Ensure the prompt includes the owner name for personalization
+    if (!personalizedPrompt.includes(ownerFirstName) && ownerFirstName) {
+      personalizedPrompt += `\n\nIMPORTANT: The image MUST include text greeting "${ownerFirstName}" prominently.`;
+    }
 
-Style: Photorealistic, warm and inviting, high quality. Perfect for a holiday greeting card.
-Aspect ratio: 16:9 landscape orientation.
-
-${textPrompt}`;
-
-    console.log('Generating image with prompt...');
+    console.log('Using prompt:', personalizedPrompt.substring(0, 200) + '...');
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -62,7 +61,7 @@ ${textPrompt}`;
         messages: [
           {
             role: "user",
-            content: prompt
+            content: personalizedPrompt
           }
         ],
         modalities: ["image", "text"]
@@ -97,9 +96,11 @@ ${textPrompt}`;
     const base64Data = imageData.replace(/^data:image\/\w+;base64,/, '');
     const imageBuffer = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
 
-    // Generate unique filename
+    // Generate unique filename with holiday context
     const timestamp = Date.now();
-    const fileName = `${timestamp}-${ownerFirstName?.replace(/\s+/g, '_') || 'owner'}.png`;
+    const holidaySlug = (holidayName || 'holiday').replace(/\s+/g, '-').toLowerCase();
+    const ownerSlug = (ownerFirstName || 'owner').replace(/\s+/g, '_');
+    const fileName = `${timestamp}-${holidaySlug}-${ownerSlug}.png`;
     const filePath = `generated/${fileName}`;
 
     // Upload to storage
