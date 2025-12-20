@@ -946,6 +946,116 @@ export type Database = {
           },
         ]
       }
+      holiday_email_logs: {
+        Row: {
+          created_at: string
+          error_message: string | null
+          generated_image_url: string | null
+          holiday_template_id: string | null
+          id: string
+          owner_id: string | null
+          property_id: string | null
+          recipient_email: string
+          sent_at: string
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          error_message?: string | null
+          generated_image_url?: string | null
+          holiday_template_id?: string | null
+          id?: string
+          owner_id?: string | null
+          property_id?: string | null
+          recipient_email: string
+          sent_at?: string
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          error_message?: string | null
+          generated_image_url?: string | null
+          holiday_template_id?: string | null
+          id?: string
+          owner_id?: string | null
+          property_id?: string | null
+          recipient_email?: string
+          sent_at?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "holiday_email_logs_holiday_template_id_fkey"
+            columns: ["holiday_template_id"]
+            isOneToOne: false
+            referencedRelation: "holiday_email_templates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "holiday_email_logs_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "property_owners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "holiday_email_logs_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "comprehensive_property_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "holiday_email_logs_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      holiday_email_templates: {
+        Row: {
+          created_at: string
+          emoji: string | null
+          holiday_date: string
+          holiday_name: string
+          id: string
+          image_prompt_template: string
+          is_active: boolean
+          message_template: string
+          recurring: boolean
+          subject_template: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          emoji?: string | null
+          holiday_date: string
+          holiday_name: string
+          id?: string
+          image_prompt_template: string
+          is_active?: boolean
+          message_template: string
+          recurring?: boolean
+          subject_template: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          emoji?: string | null
+          holiday_date?: string
+          holiday_name?: string
+          id?: string
+          image_prompt_template?: string
+          is_active?: boolean
+          message_template?: string
+          recurring?: boolean
+          subject_template?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       inspection_issues: {
         Row: {
           created_at: string
