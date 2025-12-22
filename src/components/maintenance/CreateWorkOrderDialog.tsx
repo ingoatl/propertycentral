@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -18,8 +19,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { WORK_ORDER_CATEGORIES } from "@/types/maintenance";
+import { Phone, Mail } from "lucide-react";
+import { WORK_ORDER_CATEGORIES, Vendor } from "@/types/maintenance";
 
 interface CreateWorkOrderDialogProps {
   open: boolean;
@@ -46,7 +49,10 @@ const CreateWorkOrderDialog = ({
     reported_by_phone: "",
     access_instructions: "",
     estimated_cost: "",
+    assigned_vendor_id: "",
   });
+  const [notifySms, setNotifySms] = useState(true);
+  const [notifyEmail, setNotifyEmail] = useState(true);
 
   // Fetch properties
   const { data: properties = [] } = useQuery({
@@ -63,9 +69,36 @@ const CreateWorkOrderDialog = ({
     },
   });
 
+  // Fetch all vendors
+  const { data: vendors = [] } = useQuery({
+    queryKey: ["vendors-for-workorder"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("vendors")
+        .select("*")
+        .in("status", ["active", "preferred"])
+        .order("status", { ascending: false })
+        .order("name", { ascending: true });
+      
+      if (error) throw error;
+      return data as Vendor[];
+    },
+  });
+
+  // Filter vendors by selected category
+  const matchingVendors = formData.category 
+    ? vendors.filter(v => v.specialty?.includes(formData.category))
+    : [];
+  const otherVendors = formData.category 
+    ? vendors.filter(v => !v.specialty?.includes(formData.category))
+    : vendors;
+
   const createWorkOrder = useMutation({
     mutationFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
+      
+      const assignedVendorId = formData.assigned_vendor_id || null;
+      const vendor = assignedVendorId ? vendors.find(v => v.id === assignedVendorId) : null;
       
       const { data, error } = await supabase
         .from("work_orders")
@@ -81,27 +114,69 @@ const CreateWorkOrderDialog = ({
           reported_by_phone: formData.reported_by_phone || null,
           access_instructions: formData.access_instructions || null,
           estimated_cost: formData.estimated_cost ? parseFloat(formData.estimated_cost) : null,
-          status: "new",
+          status: assignedVendorId ? "dispatched" : "new",
           created_by: user?.id,
+          assigned_vendor_id: assignedVendorId,
+          assigned_by: assignedVendorId ? user?.id : null,
+          assigned_at: assignedVendorId ? new Date().toISOString() : null,
         })
         .select()
         .single();
 
       if (error) throw error;
 
-      // Add timeline entry
+      // Add timeline entry for creation
       await supabase.from("work_order_timeline").insert({
         work_order_id: data.id,
         action: "Work order created",
         performed_by_type: "pm",
         performed_by_name: user?.email,
         performed_by_user_id: user?.id,
-        new_status: "new",
+        new_status: assignedVendorId ? "dispatched" : "new",
       });
+
+      // If vendor assigned, add assignment timeline and notify
+      if (assignedVendorId && vendor) {
+        await supabase.from("work_order_timeline").insert({
+          work_order_id: data.id,
+          action: `Assigned to vendor: ${vendor.name}`,
+          performed_by_type: "pm",
+          performed_by_name: user?.email,
+          performed_by_user_id: user?.id,
+          new_status: "dispatched",
+        });
+
+        // Notify vendor
+        const notifyMethods: string[] = [];
+        if (notifySms) notifyMethods.push("sms");
+        if (notifyEmail) notifyMethods.push("email");
+
+        if (notifyMethods.length > 0) {
+          try {
+            const { data: notifyData, error: notifyError } = await supabase.functions.invoke("notify-vendor-work-order", {
+              body: { 
+                workOrderId: data.id, 
+                vendorId: assignedVendorId,
+                notifyMethods 
+              },
+            });
+
+            if (notifyError) {
+              console.error("Notification error:", notifyError);
+              toast.warning("Work order created but vendor notification failed");
+            } else if (notifyData?.success) {
+              toast.success(notifyData.message);
+            }
+          } catch (e) {
+            console.error("Failed to notify vendor:", e);
+          }
+        }
+      }
 
       return data;
     },
     onSuccess: () => {
+      toast.success("Work order created successfully");
       onSuccess();
       onOpenChange(false);
       resetForm();
@@ -124,7 +199,10 @@ const CreateWorkOrderDialog = ({
       reported_by_phone: "",
       access_instructions: "",
       estimated_cost: "",
+      assigned_vendor_id: "",
     });
+    setNotifySms(true);
+    setNotifyEmail(true);
   };
 
   return (
@@ -313,6 +391,96 @@ const CreateWorkOrderDialog = ({
                 placeholder="Lockbox code, gate code, etc."
               />
             </div>
+          </div>
+
+          {/* Vendor Assignment (Optional) */}
+          <div className="space-y-3 p-4 border rounded-lg bg-muted/30">
+            <Label className="text-base">Assign Vendor (Optional)</Label>
+            <p className="text-sm text-muted-foreground">
+              Optionally assign a vendor now. You can also assign later from the work order details.
+            </p>
+            
+            <Select
+              value={formData.assigned_vendor_id}
+              onValueChange={(value) => setFormData({ ...formData, assigned_vendor_id: value === "none" ? "" : value })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select a vendor (optional)" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">
+                  <span className="text-muted-foreground">No vendor - assign later</span>
+                </SelectItem>
+                {matchingVendors.length > 0 && (
+                  <>
+                    <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground bg-muted">
+                      Recommended for {WORK_ORDER_CATEGORIES.find(c => c.value === formData.category)?.label}
+                    </div>
+                    {matchingVendors.map((vendor) => (
+                      <SelectItem key={vendor.id} value={vendor.id}>
+                        <div className="flex items-center gap-2">
+                          <span>{vendor.name}</span>
+                          {vendor.status === "preferred" && (
+                            <Badge variant="secondary" className="text-xs">Preferred</Badge>
+                          )}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </>
+                )}
+                {otherVendors.length > 0 && (
+                  <>
+                    <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground bg-muted">
+                      {matchingVendors.length > 0 ? "Other Vendors" : "All Vendors"}
+                    </div>
+                    {otherVendors.map((vendor) => (
+                      <SelectItem key={vendor.id} value={vendor.id}>
+                        <div className="flex items-center gap-2">
+                          <span>{vendor.name}</span>
+                          {vendor.status === "preferred" && (
+                            <Badge variant="secondary" className="text-xs">Preferred</Badge>
+                          )}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </>
+                )}
+              </SelectContent>
+            </Select>
+
+            {/* Notification options when vendor selected */}
+            {formData.assigned_vendor_id && (
+              <div className="mt-3 p-3 bg-background rounded-lg border space-y-2">
+                <Label className="text-sm font-medium">Notify Vendor</Label>
+                <div className="flex flex-wrap gap-4">
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id="create_notify_sms"
+                      checked={notifySms}
+                      onCheckedChange={(checked) => setNotifySms(!!checked)}
+                    />
+                    <label htmlFor="create_notify_sms" className="text-sm flex items-center gap-1.5 cursor-pointer">
+                      <Phone className="h-3.5 w-3.5" />
+                      SMS
+                    </label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id="create_notify_email"
+                      checked={notifyEmail}
+                      onCheckedChange={(checked) => setNotifyEmail(!!checked)}
+                    />
+                    <label htmlFor="create_notify_email" className="text-sm flex items-center gap-1.5 cursor-pointer">
+                      <Mail className="h-3.5 w-3.5" />
+                      Email
+                    </label>
+                  </div>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Vendor will be notified immediately after work order is created
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Actions */}

@@ -126,17 +126,21 @@ serve(async (req) => {
     }
 
     // Send invitation to vendor to join Bill.com network
+    // Note: Bill.com API uses "id" parameter for SendVendorInvite
     const inviteResponse = await fetch("https://api.bill.com/api/v2/SendVendorInvite.json", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({
         devKey,
         sessionId,
-        vendorId: billcomVendorId,
+        data: JSON.stringify({
+          vendorId: billcomVendorId,
+        }),
       }),
     });
 
     const inviteData = await inviteResponse.json();
+    console.log("Bill.com invite response:", JSON.stringify(inviteData));
 
     if (inviteData.response_status !== 0) {
       console.error("Failed to send Bill.com invitation:", inviteData);
