@@ -4914,6 +4914,9 @@ export type Database = {
         Row: {
           average_rating: number | null
           average_response_time_hours: number | null
+          billcom_invite_sent_at: string | null
+          billcom_synced_at: string | null
+          billcom_vendor_id: string | null
           company_name: string | null
           created_at: string | null
           created_by: string | null
@@ -4939,6 +4942,9 @@ export type Database = {
         Insert: {
           average_rating?: number | null
           average_response_time_hours?: number | null
+          billcom_invite_sent_at?: string | null
+          billcom_synced_at?: string | null
+          billcom_vendor_id?: string | null
           company_name?: string | null
           created_at?: string | null
           created_by?: string | null
@@ -4964,6 +4970,9 @@ export type Database = {
         Update: {
           average_rating?: number | null
           average_response_time_hours?: number | null
+          billcom_invite_sent_at?: string | null
+          billcom_synced_at?: string | null
+          billcom_vendor_id?: string | null
           company_name?: string | null
           created_at?: string | null
           created_by?: string | null
@@ -5133,6 +5142,9 @@ export type Database = {
           assigned_by: string | null
           assigned_vendor_id: string | null
           before_photos: string[] | null
+          billcom_bill_id: string | null
+          billcom_invoice_url: string | null
+          billcom_payment_status: string | null
           cancelled_at: string | null
           cancelled_reason: string | null
           category: string
@@ -5196,6 +5208,9 @@ export type Database = {
           assigned_by?: string | null
           assigned_vendor_id?: string | null
           before_photos?: string[] | null
+          billcom_bill_id?: string | null
+          billcom_invoice_url?: string | null
+          billcom_payment_status?: string | null
           cancelled_at?: string | null
           cancelled_reason?: string | null
           category: string
@@ -5259,6 +5274,9 @@ export type Database = {
           assigned_by?: string | null
           assigned_vendor_id?: string | null
           before_photos?: string[] | null
+          billcom_bill_id?: string | null
+          billcom_invoice_url?: string | null
+          billcom_payment_status?: string | null
           cancelled_at?: string | null
           cancelled_reason?: string | null
           category?: string

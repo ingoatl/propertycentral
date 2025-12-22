@@ -158,3 +158,12 @@ verify_jwt = false
 
 [functions.extract-vendors-from-emails]
 verify_jwt = true
+
+[functions.billcom-authenticate]
+verify_jwt = true
+
+[functions.billcom-sync-vendor]
+verify_jwt = true
+
+[functions.billcom-invite-vendor]
+verify_jwt = true
