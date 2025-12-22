@@ -173,3 +173,6 @@ verify_jwt = true
 
 [functions.maintenance-sms-webhook]
 verify_jwt = false
+
+[functions.twilio-status-callback]
+verify_jwt = false
