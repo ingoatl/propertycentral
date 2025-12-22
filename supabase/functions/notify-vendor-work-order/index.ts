@@ -68,10 +68,11 @@ serve(async (req) => {
     if (notifyMethods?.includes("sms") && vendor.phone) {
       const TWILIO_ACCOUNT_SID = Deno.env.get("TWILIO_ACCOUNT_SID");
       const TWILIO_AUTH_TOKEN = Deno.env.get("TWILIO_AUTH_TOKEN");
-      const TWILIO_PHONE_NUMBER = Deno.env.get("TWILIO_PHONE_NUMBER");
+      // USE THE DEDICATED VENDOR/MAINTENANCE PHONE NUMBER
+      const TWILIO_VENDOR_PHONE = Deno.env.get("TWILIO_VENDOR_PHONE_NUMBER") || Deno.env.get("TWILIO_PHONE_NUMBER");
 
-      if (TWILIO_ACCOUNT_SID && TWILIO_AUTH_TOKEN && TWILIO_PHONE_NUMBER) {
-        const smsMessage = `${urgencyLabel ? urgencyLabel + "\n" : ""}New Work Order Assigned\n\nProperty: ${propertyName}\nIssue: ${workOrder.title}\nCategory: ${workOrder.category}\n\nDescription: ${workOrder.description?.substring(0, 100)}${workOrder.description?.length > 100 ? "..." : ""}\n\nPlease respond to confirm availability.`;
+      if (TWILIO_ACCOUNT_SID && TWILIO_AUTH_TOKEN && TWILIO_VENDOR_PHONE) {
+        const smsMessage = `${urgencyLabel ? urgencyLabel + "\n" : ""}New Work Order Assigned\n\nProperty: ${propertyName}\nIssue: ${workOrder.title}\nCategory: ${workOrder.category}\n\nDescription: ${workOrder.description?.substring(0, 100)}${workOrder.description?.length > 100 ? "..." : ""}\n\nReply CONFIRM to accept or DECLINE to pass.`;
 
         try {
           const twilioResponse = await fetch(
@@ -83,7 +84,7 @@ serve(async (req) => {
                 Authorization: `Basic ${btoa(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`)}`,
               },
               body: new URLSearchParams({
-                From: TWILIO_PHONE_NUMBER,
+                From: TWILIO_VENDOR_PHONE,
                 To: vendor.phone,
                 Body: smsMessage,
               }),
@@ -93,7 +94,7 @@ serve(async (req) => {
           const twilioData = await twilioResponse.json();
           
           if (twilioResponse.ok) {
-            console.log(`SMS sent to vendor ${vendor.name}: ${twilioData.sid}`);
+            console.log(`SMS sent to vendor ${vendor.name} from ${TWILIO_VENDOR_PHONE}: ${twilioData.sid}`);
             results.sms = true;
 
             // Log the SMS
@@ -144,7 +145,7 @@ serve(async (req) => {
             <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;">
             
             <p style="color: #6b7280; font-size: 14px;">
-              Please respond to confirm your availability. Once confirmed, you will receive additional details including scheduling information.
+              Please respond via SMS to confirm your availability. Reply CONFIRM to accept or DECLINE to pass.
             </p>
             
             <p style="color: #6b7280; font-size: 14px;">

@@ -22,7 +22,10 @@ serve(async (req) => {
     const googleReviewUrl = Deno.env.get("GOOGLE_REVIEW_URL") || "https://g.page/r/YOUR_REVIEW_LINK";
     const twilioSid = Deno.env.get("TWILIO_ACCOUNT_SID")!;
     const twilioAuth = Deno.env.get("TWILIO_AUTH_TOKEN")!;
-    const twilioPhone = Deno.env.get("TWILIO_PHONE_NUMBER")!;
+    
+    // TWO SEPARATE PHONE NUMBERS
+    const googleReviewsPhone = Deno.env.get("TWILIO_PHONE_NUMBER")!; // 770 number for Google Reviews
+    const vendorMaintenancePhone = Deno.env.get("TWILIO_VENDOR_PHONE_NUMBER") || googleReviewsPhone; // 404 number for Maintenance
 
     const supabase = createClient(supabaseUrl, supabaseKey);
 
@@ -33,24 +36,41 @@ serve(async (req) => {
     const formData = new URLSearchParams(formDataText);
     
     const from = formData.get("From") as string;
+    const to = formData.get("To") as string; // Which Twilio number received this
     const body = (formData.get("Body") || "").trim();
     const messageSid = formData.get("MessageSid") as string;
 
-    console.log(`Received SMS from ${from}: "${body}" (SID: ${messageSid})`);
+    console.log(`Received SMS from ${from} to ${to}: "${body}" (SID: ${messageSid})`);
 
     if (!from) {
       console.error("No 'From' number in webhook");
       throw new Error("No 'From' number in webhook");
     }
 
-    // CRITICAL: Clean phone number and match on last 10 digits only
-    const cleanPhone = from.replace(/[\s\-\(\)\+]/g, "");
-    const phoneDigits = cleanPhone.slice(-10);
+    // CRITICAL: Clean phone numbers and match on last 10 digits
+    const cleanFromPhone = from.replace(/[\s\-\(\)\+]/g, "");
+    const phoneDigits = cleanFromPhone.slice(-10);
+    
+    const cleanToPhone = to?.replace(/[\s\-\(\)\+]/g, "") || "";
+    const toPhoneDigits = cleanToPhone.slice(-10);
+    
+    // Determine which channel based on receiving number
+    const googleReviewsDigits = googleReviewsPhone.replace(/[\s\-\(\)\+]/g, "").slice(-10);
+    const vendorMaintenanceDigits = vendorMaintenancePhone.replace(/[\s\-\(\)\+]/g, "").slice(-10);
+    
+    const isGoogleReviewsChannel = toPhoneDigits === googleReviewsDigits;
+    const isMaintenanceChannel = toPhoneDigits === vendorMaintenanceDigits;
 
-    console.log(`Matching phone digits: ${phoneDigits}`);
+    console.log(`Channel Detection:`);
+    console.log(`  Received on: ${to} (digits: ${toPhoneDigits})`);
+    console.log(`  Google Reviews number: ${googleReviewsPhone} (digits: ${googleReviewsDigits})`);
+    console.log(`  Maintenance number: ${vendorMaintenancePhone} (digits: ${vendorMaintenanceDigits})`);
+    console.log(`  Is Google Reviews channel: ${isGoogleReviewsChannel}`);
+    console.log(`  Is Maintenance channel: ${isMaintenanceChannel}`);
+    console.log(`  From phone digits: ${phoneDigits}`);
 
     // ============================================
-    // STEP 1: Check for opt-out keywords (global)
+    // STEP 1: Check for opt-out keywords (global - both channels)
     // ============================================
     const optOutKeywords = ["stop", "unsubscribe", "opt out", "opt-out", "cancel", "quit", "end"];
     const isOptOut = optOutKeywords.some(kw => body.toLowerCase() === kw || body.toLowerCase().includes(kw));
@@ -58,16 +78,21 @@ serve(async (req) => {
     if (isOptOut) {
       console.log(`Opt-out detected from ${from}`);
       
-      // Update Google review requests
-      await supabase
-        .from("google_review_requests")
-        .update({
-          opted_out: true,
-          opted_out_at: new Date().toISOString(),
-          workflow_status: "ignored",
-          updated_at: new Date().toISOString(),
-        })
-        .ilike("guest_phone", `%${phoneDigits}`);
+      // Determine which phone to respond from based on channel
+      const responsePhone = isMaintenanceChannel ? vendorMaintenancePhone : googleReviewsPhone;
+      
+      // Update Google review requests if on that channel
+      if (isGoogleReviewsChannel) {
+        await supabase
+          .from("google_review_requests")
+          .update({
+            opted_out: true,
+            opted_out_at: new Date().toISOString(),
+            workflow_status: "ignored",
+            updated_at: new Date().toISOString(),
+          })
+          .ilike("guest_phone", `%${phoneDigits}`);
+      }
 
       await supabase.from("sms_log").insert({
         phone_number: from,
@@ -76,17 +101,17 @@ serve(async (req) => {
         status: "received",
       });
 
-      await sendSms(twilioSid, twilioAuth, twilioPhone, from, 
+      await sendSms(twilioSid, twilioAuth, responsePhone, from, 
         "You've been unsubscribed from PeachHaus messages. Reply START to resubscribe.");
 
       return xmlResponse();
     }
 
-    // Check for re-subscribe keywords
+    // Check for re-subscribe keywords (global)
     const resubKeywords = ["start", "yes", "unstop"];
     const isResubscribe = resubKeywords.some(kw => body.toLowerCase() === kw);
 
-    if (isResubscribe) {
+    if (isResubscribe && isGoogleReviewsChannel) {
       console.log(`Re-subscribe detected from ${from}`);
       
       await supabase
@@ -105,57 +130,85 @@ serve(async (req) => {
         status: "received",
       });
 
-      await sendSms(twilioSid, twilioAuth, twilioPhone, from,
+      await sendSms(twilioSid, twilioAuth, googleReviewsPhone, from,
         "You've been re-subscribed to PeachHaus messages. Thank you!");
 
       return xmlResponse();
     }
 
     // ============================================
-    // STEP 2: Check if this is a VENDOR response (maintenance)
+    // MAINTENANCE CHANNEL: Vendor and Owner Responses
     // ============================================
-    const vendorResult = await checkVendorResponse(supabase, phoneDigits, body, twilioSid, twilioAuth, twilioPhone);
-    if (vendorResult.handled) {
-      console.log("Message handled as vendor response");
+    if (isMaintenanceChannel) {
+      console.log("=== MAINTENANCE CHANNEL ===");
+      
+      // Check if this is a VENDOR response
+      const vendorResult = await checkVendorResponse(supabase, phoneDigits, body, twilioSid, twilioAuth, vendorMaintenancePhone);
+      if (vendorResult.handled) {
+        console.log("Message handled as vendor response");
+        return xmlResponse();
+      }
+
+      // Check if this is a PROPERTY OWNER response (quote approvals)
+      const ownerResult = await checkOwnerResponse(supabase, phoneDigits, body, twilioSid, twilioAuth, vendorMaintenancePhone);
+      if (ownerResult.handled) {
+        console.log("Message handled as owner response");
+        return xmlResponse();
+      }
+
+      // Unmatched maintenance message
+      console.log(`Unmatched maintenance message from ${phoneDigits}`);
+      await supabase.from("sms_log").insert({
+        phone_number: from,
+        message_type: "inbound_unmatched_maintenance",
+        message_body: body,
+        status: "received",
+      });
+
       return xmlResponse();
     }
 
     // ============================================
-    // STEP 3: Check if this is a PROPERTY OWNER response (maintenance quotes)
+    // GOOGLE REVIEWS CHANNEL: Guest Review Responses
     // ============================================
-    const ownerResult = await checkOwnerResponse(supabase, phoneDigits, body, twilioSid, twilioAuth, twilioPhone);
-    if (ownerResult.handled) {
-      console.log("Message handled as owner response");
+    if (isGoogleReviewsChannel) {
+      console.log("=== GOOGLE REVIEWS CHANNEL ===");
+      
+      const { data: reviewRequest, error: findError } = await supabase
+        .from("google_review_requests")
+        .select("*, ownerrez_reviews(*)")
+        .ilike("guest_phone", `%${phoneDigits}`)
+        .in("workflow_status", ["permission_asked"])
+        .eq("opted_out", false)
+        .order("permission_asked_at", { ascending: false })
+        .limit(1)
+        .single();
+
+      if (!findError && reviewRequest) {
+        console.log(`Found pending Google review request: ${reviewRequest.id}`);
+        await processGoogleReviewReply(supabase, reviewRequest, body, googleReviewUrl, twilioSid, twilioAuth, googleReviewsPhone);
+        return xmlResponse();
+      }
+
+      // Unmatched Google reviews message
+      console.log(`No pending review request found for phone digits ${phoneDigits}`);
+      await supabase.from("sms_log").insert({
+        phone_number: from,
+        message_type: "inbound_unmatched_reviews",
+        message_body: body,
+        status: "received",
+      });
+
       return xmlResponse();
     }
 
     // ============================================
-    // STEP 4: Check if this is a GOOGLE REVIEW response
+    // UNKNOWN CHANNEL - Log and exit
     // ============================================
-    const { data: reviewRequest, error: findError } = await supabase
-      .from("google_review_requests")
-      .select("*, ownerrez_reviews(*)")
-      .ilike("guest_phone", `%${phoneDigits}`)
-      .in("workflow_status", ["permission_asked"])
-      .eq("opted_out", false)
-      .order("permission_asked_at", { ascending: false })
-      .limit(1)
-      .single();
-
-    if (!findError && reviewRequest) {
-      console.log(`Found pending Google review request: ${reviewRequest.id}`);
-      await processGoogleReviewReply(supabase, reviewRequest, body, googleReviewUrl, twilioSid, twilioAuth, twilioPhone);
-      return xmlResponse();
-    }
-
-    // ============================================
-    // STEP 5: Unmatched message - log it
-    // ============================================
-    console.log(`No pending request found for phone digits ${phoneDigits}`);
-    
+    console.log(`Unknown channel - received on ${to}, not matching either number`);
     await supabase.from("sms_log").insert({
       phone_number: from,
-      message_type: "inbound_unmatched",
+      message_type: "inbound_unknown_channel",
       message_body: body,
       status: "received",
     });
@@ -553,7 +606,7 @@ async function sendSms(
     }
 
     const data = await response.json();
-    console.log(`SMS sent successfully, SID: ${data.sid}`);
+    console.log(`SMS sent successfully from ${twilioPhone}, SID: ${data.sid}`);
     return { success: true, sid: data.sid };
   } catch (error) {
     console.error("Twilio send exception:", error);
