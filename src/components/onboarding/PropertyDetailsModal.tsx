@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { OnboardingTask } from "@/types/onboarding";
-import { Loader2, MapPin, User, Lock, Phone, Link as LinkIcon, Mail, Home, Search, DollarSign, AlertCircle, Clock, Heart, Frown, Meh, Zap, Lightbulb, Copy, Check, TrendingUp, FileText, ExternalLink, ClipboardCheck, Key, Settings, Car, Bed, ChevronDown, ChevronUp, Download, MessageSquare, Plus, ArrowRight, ListTodo, Info, AlertTriangle, FolderOpen, Eye, FileSpreadsheet } from "lucide-react";
+import { Loader2, MapPin, User, Lock, Phone, Link as LinkIcon, Mail, Home, Search, DollarSign, AlertCircle, Clock, Heart, Frown, Meh, Zap, Lightbulb, Copy, Check, TrendingUp, FileText, ExternalLink, ClipboardCheck, Key, Settings, Car, Bed, ChevronDown, ChevronUp, Download, MessageSquare, Plus, ArrowRight, ListTodo, Info, AlertTriangle, FolderOpen, Eye, FileSpreadsheet, X } from "lucide-react";
 import { toast } from "sonner";
 import { InspectionDataSection } from "@/components/properties/InspectionDataSection";
 import { ONBOARDING_PHASES } from "@/context/onboardingPhases";
@@ -640,6 +640,80 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
     return filtered;
   }, [phasedData, searchQuery]);
 
+  // Aggregated search results for immediate display at top
+  const aggregatedSearchResults = useMemo(() => {
+    if (!searchQuery) return [];
+    
+    const query = searchQuery.toLowerCase();
+    const results: Array<{type: string; label: string; value: string; source: string; icon?: any}> = [];
+    
+    // Search property info
+    if (propertyInfo?.address?.toLowerCase().includes(query)) {
+      results.push({type: 'property', label: 'Address', value: propertyInfo.address, source: 'Property Info', icon: MapPin});
+    }
+    if (propertyInfo?.visit_price?.toString().includes(query)) {
+      results.push({type: 'property', label: 'Visit Price', value: `$${propertyInfo.visit_price}`, source: 'Property Info', icon: DollarSign});
+    }
+    if (propertyInfo?.rental_type?.toLowerCase().includes(query)) {
+      results.push({type: 'property', label: 'Rental Type', value: propertyInfo.rental_type, source: 'Property Info', icon: Home});
+    }
+    
+    // Search tasks with field values
+    tasks.forEach(task => {
+      const titleMatch = task.title.toLowerCase().includes(query);
+      const valueMatch = task.field_value?.toLowerCase().includes(query);
+      const descMatch = task.description?.toLowerCase().includes(query);
+      
+      if ((titleMatch || valueMatch || descMatch) && (task.field_value || task.description)) {
+        results.push({
+          type: 'task',
+          label: task.title,
+          value: task.field_value || task.description || '',
+          source: task.phase_title || `Phase ${task.phase_number}`,
+          icon: task.title.toLowerCase().includes('phone') ? Phone :
+                task.title.toLowerCase().includes('email') ? Mail :
+                task.title.toLowerCase().includes('address') ? MapPin :
+                task.title.toLowerCase().includes('code') || task.title.toLowerCase().includes('password') ? Lock :
+                FileText
+        });
+      }
+    });
+    
+    // Search owner actions
+    ownerActions.forEach(action => {
+      const titleMatch = action.title?.toLowerCase().includes(query);
+      const descMatch = action.description?.toLowerCase().includes(query);
+      const contentMatch = JSON.stringify(action.content)?.toLowerCase().includes(query);
+      
+      if (titleMatch || descMatch || contentMatch) {
+        results.push({
+          type: 'owner_action',
+          label: action.title || 'Owner Info',
+          value: action.description || JSON.stringify(action.content) || '',
+          source: action.category || 'Owner Intel',
+          icon: Info
+        });
+      }
+    });
+    
+    // Search financial data
+    if (financialData) {
+      if (financialData.last_year_revenue?.toString().includes(query)) {
+        results.push({type: 'financial', label: 'Last Year Revenue', value: `$${financialData.last_year_revenue.toLocaleString()}`, source: 'Financial Data', icon: DollarSign});
+      }
+      if (financialData.average_daily_rate?.toString().includes(query)) {
+        results.push({type: 'financial', label: 'Average Daily Rate', value: `$${financialData.average_daily_rate}`, source: 'Financial Data', icon: TrendingUp});
+      }
+    }
+    
+    return results;
+  }, [searchQuery, propertyInfo, tasks, ownerActions, financialData]);
+
+  // Total search result count
+  const totalResultCount = useMemo(() => {
+    return aggregatedSearchResults.length;
+  }, [aggregatedSearchResults]);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl h-[85vh] flex flex-col max-md:h-screen max-md:max-w-full max-md:p-4">
@@ -649,17 +723,30 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
         
         <div className="space-y-4 flex-1 min-h-0 flex flex-col max-md:space-y-3">
           <div className="relative flex-shrink-0">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none max-md:h-5 max-md:w-5 max-md:left-4 z-10" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none z-10" />
             <Input
               placeholder="Search property information..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 max-md:h-12 max-md:text-base max-md:pl-12"
+              className="pl-10 pr-24"
             />
             {searchQuery && (
-              <Badge variant="secondary" className="absolute right-3 top-1/2 transform -translate-y-1/2 text-xs">
-                Searching...
-              </Badge>
+              <div className="absolute right-2 top-1/2 transform -translate-y-1/2 flex items-center gap-1">
+                <Badge 
+                  variant={totalResultCount > 0 ? "default" : "secondary"} 
+                  className="text-xs"
+                >
+                  {totalResultCount > 0 ? `${totalResultCount} found` : 'No results'}
+                </Badge>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6"
+                  onClick={() => setSearchQuery("")}
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              </div>
             )}
           </div>
 
@@ -688,7 +775,76 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
               <TabsContent value="details" className="flex-1 min-h-0 mt-4">
                 <ScrollArea className="h-full">
                   <div className="space-y-4 pr-4 max-md:pr-2 max-md:space-y-3">
-                    {/* Property Information - Always show at top */}
+                    {/* Search Results - Show at top when searching */}
+                    {searchQuery && aggregatedSearchResults.length > 0 && (
+                      <Card className="border-2 border-yellow-500 bg-yellow-50/50 dark:bg-yellow-900/20">
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-sm font-semibold flex items-center gap-2 text-yellow-800 dark:text-yellow-200">
+                            <Search className="h-4 w-4" />
+                            Search Results ({aggregatedSearchResults.length})
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-2">
+                          {aggregatedSearchResults.map((result, idx) => {
+                            const IconComponent = result.icon;
+                            return (
+                              <div 
+                                key={idx} 
+                                className="p-3 bg-background rounded-lg border border-yellow-300 dark:border-yellow-700 flex items-start gap-3"
+                              >
+                                {IconComponent && (
+                                  <IconComponent className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                                )}
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <Badge variant="outline" className="text-xs">
+                                      {result.source}
+                                    </Badge>
+                                  </div>
+                                  <p className="text-sm font-medium">
+                                    {highlightText(result.label, searchQuery)}
+                                  </p>
+                                  <p className="text-sm text-muted-foreground break-words">
+                                    {highlightText(result.value, searchQuery)}
+                                  </p>
+                                </div>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7 flex-shrink-0"
+                                  onClick={() => copyToClipboard(result.value, result.label)}
+                                >
+                                  {copiedField === result.label ? (
+                                    <Check className="h-3.5 w-3.5 text-green-600" />
+                                  ) : (
+                                    <Copy className="h-3.5 w-3.5" />
+                                  )}
+                                </Button>
+                              </div>
+                            );
+                          })}
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    {/* No results message */}
+                    {searchQuery && aggregatedSearchResults.length === 0 && (
+                      <Card className="border-2 border-muted">
+                        <CardContent className="py-8 text-center">
+                          <Search className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                          <p className="text-muted-foreground">No results found for "{searchQuery}"</p>
+                          <Button 
+                            variant="link" 
+                            className="mt-2"
+                            onClick={() => setSearchQuery("")}
+                          >
+                            Clear search
+                          </Button>
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    {/* Property Information - Always show at top (hidden when searching) */}
                 {propertyInfo && (
                   <Card className="border-2 border-primary/20">
                     <CardHeader className="pb-3">
