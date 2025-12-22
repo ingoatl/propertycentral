@@ -347,6 +347,31 @@ const WorkOrderDetailModal = ({
                         <Phone className="h-3.5 w-3.5" />
                         {workOrder.assigned_vendor.phone}
                       </p>
+                      {/* Vendor Response Status */}
+                      <div className="mt-2 pt-2 border-t border-border/50">
+                        {workOrder.vendor_accepted === true && (
+                          <Badge className="bg-green-100 text-green-700">
+                            <CheckCircle className="h-3 w-3 mr-1" />
+                            Confirmed
+                          </Badge>
+                        )}
+                        {workOrder.vendor_accepted === false && (
+                          <div>
+                            <Badge className="bg-red-100 text-red-700">Declined</Badge>
+                            {workOrder.vendor_declined_reason && (
+                              <p className="text-xs text-muted-foreground mt-1">
+                                {workOrder.vendor_declined_reason}
+                              </p>
+                            )}
+                          </div>
+                        )}
+                        {workOrder.vendor_accepted === null && (
+                          <Badge className="bg-yellow-100 text-yellow-700">
+                            <Clock className="h-3 w-3 mr-1" />
+                            Awaiting Response
+                          </Badge>
+                        )}
+                      </div>
                     </div>
                   </div>
                 )}
@@ -362,11 +387,17 @@ const WorkOrderDetailModal = ({
                   </div>
                 )}
 
-                <div className="flex gap-4">
+                <div className="flex gap-4 flex-wrap">
                   {workOrder.estimated_cost && (
                     <div>
                       <Label className="text-muted-foreground">Estimated</Label>
                       <p className="mt-1 font-medium">${workOrder.estimated_cost}</p>
+                    </div>
+                  )}
+                  {workOrder.quoted_cost && (
+                    <div>
+                      <Label className="text-muted-foreground">Vendor Quote</Label>
+                      <p className="mt-1 font-medium text-primary">${workOrder.quoted_cost}</p>
                     </div>
                   )}
                   {workOrder.actual_cost && (
@@ -376,6 +407,36 @@ const WorkOrderDetailModal = ({
                     </div>
                   )}
                 </div>
+
+                {/* Owner Approval Status */}
+                {workOrder.status === "awaiting_approval" && (
+                  <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <div className="flex items-center gap-2 text-yellow-700 font-medium">
+                      <AlertTriangle className="h-4 w-4" />
+                      Awaiting Owner Approval
+                    </div>
+                    <p className="text-sm text-yellow-600 mt-1">
+                      Quote of ${workOrder.quoted_cost} requires owner authorization
+                    </p>
+                  </div>
+                )}
+                {workOrder.owner_approved === true && (
+                  <div className="flex items-center gap-2 text-green-600">
+                    <CheckCircle className="h-4 w-4" />
+                    <span className="text-sm font-medium">Owner Approved</span>
+                    {workOrder.owner_approved_at && (
+                      <span className="text-xs text-muted-foreground">
+                        {format(new Date(workOrder.owner_approved_at), "MMM d, h:mm a")}
+                      </span>
+                    )}
+                  </div>
+                )}
+                {workOrder.owner_approved === false && (
+                  <div className="flex items-center gap-2 text-red-600">
+                    <AlertTriangle className="h-4 w-4" />
+                    <span className="text-sm font-medium">Owner Declined</span>
+                  </div>
+                )}
 
                 {workOrder.access_instructions && (
                   <div>
