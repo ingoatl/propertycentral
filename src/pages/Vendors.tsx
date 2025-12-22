@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Plus, Search, Phone, Mail, Star, Clock, Wrench, Shield, AlertTriangle } from "lucide-react";
+import { Plus, Search, Phone, Mail, Star, Clock, Wrench, Shield, AlertTriangle, Loader2, ScanSearch } from "lucide-react";
 import { Vendor, VENDOR_SPECIALTIES } from "@/types/maintenance";
 import AddVendorDialog from "@/components/maintenance/AddVendorDialog";
 import VendorDetailModal from "@/components/maintenance/VendorDetailModal";
@@ -16,7 +16,29 @@ const Vendors = () => {
   const [selectedSpecialty, setSelectedSpecialty] = useState<string | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [selectedVendor, setSelectedVendor] = useState<Vendor | null>(null);
+  const [isExtracting, setIsExtracting] = useState(false);
   const queryClient = useQueryClient();
+
+  const extractVendorsFromEmails = async () => {
+    setIsExtracting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('extract-vendors-from-emails');
+      
+      if (error) throw error;
+      
+      if (data.success) {
+        toast.success(data.message);
+        queryClient.invalidateQueries({ queryKey: ["vendors"] });
+      } else {
+        toast.error(data.error || 'Failed to extract vendors');
+      }
+    } catch (error: any) {
+      console.error('Error extracting vendors:', error);
+      toast.error(error.message || 'Failed to extract vendors from emails');
+    } finally {
+      setIsExtracting(false);
+    }
+  };
 
   const { data: vendors = [], isLoading } = useQuery({
     queryKey: ["vendors"],
@@ -67,10 +89,25 @@ const Vendors = () => {
             <h1 className="text-3xl font-bold text-foreground">Vendor Management</h1>
             <p className="text-muted-foreground mt-1">Manage your network of trusted vendors</p>
           </div>
-          <Button onClick={() => setShowAddDialog(true)} className="gap-2">
-            <Plus className="h-4 w-4" />
-            Add Vendor
-          </Button>
+          <div className="flex gap-2">
+            <Button 
+              variant="outline" 
+              onClick={extractVendorsFromEmails} 
+              disabled={isExtracting}
+              className="gap-2"
+            >
+              {isExtracting ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <ScanSearch className="h-4 w-4" />
+              )}
+              {isExtracting ? 'Scanning...' : 'Extract from Emails'}
+            </Button>
+            <Button onClick={() => setShowAddDialog(true)} className="gap-2">
+              <Plus className="h-4 w-4" />
+              Add Vendor
+            </Button>
+          </div>
         </div>
 
         {/* Stats Cards */}
