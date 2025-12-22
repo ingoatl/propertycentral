@@ -1,19 +1,19 @@
 import { ReactNode, useState, useEffect } from "react";
-import { Link, useLocation } from "react-router-dom";
-import { Home, Building2, DollarSign, Calendar, LogOut, Shield, Users, Receipt, FileText, CalendarDays, FileSignature, Zap, MessageSquareText } from "lucide-react";
+import { Building2, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useAuth } from "./ProtectedRoute";
 import { FloatingChatButton } from "@/components/ai-assistant/FloatingChatButton";
+import { MainNavigation } from "@/components/navigation/MainNavigation";
+import { MobileNavigation } from "@/components/navigation/MobileNavigation";
 
 interface LayoutProps {
   children: ReactNode;
 }
 
 const Layout = ({ children }: LayoutProps) => {
-  const location = useLocation();
   const { user, loading, pendingApproval } = useAuth() as any;
   const [isAdmin, setIsAdmin] = useState(false);
   const [hasUserRole, setHasUserRole] = useState(false);
@@ -83,46 +83,40 @@ const Layout = ({ children }: LayoutProps) => {
     );
   }
 
-  // Build nav items based on roles
-  const navItems = [
-    ...(isAdmin || hasUserRole ? [
-      { path: "/", label: "Dashboard", icon: Home },
-      { path: "/properties", label: "Properties", icon: Building2 },
-      { path: "/utilities", label: "Utilities", icon: Zap },
-      { path: "/visits", label: "Log Visit", icon: Calendar },
-      { path: "/expenses", label: "Expenses", icon: DollarSign },
-      { path: "/bookings", label: "Bookings", icon: CalendarDays },
-      { path: "/documents", label: "Documents", icon: FileSignature },
-    ] : []),
-    ...(isAdmin ? [
-      { path: "/owners", label: "Owners", icon: Users },
-      { path: "/charges", label: "Charges", icon: Receipt },
-      { path: "/owner-conversations", label: "Owner Intel", icon: MessageSquareText },
-      { path: "/admin", label: "Admin", icon: Shield }
-    ] : []),
-  ];
+  const canAccessNav = isAdmin || hasUserRole;
 
   return (
     <div className="min-h-screen bg-gradient-subtle">
-      <header className="bg-card border-b border-border shadow-sm sticky top-0 z-40">
-        <div className="container mx-auto px-4 py-4 md:py-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3 md:gap-2">
-              <div className="w-12 h-12 md:w-10 md:h-10 rounded-lg bg-gradient-primary flex items-center justify-center shadow-warm">
-                <Building2 className="w-7 h-7 md:w-6 md:h-6 text-primary-foreground" />
-              </div>
-              <div>
-                <h1 className="text-lg md:text-xl font-bold text-foreground">PeachHaus</h1>
-                <p className="text-xs text-muted-foreground">Property Tracker</p>
+      <header className="bg-card/80 backdrop-blur-md border-b border-border shadow-sm sticky top-0 z-50">
+        <div className="container mx-auto px-4">
+          <div className="flex items-center justify-between h-16">
+            {/* Left side: Mobile menu + Logo */}
+            <div className="flex items-center gap-3">
+              {canAccessNav && <MobileNavigation isAdmin={isAdmin} />}
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-gradient-primary flex items-center justify-center shadow-warm">
+                  <Building2 className="w-6 h-6 text-primary-foreground" />
+                </div>
+                <div className="hidden sm:block">
+                  <h1 className="text-lg font-bold text-foreground">PeachHaus</h1>
+                  <p className="text-xs text-muted-foreground">Property Tracker</p>
+                </div>
               </div>
             </div>
-            <div className="flex items-center gap-3 md:gap-4">
+
+            {/* Center: Desktop Navigation */}
+            {canAccessNav && <MainNavigation isAdmin={isAdmin} />}
+
+            {/* Right side: User info + Logout */}
+            <div className="flex items-center gap-3">
               {user && (
                 <>
-                  <span className="text-sm text-muted-foreground hidden sm:inline truncate max-w-[150px]">{user.email}</span>
+                  <span className="text-sm text-muted-foreground hidden md:inline truncate max-w-[150px]">
+                    {user.email}
+                  </span>
                   <Button variant="outline" size="sm" onClick={handleLogout} className="shrink-0">
-                    <LogOut className="h-5 w-5 md:h-4 md:w-4 md:mr-2" />
-                    <span className="hidden md:inline">Logout</span>
+                    <LogOut className="h-4 w-4 lg:mr-2" />
+                    <span className="hidden lg:inline">Logout</span>
                   </Button>
                 </>
               )}
@@ -130,31 +124,6 @@ const Layout = ({ children }: LayoutProps) => {
           </div>
         </div>
       </header>
-
-      <nav className="bg-card border-b border-border sticky top-[72px] md:top-[64px] z-30 overflow-x-auto scrollbar-hide">
-        <div className="container mx-auto px-4 md:px-2">
-          <div className="flex gap-1 min-w-max md:min-w-0">
-            {navItems.map((item) => {
-              const Icon = item.icon;
-              const isActive = location.pathname === item.path;
-              return (
-                <Link
-                  key={item.path}
-                  to={item.path}
-                  className={`flex items-center gap-2 px-4 py-3.5 md:px-3 md:py-3 text-base md:text-sm font-medium transition-colors whitespace-nowrap min-h-[44px] touch-manipulation ${
-                    isActive
-                      ? "text-primary border-b-2 border-primary bg-accent/50"
-                      : "text-muted-foreground hover:text-foreground hover:bg-accent active:bg-accent/80"
-                  }`}
-                >
-                  <Icon className="w-5 h-5 md:w-4 md:h-4 shrink-0" />
-                  <span className="truncate">{item.label}</span>
-                </Link>
-              );
-            })}
-          </div>
-        </div>
-      </nav>
 
       <main className="container mx-auto px-4 py-6 md:py-8 text-base">{children}</main>
       <FloatingChatButton />
