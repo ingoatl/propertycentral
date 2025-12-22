@@ -40,16 +40,16 @@ const Vendors = () => {
     }
   };
 
-  const { data: vendors = [], isLoading } = useQuery({
+  const { data: vendors = [], isLoading, refetch } = useQuery({
     queryKey: ["vendors"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("vendors")
-        .select("*")
+        .select("*, billcom_vendor_id, billcom_synced_at, billcom_invite_sent_at")
         .order("name");
       
       if (error) throw error;
-      return data as Vendor[];
+      return data;
     },
   });
 
