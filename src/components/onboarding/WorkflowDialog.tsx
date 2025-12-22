@@ -389,13 +389,13 @@ export const WorkflowDialog = ({ open, onOpenChange, project, propertyId, proper
             {/* Filters Row */}
             <div className="flex items-center gap-2 max-md:flex-col">
               <div className="relative flex-1 max-md:w-full">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground max-md:h-5 max-md:w-5" />
                 <Input
                   placeholder="Search tasks, phases, values, notes..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-9 max-md:h-12 max-md:text-base max-md:pl-10"
+                  className="pl-10 max-md:h-12 max-md:text-base max-md:pl-12"
                 />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none max-md:h-5 max-md:w-5 max-md:left-4" />
               </div>
               <Button
                 variant={showMyTasksOnly ? "default" : "outline"}
