@@ -188,6 +188,12 @@ export const navigationConfig: NavElement[] = [
         icon: Calendar,
         description: "Schedule holiday emails",
       },
+      {
+        path: "/admin?tab=google-reviews",
+        label: "Google Reviews",
+        icon: MessageSquare,
+        description: "Review conversion campaign",
+      },
     ],
   },
 ];
