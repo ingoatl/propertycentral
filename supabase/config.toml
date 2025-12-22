@@ -167,3 +167,6 @@ verify_jwt = true
 
 [functions.billcom-invite-vendor]
 verify_jwt = true
+
+[functions.notify-vendor-work-order]
+verify_jwt = true

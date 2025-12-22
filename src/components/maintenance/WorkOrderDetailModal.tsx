@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select,
@@ -46,6 +47,9 @@ const WorkOrderDetailModal = ({
 }: WorkOrderDetailModalProps) => {
   const [newMessage, setNewMessage] = useState("");
   const [selectedVendorId, setSelectedVendorId] = useState<string | null>(null);
+  const [notifySms, setNotifySms] = useState(true);
+  const [notifyEmail, setNotifyEmail] = useState(true);
+  const [isNotifying, setIsNotifying] = useState(false);
   const queryClient = useQueryClient();
 
   const statusConfig = STATUS_CONFIG[workOrder.status];
@@ -133,7 +137,7 @@ const WorkOrderDetailModal = ({
     },
   });
 
-  // Assign vendor
+  // Assign vendor and notify
   const assignVendor = useMutation({
     mutationFn: async (vendorId: string) => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -160,9 +164,38 @@ const WorkOrderDetailModal = ({
         previous_status: workOrder.status,
         new_status: "dispatched",
       });
+
+      // Notify vendor via SMS and/or Email
+      const notifyMethods: string[] = [];
+      if (notifySms) notifyMethods.push("sms");
+      if (notifyEmail) notifyMethods.push("email");
+
+      if (notifyMethods.length > 0) {
+        setIsNotifying(true);
+        try {
+          const { data, error: notifyError } = await supabase.functions.invoke("notify-vendor-work-order", {
+            body: { 
+              workOrderId: workOrder.id, 
+              vendorId,
+              notifyMethods 
+            },
+          });
+
+          if (notifyError) {
+            console.error("Notification error:", notifyError);
+            toast.warning("Vendor assigned but notification failed");
+          } else if (data?.success) {
+            toast.success(data.message);
+          }
+        } catch (e) {
+          console.error("Failed to notify vendor:", e);
+        } finally {
+          setIsNotifying(false);
+        }
+      }
     },
     onSuccess: () => {
-      toast.success("Vendor assigned");
+      toast.success("Vendor assigned successfully");
       onUpdate();
       setSelectedVendorId(null);
       queryClient.invalidateQueries({ queryKey: ["work-order-timeline", workOrder.id] });
@@ -435,7 +468,7 @@ const WorkOrderDetailModal = ({
 
             {/* Vendor Assignment */}
             {!workOrder.assigned_vendor_id && (
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <Label>Assign Vendor</Label>
                 <div className="flex gap-2">
                   <Select
@@ -460,11 +493,46 @@ const WorkOrderDetailModal = ({
                   </Select>
                   <Button
                     onClick={() => selectedVendorId && assignVendor.mutate(selectedVendorId)}
-                    disabled={!selectedVendorId || assignVendor.isPending}
+                    disabled={!selectedVendorId || assignVendor.isPending || isNotifying}
                   >
-                    Assign
+                    {assignVendor.isPending || isNotifying ? "Assigning..." : "Assign"}
                   </Button>
                 </div>
+
+                {/* Notification Options */}
+                {selectedVendorId && (
+                  <div className="p-3 bg-muted/50 rounded-lg space-y-2">
+                    <Label className="text-sm font-medium">Notify Vendor</Label>
+                    <div className="flex flex-wrap gap-4">
+                      <div className="flex items-center gap-2">
+                        <Checkbox
+                          id="notify_sms"
+                          checked={notifySms}
+                          onCheckedChange={(checked) => setNotifySms(!!checked)}
+                        />
+                        <label htmlFor="notify_sms" className="text-sm flex items-center gap-1.5 cursor-pointer">
+                          <Phone className="h-3.5 w-3.5" />
+                          SMS
+                        </label>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Checkbox
+                          id="notify_email"
+                          checked={notifyEmail}
+                          onCheckedChange={(checked) => setNotifyEmail(!!checked)}
+                        />
+                        <label htmlFor="notify_email" className="text-sm flex items-center gap-1.5 cursor-pointer">
+                          <Mail className="h-3.5 w-3.5" />
+                          Email
+                        </label>
+                      </div>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Vendor will receive work order details and be asked to confirm availability
+                    </p>
+                  </div>
+                )}
+
                 {vendors.length === 0 && (
                   <p className="text-sm text-muted-foreground">
                     No vendors available for {category?.label}
