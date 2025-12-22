@@ -86,21 +86,25 @@ const WorkOrderDetailModal = ({
     },
   });
 
-  // Fetch vendors for assignment
+  // Fetch vendors for assignment (all active vendors, preferred ones first, matching category highlighted)
   const { data: vendors = [] } = useQuery({
-    queryKey: ["vendors-for-assignment", workOrder.category],
+    queryKey: ["vendors-for-assignment"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("vendors")
         .select("*")
-        .contains("specialty", [workOrder.category])
         .in("status", ["active", "preferred"])
-        .order("status", { ascending: false });
+        .order("status", { ascending: false })
+        .order("name", { ascending: true });
       
       if (error) throw error;
       return data as Vendor[];
     },
   });
+
+  // Separate vendors by category match for display
+  const matchingVendors = vendors.filter(v => v.specialty?.includes(workOrder.category));
+  const otherVendors = vendors.filter(v => !v.specialty?.includes(workOrder.category));
 
   // Update status
   const updateStatus = useMutation({
@@ -470,6 +474,39 @@ const WorkOrderDetailModal = ({
             {!workOrder.assigned_vendor_id && (
               <div className="space-y-3">
                 <Label>Assign Vendor</Label>
+                
+                {/* Notification Options - Show before dropdown */}
+                <div className="p-3 bg-muted/50 rounded-lg space-y-2">
+                  <Label className="text-sm font-medium">Notify Vendor When Assigned</Label>
+                  <div className="flex flex-wrap gap-4">
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        id="notify_sms"
+                        checked={notifySms}
+                        onCheckedChange={(checked) => setNotifySms(!!checked)}
+                      />
+                      <label htmlFor="notify_sms" className="text-sm flex items-center gap-1.5 cursor-pointer">
+                        <Phone className="h-3.5 w-3.5" />
+                        SMS
+                      </label>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        id="notify_email"
+                        checked={notifyEmail}
+                        onCheckedChange={(checked) => setNotifyEmail(!!checked)}
+                      />
+                      <label htmlFor="notify_email" className="text-sm flex items-center gap-1.5 cursor-pointer">
+                        <Mail className="h-3.5 w-3.5" />
+                        Email
+                      </label>
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Vendor will receive work order details and be asked to confirm availability
+                  </p>
+                </div>
+
                 <div className="flex gap-2">
                   <Select
                     value={selectedVendorId || ""}
@@ -479,16 +516,45 @@ const WorkOrderDetailModal = ({
                       <SelectValue placeholder="Select a vendor" />
                     </SelectTrigger>
                     <SelectContent>
-                      {vendors.map((vendor) => (
-                        <SelectItem key={vendor.id} value={vendor.id}>
-                          <div className="flex items-center gap-2">
-                            <span>{vendor.name}</span>
-                            {vendor.status === "preferred" && (
-                              <Badge variant="secondary" className="text-xs">Preferred</Badge>
-                            )}
+                      {matchingVendors.length > 0 && (
+                        <>
+                          <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground bg-muted">
+                            Recommended for {category?.label}
                           </div>
-                        </SelectItem>
-                      ))}
+                          {matchingVendors.map((vendor) => (
+                            <SelectItem key={vendor.id} value={vendor.id}>
+                              <div className="flex items-center gap-2">
+                                <span>{vendor.name}</span>
+                                {vendor.status === "preferred" && (
+                                  <Badge variant="secondary" className="text-xs">Preferred</Badge>
+                                )}
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </>
+                      )}
+                      {otherVendors.length > 0 && (
+                        <>
+                          <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground bg-muted">
+                            Other Vendors
+                          </div>
+                          {otherVendors.map((vendor) => (
+                            <SelectItem key={vendor.id} value={vendor.id}>
+                              <div className="flex items-center gap-2">
+                                <span>{vendor.name}</span>
+                                {vendor.status === "preferred" && (
+                                  <Badge variant="secondary" className="text-xs">Preferred</Badge>
+                                )}
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </>
+                      )}
+                      {vendors.length === 0 && (
+                        <div className="px-2 py-4 text-sm text-muted-foreground text-center">
+                          No vendors available
+                        </div>
+                      )}
                     </SelectContent>
                   </Select>
                   <Button
@@ -498,46 +564,6 @@ const WorkOrderDetailModal = ({
                     {assignVendor.isPending || isNotifying ? "Assigning..." : "Assign"}
                   </Button>
                 </div>
-
-                {/* Notification Options */}
-                {selectedVendorId && (
-                  <div className="p-3 bg-muted/50 rounded-lg space-y-2">
-                    <Label className="text-sm font-medium">Notify Vendor</Label>
-                    <div className="flex flex-wrap gap-4">
-                      <div className="flex items-center gap-2">
-                        <Checkbox
-                          id="notify_sms"
-                          checked={notifySms}
-                          onCheckedChange={(checked) => setNotifySms(!!checked)}
-                        />
-                        <label htmlFor="notify_sms" className="text-sm flex items-center gap-1.5 cursor-pointer">
-                          <Phone className="h-3.5 w-3.5" />
-                          SMS
-                        </label>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Checkbox
-                          id="notify_email"
-                          checked={notifyEmail}
-                          onCheckedChange={(checked) => setNotifyEmail(!!checked)}
-                        />
-                        <label htmlFor="notify_email" className="text-sm flex items-center gap-1.5 cursor-pointer">
-                          <Mail className="h-3.5 w-3.5" />
-                          Email
-                        </label>
-                      </div>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      Vendor will receive work order details and be asked to confirm availability
-                    </p>
-                  </div>
-                )}
-
-                {vendors.length === 0 && (
-                  <p className="text-sm text-muted-foreground">
-                    No vendors available for {category?.label}
-                  </p>
-                )}
               </div>
             )}
 
