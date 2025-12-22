@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { CheckCircle, XCircle, Clock, Shield, UserPlus, Key, Users, MessageCircleQuestion, UserCog, Bug, Mail, Database, Briefcase, Sparkles } from "lucide-react";
+import { CheckCircle, XCircle, Clock, Shield, UserPlus, Key, Users, MessageCircleQuestion, UserCog, Bug, Mail, Database, Briefcase, Sparkles, Star } from "lucide-react";
 import { RescheduleLogsTab } from "@/components/admin/RescheduleLogsTab";
 import { z } from "zod";
 import { TeamMatrixTab } from "@/components/admin/TeamMatrixTab";
@@ -20,6 +20,7 @@ import { DataCleanupPanel } from "@/components/reconciliation/DataCleanupPanel";
 import { JobApplicationsCard } from "@/components/admin/JobApplicationsCard";
 import { HolidayEmailManager } from "@/components/admin/HolidayEmailManager";
 import { HolidayEmailWatchdogCard } from "@/components/admin/HolidayEmailWatchdogCard";
+import GoogleReviewsTab from "@/components/bookings/GoogleReviewsTab";
 
 const createUserSchema = z.object({
   email: z.string().email("Invalid email address").max(255),
@@ -393,7 +394,7 @@ const Admin = () => {
       </div>
 
       <Tabs defaultValue="users" className="w-full">
-        <TabsList className="grid w-full grid-cols-9">
+        <TabsList className="flex flex-wrap gap-1 h-auto p-1">
           <TabsTrigger value="users">User Management</TabsTrigger>
           <TabsTrigger value="team-matrix">
             <Users className="w-4 h-4 mr-2" />
@@ -426,6 +427,10 @@ const Admin = () => {
           <TabsTrigger value="holiday-emails">
             <Sparkles className="w-4 h-4 mr-2" />
             Holiday Emails
+          </TabsTrigger>
+          <TabsTrigger value="google-reviews">
+            <Star className="w-4 h-4 mr-2" />
+            Google Reviews
           </TabsTrigger>
         </TabsList>
 
@@ -772,6 +777,10 @@ const Admin = () => {
               <HolidayEmailWatchdogCard />
             </div>
           </div>
+        </TabsContent>
+
+        <TabsContent value="google-reviews" className="mt-8">
+          <GoogleReviewsTab />
         </TabsContent>
       </Tabs>
     </div>

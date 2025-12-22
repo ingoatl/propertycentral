@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -421,6 +421,17 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
     }
   };
 
+  // Highlight matching text in search results
+  const highlightText = useCallback((text: string, query: string) => {
+    if (!query || !text) return text;
+    const parts = text.split(new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi'));
+    return parts.map((part, i) => 
+      part.toLowerCase() === query.toLowerCase() 
+        ? <mark key={i} className="bg-yellow-300 dark:bg-yellow-600 px-0.5 rounded">{part}</mark>
+        : part
+    );
+  }, []);
+
   const organizeTasksByCategory = (): CategorizedData => {
     const categories: CategorizedData = {
       'Owner Information': [],
@@ -638,13 +649,18 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
         
         <div className="space-y-4 flex-1 min-h-0 flex flex-col max-md:space-y-3">
           <div className="relative flex-shrink-0">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none max-md:h-5 max-md:w-5 max-md:left-4 z-10" />
             <Input
               placeholder="Search property information..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-10 max-md:h-12 max-md:text-base max-md:pl-12"
             />
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none max-md:h-5 max-md:w-5 max-md:left-4" />
+            {searchQuery && (
+              <Badge variant="secondary" className="absolute right-3 top-1/2 transform -translate-y-1/2 text-xs">
+                Searching...
+              </Badge>
+            )}
           </div>
 
           {loading ? (
@@ -983,12 +999,12 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
                             <p className="text-xs font-semibold text-muted-foreground border-b border-border/50 pb-1">{phase}</p>
                             <div className="grid gap-2">
                               {phaseTasks.map(task => (
-                                <div key={task.id} className="flex items-start justify-between gap-2 bg-background/50 p-2 rounded-md">
+                                <div key={task.id} className={`flex items-start justify-between gap-2 p-2 rounded-md ${searchQuery && (task.title.toLowerCase().includes(searchQuery.toLowerCase()) || task.field_value?.toLowerCase().includes(searchQuery.toLowerCase())) ? 'bg-yellow-100 dark:bg-yellow-900/30 ring-2 ring-yellow-400' : 'bg-background/50'}`}>
                                   <div className="flex-1 min-w-0">
-                                    <p className="text-xs font-medium text-muted-foreground">{task.title}</p>
-                                    <p className="text-sm font-medium break-words">{task.field_value}</p>
+                                    <p className="text-xs font-medium text-muted-foreground">{highlightText(task.title, searchQuery)}</p>
+                                    <p className="text-sm font-medium break-words">{highlightText(task.field_value || '', searchQuery)}</p>
                                     {task.notes && (
-                                      <p className="text-xs text-muted-foreground mt-1 italic">{task.notes}</p>
+                                      <p className="text-xs text-muted-foreground mt-1 italic">{highlightText(task.notes, searchQuery)}</p>
                                     )}
                                   </div>
                                   <Button
@@ -1344,7 +1360,7 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
                             const valueMatch = searchQuery && item.value.toLowerCase().includes(searchQuery.toLowerCase());
                             
                             return (
-                              <div key={idx} className="flex items-center justify-between gap-2 py-1">
+                              <div key={idx} className={`flex items-center justify-between gap-2 py-1 px-2 rounded ${(labelMatch || valueMatch) ? 'bg-yellow-100 dark:bg-yellow-900/30 ring-2 ring-yellow-400' : ''}`}>
                                 <div className="flex-1 min-w-0 space-y-1">
                                   <div className="flex items-center gap-2">
                                     {Icon && <Icon className="h-3.5 w-3.5 text-muted-foreground" />}
