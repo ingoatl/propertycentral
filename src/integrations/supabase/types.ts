@@ -4927,7 +4927,7 @@ export type Database = {
           license_number: string | null
           name: string
           notes: string | null
-          phone: string
+          phone: string | null
           preferred_payment_method: string | null
           service_area: string[] | null
           specialty: string[]
@@ -4952,7 +4952,7 @@ export type Database = {
           license_number?: string | null
           name: string
           notes?: string | null
-          phone: string
+          phone?: string | null
           preferred_payment_method?: string | null
           service_area?: string[] | null
           specialty?: string[]
@@ -4977,7 +4977,7 @@ export type Database = {
           license_number?: string | null
           name?: string
           notes?: string | null
-          phone?: string
+          phone?: string | null
           preferred_payment_method?: string | null
           service_area?: string[] | null
           specialty?: string[]
