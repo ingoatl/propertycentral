@@ -31,7 +31,6 @@ const Dashboard = () => {
           table: 'monthly_reconciliations'
         },
         (payload) => {
-          console.log('Reconciliation changed:', payload);
           // Reload data when reconciliations are approved or updated
           if (payload.eventType === 'UPDATE' || payload.eventType === 'INSERT') {
             loadData();
@@ -50,7 +49,6 @@ const Dashboard = () => {
           table: 'visits'
         },
         (payload) => {
-          console.log('Visit billed status changed:', payload);
           // Reload when visits are marked as billed
           loadData();
         }
@@ -67,7 +65,6 @@ const Dashboard = () => {
           table: 'expenses'
         },
         (payload) => {
-          console.log('Expense changed:', payload);
           // Reload when expenses are added, updated, or deleted
           loadData();
         }
@@ -352,12 +349,9 @@ const Dashboard = () => {
 
       setSummaries(allSummaries);
     } catch (error: any) {
-      console.error("Error loading data:", error);
-      console.error("Error details:", {
-        message: error?.message,
-        stack: error?.stack,
-        name: error?.name
-      });
+      if (import.meta.env.DEV) {
+        console.error("Error loading data:", error);
+      }
       toast.error(`Failed to load dashboard data: ${error?.message || 'Unknown error'}`);
     } finally {
       setLoading(false);
@@ -403,7 +397,7 @@ const Dashboard = () => {
         toast.success("Report exported and emailed to anja@peachhausgroup.com!");
       }
     } catch (error) {
-      console.error("Export error:", error);
+      if (import.meta.env.DEV) console.error("Export error:", error);
       toast.error("Failed to export report");
     }
   };
@@ -422,7 +416,7 @@ const Dashboard = () => {
       
       await loadData();
     } catch (error: any) {
-      console.error("OwnerRez sync error:", error);
+      if (import.meta.env.DEV) console.error("OwnerRez sync error:", error);
       toast.dismiss();
       toast.error("Failed to sync OwnerRez data");
     } finally {
