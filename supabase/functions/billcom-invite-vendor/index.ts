@@ -126,7 +126,7 @@ serve(async (req) => {
     }
 
     // Send invitation to vendor to join Bill.com network
-    // Note: Bill.com API uses "id" parameter for SendVendorInvite
+    // SendVendorInvite requires vendorId and email
     const inviteResponse = await fetch("https://api.bill.com/api/v2/SendVendorInvite.json", {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -135,6 +135,7 @@ serve(async (req) => {
         sessionId,
         data: JSON.stringify({
           vendorId: billcomVendorId,
+          email: vendor.email,
         }),
       }),
     });
