@@ -187,16 +187,17 @@ Return ONLY valid JSON array. If no vendors found, return empty array [].`
 
     console.log(`AI identified ${vendors.length} vendors`);
 
-    // Insert new vendors
+    // Insert new vendors - filter out those without phone numbers (required field)
     const vendorsToInsert = vendors
       .filter(v => v.email && v.company_name)
+      .filter(v => v.phone && v.phone.trim() !== '') // Phone is required
       .filter(v => !existingEmails.has(v.email.toLowerCase()))
       .filter(v => !existingCompanies.has(v.company_name.toLowerCase()))
       .map(v => ({
         name: v.name || v.company_name,
         company_name: v.company_name,
         email: v.email.toLowerCase(),
-        phone: v.phone,
+        phone: v.phone!.trim(),
         specialty: v.specialty || [],
         service_area: ['Atlanta Metro'],
         notes: v.notes || 'Auto-extracted from email communications',
@@ -207,6 +208,13 @@ Return ONLY valid JSON array. If no vendors found, return empty array [].`
         total_jobs_completed: 0,
         average_rating: 0
       }));
+
+    // Log skipped vendors for debugging
+    const skippedNoPhone = vendors.filter(v => !v.phone || v.phone.trim() === '');
+    if (skippedNoPhone.length > 0) {
+      console.log(`Skipped ${skippedNoPhone.length} vendors without phone numbers:`, 
+        skippedNoPhone.map(v => v.company_name || v.name).join(', '));
+    }
 
     console.log(`Inserting ${vendorsToInsert.length} new vendors`);
 
