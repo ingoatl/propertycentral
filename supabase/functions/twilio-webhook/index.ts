@@ -12,6 +12,10 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  console.log("=== TWILIO WEBHOOK RECEIVED ===");
+  console.log("Method:", req.method);
+  console.log("URL:", req.url);
+
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -24,15 +28,18 @@ serve(async (req) => {
 
     // CRITICAL: Parse form data using URLSearchParams, NOT req.formData()
     const formDataText = await req.text();
+    console.log("Raw form data:", formDataText);
+    
     const formData = new URLSearchParams(formDataText);
     
     const from = formData.get("From") as string;
-    const body = formData.get("Body") as string;
+    const body = (formData.get("Body") || "").trim();
     const messageSid = formData.get("MessageSid") as string;
 
-    console.log(`Received SMS from ${from}: ${body}`);
+    console.log(`Received SMS from ${from}: "${body}" (SID: ${messageSid})`);
 
     if (!from) {
+      console.error("No 'From' number in webhook");
       throw new Error("No 'From' number in webhook");
     }
 
@@ -42,14 +49,16 @@ serve(async (req) => {
 
     console.log(`Matching phone digits: ${phoneDigits}`);
 
-    // Check for opt-out keywords FIRST
+    // ============================================
+    // STEP 1: Check for opt-out keywords (global)
+    // ============================================
     const optOutKeywords = ["stop", "unsubscribe", "opt out", "opt-out", "cancel", "quit", "end"];
-    const isOptOut = optOutKeywords.some(kw => body.toLowerCase().trim() === kw || body.toLowerCase().includes(kw));
+    const isOptOut = optOutKeywords.some(kw => body.toLowerCase() === kw || body.toLowerCase().includes(kw));
 
     if (isOptOut) {
       console.log(`Opt-out detected from ${from}`);
       
-      // Update any matching requests to opted_out
+      // Update Google review requests
       await supabase
         .from("google_review_requests")
         .update({
@@ -60,7 +69,6 @@ serve(async (req) => {
         })
         .ilike("guest_phone", `%${phoneDigits}`);
 
-      // Log the opt-out message
       await supabase.from("sms_log").insert({
         phone_number: from,
         message_type: "inbound_opt_out",
@@ -68,19 +76,15 @@ serve(async (req) => {
         status: "received",
       });
 
-      // Send opt-out confirmation
       await sendSms(twilioSid, twilioAuth, twilioPhone, from, 
-        "You've been unsubscribed from PeachHaus review requests. Reply START to resubscribe.");
+        "You've been unsubscribed from PeachHaus messages. Reply START to resubscribe.");
 
-      return new Response(
-        '<?xml version="1.0" encoding="UTF-8"?><Response></Response>',
-        { headers: { "Content-Type": "text/xml" } }
-      );
+      return xmlResponse();
     }
 
     // Check for re-subscribe keywords
     const resubKeywords = ["start", "yes", "unstop"];
-    const isResubscribe = resubKeywords.some(kw => body.toLowerCase().trim() === kw);
+    const isResubscribe = resubKeywords.some(kw => body.toLowerCase() === kw);
 
     if (isResubscribe) {
       console.log(`Re-subscribe detected from ${from}`);
@@ -104,14 +108,31 @@ serve(async (req) => {
       await sendSms(twilioSid, twilioAuth, twilioPhone, from,
         "You've been re-subscribed to PeachHaus messages. Thank you!");
 
-      return new Response(
-        '<?xml version="1.0" encoding="UTF-8"?><Response></Response>',
-        { headers: { "Content-Type": "text/xml" } }
-      );
+      return xmlResponse();
     }
 
-    // Find the most recent pending request for this phone using last 10 digits
-    const { data: request, error: findError } = await supabase
+    // ============================================
+    // STEP 2: Check if this is a VENDOR response (maintenance)
+    // ============================================
+    const vendorResult = await checkVendorResponse(supabase, phoneDigits, body, twilioSid, twilioAuth, twilioPhone);
+    if (vendorResult.handled) {
+      console.log("Message handled as vendor response");
+      return xmlResponse();
+    }
+
+    // ============================================
+    // STEP 3: Check if this is a PROPERTY OWNER response (maintenance quotes)
+    // ============================================
+    const ownerResult = await checkOwnerResponse(supabase, phoneDigits, body, twilioSid, twilioAuth, twilioPhone);
+    if (ownerResult.handled) {
+      console.log("Message handled as owner response");
+      return xmlResponse();
+    }
+
+    // ============================================
+    // STEP 4: Check if this is a GOOGLE REVIEW response
+    // ============================================
+    const { data: reviewRequest, error: findError } = await supabase
       .from("google_review_requests")
       .select("*, ownerrez_reviews(*)")
       .ilike("guest_phone", `%${phoneDigits}`)
@@ -121,41 +142,310 @@ serve(async (req) => {
       .limit(1)
       .single();
 
-    if (findError || !request) {
-      console.log(`No pending request found for phone digits ${phoneDigits}`);
-      
-      // Log unmatched inbound message
-      await supabase.from("sms_log").insert({
-        phone_number: from,
-        message_type: "inbound_unmatched",
-        message_body: body,
-        status: "received",
-      });
-
-      return new Response(
-        '<?xml version="1.0" encoding="UTF-8"?><Response></Response>',
-        { headers: { "Content-Type": "text/xml" } }
-      );
+    if (!findError && reviewRequest) {
+      console.log(`Found pending Google review request: ${reviewRequest.id}`);
+      await processGoogleReviewReply(supabase, reviewRequest, body, googleReviewUrl, twilioSid, twilioAuth, twilioPhone);
+      return xmlResponse();
     }
 
-    // Process the reply - any reply counts as permission granted
-    await processReply(supabase, request, body, googleReviewUrl, twilioSid, twilioAuth, twilioPhone);
+    // ============================================
+    // STEP 5: Unmatched message - log it
+    // ============================================
+    console.log(`No pending request found for phone digits ${phoneDigits}`);
+    
+    await supabase.from("sms_log").insert({
+      phone_number: from,
+      message_type: "inbound_unmatched",
+      message_body: body,
+      status: "received",
+    });
 
-    // Return TwiML response (empty, no auto-reply needed - we send manually)
-    return new Response(
-      '<?xml version="1.0" encoding="UTF-8"?><Response></Response>',
-      { headers: { "Content-Type": "text/xml" } }
-    );
+    return xmlResponse();
   } catch (error) {
     console.error("Webhook error:", error);
-    return new Response(
-      '<?xml version="1.0" encoding="UTF-8"?><Response></Response>',
-      { headers: { "Content-Type": "text/xml" } }
-    );
+    return xmlResponse();
   }
 });
 
-async function processReply(
+function xmlResponse() {
+  return new Response(
+    '<?xml version="1.0" encoding="UTF-8"?><Response></Response>',
+    { headers: { "Content-Type": "text/xml" } }
+  );
+}
+
+// ============================================
+// VENDOR RESPONSE HANDLING (Maintenance)
+// ============================================
+interface VendorResponseParsed {
+  type: "confirm" | "decline" | "quote" | "complete" | "eta" | "unknown";
+  quote?: number;
+  eta?: string;
+}
+
+function parseVendorResponse(body: string): VendorResponseParsed {
+  const lower = body.toLowerCase().trim();
+  
+  if (lower === "confirm" || lower === "yes" || lower === "accept" || lower.includes("on my way") || lower.includes("omw")) {
+    return { type: "confirm" };
+  }
+  if (lower === "decline" || lower === "no" || lower === "reject" || lower.includes("can't make it") || lower.includes("cannot")) {
+    return { type: "decline" };
+  }
+  if (lower === "complete" || lower === "done" || lower === "finished" || lower.includes("job complete")) {
+    return { type: "complete" };
+  }
+  
+  // Check for quote pattern: "quote $500" or "$500" or "500"
+  const quoteMatch = body.match(/(?:quote\s*)?[\$]?\s*(\d+(?:\.\d{2})?)/i);
+  if (quoteMatch && (lower.includes("quote") || lower.startsWith("$"))) {
+    return { type: "quote", quote: parseFloat(quoteMatch[1]) };
+  }
+  
+  // Check for ETA pattern
+  const etaMatch = body.match(/(?:eta|arrive|arriving|be there)\s*(?:in\s*)?(.+)/i);
+  if (etaMatch) {
+    return { type: "eta", eta: etaMatch[1].trim() };
+  }
+  
+  return { type: "unknown" };
+}
+
+async function checkVendorResponse(
+  supabase: any,
+  phoneDigits: string,
+  body: string,
+  twilioSid: string,
+  twilioAuth: string,
+  twilioPhone: string
+): Promise<{ handled: boolean }> {
+  // Find vendor by phone number
+  const { data: vendor } = await supabase
+    .from("vendors")
+    .select("id, name, phone")
+    .or(`phone.ilike.%${phoneDigits},phone.ilike.%${phoneDigits.replace(/(\d{3})(\d{3})(\d{4})/, "$1-$2-$3")}`)
+    .limit(1)
+    .single();
+
+  if (!vendor) {
+    return { handled: false };
+  }
+
+  console.log(`Found vendor: ${vendor.name} (${vendor.id})`);
+
+  // Find assigned work orders for this vendor
+  const { data: workOrders } = await supabase
+    .from("work_orders")
+    .select("*, properties(name, owner_id, property_owners(phone))")
+    .eq("assigned_vendor_id", vendor.id)
+    .in("status", ["assigned", "scheduled", "in_progress", "pending_approval"])
+    .order("updated_at", { ascending: false });
+
+  if (!workOrders || workOrders.length === 0) {
+    console.log("No active work orders for this vendor");
+    return { handled: false };
+  }
+
+  const workOrder = workOrders[0];
+  const parsed = parseVendorResponse(body);
+
+  console.log(`Vendor response type: ${parsed.type} for work order ${workOrder.id}`);
+
+  // Log the vendor message
+  await supabase.from("maintenance_messages").insert({
+    work_order_id: workOrder.id,
+    sender_type: "vendor",
+    sender_name: vendor.name,
+    message_text: body,
+    visible_to_owner: true,
+    visible_to_vendor: true,
+  });
+
+  switch (parsed.type) {
+    case "confirm":
+      await supabase.from("work_orders").update({
+        status: "scheduled",
+        updated_at: new Date().toISOString(),
+      }).eq("id", workOrder.id);
+      
+      await sendSms(twilioSid, twilioAuth, twilioPhone, vendor.phone,
+        `Thank you! You're confirmed for: ${workOrder.title}. Please reply COMPLETE when finished.`);
+      break;
+
+    case "decline":
+      await supabase.from("work_orders").update({
+        status: "new",
+        assigned_vendor_id: null,
+        updated_at: new Date().toISOString(),
+      }).eq("id", workOrder.id);
+      
+      await sendSms(twilioSid, twilioAuth, twilioPhone, vendor.phone,
+        `Understood. We'll find another vendor for this job. Thank you for letting us know.`);
+      break;
+
+    case "quote":
+      // Check if quote needs owner approval (over threshold)
+      const threshold = workOrder.properties?.auto_approve_threshold || 200;
+      if (parsed.quote && parsed.quote > threshold) {
+        await supabase.from("work_orders").update({
+          status: "pending_approval",
+          quoted_cost: parsed.quote,
+          updated_at: new Date().toISOString(),
+        }).eq("id", workOrder.id);
+        
+        // Notify owner for approval
+        const ownerPhone = workOrder.properties?.property_owners?.phone;
+        if (ownerPhone) {
+          await sendSms(twilioSid, twilioAuth, twilioPhone, ownerPhone,
+            `Quote received for ${workOrder.title}: $${parsed.quote}. Reply APPROVE or DECLINE.`);
+        }
+        
+        await sendSms(twilioSid, twilioAuth, twilioPhone, vendor.phone,
+          `Quote of $${parsed.quote} received. Waiting for owner approval.`);
+      } else {
+        await supabase.from("work_orders").update({
+          quoted_cost: parsed.quote,
+          status: "scheduled",
+          updated_at: new Date().toISOString(),
+        }).eq("id", workOrder.id);
+        
+        await sendSms(twilioSid, twilioAuth, twilioPhone, vendor.phone,
+          `Quote of $${parsed.quote} auto-approved. Please proceed with the work.`);
+      }
+      break;
+
+    case "complete":
+      await supabase.from("work_orders").update({
+        status: "pending_verification",
+        completed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }).eq("id", workOrder.id);
+      
+      await sendSms(twilioSid, twilioAuth, twilioPhone, vendor.phone,
+        `Great! Job marked as complete. Thank you for your work!`);
+      break;
+
+    case "eta":
+      await supabase.from("work_orders").update({
+        status: "in_progress",
+        updated_at: new Date().toISOString(),
+      }).eq("id", workOrder.id);
+      
+      await sendSms(twilioSid, twilioAuth, twilioPhone, vendor.phone,
+        `Thanks for the update! ETA noted: ${parsed.eta}`);
+      break;
+
+    default:
+      // Unknown response, just log it
+      console.log("Unknown vendor response, logged as message");
+      break;
+  }
+
+  return { handled: true };
+}
+
+// ============================================
+// OWNER RESPONSE HANDLING (Quote Approvals)
+// ============================================
+async function checkOwnerResponse(
+  supabase: any,
+  phoneDigits: string,
+  body: string,
+  twilioSid: string,
+  twilioAuth: string,
+  twilioPhone: string
+): Promise<{ handled: boolean }> {
+  // Find owner by phone number
+  const { data: owner } = await supabase
+    .from("property_owners")
+    .select("id, name, phone")
+    .or(`phone.ilike.%${phoneDigits},phone.ilike.%${phoneDigits.replace(/(\d{3})(\d{3})(\d{4})/, "$1-$2-$3")}`)
+    .limit(1)
+    .single();
+
+  if (!owner) {
+    return { handled: false };
+  }
+
+  console.log(`Found owner: ${owner.name} (${owner.id})`);
+
+  // Find pending approval work orders for this owner's properties
+  const { data: workOrders } = await supabase
+    .from("work_orders")
+    .select("*, properties!inner(name, owner_id), vendors(name, phone)")
+    .eq("properties.owner_id", owner.id)
+    .eq("status", "pending_approval")
+    .order("updated_at", { ascending: false });
+
+  if (!workOrders || workOrders.length === 0) {
+    console.log("No pending approval work orders for this owner");
+    return { handled: false };
+  }
+
+  const workOrder = workOrders[0];
+  const lower = body.toLowerCase().trim();
+
+  if (lower === "approve" || lower === "yes" || lower === "ok" || lower === "approved") {
+    await supabase.from("work_orders").update({
+      status: "scheduled",
+      updated_at: new Date().toISOString(),
+    }).eq("id", workOrder.id);
+
+    await supabase.from("maintenance_messages").insert({
+      work_order_id: workOrder.id,
+      sender_type: "owner",
+      sender_name: owner.name,
+      message_text: `Approved: ${body}`,
+      visible_to_owner: true,
+      visible_to_vendor: true,
+    });
+
+    // Notify vendor
+    if (workOrder.vendors?.phone) {
+      await sendSms(twilioSid, twilioAuth, twilioPhone, workOrder.vendors.phone,
+        `Good news! Quote approved for: ${workOrder.title}. Please proceed with the work.`);
+    }
+
+    await sendSms(twilioSid, twilioAuth, twilioPhone, owner.phone,
+      `Quote approved. Vendor has been notified to proceed.`);
+
+    return { handled: true };
+  }
+
+  if (lower === "decline" || lower === "no" || lower === "reject" || lower === "declined") {
+    await supabase.from("work_orders").update({
+      status: "cancelled",
+      updated_at: new Date().toISOString(),
+    }).eq("id", workOrder.id);
+
+    await supabase.from("maintenance_messages").insert({
+      work_order_id: workOrder.id,
+      sender_type: "owner",
+      sender_name: owner.name,
+      message_text: `Declined: ${body}`,
+      visible_to_owner: true,
+      visible_to_vendor: true,
+    });
+
+    // Notify vendor
+    if (workOrder.vendors?.phone) {
+      await sendSms(twilioSid, twilioAuth, twilioPhone, workOrder.vendors.phone,
+        `Quote was declined for: ${workOrder.title}. Job cancelled.`);
+    }
+
+    await sendSms(twilioSid, twilioAuth, twilioPhone, owner.phone,
+      `Quote declined. Vendor has been notified.`);
+
+    return { handled: true };
+  }
+
+  return { handled: false };
+}
+
+// ============================================
+// GOOGLE REVIEW REPLY HANDLING
+// ============================================
+async function processGoogleReviewReply(
   supabase: any,
   request: any,
   replyBody: string,
@@ -168,7 +458,7 @@ async function processReply(
   const source = review?.review_source || "Airbnb";
   const reviewText = review?.review_text || "";
 
-  console.log(`Processing reply for request ${request.id}`);
+  console.log(`Processing Google review reply for request ${request.id}`);
 
   // Mark as permission granted
   await supabase
@@ -230,6 +520,9 @@ async function processReply(
   console.log(`Link sent to ${request.guest_phone} after permission granted`);
 }
 
+// ============================================
+// SMS SENDING HELPER
+// ============================================
 async function sendSms(
   twilioSid: string,
   twilioAuth: string,
