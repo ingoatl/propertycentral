@@ -52,22 +52,26 @@ serve(async (req) => {
       );
     }
 
-    // Helper function to send SMS via Twilio with error handling
+    // Helper function to send SMS via Twilio with status callback
     const sendSms = async (to: string, body: string, contactId?: string): Promise<{ success: boolean; sid?: string; error?: string; optedOut?: boolean }> => {
       const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${twilioSid}/Messages.json`;
+      const statusCallbackUrl = `${supabaseUrl}/functions/v1/twilio-status-callback`;
       
       try {
+        const params = new URLSearchParams({
+          To: to,
+          From: twilioPhone,
+          Body: body,
+          StatusCallback: statusCallbackUrl,
+        });
+
         const response = await fetch(twilioUrl, {
           method: "POST",
           headers: {
             Authorization: `Basic ${btoa(`${twilioSid}:${twilioAuth}`)}`,
             "Content-Type": "application/x-www-form-urlencoded",
           },
-          body: new URLSearchParams({
-            To: to,
-            From: twilioPhone,
-            Body: body,
-          }),
+          body: params,
         });
 
         if (!response.ok) {

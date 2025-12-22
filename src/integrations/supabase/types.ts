@@ -4352,6 +4352,9 @@ export type Database = {
       sms_log: {
         Row: {
           created_at: string | null
+          delivery_status: string | null
+          delivery_status_updated_at: string | null
+          error_code: number | null
           error_message: string | null
           id: string
           message_body: string | null
@@ -4364,6 +4367,9 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
+          delivery_status?: string | null
+          delivery_status_updated_at?: string | null
+          error_code?: number | null
           error_message?: string | null
           id?: string
           message_body?: string | null
@@ -4376,6 +4382,9 @@ export type Database = {
         }
         Update: {
           created_at?: string | null
+          delivery_status?: string | null
+          delivery_status_updated_at?: string | null
+          error_code?: number | null
           error_message?: string | null
           id?: string
           message_body?: string | null
