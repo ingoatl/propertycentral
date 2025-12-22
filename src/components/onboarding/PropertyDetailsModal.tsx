@@ -638,13 +638,13 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
         
         <div className="space-y-4 flex-1 min-h-0 flex flex-col max-md:space-y-3">
           <div className="relative flex-shrink-0">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground max-md:h-5 max-md:w-5" />
             <Input
               placeholder="Search property information..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 max-md:h-12 max-md:text-base max-md:pl-10"
+              className="pl-10 max-md:h-12 max-md:text-base max-md:pl-12"
             />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none max-md:h-5 max-md:w-5 max-md:left-4" />
           </div>
 
           {loading ? (
