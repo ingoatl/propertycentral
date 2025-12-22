@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Menu, ChevronDown } from "lucide-react";
+import { Menu, ChevronDown, Building2 } from "lucide-react";
 import { navigationConfig, NavDropdown, NavLink } from "@/config/navigation";
 import { Button } from "@/components/ui/button";
 import {
@@ -52,12 +52,11 @@ export function MobileNavigation({ isAdmin }: MobileNavigationProps) {
       </SheetTrigger>
       <SheetContent side="left" className="w-[300px] p-0">
         <SheetHeader className="p-6 border-b border-border">
-          <SheetTitle className="flex items-center gap-2">
-            <img
-              src="/peachhaus-logo.png"
-              alt="PeachHaus"
-              className="h-8 w-auto"
-            />
+          <SheetTitle className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-gradient-primary flex items-center justify-center shadow-warm">
+              <Building2 className="w-6 h-6 text-primary-foreground" />
+            </div>
+            <span className="text-lg font-bold">Property Central</span>
           </SheetTitle>
         </SheetHeader>
         
