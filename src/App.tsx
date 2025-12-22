@@ -28,6 +28,8 @@ import InspectIssues from "./pages/InspectIssues";
 import InspectSettings from "./pages/InspectSettings";
 import JobApplication from "./pages/JobApplication";
 import OwnerConversations from "./pages/OwnerConversations";
+import Vendors from "./pages/Vendors";
+import Maintenance from "./pages/Maintenance";
 
 const queryClient = new QueryClient();
 
@@ -66,6 +68,8 @@ const App = () => (
                 <Route path="/documents" element={<Documents />} />
                 <Route path="/utilities" element={<Utilities />} />
                 <Route path="/owner-conversations" element={<OwnerConversations />} />
+                <Route path="/vendors" element={<Vendors />} />
+                <Route path="/maintenance" element={<Maintenance />} />
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>
