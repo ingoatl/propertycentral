@@ -21,7 +21,6 @@ export const AssignUnassignedTasksButton = () => {
   const handleAssignTasks = async () => {
     try {
       setLoading(true);
-      console.log("Starting task assignment process...");
 
       // Fetch all necessary data
       const [phaseData, templateData, roleData, tasksData] = await Promise.all([
@@ -45,10 +44,6 @@ export const AssignUnassignedTasksButton = () => {
       const userTeamRoles = roleData.data || [];
       const unassignedTasks = tasksData.data || [];
 
-      console.log(`Found ${unassignedTasks.length} tasks to process`);
-      console.log(`Available phase assignments: ${phaseAssignments.length}`);
-      console.log(`Available task templates: ${taskTemplates.length}`);
-      console.log(`Available user team roles: ${userTeamRoles.length}`);
 
       if (unassignedTasks.length === 0) {
         toast.info("All tasks are already assigned!");
@@ -66,7 +61,6 @@ export const AssignUnassignedTasksButton = () => {
 
         if (taskTemplate?.default_role_id) {
           assignedRoleId = taskTemplate.default_role_id;
-          console.log(`Task "${task.title}" assigned role ${assignedRoleId} from template`);
         } else {
           // Use phase assignment (second priority)
           const phaseAssignment = phaseAssignments.find(
@@ -74,7 +68,6 @@ export const AssignUnassignedTasksButton = () => {
           );
           if (phaseAssignment) {
             assignedRoleId = phaseAssignment.role_id;
-            console.log(`Task "${task.title}" assigned role ${assignedRoleId} from phase ${task.phase_number}`);
           }
         }
 
@@ -106,14 +99,12 @@ export const AssignUnassignedTasksButton = () => {
             updatedCount++;
           } else {
             errorCount++;
-            console.error(`Failed to update task ${update.id}:`, error);
+            if (import.meta.env.DEV) console.error(`Failed to update task ${update.id}:`, error);
           }
         }
       }
 
       const assignedToRoleCount = updates.filter(u => u.assigned_role_id).length;
-      
-      console.log(`Assignment complete: ${assignedToRoleCount} assigned to roles, ${errorCount} errors`);
 
       if (assignedToRoleCount > 0) {
         toast.success(
@@ -124,9 +115,9 @@ export const AssignUnassignedTasksButton = () => {
       }
 
       // Reload the page to show updates
-      setTimeout(() => window.location.reload(), 2000);
+      setTimeout(() => window.location.reload(), 1500);
     } catch (error: any) {
-      console.error("Error assigning tasks:", error);
+      if (import.meta.env.DEV) console.error("Error assigning tasks:", error);
       toast.error("Failed to assign tasks: " + error.message);
     } finally {
       setLoading(false);

@@ -126,7 +126,6 @@ export const MonthlyEmailPreviewModal = ({
           const deduplicatedApproved = approved.filter((item: any) => {
             const key = `${item.item_type}:${item.item_id}`;
             if (seenItemIds.has(key)) {
-              console.log(`WATCHDOG: Filtering out duplicate line item: ${item.description}`);
               return false;
             }
             seenItemIds.add(key);
@@ -180,16 +179,11 @@ export const MonthlyEmailPreviewModal = ({
           setExpenseTotal(displayedExpenseTotal);
           setDueFromOwner(calculatedDueFromOwner);
           
-          // Log watchdog summary for debugging
-          console.log("=== PREVIEW CALCULATION WATCHDOG ===");
-          console.log(`Management Fee: $${mgmtFee.toFixed(2)}`);
-          console.log(`Visit Total (${visits.length} visits): $${displayedVisitTotal.toFixed(2)}`);
-          visits.forEach((v: any, i: number) => console.log(`  └ Visit ${i+1}: ${v.description} = $${Math.abs(v.amount).toFixed(2)}`));
-          console.log(`Expense Total (${expenses.length} expenses): $${displayedExpenseTotal.toFixed(2)}`);
-          expenses.forEach((e: any, i: number) => console.log(`  └ Expense ${i+1}: ${e.description?.substring(0, 40)} = $${Math.abs(e.amount).toFixed(2)}`));
-          console.log(`TOTAL DUE: $${calculatedDueFromOwner.toFixed(2)}`);
-          console.log(`Formula: ${mgmtFee} + ${displayedVisitTotal} + ${displayedExpenseTotal} = ${calculatedDueFromOwner}`);
-          console.log("=====================================");
+          // Calculation watchdog logs (dev only)
+          if (import.meta.env.DEV) {
+            console.log("=== PREVIEW CALCULATION WATCHDOG ===");
+            console.log(`Management Fee: $${mgmtFee.toFixed(2)}, Visits: $${displayedVisitTotal.toFixed(2)}, Expenses: $${displayedExpenseTotal.toFixed(2)}, Total: $${calculatedDueFromOwner.toFixed(2)}`);
+          }
         }
         
         // Set revenue split
