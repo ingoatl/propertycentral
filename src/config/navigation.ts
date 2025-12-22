@@ -147,10 +147,47 @@ export const navigationConfig: NavElement[] = [
     ],
   },
   {
-    type: "link",
+    type: "dropdown",
     label: "Admin",
-    path: "/admin",
     icon: Shield,
     adminOnly: true,
+    items: [
+      {
+        path: "/admin",
+        label: "Dashboard",
+        icon: LayoutDashboard,
+        description: "Admin overview and tools",
+      },
+      {
+        path: "/admin?tab=users",
+        label: "User Management",
+        icon: Users,
+        description: "Manage user accounts",
+      },
+      {
+        path: "/admin?tab=applications",
+        label: "Job Applications",
+        icon: UserCircle,
+        description: "Review applications",
+      },
+      {
+        path: "/admin?tab=faqs",
+        label: "FAQ Management",
+        icon: MessageSquare,
+        description: "Manage FAQs",
+      },
+      {
+        path: "/admin?tab=bugs",
+        label: "Bug Tracker",
+        icon: ClipboardCheck,
+        description: "Track reported bugs",
+      },
+      {
+        path: "/admin?tab=holidays",
+        label: "Holiday Emails",
+        icon: Calendar,
+        description: "Schedule holiday emails",
+      },
+    ],
   },
 ];

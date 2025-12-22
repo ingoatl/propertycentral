@@ -156,9 +156,14 @@ const CreateWorkOrderDialog = ({
                 <SelectValue placeholder="Select a property" />
               </SelectTrigger>
               <SelectContent>
-                {properties.map((property) => (
+              {properties.map((property) => (
                   <SelectItem key={property.id} value={property.id}>
-                    {property.name || property.address}
+                    <span className="flex flex-col">
+                      <span className="font-medium">{property.name || "Unnamed Property"}</span>
+                      {property.address && (
+                        <span className="text-xs text-muted-foreground">{property.address}</span>
+                      )}
+                    </span>
                   </SelectItem>
                 ))}
               </SelectContent>
