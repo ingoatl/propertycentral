@@ -114,21 +114,36 @@ const BillComSyncButton = ({
         </p>
       )}
 
-      <div className="flex gap-2">
+      <div className="flex gap-2 flex-wrap">
         {billcomVendorId ? (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={syncToBillCom}
-            disabled={isSyncing || !vendorEmail}
-          >
-            {isSyncing ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <RefreshCw className="h-4 w-4 mr-2" />
-            )}
-            Re-sync
-          </Button>
+          <>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={syncToBillCom}
+              disabled={isSyncing || !vendorEmail}
+            >
+              {isSyncing ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4 mr-2" />
+              )}
+              Re-sync
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={inviteToBillCom}
+              disabled={isInviting || !vendorEmail}
+            >
+              {isInviting ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Send className="h-4 w-4 mr-2" />
+              )}
+              {billcomInviteSentAt ? "Resend Invite" : "Send Invite"}
+            </Button>
+          </>
         ) : (
           <>
             <Button
@@ -155,7 +170,7 @@ const BillComSyncButton = ({
               ) : (
                 <Send className="h-4 w-4 mr-2" />
               )}
-              Invite Vendor
+              {billcomInviteSentAt ? "Resend Invite" : "Invite Vendor"}
             </Button>
           </>
         )}
