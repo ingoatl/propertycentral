@@ -1,0 +1,438 @@
+import { useState } from "react";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { toast } from "sonner";
+import { Phone, Mail, Star, Clock, Wrench, Shield, AlertTriangle, DollarSign, FileText } from "lucide-react";
+import { Vendor, VENDOR_SPECIALTIES } from "@/types/maintenance";
+import { format } from "date-fns";
+
+interface VendorDetailModalProps {
+  vendor: Vendor;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onUpdate: () => void;
+}
+
+const VendorDetailModal = ({ vendor, open, onOpenChange, onUpdate }: VendorDetailModalProps) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const [formData, setFormData] = useState(vendor);
+
+  // Fetch work orders for this vendor
+  const { data: workOrders = [] } = useQuery({
+    queryKey: ["vendor-work-orders", vendor.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("work_orders")
+        .select("*, property:properties(name, address)")
+        .eq("assigned_vendor_id", vendor.id)
+        .order("created_at", { ascending: false })
+        .limit(10);
+      
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const updateVendor = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase
+        .from("vendors")
+        .update({
+          name: formData.name,
+          company_name: formData.company_name || null,
+          email: formData.email || null,
+          phone: formData.phone,
+          specialty: formData.specialty,
+          hourly_rate: formData.hourly_rate || null,
+          emergency_rate: formData.emergency_rate || null,
+          emergency_available: formData.emergency_available,
+          license_number: formData.license_number || null,
+          insurance_verified: formData.insurance_verified,
+          insurance_expiration: formData.insurance_expiration || null,
+          w9_on_file: formData.w9_on_file,
+          preferred_payment_method: formData.preferred_payment_method || null,
+          notes: formData.notes || null,
+          status: formData.status,
+        })
+        .eq("id", vendor.id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Vendor updated successfully");
+      setIsEditing(false);
+      onUpdate();
+    },
+    onError: (error) => {
+      toast.error("Failed to update vendor: " + error.message);
+    },
+  });
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'preferred': return 'bg-green-100 text-green-800';
+      case 'active': return 'bg-blue-100 text-blue-800';
+      case 'inactive': return 'bg-gray-100 text-gray-800';
+      case 'blocked': return 'bg-red-100 text-red-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getSpecialtyLabel = (specialty: string) => {
+    return specialty.split('_').map(word => 
+      word.charAt(0).toUpperCase() + word.slice(1)
+    ).join(' ');
+  };
+
+  const toggleSpecialty = (specialty: string) => {
+    setFormData(prev => ({
+      ...prev,
+      specialty: prev.specialty.includes(specialty)
+        ? prev.specialty.filter(s => s !== specialty)
+        : [...prev.specialty, specialty],
+    }));
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <div className="flex items-center justify-between">
+            <DialogTitle className="text-xl">{vendor.name}</DialogTitle>
+            <Badge className={getStatusColor(vendor.status)}>
+              {vendor.status}
+            </Badge>
+          </div>
+          {vendor.company_name && (
+            <p className="text-muted-foreground">{vendor.company_name}</p>
+          )}
+        </DialogHeader>
+
+        <Tabs defaultValue="details" className="mt-4">
+          <TabsList>
+            <TabsTrigger value="details">Details</TabsTrigger>
+            <TabsTrigger value="jobs">Work Orders ({workOrders.length})</TabsTrigger>
+            <TabsTrigger value="edit">Edit</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="details" className="space-y-6 mt-4">
+            {/* Contact & Stats */}
+            <div className="grid grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <h3 className="font-semibold">Contact Information</h3>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 text-sm">
+                    <Phone className="h-4 w-4 text-muted-foreground" />
+                    <a href={`tel:${vendor.phone}`} className="hover:underline">
+                      {vendor.phone}
+                    </a>
+                  </div>
+                  {vendor.email && (
+                    <div className="flex items-center gap-2 text-sm">
+                      <Mail className="h-4 w-4 text-muted-foreground" />
+                      <a href={`mailto:${vendor.email}`} className="hover:underline">
+                        {vendor.email}
+                      </a>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <h3 className="font-semibold">Performance</h3>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div className="flex items-center gap-2">
+                    <Star className="h-4 w-4 text-yellow-500" />
+                    <span>{vendor.average_rating > 0 ? vendor.average_rating.toFixed(1) : "N/A"} rating</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Wrench className="h-4 w-4 text-muted-foreground" />
+                    <span>{vendor.total_jobs_completed} jobs</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-muted-foreground" />
+                    <span>
+                      {vendor.average_response_time_hours 
+                        ? `${vendor.average_response_time_hours}h avg response`
+                        : "No data"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Specialties */}
+            <div className="space-y-2">
+              <h3 className="font-semibold">Specialties</h3>
+              <div className="flex flex-wrap gap-2">
+                {vendor.specialty.map((s) => (
+                  <Badge key={s} variant="secondary">
+                    {getSpecialtyLabel(s)}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+
+            {/* Rates */}
+            <div className="space-y-2">
+              <h3 className="font-semibold">Rates</h3>
+              <div className="flex gap-6 text-sm">
+                <div className="flex items-center gap-2">
+                  <DollarSign className="h-4 w-4 text-muted-foreground" />
+                  <span>
+                    Hourly: {vendor.hourly_rate ? `$${vendor.hourly_rate}` : "Not set"}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 text-red-500" />
+                  <span>
+                    Emergency: {vendor.emergency_rate ? `$${vendor.emergency_rate}` : "Not set"}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Compliance */}
+            <div className="space-y-2">
+              <h3 className="font-semibold">Compliance</h3>
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div className="flex items-center gap-2">
+                  <Shield className={`h-4 w-4 ${vendor.insurance_verified ? "text-green-500" : "text-gray-400"}`} />
+                  <span>
+                    Insurance: {vendor.insurance_verified ? "Verified" : "Not verified"}
+                    {vendor.insurance_expiration && (
+                      <span className="text-muted-foreground ml-1">
+                        (expires {format(new Date(vendor.insurance_expiration), "MMM d, yyyy")})
+                      </span>
+                    )}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <FileText className={`h-4 w-4 ${vendor.w9_on_file ? "text-green-500" : "text-gray-400"}`} />
+                  <span>W-9: {vendor.w9_on_file ? "On file" : "Not on file"}</span>
+                </div>
+                {vendor.license_number && (
+                  <div className="flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-muted-foreground" />
+                    <span>License: {vendor.license_number}</span>
+                  </div>
+                )}
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className={`h-4 w-4 ${vendor.emergency_available ? "text-red-500" : "text-gray-400"}`} />
+                  <span>24/7 Available: {vendor.emergency_available ? "Yes" : "No"}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Notes */}
+            {vendor.notes && (
+              <div className="space-y-2">
+                <h3 className="font-semibold">Notes</h3>
+                <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                  {vendor.notes}
+                </p>
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="jobs" className="mt-4">
+            {workOrders.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <Wrench className="h-8 w-8 mx-auto mb-2" />
+                <p>No work orders assigned yet</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {workOrders.map((wo: any) => (
+                  <div key={wo.id} className="p-3 border rounded-lg">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <p className="font-medium">{wo.title}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {wo.property?.name || wo.property?.address}
+                        </p>
+                      </div>
+                      <Badge variant="secondary">{wo.status}</Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      {format(new Date(wo.created_at), "MMM d, yyyy")}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="edit" className="space-y-4 mt-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Contact Name</Label>
+                <Input
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Company Name</Label>
+                <Input
+                  value={formData.company_name || ""}
+                  onChange={(e) => setFormData({ ...formData, company_name: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Phone</Label>
+                <Input
+                  value={formData.phone}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Email</Label>
+                <Input
+                  type="email"
+                  value={formData.email || ""}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Specialties</Label>
+              <div className="flex flex-wrap gap-2">
+                {VENDOR_SPECIALTIES.map((specialty) => (
+                  <Button
+                    key={specialty}
+                    type="button"
+                    variant={formData.specialty.includes(specialty) ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => toggleSpecialty(specialty)}
+                  >
+                    {getSpecialtyLabel(specialty)}
+                  </Button>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label>Hourly Rate ($)</Label>
+                <Input
+                  type="number"
+                  value={formData.hourly_rate || ""}
+                  onChange={(e) => setFormData({ ...formData, hourly_rate: e.target.value ? parseFloat(e.target.value) : undefined })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Emergency Rate ($)</Label>
+                <Input
+                  type="number"
+                  value={formData.emergency_rate || ""}
+                  onChange={(e) => setFormData({ ...formData, emergency_rate: e.target.value ? parseFloat(e.target.value) : undefined })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Status</Label>
+                <Select
+                  value={formData.status}
+                  onValueChange={(value: any) => setFormData({ ...formData, status: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="preferred">Preferred</SelectItem>
+                    <SelectItem value="inactive">Inactive</SelectItem>
+                    <SelectItem value="blocked">Blocked</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-4">
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="edit_emergency"
+                  checked={formData.emergency_available}
+                  onCheckedChange={(checked) => 
+                    setFormData({ ...formData, emergency_available: !!checked })
+                  }
+                />
+                <Label htmlFor="edit_emergency" className="font-normal">24/7 Available</Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="edit_insurance"
+                  checked={formData.insurance_verified}
+                  onCheckedChange={(checked) => 
+                    setFormData({ ...formData, insurance_verified: !!checked })
+                  }
+                />
+                <Label htmlFor="edit_insurance" className="font-normal">Insurance Verified</Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="edit_w9"
+                  checked={formData.w9_on_file}
+                  onCheckedChange={(checked) => 
+                    setFormData({ ...formData, w9_on_file: !!checked })
+                  }
+                />
+                <Label htmlFor="edit_w9" className="font-normal">W-9 on File</Label>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Notes</Label>
+              <Textarea
+                value={formData.notes || ""}
+                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                rows={3}
+              />
+            </div>
+
+            <div className="flex justify-end gap-3">
+              <Button
+                variant="outline"
+                onClick={() => setFormData(vendor)}
+              >
+                Reset
+              </Button>
+              <Button
+                onClick={() => updateVendor.mutate()}
+                disabled={updateVendor.isPending}
+              >
+                {updateVendor.isPending ? "Saving..." : "Save Changes"}
+              </Button>
+            </div>
+          </TabsContent>
+        </Tabs>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+export default VendorDetailModal;
