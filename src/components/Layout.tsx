@@ -98,8 +98,7 @@ const Layout = ({ children }: LayoutProps) => {
                   <Building2 className="w-6 h-6 text-primary-foreground" />
                 </div>
                 <div className="hidden sm:block">
-                  <h1 className="text-lg font-bold text-foreground">PeachHaus</h1>
-                  <p className="text-xs text-muted-foreground">Property Tracker</p>
+                  <h1 className="text-lg font-bold text-foreground">Property Central</h1>
                 </div>
               </div>
             </div>
