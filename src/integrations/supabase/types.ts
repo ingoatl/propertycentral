@@ -14,6 +14,102 @@ export type Database = {
   }
   public: {
     Tables: {
+      appliance_warranties: {
+        Row: {
+          appliance_type: string
+          brand: string | null
+          coverage_details: string | null
+          created_at: string | null
+          created_by: string | null
+          deductible: number | null
+          id: string
+          installation_date: string | null
+          max_coverage: number | null
+          model_number: string | null
+          notes: string | null
+          photo_path: string | null
+          policy_number: string | null
+          property_id: string
+          purchase_date: string | null
+          receipt_path: string | null
+          serial_number: string | null
+          updated_at: string | null
+          warranty_email: string | null
+          warranty_expiration: string | null
+          warranty_phone: string | null
+          warranty_provider: string | null
+          warranty_start_date: string | null
+          warranty_type: string | null
+        }
+        Insert: {
+          appliance_type: string
+          brand?: string | null
+          coverage_details?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          deductible?: number | null
+          id?: string
+          installation_date?: string | null
+          max_coverage?: number | null
+          model_number?: string | null
+          notes?: string | null
+          photo_path?: string | null
+          policy_number?: string | null
+          property_id: string
+          purchase_date?: string | null
+          receipt_path?: string | null
+          serial_number?: string | null
+          updated_at?: string | null
+          warranty_email?: string | null
+          warranty_expiration?: string | null
+          warranty_phone?: string | null
+          warranty_provider?: string | null
+          warranty_start_date?: string | null
+          warranty_type?: string | null
+        }
+        Update: {
+          appliance_type?: string
+          brand?: string | null
+          coverage_details?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          deductible?: number | null
+          id?: string
+          installation_date?: string | null
+          max_coverage?: number | null
+          model_number?: string | null
+          notes?: string | null
+          photo_path?: string | null
+          policy_number?: string | null
+          property_id?: string
+          purchase_date?: string | null
+          receipt_path?: string | null
+          serial_number?: string | null
+          updated_at?: string | null
+          warranty_email?: string | null
+          warranty_expiration?: string | null
+          warranty_phone?: string | null
+          warranty_provider?: string | null
+          warranty_start_date?: string | null
+          warranty_type?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "appliance_warranties_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "comprehensive_property_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "appliance_warranties_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       booking_documents: {
         Row: {
           booking_id: string | null
@@ -1403,6 +1499,161 @@ export type Database = {
         }
         Relationships: []
       }
+      maintenance_messages: {
+        Row: {
+          ai_context: Json | null
+          attachments: string[] | null
+          created_at: string | null
+          id: string
+          is_ai_generated: boolean | null
+          is_internal: boolean | null
+          message_text: string
+          read_by_owner: boolean | null
+          read_by_owner_at: string | null
+          read_by_vendor: boolean | null
+          read_by_vendor_at: string | null
+          sender_email: string | null
+          sender_name: string
+          sender_type: Database["public"]["Enums"]["message_sender_type"]
+          sender_user_id: string | null
+          visible_to_guest: boolean | null
+          visible_to_owner: boolean | null
+          visible_to_vendor: boolean | null
+          work_order_id: string
+        }
+        Insert: {
+          ai_context?: Json | null
+          attachments?: string[] | null
+          created_at?: string | null
+          id?: string
+          is_ai_generated?: boolean | null
+          is_internal?: boolean | null
+          message_text: string
+          read_by_owner?: boolean | null
+          read_by_owner_at?: string | null
+          read_by_vendor?: boolean | null
+          read_by_vendor_at?: string | null
+          sender_email?: string | null
+          sender_name: string
+          sender_type: Database["public"]["Enums"]["message_sender_type"]
+          sender_user_id?: string | null
+          visible_to_guest?: boolean | null
+          visible_to_owner?: boolean | null
+          visible_to_vendor?: boolean | null
+          work_order_id: string
+        }
+        Update: {
+          ai_context?: Json | null
+          attachments?: string[] | null
+          created_at?: string | null
+          id?: string
+          is_ai_generated?: boolean | null
+          is_internal?: boolean | null
+          message_text?: string
+          read_by_owner?: boolean | null
+          read_by_owner_at?: string | null
+          read_by_vendor?: boolean | null
+          read_by_vendor_at?: string | null
+          sender_email?: string | null
+          sender_name?: string
+          sender_type?: Database["public"]["Enums"]["message_sender_type"]
+          sender_user_id?: string | null
+          visible_to_guest?: boolean | null
+          visible_to_owner?: boolean | null
+          visible_to_vendor?: boolean | null
+          work_order_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "maintenance_messages_work_order_id_fkey"
+            columns: ["work_order_id"]
+            isOneToOne: false
+            referencedRelation: "work_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      maintenance_troubleshooting_guides: {
+        Row: {
+          category: string
+          common_causes: string[] | null
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          issue_type: string
+          keywords: string[] | null
+          property_id: string | null
+          requires_professional: boolean | null
+          steps: Json
+          success_rate: number | null
+          times_used: number | null
+          title: string
+          typical_cost_range: string | null
+          typical_resolution_time: string | null
+          updated_at: string | null
+          urgency_indicators: string[] | null
+        }
+        Insert: {
+          category: string
+          common_causes?: string[] | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          issue_type: string
+          keywords?: string[] | null
+          property_id?: string | null
+          requires_professional?: boolean | null
+          steps?: Json
+          success_rate?: number | null
+          times_used?: number | null
+          title: string
+          typical_cost_range?: string | null
+          typical_resolution_time?: string | null
+          updated_at?: string | null
+          urgency_indicators?: string[] | null
+        }
+        Update: {
+          category?: string
+          common_causes?: string[] | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          issue_type?: string
+          keywords?: string[] | null
+          property_id?: string | null
+          requires_professional?: boolean | null
+          steps?: Json
+          success_rate?: number | null
+          times_used?: number | null
+          title?: string
+          typical_cost_range?: string | null
+          typical_resolution_time?: string | null
+          updated_at?: string | null
+          urgency_indicators?: string[] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "maintenance_troubleshooting_guides_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "comprehensive_property_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "maintenance_troubleshooting_guides_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       mid_term_bookings: {
         Row: {
           created_at: string
@@ -1923,6 +2174,101 @@ export type Database = {
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "onboarding_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      owner_approvals: {
+        Row: {
+          amount_requiring_approval: number
+          approval_threshold: number
+          approved_amount: number | null
+          auto_approved_reason: string | null
+          created_at: string | null
+          expires_at: string | null
+          id: string
+          owner_id: string
+          owner_notes: string | null
+          property_id: string
+          reason_for_approval: string | null
+          reminder_count: number | null
+          reminder_sent_at: string | null
+          requested_at: string | null
+          requested_by: string | null
+          responded_at: string | null
+          status: Database["public"]["Enums"]["approval_status"] | null
+          updated_at: string | null
+          work_order_id: string
+        }
+        Insert: {
+          amount_requiring_approval: number
+          approval_threshold: number
+          approved_amount?: number | null
+          auto_approved_reason?: string | null
+          created_at?: string | null
+          expires_at?: string | null
+          id?: string
+          owner_id: string
+          owner_notes?: string | null
+          property_id: string
+          reason_for_approval?: string | null
+          reminder_count?: number | null
+          reminder_sent_at?: string | null
+          requested_at?: string | null
+          requested_by?: string | null
+          responded_at?: string | null
+          status?: Database["public"]["Enums"]["approval_status"] | null
+          updated_at?: string | null
+          work_order_id: string
+        }
+        Update: {
+          amount_requiring_approval?: number
+          approval_threshold?: number
+          approved_amount?: number | null
+          auto_approved_reason?: string | null
+          created_at?: string | null
+          expires_at?: string | null
+          id?: string
+          owner_id?: string
+          owner_notes?: string | null
+          property_id?: string
+          reason_for_approval?: string | null
+          reminder_count?: number | null
+          reminder_sent_at?: string | null
+          requested_at?: string | null
+          requested_by?: string | null
+          responded_at?: string | null
+          status?: Database["public"]["Enums"]["approval_status"] | null
+          updated_at?: string | null
+          work_order_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "owner_approvals_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "property_owners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "owner_approvals_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "comprehensive_property_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "owner_approvals_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "owner_approvals_work_order_id_fkey"
+            columns: ["work_order_id"]
+            isOneToOne: false
+            referencedRelation: "work_orders"
             referencedColumns: ["id"]
           },
         ]
@@ -2459,6 +2805,80 @@ export type Database = {
             columns: ["property_id"]
             isOneToOne: false
             referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      owner_portal_access: {
+        Row: {
+          created_at: string | null
+          default_view: string | null
+          email: string
+          id: string
+          last_login_at: string | null
+          login_count: number | null
+          magic_link_expires_at: string | null
+          magic_link_token: string | null
+          notification_level: string | null
+          notify_approval_needed: boolean | null
+          notify_monthly_report: boolean | null
+          notify_work_completed: boolean | null
+          notify_work_requested: boolean | null
+          notify_work_scheduled: boolean | null
+          owner_id: string
+          prefer_sms: boolean | null
+          sms_phone: string | null
+          timezone: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          default_view?: string | null
+          email: string
+          id?: string
+          last_login_at?: string | null
+          login_count?: number | null
+          magic_link_expires_at?: string | null
+          magic_link_token?: string | null
+          notification_level?: string | null
+          notify_approval_needed?: boolean | null
+          notify_monthly_report?: boolean | null
+          notify_work_completed?: boolean | null
+          notify_work_requested?: boolean | null
+          notify_work_scheduled?: boolean | null
+          owner_id: string
+          prefer_sms?: boolean | null
+          sms_phone?: string | null
+          timezone?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          default_view?: string | null
+          email?: string
+          id?: string
+          last_login_at?: string | null
+          login_count?: number | null
+          magic_link_expires_at?: string | null
+          magic_link_token?: string | null
+          notification_level?: string | null
+          notify_approval_needed?: boolean | null
+          notify_monthly_report?: boolean | null
+          notify_work_completed?: boolean | null
+          notify_work_requested?: boolean | null
+          notify_work_scheduled?: boolean | null
+          owner_id?: string
+          prefer_sms?: boolean | null
+          sms_phone?: string | null
+          timezone?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "owner_portal_access_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: true
+            referencedRelation: "property_owners"
             referencedColumns: ["id"]
           },
         ]
@@ -3396,6 +3816,99 @@ export type Database = {
           },
         ]
       }
+      property_maintenance_book: {
+        Row: {
+          access_instructions: string | null
+          alarm_code: string | null
+          appliance_spend_limit: number | null
+          auto_approve_preferred_vendors: boolean | null
+          cleaning_spend_limit: number | null
+          created_at: string | null
+          electrical_spend_limit: number | null
+          emergency_authorization_limit: number | null
+          exterior_spend_limit: number | null
+          gate_code: string | null
+          general_spend_limit: number | null
+          hvac_spend_limit: number | null
+          id: string
+          lockbox_code: string | null
+          maintenance_notes: string | null
+          owner_prefers_lowest_bid: boolean | null
+          plumbing_spend_limit: number | null
+          preferred_contact_method: string | null
+          property_id: string
+          require_multiple_quotes_above: number | null
+          require_owner_approval_above: number | null
+          special_instructions: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          access_instructions?: string | null
+          alarm_code?: string | null
+          appliance_spend_limit?: number | null
+          auto_approve_preferred_vendors?: boolean | null
+          cleaning_spend_limit?: number | null
+          created_at?: string | null
+          electrical_spend_limit?: number | null
+          emergency_authorization_limit?: number | null
+          exterior_spend_limit?: number | null
+          gate_code?: string | null
+          general_spend_limit?: number | null
+          hvac_spend_limit?: number | null
+          id?: string
+          lockbox_code?: string | null
+          maintenance_notes?: string | null
+          owner_prefers_lowest_bid?: boolean | null
+          plumbing_spend_limit?: number | null
+          preferred_contact_method?: string | null
+          property_id: string
+          require_multiple_quotes_above?: number | null
+          require_owner_approval_above?: number | null
+          special_instructions?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          access_instructions?: string | null
+          alarm_code?: string | null
+          appliance_spend_limit?: number | null
+          auto_approve_preferred_vendors?: boolean | null
+          cleaning_spend_limit?: number | null
+          created_at?: string | null
+          electrical_spend_limit?: number | null
+          emergency_authorization_limit?: number | null
+          exterior_spend_limit?: number | null
+          gate_code?: string | null
+          general_spend_limit?: number | null
+          hvac_spend_limit?: number | null
+          id?: string
+          lockbox_code?: string | null
+          maintenance_notes?: string | null
+          owner_prefers_lowest_bid?: boolean | null
+          plumbing_spend_limit?: number | null
+          preferred_contact_method?: string | null
+          property_id?: string
+          require_multiple_quotes_above?: number | null
+          require_owner_approval_above?: number | null
+          special_instructions?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "property_maintenance_book_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: true
+            referencedRelation: "comprehensive_property_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "property_maintenance_book_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: true
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       property_owners: {
         Row: {
           created_at: string
@@ -3605,6 +4118,67 @@ export type Database = {
             columns: ["property_id"]
             isOneToOne: true
             referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      property_vendor_assignments: {
+        Row: {
+          assigned_by: string | null
+          created_at: string | null
+          id: string
+          is_primary: boolean | null
+          notes: string | null
+          property_id: string
+          specialty: string
+          spend_limit: number | null
+          updated_at: string | null
+          vendor_id: string
+        }
+        Insert: {
+          assigned_by?: string | null
+          created_at?: string | null
+          id?: string
+          is_primary?: boolean | null
+          notes?: string | null
+          property_id: string
+          specialty: string
+          spend_limit?: number | null
+          updated_at?: string | null
+          vendor_id: string
+        }
+        Update: {
+          assigned_by?: string | null
+          created_at?: string | null
+          id?: string
+          is_primary?: boolean | null
+          notes?: string | null
+          property_id?: string
+          specialty?: string
+          spend_limit?: number | null
+          updated_at?: string | null
+          vendor_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "property_vendor_assignments_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "comprehensive_property_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "property_vendor_assignments_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "property_vendor_assignments_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
             referencedColumns: ["id"]
           },
         ]
@@ -4336,6 +4910,84 @@ export type Database = {
           },
         ]
       }
+      vendors: {
+        Row: {
+          average_rating: number | null
+          average_response_time_hours: number | null
+          company_name: string | null
+          created_at: string | null
+          created_by: string | null
+          email: string | null
+          emergency_available: boolean | null
+          emergency_rate: number | null
+          hourly_rate: number | null
+          id: string
+          insurance_expiration: string | null
+          insurance_verified: boolean | null
+          license_number: string | null
+          name: string
+          notes: string | null
+          phone: string
+          preferred_payment_method: string | null
+          service_area: string[] | null
+          specialty: string[]
+          status: Database["public"]["Enums"]["vendor_status"] | null
+          total_jobs_completed: number | null
+          updated_at: string | null
+          w9_on_file: boolean | null
+        }
+        Insert: {
+          average_rating?: number | null
+          average_response_time_hours?: number | null
+          company_name?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          email?: string | null
+          emergency_available?: boolean | null
+          emergency_rate?: number | null
+          hourly_rate?: number | null
+          id?: string
+          insurance_expiration?: string | null
+          insurance_verified?: boolean | null
+          license_number?: string | null
+          name: string
+          notes?: string | null
+          phone: string
+          preferred_payment_method?: string | null
+          service_area?: string[] | null
+          specialty?: string[]
+          status?: Database["public"]["Enums"]["vendor_status"] | null
+          total_jobs_completed?: number | null
+          updated_at?: string | null
+          w9_on_file?: boolean | null
+        }
+        Update: {
+          average_rating?: number | null
+          average_response_time_hours?: number | null
+          company_name?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          email?: string | null
+          emergency_available?: boolean | null
+          emergency_rate?: number | null
+          hourly_rate?: number | null
+          id?: string
+          insurance_expiration?: string | null
+          insurance_verified?: boolean | null
+          license_number?: string | null
+          name?: string
+          notes?: string | null
+          phone?: string
+          preferred_payment_method?: string | null
+          service_area?: string[] | null
+          specialty?: string[]
+          status?: Database["public"]["Enums"]["vendor_status"] | null
+          total_jobs_completed?: number | null
+          updated_at?: string | null
+          w9_on_file?: boolean | null
+        }
+        Relationships: []
+      }
       visits: {
         Row: {
           billed: boolean | null
@@ -4399,6 +5051,317 @@ export type Database = {
             columns: ["reconciliation_id"]
             isOneToOne: false
             referencedRelation: "monthly_reconciliations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      work_order_timeline: {
+        Row: {
+          action: string
+          created_at: string | null
+          details: Json | null
+          id: string
+          is_internal: boolean | null
+          new_status: Database["public"]["Enums"]["work_order_status"] | null
+          performed_by_name: string | null
+          performed_by_type:
+            | Database["public"]["Enums"]["message_sender_type"]
+            | null
+          performed_by_user_id: string | null
+          previous_status:
+            | Database["public"]["Enums"]["work_order_status"]
+            | null
+          work_order_id: string
+        }
+        Insert: {
+          action: string
+          created_at?: string | null
+          details?: Json | null
+          id?: string
+          is_internal?: boolean | null
+          new_status?: Database["public"]["Enums"]["work_order_status"] | null
+          performed_by_name?: string | null
+          performed_by_type?:
+            | Database["public"]["Enums"]["message_sender_type"]
+            | null
+          performed_by_user_id?: string | null
+          previous_status?:
+            | Database["public"]["Enums"]["work_order_status"]
+            | null
+          work_order_id: string
+        }
+        Update: {
+          action?: string
+          created_at?: string | null
+          details?: Json | null
+          id?: string
+          is_internal?: boolean | null
+          new_status?: Database["public"]["Enums"]["work_order_status"] | null
+          performed_by_name?: string | null
+          performed_by_type?:
+            | Database["public"]["Enums"]["message_sender_type"]
+            | null
+          performed_by_user_id?: string | null
+          previous_status?:
+            | Database["public"]["Enums"]["work_order_status"]
+            | null
+          work_order_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "work_order_timeline_work_order_id_fkey"
+            columns: ["work_order_id"]
+            isOneToOne: false
+            referencedRelation: "work_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      work_orders: {
+        Row: {
+          access_instructions: string | null
+          actual_cost: number | null
+          after_photos: string[] | null
+          ai_confidence_score: number | null
+          ai_estimated_cost_high: number | null
+          ai_estimated_cost_low: number | null
+          ai_suggested_category: string | null
+          ai_suggested_vendor_id: string | null
+          ai_triage_summary: string | null
+          ai_troubleshooting_steps: Json | null
+          assigned_at: string | null
+          assigned_by: string | null
+          assigned_vendor_id: string | null
+          before_photos: string[] | null
+          cancelled_at: string | null
+          cancelled_reason: string | null
+          category: string
+          completed_at: string | null
+          completion_verified: boolean | null
+          created_at: string | null
+          created_by: string | null
+          description: string
+          estimated_cost: number | null
+          expense_id: string | null
+          guest_notified: boolean | null
+          guest_notified_at: string | null
+          id: string
+          inspection_issue_id: string | null
+          invoice_path: string | null
+          owner_approved: boolean | null
+          owner_approved_at: string | null
+          owner_approved_by: string | null
+          owner_notified: boolean | null
+          owner_notified_at: string | null
+          parent_work_order_id: string | null
+          property_id: string
+          quoted_cost: number | null
+          reported_by: string | null
+          reported_by_email: string | null
+          reported_by_phone: string | null
+          reported_by_user_id: string | null
+          requires_vendor: boolean | null
+          scheduled_date: string | null
+          scheduled_time_end: string | null
+          scheduled_time_start: string | null
+          scheduled_time_window: string | null
+          source: string | null
+          status: Database["public"]["Enums"]["work_order_status"] | null
+          title: string
+          troubleshooting_resolved: boolean | null
+          updated_at: string | null
+          urgency: Database["public"]["Enums"]["work_order_urgency"] | null
+          vendor_accepted: boolean | null
+          vendor_accepted_at: string | null
+          vendor_declined_reason: string | null
+          vendor_notes: string | null
+          verification_notes: string | null
+          verified_at: string | null
+          verified_by: string | null
+          warranty_id: string | null
+          work_order_number: number
+        }
+        Insert: {
+          access_instructions?: string | null
+          actual_cost?: number | null
+          after_photos?: string[] | null
+          ai_confidence_score?: number | null
+          ai_estimated_cost_high?: number | null
+          ai_estimated_cost_low?: number | null
+          ai_suggested_category?: string | null
+          ai_suggested_vendor_id?: string | null
+          ai_triage_summary?: string | null
+          ai_troubleshooting_steps?: Json | null
+          assigned_at?: string | null
+          assigned_by?: string | null
+          assigned_vendor_id?: string | null
+          before_photos?: string[] | null
+          cancelled_at?: string | null
+          cancelled_reason?: string | null
+          category: string
+          completed_at?: string | null
+          completion_verified?: boolean | null
+          created_at?: string | null
+          created_by?: string | null
+          description: string
+          estimated_cost?: number | null
+          expense_id?: string | null
+          guest_notified?: boolean | null
+          guest_notified_at?: string | null
+          id?: string
+          inspection_issue_id?: string | null
+          invoice_path?: string | null
+          owner_approved?: boolean | null
+          owner_approved_at?: string | null
+          owner_approved_by?: string | null
+          owner_notified?: boolean | null
+          owner_notified_at?: string | null
+          parent_work_order_id?: string | null
+          property_id: string
+          quoted_cost?: number | null
+          reported_by?: string | null
+          reported_by_email?: string | null
+          reported_by_phone?: string | null
+          reported_by_user_id?: string | null
+          requires_vendor?: boolean | null
+          scheduled_date?: string | null
+          scheduled_time_end?: string | null
+          scheduled_time_start?: string | null
+          scheduled_time_window?: string | null
+          source?: string | null
+          status?: Database["public"]["Enums"]["work_order_status"] | null
+          title: string
+          troubleshooting_resolved?: boolean | null
+          updated_at?: string | null
+          urgency?: Database["public"]["Enums"]["work_order_urgency"] | null
+          vendor_accepted?: boolean | null
+          vendor_accepted_at?: string | null
+          vendor_declined_reason?: string | null
+          vendor_notes?: string | null
+          verification_notes?: string | null
+          verified_at?: string | null
+          verified_by?: string | null
+          warranty_id?: string | null
+          work_order_number?: number
+        }
+        Update: {
+          access_instructions?: string | null
+          actual_cost?: number | null
+          after_photos?: string[] | null
+          ai_confidence_score?: number | null
+          ai_estimated_cost_high?: number | null
+          ai_estimated_cost_low?: number | null
+          ai_suggested_category?: string | null
+          ai_suggested_vendor_id?: string | null
+          ai_triage_summary?: string | null
+          ai_troubleshooting_steps?: Json | null
+          assigned_at?: string | null
+          assigned_by?: string | null
+          assigned_vendor_id?: string | null
+          before_photos?: string[] | null
+          cancelled_at?: string | null
+          cancelled_reason?: string | null
+          category?: string
+          completed_at?: string | null
+          completion_verified?: boolean | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string
+          estimated_cost?: number | null
+          expense_id?: string | null
+          guest_notified?: boolean | null
+          guest_notified_at?: string | null
+          id?: string
+          inspection_issue_id?: string | null
+          invoice_path?: string | null
+          owner_approved?: boolean | null
+          owner_approved_at?: string | null
+          owner_approved_by?: string | null
+          owner_notified?: boolean | null
+          owner_notified_at?: string | null
+          parent_work_order_id?: string | null
+          property_id?: string
+          quoted_cost?: number | null
+          reported_by?: string | null
+          reported_by_email?: string | null
+          reported_by_phone?: string | null
+          reported_by_user_id?: string | null
+          requires_vendor?: boolean | null
+          scheduled_date?: string | null
+          scheduled_time_end?: string | null
+          scheduled_time_start?: string | null
+          scheduled_time_window?: string | null
+          source?: string | null
+          status?: Database["public"]["Enums"]["work_order_status"] | null
+          title?: string
+          troubleshooting_resolved?: boolean | null
+          updated_at?: string | null
+          urgency?: Database["public"]["Enums"]["work_order_urgency"] | null
+          vendor_accepted?: boolean | null
+          vendor_accepted_at?: string | null
+          vendor_declined_reason?: string | null
+          vendor_notes?: string | null
+          verification_notes?: string | null
+          verified_at?: string | null
+          verified_by?: string | null
+          warranty_id?: string | null
+          work_order_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "work_orders_ai_suggested_vendor_id_fkey"
+            columns: ["ai_suggested_vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "work_orders_assigned_vendor_id_fkey"
+            columns: ["assigned_vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "work_orders_expense_id_fkey"
+            columns: ["expense_id"]
+            isOneToOne: false
+            referencedRelation: "expenses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "work_orders_inspection_issue_id_fkey"
+            columns: ["inspection_issue_id"]
+            isOneToOne: false
+            referencedRelation: "inspection_issues"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "work_orders_parent_work_order_id_fkey"
+            columns: ["parent_work_order_id"]
+            isOneToOne: false
+            referencedRelation: "work_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "work_orders_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "comprehensive_property_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "work_orders_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "work_orders_warranty_id_fkey"
+            columns: ["warranty_id"]
+            isOneToOne: false
+            referencedRelation: "appliance_warranties"
             referencedColumns: ["id"]
           },
         ]
@@ -4487,7 +5450,28 @@ export type Database = {
     Enums: {
       account_status: "pending" | "approved" | "rejected"
       app_role: "admin" | "user"
+      approval_status:
+        | "pending"
+        | "approved"
+        | "declined"
+        | "auto_approved"
+        | "expired"
+      message_sender_type: "owner" | "pm" | "vendor" | "guest" | "ai" | "system"
       property_type: "Client-Managed" | "Company-Owned" | "Inactive"
+      vendor_status: "active" | "inactive" | "preferred" | "blocked"
+      work_order_status:
+        | "new"
+        | "triaging"
+        | "awaiting_approval"
+        | "approved"
+        | "dispatched"
+        | "scheduled"
+        | "in_progress"
+        | "pending_verification"
+        | "completed"
+        | "cancelled"
+        | "on_hold"
+      work_order_urgency: "low" | "normal" | "high" | "emergency"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -4617,7 +5601,30 @@ export const Constants = {
     Enums: {
       account_status: ["pending", "approved", "rejected"],
       app_role: ["admin", "user"],
+      approval_status: [
+        "pending",
+        "approved",
+        "declined",
+        "auto_approved",
+        "expired",
+      ],
+      message_sender_type: ["owner", "pm", "vendor", "guest", "ai", "system"],
       property_type: ["Client-Managed", "Company-Owned", "Inactive"],
+      vendor_status: ["active", "inactive", "preferred", "blocked"],
+      work_order_status: [
+        "new",
+        "triaging",
+        "awaiting_approval",
+        "approved",
+        "dispatched",
+        "scheduled",
+        "in_progress",
+        "pending_verification",
+        "completed",
+        "cancelled",
+        "on_hold",
+      ],
+      work_order_urgency: ["low", "normal", "high", "emergency"],
     },
   },
 } as const
