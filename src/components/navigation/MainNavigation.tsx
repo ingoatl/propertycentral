@@ -1,5 +1,4 @@
 import { Link, useLocation } from "react-router-dom";
-import { ChevronDown } from "lucide-react";
 import { navigationConfig, NavDropdown, NavLink } from "@/config/navigation";
 import {
   NavigationMenu,
@@ -26,10 +25,17 @@ export function MainNavigation({ isAdmin }: MainNavigationProps) {
     item => !item.adminOnly || isAdmin
   );
 
+  // Get index to determine if item should align right
+  const getDropdownAlignment = (index: number) => {
+    const totalItems = visibleNavItems.length;
+    // Last 2 items should align to the right
+    return index >= totalItems - 2 ? "right" : "left";
+  };
+
   return (
     <NavigationMenu className="hidden lg:flex">
       <NavigationMenuList className="gap-1">
-        {visibleNavItems.map((navItem) => {
+        {visibleNavItems.map((navItem, index) => {
           if (navItem.type === "link") {
             const linkItem = navItem as NavLink;
             const isActive = location.pathname === linkItem.path;
@@ -61,9 +67,10 @@ export function MainNavigation({ isAdmin }: MainNavigationProps) {
           const visibleItems = dropdownItem.items.filter(
             item => !item.adminOnly || isAdmin
           );
+          const alignment = getDropdownAlignment(index);
 
           return (
-            <NavigationMenuItem key={dropdownItem.label}>
+            <NavigationMenuItem key={dropdownItem.label} className="relative">
               <NavigationMenuTrigger
                 className={cn(
                   "h-10 rounded-lg px-4 py-2 text-sm font-medium",
@@ -75,8 +82,10 @@ export function MainNavigation({ isAdmin }: MainNavigationProps) {
                 <Icon className="w-4 h-4 mr-2" />
                 {dropdownItem.label}
               </NavigationMenuTrigger>
-              <NavigationMenuContent>
-                <ul className="grid w-[400px] gap-2 p-4 bg-popover">
+              <NavigationMenuContent className={cn(
+                alignment === "right" && "left-auto right-0"
+              )}>
+                <ul className="grid w-[400px] gap-2 p-4">
                   {visibleItems.map((item) => {
                     const isItemActive = location.pathname === item.path;
                     const ItemIcon = item.icon;
