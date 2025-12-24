@@ -40,7 +40,7 @@ const VoiceDialer = ({ defaultMessage }: VoiceDialerProps) => {
   const [isOnCall, setIsOnCall] = useState(false);
   const [callDuration, setCallDuration] = useState(0);
   const [open, setOpen] = useState(false);
-  const [showSearch, setShowSearch] = useState(true);
+  const [view, setView] = useState<'search' | 'dialer'>('search');
   const [searchQuery, setSearchQuery] = useState("");
   const [isSendingSMS, setIsSendingSMS] = useState(false);
   const [selectedContact, setSelectedContact] = useState<ContactRecord | null>(null);
@@ -167,36 +167,27 @@ const VoiceDialer = ({ defaultMessage }: VoiceDialerProps) => {
 
   const handleDigitPress = (digit: string) => {
     setPhoneNumber((prev) => prev + digit);
-    setShowSearch(false);
-    setSelectedContact(null);
-    // Send DTMF tone if on call
     if (callRef.current && isOnCall) {
       callRef.current.sendDigits(digit);
     }
   };
 
   const handleBackspace = () => {
-    setPhoneNumber((prev) => {
-      const newVal = prev.slice(0, -1);
-      if (!newVal) {
-        setShowSearch(true);
-        setSelectedContact(null);
-      }
-      return newVal;
-    });
+    setPhoneNumber((prev) => prev.slice(0, -1));
   };
 
   const handleClear = () => {
     setPhoneNumber("");
-    setShowSearch(true);
     setSelectedContact(null);
+    setView('search');
+    setSearchQuery("");
   };
 
   const handleSelectContact = (contact: ContactRecord) => {
     if (contact.phone) {
       setPhoneNumber(contact.phone.replace(/\D/g, ''));
       setSelectedContact(contact);
-      setShowSearch(false);
+      setView('dialer');
     }
   };
 
@@ -228,7 +219,6 @@ const VoiceDialer = ({ defaultMessage }: VoiceDialerProps) => {
         device = await initializeDevice();
       }
 
-      // Format phone number
       let formattedPhone = phoneNumber.replace(/\D/g, "");
       if (!formattedPhone.startsWith('1') && formattedPhone.length === 10) {
         formattedPhone = '1' + formattedPhone;
@@ -327,53 +317,72 @@ const VoiceDialer = ({ defaultMessage }: VoiceDialerProps) => {
         </DialogHeader>
         
         <div className="space-y-4">
-          {/* Search or Phone input */}
-          {showSearch && !isOnCall ? (
-            <Command className="rounded-lg border">
-              <CommandInput 
-                placeholder="Search owners, leads, addresses..." 
-                value={searchQuery}
-                onValueChange={setSearchQuery}
-              />
-              <CommandList className="max-h-48">
-                <CommandEmpty>No contacts found.</CommandEmpty>
-                <CommandGroup>
-                  {filteredContacts.slice(0, 10).map((contact) => (
-                    <CommandItem
-                      key={`${contact.type}-${contact.id}`}
-                      onSelect={() => handleSelectContact(contact)}
-                      className="cursor-pointer"
-                    >
-                      <div className="flex items-center gap-2 flex-1">
-                        {contact.type === 'owner' ? (
-                          <Home className="h-4 w-4 text-muted-foreground" />
-                        ) : (
-                          <User className="h-4 w-4 text-muted-foreground" />
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium truncate">{contact.name}</p>
-                          {contact.address && (
-                            <p className="text-xs text-muted-foreground truncate">{contact.address}</p>
+          {view === 'search' && !isOnCall ? (
+            <>
+              <Command className="rounded-lg border">
+                <CommandInput 
+                  placeholder="Search owners, leads, addresses..." 
+                  value={searchQuery}
+                  onValueChange={setSearchQuery}
+                />
+                <CommandList className="max-h-64">
+                  <CommandEmpty>No contacts found.</CommandEmpty>
+                  <CommandGroup>
+                    {filteredContacts.slice(0, 15).map((contact) => (
+                      <CommandItem
+                        key={`${contact.type}-${contact.id}`}
+                        onSelect={() => handleSelectContact(contact)}
+                        className="cursor-pointer"
+                      >
+                        <div className="flex items-center gap-2 flex-1">
+                          {contact.type === 'owner' ? (
+                            <Home className="h-4 w-4 text-muted-foreground shrink-0" />
+                          ) : (
+                            <User className="h-4 w-4 text-muted-foreground shrink-0" />
                           )}
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium truncate">{contact.name}</p>
+                            {contact.address && (
+                              <p className="text-xs text-muted-foreground truncate">{contact.address}</p>
+                            )}
+                          </div>
+                          <span className="text-xs text-muted-foreground shrink-0">{contact.phone}</span>
                         </div>
-                        <span className="text-xs text-muted-foreground">{contact.phone}</span>
-                      </div>
-                    </CommandItem>
-                  ))}
-                </CommandGroup>
-              </CommandList>
-            </Command>
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+              
+              <Button 
+                variant="outline" 
+                className="w-full"
+                onClick={() => setView('dialer')}
+              >
+                <Phone className="h-4 w-4 mr-2" />
+                Manual dial
+              </Button>
+            </>
           ) : (
             <>
-              {/* Selected contact info */}
               {selectedContact && !isOnCall && (
-                <div className="text-center text-sm text-muted-foreground">
-                  {selectedContact.name}
-                  {selectedContact.address && ` • ${selectedContact.address}`}
+                <div className="p-3 bg-muted rounded-lg">
+                  <div className="flex items-center gap-2">
+                    {selectedContact.type === 'owner' ? (
+                      <Home className="h-4 w-4 text-muted-foreground" />
+                    ) : (
+                      <User className="h-4 w-4 text-muted-foreground" />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium truncate">{selectedContact.name}</p>
+                      {selectedContact.address && (
+                        <p className="text-xs text-muted-foreground truncate">{selectedContact.address}</p>
+                      )}
+                    </div>
+                  </div>
                 </div>
               )}
               
-              {/* Phone number display */}
               <div className="relative">
                 <Input
                   value={formatPhoneDisplay(phoneNumber)}
@@ -394,100 +403,78 @@ const VoiceDialer = ({ defaultMessage }: VoiceDialerProps) => {
                 )}
               </div>
 
-              {/* Back to search button */}
-              {!isOnCall && (
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  className="w-full text-muted-foreground"
-                  onClick={() => {
-                    setShowSearch(true);
-                    setSearchQuery("");
-                  }}
-                >
-                  <Search className="h-4 w-4 mr-2" />
-                  Search contacts
-                </Button>
+              {isOnCall && (
+                <div className="text-center text-green-600 font-medium">
+                  Connected • {formatDuration(callDuration)}
+                </div>
               )}
-            </>
-          )}
 
-          {/* Call status */}
-          {isOnCall && (
-            <div className="text-center text-green-600 font-medium">
-              Connected • {formatDuration(callDuration)}
-            </div>
-          )}
-
-          {/* Dial pad */}
-          {!showSearch && (
-            <div className="grid grid-cols-3 gap-2">
-              {dialPad.flat().map((digit) => (
-                <Button
-                  key={digit}
-                  variant="outline"
-                  className="h-14 text-xl font-medium"
-                  onClick={() => handleDigitPress(digit)}
-                >
-                  {digit}
-                </Button>
-              ))}
-            </div>
-          )}
-
-          {/* Action buttons */}
-          {!showSearch && (
-            <div className="flex gap-2">
-              {!isOnCall && (
-                <>
+              <div className="grid grid-cols-3 gap-2">
+                {dialPad.flat().map((digit) => (
                   <Button
+                    key={digit}
                     variant="outline"
-                    className="flex-1"
-                    onClick={handleClear}
-                    disabled={!phoneNumber || isConnecting}
+                    className="h-12 text-xl font-medium"
+                    onClick={() => handleDigitPress(digit)}
                   >
-                    Clear
+                    {digit}
                   </Button>
+                ))}
+              </div>
+
+              <div className="flex gap-2">
+                {!isOnCall && (
+                  <>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={handleClear}
+                      disabled={isConnecting}
+                    >
+                      <Search className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={handleSendSMS}
+                      disabled={!phoneNumber || isSendingSMS || isConnecting}
+                    >
+                      {isSendingSMS ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <MessageSquare className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </>
+                )}
+                
+                {isOnCall ? (
                   <Button
-                    variant="outline"
-                    onClick={handleSendSMS}
-                    disabled={!phoneNumber || isSendingSMS || isConnecting}
+                    variant="destructive"
+                    className="flex-1"
+                    onClick={handleEndCall}
                   >
-                    {isSendingSMS ? (
+                    <PhoneOff className="h-4 w-4 mr-2" />
+                    End Call
+                  </Button>
+                ) : (
+                  <Button
+                    className="flex-1 bg-green-600 hover:bg-green-700"
+                    onClick={handleCall}
+                    disabled={isConnecting || !phoneNumber}
+                  >
+                    {isConnecting ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
                     ) : (
-                      <MessageSquare className="h-4 w-4" />
+                      <>
+                        <PhoneCall className="h-4 w-4 mr-2" />
+                        Call
+                      </>
                     )}
                   </Button>
-                </>
-              )}
-              
-              {isOnCall ? (
-                <Button
-                  variant="destructive"
-                  className="flex-1"
-                  onClick={handleEndCall}
-                >
-                  <PhoneOff className="h-4 w-4 mr-2" />
-                  End Call
-                </Button>
-              ) : (
-                <Button
-                  className="flex-1 bg-green-600 hover:bg-green-700"
-                  onClick={handleCall}
-                  disabled={isConnecting || !phoneNumber}
-                >
-                  {isConnecting ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <>
-                      <PhoneCall className="h-4 w-4 mr-2" />
-                      Call
-                    </>
-                  )}
-                </Button>
-              )}
-            </div>
+                )}
+              </div>
+            </>
           )}
         </div>
       </DialogContent>

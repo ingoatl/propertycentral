@@ -21,7 +21,6 @@ serve(async (req) => {
 
     console.log('Inbound call received:', { callSid, fromNumber, toNumber, callStatus });
 
-    const ELEVENLABS_AGENT_ID = Deno.env.get('ELEVENLABS_AGENT_ID');
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
 
     // Initialize Supabase client to look up lead and log the call
@@ -46,6 +45,8 @@ serve(async (req) => {
       .maybeSingle();
 
     const statusCallbackUrl = `${SUPABASE_URL}/functions/v1/twilio-call-status`;
+    // Convert https:// to wss:// for WebSocket URL
+    const bridgeUrl = SUPABASE_URL?.replace('https://', 'wss://') + '/functions/v1/twilio-elevenlabs-bridge';
 
     if (lead) {
       console.log('Found lead for inbound call:', lead.id, lead.name);
@@ -73,23 +74,20 @@ serve(async (req) => {
       console.log('No lead found for phone:', fromNumber);
     }
 
-    // NOTE: ElevenLabs agents require a WebSocket bridge server which isn't directly 
-    // compatible with Twilio's <Stream>. For now, use professional voicemail with recording.
-    // A full integration would require a WebSocket bridge service.
-    
+    // Return TwiML that connects to our WebSocket bridge for ElevenLabs
     const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Say voice="Polly.Matthew">Thank you for calling Peachhaus Property Management. We're currently assisting other clients. Please leave your name, phone number, and a brief message after the beep, and we'll get back to you as soon as possible.</Say>
-  <Record 
-    maxLength="120" 
-    playBeep="true"
-    recordingStatusCallback="${statusCallbackUrl}"
-    recordingStatusCallbackEvent="completed"
-  />
-  <Say voice="Polly.Matthew">Thank you for your message. We'll be in touch soon. Goodbye.</Say>
+  <Connect>
+    <Stream url="${bridgeUrl}">
+      <Parameter name="caller_number" value="${fromNumber}" />
+      <Parameter name="call_sid" value="${callSid}" />
+      ${lead ? `<Parameter name="lead_name" value="${lead.name}" />` : ''}
+      ${lead?.property_address ? `<Parameter name="property_address" value="${lead.property_address}" />` : ''}
+    </Stream>
+  </Connect>
 </Response>`;
 
-    console.log('Returning TwiML with voicemail recording');
+    console.log('Returning TwiML with ElevenLabs bridge stream:', bridgeUrl);
 
     return new Response(twiml, {
       headers: { 'Content-Type': 'text/xml' },
@@ -101,7 +99,7 @@ serve(async (req) => {
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
     const statusCallbackUrl = `${SUPABASE_URL}/functions/v1/twilio-call-status`;
     
-    // Return a graceful fallback TwiML
+    // Return a graceful fallback TwiML with voicemail
     const fallbackTwiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Say voice="Polly.Matthew">Thank you for calling Peachhaus. Please leave a message after the beep.</Say>
