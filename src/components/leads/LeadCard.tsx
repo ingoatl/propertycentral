@@ -52,15 +52,31 @@ const LeadCard = ({ lead, onClick, compact = false }: LeadCardProps) => {
     queryFn: async () => {
       const { data } = await supabase
         .from("lead_follow_up_schedules")
-        .select("scheduled_for")
+        .select("scheduled_for, step_number")
         .eq("lead_id", lead.id)
         .eq("status", "pending")
         .order("scheduled_for", { ascending: true })
         .limit(1)
-        .single();
+        .maybeSingle();
       return data;
     },
     staleTime: 30000,
+  });
+
+  // Fetch sequence info
+  const { data: sequenceInfo } = useQuery({
+    queryKey: ["lead-sequence-info", lead.active_sequence_id],
+    queryFn: async () => {
+      if (!lead.active_sequence_id) return null;
+      const { data } = await supabase
+        .from("lead_follow_up_sequences")
+        .select("name, lead_follow_up_steps(count)")
+        .eq("id", lead.active_sequence_id)
+        .maybeSingle();
+      return data;
+    },
+    enabled: !!lead.active_sequence_id,
+    staleTime: 60000,
   });
 
   if (compact) {
@@ -104,6 +120,12 @@ const LeadCard = ({ lead, onClick, compact = false }: LeadCardProps) => {
 
           {/* Quick Action Badges */}
           <div className="flex items-center gap-2 flex-wrap">
+            {lead.active_sequence_id && (
+              <Badge className="text-xs px-1.5 py-0 bg-green-100 text-green-700 border-green-300">
+                <Sparkles className="h-3 w-3 mr-1" />
+                Auto
+              </Badge>
+            )}
             {commCounts && commCounts.sms > 0 && (
               <Badge variant="secondary" className="text-xs px-1.5 py-0">
                 <MessageSquare className="h-3 w-3 mr-1" />
@@ -117,9 +139,9 @@ const LeadCard = ({ lead, onClick, compact = false }: LeadCardProps) => {
               </Badge>
             )}
             {nextFollowUp && (
-              <Badge variant="outline" className="text-xs px-1.5 py-0">
+              <Badge variant="outline" className="text-xs px-1.5 py-0 border-orange-300 text-orange-600">
                 <Clock className="h-3 w-3 mr-1" />
-                {formatDistanceToNow(new Date(nextFollowUp.scheduled_for), { addSuffix: true })}
+                Step {nextFollowUp.step_number} • {formatDistanceToNow(new Date(nextFollowUp.scheduled_for), { addSuffix: true })}
               </Badge>
             )}
           </div>
