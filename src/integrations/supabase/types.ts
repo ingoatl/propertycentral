@@ -1514,41 +1514,62 @@ export type Database = {
       lead_communications: {
         Row: {
           body: string
+          clicked_at: string | null
           communication_type: string
           created_at: string
+          delivery_status: string | null
+          delivery_updated_at: string | null
           direction: string
           error_message: string | null
           external_id: string | null
           id: string
           lead_id: string
+          opened_at: string | null
+          replied_at: string | null
           sent_at: string | null
+          sequence_id: string | null
           status: string | null
+          step_number: number | null
           subject: string | null
         }
         Insert: {
           body: string
+          clicked_at?: string | null
           communication_type: string
           created_at?: string
+          delivery_status?: string | null
+          delivery_updated_at?: string | null
           direction?: string
           error_message?: string | null
           external_id?: string | null
           id?: string
           lead_id: string
+          opened_at?: string | null
+          replied_at?: string | null
           sent_at?: string | null
+          sequence_id?: string | null
           status?: string | null
+          step_number?: number | null
           subject?: string | null
         }
         Update: {
           body?: string
+          clicked_at?: string | null
           communication_type?: string
           created_at?: string
+          delivery_status?: string | null
+          delivery_updated_at?: string | null
           direction?: string
           error_message?: string | null
           external_id?: string | null
           id?: string
           lead_id?: string
+          opened_at?: string | null
+          replied_at?: string | null
           sent_at?: string | null
+          sequence_id?: string | null
           status?: string | null
+          step_number?: number | null
           subject?: string | null
         }
         Relationships: [
@@ -1557,6 +1578,166 @@ export type Database = {
             columns: ["lead_id"]
             isOneToOne: false
             referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_communications_sequence_id_fkey"
+            columns: ["sequence_id"]
+            isOneToOne: false
+            referencedRelation: "lead_follow_up_sequences"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lead_follow_up_schedules: {
+        Row: {
+          attempt_count: number | null
+          created_at: string | null
+          error_message: string | null
+          id: string
+          lead_id: string | null
+          scheduled_for: string
+          sent_at: string | null
+          sequence_id: string | null
+          status: string | null
+          step_id: string | null
+          step_number: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          attempt_count?: number | null
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          lead_id?: string | null
+          scheduled_for: string
+          sent_at?: string | null
+          sequence_id?: string | null
+          status?: string | null
+          step_id?: string | null
+          step_number?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          attempt_count?: number | null
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          lead_id?: string | null
+          scheduled_for?: string
+          sent_at?: string | null
+          sequence_id?: string | null
+          status?: string | null
+          step_id?: string | null
+          step_number?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_follow_up_schedules_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_follow_up_schedules_sequence_id_fkey"
+            columns: ["sequence_id"]
+            isOneToOne: false
+            referencedRelation: "lead_follow_up_sequences"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_follow_up_schedules_step_id_fkey"
+            columns: ["step_id"]
+            isOneToOne: false
+            referencedRelation: "lead_follow_up_steps"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lead_follow_up_sequences: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          stop_on_response: boolean | null
+          trigger_stage: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          stop_on_response?: boolean | null
+          trigger_stage: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          stop_on_response?: boolean | null
+          trigger_stage?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      lead_follow_up_steps: {
+        Row: {
+          action_type: string
+          ai_personalize: boolean | null
+          created_at: string | null
+          delay_days: number
+          delay_hours: number
+          id: string
+          send_days: string[] | null
+          send_time: string | null
+          sequence_id: string | null
+          step_number: number
+          template_content: string
+          template_subject: string | null
+        }
+        Insert: {
+          action_type: string
+          ai_personalize?: boolean | null
+          created_at?: string | null
+          delay_days?: number
+          delay_hours?: number
+          id?: string
+          send_days?: string[] | null
+          send_time?: string | null
+          sequence_id?: string | null
+          step_number: number
+          template_content: string
+          template_subject?: string | null
+        }
+        Update: {
+          action_type?: string
+          ai_personalize?: boolean | null
+          created_at?: string | null
+          delay_days?: number
+          delay_hours?: number
+          id?: string
+          send_days?: string[] | null
+          send_time?: string | null
+          sequence_id?: string | null
+          step_number?: number
+          template_content?: string
+          template_subject?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_follow_up_steps_sequence_id_fkey"
+            columns: ["sequence_id"]
+            isOneToOne: false
+            referencedRelation: "lead_follow_up_sequences"
             referencedColumns: ["id"]
           },
         ]
@@ -1607,6 +1788,7 @@ export type Database = {
       }
       leads: {
         Row: {
+          active_sequence_id: string | null
           ai_next_action: string | null
           ai_qualification_score: number | null
           ai_summary: string | null
@@ -1614,7 +1796,10 @@ export type Database = {
           calendar_event_id: string | null
           created_at: string
           email: string | null
+          follow_up_paused: boolean | null
           id: string
+          last_contacted_at: string | null
+          last_response_at: string | null
           lead_number: number
           name: string
           notes: string | null
@@ -1633,6 +1818,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          active_sequence_id?: string | null
           ai_next_action?: string | null
           ai_qualification_score?: number | null
           ai_summary?: string | null
@@ -1640,7 +1826,10 @@ export type Database = {
           calendar_event_id?: string | null
           created_at?: string
           email?: string | null
+          follow_up_paused?: boolean | null
           id?: string
+          last_contacted_at?: string | null
+          last_response_at?: string | null
           lead_number?: number
           name: string
           notes?: string | null
@@ -1659,6 +1848,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          active_sequence_id?: string | null
           ai_next_action?: string | null
           ai_qualification_score?: number | null
           ai_summary?: string | null
@@ -1666,7 +1856,10 @@ export type Database = {
           calendar_event_id?: string | null
           created_at?: string
           email?: string | null
+          follow_up_paused?: boolean | null
           id?: string
+          last_contacted_at?: string | null
+          last_response_at?: string | null
           lead_number?: number
           name?: string
           notes?: string | null
@@ -1685,6 +1878,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "leads_active_sequence_id_fkey"
+            columns: ["active_sequence_id"]
+            isOneToOne: false
+            referencedRelation: "lead_follow_up_sequences"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "leads_owner_id_fkey"
             columns: ["owner_id"]
