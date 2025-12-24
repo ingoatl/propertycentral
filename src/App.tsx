@@ -32,6 +32,7 @@ const JobApplication = lazy(() => import("./pages/JobApplication"));
 const OwnerConversations = lazy(() => import("./pages/OwnerConversations"));
 const Vendors = lazy(() => import("./pages/Vendors"));
 const Maintenance = lazy(() => import("./pages/Maintenance"));
+const Leads = lazy(() => import("./pages/Leads"));
 
 // Optimized QueryClient with caching and stale time
 const queryClient = new QueryClient({
@@ -91,6 +92,7 @@ const App = () => (
                     <Route path="/owner-conversations" element={<OwnerConversations />} />
                     <Route path="/vendors" element={<Vendors />} />
                     <Route path="/maintenance" element={<Maintenance />} />
+                    <Route path="/leads" element={<Leads />} />
                     {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                     <Route path="*" element={<NotFound />} />
                   </Routes>

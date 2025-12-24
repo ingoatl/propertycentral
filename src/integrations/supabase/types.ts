@@ -1469,6 +1469,252 @@ export type Database = {
         }
         Relationships: []
       }
+      lead_automations: {
+        Row: {
+          action_type: string
+          ai_enabled: boolean | null
+          created_at: string
+          delay_minutes: number | null
+          id: string
+          is_active: boolean | null
+          name: string
+          template_content: string | null
+          template_subject: string | null
+          trigger_stage: Database["public"]["Enums"]["lead_stage"]
+          updated_at: string
+        }
+        Insert: {
+          action_type: string
+          ai_enabled?: boolean | null
+          created_at?: string
+          delay_minutes?: number | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          template_content?: string | null
+          template_subject?: string | null
+          trigger_stage: Database["public"]["Enums"]["lead_stage"]
+          updated_at?: string
+        }
+        Update: {
+          action_type?: string
+          ai_enabled?: boolean | null
+          created_at?: string
+          delay_minutes?: number | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          template_content?: string | null
+          template_subject?: string | null
+          trigger_stage?: Database["public"]["Enums"]["lead_stage"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      lead_communications: {
+        Row: {
+          body: string
+          communication_type: string
+          created_at: string
+          direction: string
+          error_message: string | null
+          external_id: string | null
+          id: string
+          lead_id: string
+          sent_at: string | null
+          status: string | null
+          subject: string | null
+        }
+        Insert: {
+          body: string
+          communication_type: string
+          created_at?: string
+          direction?: string
+          error_message?: string | null
+          external_id?: string | null
+          id?: string
+          lead_id: string
+          sent_at?: string | null
+          status?: string | null
+          subject?: string | null
+        }
+        Update: {
+          body?: string
+          communication_type?: string
+          created_at?: string
+          direction?: string
+          error_message?: string | null
+          external_id?: string | null
+          id?: string
+          lead_id?: string
+          sent_at?: string | null
+          status?: string | null
+          subject?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_communications_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lead_timeline: {
+        Row: {
+          action: string
+          created_at: string
+          id: string
+          lead_id: string
+          metadata: Json | null
+          new_stage: Database["public"]["Enums"]["lead_stage"] | null
+          performed_by_name: string | null
+          performed_by_user_id: string | null
+          previous_stage: Database["public"]["Enums"]["lead_stage"] | null
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          id?: string
+          lead_id: string
+          metadata?: Json | null
+          new_stage?: Database["public"]["Enums"]["lead_stage"] | null
+          performed_by_name?: string | null
+          performed_by_user_id?: string | null
+          previous_stage?: Database["public"]["Enums"]["lead_stage"] | null
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          id?: string
+          lead_id?: string
+          metadata?: Json | null
+          new_stage?: Database["public"]["Enums"]["lead_stage"] | null
+          performed_by_name?: string | null
+          performed_by_user_id?: string | null
+          previous_stage?: Database["public"]["Enums"]["lead_stage"] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_timeline_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      leads: {
+        Row: {
+          ai_next_action: string | null
+          ai_qualification_score: number | null
+          ai_summary: string | null
+          assigned_to: string | null
+          calendar_event_id: string | null
+          created_at: string
+          email: string | null
+          id: string
+          lead_number: number
+          name: string
+          notes: string | null
+          opportunity_source: string | null
+          opportunity_value: number | null
+          owner_id: string | null
+          phone: string | null
+          project_id: string | null
+          property_address: string | null
+          property_id: string | null
+          property_type: string | null
+          signwell_document_id: string | null
+          stage: Database["public"]["Enums"]["lead_stage"]
+          stage_changed_at: string | null
+          tags: string[] | null
+          updated_at: string
+        }
+        Insert: {
+          ai_next_action?: string | null
+          ai_qualification_score?: number | null
+          ai_summary?: string | null
+          assigned_to?: string | null
+          calendar_event_id?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          lead_number?: number
+          name: string
+          notes?: string | null
+          opportunity_source?: string | null
+          opportunity_value?: number | null
+          owner_id?: string | null
+          phone?: string | null
+          project_id?: string | null
+          property_address?: string | null
+          property_id?: string | null
+          property_type?: string | null
+          signwell_document_id?: string | null
+          stage?: Database["public"]["Enums"]["lead_stage"]
+          stage_changed_at?: string | null
+          tags?: string[] | null
+          updated_at?: string
+        }
+        Update: {
+          ai_next_action?: string | null
+          ai_qualification_score?: number | null
+          ai_summary?: string | null
+          assigned_to?: string | null
+          calendar_event_id?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          lead_number?: number
+          name?: string
+          notes?: string | null
+          opportunity_source?: string | null
+          opportunity_value?: number | null
+          owner_id?: string | null
+          phone?: string | null
+          project_id?: string | null
+          property_address?: string | null
+          property_id?: string | null
+          property_type?: string | null
+          signwell_document_id?: string | null
+          stage?: Database["public"]["Enums"]["lead_stage"]
+          stage_changed_at?: string | null
+          tags?: string[] | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "leads_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "property_owners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leads_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "onboarding_projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leads_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "comprehensive_property_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leads_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       listing_templates: {
         Row: {
           available_variables: string[] | null
@@ -5483,6 +5729,25 @@ export type Database = {
         | "declined"
         | "auto_approved"
         | "expired"
+      lead_source:
+        | "calendar_booking"
+        | "referral"
+        | "website"
+        | "phone_call"
+        | "email"
+        | "other"
+      lead_stage:
+        | "new_lead"
+        | "unreached"
+        | "call_scheduled"
+        | "call_attended"
+        | "send_contract"
+        | "contract_out"
+        | "contract_signed"
+        | "ach_form_signed"
+        | "onboarding_form_requested"
+        | "insurance_requested"
+        | "ops_handoff"
       message_sender_type: "owner" | "pm" | "vendor" | "guest" | "ai" | "system"
       property_type: "Client-Managed" | "Company-Owned" | "Inactive"
       vendor_status: "active" | "inactive" | "preferred" | "blocked"
@@ -5634,6 +5899,27 @@ export const Constants = {
         "declined",
         "auto_approved",
         "expired",
+      ],
+      lead_source: [
+        "calendar_booking",
+        "referral",
+        "website",
+        "phone_call",
+        "email",
+        "other",
+      ],
+      lead_stage: [
+        "new_lead",
+        "unreached",
+        "call_scheduled",
+        "call_attended",
+        "send_contract",
+        "contract_out",
+        "contract_signed",
+        "ach_form_signed",
+        "onboarding_form_requested",
+        "insurance_requested",
+        "ops_handoff",
       ],
       message_sender_type: ["owner", "pm", "vendor", "guest", "ai", "system"],
       property_type: ["Client-Managed", "Company-Owned", "Inactive"],
