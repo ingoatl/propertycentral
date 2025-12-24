@@ -1,66 +1,36 @@
 project_id = "ijsxcaaqphaciaenlegl"
 
+[functions.ai-property-chat]
+verify_jwt = true
+
 [functions.analyze-document-fields]
 verify_jwt = true
 
+[functions.analyze-owner-conversation]
+verify_jwt = true
+
 [functions.backfill-expense-receipts]
-verify_jwt = false
-
-[functions.send-team-performance-digest]
-verify_jwt = false
-
-[functions.send-bug-notification]
 verify_jwt = true
 
-[functions.send-overdue-task-emails]
-verify_jwt = false
-
-[functions.reset-user-password]
+[functions.billcom-authenticate]
 verify_jwt = true
 
-[functions.send-welcome-email]
+[functions.billcom-invite-vendor]
 verify_jwt = true
 
-[functions.send-report-email]
-verify_jwt = true
-
-[functions.send-monthly-report]
-verify_jwt = true
-
-[functions.sync-ownerrez]
-verify_jwt = true
-
-[functions.charge-monthly-fees]
-verify_jwt = true
-
-[functions.create-setup-intent]
-verify_jwt = true
-
-[functions.get-payment-methods]
-verify_jwt = true
-
-[functions.gmail-oauth]
-verify_jwt = false
-
-[functions.scan-gmail]
-verify_jwt = true
-
-[functions.extract-insights]
+[functions.billcom-sync-vendor]
 verify_jwt = true
 
 [functions.charge-individual-owner]
 verify_jwt = true
 
-[functions.create-user]
-verify_jwt = true
-
-[functions.schedule-daily-scan]
+[functions.charge-monthly-fees]
 verify_jwt = false
 
-[functions.ai-property-chat]
+[functions.charge-owner-fees]
 verify_jwt = true
 
-[functions.send-daily-digest]
+[functions.check-review-eligible-tenants]
 verify_jwt = false
 
 [functions.cleanup-contaminated-expenses]
@@ -69,19 +39,148 @@ verify_jwt = true
 [functions.create-reconciliation]
 verify_jwt = true
 
-[functions.update-reconciliation-and-resend]
+[functions.create-setup-intent]
+verify_jwt = true
+
+[functions.create-user]
+verify_jwt = true
+
+[functions.elevenlabs-transcribe]
+verify_jwt = true
+
+[functions.elevenlabs-voice-call]
+verify_jwt = true
+
+[functions.extract-document-text]
+verify_jwt = true
+
+[functions.extract-insights]
+verify_jwt = true
+
+[functions.extract-utility-data]
+verify_jwt = true
+
+[functions.extract-vendors-from-emails]
+verify_jwt = true
+
+[functions.generate-holiday-image]
+verify_jwt = false
+
+[functions.get-payment-methods]
+verify_jwt = true
+
+[functions.get-public-properties]
+verify_jwt = false
+
+[functions.gmail-oauth]
+verify_jwt = true
+
+[functions.handle-lead-sms-reply]
+verify_jwt = false
+
+[functions.lead-ai-assistant]
+verify_jwt = true
+
+[functions.lead-calendar-webhook]
+verify_jwt = false
+
+[functions.maintenance-sms-webhook]
+verify_jwt = false
+
+[functions.notify-vendor-work-order]
+verify_jwt = true
+
+[functions.process-lead-stage-change]
+verify_jwt = true
+
+[functions.process-new-str-onboarding]
+verify_jwt = false
+
+[functions.process-owner-onboarding]
+verify_jwt = false
+
+[functions.process-scheduled-follow-ups]
+verify_jwt = false
+
+[functions.receive-partner-sync]
+verify_jwt = false
+
+[functions.reset-user-password]
+verify_jwt = true
+
+[functions.scan-gmail]
+verify_jwt = true
+
+[functions.scan-utilities-inbox]
+verify_jwt = true
+
+[functions.schedule-daily-scan]
+verify_jwt = false
+
+[functions.schedule-holiday-emails]
+verify_jwt = false
+
+[functions.schedule-lead-follow-ups]
+verify_jwt = false
+
+[functions.schedule-utility-tasks]
+verify_jwt = false
+
+[functions.send-bug-notification]
+verify_jwt = true
+
+[functions.send-daily-digest]
+verify_jwt = false
+
+[functions.send-faq-notification]
+verify_jwt = true
+
+[functions.send-holiday-email]
+verify_jwt = false
+
+[functions.send-inspection-report]
+verify_jwt = true
+
+[functions.send-job-application-notification]
+verify_jwt = false
+
+[functions.send-lead-notification]
+verify_jwt = true
+
+[functions.send-monthly-report]
+verify_jwt = false
+
+[functions.send-offboarding-notification]
+verify_jwt = true
+
+[functions.send-overdue-task-emails]
+verify_jwt = false
+
+[functions.send-owner-setup-status]
+verify_jwt = true
+
+[functions.send-report-email]
 verify_jwt = true
 
 [functions.send-review-request-email]
+verify_jwt = true
+
+[functions.send-review-sms]
+verify_jwt = true
+
+[functions.send-team-performance-digest]
 verify_jwt = false
 
-[functions.mark-review-submitted]
-verify_jwt = false
-
-[functions.check-review-eligible-tenants]
-verify_jwt = false
+[functions.send-welcome-email]
+verify_jwt = true
 
 [functions.signwell-create-document]
+verify_jwt = true
+
+[functions.signwell-create-draft-document]
+verify_jwt = true
+
+[functions.signwell-finalize-document]
 verify_jwt = true
 
 [functions.signwell-get-signing-url]
@@ -90,22 +189,31 @@ verify_jwt = true
 [functions.signwell-webhook]
 verify_jwt = false
 
-[functions.signwell-create-draft-document]
+[functions.sync-ownerrez]
 verify_jwt = true
 
-[functions.signwell-finalize-document]
+[functions.sync-ownerrez-reviews]
 verify_jwt = true
 
-[functions.receive-partner-sync]
+[functions.mark-review-submitted]
 verify_jwt = false
 
-[functions.get-public-properties]
+[functions.twilio-status-callback]
 verify_jwt = false
 
-[functions.extract-utility-data]
+[functions.twilio-webhook]
+verify_jwt = false
+
+[functions.twilio-token]
 verify_jwt = true
 
-[functions.scan-utilities-inbox]
+[functions.twilio-voice]
+verify_jwt = false
+
+[functions.update-reconciliation-and-resend]
+verify_jwt = true
+
+[functions.upload-logo]
 verify_jwt = true
 
 [functions.utility-anomaly-detector]
@@ -113,18 +221,6 @@ verify_jwt = true
 
 [functions.utility-provider-recommendations]
 verify_jwt = true
-
-[functions.schedule-utility-tasks]
-verify_jwt = false
-
-[functions.sync-ownerrez-reviews]
-verify_jwt = true
-
-[functions.send-review-sms]
-verify_jwt = true
-
-[functions.twilio-webhook]
-verify_jwt = false
 
 [functions.process-owner-onboarding]
 verify_jwt = false

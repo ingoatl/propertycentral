@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -8,9 +8,10 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Phone, Delete, Loader2 } from "lucide-react";
+import { Phone, Delete, Loader2, PhoneOff, PhoneCall } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { Device, Call } from "@twilio/voice-sdk";
 
 interface VoiceDialerProps {
   defaultMessage?: string;
@@ -18,8 +19,14 @@ interface VoiceDialerProps {
 
 const VoiceDialer = ({ defaultMessage }: VoiceDialerProps) => {
   const [phoneNumber, setPhoneNumber] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [isOnCall, setIsOnCall] = useState(false);
+  const [callDuration, setCallDuration] = useState(0);
   const [open, setOpen] = useState(false);
+  
+  const deviceRef = useRef<Device | null>(null);
+  const callRef = useRef<Call | null>(null);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   const dialPad = [
     ["1", "2", "3"],
@@ -28,8 +35,74 @@ const VoiceDialer = ({ defaultMessage }: VoiceDialerProps) => {
     ["*", "0", "#"],
   ];
 
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
+      if (deviceRef.current) {
+        deviceRef.current.destroy();
+      }
+    };
+  }, []);
+
+  const initializeDevice = async () => {
+    try {
+      console.log('Getting Twilio token...');
+      const { data, error } = await supabase.functions.invoke('twilio-token', {
+        body: { identity: `peachhaus-${Date.now()}` }
+      });
+
+      if (error) throw error;
+      if (!data?.token) throw new Error('No token received');
+
+      console.log('Token received, initializing device...');
+      
+      const device = new Device(data.token, {
+        logLevel: 1,
+        codecPreferences: [Call.Codec.Opus, Call.Codec.PCMU]
+      });
+
+      device.on('registered', () => {
+        console.log('Device registered successfully');
+      });
+
+      device.on('error', (err) => {
+        console.error('Device error:', err);
+        toast.error('Call device error: ' + err.message);
+      });
+
+      await device.register();
+      deviceRef.current = device;
+      
+      return device;
+    } catch (error) {
+      console.error('Failed to initialize device:', error);
+      throw error;
+    }
+  };
+
+  const handleEndCall = useCallback(() => {
+    if (callRef.current) {
+      callRef.current.disconnect();
+      callRef.current = null;
+    }
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    setIsOnCall(false);
+    setIsConnecting(false);
+    setCallDuration(0);
+  }, []);
+
   const handleDigitPress = (digit: string) => {
     setPhoneNumber((prev) => prev + digit);
+    // Send DTMF tone if on call
+    if (callRef.current && isOnCall) {
+      callRef.current.sendDigits(digit);
+    }
   };
 
   const handleBackspace = () => {
@@ -47,54 +120,75 @@ const VoiceDialer = ({ defaultMessage }: VoiceDialerProps) => {
     return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6, 10)}`;
   };
 
+  const formatDuration = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
   const handleCall = async () => {
     if (!phoneNumber || phoneNumber.replace(/\D/g, "").length < 10) {
       toast.error("Please enter a valid phone number");
       return;
     }
 
-    setIsLoading(true);
+    setIsConnecting(true);
 
     try {
-      // Create a temporary lead entry for the call or use a generic message
-      const message = defaultMessage || 
-        `Hi there, this is Ingo from PeachHaus. I hope you're having a wonderful day. I wanted to reach out personally because I believe we might be able to help you with your property management needs. If you have a moment, I'd love to chat about how we can help maximize your rental income while taking excellent care of your property. Feel free to call me back anytime. Looking forward to connecting with you!`;
+      let device = deviceRef.current;
+      
+      if (!device) {
+        device = await initializeDevice();
+      }
 
       // Format phone number
-      const formattedPhone = phoneNumber.replace(/\D/g, "");
-      const fullPhone = formattedPhone.startsWith("1") ? `+${formattedPhone}` : `+1${formattedPhone}`;
-
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-voice-call`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-          },
-          body: JSON.stringify({
-            phoneNumber: fullPhone,
-            message,
-            isManualDial: true,
-          }),
-        }
-      );
-
-      const data = await response.json();
-
-      if (data?.success) {
-        toast.success(`Calling ${formatPhoneDisplay(phoneNumber)}...`);
-        setPhoneNumber("");
-        setOpen(false);
-      } else {
-        toast.error(data?.error || "Failed to initiate call");
+      let formattedPhone = phoneNumber.replace(/\D/g, "");
+      if (!formattedPhone.startsWith('1') && formattedPhone.length === 10) {
+        formattedPhone = '1' + formattedPhone;
       }
-    } catch (err) {
-      console.error("Dialer call error:", err);
-      toast.error("Failed to initiate call");
-    } finally {
-      setIsLoading(false);
+      formattedPhone = '+' + formattedPhone;
+
+      console.log('Making call to:', formattedPhone);
+
+      const call = await device.connect({
+        params: {
+          To: formattedPhone
+        }
+      });
+
+      callRef.current = call;
+
+      call.on('accept', () => {
+        console.log('Call accepted');
+        setIsOnCall(true);
+        setIsConnecting(false);
+        setCallDuration(0);
+        timerRef.current = setInterval(() => {
+          setCallDuration(prev => prev + 1);
+        }, 1000);
+        toast.success('Call connected');
+      });
+
+      call.on('disconnect', () => {
+        console.log('Call disconnected');
+        handleEndCall();
+      });
+
+      call.on('cancel', () => {
+        console.log('Call cancelled');
+        handleEndCall();
+      });
+
+      call.on('error', (err) => {
+        console.error('Call error:', err);
+        toast.error('Call error: ' + err.message);
+        handleEndCall();
+      });
+
+    } catch (error) {
+      console.error('Failed to make call:', error);
+      toast.error('Failed to initiate call: ' + (error instanceof Error ? error.message : 'Unknown error'));
+      setIsConnecting(false);
     }
   };
 
@@ -119,8 +213,9 @@ const VoiceDialer = ({ defaultMessage }: VoiceDialerProps) => {
               onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, ""))}
               placeholder="Enter phone number"
               className="text-center text-xl font-medium h-14 pr-10"
+              disabled={isOnCall}
             />
-            {phoneNumber && (
+            {phoneNumber && !isOnCall && (
               <Button
                 variant="ghost"
                 size="icon"
@@ -131,6 +226,13 @@ const VoiceDialer = ({ defaultMessage }: VoiceDialerProps) => {
               </Button>
             )}
           </div>
+
+          {/* Call status */}
+          {isOnCall && (
+            <div className="text-center text-green-600 font-medium">
+              Connected • {formatDuration(callDuration)}
+            </div>
+          )}
 
           {/* Dial pad */}
           <div className="grid grid-cols-3 gap-2">
@@ -148,28 +250,42 @@ const VoiceDialer = ({ defaultMessage }: VoiceDialerProps) => {
 
           {/* Action buttons */}
           <div className="flex gap-2">
-            <Button
-              variant="outline"
-              className="flex-1"
-              onClick={handleClear}
-              disabled={!phoneNumber}
-            >
-              Clear
-            </Button>
-            <Button
-              className="flex-1 bg-green-600 hover:bg-green-700"
-              onClick={handleCall}
-              disabled={isLoading || !phoneNumber}
-            >
-              {isLoading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <>
-                  <Phone className="h-4 w-4 mr-2" />
-                  Call
-                </>
-              )}
-            </Button>
+            {!isOnCall && (
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={handleClear}
+                disabled={!phoneNumber || isConnecting}
+              >
+                Clear
+              </Button>
+            )}
+            
+            {isOnCall ? (
+              <Button
+                variant="destructive"
+                className="flex-1"
+                onClick={handleEndCall}
+              >
+                <PhoneOff className="h-4 w-4 mr-2" />
+                End Call
+              </Button>
+            ) : (
+              <Button
+                className="flex-1 bg-green-600 hover:bg-green-700"
+                onClick={handleCall}
+                disabled={isConnecting || !phoneNumber}
+              >
+                {isConnecting ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <>
+                    <PhoneCall className="h-4 w-4 mr-2" />
+                    Call
+                  </>
+                )}
+              </Button>
+            )}
           </div>
         </div>
       </DialogContent>
