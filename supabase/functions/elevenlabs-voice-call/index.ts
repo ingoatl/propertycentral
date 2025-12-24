@@ -113,15 +113,21 @@ serve(async (req) => {
       throw new Error('Lead has no phone number');
     }
 
-    // Make Twilio call using TwiML Say with synthesized text
-    // Since we can't easily host the audio, we'll use Twilio's built-in TTS
-    // combined with our personalized message
+    // Make Twilio call using TwiML Say with Polly Matthew (warm male voice)
     const twilioAuth = btoa(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`);
     
-    // Create TwiML that speaks the message using Twilio's Polly voices
+    // Escape XML special characters and create TwiML
+    const escapedMessage = processedMessage
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&apos;');
+    
+    // Create TwiML that speaks the message using Polly Matthew (warm male voice)
     const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Say voice="Polly.Matthew">${processedMessage.replace(/"/g, '&quot;').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</Say>
+  <Say voice="Polly.Matthew">${escapedMessage}</Say>
 </Response>`;
 
     const callResponse = await fetch(

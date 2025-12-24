@@ -2,7 +2,7 @@ import { Lead, STAGE_CONFIG } from "@/types/leads";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Phone, Mail, MapPin, DollarSign, MessageSquare, FileText, Sparkles, Clock, Calendar } from "lucide-react";
+import { Phone, Mail, MapPin, DollarSign, MessageSquare, Sparkles, Clock, PhoneCall, Volume2 } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -31,7 +31,7 @@ const LeadCard = ({ lead, onClick, compact = false }: LeadCardProps) => {
     }).format(amount);
   };
 
-  // Fetch communication counts
+  // Fetch communication counts including voice calls
   const { data: commCounts } = useQuery({
     queryKey: ["lead-comm-counts", lead.id],
     queryFn: async () => {
@@ -42,7 +42,8 @@ const LeadCard = ({ lead, onClick, compact = false }: LeadCardProps) => {
       
       const sms = data?.filter(c => c.communication_type === "sms").length || 0;
       const email = data?.filter(c => c.communication_type === "email").length || 0;
-      return { sms, email };
+      const voiceCall = data?.filter(c => c.communication_type === "voice_call").length || 0;
+      return { sms, email, voiceCall };
     },
     staleTime: 30000,
   });
@@ -137,6 +138,12 @@ const LeadCard = ({ lead, onClick, compact = false }: LeadCardProps) => {
               <Badge variant="secondary" className="text-xs px-1.5 py-0">
                 <Mail className="h-3 w-3 mr-1" />
                 {commCounts.email}
+              </Badge>
+            )}
+            {commCounts && commCounts.voiceCall > 0 && (
+              <Badge variant="secondary" className="text-xs px-1.5 py-0 bg-purple-100 text-purple-700">
+                <Volume2 className="h-3 w-3 mr-1" />
+                {commCounts.voiceCall}
               </Badge>
             )}
             {nextFollowUp && (
