@@ -13,15 +13,35 @@ serve(async (req) => {
 
   try {
     const formData = await req.formData();
+    
+    // Log all form data for debugging
+    const formEntries: Record<string, string> = {};
+    for (const [key, value] of formData.entries()) {
+      formEntries[key] = String(value);
+    }
+    console.log('Twilio callback received:', JSON.stringify(formEntries, null, 2));
+    
     const callSid = formData.get('CallSid') as string;
     const callStatus = formData.get('CallStatus') as string;
     const callDuration = formData.get('CallDuration') as string;
-    const recordingUrl = formData.get('RecordingUrl') as string;
-    const recordingSid = formData.get('RecordingSid') as string;
     const fromNumber = formData.get('From') as string;
     const toNumber = formData.get('To') as string;
+    
+    // Recording-specific fields (from recordingStatusCallback)
+    const recordingUrl = formData.get('RecordingUrl') as string;
+    const recordingSid = formData.get('RecordingSid') as string;
+    const recordingStatus = formData.get('RecordingStatus') as string;
+    const recordingDuration = formData.get('RecordingDuration') as string;
 
-    console.log('Call status update:', { callSid, callStatus, callDuration, recordingUrl });
+    console.log('Call status update:', { 
+      callSid, 
+      callStatus, 
+      callDuration, 
+      recordingUrl, 
+      recordingStatus,
+      fromNumber,
+      toNumber 
+    });
 
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -29,45 +49,51 @@ serve(async (req) => {
     );
 
     // Update the communication record with the call status
-    const { error: updateError } = await supabase
-      .from('lead_communications')
-      .update({
-        status: callStatus,
-        delivery_status: callStatus,
-        delivery_updated_at: new Date().toISOString(),
-      })
-      .eq('external_id', callSid);
+    if (callSid && callStatus) {
+      const { error: updateError } = await supabase
+        .from('lead_communications')
+        .update({
+          status: callStatus,
+          delivery_status: callStatus,
+          delivery_updated_at: new Date().toISOString(),
+        })
+        .eq('external_id', callSid);
 
-    if (updateError) {
-      console.error('Error updating communication:', updateError);
+      if (updateError) {
+        console.error('Error updating communication:', updateError);
+      } else {
+        console.log('Updated communication status to:', callStatus);
+      }
     }
 
-    // If call completed and there's a recording, trigger transcription
-    if (callStatus === 'completed' && recordingUrl) {
-      console.log('Call completed with recording, triggering transcription');
+    // If recording is complete, trigger transcription
+    if (recordingStatus === 'completed' && recordingUrl) {
+      console.log('Recording completed, triggering transcription');
+      console.log('Recording URL:', recordingUrl);
+      console.log('Recording Duration:', recordingDuration);
       
-      // Trigger transcription in background
-      const TWILIO_ACCOUNT_SID = Deno.env.get('TWILIO_ACCOUNT_SID');
-      const TWILIO_AUTH_TOKEN = Deno.env.get('TWILIO_AUTH_TOKEN');
+      // The recording URL from Twilio needs .mp3 extension for the audio file
+      const recordingWithFormat = `${recordingUrl}.mp3`;
       
-      if (TWILIO_ACCOUNT_SID && TWILIO_AUTH_TOKEN) {
-        // Get recording with authentication
-        const recordingWithAuth = `${recordingUrl}.mp3`;
+      // Trigger transcription
+      try {
+        const { data, error } = await supabase.functions.invoke('transcribe-call', {
+          body: {
+            callSid,
+            recordingUrl: recordingWithFormat,
+            fromNumber: fromNumber || toNumber, // Use whichever we have
+            toNumber: toNumber || fromNumber,
+            duration: recordingDuration || callDuration,
+          },
+        });
         
-        // Call our transcription function
-        try {
-          await supabase.functions.invoke('transcribe-call', {
-            body: {
-              callSid,
-              recordingUrl: recordingWithAuth,
-              fromNumber,
-              toNumber,
-              duration: callDuration,
-            },
-          });
-        } catch (transcribeError) {
-          console.error('Error invoking transcription:', transcribeError);
+        if (error) {
+          console.error('Error invoking transcription:', error);
+        } else {
+          console.log('Transcription triggered successfully:', data);
         }
+      } catch (transcribeError) {
+        console.error('Error invoking transcription:', transcribeError);
       }
     }
 

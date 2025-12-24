@@ -48,13 +48,19 @@ serve(async (req) => {
       formattedPhone = formattedPhone.startsWith('1') ? `+${formattedPhone}` : `+1${formattedPhone}`;
     }
 
+    const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
+    const statusCallbackUrl = `${SUPABASE_URL}/functions/v1/twilio-call-status`;
+
     console.log(`Creating TwiML to dial ${formattedPhone} from ${TWILIO_PHONE_NUMBER}`);
+    console.log(`Status callback URL: ${statusCallbackUrl}`);
 
     // Generate TwiML to connect the browser call to the phone number
+    // record="record-from-answer-dual" records both sides of the call
+    // statusCallbackEvent triggers our webhook on call completion with recording URL
     const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Dial callerId="${TWILIO_PHONE_NUMBER}">
-    <Number>${formattedPhone}</Number>
+  <Dial callerId="${TWILIO_PHONE_NUMBER}" record="record-from-answer-dual" recordingStatusCallback="${statusCallbackUrl}" recordingStatusCallbackEvent="completed">
+    <Number statusCallback="${statusCallbackUrl}" statusCallbackEvent="initiated ringing answered completed">${formattedPhone}</Number>
   </Dial>
 </Response>`;
 
