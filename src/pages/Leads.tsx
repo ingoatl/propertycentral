@@ -23,7 +23,7 @@ const Leads = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("leads")
-        .select("*")
+        .select("*, last_contacted_at, last_response_at, follow_up_paused, active_sequence_id")
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data as Lead[];

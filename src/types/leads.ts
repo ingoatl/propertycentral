@@ -44,6 +44,11 @@ export interface Lead {
   signwell_document_id: string | null;
   created_at: string;
   updated_at: string;
+  // New fields for follow-up tracking
+  last_contacted_at?: string | null;
+  last_response_at?: string | null;
+  follow_up_paused?: boolean;
+  active_sequence_id?: string | null;
 }
 
 export interface LeadTimeline {
@@ -84,6 +89,51 @@ export interface LeadCommunication {
   error_message: string | null;
   sent_at: string | null;
   created_at: string;
+  // New fields for enhanced tracking
+  sequence_id?: string | null;
+  step_number?: number | null;
+  delivery_status?: string;
+  opened_at?: string | null;
+  clicked_at?: string | null;
+  replied_at?: string | null;
+}
+
+export interface LeadFollowUpSequence {
+  id: string;
+  name: string;
+  trigger_stage: string;
+  description: string | null;
+  is_active: boolean;
+  stop_on_response: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface LeadFollowUpStep {
+  id: string;
+  sequence_id: string;
+  step_number: number;
+  delay_days: number;
+  delay_hours: number;
+  action_type: 'email' | 'sms' | 'both';
+  template_subject: string | null;
+  template_content: string;
+  send_time: string;
+  send_days: string[];
+  ai_personalize: boolean;
+  created_at: string;
+}
+
+export interface LeadFollowUpSchedule {
+  id: string;
+  lead_id: string;
+  sequence_id: string | null;
+  step_id: string | null;
+  step_number: number;
+  scheduled_for: string;
+  status: 'pending' | 'sent' | 'cancelled' | 'failed' | 'skipped';
+  sent_at: string | null;
+  created_at: string;
 }
 
 export const LEAD_STAGES: { stage: LeadStage; title: string; description: string }[] = [
@@ -93,7 +143,7 @@ export const LEAD_STAGES: { stage: LeadStage; title: string; description: string
   { stage: 'call_attended', title: 'Call Attended', description: 'Call completed, ready for review' },
   { stage: 'send_contract', title: 'Send Contract', description: 'Ready to send management agreement' },
   { stage: 'contract_out', title: 'Contract Out', description: 'Contract sent, awaiting signature' },
-  { stage: 'contract_signed', title: 'Contract Signed', description: 'Agreement signed, need payment info' },
+  { stage: 'contract_signed', title: 'Contract Signed', description: 'Agreement signed, need ACH form' },
   { stage: 'ach_form_signed', title: 'ACH Form Signed', description: 'Payment method confirmed' },
   { stage: 'onboarding_form_requested', title: 'Onboarding Requested', description: 'Waiting for property details' },
   { stage: 'insurance_requested', title: 'Insurance Requested', description: 'Waiting for STR insurance' },
@@ -102,7 +152,7 @@ export const LEAD_STAGES: { stage: LeadStage; title: string; description: string
 
 export const STAGE_CONFIG: Record<LeadStage, { label: string; color: string; bgColor: string }> = {
   new_lead: { label: 'New Lead', color: 'text-blue-700', bgColor: 'bg-blue-50' },
-  unreached: { label: 'Unreached', color: 'text-gray-700', bgColor: 'bg-gray-50' },
+  unreached: { label: 'Unreached', color: 'text-gray-700', bgColor: 'bg-gray-100' },
   call_scheduled: { label: 'Call Scheduled', color: 'text-purple-700', bgColor: 'bg-purple-50' },
   call_attended: { label: 'Call Attended', color: 'text-indigo-700', bgColor: 'bg-indigo-50' },
   send_contract: { label: 'Send Contract', color: 'text-orange-700', bgColor: 'bg-orange-50' },
