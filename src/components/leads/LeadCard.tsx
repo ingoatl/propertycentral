@@ -6,6 +6,7 @@ import { Phone, Mail, MapPin, DollarSign, MessageSquare, FileText, Sparkles, Clo
 import { format, formatDistanceToNow } from "date-fns";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import TestEmailButton from "./TestEmailButton";
 
 interface LeadCardProps {
   lead: Lead & {
@@ -173,9 +174,16 @@ const LeadCard = ({ lead, onClick, compact = false }: LeadCardProps) => {
                 <Mail className="h-3 w-3" />
               </Button>
             )}
-            <span className="text-xs text-muted-foreground ml-auto">
-              #{lead.lead_number}
-            </span>
+            <div onClick={(e) => e.stopPropagation()} className="ml-auto flex items-center gap-2">
+              <TestEmailButton 
+                leadId={lead.id} 
+                leadEmail={lead.email} 
+                currentStage={lead.stage} 
+              />
+              <span className="text-xs text-muted-foreground">
+                #{lead.lead_number}
+              </span>
+            </div>
           </div>
         </div>
       </Card>
