@@ -88,7 +88,11 @@ function int16ToBytes(int16Array: Int16Array): Uint8Array {
 }
 
 function bytesToInt16(bytes: Uint8Array): Int16Array {
-  return new Int16Array(bytes.buffer);
+  // Create a new buffer and copy bytes to ensure proper alignment
+  const buffer = new ArrayBuffer(bytes.length);
+  const view = new Uint8Array(buffer);
+  view.set(bytes);
+  return new Int16Array(buffer);
 }
 
 serve(async (req) => {
@@ -106,12 +110,12 @@ serve(async (req) => {
   let elevenLabsSocket: WebSocket | null = null;
   let streamSid: string | null = null;
   let callSid: string | null = null;
+  let audioChunksSent = 0;
+  let audioChunksReceived = 0;
 
-  twilioSocket.onopen = async () => {
-    console.log("Twilio WebSocket connected");
-    
+  const connectToElevenLabs = async () => {
     try {
-      // Get signed URL for ElevenLabs conversation
+      console.log("Getting ElevenLabs signed URL...");
       const signedUrlResponse = await fetch(
         `https://api.elevenlabs.io/v1/convai/conversation/get-signed-url?agent_id=${ELEVENLABS_AGENT_ID}`,
         {
@@ -122,21 +126,20 @@ serve(async (req) => {
       );
 
       if (!signedUrlResponse.ok) {
-        console.error("Failed to get ElevenLabs signed URL:", await signedUrlResponse.text());
-        twilioSocket.close();
+        const errorText = await signedUrlResponse.text();
+        console.error("Failed to get ElevenLabs signed URL:", signedUrlResponse.status, errorText);
         return;
       }
 
       const { signed_url } = await signedUrlResponse.json();
       console.log("Got ElevenLabs signed URL, connecting...");
 
-      // Connect to ElevenLabs
       elevenLabsSocket = new WebSocket(signed_url);
 
       elevenLabsSocket.onopen = () => {
-        console.log("ElevenLabs WebSocket connected");
+        console.log("ElevenLabs WebSocket connected, sending initial config...");
         
-        // Send initial configuration to ElevenLabs
+        // Send conversation initiation with first message override
         const initMessage = {
           type: "conversation_initiation_client_data",
           conversation_config_override: {
@@ -146,55 +149,78 @@ serve(async (req) => {
           }
         };
         elevenLabsSocket!.send(JSON.stringify(initMessage));
-        console.log("Sent first_message override to ElevenLabs");
+        console.log("Sent conversation_initiation_client_data with first_message override");
       };
 
       elevenLabsSocket.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
           
+          // Log all message types except ping for debugging
           if (data.type !== 'ping') {
-            console.log("ElevenLabs message:", data.type, JSON.stringify(Object.keys(data)));
+            console.log("ElevenLabs received:", data.type);
           }
 
-          // Handle audio from ElevenLabs - check all possible audio formats
-          let audioBase64: string | null = null;
-          
-          if (data.audio_event?.audio_base_64) {
-            audioBase64 = data.audio_event.audio_base_64;
-            console.log("Found audio in audio_event.audio_base_64");
-          } else if (data.audio) {
-            audioBase64 = data.audio;
-            console.log("Found audio in data.audio");
-          } else if (data.delta) {
-            audioBase64 = data.delta;
-            console.log("Found audio in data.delta");
+          // Handle conversation initiation metadata - this confirms the agent is ready
+          if (data.type === 'conversation_initiation_metadata') {
+            console.log("ElevenLabs agent initialized, conversation_id:", data.conversation_initiation_metadata_event?.conversation_id);
           }
-          
-          if (audioBase64 && streamSid) {
-            console.log("Processing audio chunk, length:", audioBase64.length);
-            try {
-              // Decode base64 PCM audio from ElevenLabs
-              const pcmBytes = base64ToBytes(audioBase64);
-              const pcm16k = bytesToInt16(pcmBytes);
+
+          // Handle audio from ElevenLabs - it sends audio in "audio" type messages
+          if (data.type === 'audio') {
+            // Try multiple possible audio data locations
+            let audioBase64: string | null = null;
+            
+            if (data.audio_event?.audio_base_64) {
+              audioBase64 = data.audio_event.audio_base_64;
+            } else if (data.audio) {
+              audioBase64 = data.audio;
+            }
+            
+            if (audioBase64 && streamSid) {
+              audioChunksReceived++;
+              if (audioChunksReceived <= 3 || audioChunksReceived % 50 === 0) {
+                console.log(`Processing ElevenLabs audio chunk #${audioChunksReceived}, base64 length: ${audioBase64.length}`);
+              }
               
-              // Convert to mulaw 8kHz for Twilio
-              const mulawData = pcm16kToMulaw8k(pcm16k);
-              const mulawBase64 = bytesToBase64(mulawData);
-              
-              const twilioMessage = {
-                event: 'media',
-                streamSid: streamSid,
-                media: {
-                  payload: mulawBase64
+              try {
+                // Decode base64 PCM audio from ElevenLabs (16kHz, 16-bit, mono)
+                const pcmBytes = base64ToBytes(audioBase64);
+                const pcm16k = bytesToInt16(pcmBytes);
+                
+                // Convert to mulaw 8kHz for Twilio
+                const mulawData = pcm16kToMulaw8k(pcm16k);
+                const mulawBase64 = bytesToBase64(mulawData);
+                
+                // Send to Twilio
+                const twilioMessage = {
+                  event: 'media',
+                  streamSid: streamSid,
+                  media: {
+                    payload: mulawBase64
+                  }
+                };
+                twilioSocket.send(JSON.stringify(twilioMessage));
+                
+                if (audioChunksReceived <= 3) {
+                  console.log(`Sent audio chunk #${audioChunksReceived} to Twilio, mulaw size: ${mulawData.length} bytes`);
                 }
-              };
-              twilioSocket.send(JSON.stringify(twilioMessage));
-              console.log("Sent audio to Twilio, mulaw length:", mulawData.length);
-            } catch (audioError) {
-              console.error("Error converting audio:", audioError);
+              } catch (audioError) {
+                console.error("Error converting ElevenLabs audio:", audioError);
+              }
             }
           }
+
+          // Handle agent response text for logging
+          if (data.type === 'agent_response') {
+            console.log("Agent speaking:", data.agent_response_event?.agent_response?.substring(0, 100));
+          }
+
+          // Handle interruption
+          if (data.type === 'interruption') {
+            console.log("User interrupted agent");
+          }
+
         } catch (e) {
           console.error("Error processing ElevenLabs message:", e);
         }
@@ -204,17 +230,20 @@ serve(async (req) => {
         console.error("ElevenLabs WebSocket error:", error);
       };
 
-      elevenLabsSocket.onclose = () => {
-        console.log("ElevenLabs WebSocket closed");
+      elevenLabsSocket.onclose = (event) => {
+        console.log("ElevenLabs WebSocket closed, code:", event.code, "reason:", event.reason);
       };
 
     } catch (error) {
       console.error("Error setting up ElevenLabs connection:", error);
-      twilioSocket.close();
     }
   };
 
-  twilioSocket.onmessage = (event) => {
+  twilioSocket.onopen = () => {
+    console.log("Twilio WebSocket connected");
+  };
+
+  twilioSocket.onmessage = async (event) => {
     try {
       const data = JSON.parse(event.data);
       
@@ -222,21 +251,31 @@ serve(async (req) => {
         streamSid = data.start.streamSid;
         callSid = data.start.callSid;
         console.log("Twilio stream started:", { streamSid, callSid });
+        
+        // Now connect to ElevenLabs after we have the streamSid
+        await connectToElevenLabs();
       } 
-      else if (data.event === 'media' && elevenLabsSocket?.readyState === WebSocket.OPEN) {
-        // Decode mulaw audio from Twilio
-        const mulawData = base64ToBytes(data.media.payload);
-        
-        // Convert mulaw 8kHz to PCM 16kHz
-        const pcm16k = mulawToPcm16k(mulawData);
-        const pcmBytes = int16ToBytes(pcm16k);
-        const pcmBase64 = bytesToBase64(pcmBytes);
-        
-        // Send to ElevenLabs
-        const audioMessage = {
-          user_audio_chunk: pcmBase64
-        };
-        elevenLabsSocket.send(JSON.stringify(audioMessage));
+      else if (data.event === 'media') {
+        if (elevenLabsSocket?.readyState === WebSocket.OPEN) {
+          // Decode mulaw audio from Twilio (8kHz)
+          const mulawData = base64ToBytes(data.media.payload);
+          
+          // Convert mulaw 8kHz to PCM 16kHz for ElevenLabs
+          const pcm16k = mulawToPcm16k(mulawData);
+          const pcmBytes = int16ToBytes(pcm16k);
+          const pcmBase64 = bytesToBase64(pcmBytes);
+          
+          // Send to ElevenLabs in the correct format
+          const audioMessage = {
+            user_audio_chunk: pcmBase64
+          };
+          elevenLabsSocket.send(JSON.stringify(audioMessage));
+          
+          audioChunksSent++;
+          if (audioChunksSent <= 3 || audioChunksSent % 100 === 0) {
+            console.log(`Sent audio chunk #${audioChunksSent} to ElevenLabs, PCM size: ${pcmBytes.length} bytes`);
+          }
+        }
       }
       else if (data.event === 'stop') {
         console.log("Twilio stream stopped");
