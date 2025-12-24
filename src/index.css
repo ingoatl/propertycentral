@@ -72,6 +72,30 @@ All colors MUST be HSL.
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
   }
+
+  /* Custom prominent scrollbar for Kanban */
+  .scrollbar-custom {
+    scrollbar-width: auto;
+  }
+  
+  .scrollbar-custom::-webkit-scrollbar {
+    height: 12px;
+  }
+  
+  .scrollbar-custom::-webkit-scrollbar-track {
+    background: hsl(var(--muted));
+    border-radius: 6px;
+  }
+  
+  .scrollbar-custom::-webkit-scrollbar-thumb {
+    background: hsl(var(--primary) / 0.5);
+    border-radius: 6px;
+    border: 2px solid hsl(var(--muted));
+  }
+  
+  .scrollbar-custom::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--primary) / 0.7);
+  }
 }
 
 @layer base {
