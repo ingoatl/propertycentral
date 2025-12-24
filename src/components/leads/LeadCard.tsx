@@ -7,7 +7,7 @@ import { format, formatDistanceToNow } from "date-fns";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import TestEmailButton from "./TestEmailButton";
-import QuickCallButton from "./QuickCallButton";
+import DirectCallButton from "./DirectCallButton";
 
 interface LeadCardProps {
   lead: Lead & {
@@ -156,10 +156,11 @@ const LeadCard = ({ lead, onClick, compact = false }: LeadCardProps) => {
           </div>
           
           <div className="flex items-center gap-1 pt-1">
-            <QuickCallButton 
+            <DirectCallButton 
               leadId={lead.id}
               leadPhone={lead.phone}
               leadName={lead.name}
+              leadAddress={lead.property_address}
             />
             {lead.email && (
               <Button 
