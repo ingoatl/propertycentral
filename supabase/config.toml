@@ -87,6 +87,9 @@ verify_jwt = false
 [functions.maintenance-sms-webhook]
 verify_jwt = false
 
+[functions.mark-review-submitted]
+verify_jwt = false
+
 [functions.notify-vendor-work-order]
 verify_jwt = true
 
@@ -195,19 +198,25 @@ verify_jwt = true
 [functions.sync-ownerrez-reviews]
 verify_jwt = true
 
-[functions.mark-review-submitted]
+[functions.transcribe-call]
+verify_jwt = true
+
+[functions.twilio-call-status]
+verify_jwt = false
+
+[functions.twilio-inbound-voice]
 verify_jwt = false
 
 [functions.twilio-status-callback]
-verify_jwt = false
-
-[functions.twilio-webhook]
 verify_jwt = false
 
 [functions.twilio-token]
 verify_jwt = true
 
 [functions.twilio-voice]
+verify_jwt = false
+
+[functions.twilio-webhook]
 verify_jwt = false
 
 [functions.update-reconciliation-and-resend]
@@ -220,82 +229,4 @@ verify_jwt = true
 verify_jwt = true
 
 [functions.utility-provider-recommendations]
-verify_jwt = true
-
-[functions.process-owner-onboarding]
-verify_jwt = false
-
-[functions.send-offboarding-notification]
-verify_jwt = true
-
-[functions.process-new-str-onboarding]
-verify_jwt = false
-
-[functions.send-inspection-report]
-verify_jwt = true
-
-[functions.send-job-application-notification]
-verify_jwt = false
-
-[functions.analyze-owner-conversation]
-verify_jwt = true
-
-[functions.send-owner-setup-status]
-verify_jwt = true
-
-[functions.generate-holiday-image]
-verify_jwt = true
-
-[functions.send-holiday-email]
-verify_jwt = true
-
-[functions.schedule-holiday-emails]
-verify_jwt = false
-
-[functions.extract-vendors-from-emails]
-verify_jwt = true
-
-[functions.billcom-authenticate]
-verify_jwt = true
-
-[functions.billcom-sync-vendor]
-verify_jwt = true
-
-[functions.billcom-invite-vendor]
-verify_jwt = true
-
-[functions.notify-vendor-work-order]
-verify_jwt = true
-
-[functions.maintenance-sms-webhook]
-verify_jwt = false
-
-[functions.twilio-status-callback]
-verify_jwt = false
-
-[functions.process-lead-stage-change]
-verify_jwt = true
-
-[functions.lead-ai-assistant]
-verify_jwt = true
-
-[functions.send-lead-notification]
-verify_jwt = true
-
-[functions.lead-calendar-webhook]
-verify_jwt = false
-
-[functions.process-scheduled-follow-ups]
-verify_jwt = false
-
-[functions.schedule-lead-follow-ups]
-verify_jwt = true
-
-[functions.handle-lead-sms-reply]
-verify_jwt = false
-
-[functions.elevenlabs-voice-call]
-verify_jwt = false
-
-[functions.elevenlabs-transcribe]
 verify_jwt = true
