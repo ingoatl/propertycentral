@@ -35,6 +35,8 @@ import {
 } from "lucide-react";
 import { Lead, LeadStage, LeadTimeline, LeadCommunication, LEAD_STAGES, STAGE_CONFIG } from "@/types/leads";
 import FollowUpManager from "./FollowUpManager";
+import TestEmailButton from "./TestEmailButton";
+import TestVoiceCallButton from "./TestVoiceCallButton";
 
 interface LeadDetailModalProps {
   lead: Lead | null;
@@ -279,6 +281,19 @@ const LeadDetailModal = ({ lead, open, onOpenChange, onRefresh }: LeadDetailModa
             <Sparkles className="h-4 w-4 mr-2" />
             {aiQualify.isPending ? "Analyzing..." : "AI Qualify"}
           </Button>
+
+          <TestEmailButton 
+            leadId={lead.id} 
+            leadEmail={lead.email} 
+            currentStage={lead.stage} 
+          />
+
+          <TestVoiceCallButton
+            leadId={lead.id}
+            leadPhone={lead.phone}
+            leadName={lead.name}
+            propertyAddress={lead.property_address}
+          />
         </div>
 
         {(lead.ai_summary || lead.ai_next_action) && (
