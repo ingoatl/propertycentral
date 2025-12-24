@@ -197,3 +197,9 @@ verify_jwt = true
 
 [functions.handle-lead-sms-reply]
 verify_jwt = false
+
+[functions.elevenlabs-voice-call]
+verify_jwt = true
+
+[functions.elevenlabs-transcribe]
+verify_jwt = true
