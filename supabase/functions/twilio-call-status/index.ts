@@ -75,14 +75,40 @@ serve(async (req) => {
       // The recording URL from Twilio needs .mp3 extension for the audio file
       const recordingWithFormat = `${recordingUrl}.mp3`;
       
+      // Try to get phone numbers from the lead_communications table if not in callback
+      let phoneFrom = fromNumber;
+      let phoneTo = toNumber;
+      
+      if ((!phoneFrom || !phoneTo) && callSid) {
+        // Look up the parent call's communication record which should have the phone
+        const { data: comm } = await supabase
+          .from('lead_communications')
+          .select('lead_id')
+          .eq('external_id', callSid)
+          .maybeSingle();
+        
+        if (comm?.lead_id) {
+          const { data: lead } = await supabase
+            .from('leads')
+            .select('phone')
+            .eq('id', comm.lead_id)
+            .maybeSingle();
+          
+          if (lead?.phone) {
+            phoneTo = lead.phone;
+            console.log('Found lead phone from communication record:', phoneTo);
+          }
+        }
+      }
+      
       // Trigger transcription
       try {
         const { data, error } = await supabase.functions.invoke('transcribe-call', {
           body: {
             callSid,
             recordingUrl: recordingWithFormat,
-            fromNumber: fromNumber || toNumber, // Use whichever we have
-            toNumber: toNumber || fromNumber,
+            fromNumber: phoneFrom,
+            toNumber: phoneTo,
             duration: recordingDuration || callDuration,
           },
         });
