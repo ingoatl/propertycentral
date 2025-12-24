@@ -170,6 +170,22 @@ serve(async (req) => {
       }
     }
 
+    // Schedule follow-up sequences for this stage
+    try {
+      console.log(`Scheduling follow-up sequences for stage ${newStage}`);
+      await fetch(`${supabaseUrl}/functions/v1/schedule-lead-follow-ups`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${supabaseServiceKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ leadId, stage: newStage }),
+      });
+      console.log(`Follow-up sequences scheduled for lead ${leadId}`);
+    } catch (seqError) {
+      console.error("Error scheduling follow-up sequences:", seqError);
+    }
+
     return new Response(
       JSON.stringify({ success: true, automationsProcessed: automations?.length || 0 }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
