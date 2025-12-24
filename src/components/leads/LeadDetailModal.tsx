@@ -208,8 +208,8 @@ const LeadDetailModal = ({ lead, open, onOpenChange, onRefresh }: LeadDetailModa
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh]">
-        <DialogHeader>
+      <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col">
+        <DialogHeader className="flex-shrink-0">
           <div className="flex items-start justify-between">
             <div>
               <DialogTitle className="text-xl">{lead.name}</DialogTitle>
@@ -223,6 +223,7 @@ const LeadDetailModal = ({ lead, open, onOpenChange, onRefresh }: LeadDetailModa
           </div>
         </DialogHeader>
 
+        <ScrollArea className="flex-1 overflow-y-auto pr-4">
         <div className="grid grid-cols-3 gap-4 py-4">
           {lead.phone && (
             <Button variant="outline" size="sm" asChild>
@@ -340,17 +341,50 @@ const LeadDetailModal = ({ lead, open, onOpenChange, onRefresh }: LeadDetailModa
             <ScrollArea className="h-[250px]">
               {timeline && timeline.length > 0 ? (
                 <div className="space-y-3">
-                  {timeline.map((entry) => (
-                    <div key={entry.id} className="flex gap-3 text-sm">
-                      <div className="w-2 h-2 rounded-full bg-primary mt-2 shrink-0" />
-                      <div className="flex-1">
-                        <p>{entry.action}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {entry.performed_by_name} • {format(new Date(entry.created_at), 'MMM d, h:mm a')}
-                        </p>
+                  {timeline.map((entry) => {
+                    const metadata = entry.metadata as Record<string, unknown> | null;
+                    const hasTranscript = entry.action === 'call_transcribed' && metadata?.transcript_preview;
+                    const insights = metadata?.insights as Record<string, unknown> | null;
+                    
+                    return (
+                      <div key={entry.id} className="flex gap-3 text-sm">
+                        <div className="w-2 h-2 rounded-full bg-primary mt-2 shrink-0" />
+                        <div className="flex-1">
+                          <p className="font-medium">{entry.action}</p>
+                          {hasTranscript && (
+                            <div className="mt-2 p-2 bg-muted/50 rounded text-xs">
+                              <p className="text-muted-foreground mb-1 font-medium">Transcript:</p>
+                              <p className="italic">"{String(metadata?.transcript_preview)}"</p>
+                              {insights && (
+                                <div className="mt-2 pt-2 border-t">
+                                  {insights.interest_level && (
+                                    <Badge variant="outline" className="mr-1 text-xs">
+                                      Interest: {String(insights.interest_level)}
+                                    </Badge>
+                                  )}
+                                  {insights.sentiment && (
+                                    <Badge variant="outline" className="mr-1 text-xs">
+                                      {String(insights.sentiment)}
+                                    </Badge>
+                                  )}
+                                  {Array.isArray(insights.key_points) && insights.key_points.length > 0 && (
+                                    <ul className="mt-2 list-disc list-inside text-muted-foreground">
+                                      {insights.key_points.map((point, i) => (
+                                        <li key={i}>{String(point)}</li>
+                                      ))}
+                                    </ul>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                          <p className="text-xs text-muted-foreground">
+                            {entry.performed_by_name} • {format(new Date(entry.created_at), 'MMM d, h:mm a')}
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               ) : (
                 <p className="text-sm text-muted-foreground text-center py-8">
@@ -451,6 +485,7 @@ const LeadDetailModal = ({ lead, open, onOpenChange, onRefresh }: LeadDetailModa
             </div>
           </TabsContent>
         </Tabs>
+        </ScrollArea>
       </DialogContent>
     </Dialog>
   );
