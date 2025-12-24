@@ -6,6 +6,31 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Check if current time is within allowed sending window (11am-5pm EST)
+function isWithinSendingWindow(): { allowed: boolean; currentHourEST: number; message: string } {
+  // Get current time in EST/EDT
+  const now = new Date();
+  const estFormatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    hour: 'numeric',
+    hour12: false,
+  });
+  
+  const currentHourEST = parseInt(estFormatter.format(now), 10);
+  
+  // Allowed window: 11am (11) to 5pm (17) EST
+  const START_HOUR = 11;
+  const END_HOUR = 17;
+  
+  const allowed = currentHourEST >= START_HOUR && currentHourEST < END_HOUR;
+  
+  const message = allowed 
+    ? `Within sending window (${currentHourEST}:00 EST, allowed ${START_HOUR}:00-${END_HOUR}:00)`
+    : `Outside sending window (${currentHourEST}:00 EST, allowed ${START_HOUR}:00-${END_HOUR}:00 EST)`;
+  
+  return { allowed, currentHourEST, message };
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -18,6 +43,24 @@ serve(async (req) => {
 
     const today = new Date().toISOString().split('T')[0];
     console.log(`=== HOLIDAY EMAIL SCHEDULER - ${today} ===`);
+
+    // Check if we're within the sending window (11am-5pm EST)
+    const { allowed, currentHourEST, message: windowMessage } = isWithinSendingWindow();
+    console.log(windowMessage);
+    
+    if (!allowed) {
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          message: `Skipping: ${windowMessage}. Will retry later.`,
+          sent: 0,
+          currentHourEST,
+          windowStart: 11,
+          windowEnd: 17
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     // Get all pending emails scheduled for today from the queue
     const { data: pendingEmails, error: queueError } = await supabase
@@ -128,6 +171,7 @@ serve(async (req) => {
       JSON.stringify({ 
         success: true, 
         message: `Sent ${results.sent} emails, ${results.failed} failed`,
+        currentHourEST,
         ...results 
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
