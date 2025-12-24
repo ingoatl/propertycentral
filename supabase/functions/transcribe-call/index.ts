@@ -42,6 +42,41 @@ function fuzzyMatch(str1: string, str2: string): number {
   return overlap.length / Math.max(words1.length, words2.length);
 }
 
+// Spam/noise detection patterns
+const SPAM_PATTERNS = [
+  /^(hello|hi|hey)[\s.,!?]*$/i,
+  /^(bye|goodbye|thanks|thank you)[\s.,!?]*$/i,
+  /^(yes|no|ok|okay|yeah|yep|nope)[\s.,!?]*$/i,
+  /^[\s.,!?]*$/,
+  /this call (may be|is being) (recorded|monitored)/i,
+  /press \d+ (to|for)/i,
+  /your call is important/i,
+  /please hold/i,
+  /leave a message after the (beep|tone)/i,
+  /the person you are trying to reach/i,
+  /mailbox is full/i,
+  /not available/i,
+];
+
+function isSpamOrNoise(text: string): boolean {
+  if (!text) return true;
+  const trimmed = text.trim();
+  
+  // Too short (under 20 chars is likely just noise)
+  if (trimmed.length < 20) return true;
+  
+  // Word count too low (less than 5 words)
+  const wordCount = trimmed.split(/\s+/).filter(w => w.length > 0).length;
+  if (wordCount < 5) return true;
+  
+  // Check spam patterns
+  for (const pattern of SPAM_PATTERNS) {
+    if (pattern.test(trimmed)) return true;
+  }
+  
+  return false;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -51,6 +86,16 @@ serve(async (req) => {
     const { callSid, recordingUrl, fromNumber, toNumber, duration } = await req.json();
 
     console.log('Transcribing call:', { callSid, recordingUrl, fromNumber, toNumber, duration });
+
+    // Skip very short calls (under 5 seconds) - likely spam/hangups
+    const callDuration = parseInt(duration) || 0;
+    if (callDuration < 5) {
+      console.log('Skipping very short call:', callDuration, 'seconds');
+      return new Response(
+        JSON.stringify({ success: true, skipped: true, reason: 'Call too short' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
     const TWILIO_ACCOUNT_SID = Deno.env.get('TWILIO_ACCOUNT_SID');
@@ -131,9 +176,37 @@ serve(async (req) => {
 
     console.log('Transcription complete:', transcriptText?.substring(0, 200));
 
-    // ALWAYS analyze the transcription for key insights using AI (even short ones)
+    // Check if transcript is spam/noise - skip AI analysis if so
+    if (isSpamOrNoise(transcriptText)) {
+      console.log('Transcript identified as spam/noise, skipping AI analysis');
+      
+      // Still save the transcript if we have a lead, but don't analyze
+      if (lead) {
+        await supabase.from('lead_communications').upsert({
+          lead_id: lead.id,
+          communication_type: 'call',
+          direction: 'inbound',
+          body: transcriptText || 'Short call - no meaningful content',
+          external_id: callSid,
+          status: 'completed',
+          sent_at: new Date().toISOString(),
+        }, { onConflict: 'external_id' });
+      }
+      
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          skipped: true, 
+          reason: 'Spam or noise detected',
+          transcription: transcriptText 
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Only analyze meaningful transcriptions with AI
     let insights = null;
-    if (transcriptText && transcriptText.length > 10) {
+    if (transcriptText && transcriptText.length > 50) {
       try {
         const analysisResponse = await fetch('https://api.openai.com/v1/chat/completions', {
           method: 'POST',
@@ -186,7 +259,7 @@ Always include at least caller_name (if mentioned), interest_level, sentiment, k
         console.error('Error analyzing call:', analysisError);
       }
     } else {
-      console.log('Transcript too short for analysis:', transcriptText?.length || 0, 'chars');
+      console.log('Transcript too short for detailed analysis:', transcriptText?.length || 0, 'chars');
     }
 
     // If no lead found by phone, try matching by name or property from transcript
