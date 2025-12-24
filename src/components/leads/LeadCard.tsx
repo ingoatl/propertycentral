@@ -2,11 +2,18 @@ import { Lead, STAGE_CONFIG } from "@/types/leads";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Phone, Mail, MapPin, DollarSign, MessageSquare, FileText, Sparkles } from "lucide-react";
-import { format } from "date-fns";
+import { Phone, Mail, MapPin, DollarSign, MessageSquare, FileText, Sparkles, Clock, Calendar } from "lucide-react";
+import { format, formatDistanceToNow } from "date-fns";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 
 interface LeadCardProps {
-  lead: Lead;
+  lead: Lead & {
+    last_contacted_at?: string | null;
+    last_response_at?: string | null;
+    follow_up_paused?: boolean;
+    active_sequence_id?: string | null;
+  };
   onClick: () => void;
   compact?: boolean;
 }
@@ -22,6 +29,39 @@ const LeadCard = ({ lead, onClick, compact = false }: LeadCardProps) => {
       maximumFractionDigits: 0,
     }).format(amount);
   };
+
+  // Fetch communication counts
+  const { data: commCounts } = useQuery({
+    queryKey: ["lead-comm-counts", lead.id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("lead_communications")
+        .select("communication_type")
+        .eq("lead_id", lead.id);
+      
+      const sms = data?.filter(c => c.communication_type === "sms").length || 0;
+      const email = data?.filter(c => c.communication_type === "email").length || 0;
+      return { sms, email };
+    },
+    staleTime: 30000,
+  });
+
+  // Fetch next scheduled follow-up
+  const { data: nextFollowUp } = useQuery({
+    queryKey: ["lead-next-followup", lead.id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("lead_follow_up_schedules")
+        .select("scheduled_for")
+        .eq("lead_id", lead.id)
+        .eq("status", "pending")
+        .order("scheduled_for", { ascending: true })
+        .limit(1)
+        .single();
+      return data;
+    },
+    staleTime: 30000,
+  });
 
   if (compact) {
     return (
@@ -59,6 +99,28 @@ const LeadCard = ({ lead, onClick, compact = false }: LeadCardProps) => {
                 <MapPin className="h-3 w-3 shrink-0" />
                 <span className="truncate">{lead.property_address}</span>
               </span>
+            )}
+          </div>
+
+          {/* Quick Action Badges */}
+          <div className="flex items-center gap-2 flex-wrap">
+            {commCounts && commCounts.sms > 0 && (
+              <Badge variant="secondary" className="text-xs px-1.5 py-0">
+                <MessageSquare className="h-3 w-3 mr-1" />
+                {commCounts.sms}
+              </Badge>
+            )}
+            {commCounts && commCounts.email > 0 && (
+              <Badge variant="secondary" className="text-xs px-1.5 py-0">
+                <Mail className="h-3 w-3 mr-1" />
+                {commCounts.email}
+              </Badge>
+            )}
+            {nextFollowUp && (
+              <Badge variant="outline" className="text-xs px-1.5 py-0">
+                <Clock className="h-3 w-3 mr-1" />
+                {formatDistanceToNow(new Date(nextFollowUp.scheduled_for), { addSuffix: true })}
+              </Badge>
             )}
           </div>
           

@@ -31,9 +31,10 @@ import {
   Clock,
   FileText,
   Send,
-  RefreshCw
+  CalendarClock
 } from "lucide-react";
 import { Lead, LeadStage, LeadTimeline, LeadCommunication, LEAD_STAGES, STAGE_CONFIG } from "@/types/leads";
+import FollowUpManager from "./FollowUpManager";
 
 interface LeadDetailModalProps {
   lead: Lead | null;
@@ -301,10 +302,14 @@ const LeadDetailModal = ({ lead, open, onOpenChange, onRefresh }: LeadDetailModa
         )}
 
         <Tabs defaultValue="timeline" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="timeline">
               <Clock className="h-4 w-4 mr-2" />
               Timeline
+            </TabsTrigger>
+            <TabsTrigger value="followups">
+              <CalendarClock className="h-4 w-4 mr-2" />
+              Follow-ups
             </TabsTrigger>
             <TabsTrigger value="messages">
               <MessageSquare className="h-4 w-4 mr-2" />
@@ -338,6 +343,14 @@ const LeadDetailModal = ({ lead, open, onOpenChange, onRefresh }: LeadDetailModa
                 </p>
               )}
             </ScrollArea>
+          </TabsContent>
+
+          <TabsContent value="followups" className="mt-4">
+            <FollowUpManager 
+              leadId={lead.id} 
+              isPaused={(lead as any).follow_up_paused || false}
+              activeSequenceId={(lead as any).active_sequence_id || null}
+            />
           </TabsContent>
 
           <TabsContent value="messages" className="mt-4">
