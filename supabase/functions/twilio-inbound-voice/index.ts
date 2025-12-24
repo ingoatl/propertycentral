@@ -73,69 +73,23 @@ serve(async (req) => {
       console.log('No lead found for phone:', fromNumber);
     }
 
-    // Check if ElevenLabs agent is configured
-    if (!ELEVENLABS_AGENT_ID) {
-      console.log('No ElevenLabs agent configured, falling back to voicemail');
-      const fallbackTwiml = `<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-  <Say voice="Polly.Matthew">Thank you for calling Peachhaus Property Management. Please leave a message after the beep.</Say>
-  <Record 
-    maxLength="120" 
-    playBeep="true"
-    recordingStatusCallback="${statusCallbackUrl}"
-    recordingStatusCallbackEvent="completed"
-  />
-  <Say voice="Polly.Matthew">Thank you for your message. Goodbye.</Say>
-</Response>`;
-      return new Response(fallbackTwiml, { headers: { 'Content-Type': 'text/xml' } });
-    }
-
-    // Get ElevenLabs signed URL for the conversation
-    const ELEVENLABS_API_KEY = Deno.env.get('ELEVENLABS_API_KEY');
+    // NOTE: ElevenLabs agents require a WebSocket bridge server which isn't directly 
+    // compatible with Twilio's <Stream>. For now, use professional voicemail with recording.
+    // A full integration would require a WebSocket bridge service.
     
-    const signedUrlResponse = await fetch(
-      `https://api.elevenlabs.io/v1/convai/conversation/get-signed-url?agent_id=${ELEVENLABS_AGENT_ID}`,
-      {
-        headers: {
-          'xi-api-key': ELEVENLABS_API_KEY || '',
-        },
-      }
-    );
-
-    if (!signedUrlResponse.ok) {
-      console.error('Failed to get ElevenLabs signed URL:', await signedUrlResponse.text());
-      // Fall back to voicemail
-      const fallbackTwiml = `<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-  <Say voice="Polly.Matthew">Thank you for calling Peachhaus Property Management. Please leave a message after the beep.</Say>
-  <Record 
-    maxLength="120" 
-    playBeep="true"
-    recordingStatusCallback="${statusCallbackUrl}"
-    recordingStatusCallbackEvent="completed"
-  />
-</Response>`;
-      return new Response(fallbackTwiml, { headers: { 'Content-Type': 'text/xml' } });
-    }
-
-    const { signed_url } = await signedUrlResponse.json();
-    console.log('Got ElevenLabs signed URL for agent');
-
-    // Return TwiML that connects to ElevenLabs agent via bidirectional stream
-    // Also record the call for transcription
     const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Connect>
-    <Stream url="${signed_url}">
-      <Parameter name="caller_number" value="${fromNumber}" />
-      <Parameter name="call_sid" value="${callSid}" />
-      ${lead ? `<Parameter name="lead_name" value="${lead.name}" />` : ''}
-      ${lead?.property_address ? `<Parameter name="property_address" value="${lead.property_address}" />` : ''}
-    </Stream>
-  </Connect>
+  <Say voice="Polly.Matthew">Thank you for calling Peachhaus Property Management. We're currently assisting other clients. Please leave your name, phone number, and a brief message after the beep, and we'll get back to you as soon as possible.</Say>
+  <Record 
+    maxLength="120" 
+    playBeep="true"
+    recordingStatusCallback="${statusCallbackUrl}"
+    recordingStatusCallbackEvent="completed"
+  />
+  <Say voice="Polly.Matthew">Thank you for your message. We'll be in touch soon. Goodbye.</Say>
 </Response>`;
 
-    console.log('Returning TwiML with ElevenLabs agent stream');
+    console.log('Returning TwiML with voicemail recording');
 
     return new Response(twiml, {
       headers: { 'Content-Type': 'text/xml' },

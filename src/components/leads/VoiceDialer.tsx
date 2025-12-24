@@ -8,13 +8,30 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Phone, Delete, Loader2, PhoneOff, PhoneCall } from "lucide-react";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import { Phone, Delete, Loader2, PhoneOff, PhoneCall, MessageSquare, Search, User, Home } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Device, Call } from "@twilio/voice-sdk";
+import { useQuery } from "@tanstack/react-query";
 
 interface VoiceDialerProps {
   defaultMessage?: string;
+}
+
+interface ContactRecord {
+  id: string;
+  name: string;
+  phone: string | null;
+  type: 'owner' | 'lead';
+  address?: string;
 }
 
 const VoiceDialer = ({ defaultMessage }: VoiceDialerProps) => {
@@ -23,6 +40,10 @@ const VoiceDialer = ({ defaultMessage }: VoiceDialerProps) => {
   const [isOnCall, setIsOnCall] = useState(false);
   const [callDuration, setCallDuration] = useState(0);
   const [open, setOpen] = useState(false);
+  const [showSearch, setShowSearch] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isSendingSMS, setIsSendingSMS] = useState(false);
+  const [selectedContact, setSelectedContact] = useState<ContactRecord | null>(null);
   
   const deviceRef = useRef<Device | null>(null);
   const callRef = useRef<Call | null>(null);
@@ -34,6 +55,53 @@ const VoiceDialer = ({ defaultMessage }: VoiceDialerProps) => {
     ["7", "8", "9"],
     ["*", "0", "#"],
   ];
+
+  // Fetch owners and leads for search
+  const { data: contacts = [] } = useQuery({
+    queryKey: ['dialer-contacts'],
+    queryFn: async () => {
+      const [ownersResult, leadsResult] = await Promise.all([
+        supabase
+          .from('property_owners')
+          .select('id, name, phone, properties(address)')
+          .not('phone', 'is', null),
+        supabase
+          .from('leads')
+          .select('id, name, phone, property_address')
+          .not('phone', 'is', null)
+      ]);
+
+      const owners: ContactRecord[] = (ownersResult.data || []).map(o => ({
+        id: o.id,
+        name: o.name,
+        phone: o.phone,
+        type: 'owner' as const,
+        address: o.properties?.[0]?.address || undefined,
+      }));
+
+      const leads: ContactRecord[] = (leadsResult.data || []).map(l => ({
+        id: l.id,
+        name: l.name,
+        phone: l.phone,
+        type: 'lead' as const,
+        address: l.property_address || undefined,
+      }));
+
+      return [...owners, ...leads];
+    },
+    enabled: open,
+  });
+
+  // Filter contacts based on search
+  const filteredContacts = contacts.filter(c => {
+    if (!searchQuery) return true;
+    const q = searchQuery.toLowerCase();
+    return (
+      c.name.toLowerCase().includes(q) ||
+      c.phone?.includes(q) ||
+      c.address?.toLowerCase().includes(q)
+    );
+  });
 
   // Cleanup on unmount
   useEffect(() => {
@@ -99,6 +167,8 @@ const VoiceDialer = ({ defaultMessage }: VoiceDialerProps) => {
 
   const handleDigitPress = (digit: string) => {
     setPhoneNumber((prev) => prev + digit);
+    setShowSearch(false);
+    setSelectedContact(null);
     // Send DTMF tone if on call
     if (callRef.current && isOnCall) {
       callRef.current.sendDigits(digit);
@@ -106,11 +176,28 @@ const VoiceDialer = ({ defaultMessage }: VoiceDialerProps) => {
   };
 
   const handleBackspace = () => {
-    setPhoneNumber((prev) => prev.slice(0, -1));
+    setPhoneNumber((prev) => {
+      const newVal = prev.slice(0, -1);
+      if (!newVal) {
+        setShowSearch(true);
+        setSelectedContact(null);
+      }
+      return newVal;
+    });
   };
 
   const handleClear = () => {
     setPhoneNumber("");
+    setShowSearch(true);
+    setSelectedContact(null);
+  };
+
+  const handleSelectContact = (contact: ContactRecord) => {
+    if (contact.phone) {
+      setPhoneNumber(contact.phone.replace(/\D/g, ''));
+      setSelectedContact(contact);
+      setShowSearch(false);
+    }
   };
 
   const formatPhoneDisplay = (phone: string) => {
@@ -192,6 +279,40 @@ const VoiceDialer = ({ defaultMessage }: VoiceDialerProps) => {
     }
   };
 
+  const handleSendSMS = async () => {
+    if (!phoneNumber || phoneNumber.replace(/\D/g, "").length < 10) {
+      toast.error("Please enter a valid phone number");
+      return;
+    }
+
+    const message = prompt("Enter your message:");
+    if (!message) return;
+
+    setIsSendingSMS(true);
+    try {
+      let formattedPhone = phoneNumber.replace(/\D/g, "");
+      if (!formattedPhone.startsWith('1') && formattedPhone.length === 10) {
+        formattedPhone = '1' + formattedPhone;
+      }
+      formattedPhone = '+' + formattedPhone;
+
+      const { error } = await supabase.functions.invoke('send-review-sms', {
+        body: {
+          to: formattedPhone,
+          body: message,
+        }
+      });
+
+      if (error) throw error;
+      toast.success('SMS sent successfully');
+    } catch (error) {
+      console.error('Failed to send SMS:', error);
+      toast.error('Failed to send SMS');
+    } finally {
+      setIsSendingSMS(false);
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
@@ -200,32 +321,96 @@ const VoiceDialer = ({ defaultMessage }: VoiceDialerProps) => {
           Dialer
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[320px]">
+      <DialogContent className="sm:max-w-[360px]">
         <DialogHeader>
           <DialogTitle className="text-center">Voice Dialer</DialogTitle>
         </DialogHeader>
         
         <div className="space-y-4">
-          {/* Phone number display */}
-          <div className="relative">
-            <Input
-              value={formatPhoneDisplay(phoneNumber)}
-              onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, ""))}
-              placeholder="Enter phone number"
-              className="text-center text-xl font-medium h-14 pr-10"
-              disabled={isOnCall}
-            />
-            {phoneNumber && !isOnCall && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8"
-                onClick={handleBackspace}
-              >
-                <Delete className="h-4 w-4" />
-              </Button>
-            )}
-          </div>
+          {/* Search or Phone input */}
+          {showSearch && !isOnCall ? (
+            <Command className="rounded-lg border">
+              <CommandInput 
+                placeholder="Search owners, leads, addresses..." 
+                value={searchQuery}
+                onValueChange={setSearchQuery}
+              />
+              <CommandList className="max-h-48">
+                <CommandEmpty>No contacts found.</CommandEmpty>
+                <CommandGroup>
+                  {filteredContacts.slice(0, 10).map((contact) => (
+                    <CommandItem
+                      key={`${contact.type}-${contact.id}`}
+                      onSelect={() => handleSelectContact(contact)}
+                      className="cursor-pointer"
+                    >
+                      <div className="flex items-center gap-2 flex-1">
+                        {contact.type === 'owner' ? (
+                          <Home className="h-4 w-4 text-muted-foreground" />
+                        ) : (
+                          <User className="h-4 w-4 text-muted-foreground" />
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium truncate">{contact.name}</p>
+                          {contact.address && (
+                            <p className="text-xs text-muted-foreground truncate">{contact.address}</p>
+                          )}
+                        </div>
+                        <span className="text-xs text-muted-foreground">{contact.phone}</span>
+                      </div>
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              </CommandList>
+            </Command>
+          ) : (
+            <>
+              {/* Selected contact info */}
+              {selectedContact && !isOnCall && (
+                <div className="text-center text-sm text-muted-foreground">
+                  {selectedContact.name}
+                  {selectedContact.address && ` • ${selectedContact.address}`}
+                </div>
+              )}
+              
+              {/* Phone number display */}
+              <div className="relative">
+                <Input
+                  value={formatPhoneDisplay(phoneNumber)}
+                  onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, ""))}
+                  placeholder="Enter phone number"
+                  className="text-center text-xl font-medium h-14 pr-10"
+                  disabled={isOnCall}
+                />
+                {phoneNumber && !isOnCall && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8"
+                    onClick={handleBackspace}
+                  >
+                    <Delete className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+
+              {/* Back to search button */}
+              {!isOnCall && (
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="w-full text-muted-foreground"
+                  onClick={() => {
+                    setShowSearch(true);
+                    setSearchQuery("");
+                  }}
+                >
+                  <Search className="h-4 w-4 mr-2" />
+                  Search contacts
+                </Button>
+              )}
+            </>
+          )}
 
           {/* Call status */}
           {isOnCall && (
@@ -235,58 +420,75 @@ const VoiceDialer = ({ defaultMessage }: VoiceDialerProps) => {
           )}
 
           {/* Dial pad */}
-          <div className="grid grid-cols-3 gap-2">
-            {dialPad.flat().map((digit) => (
-              <Button
-                key={digit}
-                variant="outline"
-                className="h-14 text-xl font-medium"
-                onClick={() => handleDigitPress(digit)}
-              >
-                {digit}
-              </Button>
-            ))}
-          </div>
+          {!showSearch && (
+            <div className="grid grid-cols-3 gap-2">
+              {dialPad.flat().map((digit) => (
+                <Button
+                  key={digit}
+                  variant="outline"
+                  className="h-14 text-xl font-medium"
+                  onClick={() => handleDigitPress(digit)}
+                >
+                  {digit}
+                </Button>
+              ))}
+            </div>
+          )}
 
           {/* Action buttons */}
-          <div className="flex gap-2">
-            {!isOnCall && (
-              <Button
-                variant="outline"
-                className="flex-1"
-                onClick={handleClear}
-                disabled={!phoneNumber || isConnecting}
-              >
-                Clear
-              </Button>
-            )}
-            
-            {isOnCall ? (
-              <Button
-                variant="destructive"
-                className="flex-1"
-                onClick={handleEndCall}
-              >
-                <PhoneOff className="h-4 w-4 mr-2" />
-                End Call
-              </Button>
-            ) : (
-              <Button
-                className="flex-1 bg-green-600 hover:bg-green-700"
-                onClick={handleCall}
-                disabled={isConnecting || !phoneNumber}
-              >
-                {isConnecting ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <>
-                    <PhoneCall className="h-4 w-4 mr-2" />
-                    Call
-                  </>
-                )}
-              </Button>
-            )}
-          </div>
+          {!showSearch && (
+            <div className="flex gap-2">
+              {!isOnCall && (
+                <>
+                  <Button
+                    variant="outline"
+                    className="flex-1"
+                    onClick={handleClear}
+                    disabled={!phoneNumber || isConnecting}
+                  >
+                    Clear
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={handleSendSMS}
+                    disabled={!phoneNumber || isSendingSMS || isConnecting}
+                  >
+                    {isSendingSMS ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <MessageSquare className="h-4 w-4" />
+                    )}
+                  </Button>
+                </>
+              )}
+              
+              {isOnCall ? (
+                <Button
+                  variant="destructive"
+                  className="flex-1"
+                  onClick={handleEndCall}
+                >
+                  <PhoneOff className="h-4 w-4 mr-2" />
+                  End Call
+                </Button>
+              ) : (
+                <Button
+                  className="flex-1 bg-green-600 hover:bg-green-700"
+                  onClick={handleCall}
+                  disabled={isConnecting || !phoneNumber}
+                >
+                  {isConnecting ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <>
+                      <PhoneCall className="h-4 w-4 mr-2" />
+                      Call
+                    </>
+                  )}
+                </Button>
+              )}
+            </div>
+          )}
         </div>
       </DialogContent>
     </Dialog>
