@@ -10,6 +10,7 @@ import LeadKanban from "@/components/leads/LeadKanban";
 import LeadCard from "@/components/leads/LeadCard";
 import LeadDetailModal from "@/components/leads/LeadDetailModal";
 import CreateLeadDialog from "@/components/leads/CreateLeadDialog";
+import VoiceDialer from "@/components/leads/VoiceDialer";
 
 const Leads = () => {
   const [searchQuery, setSearchQuery] = useState("");
@@ -73,10 +74,13 @@ const Leads = () => {
             Manage your sales pipeline from inquiry to ops handoff
           </p>
         </div>
-        <Button onClick={() => setIsCreateOpen(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          Add Lead
-        </Button>
+        <div className="flex gap-2">
+          <VoiceDialer />
+          <Button onClick={() => setIsCreateOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Add Lead
+          </Button>
+        </div>
       </div>
 
       {/* Stats Cards */}
