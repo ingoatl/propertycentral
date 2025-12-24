@@ -83,7 +83,7 @@ const TestEmailButton = ({ leadId, leadEmail, currentStage }: TestEmailButtonPro
         .replace(/\{\{name\}\}/g, lead?.name || "")
         .replace(/\{\{first_name\}\}/g, firstName);
 
-      const { error } = await supabase.functions.invoke('send-lead-notification', {
+      const { data, error } = await supabase.functions.invoke('send-lead-notification', {
         body: {
           leadId,
           type: 'email',
@@ -94,12 +94,19 @@ const TestEmailButton = ({ leadId, leadEmail, currentStage }: TestEmailButtonPro
       });
       
       if (error) throw error;
+      
+      // Check for API-level errors in response
+      if (data?.error) {
+        throw new Error(data.error);
+      }
+      
+      return data;
     },
     onSuccess: () => {
       toast.success(`Test email sent to ${leadEmail}`);
       setSendingStep(null);
     },
-    onError: (error) => {
+    onError: (error: Error) => {
       toast.error("Failed to send test email: " + error.message);
       setSendingStep(null);
     },
