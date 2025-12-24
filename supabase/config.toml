@@ -176,3 +176,15 @@ verify_jwt = false
 
 [functions.twilio-status-callback]
 verify_jwt = false
+
+[functions.process-lead-stage-change]
+verify_jwt = true
+
+[functions.lead-ai-assistant]
+verify_jwt = true
+
+[functions.send-lead-notification]
+verify_jwt = true
+
+[functions.lead-calendar-webhook]
+verify_jwt = false
