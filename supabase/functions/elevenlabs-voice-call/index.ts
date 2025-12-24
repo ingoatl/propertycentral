@@ -12,7 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const { leadId, message, voiceId, isTest } = await req.json();
+    const { leadId, message, voiceId, isTest, phoneNumber, isManualDial } = await req.json();
 
     const ELEVENLABS_API_KEY = Deno.env.get('ELEVENLABS_API_KEY');
     const TWILIO_ACCOUNT_SID = Deno.env.get('TWILIO_ACCOUNT_SID');
@@ -28,25 +28,44 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Fetch lead details
-    const { data: lead, error: leadError } = await supabase
-      .from('leads')
-      .select('*')
-      .eq('id', leadId)
-      .single();
+    let lead = null;
+    let targetPhone = phoneNumber;
+    let processedMessage = message;
 
-    if (leadError || !lead) {
-      throw new Error('Lead not found');
+    // If leadId provided, fetch lead details
+    if (leadId) {
+      const { data: leadData, error: leadError } = await supabase
+        .from('leads')
+        .select('*')
+        .eq('id', leadId)
+        .single();
+
+      if (leadError || !leadData) {
+        throw new Error('Lead not found');
+      }
+      
+      lead = leadData;
+      targetPhone = lead.phone;
+
+      console.log(`Generating voice message for lead ${leadId}`);
+
+      // Process template variables in the message
+      processedMessage = message
+        .replace(/\{\{name\}\}/g, lead.name || 'there')
+        .replace(/\{\{first_name\}\}/g, (lead.name || 'there').split(' ')[0])
+        .replace(/\{\{property_address\}\}/g, lead.property_address || 'your property')
+        .replace(/\{\{property_type\}\}/g, lead.property_type || 'property');
+    } else if (isManualDial && phoneNumber) {
+      console.log(`Manual dial to ${phoneNumber}`);
+      targetPhone = phoneNumber;
+    } else {
+      throw new Error('Either leadId or phoneNumber is required');
     }
 
-    console.log(`Generating voice message for lead ${leadId}`);
-
-    // Process template variables in the message
-    let processedMessage = message
-      .replace(/\{\{name\}\}/g, lead.name || 'there')
-      .replace(/\{\{first_name\}\}/g, (lead.name || 'there').split(' ')[0])
-      .replace(/\{\{property_address\}\}/g, lead.property_address || 'your property')
-      .replace(/\{\{property_type\}\}/g, lead.property_type || 'property');
+    // Process template variables in the message (for non-lead calls, just use the message as-is)
+    if (!leadId) {
+      processedMessage = message;
+    }
 
     // Generate voice audio using ElevenLabs TTS
     // Using "Brian" voice (professional male voice) as default
@@ -109,8 +128,8 @@ serve(async (req) => {
       throw new Error('Twilio credentials not configured');
     }
 
-    if (!lead.phone) {
-      throw new Error('Lead has no phone number');
+    if (!targetPhone) {
+      throw new Error('No phone number available');
     }
 
     // Make Twilio call using TwiML Say with Polly Matthew (warm male voice)
@@ -130,6 +149,12 @@ serve(async (req) => {
   <Say voice="Polly.Matthew">${escapedMessage}</Say>
 </Response>`;
 
+    // Format phone number
+    let formattedPhone = targetPhone;
+    if (!formattedPhone.startsWith('+')) {
+      formattedPhone = formattedPhone.startsWith('1') ? `+${formattedPhone}` : `+1${formattedPhone}`;
+    }
+
     const callResponse = await fetch(
       `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Calls.json`,
       {
@@ -139,7 +164,7 @@ serve(async (req) => {
           'Content-Type': 'application/x-www-form-urlencoded',
         },
         body: new URLSearchParams({
-          To: lead.phone,
+          To: formattedPhone,
           From: TWILIO_PHONE_NUMBER,
           Twiml: twiml,
         }),
@@ -155,28 +180,31 @@ serve(async (req) => {
 
     console.log('Call initiated:', callData.sid);
 
-    // Record communication
-    await supabase.from('lead_communications').insert({
-      lead_id: leadId,
-      communication_type: 'voice_call',
-      direction: 'outbound',
-      body: processedMessage,
-      external_id: callData.sid,
-      status: 'initiated',
-    });
+    // Only record communication if this is a lead call
+    if (leadId && lead) {
+      // Record communication
+      await supabase.from('lead_communications').insert({
+        lead_id: leadId,
+        communication_type: 'voice_call',
+        direction: 'outbound',
+        body: processedMessage,
+        external_id: callData.sid,
+        status: 'initiated',
+      });
 
-    // Update lead
-    await supabase
-      .from('leads')
-      .update({ last_contacted_at: new Date().toISOString() })
-      .eq('id', leadId);
+      // Update lead
+      await supabase
+        .from('leads')
+        .update({ last_contacted_at: new Date().toISOString() })
+        .eq('id', leadId);
 
-    // Add timeline entry
-    await supabase.from('lead_timeline').insert({
-      lead_id: leadId,
-      action: 'voice_call_sent',
-      metadata: { call_sid: callData.sid },
-    });
+      // Add timeline entry
+      await supabase.from('lead_timeline').insert({
+        lead_id: leadId,
+        action: 'voice_call_sent',
+        metadata: { call_sid: callData.sid },
+      });
+    }
 
     return new Response(
       JSON.stringify({ 
