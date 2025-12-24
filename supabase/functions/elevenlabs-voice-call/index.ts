@@ -49,8 +49,8 @@ serve(async (req) => {
       .replace(/\{\{property_type\}\}/g, lead.property_type || 'property');
 
     // Generate voice audio using ElevenLabs TTS
-    // Using "Sarah" voice (professional female voice) as default
-    const selectedVoiceId = voiceId || 'EXAVITQu4vr4xnSDxMaL'; // Sarah voice
+    // Using "Brian" voice (professional male voice) as default
+    const selectedVoiceId = voiceId || 'nPczCjzI2devNBz1zQrb'; // Brian voice
     
     const ttsResponse = await fetch(
       `https://api.elevenlabs.io/v1/text-to-speech/${selectedVoiceId}`,
@@ -113,34 +113,15 @@ serve(async (req) => {
       throw new Error('Lead has no phone number');
     }
 
-    // Upload audio to Supabase storage
-    const fileName = `voice-calls/${leadId}-${Date.now()}.mp3`;
-    const { error: uploadError } = await supabase.storage
-      .from('lead-assets')
-      .upload(fileName, audioBuffer, {
-        contentType: 'audio/mpeg',
-        upsert: true,
-      });
-
-    if (uploadError) {
-      console.error('Storage upload error:', uploadError);
-      // Continue without storage if bucket doesn't exist
-    }
-
-    // Get public URL for the audio
-    const { data: urlData } = supabase.storage
-      .from('lead-assets')
-      .getPublicUrl(fileName);
-
-    const audioUrl = urlData?.publicUrl;
-
-    // Make Twilio call
+    // Make Twilio call using TwiML Say with synthesized text
+    // Since we can't easily host the audio, we'll use Twilio's built-in TTS
+    // combined with our personalized message
     const twilioAuth = btoa(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`);
     
-    // Create TwiML that plays the audio
+    // Create TwiML that speaks the message using Twilio's Polly voices
     const twiml = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Play>${audioUrl}</Play>
+  <Say voice="Polly.Matthew">${processedMessage.replace(/"/g, '&quot;').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</Say>
 </Response>`;
 
     const callResponse = await fetch(
