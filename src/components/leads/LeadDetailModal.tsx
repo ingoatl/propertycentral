@@ -318,10 +318,14 @@ const LeadDetailModal = ({ lead, open, onOpenChange, onRefresh }: LeadDetailModa
         )}
 
         <Tabs defaultValue="timeline" className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="timeline">
               <Clock className="h-4 w-4 mr-2" />
               Timeline
+            </TabsTrigger>
+            <TabsTrigger value="transcripts">
+              <Phone className="h-4 w-4 mr-2" />
+              Calls
             </TabsTrigger>
             <TabsTrigger value="followups">
               <CalendarClock className="h-4 w-4 mr-2" />
@@ -389,6 +393,54 @@ const LeadDetailModal = ({ lead, open, onOpenChange, onRefresh }: LeadDetailModa
               ) : (
                 <p className="text-sm text-muted-foreground text-center py-8">
                   No timeline entries yet
+                </p>
+              )}
+            </ScrollArea>
+          </TabsContent>
+
+          <TabsContent value="transcripts" className="mt-4">
+            <ScrollArea className="h-[250px]">
+              {communications && communications.filter(c => c.communication_type === 'voice_call').length > 0 ? (
+                <div className="space-y-4">
+                  {communications
+                    .filter(c => c.communication_type === 'voice_call')
+                    .map((comm) => (
+                      <div key={comm.id} className="p-4 border rounded-lg">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <Phone className="h-4 w-4 text-muted-foreground" />
+                            <span className="font-medium">
+                              {comm.direction === 'outbound' ? 'Outbound Call' : 'Inbound Call'}
+                            </span>
+                          </div>
+                          <Badge 
+                            variant={comm.status === 'completed' ? 'default' : 'secondary'}
+                            className="text-xs"
+                          >
+                            {comm.status}
+                          </Badge>
+                        </div>
+                        
+                        {comm.body ? (
+                          <div className="bg-muted/50 p-3 rounded text-sm">
+                            <p className="text-xs text-muted-foreground mb-1 font-medium">Transcript:</p>
+                            <p className="whitespace-pre-wrap">{comm.body}</p>
+                          </div>
+                        ) : (
+                          <p className="text-sm text-muted-foreground italic">
+                            No transcript available
+                          </p>
+                        )}
+                        
+                        <p className="text-xs text-muted-foreground mt-2">
+                          {format(new Date(comm.created_at), 'MMM d, yyyy h:mm a')}
+                        </p>
+                      </div>
+                    ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground text-center py-8">
+                  No call transcripts yet
                 </p>
               )}
             </ScrollArea>

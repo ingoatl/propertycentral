@@ -137,19 +137,9 @@ serve(async (req) => {
       elevenLabsSocket = new WebSocket(signed_url);
 
       elevenLabsSocket.onopen = () => {
-        console.log("ElevenLabs WebSocket connected, sending initial config...");
-        
-        // Send conversation initiation with first message override
-        const initMessage = {
-          type: "conversation_initiation_client_data",
-          conversation_config_override: {
-            agent: {
-              first_message: "Hello! Thank you for calling Peachhaus Property Management. How can I help you today?"
-            }
-          }
-        };
-        elevenLabsSocket!.send(JSON.stringify(initMessage));
-        console.log("Sent conversation_initiation_client_data with first_message override");
+        console.log("ElevenLabs WebSocket connected, ready to receive audio");
+        // Note: Don't send first_message override - let the agent use its configured greeting
+        // The agent should be configured in the ElevenLabs dashboard with the appropriate first message
       };
 
       elevenLabsSocket.onmessage = (event) => {

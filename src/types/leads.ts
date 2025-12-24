@@ -80,11 +80,11 @@ export interface LeadAutomation {
 export interface LeadCommunication {
   id: string;
   lead_id: string;
-  communication_type: 'email' | 'sms';
+  communication_type: 'email' | 'sms' | 'voice_call';
   direction: 'inbound' | 'outbound';
   subject: string | null;
   body: string;
-  status: 'pending' | 'sent' | 'delivered' | 'failed';
+  status: 'pending' | 'sent' | 'delivered' | 'failed' | 'completed';
   external_id: string | null;
   error_message: string | null;
   sent_at: string | null;
