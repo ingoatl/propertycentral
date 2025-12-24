@@ -154,44 +154,46 @@ serve(async (req) => {
           const data = JSON.parse(event.data);
           
           if (data.type !== 'ping') {
-            console.log("ElevenLabs message:", data.type);
+            console.log("ElevenLabs message:", data.type, JSON.stringify(Object.keys(data)));
           }
 
-          // Handle audio from ElevenLabs (PCM 16kHz)
-          if (data.type === 'audio' && data.audio_event?.audio_base_64 && streamSid) {
-            // Decode base64 PCM audio from ElevenLabs
-            const pcmBytes = base64ToBytes(data.audio_event.audio_base_64);
-            const pcm16k = bytesToInt16(pcmBytes);
-            
-            // Convert to mulaw 8kHz for Twilio
-            const mulawData = pcm16kToMulaw8k(pcm16k);
-            const mulawBase64 = bytesToBase64(mulawData);
-            
-            const twilioMessage = {
-              event: 'media',
-              streamSid: streamSid,
-              media: {
-                payload: mulawBase64
-              }
-            };
-            twilioSocket.send(JSON.stringify(twilioMessage));
+          // Handle audio from ElevenLabs - check all possible audio formats
+          let audioBase64: string | null = null;
+          
+          if (data.audio_event?.audio_base_64) {
+            audioBase64 = data.audio_event.audio_base_64;
+            console.log("Found audio in audio_event.audio_base_64");
+          } else if (data.audio) {
+            audioBase64 = data.audio;
+            console.log("Found audio in data.audio");
+          } else if (data.delta) {
+            audioBase64 = data.delta;
+            console.log("Found audio in data.delta");
           }
           
-          // Also check for the alternate audio format
-          if (data.type === 'audio' && data.audio && streamSid) {
-            const pcmBytes = base64ToBytes(data.audio);
-            const pcm16k = bytesToInt16(pcmBytes);
-            const mulawData = pcm16kToMulaw8k(pcm16k);
-            const mulawBase64 = bytesToBase64(mulawData);
-            
-            const twilioMessage = {
-              event: 'media',
-              streamSid: streamSid,
-              media: {
-                payload: mulawBase64
-              }
-            };
-            twilioSocket.send(JSON.stringify(twilioMessage));
+          if (audioBase64 && streamSid) {
+            console.log("Processing audio chunk, length:", audioBase64.length);
+            try {
+              // Decode base64 PCM audio from ElevenLabs
+              const pcmBytes = base64ToBytes(audioBase64);
+              const pcm16k = bytesToInt16(pcmBytes);
+              
+              // Convert to mulaw 8kHz for Twilio
+              const mulawData = pcm16kToMulaw8k(pcm16k);
+              const mulawBase64 = bytesToBase64(mulawData);
+              
+              const twilioMessage = {
+                event: 'media',
+                streamSid: streamSid,
+                media: {
+                  payload: mulawBase64
+                }
+              };
+              twilioSocket.send(JSON.stringify(twilioMessage));
+              console.log("Sent audio to Twilio, mulaw length:", mulawData.length);
+            } catch (audioError) {
+              console.error("Error converting audio:", audioError);
+            }
           }
         } catch (e) {
           console.error("Error processing ElevenLabs message:", e);
