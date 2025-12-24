@@ -131,9 +131,9 @@ serve(async (req) => {
 
     console.log('Transcription complete:', transcriptText?.substring(0, 200));
 
-    // Analyze the transcription for key insights using AI
+    // ALWAYS analyze the transcription for key insights using AI (even short ones)
     let insights = null;
-    if (transcriptText && transcriptText.length > 50) {
+    if (transcriptText && transcriptText.length > 10) {
       try {
         const analysisResponse = await fetch('https://api.openai.com/v1/chat/completions', {
           method: 'POST',
@@ -146,7 +146,7 @@ serve(async (req) => {
             messages: [
               {
                 role: 'system',
-                content: `You are analyzing a phone call transcript between a property management company (Peachhaus) and a potential lead interested in their short-term rental management services. Extract key insights from the conversation.
+                content: `You are analyzing a phone call transcript or voicemail between a property management company (Peachhaus) and a potential lead interested in their short-term rental management services. Extract key insights from the conversation.
 
 Return a JSON object with these fields:
 - caller_name: name of the caller if mentioned (first and last if available)
@@ -154,18 +154,21 @@ Return a JSON object with these fields:
 - interest_level: "high", "medium", "low", or "none"
 - property_details: any details mentioned about their property (bedrooms, type, location, etc.)
 - concerns: array of any concerns or objections mentioned
-- timeline: when they're looking to start (if mentioned)
+- timeline: when they're looking to start (if mentioned) - be specific about dates/timeframes
+- delay_requested: boolean - true if the caller asks to wait, call back later, or mentions needing more time
+- delay_until: if delay_requested is true, specify when to follow up (e.g., "next week", "after holidays", "in 2 weeks")
 - budget_expectations: any pricing or fee discussions
 - next_steps: what was agreed upon for follow-up
 - key_points: array of 2-5 bullet points summarizing the conversation
 - sentiment: "positive", "neutral", or "negative"
 - recommended_stage: suggested lead stage ("new_lead", "contacted", "qualifying", "proposal_sent", "negotiating", "closed_won", "closed_lost")
+- pause_follow_ups: boolean - true if the lead explicitly asked to stop contact or needs a break
 
-Only include fields that have relevant information from the call.`
+Always include at least caller_name (if mentioned), interest_level, sentiment, key_points, and recommended_stage.`
               },
               {
                 role: 'user',
-                content: `Analyze this call transcript:\n\n${transcriptText}`
+                content: `Analyze this call transcript or voicemail:\n\n${transcriptText}`
               }
             ],
             response_format: { type: 'json_object' },
@@ -176,10 +179,14 @@ Only include fields that have relevant information from the call.`
           const analysisResult = await analysisResponse.json();
           insights = JSON.parse(analysisResult.choices[0].message.content);
           console.log('Call analysis insights:', insights);
+        } else {
+          console.error('AI analysis failed:', await analysisResponse.text());
         }
       } catch (analysisError) {
         console.error('Error analyzing call:', analysisError);
       }
+    } else {
+      console.log('Transcript too short for analysis:', transcriptText?.length || 0, 'chars');
     }
 
     // If no lead found by phone, try matching by name or property from transcript
@@ -284,10 +291,66 @@ Only include fields that have relevant information from the call.`
           updateData.stage = insights.recommended_stage;
         }
 
+        // Handle follow-up pausing if requested
+        if (insights.pause_follow_ups === true) {
+          updateData.follow_up_paused = true;
+          console.log('Pausing follow-ups as requested by lead');
+        }
+
         await supabase
           .from('leads')
           .update(updateData)
           .eq('id', lead.id);
+
+        // If delay was requested, update pending follow-up schedules
+        if (insights.delay_requested === true && insights.delay_until) {
+          console.log('Lead requested delay until:', insights.delay_until);
+          
+          // Calculate new follow-up date based on delay_until
+          let delayDays = 7; // Default to 1 week
+          const delayText = (insights.delay_until as string).toLowerCase();
+          
+          if (delayText.includes('2 week') || delayText.includes('two week')) {
+            delayDays = 14;
+          } else if (delayText.includes('month')) {
+            delayDays = 30;
+          } else if (delayText.includes('holiday') || delayText.includes('new year')) {
+            delayDays = 14;
+          } else if (delayText.includes('tomorrow')) {
+            delayDays = 1;
+          } else if (delayText.includes('few days') || delayText.includes('couple days')) {
+            delayDays = 3;
+          }
+
+          const newScheduleDate = new Date();
+          newScheduleDate.setDate(newScheduleDate.getDate() + delayDays);
+
+          // Update pending follow-up schedules
+          const { error: scheduleError } = await supabase
+            .from('lead_follow_up_schedules')
+            .update({ 
+              scheduled_for: newScheduleDate.toISOString(),
+            })
+            .eq('lead_id', lead.id)
+            .eq('status', 'pending');
+
+          if (scheduleError) {
+            console.error('Error updating follow-up schedules:', scheduleError);
+          } else {
+            console.log(`Rescheduled pending follow-ups to ${newScheduleDate.toISOString()}`);
+          }
+
+          // Add timeline entry about the delay
+          await supabase.from('lead_timeline').insert({
+            lead_id: lead.id,
+            action: 'follow_up_delayed',
+            metadata: {
+              reason: 'Lead requested delay',
+              delay_until: insights.delay_until,
+              new_date: newScheduleDate.toISOString(),
+            },
+          });
+        }
       }
 
       console.log('Updated lead with call transcription and insights:', lead.id);
