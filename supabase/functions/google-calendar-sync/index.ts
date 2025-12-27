@@ -16,12 +16,13 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 // Get Pipedream access token using OAuth client credentials
 async function getPipedreamAccessToken(): Promise<string> {
+  console.log("Getting Pipedream access token...");
   const response = await fetch("https://api.pipedream.com/v1/oauth/token", {
     method: "POST",
     headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
+      "Content-Type": "application/json",
     },
-    body: new URLSearchParams({
+    body: JSON.stringify({
       grant_type: "client_credentials",
       client_id: PIPEDREAM_CLIENT_ID!,
       client_secret: PIPEDREAM_CLIENT_SECRET!,
@@ -29,6 +30,8 @@ async function getPipedreamAccessToken(): Promise<string> {
   });
 
   const data = await response.json();
+  console.log("Pipedream token response status:", response.status);
+  
   if (data.error) {
     console.error("Pipedream token error:", data);
     throw new Error(data.error_description || data.error);
@@ -38,44 +41,63 @@ async function getPipedreamAccessToken(): Promise<string> {
 }
 
 // Create a Pipedream Connect token for the user
-async function createConnectToken(userId: string, redirectUrl: string): Promise<{ token: string; expires_at: string }> {
+async function createConnectToken(userId: string, successRedirectUri: string): Promise<{ token: string; connect_link_url: string; expires_at: string }> {
   const accessToken = await getPipedreamAccessToken();
 
-  const response = await fetch("https://api.pipedream.com/v1/connect/tokens", {
+  console.log("Creating Connect token for user:", userId);
+  console.log("Success redirect URI:", successRedirectUri);
+  console.log("Project ID:", PIPEDREAM_PROJECT_ID);
+
+  const response = await fetch(`https://api.pipedream.com/v1/connect/${PIPEDREAM_PROJECT_ID}/tokens`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${accessToken}`,
       "Content-Type": "application/json",
+      "x-pd-environment": "production",
     },
     body: JSON.stringify({
       external_user_id: userId,
-      redirect_uri: redirectUrl,
+      success_redirect_uri: successRedirectUri,
+      error_redirect_uri: successRedirectUri.replace("connected=true", "connected=false"),
     }),
   });
 
   const data = await response.json();
-  if (data.error) {
+  console.log("Connect token response status:", response.status);
+  console.log("Connect token response:", JSON.stringify(data));
+  
+  if (!response.ok || data.error) {
     console.error("Connect token error:", data);
-    throw new Error(data.error_description || data.error);
+    throw new Error(data.error_description || data.error || data.message || "Failed to create connect token");
   }
 
-  return { token: data.token, expires_at: data.expires_at };
+  return { 
+    token: data.token, 
+    connect_link_url: data.connect_link_url,
+    expires_at: data.expires_at 
+  };
 }
 
 // Get user's connected accounts from Pipedream
 async function getUserAccounts(userId: string): Promise<any[]> {
   const accessToken = await getPipedreamAccessToken();
 
+  console.log("Getting accounts for user:", userId);
+
   const response = await fetch(
     `https://api.pipedream.com/v1/connect/${PIPEDREAM_PROJECT_ID}/users/${encodeURIComponent(userId)}/accounts`,
     {
       headers: {
         Authorization: `Bearer ${accessToken}`,
+        "x-pd-environment": "production",
       },
     }
   );
 
   const data = await response.json();
+  console.log("Get accounts response status:", response.status);
+  console.log("Accounts data:", JSON.stringify(data));
+  
   if (data.error) {
     console.error("Get accounts error:", data);
     return [];
@@ -90,7 +112,7 @@ async function getGoogleCalendarCredentials(userId: string): Promise<{ access_to
 
   // First get the user's accounts
   const accounts = await getUserAccounts(userId);
-  console.log("User accounts:", accounts);
+  console.log("User accounts count:", accounts.length);
 
   // Find Google Calendar account
   const googleAccount = accounts.find((a: any) => 
@@ -102,7 +124,7 @@ async function getGoogleCalendarCredentials(userId: string): Promise<{ access_to
     return null;
   }
 
-  console.log("Found Google account:", googleAccount.id);
+  console.log("Found Google account:", googleAccount.id, "app:", googleAccount.app);
 
   // Get the OAuth credentials for this account
   const credResponse = await fetch(
@@ -110,12 +132,15 @@ async function getGoogleCalendarCredentials(userId: string): Promise<{ access_to
     {
       headers: {
         Authorization: `Bearer ${accessToken}`,
+        "x-pd-environment": "production",
       },
     }
   );
 
   const credData = await credResponse.json();
-  if (credData.error) {
+  console.log("Credentials response status:", credResponse.status);
+  
+  if (!credResponse.ok || credData.error) {
     console.error("Get credentials error:", credData);
     return null;
   }
@@ -145,6 +170,7 @@ async function deleteUserAccount(userId: string): Promise<boolean> {
       method: "DELETE",
       headers: {
         Authorization: `Bearer ${accessToken}`,
+        "x-pd-environment": "production",
       },
     }
   );
@@ -164,34 +190,6 @@ serve(async (req) => {
   let action = url.searchParams.get("action");
 
   try {
-    // Pipedream callback after OAuth (redirect from Pipedream Connect)
-    if (action === "oauth-callback") {
-      const success = url.searchParams.get("success");
-      const state = url.searchParams.get("state");
-
-      let stateData: { userId: string; redirectUrl: string } = { userId: "", redirectUrl: "" };
-      if (state) {
-        try {
-          stateData = JSON.parse(decodeURIComponent(state));
-        } catch (e) {
-          console.log("Failed to parse state:", e);
-        }
-      }
-
-      // Redirect back to the frontend app
-      const redirectUrl = stateData.redirectUrl || "https://peachhaus.lovable.app";
-      const connected = success === "true" ? "true" : "false";
-      const finalRedirect = `${redirectUrl}/admin?tab=calendar&connected=${connected}`;
-      console.log("Pipedream OAuth callback - redirecting to:", finalRedirect);
-
-      return new Response(null, {
-        status: 302,
-        headers: {
-          Location: finalRedirect,
-        },
-      });
-    }
-
     // For other actions, parse from body
     const body = await req.json();
     action = body.action || action;
@@ -204,39 +202,42 @@ serve(async (req) => {
       const { redirectUrl } = body;
 
       if (!PIPEDREAM_CLIENT_ID || !PIPEDREAM_CLIENT_SECRET || !PIPEDREAM_PROJECT_ID) {
-        throw new Error("Pipedream credentials not configured.");
+        throw new Error("Pipedream credentials not configured. Please add PIPEDREAM_CLIENT_ID, PIPEDREAM_CLIENT_SECRET, and PIPEDREAM_PROJECT_ID.");
       }
 
       // Check if user already has Google Calendar connected
-      const credentials = await getGoogleCalendarCredentials(userId);
-      if (credentials) {
-        // Test the connection
-        const testRes = await fetch(
-          "https://www.googleapis.com/calendar/v3/users/me/calendarList?maxResults=1",
-          { headers: { Authorization: `Bearer ${credentials.access_token}` } }
-        );
-        if (testRes.ok) {
-          return new Response(JSON.stringify({ 
-            success: true, 
-            message: "Google Calendar is already connected" 
-          }), {
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
+      try {
+        const credentials = await getGoogleCalendarCredentials(userId);
+        if (credentials) {
+          // Test the connection
+          const testRes = await fetch(
+            "https://www.googleapis.com/calendar/v3/users/me/calendarList?maxResults=1",
+            { headers: { Authorization: `Bearer ${credentials.access_token}` } }
+          );
+          if (testRes.ok) {
+            return new Response(JSON.stringify({ 
+              success: true, 
+              message: "Google Calendar is already connected" 
+            }), {
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+          }
         }
+      } catch (e) {
+        console.log("No existing connection or check failed:", e);
       }
 
+      // Create success redirect URL
+      const baseRedirect = redirectUrl || "https://peachhaus.lovable.app";
+      const successRedirectUri = `${baseRedirect}/admin?tab=calendar&connected=true`;
+
       // Create a Pipedream Connect token
-      const callbackUrl = `${SUPABASE_URL}/functions/v1/google-calendar-sync?action=oauth-callback`;
-      const stateData = JSON.stringify({ userId, redirectUrl: redirectUrl || "" });
-      const encodedState = encodeURIComponent(stateData);
-
-      // Build Pipedream Connect URL
-      const connectToken = await createConnectToken(userId, callbackUrl);
+      const connectData = await createConnectToken(userId, successRedirectUri);
       
-      // The Pipedream Connect URL with Google Calendar app
-      const authUrl = `https://pipedream.com/connect/${PIPEDREAM_PROJECT_ID}/google_calendar?token=${connectToken.token}&redirect_uri=${encodeURIComponent(callbackUrl)}&state=${encodedState}`;
+      // Build the Connect Link URL with app parameter for Google Calendar
+      const authUrl = `${connectData.connect_link_url}&app=google_calendar`;
 
-      console.log("Generated Pipedream Connect auth URL for user:", userId);
+      console.log("Generated Pipedream Connect auth URL:", authUrl);
 
       return new Response(JSON.stringify({ authUrl }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
