@@ -14,6 +14,9 @@ const PIPEDREAM_PROJECT_ID = Deno.env.get("PIPEDREAM_PROJECT_ID");
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
+// Pipedream MCP Server URL
+const MCP_SERVER_URL = "https://remote.mcp.pipedream.net";
+
 // Get Pipedream access token using OAuth client credentials
 async function getPipedreamAccessToken(): Promise<string> {
   console.log("Getting Pipedream access token...");
@@ -78,15 +81,143 @@ async function createConnectToken(userId: string, successRedirectUri: string): P
   };
 }
 
-// Get user's connected accounts from Pipedream WITH credentials
-async function getUserAccountsWithCredentials(userId: string): Promise<any[]> {
+// Parse SSE response from MCP server
+async function parseSSEResponse(response: Response): Promise<any> {
+  const contentType = response.headers.get("content-type") || "";
+  
+  // If it's regular JSON, parse directly
+  if (contentType.includes("application/json")) {
+    return await response.json();
+  }
+  
+  // Handle SSE (Server-Sent Events) response
+  const reader = response.body!.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let lastData: any = null;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() || "";
+
+    for (const line of lines) {
+      if (line.startsWith("data: ")) {
+        const data = line.slice(6).trim();
+        if (data === "[DONE]") continue;
+        try {
+          lastData = JSON.parse(data);
+          console.log("SSE data parsed:", JSON.stringify(lastData).substring(0, 200));
+        } catch (e) {
+          console.log("SSE parse error for line:", data);
+        }
+      }
+    }
+  }
+  
+  return lastData;
+}
+
+// Call MCP tool via Pipedream
+async function callMCPTool(
+  accessToken: string,
+  userId: string,
+  toolName: string,
+  args: Record<string, any>
+): Promise<any> {
+  console.log(`Calling MCP tool: ${toolName}`);
+  console.log("Tool args:", JSON.stringify(args));
+
+  const response = await fetch(MCP_SERVER_URL, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+      "x-pd-project-id": PIPEDREAM_PROJECT_ID!,
+      "x-pd-environment": "development",
+      "x-pd-external-user-id": userId,
+      "x-pd-app-slug": "google_calendar",
+      "x-pd-app-discovery": "true",
+      "x-pd-tool-mode": "sub-agent",
+    },
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: Date.now(),
+      method: "tools/call",
+      params: {
+        name: toolName,
+        arguments: args,
+      },
+    }),
+  });
+
+  console.log("MCP response status:", response.status);
+  console.log("MCP response headers:", JSON.stringify(Object.fromEntries(response.headers.entries())));
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error("MCP request failed:", errorText);
+    throw new Error(`MCP request failed: ${response.status} - ${errorText}`);
+  }
+
+  const result = await parseSSEResponse(response);
+  console.log("MCP tool result:", JSON.stringify(result).substring(0, 500));
+  
+  if (result?.error) {
+    throw new Error(result.error.message || JSON.stringify(result.error));
+  }
+  
+  return result;
+}
+
+// List available MCP tools
+async function listMCPTools(accessToken: string, userId: string): Promise<any> {
+  console.log("Listing available MCP tools for user:", userId);
+
+  const response = await fetch(MCP_SERVER_URL, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+      "x-pd-project-id": PIPEDREAM_PROJECT_ID!,
+      "x-pd-environment": "development",
+      "x-pd-external-user-id": userId,
+      "x-pd-app-slug": "google_calendar",
+      "x-pd-app-discovery": "true",
+    },
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: Date.now(),
+      method: "tools/list",
+      params: {},
+    }),
+  });
+
+  console.log("MCP tools/list response status:", response.status);
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error("MCP tools/list failed:", errorText);
+    throw new Error(`MCP tools/list failed: ${response.status} - ${errorText}`);
+  }
+
+  const result = await parseSSEResponse(response);
+  console.log("Available MCP tools:", JSON.stringify(result).substring(0, 1000));
+  
+  return result;
+}
+
+// Get user's connected accounts from Pipedream
+async function getUserAccounts(userId: string): Promise<any[]> {
   const accessToken = await getPipedreamAccessToken();
 
-  console.log("Getting accounts with credentials for user:", userId);
+  console.log("Getting accounts for user:", userId);
 
-  // Add include_credentials=true to get OAuth tokens
   const response = await fetch(
-    `https://api.pipedream.com/v1/connect/${PIPEDREAM_PROJECT_ID}/users/${encodeURIComponent(userId)}/accounts?include_credentials=true`,
+    `https://api.pipedream.com/v1/connect/${PIPEDREAM_PROJECT_ID}/users/${encodeURIComponent(userId)}/accounts`,
     {
       headers: {
         Authorization: `Bearer ${accessToken}`,
@@ -104,7 +235,6 @@ async function getUserAccountsWithCredentials(userId: string): Promise<any[]> {
     return [];
   }
 
-  // Parse accounts - API can return array directly or wrapped
   let accounts: any[] = [];
   if (Array.isArray(data)) {
     accounts = data;
@@ -118,86 +248,25 @@ async function getUserAccountsWithCredentials(userId: string): Promise<any[]> {
   return accounts;
 }
 
-// Find Google Calendar account and get OAuth credentials
-async function getGoogleCalendarCredentials(userId: string): Promise<{ accessToken: string; accountId: string } | null> {
-  const accounts = await getUserAccountsWithCredentials(userId);
+// Check if user has Google Calendar connected
+async function hasGoogleCalendarConnection(userId: string): Promise<boolean> {
+  const accounts = await getUserAccounts(userId);
   
-  // Find Google Calendar account
   const googleAccount = accounts.find((a: any) => {
-    const appSlug = typeof a.app === 'object' ? a.app?.name_slug : a.app;
+    const appSlug = typeof a.app === "object" ? a.app?.name_slug : a.app;
     return appSlug === "google_calendar" || appSlug === "google" || a.name?.toLowerCase().includes("google");
   });
 
-  if (!googleAccount) {
-    console.log("No Google Calendar account found for user");
-    return null;
-  }
-
-  console.log("Found Google account:", googleAccount.id);
-  console.log("Account has credentials:", !!googleAccount.credentials);
-  console.log("Account structure:", JSON.stringify(googleAccount).substring(0, 500));
-
-  // Extract OAuth token from credentials
-  // Pipedream stores OAuth tokens in credentials.oauth_access_token
-  const oauthToken = googleAccount.credentials?.oauth_access_token || 
-                     googleAccount.oauth_access_token ||
-                     googleAccount.credentials?.access_token ||
-                     googleAccount.access_token;
-
-  if (!oauthToken) {
-    console.log("No OAuth token found in account. This may be because:");
-    console.log("1. Using Pipedream's default OAuth (not custom OAuth app)");
-    console.log("2. Credentials aren't included in the response");
-    console.log("Full account object:", JSON.stringify(googleAccount));
-    return null;
-  }
-
-  console.log("Successfully extracted OAuth token");
-  return { accessToken: oauthToken, accountId: googleAccount.id };
-}
-
-// Make direct Google Calendar API request using OAuth token
-async function googleCalendarRequest(
-  oauthToken: string,
-  method: string,
-  endpoint: string,
-  body?: any
-): Promise<any> {
-  const url = `https://www.googleapis.com/calendar/v3${endpoint}`;
-  console.log(`Making Google Calendar API request: ${method} ${url}`);
-  
-  const headers: Record<string, string> = {
-    Authorization: `Bearer ${oauthToken}`,
-  };
-  
-  if (body) {
-    headers["Content-Type"] = "application/json";
-  }
-  
-  const response = await fetch(url, {
-    method,
-    headers,
-    body: body ? JSON.stringify(body) : undefined,
-  });
-  
-  const data = await response.json();
-  console.log("Google Calendar API response status:", response.status);
-  
-  if (!response.ok) {
-    console.error("Google Calendar API error:", data);
-    throw new Error(data.error?.message || data.message || "Google Calendar API request failed");
-  }
-  
-  return data;
+  return !!googleAccount;
 }
 
 // Delete a user's Google Calendar connection
 async function deleteUserAccount(userId: string): Promise<boolean> {
   const accessToken = await getPipedreamAccessToken();
 
-  const accounts = await getUserAccountsWithCredentials(userId);
+  const accounts = await getUserAccounts(userId);
   const googleAccount = accounts.find((a: any) => {
-    const appSlug = typeof a.app === 'object' ? a.app?.name_slug : a.app;
+    const appSlug = typeof a.app === "object" ? a.app?.name_slug : a.app;
     return appSlug === "google_calendar" || appSlug === "google" || a.name?.toLowerCase().includes("google");
   });
 
@@ -227,11 +296,9 @@ serve(async (req) => {
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
   const url = new URL(req.url);
 
-  // Check for action in URL params first (for OAuth callback)
   let action = url.searchParams.get("action");
 
   try {
-    // For other actions, parse from body
     const body = await req.json();
     action = body.action || action;
     const { userId } = body;
@@ -246,31 +313,26 @@ serve(async (req) => {
         throw new Error("Pipedream credentials not configured. Please add PIPEDREAM_CLIENT_ID, PIPEDREAM_CLIENT_SECRET, and PIPEDREAM_PROJECT_ID.");
       }
 
-      // Check if user already has Google Calendar connected with valid credentials
-      try {
-        const credentials = await getGoogleCalendarCredentials(userId);
-        if (credentials) {
-          // Try to verify the connection works with direct API call
-          try {
-            const calendars = await googleCalendarRequest(
-              credentials.accessToken,
-              "GET",
-              "/users/me/calendarList?maxResults=1"
-            );
-            if (calendars && !calendars.error) {
-              return new Response(JSON.stringify({ 
-                success: true, 
-                message: "Google Calendar is already connected" 
-              }), {
-                headers: { ...corsHeaders, "Content-Type": "application/json" },
-              });
-            }
-          } catch (e) {
-            console.log("Existing connection verification failed, will prompt for reconnect:", e);
+      // Check if user already has Google Calendar connected
+      const hasConnection = await hasGoogleCalendarConnection(userId);
+      if (hasConnection) {
+        // Verify the connection works via MCP
+        try {
+          const accessToken = await getPipedreamAccessToken();
+          const tools = await listMCPTools(accessToken, userId);
+          
+          // If we can list tools, connection is working
+          if (tools && !tools.error) {
+            return new Response(JSON.stringify({ 
+              success: true, 
+              message: "Google Calendar is already connected" 
+            }), {
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
           }
+        } catch (e) {
+          console.log("Existing connection verification failed, will prompt for reconnect:", e);
         }
-      } catch (e) {
-        console.log("No existing connection or check failed:", e);
       }
 
       // Create success redirect URL
@@ -290,41 +352,53 @@ serve(async (req) => {
       });
     }
 
-    // Verify connection status
+    // Verify connection status using MCP
     if (action === "verify-connection") {
       try {
-        const credentials = await getGoogleCalendarCredentials(userId);
-        if (!credentials) {
+        const hasConnection = await hasGoogleCalendarConnection(userId);
+        
+        if (!hasConnection) {
           return new Response(JSON.stringify({ 
             connected: false, 
             verified: false,
-            error: "No Google Calendar credentials found. You may need to set up a custom OAuth app in Pipedream."
+            error: "No Google Calendar account connected"
           }), {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
         }
 
-        // Test the connection with direct API call
+        // Verify connection works by listing calendars via MCP
         try {
-          const calendars = await googleCalendarRequest(
-            credentials.accessToken,
-            "GET",
-            "/users/me/calendarList?maxResults=10"
+          const accessToken = await getPipedreamAccessToken();
+          
+          // Try to list calendars using MCP
+          const result = await callMCPTool(
+            accessToken,
+            userId,
+            "google_calendar-list-calendars",
+            {
+              instruction: "List all available Google calendars"
+            }
           );
 
+          // Check if we got a valid response
+          const hasCalendars = result?.result?.content || result?.content || result?.items;
+          
           return new Response(JSON.stringify({ 
             connected: true, 
             verified: true,
-            calendarCount: calendars.items?.length || 0 
+            message: "Google Calendar connected and verified"
           }), {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
-        } catch (apiError: any) {
-          console.error("Google Calendar API verification failed:", apiError);
+        } catch (mcpError: any) {
+          console.error("MCP verification failed:", mcpError);
+          
+          // Connection exists but MCP failed - might need reconnect
           return new Response(JSON.stringify({ 
             connected: true, 
             verified: false,
-            error: apiError.message || "Could not verify calendar access"
+            error: mcpError.message || "Could not verify calendar access via MCP"
           }), {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
@@ -340,14 +414,13 @@ serve(async (req) => {
       }
     }
 
-    // Create calendar event for discovery call
+    // Create calendar event for discovery call using MCP
     if (action === "create-event") {
       const { callId } = body;
 
-      // Get Google Calendar credentials
-      const credentials = await getGoogleCalendarCredentials(userId);
-      if (!credentials) {
-        throw new Error("Google Calendar not connected or credentials not available");
+      const hasConnection = await hasGoogleCalendarConnection(userId);
+      if (!hasConnection) {
+        throw new Error("Google Calendar not connected");
       }
 
       // Get call details
@@ -364,111 +437,148 @@ serve(async (req) => {
       const startTime = new Date(call.scheduled_at);
       const endTime = new Date(startTime.getTime() + (call.duration_minutes || 15) * 60000);
 
-      const event = {
-        summary: `Discovery Call: ${call.leads?.name || "Unknown"}`,
-        description: `Discovery call with ${call.leads?.name}\nPhone: ${call.leads?.phone || "N/A"}\nEmail: ${call.leads?.email || "N/A"}`,
-        start: {
-          dateTime: startTime.toISOString(),
-          timeZone: "America/New_York",
-        },
-        end: {
-          dateTime: endTime.toISOString(),
-          timeZone: "America/New_York",
-        },
-        reminders: {
-          useDefault: false,
-          overrides: [
-            { method: "email", minutes: 1440 },
-            { method: "popup", minutes: 60 },
-          ],
-        },
-        attendees: call.leads?.email ? [{ email: call.leads.email }] : [],
-      };
-
-      // Create event with direct API call
-      const calendarEvent = await googleCalendarRequest(
-        credentials.accessToken,
-        "POST",
-        "/calendars/primary/events?sendUpdates=all",
-        event
+      const accessToken = await getPipedreamAccessToken();
+      
+      // Create event using MCP tool
+      const attendeeList = call.leads?.email ? call.leads.email : "";
+      const result = await callMCPTool(
+        accessToken,
+        userId,
+        "google_calendar-create-event",
+        {
+          calendarId: "primary",
+          summary: `Discovery Call: ${call.leads?.name || "Unknown"}`,
+          description: `Discovery call with ${call.leads?.name}\nPhone: ${call.leads?.phone || "N/A"}\nEmail: ${call.leads?.email || "N/A"}`,
+          start: {
+            dateTime: startTime.toISOString(),
+            timeZone: "America/New_York",
+          },
+          end: {
+            dateTime: endTime.toISOString(),
+            timeZone: "America/New_York",
+          },
+          attendees: call.leads?.email ? [{ email: call.leads.email }] : [],
+          instruction: `Create a calendar event titled "Discovery Call: ${call.leads?.name || "Unknown"}" on ${startTime.toISOString()} for ${call.duration_minutes || 15} minutes${attendeeList ? ` with attendee ${attendeeList}` : ""}`
+        }
       );
 
-      if (calendarEvent.error) {
-        throw new Error(calendarEvent.error.message);
-      }
+      // Extract event ID from result
+      const eventId = result?.result?.content?.[0]?.text || 
+                      result?.content?.[0]?.text || 
+                      result?.id || 
+                      `mcp-event-${Date.now()}`;
 
       // Update call with event ID
       await supabase
         .from("discovery_calls")
         .update({
-          google_calendar_event_id: calendarEvent.id,
+          google_calendar_event_id: eventId,
           confirmation_email_sent: true,
         })
         .eq("id", callId);
 
-      return new Response(JSON.stringify({ success: true, eventId: calendarEvent.id }), {
+      return new Response(JSON.stringify({ success: true, eventId }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Check calendar availability
+    // Check calendar availability using MCP
     if (action === "check-availability") {
       const { date } = body;
 
-      const credentials = await getGoogleCalendarCredentials(userId);
-      if (!credentials) {
+      const hasConnection = await hasGoogleCalendarConnection(userId);
+      if (!hasConnection) {
         return new Response(JSON.stringify({ events: [] }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
-      // Get events for the day
       const startOfDay = new Date(date);
       startOfDay.setHours(0, 0, 0, 0);
       const endOfDay = new Date(date);
       endOfDay.setHours(23, 59, 59, 999);
 
-      const eventsData = await googleCalendarRequest(
-        credentials.accessToken,
-        "GET",
-        `/calendars/primary/events?timeMin=${startOfDay.toISOString()}&timeMax=${endOfDay.toISOString()}&singleEvents=true`
+      const accessToken = await getPipedreamAccessToken();
+      
+      const result = await callMCPTool(
+        accessToken,
+        userId,
+        "google_calendar-list-events",
+        {
+          calendarId: "primary",
+          timeMin: startOfDay.toISOString(),
+          timeMax: endOfDay.toISOString(),
+          singleEvents: true,
+          instruction: `List all calendar events for ${date}`
+        }
       );
+
+      // Parse events from MCP response
+      let events: any[] = [];
+      try {
+        const content = result?.result?.content?.[0]?.text || result?.content?.[0]?.text;
+        if (content) {
+          const parsed = JSON.parse(content);
+          events = parsed.items || parsed.events || [];
+        } else if (result?.items) {
+          events = result.items;
+        }
+      } catch (e) {
+        console.log("Could not parse events from MCP response:", e);
+      }
 
       return new Response(
         JSON.stringify({
-          events:
-            eventsData.items?.map((e: any) => ({
-              id: e.id,
-              summary: e.summary,
-              start: e.start?.dateTime || e.start?.date,
-              end: e.end?.dateTime || e.end?.date,
-            })) || [],
+          events: events.map((e: any) => ({
+            id: e.id,
+            summary: e.summary,
+            start: e.start?.dateTime || e.start?.date,
+            end: e.end?.dateTime || e.end?.date,
+          })),
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // List calendars
+    // List calendars using MCP
     if (action === "list-calendars") {
-      const credentials = await getGoogleCalendarCredentials(userId);
-      if (!credentials) {
-        throw new Error("Google Calendar not connected or credentials not available");
+      const hasConnection = await hasGoogleCalendarConnection(userId);
+      if (!hasConnection) {
+        throw new Error("Google Calendar not connected");
       }
 
-      const calendars = await googleCalendarRequest(
-        credentials.accessToken,
-        "GET",
-        "/users/me/calendarList"
+      const accessToken = await getPipedreamAccessToken();
+      
+      const result = await callMCPTool(
+        accessToken,
+        userId,
+        "google_calendar-list-calendars",
+        {
+          instruction: "List all available Google calendars"
+        }
       );
+
+      // Parse calendars from MCP response
+      let calendars: any[] = [];
+      try {
+        const content = result?.result?.content?.[0]?.text || result?.content?.[0]?.text;
+        if (content) {
+          const parsed = JSON.parse(content);
+          calendars = parsed.items || parsed.calendars || [];
+        } else if (result?.items) {
+          calendars = result.items;
+        }
+      } catch (e) {
+        console.log("Could not parse calendars from MCP response:", e);
+      }
 
       return new Response(
         JSON.stringify({
-          calendars:
-            calendars.items?.map((c: any) => ({
-              id: c.id,
-              summary: c.summary,
-              primary: c.primary,
-            })) || [],
+          calendars: calendars.map((c: any) => ({
+            id: c.id,
+            summary: c.summary,
+            primary: c.primary,
+          })),
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
