@@ -72,6 +72,9 @@ verify_jwt = true
 [functions.get-public-properties]
 verify_jwt = false
 
+[functions.google-calendar-sync]
+verify_jwt = false
+
 [functions.gmail-oauth]
 verify_jwt = true
 

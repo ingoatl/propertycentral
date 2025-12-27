@@ -14,6 +14,9 @@ const PIPEDREAM_PROJECT_ID = Deno.env.get("PIPEDREAM_PROJECT_ID");
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
+// Admin user ID for automatic calendar sync operations (cron jobs)
+const CALENDAR_SYNC_USER_ID = Deno.env.get("CALENDAR_SYNC_USER_ID");
+
 // Pipedream MCP Server URL
 const MCP_SERVER_URL = "https://remote.mcp.pipedream.net";
 
@@ -418,6 +421,15 @@ serve(async (req) => {
 
     // Process calendar sync queue (called by cron or manually)
     if (action === "process-queue") {
+      // Use the configured admin user ID for automatic sync operations
+      const syncUserId = userId || CALENDAR_SYNC_USER_ID;
+      
+      if (!syncUserId) {
+        throw new Error("No user ID provided and CALENDAR_SYNC_USER_ID not configured");
+      }
+
+      console.log(`Processing queue with user ID: ${syncUserId}`);
+
       // Get pending items from queue
       const { data: pendingItems, error: queueError } = await supabase
         .from("calendar_sync_queue")
@@ -463,7 +475,7 @@ serve(async (req) => {
           
           const result = await callMCPTool(
             accessToken,
-            userId,
+            syncUserId,
             "google_calendar-create-event",
             {
               calendarId: "primary",
@@ -487,11 +499,30 @@ serve(async (req) => {
 
           console.log("MCP create-event result:", JSON.stringify(result).substring(0, 500));
 
-          // Extract event ID from result
-          const eventId = result?.result?.content?.[0]?.text || 
-                          result?.content?.[0]?.text || 
-                          result?.id || 
-                          `mcp-event-${Date.now()}`;
+          // Extract just the event ID from result - parse it properly
+          let eventId = `mcp-event-${Date.now()}`;
+          try {
+            const content = result?.result?.content?.[0]?.text || result?.content?.[0]?.text;
+            if (content) {
+              // Try to parse as JSON first
+              try {
+                const parsed = JSON.parse(content);
+                eventId = parsed.id || parsed.eventId || eventId;
+              } catch {
+                // Not JSON, check if it contains an event ID pattern
+                const idMatch = content.match(/[a-z0-9]{26}/);
+                if (idMatch) {
+                  eventId = idMatch[0];
+                }
+              }
+            } else if (result?.id) {
+              eventId = result.id;
+            }
+          } catch (e) {
+            console.log("Could not extract event ID:", e);
+          }
+
+          console.log(`Extracted event ID: ${eventId}`);
 
           // Update call with event ID
           await supabase
@@ -521,6 +552,37 @@ serve(async (req) => {
       }
 
       return new Response(JSON.stringify({ processed: results.length, results }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Send Slack message using MCP
+    if (action === "send-slack-message") {
+      const { channel, message } = body;
+      const slackUserId = userId || CALENDAR_SYNC_USER_ID;
+      
+      if (!slackUserId) {
+        throw new Error("No user ID provided for Slack");
+      }
+
+      console.log(`Sending Slack message to ${channel}: ${message}`);
+      
+      const accessToken = await getPipedreamAccessToken();
+      
+      const result = await callMCPTool(
+        accessToken,
+        slackUserId,
+        "slack-post-message",
+        {
+          channel: channel,
+          text: message,
+          instruction: `Send a Slack message to ${channel} with the text: "${message}"`
+        }
+      );
+
+      console.log("Slack MCP result:", JSON.stringify(result).substring(0, 500));
+
+      return new Response(JSON.stringify({ success: true, result }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
