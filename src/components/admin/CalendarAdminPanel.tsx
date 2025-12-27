@@ -117,8 +117,14 @@ export function CalendarAdminPanel() {
   // Connect Google Calendar
   const connectGoogleCalendar = async () => {
     try {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) {
+        toast.error("Please log in first");
+        return;
+      }
+      
       const response = await supabase.functions.invoke("google-calendar-sync", {
-        body: { action: "get-auth-url" },
+        body: { action: "get-auth-url", userId: userData.user.id },
       });
       
       if (response.error) throw new Error(response.error.message);
