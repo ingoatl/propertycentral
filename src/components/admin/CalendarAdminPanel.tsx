@@ -97,20 +97,29 @@ export function CalendarAdminPanel() {
     },
   });
 
-  // Check Google Calendar connection status
+  // Check Google Calendar connection status - verify it actually works
   const { data: gcalStatus, isLoading: gcalLoading, refetch: refetchGcalStatus } = useQuery({
     queryKey: ["google-calendar-status"],
     queryFn: async () => {
       const { data: user } = await supabase.auth.getUser();
-      if (!user.user) return { connected: false };
+      if (!user.user) return { connected: false, verified: false };
       
-      const { data } = await supabase
-        .from("google_calendar_tokens")
-        .select("id, calendar_id")
-        .eq("user_id", user.user.id)
-        .maybeSingle();
+      // Actually verify the connection works by calling the edge function
+      const response = await supabase.functions.invoke("google-calendar-sync", {
+        body: { action: "verify-connection", userId: user.user.id },
+      });
       
-      return { connected: !!data, calendarId: data?.calendar_id };
+      if (response.error) {
+        console.error("Calendar status check error:", response.error);
+        return { connected: false, verified: false };
+      }
+      
+      return {
+        connected: response.data?.connected || false,
+        verified: response.data?.verified || false,
+        calendarCount: response.data?.calendarCount,
+        error: response.data?.error,
+      };
     },
   });
 
@@ -494,15 +503,15 @@ export function CalendarAdminPanel() {
                 )}
               </div>
 
-              {gcalStatus?.connected ? (
+              {gcalStatus?.connected && gcalStatus?.verified ? (
                 <div className="space-y-4">
                   <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
                     <p className="text-sm text-green-800">
-                      ✓ Your Google Calendar is connected. New discovery calls will automatically sync.
+                      ✓ Your Google Calendar is connected and verified.
                     </p>
-                    {gcalStatus.calendarId && (
+                    {gcalStatus.calendarCount !== undefined && (
                       <p className="text-xs text-green-600 mt-1">
-                        Calendar: {gcalStatus.calendarId}
+                        {gcalStatus.calendarCount} calendar(s) accessible
                       </p>
                     )}
                   </div>
@@ -514,6 +523,19 @@ export function CalendarAdminPanel() {
                       <li>Calendar events include lead details and property info</li>
                     </ul>
                   </div>
+                </div>
+              ) : gcalStatus?.connected && !gcalStatus?.verified ? (
+                <div className="space-y-4">
+                  <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <p className="text-sm text-yellow-800">
+                      ⚠ Calendar tokens found but verification failed. 
+                      {gcalStatus.error && <span className="block mt-1 text-xs">{gcalStatus.error}</span>}
+                    </p>
+                  </div>
+                  <Button onClick={connectGoogleCalendar} className="w-full sm:w-auto">
+                    <Calendar className="h-4 w-4 mr-2" />
+                    Reconnect Google Calendar
+                  </Button>
                 </div>
               ) : (
                 <div className="space-y-4">
