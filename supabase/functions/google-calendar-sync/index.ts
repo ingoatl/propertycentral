@@ -124,10 +124,38 @@ async function getUserAccounts(userId: string, includeCredentials: boolean = fal
   return accounts;
 }
 
+// Retrieve a single account with credentials from Pipedream
+async function getAccountWithCredentials(accountId: string): Promise<any | null> {
+  const accessToken = await getPipedreamAccessToken();
+  
+  console.log("Fetching account with credentials:", accountId);
+  
+  const response = await fetch(
+    `https://api.pipedream.com/v1/connect/${PIPEDREAM_PROJECT_ID}/accounts/${accountId}`,
+    {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "x-pd-environment": "development",
+      },
+    }
+  );
+
+  const data = await response.json();
+  console.log("Single account response status:", response.status);
+  console.log("Single account data:", JSON.stringify(data));
+  
+  if (!response.ok || data.error) {
+    console.error("Get single account error:", data);
+    return null;
+  }
+
+  return data;
+}
+
 // Get Google Calendar credentials from Pipedream for a user
 async function getGoogleCalendarCredentials(userId: string): Promise<{ access_token: string; refresh_token?: string } | null> {
-  // Get the user's accounts with credentials included
-  const accounts = await getUserAccounts(userId, true);
+  // First get the list of user accounts (without credentials)
+  const accounts = await getUserAccounts(userId, false);
   console.log("User accounts count:", accounts.length);
 
   // Find Google Calendar account - check both app object and app string
@@ -143,12 +171,21 @@ async function getGoogleCalendarCredentials(userId: string): Promise<{ access_to
   }
 
   console.log("Found Google account:", googleAccount.id);
-  console.log("Account credentials:", JSON.stringify(googleAccount.credentials));
 
-  // Credentials are included in the account response when include_credentials=1
-  const creds = googleAccount.credentials;
+  // Now fetch the individual account to get credentials
+  const accountWithCreds = await getAccountWithCredentials(googleAccount.id);
+  
+  if (!accountWithCreds) {
+    console.error("Failed to fetch account with credentials");
+    return null;
+  }
+
+  console.log("Account credentials:", JSON.stringify(accountWithCreds.credentials));
+
+  // Credentials are in the single account response
+  const creds = accountWithCreds.credentials;
   if (!creds || !creds.oauth_access_token) {
-    console.error("No credentials found in account response");
+    console.error("No OAuth credentials found in account response");
     return null;
   }
 
