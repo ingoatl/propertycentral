@@ -214,6 +214,12 @@ export const navigationConfig: NavElement[] = [
         icon: MessageSquare,
         description: "Review conversion campaign",
       },
+      {
+        path: "/admin?tab=gbp",
+        label: "Google Business Profile",
+        icon: Building2,
+        description: "Reviews & posts automation",
+      },
     ],
   },
 ];
