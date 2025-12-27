@@ -277,16 +277,45 @@ serve(async (req) => {
             }
           }
         }
+      },
+      {
+        type: "function",
+        function: {
+          name: "search_business_knowledge",
+          description: "Search the Peachhaus business knowledge base for policies, procedures, cleaning guides, HOA rules, operational documents, and company information. Use this when users ask about how things work, company policies, cleaning procedures, property rules, or general business operations.",
+          parameters: {
+            type: "object",
+            properties: {
+              query: { 
+                type: "string",
+                description: "The search query to find relevant business knowledge"
+              },
+              max_results: {
+                type: "number",
+                description: "Maximum number of results to return (1-10, default 5)"
+              }
+            },
+            required: ["query"]
+          }
+        }
       }
     ];
 
-    const systemPrompt = `You are a Property Assistant AI. Help users find information about properties, bookings, expenses, and onboarding details.
+    const systemPrompt = `You are a Property Assistant AI for Peachhaus Group, an Atlanta-based property management company. Help users find information about properties, bookings, expenses, onboarding details, AND business operations.
 
 SECURITY:
 - Never share credit card numbers, bank account numbers, or financial data
 - Respond with security error if you see such data
 
-WORKFLOW:
+KNOWLEDGE BASE:
+You have access to Peachhaus's internal knowledge base containing cleaning guides, HOA rules, property procedures, and operational documents. Use the search_business_knowledge tool when users ask about:
+- Company policies and procedures
+- Cleaning instructions or house rules
+- HOA bylaws and regulations
+- How to handle specific situations
+- General business operations
+
+PROPERTY WORKFLOW:
 1. User asks about property → Call search_properties (returns property with id, name, address)
 2. Extract the "id" field from the property object in the results
 3. Call get_property_onboarding with that exact id
@@ -310,7 +339,9 @@ TOOLS:
 - get_bookings: Reservations
 - get_visits: Scheduled visits
 - get_faqs: FAQs
+- search_business_knowledge: Search company knowledge base for policies, procedures, guides
 
+When citing information from the knowledge base, mention the source document if available.
 Be helpful and concise.`;
 
     let pendingToolCalls: any[] = [];
@@ -531,6 +562,62 @@ Be helpful and concise.`;
                         }
                         const { data } = await query.limit(20);
                         result = data || [];
+                        break;
+                      }
+                      case "search_business_knowledge": {
+                        const vectorStoreId = Deno.env.get('OPENAI_VECTOR_STORE_ID');
+                        if (!vectorStoreId) {
+                          result = { error: "Knowledge base not configured", results: [] };
+                          break;
+                        }
+                        
+                        const maxResults = Math.min(Math.max(1, args.max_results || 5), 10);
+                        
+                        try {
+                          const searchResponse = await fetch(
+                            `https://api.openai.com/v1/vector_stores/${vectorStoreId}/search`,
+                            {
+                              method: 'POST',
+                              headers: {
+                                'Authorization': `Bearer ${OPENAI_API_KEY}`,
+                                'Content-Type': 'application/json',
+                              },
+                              body: JSON.stringify({
+                                query: args.query,
+                                max_num_results: maxResults,
+                                rewrite_query: true,
+                                ranking_options: { ranker: "auto" }
+                              }),
+                            }
+                          );
+                          
+                          if (!searchResponse.ok) {
+                            console.error('Vector store search error:', searchResponse.status);
+                            result = { error: "Knowledge base search failed", results: [] };
+                            break;
+                          }
+                          
+                          const searchData = await searchResponse.json();
+                          const searchResults = (searchData.data || []).map((r: any) => ({
+                            filename: r.filename,
+                            score: r.score,
+                            content: Array.isArray(r.content) 
+                              ? r.content.map((c: any) => c.text || '').join('\n')
+                              : '',
+                          }));
+                          
+                          console.log(`Knowledge base search for "${args.query}" found ${searchResults.length} results`);
+                          result = {
+                            query: args.query,
+                            results: searchResults,
+                            message: searchResults.length > 0 
+                              ? `Found ${searchResults.length} relevant documents`
+                              : "No relevant documents found"
+                          };
+                        } catch (error) {
+                          console.error('Knowledge base search error:', error);
+                          result = { error: "Knowledge base search failed", results: [] };
+                        }
                         break;
                       }
                       default:
