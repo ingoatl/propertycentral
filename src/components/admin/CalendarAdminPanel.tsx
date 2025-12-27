@@ -51,6 +51,7 @@ export function CalendarAdminPanel() {
   const [blockDate, setBlockDate] = useState<Date | undefined>();
   const [blockReason, setBlockReason] = useState("");
   const [copied, setCopied] = useState(false);
+  const [isConnecting, setIsConnecting] = useState(false);
   const queryClient = useQueryClient();
 
   // Use the actual frontend URL, not the Supabase URL
@@ -123,6 +124,22 @@ export function CalendarAdminPanel() {
     },
   });
 
+  // Check if returning from OAuth flow
+  useEffect(() => {
+    const oauthPending = sessionStorage.getItem('gcal_oauth_pending');
+    if (oauthPending === 'true') {
+      sessionStorage.removeItem('gcal_oauth_pending');
+      // Check connection status after returning from OAuth
+      refetchGcalStatus().then((result) => {
+        if (result.data?.connected && result.data?.verified) {
+          toast.success("Google Calendar connected successfully!");
+        } else {
+          toast.info("Complete the Google Calendar connection by clicking Connect again if needed.");
+        }
+      });
+    }
+  }, [refetchGcalStatus]);
+
   // Connect Google Calendar
   const connectGoogleCalendar = async () => {
     try {
@@ -145,20 +162,12 @@ export function CalendarAdminPanel() {
         return;
       }
       
-      // Otherwise, need OAuth flow
+      // Otherwise, need OAuth flow - redirect the current page (popups are blocked by Google)
       if (response.data?.authUrl) {
-        window.open(response.data.authUrl, "_blank");
-        toast.info("Complete the Google sign-in in the new tab, then return here.");
-        // Poll for connection status
-        const interval = setInterval(async () => {
-          const result = await refetchGcalStatus();
-          if (result.data?.connected && result.data?.verified) {
-            clearInterval(interval);
-            toast.success("Google Calendar connected successfully!");
-          }
-        }, 2000);
-        // Stop polling after 2 minutes
-        setTimeout(() => clearInterval(interval), 120000);
+        // Store a flag so we know to check status when we return
+        sessionStorage.setItem('gcal_oauth_pending', 'true');
+        // Redirect the entire page to Google OAuth
+        window.location.href = response.data.authUrl;
       }
     } catch (error: any) {
       toast.error(error.message || "Failed to connect Google Calendar");
