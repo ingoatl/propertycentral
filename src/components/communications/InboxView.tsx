@@ -126,7 +126,7 @@ export function InboxView() {
 
       // Fetch email insights (Gmail inbox emails) - latest 10
       if (channelFilter === "all" || channelFilter === "gmail") {
-        const { data: emailInsights } = await supabase
+        const { data: emailInsights, error: emailError } = await supabase
           .from("email_insights")
           .select(`
             id,
@@ -135,27 +135,27 @@ export function InboxView() {
             sender_email,
             email_date,
             category,
-            priority,
-            property:properties(id, name),
-            owner:property_owners(id, name, email)
+            priority
           `)
           .order("email_date", { ascending: false })
           .limit(10);
 
-        if (emailInsights) {
+        console.log("Email insights fetched:", emailInsights?.length, "Error:", emailError);
+
+        if (emailInsights && emailInsights.length > 0) {
           for (const email of emailInsights) {
-            const ownerData = email.owner as any;
+            const senderName = email.sender_email?.split("@")[0] || "Unknown";
             const item: CommunicationItem = {
               id: email.id,
               type: "gmail",
               direction: "inbound",
-              body: email.summary,
-              subject: email.subject,
+              body: email.summary || "No summary available",
+              subject: email.subject || "No subject",
               created_at: email.email_date,
-              contact_name: ownerData?.name || email.sender_email?.split("@")[0] || "Unknown",
+              contact_name: senderName,
               contact_email: email.sender_email,
-              contact_type: ownerData?.id ? "owner" : "external",
-              contact_id: ownerData?.id || "",
+              contact_type: "external",
+              contact_id: email.id,
               status: email.category,
               sender_email: email.sender_email,
             };
@@ -172,8 +172,8 @@ export function InboxView() {
               }
             }
 
-            // Apply type filter
-            if (typeFilter !== "all" && item.contact_type !== typeFilter) {
+            // Apply type filter (skip for gmail since they are external)
+            if (typeFilter !== "all" && typeFilter !== "external" && item.contact_type !== typeFilter) {
               continue;
             }
 
