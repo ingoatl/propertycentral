@@ -135,6 +135,7 @@ async function callMCPTool(
     method: "POST",
     headers: {
       "Authorization": `Bearer ${accessToken}`,
+      "Accept": "application/json, text/event-stream",
       "Content-Type": "application/json",
       "x-pd-project-id": PIPEDREAM_PROJECT_ID!,
       "x-pd-environment": "development",
@@ -181,6 +182,7 @@ async function listMCPTools(accessToken: string, userId: string): Promise<any> {
     method: "POST",
     headers: {
       "Authorization": `Bearer ${accessToken}`,
+      "Accept": "application/json, text/event-stream",
       "Content-Type": "application/json",
       "x-pd-project-id": PIPEDREAM_PROJECT_ID!,
       "x-pd-environment": "development",
