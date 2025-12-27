@@ -143,6 +143,30 @@ export type Database = {
         }
         Relationships: []
       }
+      blocked_dates: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          date: string
+          id: string
+          reason: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          date: string
+          id?: string
+          reason?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          date?: string
+          id?: string
+          reason?: string | null
+        }
+        Relationships: []
+      }
       booking_documents: {
         Row: {
           booking_id: string | null
@@ -406,12 +430,16 @@ export type Database = {
       }
       discovery_calls: {
         Row: {
+          confirmation_email_sent: boolean | null
           confirmation_sent: boolean | null
           created_at: string | null
           duration_minutes: number | null
+          google_calendar_event_id: string | null
           id: string
           lead_id: string | null
           meeting_notes: string | null
+          reminder_1h_sent: boolean | null
+          reminder_24h_sent: boolean | null
           reminder_sent: boolean | null
           scheduled_at: string
           scheduled_by: string | null
@@ -419,12 +447,16 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          confirmation_email_sent?: boolean | null
           confirmation_sent?: boolean | null
           created_at?: string | null
           duration_minutes?: number | null
+          google_calendar_event_id?: string | null
           id?: string
           lead_id?: string | null
           meeting_notes?: string | null
+          reminder_1h_sent?: boolean | null
+          reminder_24h_sent?: boolean | null
           reminder_sent?: boolean | null
           scheduled_at: string
           scheduled_by?: string | null
@@ -432,12 +464,16 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          confirmation_email_sent?: boolean | null
           confirmation_sent?: boolean | null
           created_at?: string | null
           duration_minutes?: number | null
+          google_calendar_event_id?: string | null
           id?: string
           lead_id?: string | null
           meeting_notes?: string | null
+          reminder_1h_sent?: boolean | null
+          reminder_24h_sent?: boolean | null
           reminder_sent?: boolean | null
           scheduled_at?: string
           scheduled_by?: string | null
@@ -1059,6 +1095,39 @@ export type Database = {
           id?: string
           refresh_token?: string
           updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      google_calendar_tokens: {
+        Row: {
+          access_token: string
+          calendar_id: string | null
+          created_at: string | null
+          expires_at: string
+          id: string
+          refresh_token: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          access_token: string
+          calendar_id?: string | null
+          created_at?: string | null
+          expires_at: string
+          id?: string
+          refresh_token: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          access_token?: string
+          calendar_id?: string | null
+          created_at?: string | null
+          expires_at?: string
+          id?: string
+          refresh_token?: string
+          updated_at?: string | null
           user_id?: string
         }
         Relationships: []
