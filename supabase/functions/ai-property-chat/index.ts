@@ -1051,31 +1051,41 @@ Be helpful and take action. You are not just informational - you can DO things l
                       });
                     }
                     
-                    // Get HOA info from onboarding tasks
+                    // Get HOA info from onboarding tasks - look for any HOA-related fields
                     const { data: project } = await supabase
                       .from("onboarding_projects")
                       .select("id")
                       .eq("property_id", searchedProperty.id)
                       .maybeSingle();
                     
+                    let hoaInfo: any = null;
+                    
                     if (project) {
                       const { data: hoaTasks } = await supabase
                         .from("onboarding_tasks")
                         .select("title, field_value")
                         .eq("project_id", project.id)
-                        .or("title.ilike.%hoa%,title.ilike.%homeowner%,title.ilike.%association%");
+                        .or("title.ilike.%hoa%,title.ilike.%homeowner%,title.ilike.%association%,title.ilike.%management%");
                       
                       if (hoaTasks && hoaTasks.length > 0) {
                         for (const task of hoaTasks) {
                           if (task.field_value) {
+                            // Try to extract email
                             const emailMatch = task.field_value.match(/[\w.-]+@[\w.-]+\.\w+/);
-                            if (emailMatch) {
-                              contacts.contacts.push({
+                            // Try to extract phone
+                            const phoneMatch = task.field_value.match(/(?:\+?1[-.\s]?)?\(?[0-9]{3}\)?[-.\s]?[0-9]{3}[-.\s]?[0-9]{4}/);
+                            // Try to extract company name (usually first part before | or :)
+                            const companyMatch = task.field_value.match(/^(?:HOA:\s*)?([^|:]+)/i);
+                            
+                            if (emailMatch || phoneMatch) {
+                              hoaInfo = {
                                 type: "hoa",
-                                name: task.title || "HOA Board",
-                                email: emailMatch[0],
+                                name: companyMatch ? companyMatch[1].trim() : (task.title || "HOA Board"),
+                                email: emailMatch ? emailMatch[0] : null,
+                                phone: phoneMatch ? phoneMatch[0] : null,
                                 details: task.field_value
-                              });
+                              };
+                              contacts.contacts.push(hoaInfo);
                             }
                           }
                         }
@@ -1083,21 +1093,32 @@ Be helpful and take action. You are not just informational - you can DO things l
                     }
                     
                     console.log("Auto-chained contacts:", contacts.contacts.length, "contacts found");
+                    console.log("HOA info found:", hoaInfo);
                     
-                    // Determine recipient
+                    // Determine recipient based on user request
                     const userQuery = queryIntent.emailContext.toLowerCase();
                     let recipientEmail = null;
                     let recipientName = null;
                     let contactType = "other";
+                    let hoaDetails = null;
                     
-                    if (userQuery.includes("hoa") || userQuery.includes("homeowner") || userQuery.includes("association")) {
+                    // Check what type of contact user wants
+                    const wantsHoa = userQuery.includes("hoa") || userQuery.includes("homeowner") || userQuery.includes("association");
+                    const wantsOwner = userQuery.includes("owner");
+                    
+                    if (wantsHoa) {
                       const hoaContact = contacts.contacts.find((c: any) => c.type === "hoa");
-                      if (hoaContact?.email) {
-                        recipientEmail = hoaContact.email;
-                        recipientName = hoaContact.name;
-                        contactType = "hoa";
+                      if (hoaContact) {
+                        if (hoaContact.email) {
+                          recipientEmail = hoaContact.email;
+                          recipientName = hoaContact.name;
+                          contactType = "hoa";
+                        } else {
+                          // HOA exists but no email - save details for response
+                          hoaDetails = hoaContact;
+                        }
                       }
-                    } else if (userQuery.includes("owner")) {
+                    } else if (wantsOwner) {
                       const ownerContact = contacts.contacts.find((c: any) => c.type === "owner");
                       if (ownerContact?.email) {
                         recipientEmail = ownerContact.email;
@@ -1106,15 +1127,8 @@ Be helpful and take action. You are not just informational - you can DO things l
                       }
                     }
                     
-                    // Default to first available contact with email
-                    if (!recipientEmail) {
-                      const anyContact = contacts.contacts.find((c: any) => c.email);
-                      if (anyContact) {
-                        recipientEmail = anyContact.email;
-                        recipientName = anyContact.name;
-                        contactType = anyContact.type;
-                      }
-                    }
+                    // DON'T default to owner when user specifically asked for HOA
+                    // Only default if user didn't specify a contact type
                     
                     // Create the email draft if we have a recipient
                     if (recipientEmail) {
@@ -1166,11 +1180,24 @@ Property Management`;
                           property: searchedProperty.name
                         };
                       }
+                    } else if (hoaDetails && wantsHoa) {
+                      // User asked for HOA but no email found - provide what we have
+                      console.log("HOA found but no email, providing details");
+                      autoChainedEmailDraft = { 
+                        success: false, 
+                        isHoaWithoutEmail: true,
+                        hoaName: hoaDetails.name,
+                        hoaPhone: hoaDetails.phone,
+                        hoaDetails: hoaDetails.details,
+                        error: `The HOA (${hoaDetails.name}) doesn't have an email on file. Contact them at: ${hoaDetails.phone || 'No phone available'}. Details: ${hoaDetails.details}` 
+                      };
                     } else {
                       console.log("No suitable email recipient found in contacts");
                       autoChainedEmailDraft = { 
                         success: false, 
-                        error: "No email address found for contacts. Please add contact information in onboarding tasks." 
+                        error: wantsHoa 
+                          ? "No HOA contact information found. Please add HOA details in the property onboarding tasks."
+                          : "No email address found for contacts. Please add contact information in onboarding tasks." 
                       };
                     }
                   } catch (error) {
@@ -1184,6 +1211,8 @@ Property Management`;
                   let responseMessage = "";
                   if (autoChainedEmailDraft.success) {
                     responseMessage = `I've created an email draft for you!\n\n**To:** ${autoChainedEmailDraft.to_name || autoChainedEmailDraft.to_email}\n**Subject:** ${autoChainedEmailDraft.subject}\n**Property:** ${autoChainedEmailDraft.property}\n\nYou can find it in **Communications > Inbox** to review and send.`;
+                  } else if (autoChainedEmailDraft.isHoaWithoutEmail) {
+                    responseMessage = `I found the HOA for "${searchedProperty.name}" but they don't have an email address on file.\n\n**HOA:** ${autoChainedEmailDraft.hoaName}\n**Phone:** ${autoChainedEmailDraft.hoaPhone || 'Not available'}\n**Details:** ${autoChainedEmailDraft.hoaDetails}\n\nTo draft an email, please add the HOA email address to the property's onboarding tasks, or contact them via phone.`;
                   } else {
                     responseMessage = `I found the property "${searchedProperty.name}" but couldn't create the email draft: ${autoChainedEmailDraft.error}`;
                   }
