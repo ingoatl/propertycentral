@@ -15,6 +15,7 @@ import {
   Shield,
   ClipboardCheck,
   TrendingUp,
+  Inbox,
   LucideIcon,
 } from "lucide-react";
 
@@ -56,6 +57,12 @@ export const navigationConfig: NavElement[] = [
     label: "Leads",
     path: "/leads",
     icon: TrendingUp,
+  },
+  {
+    type: "link",
+    label: "Inbox",
+    path: "/communications",
+    icon: Inbox,
   },
   {
     type: "dropdown",

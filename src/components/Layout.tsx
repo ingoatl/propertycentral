@@ -8,6 +8,8 @@ import { useAuth } from "./ProtectedRoute";
 import { FloatingChatButton } from "@/components/ai-assistant/FloatingChatButton";
 import { MainNavigation } from "@/components/navigation/MainNavigation";
 import { MobileNavigation } from "@/components/navigation/MobileNavigation";
+import { QuickCommunicationButton } from "@/components/communications/QuickCommunicationButton";
+import VoiceDialer from "@/components/leads/VoiceDialer";
 
 interface LayoutProps {
   children: ReactNode;
@@ -106,11 +108,17 @@ const Layout = ({ children }: LayoutProps) => {
             {/* Center: Desktop Navigation */}
             {canAccessNav && <MainNavigation isAdmin={isAdmin} />}
 
-            {/* Right side: User info + Logout */}
-            <div className="flex items-center gap-3">
+            {/* Right side: Quick Actions + User info + Logout */}
+            <div className="flex items-center gap-2 sm:gap-3">
+              {canAccessNav && (
+                <>
+                  <QuickCommunicationButton />
+                  <VoiceDialer />
+                </>
+              )}
               {user && (
                 <>
-                  <span className="text-sm text-muted-foreground hidden md:inline truncate max-w-[150px]">
+                  <span className="text-sm text-muted-foreground hidden lg:inline truncate max-w-[150px]">
                     {user.email}
                   </span>
                   <Button variant="outline" size="sm" onClick={handleLogout} className="shrink-0">
