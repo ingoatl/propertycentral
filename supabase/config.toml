@@ -251,3 +251,15 @@ verify_jwt = true
 
 [functions.gbp-manager]
 verify_jwt = false
+
+[functions.telnyx-inbound-sms]
+verify_jwt = false
+
+[functions.telnyx-inbound-voice]
+verify_jwt = false
+
+[functions.telnyx-send-sms]
+verify_jwt = true
+
+[functions.telnyx-voicemail]
+verify_jwt = false
