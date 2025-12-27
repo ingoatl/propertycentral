@@ -103,7 +103,9 @@ async function getUserAccounts(userId: string): Promise<any[]> {
     return [];
   }
 
-  return data.data || [];
+  // API returns array directly, not wrapped in .data
+  const accounts = Array.isArray(data) ? data : (data.data || []);
+  return accounts;
 }
 
 // Get Google Calendar credentials from Pipedream for a user
