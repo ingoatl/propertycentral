@@ -180,6 +180,9 @@ verify_jwt = true
 [functions.send-team-performance-digest]
 verify_jwt = false
 
+[functions.send-lead-email]
+verify_jwt = true
+
 [functions.send-welcome-email]
 verify_jwt = true
 

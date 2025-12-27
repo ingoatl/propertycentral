@@ -117,43 +117,46 @@ serve(async (req) => {
 
     console.log("Action:", action, "UserId:", userId);
 
-    // Check if user already has Gmail tokens - reuse them for Calendar
-    if (action === "get-auth-url" || action === "connect-from-gmail") {
-      // Check for existing Gmail tokens first
-      const { data: gmailTokens } = await supabase
-        .from("gmail_oauth_tokens")
+    if (action === "get-auth-url") {
+      // Check if user already has valid calendar tokens
+      const { data: existingTokens } = await supabase
+        .from("google_calendar_tokens")
         .select("*")
         .eq("user_id", userId)
         .maybeSingle();
 
-      if (gmailTokens) {
-        console.log("Found existing Gmail tokens, copying to calendar...");
-        // User already has Gmail connected - copy tokens to calendar table
-        await supabase.from("google_calendar_tokens").upsert({
-          user_id: userId,
-          access_token: gmailTokens.access_token,
-          refresh_token: gmailTokens.refresh_token,
-          expires_at: gmailTokens.expires_at,
-          calendar_id: "primary",
-          updated_at: new Date().toISOString(),
-        });
-
-        return new Response(JSON.stringify({ 
-          success: true, 
-          message: "Calendar connected using existing Google credentials" 
-        }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+      if (existingTokens) {
+        // Try to verify the existing tokens work
+        try {
+          const accessToken = await getValidAccessToken(supabase, userId, existingTokens);
+          // Test the connection
+          const testRes = await fetch(
+            "https://www.googleapis.com/calendar/v3/users/me/calendarList?maxResults=1",
+            { headers: { Authorization: `Bearer ${accessToken}` } }
+          );
+          if (testRes.ok) {
+            return new Response(JSON.stringify({ 
+              success: true, 
+              message: "Google Calendar is already connected" 
+            }), {
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+          }
+        } catch (e) {
+          console.log("Existing tokens invalid, need re-auth:", e);
+          // Delete invalid tokens
+          await supabase.from("google_calendar_tokens").delete().eq("user_id", userId);
+        }
       }
 
-      // No Gmail tokens - need full OAuth
+      // Need fresh OAuth
       if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
         throw new Error("Google Calendar credentials not configured.");
       }
       
       const redirectUri = `${SUPABASE_URL}/functions/v1/google-calendar-sync?action=oauth-callback`;
       const scope = encodeURIComponent(
-        "https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/gmail.readonly"
+        "https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/calendar.events"
       );
       const authUrl =
         `https://accounts.google.com/o/oauth2/v2/auth?` +
