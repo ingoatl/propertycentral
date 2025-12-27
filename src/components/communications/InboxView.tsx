@@ -25,6 +25,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { SendSMSDialog } from "./SendSMSDialog";
+import { SendEmailDialog } from "./SendEmailDialog";
 import { useNavigate } from "react-router-dom";
 
 interface CommunicationItem {
@@ -36,6 +37,7 @@ interface CommunicationItem {
   created_at: string;
   contact_name: string;
   contact_phone?: string;
+  contact_email?: string;
   contact_type: "lead" | "owner";
   contact_id: string;
   status?: string;
@@ -46,7 +48,8 @@ export function InboxView() {
   const [channelFilter, setChannelFilter] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [selectedMessage, setSelectedMessage] = useState<CommunicationItem | null>(null);
-  const [showReply, setShowReply] = useState(false);
+  const [showSmsReply, setShowSmsReply] = useState(false);
+  const [showEmailReply, setShowEmailReply] = useState(false);
   const navigate = useNavigate();
 
   // Fetch all lead communications
@@ -67,7 +70,7 @@ export function InboxView() {
           created_at,
           status,
           lead_id,
-          leads!inner(id, name, phone)
+          leads!inner(id, name, phone, email)
         `)
         .order("created_at", { ascending: false })
         .limit(100);
@@ -90,6 +93,7 @@ export function InboxView() {
             created_at: comm.created_at,
             contact_name: lead?.name || "Unknown",
             contact_phone: lead?.phone || undefined,
+            contact_email: lead?.email || undefined,
             contact_type: "lead",
             contact_id: comm.lead_id,
             status: comm.status || undefined,
@@ -333,16 +337,27 @@ export function InboxView() {
                   </p>
                 </div>
 
-                <div className="flex gap-2 pt-2">
+                <div className="flex gap-2 pt-2 flex-wrap">
                   {selectedMessage.contact_phone && (
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => setShowReply(true)}
+                      onClick={() => setShowSmsReply(true)}
                       className="flex-1"
                     >
                       <MessageSquare className="h-4 w-4 mr-2" />
-                      Reply
+                      SMS
+                    </Button>
+                  )}
+                  {selectedMessage.contact_email && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowEmailReply(true)}
+                      className="flex-1"
+                    >
+                      <Mail className="h-4 w-4 mr-2" />
+                      Email
                     </Button>
                   )}
                   <Button
@@ -366,13 +381,25 @@ export function InboxView() {
         </Card>
       </div>
 
-      {/* Reply Dialog */}
+      {/* SMS Reply Dialog */}
       {selectedMessage && selectedMessage.contact_phone && (
         <SendSMSDialog
-          open={showReply}
-          onOpenChange={setShowReply}
+          open={showSmsReply}
+          onOpenChange={setShowSmsReply}
           contactName={selectedMessage.contact_name}
           contactPhone={selectedMessage.contact_phone}
+          contactType={selectedMessage.contact_type}
+          contactId={selectedMessage.contact_id}
+        />
+      )}
+
+      {/* Email Reply Dialog */}
+      {selectedMessage && selectedMessage.contact_email && (
+        <SendEmailDialog
+          open={showEmailReply}
+          onOpenChange={setShowEmailReply}
+          contactName={selectedMessage.contact_name}
+          contactEmail={selectedMessage.contact_email}
           contactType={selectedMessage.contact_type}
           contactId={selectedMessage.contact_id}
         />
