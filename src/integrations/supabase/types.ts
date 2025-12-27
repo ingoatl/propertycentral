@@ -4174,6 +4174,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          assigned_phone_number: string | null
           created_at: string
           email: string
           first_name: string | null
@@ -4183,6 +4184,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          assigned_phone_number?: string | null
           created_at?: string
           email: string
           first_name?: string | null
@@ -4192,6 +4194,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          assigned_phone_number?: string | null
           created_at?: string
           email?: string
           first_name?: string | null
@@ -5459,6 +5462,154 @@ export type Database = {
           role_name?: string
         }
         Relationships: []
+      }
+      user_phone_assignments: {
+        Row: {
+          created_at: string
+          display_name: string | null
+          id: string
+          is_active: boolean
+          phone_number: string
+          phone_type: string
+          telnyx_connection_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          is_active?: boolean
+          phone_number: string
+          phone_type?: string
+          telnyx_connection_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          is_active?: boolean
+          phone_number?: string
+          phone_type?: string
+          telnyx_connection_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_phone_calls: {
+        Row: {
+          created_at: string
+          direction: string
+          duration_seconds: number | null
+          ended_at: string | null
+          external_id: string | null
+          from_number: string
+          id: string
+          phone_assignment_id: string | null
+          recording_url: string | null
+          started_at: string
+          status: string | null
+          to_number: string
+          transcription: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          direction: string
+          duration_seconds?: number | null
+          ended_at?: string | null
+          external_id?: string | null
+          from_number: string
+          id?: string
+          phone_assignment_id?: string | null
+          recording_url?: string | null
+          started_at?: string
+          status?: string | null
+          to_number: string
+          transcription?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          direction?: string
+          duration_seconds?: number | null
+          ended_at?: string | null
+          external_id?: string | null
+          from_number?: string
+          id?: string
+          phone_assignment_id?: string | null
+          recording_url?: string | null
+          started_at?: string
+          status?: string | null
+          to_number?: string
+          transcription?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_phone_calls_phone_assignment_id_fkey"
+            columns: ["phone_assignment_id"]
+            isOneToOne: false
+            referencedRelation: "user_phone_assignments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_phone_messages: {
+        Row: {
+          body: string | null
+          created_at: string
+          direction: string
+          external_id: string | null
+          from_number: string
+          id: string
+          media_urls: Json | null
+          phone_assignment_id: string | null
+          read_at: string | null
+          status: string | null
+          to_number: string
+          user_id: string
+        }
+        Insert: {
+          body?: string | null
+          created_at?: string
+          direction: string
+          external_id?: string | null
+          from_number: string
+          id?: string
+          media_urls?: Json | null
+          phone_assignment_id?: string | null
+          read_at?: string | null
+          status?: string | null
+          to_number: string
+          user_id: string
+        }
+        Update: {
+          body?: string | null
+          created_at?: string
+          direction?: string
+          external_id?: string | null
+          from_number?: string
+          id?: string
+          media_urls?: Json | null
+          phone_assignment_id?: string | null
+          read_at?: string | null
+          status?: string | null
+          to_number?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_phone_messages_phone_assignment_id_fkey"
+            columns: ["phone_assignment_id"]
+            isOneToOne: false
+            referencedRelation: "user_phone_assignments"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_roles: {
         Row: {
