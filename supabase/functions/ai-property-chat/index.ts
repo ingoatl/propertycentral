@@ -373,13 +373,13 @@ serve(async (req) => {
         type: "function",
         function: {
           name: "draft_email",
-          description: "Create an email draft in the inbox. Use this when the user asks you to draft, write, or compose an email. The draft will appear in the Communications inbox for review and sending. You should first use get_property_contacts to get the correct email addresses.",
+          description: "IMPORTANT: You MUST use this tool when users ask to draft, write, compose, or send an email. This creates a REAL email draft in the Communications inbox. First use get_property_contacts to find the recipient's email, then use this tool to create the draft. The user can then review and send it from the inbox.",
           parameters: {
             type: "object",
             properties: {
               to_email: { 
                 type: "string",
-                description: "The recipient email address"
+                description: "The recipient email address (get this from get_property_contacts)"
               },
               to_name: {
                 type: "string",
@@ -387,23 +387,23 @@ serve(async (req) => {
               },
               subject: {
                 type: "string",
-                description: "Email subject line"
+                description: "Professional email subject line"
               },
               body: {
                 type: "string",
-                description: "The email body content. Write professional, friendly emails appropriate for property management communications."
+                description: "The full email body. Write professional, friendly emails. Include greeting, body content, and sign-off from Peachhaus Group."
               },
               property_id: {
                 type: "string",
-                description: "Optional: The UUID of the related property"
+                description: "The UUID of the related property"
               },
               property_name: {
                 type: "string",
-                description: "Optional: The name of the related property for context"
+                description: "The name of the related property for context"
               },
               contact_type: {
                 type: "string",
-                description: "Optional: Type of contact (hoa, vendor, owner, tenant, other)"
+                description: "Type of contact: hoa, vendor, owner, tenant, other"
               }
             },
             required: ["to_email", "subject", "body"]
@@ -412,7 +412,36 @@ serve(async (req) => {
       }
     ];
 
-    const systemPrompt = `You are a Property Assistant AI for Peachhaus Group, an Atlanta-based property management company. Help users find information about properties, bookings, expenses, onboarding details, AND business operations.
+    const systemPrompt = `You are a Property Assistant AI for Peachhaus Group, an Atlanta-based property management company. You have FULL capability to take actions including drafting emails, searching properties, and managing communications.
+
+CRITICAL - YOU CAN CREATE EMAIL DRAFTS:
+You have access to the draft_email tool which creates REAL email drafts in the Communications inbox. When users ask you to "draft an email", "write an email", "compose an email", or "send an email", you MUST use this tool. DO NOT say you cannot create drafts - you absolutely CAN.
+
+EMAIL DRAFTING WORKFLOW (PRIORITY ACTION):
+When a user mentions drafting/writing/composing an email:
+1. IMMEDIATELY call search_properties to find the property
+2. Call get_property_contacts to get the recipient's email (HOA, vendor, owner, etc.)
+3. Call draft_email with:
+   - to_email: The recipient's email from contacts
+   - to_name: The recipient's name
+   - subject: A professional subject line
+   - body: Professional email content based on user's request
+   - property_id and property_name: For context
+4. Confirm: "I've created an email draft in Communications > Inbox. You can review and send it from there."
+
+EXAMPLE EMAIL REQUEST:
+User: "Draft an email to the HOA at Piedmont about parking"
+Step 1: search_properties({"query": "Piedmont"}) → Get property ID
+Step 2: get_property_contacts({"property_id": "xxx", "contact_type": "hoa"}) → Get HOA email
+Step 3: draft_email({
+  "to_email": "hoa@example.com",
+  "to_name": "Piedmont HOA Board", 
+  "subject": "Parking Inquiry - Piedmont Property",
+  "body": "Dear HOA Board,\\n\\nI am writing regarding parking at the Piedmont property...\\n\\nBest regards,\\nPeachhaus Group",
+  "property_id": "xxx",
+  "property_name": "Piedmont"
+})
+Step 4: Tell user the draft is in Communications > Inbox
 
 SECURITY:
 - Never share credit card numbers, bank account numbers, or financial data
@@ -443,14 +472,6 @@ PROPERTY WORKFLOW:
 3. Call get_property_onboarding with that exact id
 4. Answer based on the onboarding task data
 
-EXAMPLE:
-User: "What's the WiFi for Villa 15?"
-Step 1: search_properties({"query": "Villa 15"})
-Result: [{"id": "a439a2d4-1f0f-4235-b4c1-88651f3b8bb1", "name": "Villa Ct SE - Unit 15", ...}]
-Step 2: Extract id = "a439a2d4-1f0f-4235-b4c1-88651f3b8bb1"
-Step 3: get_property_onboarding({"property_id": "a439a2d4-1f0f-4235-b4c1-88651f3b8bb1"})
-Step 4: Find WiFi task in results and answer
-
 CRITICAL: Always use the exact UUID "id" from search results. Never invent property IDs like "prop_123"!
 
 TOOLS:
@@ -465,17 +486,10 @@ TOOLS:
 - search_business_knowledge: Search company knowledge base for policies, procedures, guides
 - save_memory: Save important information to long-term memory
 - recall_memory: Search past memories for relevant context
-- draft_email: Create an email draft in the inbox
-
-EMAIL DRAFTING:
-When a user asks you to draft/write/compose an email (e.g., "draft an email to the HOA at Piedmont"), you should:
-1. First search for the property using search_properties
-2. Get the property contacts using get_property_contacts to find the HOA email
-3. Use draft_email to create the draft with proper recipient, subject, and body
-4. Let the user know the draft has been created and is in Communications > Inbox
+- draft_email: CREATE an email draft in the inbox (YOU CAN AND SHOULD USE THIS)
 
 When citing information from the knowledge base, mention the source document if available.
-Be helpful and concise.`;
+Be helpful and take action. You are not just informational - you can DO things like create email drafts.`;
 
     let pendingToolCalls: any[] = [];
     let assistantMessage = "";
