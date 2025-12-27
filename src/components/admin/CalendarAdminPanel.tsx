@@ -53,8 +53,10 @@ export function CalendarAdminPanel() {
   const [copied, setCopied] = useState(false);
   const queryClient = useQueryClient();
 
-  const embedUrl = `${window.location.origin}/book-discovery-call`;
-  const iframeCode = `<iframe src="${embedUrl}" width="100%" height="700" frameborder="0"></iframe>`;
+  // Use the actual frontend URL, not the Supabase URL
+  const frontendUrl = window.location.origin;
+  const embedUrl = `${frontendUrl}/book-discovery-call`;
+  const iframeCode = `<iframe src="${embedUrl}" width="100%" height="800" frameborder="0" style="border-radius: 12px;"></iframe>`;
 
   // Fetch availability slots
   const { data: availabilitySlots = [], isLoading: slotsLoading } = useQuery({
