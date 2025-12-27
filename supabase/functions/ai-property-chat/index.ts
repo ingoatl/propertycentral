@@ -1210,11 +1210,38 @@ Property Management`;
                 if (autoChainedEmailDraft) {
                   let responseMessage = "";
                   if (autoChainedEmailDraft.success) {
-                    responseMessage = `I've created an email draft for you!\n\n**To:** ${autoChainedEmailDraft.to_name || autoChainedEmailDraft.to_email}\n**Subject:** ${autoChainedEmailDraft.subject}\n**Property:** ${autoChainedEmailDraft.property}\n\nYou can find it in **Communications > Inbox** to review and send.`;
+                    responseMessage = `✅ **Email Draft Created!**\n\n**To:** ${autoChainedEmailDraft.to_name || autoChainedEmailDraft.to_email}\n**Subject:** ${autoChainedEmailDraft.subject}\n**Property:** ${autoChainedEmailDraft.property}\n\n📧 You can find it in **Communications > Inbox** to review and send.`;
                   } else if (autoChainedEmailDraft.isHoaWithoutEmail) {
-                    responseMessage = `I found the HOA for "${searchedProperty.name}" but they don't have an email address on file.\n\n**HOA:** ${autoChainedEmailDraft.hoaName}\n**Phone:** ${autoChainedEmailDraft.hoaPhone || 'Not available'}\n**Details:** ${autoChainedEmailDraft.hoaDetails}\n\nTo draft an email, please add the HOA email address to the property's onboarding tasks, or contact them via phone.`;
+                    // HOA found but no email - offer alternative contact options
+                    responseMessage = `📋 **No Email Available for HOA**\n\nI found the HOA for "${searchedProperty.name}" but they don't have an email address on file.\n\n**HOA:** ${autoChainedEmailDraft.hoaName}\n`;
+                    
+                    if (autoChainedEmailDraft.hoaPhone) {
+                      responseMessage += `**Phone:** ${autoChainedEmailDraft.hoaPhone}\n\n`;
+                      responseMessage += `**Alternative Contact Options:**\n`;
+                      responseMessage += `• 📞 **Call them directly** at ${autoChainedEmailDraft.hoaPhone}\n`;
+                      responseMessage += `• 💬 **Send an SMS** - Go to Leads or use the communication dialogs\n`;
+                    } else {
+                      responseMessage += `\n**Details:** ${autoChainedEmailDraft.hoaDetails}\n\n`;
+                      responseMessage += `⚠️ No phone number available either.\n`;
+                    }
+                    
+                    responseMessage += `\n**💡 To enable email drafts:**\nAdd the HOA email address in the property's onboarding tasks.`;
                   } else {
-                    responseMessage = `I found the property "${searchedProperty.name}" but couldn't create the email draft: ${autoChainedEmailDraft.error}`;
+                    // Generic no contact found - offer helpful guidance
+                    const wantsHoa = queryIntent.emailContext.toLowerCase().includes("hoa");
+                    
+                    responseMessage = `⚠️ **No Email Contact Found**\n\n`;
+                    responseMessage += `I found the property "${searchedProperty.name}" but couldn't locate an email address for ${wantsHoa ? 'the HOA' : 'this contact'}.\n\n`;
+                    
+                    responseMessage += `**What you can do:**\n`;
+                    responseMessage += `1. 📝 **Add contact info** - Update the property's onboarding tasks with the ${wantsHoa ? 'HOA' : 'contact'} email\n`;
+                    responseMessage += `2. 📞 **Try calling** - If you have their phone number, make a direct call\n`;
+                    responseMessage += `3. 💬 **Send SMS** - Use the SMS feature in Communications\n`;
+                    responseMessage += `4. 🔍 **Search contacts** - Check the Vendors or Property Owners pages\n\n`;
+                    
+                    responseMessage += `**Need help?** Ask me to:\n`;
+                    responseMessage += `• "Show me vendors for ${searchedProperty.name}"\n`;
+                    responseMessage += `• "What contacts do we have for ${searchedProperty.name}?"`;
                   }
                   
                   controller.enqueue(encoder.encode(`data: ${JSON.stringify({ 
