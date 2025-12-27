@@ -1018,65 +1018,18 @@ Be helpful and take action. You are not just informational - you can DO things l
                 
                 // AUTO-CHAIN: If user query needs onboarding data and we found exactly 1 property,
                 // automatically fetch onboarding even if AI didn't explicitly call it
-                if (queryIntent.needsOnboardingData && searchedProperty) {
-                  const alreadyCalledOnboarding = pendingToolCalls.some(
-                    tc => tc.function.name === "get_property_onboarding"
-                  );
-                  
-                  if (!alreadyCalledOnboarding) {
-                    console.log("Auto-chaining: User asked for details, calling get_property_onboarding for", searchedProperty.name);
-                    
-                    try {
-                      const { data: projects } = await supabase
-                        .from("onboarding_projects")
-                        .select("id, created_at, progress")
-                        .eq("property_id", searchedProperty.id)
-                        .order("created_at", { ascending: false });
-                      
-                      let onboardingResult: any[] = [];
-                      if (projects && projects.length > 0) {
-                        const project = projects[0];
-                        const { data: tasks } = await supabase
-                          .from("onboarding_tasks")
-                          .select("title, field_value, status, phase_title, notes, phase_number")
-                          .eq("project_id", project.id)
-                          .order("phase_number");
-                        
-                        const safeTasks = (tasks || []).map(task => ({
-                          title: task.title,
-                          field_value: task.field_value && 
-                            (task.field_value.match(/\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4}/) || 
-                             task.title?.toLowerCase().includes('credit card') ||
-                             task.title?.toLowerCase().includes('bank account'))
-                            ? '[REDACTED]'
-                            : task.field_value,
-                          status: task.status,
-                          phase_title: task.phase_title,
-                          notes: task.notes
-                        }));
-                        onboardingResult = safeTasks;
-                      }
-                      
-                      toolResults.push({
-                        role: "tool",
-                        tool_call_id: `auto_chain_${Date.now()}`,
-                        content: JSON.stringify(onboardingResult)
-                      });
-                      
-                      console.log("Auto-chained onboarding data:", onboardingResult.length, "tasks");
-                    } catch (error) {
-                      console.error("Error in auto-chaining:", error);
-                    }
-                  }
-                }
+                // NOTE: We skip auto-chaining with fake tool_call_ids as OpenAI rejects them.
+                // Instead, if email drafting is needed, we create the draft directly and include
+                // the result in a simpler response.
                 
-                // AUTO-CHAIN FOR EMAIL DRAFTING: If user wants to draft an email and we found a property,
-                // automatically get contacts and create the draft
+                let autoChainedEmailDraft: any = null;
+                
+                // AUTO-CHAIN FOR EMAIL DRAFTING: Create draft directly and track the result
                 if (queryIntent.needsEmailDraft && searchedProperty) {
                   console.log("Auto-chaining: User wants email draft, getting contacts for", searchedProperty.name);
                   
                   try {
-                    // Step 1: Get property contacts (especially HOA)
+                    // Get property contacts (especially HOA)
                     const contacts: any = { property_id: searchedProperty.id, contacts: [] };
                     contacts.property_name = searchedProperty.name;
                     contacts.property_address = searchedProperty.address;
@@ -1105,9 +1058,6 @@ Be helpful and take action. You are not just informational - you can DO things l
                       .eq("property_id", searchedProperty.id)
                       .maybeSingle();
                     
-                    let hoaEmail = null;
-                    let hoaName = "HOA Board";
-                    
                     if (project) {
                       const { data: hoaTasks } = await supabase
                         .from("onboarding_tasks")
@@ -1120,12 +1070,10 @@ Be helpful and take action. You are not just informational - you can DO things l
                           if (task.field_value) {
                             const emailMatch = task.field_value.match(/[\w.-]+@[\w.-]+\.\w+/);
                             if (emailMatch) {
-                              hoaEmail = emailMatch[0];
-                              hoaName = task.title || "HOA Board";
                               contacts.contacts.push({
                                 type: "hoa",
-                                name: hoaName,
-                                email: hoaEmail,
+                                name: task.title || "HOA Board",
+                                email: emailMatch[0],
                                 details: task.field_value
                               });
                             }
@@ -1134,33 +1082,14 @@ Be helpful and take action. You are not just informational - you can DO things l
                       }
                     }
                     
-                    // Get vendors
-                    const { data: vendors } = await supabase
-                      .from("vendors")
-                      .select("id, name, email, phone, specialty")
-                      .limit(5);
-                    
-                    if (vendors) {
-                      for (const vendor of vendors) {
-                        contacts.contacts.push({
-                          type: "vendor",
-                          name: vendor.name,
-                          email: vendor.email,
-                          phone: vendor.phone,
-                          specialty: vendor.specialty
-                        });
-                      }
-                    }
-                    
                     console.log("Auto-chained contacts:", contacts.contacts.length, "contacts found");
                     
-                    // Step 2: Determine recipient and create draft
+                    // Determine recipient
                     const userQuery = queryIntent.emailContext.toLowerCase();
                     let recipientEmail = null;
                     let recipientName = null;
                     let contactType = "other";
                     
-                    // Determine who the email is for
                     if (userQuery.includes("hoa") || userQuery.includes("homeowner") || userQuery.includes("association")) {
                       const hoaContact = contacts.contacts.find((c: any) => c.type === "hoa");
                       if (hoaContact?.email) {
@@ -1175,30 +1104,24 @@ Be helpful and take action. You are not just informational - you can DO things l
                         recipientName = ownerContact.name;
                         contactType = "owner";
                       }
-                    } else if (userQuery.includes("vendor") || userQuery.includes("cleaner") || userQuery.includes("maintenance")) {
-                      const vendorContact = contacts.contacts.find((c: any) => c.type === "vendor");
-                      if (vendorContact?.email) {
-                        recipientEmail = vendorContact.email;
-                        recipientName = vendorContact.name;
-                        contactType = "vendor";
-                      }
-                    } else {
-                      // Default to HOA if no specific type mentioned but HOA exists
-                      const hoaContact = contacts.contacts.find((c: any) => c.type === "hoa");
-                      if (hoaContact?.email) {
-                        recipientEmail = hoaContact.email;
-                        recipientName = hoaContact.name;
-                        contactType = "hoa";
+                    }
+                    
+                    // Default to first available contact with email
+                    if (!recipientEmail) {
+                      const anyContact = contacts.contacts.find((c: any) => c.email);
+                      if (anyContact) {
+                        recipientEmail = anyContact.email;
+                        recipientName = anyContact.name;
+                        contactType = anyContact.type;
                       }
                     }
                     
-                    // Step 3: Create the email draft if we have a recipient
+                    // Create the email draft if we have a recipient
                     if (recipientEmail) {
-                      // Extract the key request from the user's message
-                      const keyPhrases = queryIntent.emailContext.match(/(?:need|want|request|require|get|obtain|pick up|collect)\s+(?:the\s+)?(?:a\s+)?(\w+(?:\s+\w+)*)/i);
+                      const keyPhrases = queryIntent.emailContext.match(/(?:need|want|request|require|get|obtain|pick up|collect|ask|tell|where|keys?)\s+(?:the\s+)?(?:a\s+)?(\w+(?:\s+\w+)*)/i);
                       const requestTopic = keyPhrases ? keyPhrases[1] : "assistance";
                       
-                      const emailSubject = `Request for ${requestTopic.charAt(0).toUpperCase() + requestTopic.slice(1)} - ${searchedProperty.name}`;
+                      const emailSubject = `Request Regarding ${searchedProperty.name}`;
                       const emailBody = `Dear ${recipientName || contactType.toUpperCase()},
 
 I hope this message finds you well. I am writing regarding our property at ${searchedProperty.address}.
@@ -1231,41 +1154,49 @@ Property Management`;
                       
                       if (draftError) {
                         console.error("Error creating auto-chained email draft:", draftError);
+                        autoChainedEmailDraft = { success: false, error: draftError.message };
                       } else {
                         console.log("Auto-chained email draft created:", draft.id);
-                        
-                        // Add success message to tool results
-                        toolResults.push({
-                          role: "tool",
-                          tool_call_id: `auto_chain_email_${Date.now()}`,
-                          content: JSON.stringify({
-                            success: true,
-                            draft_id: draft.id,
-                            message: `Email draft created successfully for ${recipientName || recipientEmail}. The draft is now in Communications > Inbox.`,
-                            draft: {
-                              to: recipientEmail,
-                              to_name: recipientName,
-                              subject: emailSubject,
-                              property: searchedProperty.name
-                            }
-                          })
-                        });
+                        autoChainedEmailDraft = {
+                          success: true,
+                          draft_id: draft.id,
+                          to_email: recipientEmail,
+                          to_name: recipientName,
+                          subject: emailSubject,
+                          property: searchedProperty.name
+                        };
                       }
                     } else {
                       console.log("No suitable email recipient found in contacts");
-                      toolResults.push({
-                        role: "tool",
-                        tool_call_id: `auto_chain_email_${Date.now()}`,
-                        content: JSON.stringify({
-                          success: false,
-                          message: `Could not find an email address for the ${contactType} contact. Please add contact information in the property onboarding tasks.`,
-                          available_contacts: contacts.contacts.map((c: any) => ({ type: c.type, name: c.name, has_email: !!c.email }))
-                        })
-                      });
+                      autoChainedEmailDraft = { 
+                        success: false, 
+                        error: "No email address found for contacts. Please add contact information in onboarding tasks." 
+                      };
                     }
                   } catch (error) {
                     console.error("Error in email auto-chaining:", error);
+                    autoChainedEmailDraft = { success: false, error: "Failed to create email draft" };
                   }
+                }
+                
+                // If we auto-created an email draft, send a direct response instead of calling OpenAI again
+                if (autoChainedEmailDraft) {
+                  let responseMessage = "";
+                  if (autoChainedEmailDraft.success) {
+                    responseMessage = `I've created an email draft for you!\n\n**To:** ${autoChainedEmailDraft.to_name || autoChainedEmailDraft.to_email}\n**Subject:** ${autoChainedEmailDraft.subject}\n**Property:** ${autoChainedEmailDraft.property}\n\nYou can find it in **Communications > Inbox** to review and send.`;
+                  } else {
+                    responseMessage = `I found the property "${searchedProperty.name}" but couldn't create the email draft: ${autoChainedEmailDraft.error}`;
+                  }
+                  
+                  controller.enqueue(encoder.encode(`data: ${JSON.stringify({ 
+                    type: "content", 
+                    content: responseMessage 
+                  })}\n\n`));
+                  
+                  // Skip the follow-up OpenAI call since we handled it directly
+                  controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+                  controller.close();
+                  return;
                 }
 
                 console.log("Making follow-up request with tool results");
