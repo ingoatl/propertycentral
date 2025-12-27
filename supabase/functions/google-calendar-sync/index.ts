@@ -18,10 +18,12 @@ serve(async (req) => {
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
   const url = new URL(req.url);
-  const action = url.searchParams.get("action");
+  
+  // Check for action in URL params first (for OAuth callback)
+  let action = url.searchParams.get("action");
 
   try {
-    // OAuth callback from Google
+    // OAuth callback from Google (comes via URL redirect)
     if (action === "oauth-callback") {
       const code = url.searchParams.get("code");
       const state = url.searchParams.get("state"); // user_id
@@ -67,11 +69,19 @@ serve(async (req) => {
       });
     }
 
+    // For other actions, parse from body
     const body = await req.json();
+    action = body.action || action;
     const { userId } = body;
+
+    console.log("Action:", action, "UserId:", userId);
 
     // Get OAuth URL
     if (action === "get-auth-url") {
+      if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
+        throw new Error("Google Calendar credentials not configured. Please add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET secrets.");
+      }
+      
       const redirectUri = `${SUPABASE_URL}/functions/v1/google-calendar-sync?action=oauth-callback`;
       const scope = encodeURIComponent(
         "https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/calendar.events"
@@ -86,7 +96,7 @@ serve(async (req) => {
         `prompt=consent&` +
         `state=${userId}`;
 
-      return new Response(JSON.stringify({ url: authUrl }), {
+      return new Response(JSON.stringify({ authUrl }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
