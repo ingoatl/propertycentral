@@ -67,11 +67,22 @@ serve(async (req) => {
     // OAuth callback from Google (comes via URL redirect)
     if (action === "oauth-callback") {
       const code = url.searchParams.get("code");
-      const state = url.searchParams.get("state"); // user_id
+      const state = url.searchParams.get("state"); // JSON containing user_id and redirect_url
 
       if (!code || !state) {
         throw new Error("Missing code or state");
       }
+
+      // Parse state - it now contains { userId, redirectUrl }
+      let stateData: { userId: string; redirectUrl: string };
+      try {
+        stateData = JSON.parse(decodeURIComponent(state));
+      } catch (e) {
+        // Fallback for old format where state was just userId
+        stateData = { userId: state, redirectUrl: "" };
+      }
+
+      console.log("OAuth callback - state data:", stateData);
 
       // Exchange code for tokens
       const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
@@ -88,24 +99,31 @@ serve(async (req) => {
 
       const tokens = await tokenRes.json();
       if (tokens.error) {
+        console.error("Token exchange failed:", tokens);
         throw new Error(tokens.error_description || tokens.error);
       }
 
       // Save tokens
       const expiresAt = new Date(Date.now() + tokens.expires_in * 1000).toISOString();
       await supabase.from("google_calendar_tokens").upsert({
-        user_id: state,
+        user_id: stateData.userId,
         access_token: tokens.access_token,
         refresh_token: tokens.refresh_token,
         expires_at: expiresAt,
         updated_at: new Date().toISOString(),
       });
 
-      // Redirect back to app
+      console.log("Tokens saved successfully for user:", stateData.userId);
+
+      // Redirect back to the frontend app
+      const redirectUrl = stateData.redirectUrl || "https://peachhaus.lovable.app";
+      const finalRedirect = `${redirectUrl}/admin?tab=calendar&connected=true`;
+      console.log("Redirecting to:", finalRedirect);
+      
       return new Response(null, {
         status: 302,
         headers: {
-          Location: `/admin?tab=calendar&connected=true`,
+          Location: finalRedirect,
         },
       });
     }
@@ -118,6 +136,8 @@ serve(async (req) => {
     console.log("Action:", action, "UserId:", userId);
 
     if (action === "get-auth-url") {
+      const { redirectUrl } = body; // Frontend passes its origin URL
+      
       // Check if user already has valid calendar tokens
       const { data: existingTokens } = await supabase
         .from("google_calendar_tokens")
@@ -154,19 +174,26 @@ serve(async (req) => {
         throw new Error("Google Calendar credentials not configured.");
       }
       
-      const redirectUri = `${SUPABASE_URL}/functions/v1/google-calendar-sync?action=oauth-callback`;
+      const oauthRedirectUri = `${SUPABASE_URL}/functions/v1/google-calendar-sync?action=oauth-callback`;
       const scope = encodeURIComponent(
         "https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/calendar.events"
       );
+      
+      // Encode state as JSON with userId and redirectUrl
+      const stateData = JSON.stringify({ userId, redirectUrl: redirectUrl || "" });
+      const encodedState = encodeURIComponent(stateData);
+      
       const authUrl =
         `https://accounts.google.com/o/oauth2/v2/auth?` +
         `client_id=${GOOGLE_CLIENT_ID}&` +
-        `redirect_uri=${encodeURIComponent(redirectUri)}&` +
+        `redirect_uri=${encodeURIComponent(oauthRedirectUri)}&` +
         `response_type=code&` +
         `scope=${scope}&` +
         `access_type=offline&` +
         `prompt=consent&` +
-        `state=${userId}`;
+        `state=${encodedState}`;
+
+      console.log("Generated auth URL with state:", { userId, redirectUrl });
 
       return new Response(JSON.stringify({ authUrl }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
