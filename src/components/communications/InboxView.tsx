@@ -129,8 +129,10 @@ export function InboxView() {
   });
 
   // Fetch all communications (lead_communications + email_insights)
-  const { data: communications = [], isLoading } = useQuery({
+  const { data: communications = [], isLoading, refetch } = useQuery({
     queryKey: ["all-communications", search, channelFilter, typeFilter],
+    refetchInterval: 10000, // Refetch every 10 seconds to catch new drafts
+    staleTime: 5000, // Consider data stale after 5 seconds
     queryFn: async () => {
       const results: CommunicationItem[] = [];
 
@@ -393,6 +395,10 @@ export function InboxView() {
               <SelectItem value="external">External</SelectItem>
             </SelectContent>
           </Select>
+          <Button variant="outline" size="sm" onClick={() => refetch()}>
+            <Loader2 className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
           <Button onClick={() => setShowComposeEmail(true)} size="sm">
             <Plus className="h-4 w-4 mr-2" />
             Compose Email
