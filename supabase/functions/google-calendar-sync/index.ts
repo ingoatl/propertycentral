@@ -96,15 +96,29 @@ async function getUserAccounts(userId: string): Promise<any[]> {
 
   const data = await response.json();
   console.log("Get accounts response status:", response.status);
-  console.log("Accounts data:", JSON.stringify(data));
+  console.log("Accounts data raw:", JSON.stringify(data));
   
   if (data.error) {
     console.error("Get accounts error:", data);
     return [];
   }
 
-  // API returns array directly, not wrapped in .data
-  const accounts = Array.isArray(data) ? data : (data.data || []);
+  // Pipedream returns { data: [...accounts...] } wrapper
+  // Check if data has a 'data' property that's an array, or if data itself is an array
+  let accounts: any[] = [];
+  if (data.data && Array.isArray(data.data)) {
+    accounts = data.data;
+  } else if (Array.isArray(data)) {
+    accounts = data;
+  } else if (data.accounts && Array.isArray(data.accounts)) {
+    accounts = data.accounts;
+  }
+  
+  console.log("Parsed accounts count:", accounts.length);
+  if (accounts.length > 0) {
+    console.log("First account app:", JSON.stringify(accounts[0]?.app));
+  }
+  
   return accounts;
 }
 
