@@ -1,0 +1,103 @@
+import { useState } from "react";
+import { Sparkles, Loader2, RefreshCw, Zap, MessageSquare, FileText } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+
+interface AIWritingAssistantProps {
+  currentMessage: string;
+  onMessageGenerated: (message: string) => void;
+  contactName?: string;
+  conversationContext?: string;
+  messageType: "sms" | "email";
+}
+
+type ActionType = "improve" | "shorter" | "professional" | "generate" | "friendly";
+
+export function AIWritingAssistant({
+  currentMessage,
+  onMessageGenerated,
+  contactName,
+  conversationContext,
+  messageType,
+}: AIWritingAssistantProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleAction = async (action: ActionType) => {
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("ai-message-assistant", {
+        body: {
+          action,
+          currentMessage,
+          contactName,
+          conversationContext,
+          messageType,
+        },
+      });
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      if (data?.message) {
+        onMessageGenerated(data.message);
+        toast.success("Message generated!");
+        setIsOpen(false);
+      }
+    } catch (error: any) {
+      console.error("AI assistant error:", error);
+      toast.error(`Failed to generate message: ${error.message}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const actions = [
+    { type: "generate" as ActionType, label: "Generate Reply", icon: MessageSquare, description: "Create a contextual reply" },
+    { type: "improve" as ActionType, label: "Improve", icon: Sparkles, description: "Make it better" },
+    { type: "shorter" as ActionType, label: "Make Shorter", icon: Zap, description: "Condense the message" },
+    { type: "professional" as ActionType, label: "Professional", icon: FileText, description: "Formal tone" },
+    { type: "friendly" as ActionType, label: "Friendly", icon: RefreshCw, description: "Casual tone" },
+  ];
+
+  return (
+    <Popover open={isOpen} onOpenChange={setIsOpen}>
+      <PopoverTrigger asChild>
+        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full">
+          <Sparkles className="h-4 w-4 text-muted-foreground" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-64 p-2" align="start" side="top">
+        <div className="space-y-1">
+          <p className="text-xs font-medium text-muted-foreground px-2 py-1">
+            AI Writing Assistant
+          </p>
+          {actions.map((action) => (
+            <button
+              key={action.type}
+              onClick={() => handleAction(action.type)}
+              disabled={isLoading}
+              className="w-full flex items-center gap-3 px-2 py-2 text-sm rounded-md hover:bg-muted transition-colors disabled:opacity-50 text-left"
+            >
+              {isLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <action.icon className="h-4 w-4 text-primary" />
+              )}
+              <div>
+                <p className="font-medium">{action.label}</p>
+                <p className="text-xs text-muted-foreground">{action.description}</p>
+              </div>
+            </button>
+          ))}
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+}

@@ -433,6 +433,57 @@ export type Database = {
           },
         ]
       }
+      conversation_notes: {
+        Row: {
+          contact_email: string | null
+          contact_name: string | null
+          contact_phone: string | null
+          created_at: string
+          id: string
+          note: string
+          property_id: string | null
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          contact_email?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          id?: string
+          note: string
+          property_id?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          contact_email?: string | null
+          contact_name?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          id?: string
+          note?: string
+          property_id?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_notes_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "comprehensive_property_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_notes_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       daily_performance_entries: {
         Row: {
           created_at: string
@@ -5509,6 +5560,7 @@ export type Database = {
           from_number: string
           id: string
           phone_assignment_id: string | null
+          property_id: string | null
           recording_url: string | null
           started_at: string
           status: string | null
@@ -5525,6 +5577,7 @@ export type Database = {
           from_number: string
           id?: string
           phone_assignment_id?: string | null
+          property_id?: string | null
           recording_url?: string | null
           started_at?: string
           status?: string | null
@@ -5541,6 +5594,7 @@ export type Database = {
           from_number?: string
           id?: string
           phone_assignment_id?: string | null
+          property_id?: string | null
           recording_url?: string | null
           started_at?: string
           status?: string | null
@@ -5556,6 +5610,20 @@ export type Database = {
             referencedRelation: "user_phone_assignments"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "user_phone_calls_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "comprehensive_property_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_phone_calls_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
         ]
       }
       user_phone_messages: {
@@ -5566,8 +5634,11 @@ export type Database = {
           external_id: string | null
           from_number: string
           id: string
+          is_resolved: boolean | null
           media_urls: Json | null
+          notes: string | null
           phone_assignment_id: string | null
+          property_id: string | null
           read_at: string | null
           status: string | null
           to_number: string
@@ -5580,8 +5651,11 @@ export type Database = {
           external_id?: string | null
           from_number: string
           id?: string
+          is_resolved?: boolean | null
           media_urls?: Json | null
+          notes?: string | null
           phone_assignment_id?: string | null
+          property_id?: string | null
           read_at?: string | null
           status?: string | null
           to_number: string
@@ -5594,8 +5668,11 @@ export type Database = {
           external_id?: string | null
           from_number?: string
           id?: string
+          is_resolved?: boolean | null
           media_urls?: Json | null
+          notes?: string | null
           phone_assignment_id?: string | null
+          property_id?: string | null
           read_at?: string | null
           status?: string | null
           to_number?: string
@@ -5607,6 +5684,20 @@ export type Database = {
             columns: ["phone_assignment_id"]
             isOneToOne: false
             referencedRelation: "user_phone_assignments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_phone_messages_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "comprehensive_property_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_phone_messages_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
             referencedColumns: ["id"]
           },
         ]
