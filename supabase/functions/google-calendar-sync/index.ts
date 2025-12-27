@@ -416,6 +416,115 @@ serve(async (req) => {
       }
     }
 
+    // Process calendar sync queue (called by cron or manually)
+    if (action === "process-queue") {
+      // Get pending items from queue
+      const { data: pendingItems, error: queueError } = await supabase
+        .from("calendar_sync_queue")
+        .select("*, discovery_calls(*, leads(name, email, phone))")
+        .eq("status", "pending")
+        .limit(10);
+
+      if (queueError) {
+        throw new Error(`Failed to fetch queue: ${queueError.message}`);
+      }
+
+      console.log(`Processing ${pendingItems?.length || 0} pending calendar syncs`);
+
+      const results: any[] = [];
+      for (const item of pendingItems || []) {
+        try {
+          const call = item.discovery_calls;
+          if (!call) {
+            await supabase.from("calendar_sync_queue").update({ 
+              status: "error", 
+              error_message: "Call not found",
+              processed_at: new Date().toISOString() 
+            }).eq("id", item.id);
+            continue;
+          }
+
+          // Check if already synced
+          if (call.google_calendar_event_id) {
+            await supabase.from("calendar_sync_queue").update({ 
+              status: "completed", 
+              processed_at: new Date().toISOString() 
+            }).eq("id", item.id);
+            continue;
+          }
+
+          const startTime = new Date(call.scheduled_at);
+          const endTime = new Date(startTime.getTime() + (call.duration_minutes || 30) * 60000);
+          
+          const accessToken = await getPipedreamAccessToken();
+          const attendeeEmail = call.leads?.email || "";
+          
+          console.log(`Creating calendar event for call ${call.id} with attendee ${attendeeEmail}`);
+          
+          const result = await callMCPTool(
+            accessToken,
+            userId,
+            "google_calendar-create-event",
+            {
+              calendarId: "primary",
+              summary: `Discovery Call: ${call.leads?.name || "Unknown"}`,
+              description: `Discovery call with ${call.leads?.name}\nPhone: ${call.leads?.phone || "N/A"}\nEmail: ${call.leads?.email || "N/A"}\n\nScheduled via PeachHaus Property Management`,
+              start: {
+                dateTime: startTime.toISOString(),
+                timeZone: "America/New_York",
+              },
+              end: {
+                dateTime: endTime.toISOString(),
+                timeZone: "America/New_York",
+              },
+              attendees: attendeeEmail ? [{ email: attendeeEmail }] : [],
+              sendUpdates: "all",
+              guestsCanModify: false,
+              guestsCanInviteOthers: false,
+              instruction: `Create a Google Calendar event titled "Discovery Call: ${call.leads?.name || "Unknown"}" starting at ${startTime.toISOString()} (America/New_York timezone) for ${call.duration_minutes || 30} minutes. ${attendeeEmail ? `Add ${attendeeEmail} as an attendee and SEND THEM AN EMAIL INVITATION by setting sendUpdates to "all".` : ""} The event should be on the primary calendar.`
+            }
+          );
+
+          console.log("MCP create-event result:", JSON.stringify(result).substring(0, 500));
+
+          // Extract event ID from result
+          const eventId = result?.result?.content?.[0]?.text || 
+                          result?.content?.[0]?.text || 
+                          result?.id || 
+                          `mcp-event-${Date.now()}`;
+
+          // Update call with event ID
+          await supabase
+            .from("discovery_calls")
+            .update({
+              google_calendar_event_id: eventId,
+              confirmation_email_sent: true,
+            })
+            .eq("id", call.id);
+
+          // Mark queue item as completed
+          await supabase.from("calendar_sync_queue").update({ 
+            status: "completed", 
+            processed_at: new Date().toISOString() 
+          }).eq("id", item.id);
+
+          results.push({ callId: call.id, success: true, eventId });
+        } catch (error: any) {
+          console.error(`Failed to sync call ${item.discovery_call_id}:`, error);
+          await supabase.from("calendar_sync_queue").update({ 
+            status: "error", 
+            error_message: error.message,
+            processed_at: new Date().toISOString() 
+          }).eq("id", item.id);
+          results.push({ callId: item.discovery_call_id, success: false, error: error.message });
+        }
+      }
+
+      return new Response(JSON.stringify({ processed: results.length, results }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     // Create calendar event for discovery call using MCP
     if (action === "create-event") {
       const { callId } = body;
@@ -437,12 +546,14 @@ serve(async (req) => {
       }
 
       const startTime = new Date(call.scheduled_at);
-      const endTime = new Date(startTime.getTime() + (call.duration_minutes || 15) * 60000);
+      const endTime = new Date(startTime.getTime() + (call.duration_minutes || 30) * 60000);
 
       const accessToken = await getPipedreamAccessToken();
+      const attendeeEmail = call.leads?.email || "";
       
-      // Create event using MCP tool
-      const attendeeList = call.leads?.email ? call.leads.email : "";
+      console.log(`Creating calendar event for call ${callId} with attendee ${attendeeEmail}`);
+      
+      // Create event using MCP tool with explicit invite instructions
       const result = await callMCPTool(
         accessToken,
         userId,
@@ -450,7 +561,7 @@ serve(async (req) => {
         {
           calendarId: "primary",
           summary: `Discovery Call: ${call.leads?.name || "Unknown"}`,
-          description: `Discovery call with ${call.leads?.name}\nPhone: ${call.leads?.phone || "N/A"}\nEmail: ${call.leads?.email || "N/A"}`,
+          description: `Discovery call with ${call.leads?.name}\nPhone: ${call.leads?.phone || "N/A"}\nEmail: ${call.leads?.email || "N/A"}\n\nScheduled via PeachHaus Property Management`,
           start: {
             dateTime: startTime.toISOString(),
             timeZone: "America/New_York",
@@ -459,10 +570,15 @@ serve(async (req) => {
             dateTime: endTime.toISOString(),
             timeZone: "America/New_York",
           },
-          attendees: call.leads?.email ? [{ email: call.leads.email }] : [],
-          instruction: `Create a calendar event titled "Discovery Call: ${call.leads?.name || "Unknown"}" on ${startTime.toISOString()} for ${call.duration_minutes || 15} minutes${attendeeList ? ` with attendee ${attendeeList}` : ""}`
+          attendees: attendeeEmail ? [{ email: attendeeEmail }] : [],
+          sendUpdates: "all",
+          guestsCanModify: false,
+          guestsCanInviteOthers: false,
+          instruction: `Create a Google Calendar event titled "Discovery Call: ${call.leads?.name || "Unknown"}" starting at ${startTime.toISOString()} (America/New_York timezone) for ${call.duration_minutes || 30} minutes. ${attendeeEmail ? `Add ${attendeeEmail} as an attendee and SEND THEM AN EMAIL INVITATION by setting sendUpdates to "all".` : ""} The event should be on the primary calendar.`
         }
       );
+
+      console.log("MCP create-event result:", JSON.stringify(result).substring(0, 500));
 
       // Extract event ID from result
       const eventId = result?.result?.content?.[0]?.text || 
