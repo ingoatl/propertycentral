@@ -11,6 +11,47 @@ const GOOGLE_CLIENT_SECRET = Deno.env.get("GOOGLE_CLIENT_SECRET");
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
+// Helper to refresh tokens if expired
+async function getValidAccessToken(supabase: any, userId: string, tokenData: any) {
+  if (new Date(tokenData.expires_at) > new Date()) {
+    return tokenData.access_token;
+  }
+
+  console.log("Token expired, refreshing...");
+  const refreshRes = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      refresh_token: tokenData.refresh_token,
+      client_id: GOOGLE_CLIENT_ID!,
+      client_secret: GOOGLE_CLIENT_SECRET!,
+      grant_type: "refresh_token",
+    }),
+  });
+
+  const newTokens = await refreshRes.json();
+  if (newTokens.error) {
+    throw new Error(`Token refresh failed: ${newTokens.error}`);
+  }
+
+  const expiresAt = new Date(Date.now() + newTokens.expires_in * 1000).toISOString();
+
+  // Update both gmail_oauth_tokens and google_calendar_tokens
+  await supabase.from("gmail_oauth_tokens").update({
+    access_token: newTokens.access_token,
+    expires_at: expiresAt,
+    updated_at: new Date().toISOString(),
+  }).eq("user_id", userId);
+
+  await supabase.from("google_calendar_tokens").update({
+    access_token: newTokens.access_token,
+    expires_at: expiresAt,
+    updated_at: new Date().toISOString(),
+  }).eq("user_id", userId);
+
+  return newTokens.access_token;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -76,15 +117,43 @@ serve(async (req) => {
 
     console.log("Action:", action, "UserId:", userId);
 
-    // Get OAuth URL
-    if (action === "get-auth-url") {
+    // Check if user already has Gmail tokens - reuse them for Calendar
+    if (action === "get-auth-url" || action === "connect-from-gmail") {
+      // Check for existing Gmail tokens first
+      const { data: gmailTokens } = await supabase
+        .from("gmail_oauth_tokens")
+        .select("*")
+        .eq("user_id", userId)
+        .maybeSingle();
+
+      if (gmailTokens) {
+        console.log("Found existing Gmail tokens, copying to calendar...");
+        // User already has Gmail connected - copy tokens to calendar table
+        await supabase.from("google_calendar_tokens").upsert({
+          user_id: userId,
+          access_token: gmailTokens.access_token,
+          refresh_token: gmailTokens.refresh_token,
+          expires_at: gmailTokens.expires_at,
+          calendar_id: "primary",
+          updated_at: new Date().toISOString(),
+        });
+
+        return new Response(JSON.stringify({ 
+          success: true, 
+          message: "Calendar connected using existing Google credentials" 
+        }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      // No Gmail tokens - need full OAuth
       if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
-        throw new Error("Google Calendar credentials not configured. Please add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET secrets.");
+        throw new Error("Google Calendar credentials not configured.");
       }
       
       const redirectUri = `${SUPABASE_URL}/functions/v1/google-calendar-sync?action=oauth-callback`;
       const scope = encodeURIComponent(
-        "https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/calendar.events"
+        "https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/gmail.readonly"
       );
       const authUrl =
         `https://accounts.google.com/o/oauth2/v2/auth?` +
@@ -105,42 +174,26 @@ serve(async (req) => {
     if (action === "create-event") {
       const { callId } = body;
 
-      // Get tokens
-      const { data: tokenData, error: tokenError } = await supabase
+      // Try google_calendar_tokens first, then fall back to gmail_oauth_tokens
+      let tokenData = await supabase
         .from("google_calendar_tokens")
         .select("*")
         .eq("user_id", userId)
-        .single();
+        .maybeSingle();
 
-      if (tokenError || !tokenData) {
+      if (!tokenData.data) {
+        tokenData = await supabase
+          .from("gmail_oauth_tokens")
+          .select("*")
+          .eq("user_id", userId)
+          .maybeSingle();
+      }
+
+      if (!tokenData.data) {
         throw new Error("Google Calendar not connected");
       }
 
-      // Refresh token if expired
-      let accessToken = tokenData.access_token;
-      if (new Date(tokenData.expires_at) < new Date()) {
-        const refreshRes = await fetch("https://oauth2.googleapis.com/token", {
-          method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body: new URLSearchParams({
-            refresh_token: tokenData.refresh_token,
-            client_id: GOOGLE_CLIENT_ID!,
-            client_secret: GOOGLE_CLIENT_SECRET!,
-            grant_type: "refresh_token",
-          }),
-        });
-        const newTokens = await refreshRes.json();
-        accessToken = newTokens.access_token;
-
-        await supabase
-          .from("google_calendar_tokens")
-          .update({
-            access_token: accessToken,
-            expires_at: new Date(Date.now() + newTokens.expires_in * 1000).toISOString(),
-            updated_at: new Date().toISOString(),
-          })
-          .eq("user_id", userId);
-      }
+      const accessToken = await getValidAccessToken(supabase, userId, tokenData.data);
 
       // Get call details
       const { data: call, error: callError } = await supabase
@@ -179,7 +232,7 @@ serve(async (req) => {
 
       // Create event in Google Calendar
       const calendarRes = await fetch(
-        `https://www.googleapis.com/calendar/v3/calendars/${tokenData.calendar_id || "primary"}/events?sendUpdates=all`,
+        `https://www.googleapis.com/calendar/v3/calendars/${tokenData.data?.calendar_id || "primary"}/events?sendUpdates=all`,
         {
           method: "POST",
           headers: {

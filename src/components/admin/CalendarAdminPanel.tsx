@@ -114,7 +114,7 @@ export function CalendarAdminPanel() {
     },
   });
 
-  // Connect Google Calendar
+  // Connect Google Calendar - reuses Gmail tokens if available
   const connectGoogleCalendar = async () => {
     try {
       const { data: userData } = await supabase.auth.getUser();
@@ -129,8 +129,15 @@ export function CalendarAdminPanel() {
       
       if (response.error) throw new Error(response.error.message);
       
+      // If success message is returned, Gmail tokens were reused
+      if (response.data?.success) {
+        toast.success(response.data.message || "Google Calendar connected!");
+        refetchGcalStatus();
+        return;
+      }
+      
+      // Otherwise, need OAuth flow
       if (response.data?.authUrl) {
-        // Open in new tab (not popup) to avoid Google blocking
         window.open(response.data.authUrl, "_blank");
         toast.info("Complete the Google sign-in in the new tab, then return here.");
         // Poll for connection status
