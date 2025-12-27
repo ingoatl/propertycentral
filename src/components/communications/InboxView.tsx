@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
@@ -37,7 +37,7 @@ import { toast } from "sonner";
 
 interface CommunicationItem {
   id: string;
-  type: "sms" | "email" | "call" | "gmail" | "draft";
+  type: "sms" | "email" | "call" | "gmail" | "draft" | "personal_sms" | "personal_call";
   direction: "inbound" | "outbound";
   body: string;
   subject?: string;
@@ -45,12 +45,19 @@ interface CommunicationItem {
   contact_name: string;
   contact_phone?: string;
   contact_email?: string;
-  contact_type: "lead" | "owner" | "external" | "draft";
+  contact_type: "lead" | "owner" | "external" | "draft" | "personal";
   contact_id: string;
   status?: string;
   sender_email?: string;
   is_draft?: boolean;
   draft_id?: string;
+}
+
+interface PhoneAssignment {
+  id: string;
+  phone_number: string;
+  phone_type: string;
+  display_name: string | null;
 }
 
 type TabType = "chats" | "calls";
@@ -71,8 +78,34 @@ export function InboxView() {
     subject: string;
     body: string;
   } | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [userPhoneAssignment, setUserPhoneAssignment] = useState<PhoneAssignment | null>(null);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+
+  // Get current user and their phone assignment
+  useEffect(() => {
+    const fetchUserAndPhone = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setCurrentUserId(user.id);
+        
+        // Fetch user's phone assignment
+        const { data: assignment } = await supabase
+          .from('user_phone_assignments')
+          .select('id, phone_number, phone_type, display_name')
+          .eq('user_id', user.id)
+          .eq('is_active', true)
+          .eq('phone_type', 'personal')
+          .maybeSingle();
+        
+        if (assignment) {
+          setUserPhoneAssignment(assignment);
+        }
+      }
+    };
+    fetchUserAndPhone();
+  }, []);
 
   // Send draft mutation
   const sendDraftMutation = useMutation({
@@ -179,9 +212,10 @@ export function InboxView() {
   };
 
   const { data: communications = [], isLoading } = useQuery({
-    queryKey: ["all-communications", search, activeTab, activeFilter],
+    queryKey: ["all-communications", search, activeTab, activeFilter, currentUserId],
     refetchInterval: 10000,
     staleTime: 5000,
+    enabled: !!currentUserId,
     queryFn: async () => {
       const results: CommunicationItem[] = [];
 
@@ -330,6 +364,46 @@ export function InboxView() {
             results.push(item);
           }
         }
+
+        // Fetch user's personal phone messages
+        if (currentUserId) {
+          const { data: personalMessages } = await supabase
+            .from("user_phone_messages")
+            .select("*")
+            .eq("user_id", currentUserId)
+            .order("created_at", { ascending: false })
+            .limit(50);
+
+          if (personalMessages) {
+            for (const msg of personalMessages) {
+              const contactNumber = msg.direction === "inbound" ? msg.from_number : msg.to_number;
+              const item: CommunicationItem = {
+                id: msg.id,
+                type: "personal_sms",
+                direction: msg.direction as "inbound" | "outbound",
+                body: msg.body || "",
+                created_at: msg.created_at,
+                contact_name: contactNumber,
+                contact_phone: contactNumber,
+                contact_type: "personal",
+                contact_id: msg.id,
+                status: msg.status || undefined,
+              };
+
+              if (search) {
+                const searchLower = search.toLowerCase();
+                if (
+                  !item.contact_name.toLowerCase().includes(searchLower) &&
+                  !item.body.toLowerCase().includes(searchLower)
+                ) {
+                  continue;
+                }
+              }
+
+              results.push(item);
+            }
+          }
+        }
       }
 
       if (fetchCalls) {
@@ -376,6 +450,43 @@ export function InboxView() {
             }
 
             results.push(item);
+          }
+        }
+
+        // Fetch user's personal phone calls
+        if (currentUserId) {
+          const { data: personalCalls } = await supabase
+            .from("user_phone_calls")
+            .select("*")
+            .eq("user_id", currentUserId)
+            .order("started_at", { ascending: false })
+            .limit(50);
+
+          if (personalCalls) {
+            for (const call of personalCalls) {
+              const contactNumber = call.direction === "inbound" ? call.from_number : call.to_number;
+              const item: CommunicationItem = {
+                id: call.id,
+                type: "personal_call",
+                direction: call.direction as "inbound" | "outbound",
+                body: call.transcription || (call.direction === "inbound" ? "Incoming call" : "Outgoing call"),
+                created_at: call.started_at,
+                contact_name: contactNumber,
+                contact_phone: contactNumber,
+                contact_type: "personal",
+                contact_id: call.id,
+                status: call.status || undefined,
+              };
+
+              if (search) {
+                const searchLower = search.toLowerCase();
+                if (!item.contact_name.toLowerCase().includes(searchLower)) {
+                  continue;
+                }
+              }
+
+              results.push(item);
+            }
           }
         }
       }
@@ -444,6 +555,18 @@ export function InboxView() {
               <MessageSquare className="h-4 w-4" />
             </Button>
           </div>
+
+          {/* User's assigned phone number */}
+          {userPhoneAssignment && (
+            <div className="mb-3 px-3 py-2 bg-emerald-50 dark:bg-emerald-950/30 rounded-lg border border-emerald-200 dark:border-emerald-900">
+              <div className="flex items-center gap-2">
+                <Phone className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                <span className="text-xs font-medium text-emerald-700 dark:text-emerald-300">
+                  My Number: {userPhoneAssignment.phone_number}
+                </span>
+              </div>
+            </div>
+          )}
 
           {/* Filter chips */}
           <div className="flex items-center gap-2">
@@ -800,7 +923,7 @@ export function InboxView() {
           onOpenChange={setShowSmsReply}
           contactName={selectedMessage.contact_name}
           contactPhone={selectedMessage.contact_phone}
-          contactType={selectedMessage.contact_type === "external" || selectedMessage.contact_type === "draft" ? "lead" : selectedMessage.contact_type}
+          contactType={selectedMessage.contact_type === "external" || selectedMessage.contact_type === "draft" || selectedMessage.contact_type === "personal" ? "lead" : selectedMessage.contact_type}
           contactId={selectedMessage.contact_id}
         />
       )}
