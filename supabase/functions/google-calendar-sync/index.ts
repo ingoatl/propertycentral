@@ -78,21 +78,23 @@ async function createConnectToken(userId: string, successRedirectUri: string): P
   };
 }
 
-// Get user's connected accounts from Pipedream
-async function getUserAccounts(userId: string): Promise<any[]> {
+// Get user's connected accounts from Pipedream (with optional credentials)
+async function getUserAccounts(userId: string, includeCredentials: boolean = false): Promise<any[]> {
   const accessToken = await getPipedreamAccessToken();
 
-  console.log("Getting accounts for user:", userId);
+  console.log("Getting accounts for user:", userId, "includeCredentials:", includeCredentials);
 
-  const response = await fetch(
-    `https://api.pipedream.com/v1/connect/${PIPEDREAM_PROJECT_ID}/users/${encodeURIComponent(userId)}/accounts`,
-    {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "x-pd-environment": "development",
-      },
-    }
-  );
+  // Add include_credentials=1 to get OAuth tokens in the response
+  const url = includeCredentials
+    ? `https://api.pipedream.com/v1/connect/${PIPEDREAM_PROJECT_ID}/users/${encodeURIComponent(userId)}/accounts?include_credentials=1`
+    : `https://api.pipedream.com/v1/connect/${PIPEDREAM_PROJECT_ID}/users/${encodeURIComponent(userId)}/accounts`;
+
+  const response = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "x-pd-environment": "development",
+    },
+  });
 
   const data = await response.json();
   console.log("Get accounts response status:", response.status);
@@ -116,7 +118,7 @@ async function getUserAccounts(userId: string): Promise<any[]> {
   
   console.log("Parsed accounts count:", accounts.length);
   if (accounts.length > 0) {
-    console.log("First account app:", JSON.stringify(accounts[0]?.app));
+    console.log("First account:", JSON.stringify(accounts[0]));
   }
   
   return accounts;
@@ -124,10 +126,8 @@ async function getUserAccounts(userId: string): Promise<any[]> {
 
 // Get Google Calendar credentials from Pipedream for a user
 async function getGoogleCalendarCredentials(userId: string): Promise<{ access_token: string; refresh_token?: string } | null> {
-  const accessToken = await getPipedreamAccessToken();
-
-  // First get the user's accounts
-  const accounts = await getUserAccounts(userId);
+  // Get the user's accounts with credentials included
+  const accounts = await getUserAccounts(userId, true);
   console.log("User accounts count:", accounts.length);
 
   // Find Google Calendar account - check both app object and app string
@@ -142,30 +142,19 @@ async function getGoogleCalendarCredentials(userId: string): Promise<{ access_to
     return null;
   }
 
-  console.log("Found Google account:", googleAccount.id, "app:", googleAccount.app);
+  console.log("Found Google account:", googleAccount.id);
+  console.log("Account credentials:", JSON.stringify(googleAccount.credentials));
 
-  // Get the OAuth credentials for this account
-  const credResponse = await fetch(
-    `https://api.pipedream.com/v1/connect/${PIPEDREAM_PROJECT_ID}/accounts/${googleAccount.id}/credentials`,
-    {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "x-pd-environment": "development",
-      },
-    }
-  );
-
-  const credData = await credResponse.json();
-  console.log("Credentials response status:", credResponse.status);
-  
-  if (!credResponse.ok || credData.error) {
-    console.error("Get credentials error:", credData);
+  // Credentials are included in the account response when include_credentials=1
+  const creds = googleAccount.credentials;
+  if (!creds || !creds.oauth_access_token) {
+    console.error("No credentials found in account response");
     return null;
   }
 
   return {
-    access_token: credData.oauth_access_token,
-    refresh_token: credData.oauth_refresh_token,
+    access_token: creds.oauth_access_token,
+    refresh_token: creds.oauth_refresh_token,
   };
 }
 
