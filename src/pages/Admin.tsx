@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { CheckCircle, XCircle, Clock, Shield, UserPlus, Key, Users, MessageCircleQuestion, UserCog, Bug, Mail, Database, Briefcase, Sparkles, Star } from "lucide-react";
+import { CheckCircle, XCircle, Clock, Shield, UserPlus, Key, Users, MessageCircleQuestion, UserCog, Bug, Mail, Database, Briefcase, Sparkles, Star, Calendar } from "lucide-react";
 import { RescheduleLogsTab } from "@/components/admin/RescheduleLogsTab";
 import { z } from "zod";
 import { TeamMatrixTab } from "@/components/admin/TeamMatrixTab";
@@ -21,6 +21,7 @@ import { JobApplicationsCard } from "@/components/admin/JobApplicationsCard";
 import { HolidayEmailManager } from "@/components/admin/HolidayEmailManager";
 import { HolidayEmailWatchdogCard } from "@/components/admin/HolidayEmailWatchdogCard";
 import GoogleReviewsTab from "@/components/bookings/GoogleReviewsTab";
+import { CalendarAdminPanel } from "@/components/admin/CalendarAdminPanel";
 
 const createUserSchema = z.object({
   email: z.string().email("Invalid email address").max(255),
@@ -432,6 +433,10 @@ const Admin = () => {
             <Star className="w-4 h-4 mr-2" />
             Google Reviews
           </TabsTrigger>
+          <TabsTrigger value="calendar">
+            <Calendar className="w-4 h-4 mr-2" />
+            Calendar
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="users" className="space-y-8 mt-8">
@@ -781,6 +786,10 @@ const Admin = () => {
 
         <TabsContent value="google-reviews" className="mt-8">
           <GoogleReviewsTab />
+        </TabsContent>
+
+        <TabsContent value="calendar" className="mt-8">
+          <CalendarAdminPanel />
         </TabsContent>
       </Tabs>
     </div>
