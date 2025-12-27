@@ -629,6 +629,75 @@ export type Database = {
         }
         Relationships: []
       }
+      email_drafts: {
+        Row: {
+          ai_generated: boolean | null
+          body: string
+          contact_context: string | null
+          contact_type: string | null
+          created_at: string | null
+          created_by: string | null
+          id: string
+          property_id: string | null
+          property_name: string | null
+          sent_at: string | null
+          status: string | null
+          subject: string
+          to_email: string
+          to_name: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          ai_generated?: boolean | null
+          body: string
+          contact_context?: string | null
+          contact_type?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          property_id?: string | null
+          property_name?: string | null
+          sent_at?: string | null
+          status?: string | null
+          subject: string
+          to_email: string
+          to_name?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          ai_generated?: boolean | null
+          body?: string
+          contact_context?: string | null
+          contact_type?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          property_id?: string | null
+          property_name?: string | null
+          sent_at?: string | null
+          status?: string | null
+          subject?: string
+          to_email?: string
+          to_name?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_drafts_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "comprehensive_property_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "email_drafts_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       email_insights: {
         Row: {
           action_required: boolean | null

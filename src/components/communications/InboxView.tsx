@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 import {
@@ -11,6 +11,10 @@ import {
   Filter,
   ArrowUpRight,
   Plus,
+  Send,
+  Trash2,
+  Loader2,
+  Sparkles,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -28,10 +32,11 @@ import { SendSMSDialog } from "./SendSMSDialog";
 import { SendEmailDialog } from "./SendEmailDialog";
 import { ComposeEmailDialog } from "./ComposeEmailDialog";
 import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 
 interface CommunicationItem {
   id: string;
-  type: "sms" | "email" | "call" | "gmail";
+  type: "sms" | "email" | "call" | "gmail" | "draft";
   direction: "inbound" | "outbound";
   body: string;
   subject?: string;
@@ -39,10 +44,12 @@ interface CommunicationItem {
   contact_name: string;
   contact_phone?: string;
   contact_email?: string;
-  contact_type: "lead" | "owner" | "external";
+  contact_type: "lead" | "owner" | "external" | "draft";
   contact_id: string;
   status?: string;
   sender_email?: string;
+  is_draft?: boolean;
+  draft_id?: string;
 }
 
 export function InboxView() {
@@ -54,6 +61,72 @@ export function InboxView() {
   const [showEmailReply, setShowEmailReply] = useState(false);
   const [showComposeEmail, setShowComposeEmail] = useState(false);
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+
+  // Send draft mutation
+  const sendDraftMutation = useMutation({
+    mutationFn: async (draftId: string) => {
+      // Get the draft
+      const { data: draft, error: fetchError } = await supabase
+        .from("email_drafts")
+        .select("*")
+        .eq("id", draftId)
+        .single();
+      
+      if (fetchError || !draft) throw new Error("Draft not found");
+
+      // Send the email using send-lead-email function
+      const { data, error } = await supabase.functions.invoke("send-lead-email", {
+        body: {
+          to: draft.to_email,
+          toName: draft.to_name || "",
+          subject: draft.subject,
+          body: draft.body,
+          contactType: draft.contact_type || "other",
+          contactId: draft.id,
+        },
+      });
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      // Mark draft as sent
+      await supabase
+        .from("email_drafts")
+        .update({ status: "sent", sent_at: new Date().toISOString() })
+        .eq("id", draftId);
+
+      return data;
+    },
+    onSuccess: () => {
+      toast.success("Email sent successfully!");
+      setSelectedMessage(null);
+      queryClient.invalidateQueries({ queryKey: ["all-communications"] });
+    },
+    onError: (error: any) => {
+      toast.error(`Failed to send email: ${error.message}`);
+    },
+  });
+
+  // Discard draft mutation
+  const discardDraftMutation = useMutation({
+    mutationFn: async (draftId: string) => {
+      const { error } = await supabase
+        .from("email_drafts")
+        .update({ status: "discarded" })
+        .eq("id", draftId);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Draft discarded");
+      setSelectedMessage(null);
+      queryClient.invalidateQueries({ queryKey: ["all-communications"] });
+    },
+    onError: (error: any) => {
+      toast.error(`Failed to discard draft: ${error.message}`);
+    },
+  });
 
   // Fetch all communications (lead_communications + email_insights)
   const { data: communications = [], isLoading } = useQuery({
@@ -182,6 +255,52 @@ export function InboxView() {
         }
       }
 
+      // Fetch email drafts (AI-generated drafts)
+      if (channelFilter === "all" || channelFilter === "draft") {
+        const { data: drafts, error: draftsError } = await supabase
+          .from("email_drafts")
+          .select("*")
+          .eq("status", "draft")
+          .order("created_at", { ascending: false })
+          .limit(20);
+
+        console.log("Email drafts fetched:", drafts?.length, "Error:", draftsError);
+
+        if (drafts && drafts.length > 0) {
+          for (const draft of drafts) {
+            const item: CommunicationItem = {
+              id: draft.id,
+              type: "draft",
+              direction: "outbound",
+              body: draft.body,
+              subject: draft.subject,
+              created_at: draft.created_at,
+              contact_name: draft.to_name || draft.to_email?.split("@")[0] || "Unknown",
+              contact_email: draft.to_email,
+              contact_type: "draft",
+              contact_id: draft.id,
+              status: draft.ai_generated ? "AI Draft" : "Draft",
+              is_draft: true,
+              draft_id: draft.id,
+            };
+
+            // Apply search filter
+            if (search) {
+              const searchLower = search.toLowerCase();
+              if (
+                !item.contact_name.toLowerCase().includes(searchLower) &&
+                !item.body.toLowerCase().includes(searchLower) &&
+                !(item.subject?.toLowerCase().includes(searchLower))
+              ) {
+                continue;
+              }
+            }
+
+            results.push(item);
+          }
+        }
+      }
+
       // Sort by date descending
       results.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
@@ -199,6 +318,8 @@ export function InboxView() {
         return <Mail className="h-4 w-4" />;
       case "call":
         return <Phone className="h-4 w-4" />;
+      case "draft":
+        return <Mail className="h-4 w-4" />;
       default:
         return <MessageSquare className="h-4 w-4" />;
     }
@@ -214,6 +335,8 @@ export function InboxView() {
         return "bg-orange-100 text-orange-700";
       case "call":
         return "bg-green-100 text-green-700";
+      case "draft":
+        return "bg-yellow-100 text-yellow-700";
       default:
         return "bg-gray-100 text-gray-700";
     }
@@ -223,6 +346,8 @@ export function InboxView() {
     switch (type) {
       case "gmail":
         return "GMAIL";
+      case "draft":
+        return "DRAFT";
       default:
         return type.toUpperCase();
     }
@@ -249,6 +374,7 @@ export function InboxView() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Channels</SelectItem>
+              <SelectItem value="draft">Drafts</SelectItem>
               <SelectItem value="sms">SMS</SelectItem>
               <SelectItem value="email">Sent Emails</SelectItem>
               <SelectItem value="gmail">Gmail Inbox</SelectItem>
@@ -434,7 +560,37 @@ export function InboxView() {
                 </div>
 
                 <div className="flex gap-2 pt-2 flex-wrap">
-                  {selectedMessage.contact_phone && (
+                  {/* Draft actions */}
+                  {selectedMessage.is_draft && selectedMessage.draft_id && (
+                    <>
+                      <Button
+                        size="sm"
+                        onClick={() => sendDraftMutation.mutate(selectedMessage.draft_id!)}
+                        disabled={sendDraftMutation.isPending}
+                        className="flex-1"
+                      >
+                        {sendDraftMutation.isPending ? (
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        ) : (
+                          <Send className="h-4 w-4 mr-2" />
+                        )}
+                        Send Email
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => discardDraftMutation.mutate(selectedMessage.draft_id!)}
+                        disabled={discardDraftMutation.isPending}
+                      >
+                        {discardDraftMutation.isPending ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </>
+                  )}
+                  {!selectedMessage.is_draft && selectedMessage.contact_phone && (
                     <Button
                       variant="outline"
                       size="sm"
@@ -445,7 +601,7 @@ export function InboxView() {
                       SMS
                     </Button>
                   )}
-                  {(selectedMessage.contact_email || selectedMessage.sender_email) && selectedMessage.contact_type !== "external" && (
+                  {!selectedMessage.is_draft && (selectedMessage.contact_email || selectedMessage.sender_email) && selectedMessage.contact_type !== "external" && (
                     <Button
                       variant="outline"
                       size="sm"
@@ -456,7 +612,7 @@ export function InboxView() {
                       Email
                     </Button>
                   )}
-                  {selectedMessage.contact_id && (
+                  {!selectedMessage.is_draft && selectedMessage.contact_id && selectedMessage.contact_type !== "draft" && (
                     <Button
                       variant="outline"
                       size="sm"
@@ -486,7 +642,7 @@ export function InboxView() {
           onOpenChange={setShowSmsReply}
           contactName={selectedMessage.contact_name}
           contactPhone={selectedMessage.contact_phone}
-          contactType={selectedMessage.contact_type === "external" ? "lead" : selectedMessage.contact_type}
+          contactType={selectedMessage.contact_type === "external" || selectedMessage.contact_type === "draft" ? "lead" : selectedMessage.contact_type}
           contactId={selectedMessage.contact_id}
         />
       )}

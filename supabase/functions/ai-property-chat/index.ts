@@ -346,6 +346,69 @@ serve(async (req) => {
             required: ["query"]
           }
         }
+      },
+      {
+        type: "function",
+        function: {
+          name: "get_property_contacts",
+          description: "Get contact information associated with a property including HOA contacts, vendors, owner info, and other contacts. Use this when the user wants to email someone related to a property like HOA board, property manager, vendors, etc.",
+          parameters: {
+            type: "object",
+            properties: {
+              property_id: { 
+                type: "string",
+                description: "The UUID of the property"
+              },
+              contact_type: {
+                type: "string",
+                description: "Optional: Filter by type (hoa, vendor, owner, all)",
+                enum: ["hoa", "vendor", "owner", "all"]
+              }
+            },
+            required: ["property_id"]
+          }
+        }
+      },
+      {
+        type: "function",
+        function: {
+          name: "draft_email",
+          description: "Create an email draft in the inbox. Use this when the user asks you to draft, write, or compose an email. The draft will appear in the Communications inbox for review and sending. You should first use get_property_contacts to get the correct email addresses.",
+          parameters: {
+            type: "object",
+            properties: {
+              to_email: { 
+                type: "string",
+                description: "The recipient email address"
+              },
+              to_name: {
+                type: "string",
+                description: "The recipient name"
+              },
+              subject: {
+                type: "string",
+                description: "Email subject line"
+              },
+              body: {
+                type: "string",
+                description: "The email body content. Write professional, friendly emails appropriate for property management communications."
+              },
+              property_id: {
+                type: "string",
+                description: "Optional: The UUID of the related property"
+              },
+              property_name: {
+                type: "string",
+                description: "Optional: The name of the related property for context"
+              },
+              contact_type: {
+                type: "string",
+                description: "Optional: Type of contact (hoa, vendor, owner, tenant, other)"
+              }
+            },
+            required: ["to_email", "subject", "body"]
+          }
+        }
       }
     ];
 
@@ -393,6 +456,7 @@ CRITICAL: Always use the exact UUID "id" from search results. Never invent prope
 TOOLS:
 - search_properties: Find properties by name/address
 - get_property_onboarding: Get property details, tasks, vendors, access codes
+- get_property_contacts: Get HOA, vendor, and owner contact info for a property
 - get_property_expenses: View expenses
 - get_email_insights: Email notifications
 - get_bookings: Reservations
@@ -401,6 +465,14 @@ TOOLS:
 - search_business_knowledge: Search company knowledge base for policies, procedures, guides
 - save_memory: Save important information to long-term memory
 - recall_memory: Search past memories for relevant context
+- draft_email: Create an email draft in the inbox
+
+EMAIL DRAFTING:
+When a user asks you to draft/write/compose an email (e.g., "draft an email to the HOA at Piedmont"), you should:
+1. First search for the property using search_properties
+2. Get the property contacts using get_property_contacts to find the HOA email
+3. Use draft_email to create the draft with proper recipient, subject, and body
+4. Let the user know the draft has been created and is in Communications > Inbox
 
 When citing information from the knowledge base, mention the source document if available.
 Be helpful and concise.`;
@@ -781,6 +853,130 @@ Be helpful and concise.`;
                         } catch (error) {
                           console.error('Memory search error:', error);
                           result = { error: "Failed to search memories", memories: [] };
+                        }
+                        break;
+                      }
+                      case "get_property_contacts": {
+                        // Get contacts associated with a property (HOA, vendors, owner)
+                        const contacts: any = { property_id: args.property_id, contacts: [] };
+                        
+                        // Get property with owner info
+                        const { data: property } = await supabase
+                          .from("properties")
+                          .select(`
+                            id, name, address,
+                            property_owners(id, name, email, phone)
+                          `)
+                          .eq("id", args.property_id)
+                          .single();
+                        
+                        if (property) {
+                          contacts.property_name = property.name;
+                          contacts.property_address = property.address;
+                          
+                          // Add owner contact
+                          if (property.property_owners && (!args.contact_type || args.contact_type === "all" || args.contact_type === "owner")) {
+                            const owner = property.property_owners as any;
+                            contacts.contacts.push({
+                              type: "owner",
+                              name: owner.name,
+                              email: owner.email,
+                              phone: owner.phone
+                            });
+                          }
+                        }
+                        
+                        // Get HOA info from onboarding tasks
+                        if (!args.contact_type || args.contact_type === "all" || args.contact_type === "hoa") {
+                          const { data: project } = await supabase
+                            .from("onboarding_projects")
+                            .select("id")
+                            .eq("property_id", args.property_id)
+                            .maybeSingle();
+                          
+                          if (project) {
+                            const { data: hoaTasks } = await supabase
+                              .from("onboarding_tasks")
+                              .select("title, field_value")
+                              .eq("project_id", project.id)
+                              .or("title.ilike.%hoa%,title.ilike.%homeowner%,title.ilike.%association%");
+                            
+                            if (hoaTasks && hoaTasks.length > 0) {
+                              for (const task of hoaTasks) {
+                                if (task.field_value) {
+                                  // Try to extract email from field value
+                                  const emailMatch = task.field_value.match(/[\w.-]+@[\w.-]+\.\w+/);
+                                  contacts.contacts.push({
+                                    type: "hoa",
+                                    name: task.title,
+                                    email: emailMatch ? emailMatch[0] : null,
+                                    details: task.field_value
+                                  });
+                                }
+                              }
+                            }
+                          }
+                        }
+                        
+                        // Get vendors
+                        if (!args.contact_type || args.contact_type === "all" || args.contact_type === "vendor") {
+                          const { data: vendors } = await supabase
+                            .from("vendors")
+                            .select("id, name, email, phone, specialty")
+                            .limit(10);
+                          
+                          if (vendors) {
+                            for (const vendor of vendors) {
+                              contacts.contacts.push({
+                                type: "vendor",
+                                name: vendor.name,
+                                email: vendor.email,
+                                phone: vendor.phone,
+                                specialty: vendor.specialty
+                              });
+                            }
+                          }
+                        }
+                        
+                        result = contacts;
+                        break;
+                      }
+                      case "draft_email": {
+                        // Create an email draft in the email_drafts table
+                        const { data: draft, error: draftError } = await supabase
+                          .from("email_drafts")
+                          .insert({
+                            to_email: args.to_email,
+                            to_name: args.to_name || null,
+                            subject: args.subject,
+                            body: args.body,
+                            property_id: args.property_id || null,
+                            property_name: args.property_name || null,
+                            contact_type: args.contact_type || null,
+                            ai_generated: true,
+                            status: "draft"
+                          })
+                          .select()
+                          .single();
+                        
+                        if (draftError) {
+                          console.error("Error creating email draft:", draftError);
+                          result = { 
+                            success: false, 
+                            error: draftError.message 
+                          };
+                        } else {
+                          result = {
+                            success: true,
+                            draft_id: draft.id,
+                            message: `Email draft created successfully. You can find it in Communications > Inbox.`,
+                            draft: {
+                              to: args.to_email,
+                              to_name: args.to_name,
+                              subject: args.subject,
+                              property: args.property_name
+                            }
+                          };
                         }
                         break;
                       }
