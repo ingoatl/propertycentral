@@ -12,7 +12,7 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 // Helper to refresh tokens if expired
-async function getValidAccessToken(supabase: any, userId: string, tokenData: any) {
+async function getValidAccessToken(supabase: any, userId: string, tokenData: any, tokenTable: string) {
   if (new Date(tokenData.expires_at) > new Date()) {
     return tokenData.access_token;
   }
@@ -31,19 +31,19 @@ async function getValidAccessToken(supabase: any, userId: string, tokenData: any
 
   const newTokens = await refreshRes.json();
   if (newTokens.error) {
-    throw new Error(`Token refresh failed: ${newTokens.error}`);
+    console.error("Token refresh failed:", newTokens);
+    // If invalid_grant, tokens are revoked - delete them
+    if (newTokens.error === "invalid_grant") {
+      await supabase.from(tokenTable).delete().eq("user_id", userId);
+      throw new Error("Token expired or revoked. Please reconnect Google Calendar.");
+    }
+    throw new Error(`Token refresh failed: ${newTokens.error_description || newTokens.error}`);
   }
 
   const expiresAt = new Date(Date.now() + newTokens.expires_in * 1000).toISOString();
 
-  // Update both gmail_oauth_tokens and google_calendar_tokens
-  await supabase.from("gmail_oauth_tokens").update({
-    access_token: newTokens.access_token,
-    expires_at: expiresAt,
-    updated_at: new Date().toISOString(),
-  }).eq("user_id", userId);
-
-  await supabase.from("google_calendar_tokens").update({
+  // Update the token table
+  await supabase.from(tokenTable).update({
     access_token: newTokens.access_token,
     expires_at: expiresAt,
     updated_at: new Date().toISOString(),
@@ -128,7 +128,7 @@ serve(async (req) => {
       if (existingTokens) {
         // Try to verify the existing tokens work
         try {
-          const accessToken = await getValidAccessToken(supabase, userId, existingTokens);
+          const accessToken = await getValidAccessToken(supabase, userId, existingTokens, "google_calendar_tokens");
           // Test the connection
           const testRes = await fetch(
             "https://www.googleapis.com/calendar/v3/users/me/calendarList?maxResults=1",
@@ -196,7 +196,7 @@ serve(async (req) => {
         throw new Error("Google Calendar not connected");
       }
 
-      const accessToken = await getValidAccessToken(supabase, userId, tokenData.data);
+      const accessToken = await getValidAccessToken(supabase, userId, tokenData.data, "google_calendar_tokens");
 
       // Get call details
       const { data: call, error: callError } = await supabase
@@ -330,22 +330,14 @@ serve(async (req) => {
 
     // Check connection status and verify it works
     if (action === "check-status" || action === "verify-connection") {
-      // Try google_calendar_tokens first, then gmail_oauth_tokens
-      let tokenData = await supabase
+      // Only use google_calendar_tokens - don't fallback to gmail tokens
+      const { data: tokenData } = await supabase
         .from("google_calendar_tokens")
         .select("*")
         .eq("user_id", userId)
         .maybeSingle();
 
-      if (!tokenData.data) {
-        tokenData = await supabase
-          .from("gmail_oauth_tokens")
-          .select("*")
-          .eq("user_id", userId)
-          .maybeSingle();
-      }
-
-      if (!tokenData.data) {
+      if (!tokenData) {
         return new Response(
           JSON.stringify({ connected: false, verified: false }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -354,11 +346,11 @@ serve(async (req) => {
 
       // Actually verify the connection by making a test API call
       try {
-        const accessToken = await getValidAccessToken(supabase, userId, tokenData.data);
+        const accessToken = await getValidAccessToken(supabase, userId, tokenData, "google_calendar_tokens");
         
         // Test the connection by fetching calendar list
         const testRes = await fetch(
-          "https://www.googleapis.com/calendar/v3/users/me/calendarList?maxResults=1",
+          "https://www.googleapis.com/calendar/v3/users/me/calendarList?maxResults=10",
           {
             headers: { Authorization: `Bearer ${accessToken}` },
           }
@@ -367,6 +359,14 @@ serve(async (req) => {
         if (!testRes.ok) {
           const errData = await testRes.json();
           console.error("Calendar verification failed:", errData);
+          // If unauthorized, delete invalid tokens
+          if (testRes.status === 401) {
+            await supabase.from("google_calendar_tokens").delete().eq("user_id", userId);
+            return new Response(
+              JSON.stringify({ connected: false, verified: false, error: "Tokens expired. Please reconnect." }),
+              { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
           return new Response(
             JSON.stringify({ connected: true, verified: false, error: errData.error?.message || "API error" }),
             { headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -386,11 +386,22 @@ serve(async (req) => {
         );
       } catch (error: any) {
         console.error("Verification error:", error);
+        // Delete bad tokens on error
+        await supabase.from("google_calendar_tokens").delete().eq("user_id", userId);
         return new Response(
-          JSON.stringify({ connected: true, verified: false, error: error.message }),
+          JSON.stringify({ connected: false, verified: false, error: error.message }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
+    }
+
+    // Disconnect Google Calendar
+    if (action === "disconnect") {
+      await supabase.from("google_calendar_tokens").delete().eq("user_id", userId);
+      return new Response(
+        JSON.stringify({ success: true, message: "Google Calendar disconnected" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     return new Response(JSON.stringify({ error: "Unknown action" }), {

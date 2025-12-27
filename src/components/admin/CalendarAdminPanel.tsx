@@ -123,7 +123,7 @@ export function CalendarAdminPanel() {
     },
   });
 
-  // Connect Google Calendar - reuses Gmail tokens if available
+  // Connect Google Calendar
   const connectGoogleCalendar = async () => {
     try {
       const { data: userData } = await supabase.auth.getUser();
@@ -138,7 +138,7 @@ export function CalendarAdminPanel() {
       
       if (response.error) throw new Error(response.error.message);
       
-      // If success message is returned, Gmail tokens were reused
+      // If success message is returned, already connected
       if (response.data?.success) {
         toast.success(response.data.message || "Google Calendar connected!");
         refetchGcalStatus();
@@ -152,7 +152,7 @@ export function CalendarAdminPanel() {
         // Poll for connection status
         const interval = setInterval(async () => {
           const result = await refetchGcalStatus();
-          if (result.data?.connected) {
+          if (result.data?.connected && result.data?.verified) {
             clearInterval(interval);
             toast.success("Google Calendar connected successfully!");
           }
@@ -162,6 +162,25 @@ export function CalendarAdminPanel() {
       }
     } catch (error: any) {
       toast.error(error.message || "Failed to connect Google Calendar");
+    }
+  };
+
+  // Disconnect Google Calendar
+  const disconnectGoogleCalendar = async () => {
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) return;
+      
+      const response = await supabase.functions.invoke("google-calendar-sync", {
+        body: { action: "disconnect", userId: userData.user.id },
+      });
+      
+      if (response.error) throw new Error(response.error.message);
+      
+      toast.success("Google Calendar disconnected");
+      refetchGcalStatus();
+    } catch (error: any) {
+      toast.error(error.message || "Failed to disconnect");
     }
   };
 
@@ -523,18 +542,21 @@ export function CalendarAdminPanel() {
                       <li>Calendar events include lead details and property info</li>
                     </ul>
                   </div>
+                  <Button variant="outline" onClick={disconnectGoogleCalendar} className="text-destructive hover:text-destructive">
+                    <XCircle className="h-4 w-4 mr-2" />
+                    Disconnect Google Calendar
+                  </Button>
                 </div>
-              ) : gcalStatus?.connected && !gcalStatus?.verified ? (
+              ) : gcalStatus?.error ? (
                 <div className="space-y-4">
                   <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
                     <p className="text-sm text-yellow-800">
-                      ⚠ Calendar tokens found but verification failed. 
-                      {gcalStatus.error && <span className="block mt-1 text-xs">{gcalStatus.error}</span>}
+                      ⚠ {gcalStatus.error}
                     </p>
                   </div>
                   <Button onClick={connectGoogleCalendar} className="w-full sm:w-auto">
                     <Calendar className="h-4 w-4 mr-2" />
-                    Reconnect Google Calendar
+                    Connect Google Calendar
                   </Button>
                 </div>
               ) : (

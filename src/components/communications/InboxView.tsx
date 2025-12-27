@@ -7,10 +7,10 @@ import {
   Phone,
   Mail,
   User,
-  Building2,
   Search,
   Filter,
   ArrowUpRight,
+  Plus,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -26,11 +26,12 @@ import {
 } from "@/components/ui/select";
 import { SendSMSDialog } from "./SendSMSDialog";
 import { SendEmailDialog } from "./SendEmailDialog";
+import { ComposeEmailDialog } from "./ComposeEmailDialog";
 import { useNavigate } from "react-router-dom";
 
 interface CommunicationItem {
   id: string;
-  type: "sms" | "email" | "call";
+  type: "sms" | "email" | "call" | "gmail";
   direction: "inbound" | "outbound";
   body: string;
   subject?: string;
@@ -38,9 +39,10 @@ interface CommunicationItem {
   contact_name: string;
   contact_phone?: string;
   contact_email?: string;
-  contact_type: "lead" | "owner";
+  contact_type: "lead" | "owner" | "external";
   contact_id: string;
   status?: string;
+  sender_email?: string;
 }
 
 export function InboxView() {
@@ -50,74 +52,138 @@ export function InboxView() {
   const [selectedMessage, setSelectedMessage] = useState<CommunicationItem | null>(null);
   const [showSmsReply, setShowSmsReply] = useState(false);
   const [showEmailReply, setShowEmailReply] = useState(false);
+  const [showComposeEmail, setShowComposeEmail] = useState(false);
   const navigate = useNavigate();
 
-  // Fetch all lead communications
+  // Fetch all communications (lead_communications + email_insights)
   const { data: communications = [], isLoading } = useQuery({
     queryKey: ["all-communications", search, channelFilter, typeFilter],
     queryFn: async () => {
       const results: CommunicationItem[] = [];
 
-      // Fetch lead communications
-      let query = supabase
-        .from("lead_communications")
-        .select(`
-          id,
-          communication_type,
-          direction,
-          body,
-          subject,
-          created_at,
-          status,
-          lead_id,
-          leads!inner(id, name, phone, email)
-        `)
-        .order("created_at", { ascending: false })
-        .limit(100);
+      // Fetch lead communications (SMS, Email, Call)
+      if (channelFilter === "all" || channelFilter === "sms" || channelFilter === "email" || channelFilter === "call") {
+        let query = supabase
+          .from("lead_communications")
+          .select(`
+            id,
+            communication_type,
+            direction,
+            body,
+            subject,
+            created_at,
+            status,
+            lead_id,
+            leads!inner(id, name, phone, email)
+          `)
+          .order("created_at", { ascending: false })
+          .limit(50);
 
-      if (channelFilter !== "all") {
-        query = query.eq("communication_type", channelFilter);
-      }
+        if (channelFilter !== "all" && !["gmail"].includes(channelFilter)) {
+          query = query.eq("communication_type", channelFilter);
+        }
 
-      const { data: leadComms } = await query;
+        const { data: leadComms } = await query;
 
-      if (leadComms) {
-        for (const comm of leadComms) {
-          const lead = comm.leads as any;
-          const item: CommunicationItem = {
-            id: comm.id,
-            type: comm.communication_type as "sms" | "email" | "call",
-            direction: comm.direction as "inbound" | "outbound",
-            body: comm.body,
-            subject: comm.subject || undefined,
-            created_at: comm.created_at,
-            contact_name: lead?.name || "Unknown",
-            contact_phone: lead?.phone || undefined,
-            contact_email: lead?.email || undefined,
-            contact_type: "lead",
-            contact_id: comm.lead_id,
-            status: comm.status || undefined,
-          };
+        if (leadComms) {
+          for (const comm of leadComms) {
+            const lead = comm.leads as any;
+            const item: CommunicationItem = {
+              id: comm.id,
+              type: comm.communication_type as "sms" | "email" | "call",
+              direction: comm.direction as "inbound" | "outbound",
+              body: comm.body,
+              subject: comm.subject || undefined,
+              created_at: comm.created_at,
+              contact_name: lead?.name || "Unknown",
+              contact_phone: lead?.phone || undefined,
+              contact_email: lead?.email || undefined,
+              contact_type: "lead",
+              contact_id: comm.lead_id,
+              status: comm.status || undefined,
+            };
 
-          // Apply search filter
-          if (search) {
-            const searchLower = search.toLowerCase();
-            if (
-              !item.contact_name.toLowerCase().includes(searchLower) &&
-              !item.body.toLowerCase().includes(searchLower)
-            ) {
+            // Apply search filter
+            if (search) {
+              const searchLower = search.toLowerCase();
+              if (
+                !item.contact_name.toLowerCase().includes(searchLower) &&
+                !item.body.toLowerCase().includes(searchLower)
+              ) {
+                continue;
+              }
+            }
+
+            // Apply type filter
+            if (typeFilter !== "all" && item.contact_type !== typeFilter) {
               continue;
             }
-          }
 
-          // Apply type filter
-          if (typeFilter !== "all" && item.contact_type !== typeFilter) {
-            continue;
+            results.push(item);
           }
-
-          results.push(item);
         }
       }
+
+      // Fetch email insights (Gmail inbox emails) - latest 10
+      if (channelFilter === "all" || channelFilter === "gmail") {
+        const { data: emailInsights } = await supabase
+          .from("email_insights")
+          .select(`
+            id,
+            subject,
+            summary,
+            sender_email,
+            email_date,
+            category,
+            priority,
+            property:properties(id, name),
+            owner:property_owners(id, name, email)
+          `)
+          .order("email_date", { ascending: false })
+          .limit(10);
+
+        if (emailInsights) {
+          for (const email of emailInsights) {
+            const ownerData = email.owner as any;
+            const item: CommunicationItem = {
+              id: email.id,
+              type: "gmail",
+              direction: "inbound",
+              body: email.summary,
+              subject: email.subject,
+              created_at: email.email_date,
+              contact_name: ownerData?.name || email.sender_email?.split("@")[0] || "Unknown",
+              contact_email: email.sender_email,
+              contact_type: ownerData?.id ? "owner" : "external",
+              contact_id: ownerData?.id || "",
+              status: email.category,
+              sender_email: email.sender_email,
+            };
+
+            // Apply search filter
+            if (search) {
+              const searchLower = search.toLowerCase();
+              if (
+                !item.contact_name.toLowerCase().includes(searchLower) &&
+                !item.body.toLowerCase().includes(searchLower) &&
+                !(item.subject?.toLowerCase().includes(searchLower))
+              ) {
+                continue;
+              }
+            }
+
+            // Apply type filter
+            if (typeFilter !== "all" && item.contact_type !== typeFilter) {
+              continue;
+            }
+
+            results.push(item);
+          }
+        }
+      }
+
+      // Sort by date descending
+      results.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
       return results;
     },
@@ -128,6 +194,8 @@ export function InboxView() {
       case "sms":
         return <MessageSquare className="h-4 w-4" />;
       case "email":
+        return <Mail className="h-4 w-4" />;
+      case "gmail":
         return <Mail className="h-4 w-4" />;
       case "call":
         return <Phone className="h-4 w-4" />;
@@ -142,10 +210,21 @@ export function InboxView() {
         return "bg-blue-100 text-blue-700";
       case "email":
         return "bg-purple-100 text-purple-700";
+      case "gmail":
+        return "bg-orange-100 text-orange-700";
       case "call":
         return "bg-green-100 text-green-700";
       default:
         return "bg-gray-100 text-gray-700";
+    }
+  };
+
+  const getChannelLabel = (type: string) => {
+    switch (type) {
+      case "gmail":
+        return "GMAIL";
+      default:
+        return type.toUpperCase();
     }
   };
 
@@ -164,14 +243,15 @@ export function InboxView() {
         </div>
         <div className="flex gap-2">
           <Select value={channelFilter} onValueChange={setChannelFilter}>
-            <SelectTrigger className="w-[130px]">
+            <SelectTrigger className="w-[140px]">
               <Filter className="h-4 w-4 mr-2" />
               <SelectValue placeholder="Channel" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Channels</SelectItem>
               <SelectItem value="sms">SMS</SelectItem>
-              <SelectItem value="email">Email</SelectItem>
+              <SelectItem value="email">Sent Emails</SelectItem>
+              <SelectItem value="gmail">Gmail Inbox</SelectItem>
               <SelectItem value="call">Calls</SelectItem>
             </SelectContent>
           </Select>
@@ -184,8 +264,13 @@ export function InboxView() {
               <SelectItem value="all">All Types</SelectItem>
               <SelectItem value="lead">Leads</SelectItem>
               <SelectItem value="owner">Owners</SelectItem>
+              <SelectItem value="external">External</SelectItem>
             </SelectContent>
           </Select>
+          <Button onClick={() => setShowComposeEmail(true)} size="sm">
+            <Plus className="h-4 w-4 mr-2" />
+            Compose Email
+          </Button>
         </div>
       </div>
 
@@ -238,7 +323,9 @@ export function InboxView() {
                                 variant={
                                   comm.contact_type === "lead"
                                     ? "default"
-                                    : "secondary"
+                                    : comm.contact_type === "owner"
+                                    ? "secondary"
+                                    : "outline"
                                 }
                                 className="text-xs"
                               >
@@ -259,6 +346,9 @@ export function InboxView() {
                               }`}
                             >
                               {comm.direction === "inbound" ? "Received" : "Sent"}
+                            </Badge>
+                            <Badge variant="outline" className={`text-xs ${getChannelColor(comm.type)}`}>
+                              {getChannelLabel(comm.type)}
                             </Badge>
                           </div>
                           <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
@@ -294,7 +384,7 @@ export function InboxView() {
                   <div>
                     <h3 className="font-semibold">{selectedMessage.contact_name}</h3>
                     <p className="text-sm text-muted-foreground">
-                      {selectedMessage.contact_phone || "No phone"}
+                      {selectedMessage.sender_email || selectedMessage.contact_email || selectedMessage.contact_phone || "No contact info"}
                     </p>
                   </div>
                 </div>
@@ -303,7 +393,7 @@ export function InboxView() {
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-muted-foreground">Channel</span>
                     <Badge className={getChannelColor(selectedMessage.type)}>
-                      {selectedMessage.type.toUpperCase()}
+                      {getChannelLabel(selectedMessage.type)}
                     </Badge>
                   </div>
                   <div className="flex items-center justify-between text-sm">
@@ -321,6 +411,12 @@ export function InboxView() {
                       )}
                     </span>
                   </div>
+                  {selectedMessage.status && (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Status/Category</span>
+                      <Badge variant="secondary">{selectedMessage.status}</Badge>
+                    </div>
+                  )}
                 </div>
 
                 {selectedMessage.subject && (
@@ -332,7 +428,7 @@ export function InboxView() {
 
                 <div>
                   <label className="text-sm font-medium">Message</label>
-                  <p className="text-sm mt-1 p-3 bg-muted rounded-md">
+                  <p className="text-sm mt-1 p-3 bg-muted rounded-md whitespace-pre-wrap">
                     {selectedMessage.body}
                   </p>
                 </div>
@@ -349,7 +445,7 @@ export function InboxView() {
                       SMS
                     </Button>
                   )}
-                  {selectedMessage.contact_email && (
+                  {(selectedMessage.contact_email || selectedMessage.sender_email) && selectedMessage.contact_type !== "external" && (
                     <Button
                       variant="outline"
                       size="sm"
@@ -360,15 +456,17 @@ export function InboxView() {
                       Email
                     </Button>
                   )}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => navigate("/leads")}
-                    className="flex-1"
-                  >
-                    <ArrowUpRight className="h-4 w-4 mr-2" />
-                    View {selectedMessage.contact_type}
-                  </Button>
+                  {selectedMessage.contact_id && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => navigate(selectedMessage.contact_type === "lead" ? "/leads" : "/property-owners")}
+                      className="flex-1"
+                    >
+                      <ArrowUpRight className="h-4 w-4 mr-2" />
+                      View {selectedMessage.contact_type}
+                    </Button>
+                  )}
                 </div>
               </div>
             ) : (
@@ -388,22 +486,28 @@ export function InboxView() {
           onOpenChange={setShowSmsReply}
           contactName={selectedMessage.contact_name}
           contactPhone={selectedMessage.contact_phone}
-          contactType={selectedMessage.contact_type}
+          contactType={selectedMessage.contact_type === "external" ? "lead" : selectedMessage.contact_type}
           contactId={selectedMessage.contact_id}
         />
       )}
 
       {/* Email Reply Dialog */}
-      {selectedMessage && selectedMessage.contact_email && (
+      {selectedMessage && (selectedMessage.contact_email || selectedMessage.sender_email) && selectedMessage.contact_type !== "external" as any && (
         <SendEmailDialog
           open={showEmailReply}
           onOpenChange={setShowEmailReply}
           contactName={selectedMessage.contact_name}
-          contactEmail={selectedMessage.contact_email}
-          contactType={selectedMessage.contact_type}
+          contactEmail={selectedMessage.contact_email || selectedMessage.sender_email || ""}
+          contactType={selectedMessage.contact_type as "lead" | "owner"}
           contactId={selectedMessage.contact_id}
         />
       )}
+
+      {/* Compose Email Dialog */}
+      <ComposeEmailDialog
+        open={showComposeEmail}
+        onOpenChange={setShowComposeEmail}
+      />
     </div>
   );
 }
