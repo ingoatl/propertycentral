@@ -130,7 +130,9 @@ export function CalendarAdminPanel() {
       if (response.error) throw new Error(response.error.message);
       
       if (response.data?.authUrl) {
-        window.open(response.data.authUrl, "_blank", "width=500,height=600");
+        // Open in new tab (not popup) to avoid Google blocking
+        window.open(response.data.authUrl, "_blank");
+        toast.info("Complete the Google sign-in in the new tab, then return here.");
         // Poll for connection status
         const interval = setInterval(async () => {
           const result = await refetchGcalStatus();
