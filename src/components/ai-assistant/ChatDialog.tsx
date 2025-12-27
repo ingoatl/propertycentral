@@ -3,8 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Send, Loader2, Bot, User } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { Send, Loader2, Bot, Sparkles, Paperclip, Smile } from "lucide-react";
 import { toast } from "sonner";
 
 interface Message {
@@ -73,7 +72,6 @@ export const ChatDialog = ({ open, onOpenChange }: ChatDialogProps) => {
       let assistantMessage = "";
       let buffer = "";
 
-      // Add empty assistant message that we'll update
       setMessages([...newMessages, { role: "assistant", content: "" }]);
 
       while (true) {
@@ -103,7 +101,6 @@ export const ChatDialog = ({ open, onOpenChange }: ChatDialogProps) => {
         }
       }
 
-      // Process any remaining buffer
       if (buffer.trim()) {
         const lines = buffer.split("\n");
         for (const line of lines) {
@@ -123,7 +120,6 @@ export const ChatDialog = ({ open, onOpenChange }: ChatDialogProps) => {
         }
       }
 
-      // If no content was received, show error
       if (!assistantMessage) {
         setMessages([...newMessages, { 
           role: "assistant", 
@@ -154,7 +150,9 @@ export const ChatDialog = ({ open, onOpenChange }: ChatDialogProps) => {
       <DialogContent className="max-w-2xl h-[600px] flex flex-col p-0 max-md:h-screen max-md:max-w-full">
         <DialogHeader className="px-6 py-4 border-b max-md:px-4">
           <DialogTitle className="flex items-center gap-2 max-md:text-xl">
-            <Bot className="h-5 w-5 text-primary max-md:h-6 max-md:w-6" />
+            <div className="h-8 w-8 rounded-full bg-gradient-to-br from-violet-500 to-violet-600 flex items-center justify-center">
+              <Bot className="h-4 w-4 text-white" />
+            </div>
             AI Property Assistant
           </DialogTitle>
         </DialogHeader>
@@ -169,33 +167,33 @@ export const ChatDialog = ({ open, onOpenChange }: ChatDialogProps) => {
                 }`}
               >
                 {message.role === "assistant" && (
-                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 max-md:h-10 max-md:w-10">
-                    <Bot className="h-5 w-5 text-primary max-md:h-6 max-md:w-6" />
+                  <div className="h-9 w-9 rounded-full bg-emerald-500 flex items-center justify-center flex-shrink-0">
+                    <Bot className="h-4 w-4 text-white" />
                   </div>
                 )}
                 <div
-                  className={`rounded-lg px-4 py-2 max-w-[80%] max-md:px-3 max-md:py-3 ${
+                  className={`rounded-2xl px-4 py-2.5 max-w-[80%] max-md:px-3 max-md:py-3 ${
                     message.role === "assistant"
                       ? "bg-muted"
-                      : "bg-primary text-primary-foreground"
+                      : "bg-gradient-to-br from-violet-500 to-violet-600 text-white"
                   }`}
                 >
                   <p className="text-sm whitespace-pre-wrap max-md:text-base">{message.content}</p>
                 </div>
                 {message.role === "user" && (
-                  <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center flex-shrink-0 max-md:h-10 max-md:w-10">
-                    <User className="h-5 w-5 text-primary-foreground max-md:h-6 max-md:w-6" />
+                  <div className="h-9 w-9 rounded-full bg-gradient-to-br from-violet-500 to-violet-600 flex items-center justify-center flex-shrink-0">
+                    <span className="text-xs font-medium text-white">You</span>
                   </div>
                 )}
               </div>
             ))}
             {isLoading && (
               <div className="flex gap-3 justify-start">
-                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                  <Bot className="h-5 w-5 text-primary" />
+                <div className="h-9 w-9 rounded-full bg-emerald-500 flex items-center justify-center flex-shrink-0">
+                  <Bot className="h-4 w-4 text-white" />
                 </div>
-                <div className="rounded-lg px-4 py-2 bg-muted">
-                  <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                <div className="rounded-2xl px-4 py-2.5 bg-muted">
+                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                 </div>
               </div>
             )}
@@ -204,25 +202,36 @@ export const ChatDialog = ({ open, onOpenChange }: ChatDialogProps) => {
         </ScrollArea>
 
         <div className="px-6 py-4 border-t max-md:px-4 max-md:py-3">
-          <div className="flex gap-2">
-            <Input
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyPress={handleKeyPress}
-              placeholder="Ask about properties, bookings, expenses..."
-              disabled={isLoading}
-              className="flex-1 max-md:h-12 max-md:text-base"
-            />
+          <div className="flex items-center gap-2">
+            <div className="flex-1 flex items-center gap-2 bg-muted/50 rounded-full px-4 py-2">
+              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full">
+                <Sparkles className="h-4 w-4 text-muted-foreground" />
+              </Button>
+              <Input
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyPress={handleKeyPress}
+                placeholder="Ask about properties, bookings, expenses..."
+                disabled={isLoading}
+                className="flex-1 border-0 bg-transparent focus-visible:ring-0 px-0 h-8 max-md:h-10 max-md:text-base"
+              />
+              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full">
+                <Paperclip className="h-4 w-4 text-muted-foreground" />
+              </Button>
+              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full">
+                <Smile className="h-4 w-4 text-muted-foreground" />
+              </Button>
+            </div>
             <Button
               onClick={handleSend}
               disabled={!input.trim() || isLoading}
               size="icon"
-              className="max-md:h-12 max-md:w-12"
+              className="h-10 w-10 rounded-full bg-gradient-to-br from-violet-500 to-violet-600 hover:from-violet-600 hover:to-violet-700"
             >
               {isLoading ? (
-                <Loader2 className="h-4 w-4 animate-spin max-md:h-5 max-md:w-5" />
+                <Loader2 className="h-4 w-4 animate-spin text-white" />
               ) : (
-                <Send className="h-4 w-4 max-md:h-5 max-md:w-5" />
+                <Send className="h-4 w-4 text-white" />
               )}
             </Button>
           </div>
