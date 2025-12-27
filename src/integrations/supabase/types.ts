@@ -1104,6 +1104,195 @@ export type Database = {
           },
         ]
       }
+      gbp_content_ideas: {
+        Row: {
+          category: string
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          property_id: string | null
+          topic: string
+          used_at: string | null
+        }
+        Insert: {
+          category: string
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          property_id?: string | null
+          topic: string
+          used_at?: string | null
+        }
+        Update: {
+          category?: string
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          property_id?: string | null
+          topic?: string
+          used_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gbp_content_ideas_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "comprehensive_property_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "gbp_content_ideas_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gbp_posts: {
+        Row: {
+          ai_generated: boolean | null
+          call_to_action_type: string | null
+          call_to_action_url: string | null
+          content_type: string | null
+          created_at: string | null
+          created_by: string | null
+          error_message: string | null
+          gbp_post_name: string | null
+          id: string
+          media_url: string | null
+          posted_at: string | null
+          scheduled_for: string | null
+          status: string | null
+          summary: string
+          updated_at: string | null
+        }
+        Insert: {
+          ai_generated?: boolean | null
+          call_to_action_type?: string | null
+          call_to_action_url?: string | null
+          content_type?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          error_message?: string | null
+          gbp_post_name?: string | null
+          id?: string
+          media_url?: string | null
+          posted_at?: string | null
+          scheduled_for?: string | null
+          status?: string | null
+          summary: string
+          updated_at?: string | null
+        }
+        Update: {
+          ai_generated?: boolean | null
+          call_to_action_type?: string | null
+          call_to_action_url?: string | null
+          content_type?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          error_message?: string | null
+          gbp_post_name?: string | null
+          id?: string
+          media_url?: string | null
+          posted_at?: string | null
+          scheduled_for?: string | null
+          status?: string | null
+          summary?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      gbp_reviews: {
+        Row: {
+          ai_generated_reply: string | null
+          auto_replied: boolean | null
+          created_at: string | null
+          gbp_review_name: string
+          id: string
+          needs_reply: boolean | null
+          reply_posted_at: string | null
+          review_created_at: string | null
+          review_reply: string | null
+          review_text: string | null
+          reviewer_name: string | null
+          reviewer_profile_photo_url: string | null
+          star_rating: number | null
+          synced_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          ai_generated_reply?: string | null
+          auto_replied?: boolean | null
+          created_at?: string | null
+          gbp_review_name: string
+          id?: string
+          needs_reply?: boolean | null
+          reply_posted_at?: string | null
+          review_created_at?: string | null
+          review_reply?: string | null
+          review_text?: string | null
+          reviewer_name?: string | null
+          reviewer_profile_photo_url?: string | null
+          star_rating?: number | null
+          synced_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          ai_generated_reply?: string | null
+          auto_replied?: boolean | null
+          created_at?: string | null
+          gbp_review_name?: string
+          id?: string
+          needs_reply?: boolean | null
+          reply_posted_at?: string | null
+          review_created_at?: string | null
+          review_reply?: string | null
+          review_text?: string | null
+          reviewer_name?: string | null
+          reviewer_profile_photo_url?: string | null
+          star_rating?: number | null
+          synced_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      gbp_settings: {
+        Row: {
+          auto_post_enabled: boolean | null
+          auto_reply_enabled: boolean | null
+          created_at: string | null
+          gbp_account_id: string | null
+          gbp_location_id: string | null
+          id: string
+          post_time: string | null
+          reply_delay_minutes: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          auto_post_enabled?: boolean | null
+          auto_reply_enabled?: boolean | null
+          created_at?: string | null
+          gbp_account_id?: string | null
+          gbp_location_id?: string | null
+          id?: string
+          post_time?: string | null
+          reply_delay_minutes?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          auto_post_enabled?: boolean | null
+          auto_reply_enabled?: boolean | null
+          created_at?: string | null
+          gbp_account_id?: string | null
+          gbp_location_id?: string | null
+          id?: string
+          post_time?: string | null
+          reply_delay_minutes?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       gmail_oauth_tokens: {
         Row: {
           access_token: string
