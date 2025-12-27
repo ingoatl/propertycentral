@@ -511,7 +511,12 @@ export function CalendarAdminPanel() {
 
           {/* Upcoming Calls Tab */}
           <TabsContent value="upcoming" className="mt-4">
-            <ScrollArea className="h-80">
+            <div className="mb-3 p-3 bg-muted/50 rounded-lg">
+              <p className="text-sm text-muted-foreground">
+                📅 Calendar sync is <span className="font-medium text-green-600">fully automatic</span>. New discovery calls are synced within 1 minute.
+              </p>
+            </div>
+            <ScrollArea className="h-72">
               {upcomingCalls.length === 0 ? (
                 <p className="text-sm text-muted-foreground py-8 text-center">
                   No upcoming discovery calls
@@ -533,24 +538,10 @@ export function CalendarAdminPanel() {
                               <CheckCircle2 className="h-3 w-3 mr-1" />
                               Synced
                             </Badge>
-                          ) : gcalStatus?.connected && gcalStatus?.verified ? (
-                            <Button 
-                              size="sm" 
-                              variant="outline"
-                              onClick={() => syncToCalendarMutation.mutate(call.id)}
-                              disabled={syncToCalendarMutation.isPending}
-                            >
-                              {syncToCalendarMutation.isPending ? (
-                                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                              ) : (
-                                <Calendar className="h-3 w-3 mr-1" />
-                              )}
-                              Sync
-                            </Button>
                           ) : (
-                            <Badge variant="secondary">
-                              <XCircle className="h-3 w-3 mr-1" />
-                              No Calendar
+                            <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">
+                              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                              Pending Sync
                             </Badge>
                           )}
                           <Badge>
