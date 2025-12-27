@@ -197,7 +197,13 @@ export const navigationConfig: NavElement[] = [
         description: "Track reported bugs",
       },
       {
-        path: "/admin?tab=holidays",
+        path: "/admin?tab=calendar",
+        label: "Calendar",
+        icon: CalendarDays,
+        description: "Discovery call scheduling",
+      },
+      {
+        path: "/admin?tab=holiday-emails",
         label: "Holiday Emails",
         icon: Calendar,
         description: "Schedule holiday emails",
