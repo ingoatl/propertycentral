@@ -325,18 +325,69 @@ serve(async (req) => {
       );
     }
 
-    // Check connection status
-    if (action === "check-status") {
-      const { data: tokenData } = await supabase
+    // Check connection status and verify it works
+    if (action === "check-status" || action === "verify-connection") {
+      // Try google_calendar_tokens first, then gmail_oauth_tokens
+      let tokenData = await supabase
         .from("google_calendar_tokens")
-        .select("id, expires_at")
+        .select("*")
         .eq("user_id", userId)
-        .single();
+        .maybeSingle();
 
-      return new Response(
-        JSON.stringify({ connected: !!tokenData }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      if (!tokenData.data) {
+        tokenData = await supabase
+          .from("gmail_oauth_tokens")
+          .select("*")
+          .eq("user_id", userId)
+          .maybeSingle();
+      }
+
+      if (!tokenData.data) {
+        return new Response(
+          JSON.stringify({ connected: false, verified: false }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Actually verify the connection by making a test API call
+      try {
+        const accessToken = await getValidAccessToken(supabase, userId, tokenData.data);
+        
+        // Test the connection by fetching calendar list
+        const testRes = await fetch(
+          "https://www.googleapis.com/calendar/v3/users/me/calendarList?maxResults=1",
+          {
+            headers: { Authorization: `Bearer ${accessToken}` },
+          }
+        );
+
+        if (!testRes.ok) {
+          const errData = await testRes.json();
+          console.error("Calendar verification failed:", errData);
+          return new Response(
+            JSON.stringify({ connected: true, verified: false, error: errData.error?.message || "API error" }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        const calendarData = await testRes.json();
+        console.log("Calendar verification successful, found calendars:", calendarData.items?.length || 0);
+
+        return new Response(
+          JSON.stringify({ 
+            connected: true, 
+            verified: true,
+            calendarCount: calendarData.items?.length || 0
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      } catch (error: any) {
+        console.error("Verification error:", error);
+        return new Response(
+          JSON.stringify({ connected: true, verified: false, error: error.message }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
     }
 
     return new Response(JSON.stringify({ error: "Unknown action" }), {
