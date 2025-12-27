@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";
-import { stripePromise } from "@/lib/stripe";
+import type { Stripe } from "@stripe/stripe-js";
+import { getStripe } from "@/lib/stripe";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
@@ -80,10 +81,15 @@ const PaymentForm = ({ ownerId, onSuccess, onCancel }: Omit<AddPaymentMethodProp
 export const AddPaymentMethod = ({ ownerId, ownerName, paymentMethod, onSuccess, onCancel }: AddPaymentMethodProps) => {
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [stripe, setStripe] = useState<Stripe | null>(null);
 
   const initializePayment = async () => {
     setLoading(true);
     try {
+      // Lazy-load Stripe when payment is initiated
+      const stripeInstance = await getStripe();
+      setStripe(stripeInstance);
+
       const { data, error } = await supabase.functions.invoke("create-setup-intent", {
         body: { ownerId },
       });
@@ -150,9 +156,9 @@ export const AddPaymentMethod = ({ ownerId, ownerName, paymentMethod, onSuccess,
         </CardDescription>
       </CardHeader>
       <CardContent>
-        {clientSecret && (
+        {clientSecret && stripe && (
           <Elements 
-            stripe={stripePromise} 
+            stripe={stripe} 
             options={{ 
               clientSecret,
               appearance: {
