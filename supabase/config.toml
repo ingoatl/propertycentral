@@ -105,6 +105,9 @@ verify_jwt = false
 [functions.process-scheduled-follow-ups]
 verify_jwt = false
 
+[functions.rag-query]
+verify_jwt = true
+
 [functions.receive-partner-sync]
 verify_jwt = false
 
@@ -128,6 +131,9 @@ verify_jwt = false
 
 [functions.schedule-utility-tasks]
 verify_jwt = false
+
+[functions.search-vector-store]
+verify_jwt = true
 
 [functions.send-bug-notification]
 verify_jwt = true
