@@ -114,13 +114,15 @@ async function getGoogleCalendarCredentials(userId: string): Promise<{ access_to
   const accounts = await getUserAccounts(userId);
   console.log("User accounts count:", accounts.length);
 
-  // Find Google Calendar account
-  const googleAccount = accounts.find((a: any) => 
-    a.app === "google_calendar" || a.app === "google" || a.name?.toLowerCase().includes("google")
-  );
+  // Find Google Calendar account - check both app object and app string
+  const googleAccount = accounts.find((a: any) => {
+    // App can be a string or an object with name_slug
+    const appSlug = typeof a.app === 'object' ? a.app?.name_slug : a.app;
+    return appSlug === "google_calendar" || appSlug === "google" || a.name?.toLowerCase().includes("google");
+  });
 
   if (!googleAccount) {
-    console.log("No Google Calendar account found for user");
+    console.log("No Google Calendar account found for user, accounts:", JSON.stringify(accounts));
     return null;
   }
 
@@ -156,9 +158,10 @@ async function deleteUserAccount(userId: string): Promise<boolean> {
   const accessToken = await getPipedreamAccessToken();
 
   const accounts = await getUserAccounts(userId);
-  const googleAccount = accounts.find((a: any) => 
-    a.app === "google_calendar" || a.app === "google" || a.name?.toLowerCase().includes("google")
-  );
+  const googleAccount = accounts.find((a: any) => {
+    const appSlug = typeof a.app === 'object' ? a.app?.name_slug : a.app;
+    return appSlug === "google_calendar" || appSlug === "google" || a.name?.toLowerCase().includes("google");
+  });
 
   if (!googleAccount) {
     return true; // Already disconnected
