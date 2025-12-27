@@ -110,6 +110,39 @@ export type Database = {
           },
         ]
       }
+      availability_slots: {
+        Row: {
+          created_at: string | null
+          day_of_week: number
+          end_time: string
+          id: string
+          is_active: boolean | null
+          start_time: string
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          day_of_week: number
+          end_time: string
+          id?: string
+          is_active?: boolean | null
+          start_time: string
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          day_of_week?: number
+          end_time?: string
+          id?: string
+          is_active?: boolean | null
+          start_time?: string
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       booking_documents: {
         Row: {
           booking_id: string | null
@@ -370,6 +403,56 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      discovery_calls: {
+        Row: {
+          confirmation_sent: boolean | null
+          created_at: string | null
+          duration_minutes: number | null
+          id: string
+          lead_id: string | null
+          meeting_notes: string | null
+          reminder_sent: boolean | null
+          scheduled_at: string
+          scheduled_by: string | null
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          confirmation_sent?: boolean | null
+          created_at?: string | null
+          duration_minutes?: number | null
+          id?: string
+          lead_id?: string | null
+          meeting_notes?: string | null
+          reminder_sent?: boolean | null
+          scheduled_at: string
+          scheduled_by?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          confirmation_sent?: boolean | null
+          created_at?: string | null
+          duration_minutes?: number | null
+          id?: string
+          lead_id?: string | null
+          meeting_notes?: string | null
+          reminder_sent?: boolean | null
+          scheduled_at?: string
+          scheduled_by?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "discovery_calls_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       document_audit_log: {
         Row: {

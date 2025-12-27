@@ -31,12 +31,14 @@ import {
   Clock,
   FileText,
   Send,
-  CalendarClock
+  CalendarClock,
+  Calendar
 } from "lucide-react";
 import { Lead, LeadStage, LeadTimeline, LeadCommunication, LEAD_STAGES, STAGE_CONFIG } from "@/types/leads";
 import FollowUpManager from "./FollowUpManager";
 import TestEmailButton from "./TestEmailButton";
 import TestVoiceCallButton from "./TestVoiceCallButton";
+import { ScheduleDiscoveryCallDialog } from "./ScheduleDiscoveryCallDialog";
 
 interface LeadDetailModalProps {
   lead: Lead | null;
@@ -50,6 +52,7 @@ const LeadDetailModal = ({ lead, open, onOpenChange, onRefresh }: LeadDetailModa
   const [notes, setNotes] = useState(lead?.notes || "");
   const [newMessage, setNewMessage] = useState("");
   const [messageType, setMessageType] = useState<"sms" | "email">("sms");
+  const [showScheduleCall, setShowScheduleCall] = useState(false);
 
   // Fetch timeline
   const { data: timeline } = useQuery({
@@ -295,7 +298,26 @@ const LeadDetailModal = ({ lead, open, onOpenChange, onRefresh }: LeadDetailModa
             leadName={lead.name}
             propertyAddress={lead.property_address}
           />
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowScheduleCall(true)}
+          >
+            <Calendar className="h-4 w-4 mr-2" />
+            Schedule Call
+          </Button>
         </div>
+
+        {/* Schedule Discovery Call Dialog */}
+        <ScheduleDiscoveryCallDialog
+          open={showScheduleCall}
+          onOpenChange={setShowScheduleCall}
+          leadId={lead.id}
+          leadName={lead.name}
+          leadPhone={lead.phone || undefined}
+          onScheduled={onRefresh}
+        />
 
         {(lead.ai_summary || lead.ai_next_action) && (
           <div className="p-3 bg-muted/50 rounded-lg mb-4">
