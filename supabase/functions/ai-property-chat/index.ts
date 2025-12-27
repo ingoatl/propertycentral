@@ -10,7 +10,9 @@ const corsHeaders = {
 // Detect user query intent for smart auto-chaining
 function detectQueryIntent(query: string): { 
   needsOnboardingData: boolean;
+  needsEmailDraft: boolean;
   keywords: string[];
+  emailContext: string;
 } {
   const lower = query.toLowerCase();
   const detailKeywords = [
@@ -18,11 +20,16 @@ function detectQueryIntent(query: string): {
     'vendor', 'lock', 'pin', 'entry', 'internet', 'network'
   ];
   
+  const emailKeywords = ['draft', 'email', 'write', 'compose', 'send', 'message'];
+  const needsEmailDraft = emailKeywords.some(kw => lower.includes(kw));
+  
   const foundKeywords = detailKeywords.filter(kw => lower.includes(kw));
   
   return {
     needsOnboardingData: foundKeywords.length > 0,
-    keywords: foundKeywords
+    needsEmailDraft,
+    keywords: foundKeywords,
+    emailContext: query // Store the original query for email content
   };
 }
 
@@ -1062,6 +1069,204 @@ Be helpful and take action. You are not just informational - you can DO things l
                     }
                   }
                 }
+                
+                // AUTO-CHAIN FOR EMAIL DRAFTING: If user wants to draft an email and we found a property,
+                // automatically get contacts and create the draft
+                if (queryIntent.needsEmailDraft && searchedProperty) {
+                  console.log("Auto-chaining: User wants email draft, getting contacts for", searchedProperty.name);
+                  
+                  try {
+                    // Step 1: Get property contacts (especially HOA)
+                    const contacts: any = { property_id: searchedProperty.id, contacts: [] };
+                    contacts.property_name = searchedProperty.name;
+                    contacts.property_address = searchedProperty.address;
+                    
+                    // Get owner contact
+                    const { data: property } = await supabase
+                      .from("properties")
+                      .select(`id, name, address, property_owners(id, name, email, phone)`)
+                      .eq("id", searchedProperty.id)
+                      .single();
+                    
+                    if (property?.property_owners) {
+                      const owner = property.property_owners as any;
+                      contacts.contacts.push({
+                        type: "owner",
+                        name: owner.name,
+                        email: owner.email,
+                        phone: owner.phone
+                      });
+                    }
+                    
+                    // Get HOA info from onboarding tasks
+                    const { data: project } = await supabase
+                      .from("onboarding_projects")
+                      .select("id")
+                      .eq("property_id", searchedProperty.id)
+                      .maybeSingle();
+                    
+                    let hoaEmail = null;
+                    let hoaName = "HOA Board";
+                    
+                    if (project) {
+                      const { data: hoaTasks } = await supabase
+                        .from("onboarding_tasks")
+                        .select("title, field_value")
+                        .eq("project_id", project.id)
+                        .or("title.ilike.%hoa%,title.ilike.%homeowner%,title.ilike.%association%");
+                      
+                      if (hoaTasks && hoaTasks.length > 0) {
+                        for (const task of hoaTasks) {
+                          if (task.field_value) {
+                            const emailMatch = task.field_value.match(/[\w.-]+@[\w.-]+\.\w+/);
+                            if (emailMatch) {
+                              hoaEmail = emailMatch[0];
+                              hoaName = task.title || "HOA Board";
+                              contacts.contacts.push({
+                                type: "hoa",
+                                name: hoaName,
+                                email: hoaEmail,
+                                details: task.field_value
+                              });
+                            }
+                          }
+                        }
+                      }
+                    }
+                    
+                    // Get vendors
+                    const { data: vendors } = await supabase
+                      .from("vendors")
+                      .select("id, name, email, phone, specialty")
+                      .limit(5);
+                    
+                    if (vendors) {
+                      for (const vendor of vendors) {
+                        contacts.contacts.push({
+                          type: "vendor",
+                          name: vendor.name,
+                          email: vendor.email,
+                          phone: vendor.phone,
+                          specialty: vendor.specialty
+                        });
+                      }
+                    }
+                    
+                    console.log("Auto-chained contacts:", contacts.contacts.length, "contacts found");
+                    
+                    // Step 2: Determine recipient and create draft
+                    const userQuery = queryIntent.emailContext.toLowerCase();
+                    let recipientEmail = null;
+                    let recipientName = null;
+                    let contactType = "other";
+                    
+                    // Determine who the email is for
+                    if (userQuery.includes("hoa") || userQuery.includes("homeowner") || userQuery.includes("association")) {
+                      const hoaContact = contacts.contacts.find((c: any) => c.type === "hoa");
+                      if (hoaContact?.email) {
+                        recipientEmail = hoaContact.email;
+                        recipientName = hoaContact.name;
+                        contactType = "hoa";
+                      }
+                    } else if (userQuery.includes("owner")) {
+                      const ownerContact = contacts.contacts.find((c: any) => c.type === "owner");
+                      if (ownerContact?.email) {
+                        recipientEmail = ownerContact.email;
+                        recipientName = ownerContact.name;
+                        contactType = "owner";
+                      }
+                    } else if (userQuery.includes("vendor") || userQuery.includes("cleaner") || userQuery.includes("maintenance")) {
+                      const vendorContact = contacts.contacts.find((c: any) => c.type === "vendor");
+                      if (vendorContact?.email) {
+                        recipientEmail = vendorContact.email;
+                        recipientName = vendorContact.name;
+                        contactType = "vendor";
+                      }
+                    } else {
+                      // Default to HOA if no specific type mentioned but HOA exists
+                      const hoaContact = contacts.contacts.find((c: any) => c.type === "hoa");
+                      if (hoaContact?.email) {
+                        recipientEmail = hoaContact.email;
+                        recipientName = hoaContact.name;
+                        contactType = "hoa";
+                      }
+                    }
+                    
+                    // Step 3: Create the email draft if we have a recipient
+                    if (recipientEmail) {
+                      // Extract the key request from the user's message
+                      const keyPhrases = queryIntent.emailContext.match(/(?:need|want|request|require|get|obtain|pick up|collect)\s+(?:the\s+)?(?:a\s+)?(\w+(?:\s+\w+)*)/i);
+                      const requestTopic = keyPhrases ? keyPhrases[1] : "assistance";
+                      
+                      const emailSubject = `Request for ${requestTopic.charAt(0).toUpperCase() + requestTopic.slice(1)} - ${searchedProperty.name}`;
+                      const emailBody = `Dear ${recipientName || contactType.toUpperCase()},
+
+I hope this message finds you well. I am writing regarding our property at ${searchedProperty.address}.
+
+We need ${requestTopic} as soon as possible. Your prompt assistance with this matter would be greatly appreciated.
+
+Please let me know if you need any additional information or have any questions.
+
+Thank you for your attention to this matter.
+
+Best regards,
+Peachhaus Group
+Property Management`;
+
+                      const { data: draft, error: draftError } = await supabase
+                        .from("email_drafts")
+                        .insert({
+                          to_email: recipientEmail,
+                          to_name: recipientName,
+                          subject: emailSubject,
+                          body: emailBody,
+                          property_id: searchedProperty.id,
+                          property_name: searchedProperty.name,
+                          contact_type: contactType,
+                          ai_generated: true,
+                          status: "draft"
+                        })
+                        .select()
+                        .single();
+                      
+                      if (draftError) {
+                        console.error("Error creating auto-chained email draft:", draftError);
+                      } else {
+                        console.log("Auto-chained email draft created:", draft.id);
+                        
+                        // Add success message to tool results
+                        toolResults.push({
+                          role: "tool",
+                          tool_call_id: `auto_chain_email_${Date.now()}`,
+                          content: JSON.stringify({
+                            success: true,
+                            draft_id: draft.id,
+                            message: `Email draft created successfully for ${recipientName || recipientEmail}. The draft is now in Communications > Inbox.`,
+                            draft: {
+                              to: recipientEmail,
+                              to_name: recipientName,
+                              subject: emailSubject,
+                              property: searchedProperty.name
+                            }
+                          })
+                        });
+                      }
+                    } else {
+                      console.log("No suitable email recipient found in contacts");
+                      toolResults.push({
+                        role: "tool",
+                        tool_call_id: `auto_chain_email_${Date.now()}`,
+                        content: JSON.stringify({
+                          success: false,
+                          message: `Could not find an email address for the ${contactType} contact. Please add contact information in the property onboarding tasks.`,
+                          available_contacts: contacts.contacts.map((c: any) => ({ type: c.type, name: c.name, has_email: !!c.email }))
+                        })
+                      });
+                    }
+                  } catch (error) {
+                    console.error("Error in email auto-chaining:", error);
+                  }
+                }
 
                 console.log("Making follow-up request with tool results");
                 console.log("Tool results summary:", toolResults.map(r => ({ 
@@ -1095,6 +1300,8 @@ Be helpful and take action. You are not just informational - you can DO things l
                   body: JSON.stringify({
                     model: "gpt-4o-mini",
                     messages: followUpMessages,
+                    tools,  // Include tools so AI can continue calling more tools
+                    tool_choice: "auto",
                     stream: true,
                   }),
                 });
