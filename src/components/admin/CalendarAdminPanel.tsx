@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Calendar, Clock, Plus, Trash2, Ban, ExternalLink, Copy, Check, Link2 } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Calendar, Clock, Plus, Trash2, Ban, ExternalLink, Copy, Check, Link2, CheckCircle2, XCircle, Loader2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -96,6 +96,50 @@ export function CalendarAdminPanel() {
       return data || [];
     },
   });
+
+  // Check Google Calendar connection status
+  const { data: gcalStatus, isLoading: gcalLoading, refetch: refetchGcalStatus } = useQuery({
+    queryKey: ["google-calendar-status"],
+    queryFn: async () => {
+      const { data: user } = await supabase.auth.getUser();
+      if (!user.user) return { connected: false };
+      
+      const { data } = await supabase
+        .from("google_calendar_tokens")
+        .select("id, calendar_id")
+        .eq("user_id", user.user.id)
+        .maybeSingle();
+      
+      return { connected: !!data, calendarId: data?.calendar_id };
+    },
+  });
+
+  // Connect Google Calendar
+  const connectGoogleCalendar = async () => {
+    try {
+      const response = await supabase.functions.invoke("google-calendar-sync", {
+        body: { action: "get-auth-url" },
+      });
+      
+      if (response.error) throw new Error(response.error.message);
+      
+      if (response.data?.authUrl) {
+        window.open(response.data.authUrl, "_blank", "width=500,height=600");
+        // Poll for connection status
+        const interval = setInterval(async () => {
+          const result = await refetchGcalStatus();
+          if (result.data?.connected) {
+            clearInterval(interval);
+            toast.success("Google Calendar connected successfully!");
+          }
+        }, 2000);
+        // Stop polling after 2 minutes
+        setTimeout(() => clearInterval(interval), 120000);
+      }
+    } catch (error: any) {
+      toast.error(error.message || "Failed to connect Google Calendar");
+    }
+  };
 
   // Add availability slot
   const addSlotMutation = useMutation({
@@ -203,11 +247,12 @@ export function CalendarAdminPanel() {
       </CardHeader>
       <CardContent>
         <Tabs defaultValue="availability">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="availability">Availability</TabsTrigger>
             <TabsTrigger value="blocked">Blocked Days</TabsTrigger>
             <TabsTrigger value="upcoming">Upcoming</TabsTrigger>
-            <TabsTrigger value="embed">Embed Code</TabsTrigger>
+            <TabsTrigger value="google">Google Calendar</TabsTrigger>
+            <TabsTrigger value="embed">Embed</TabsTrigger>
           </TabsList>
 
           {/* Availability Tab */}
@@ -404,6 +449,77 @@ export function CalendarAdminPanel() {
             </ScrollArea>
           </TabsContent>
 
+          {/* Google Calendar Tab */}
+          <TabsContent value="google" className="space-y-4 mt-4">
+            <div className="p-6 border rounded-lg">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className={`p-3 rounded-full ${gcalStatus?.connected ? 'bg-green-100' : 'bg-muted'}`}>
+                    <Calendar className={`h-6 w-6 ${gcalStatus?.connected ? 'text-green-600' : 'text-muted-foreground'}`} />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-lg">Google Calendar</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Sync discovery calls with your calendar
+                    </p>
+                  </div>
+                </div>
+                {gcalLoading ? (
+                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                ) : gcalStatus?.connected ? (
+                  <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
+                    <CheckCircle2 className="h-3 w-3 mr-1" />
+                    Connected
+                  </Badge>
+                ) : (
+                  <Badge variant="secondary">
+                    <XCircle className="h-3 w-3 mr-1" />
+                    Not Connected
+                  </Badge>
+                )}
+              </div>
+
+              {gcalStatus?.connected ? (
+                <div className="space-y-4">
+                  <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                    <p className="text-sm text-green-800">
+                      ✓ Your Google Calendar is connected. New discovery calls will automatically sync.
+                    </p>
+                    {gcalStatus.calendarId && (
+                      <p className="text-xs text-green-600 mt-1">
+                        Calendar: {gcalStatus.calendarId}
+                      </p>
+                    )}
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    <h4 className="font-medium text-foreground mb-2">What happens when connected:</h4>
+                    <ul className="space-y-1 list-disc list-inside">
+                      <li>New discovery calls are added to your Google Calendar</li>
+                      <li>Automatic email reminders 24h and 1h before calls</li>
+                      <li>Calendar events include lead details and property info</li>
+                    </ul>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="text-sm text-muted-foreground">
+                    <h4 className="font-medium text-foreground mb-2">Benefits of connecting:</h4>
+                    <ul className="space-y-1 list-disc list-inside">
+                      <li>Automatic calendar event creation for new bookings</li>
+                      <li>Email reminders sent to you and leads</li>
+                      <li>Two-way sync keeps everything up to date</li>
+                      <li>Never double-book with real-time availability checks</li>
+                    </ul>
+                  </div>
+                  <Button onClick={connectGoogleCalendar} className="w-full sm:w-auto">
+                    <Calendar className="h-4 w-4 mr-2" />
+                    Connect Google Calendar
+                  </Button>
+                </div>
+              )}
+            </div>
+          </TabsContent>
+
           {/* Embed Code Tab */}
           <TabsContent value="embed" className="space-y-4 mt-4">
             <div className="space-y-4">
@@ -444,22 +560,8 @@ export function CalendarAdminPanel() {
                   </Button>
                 </div>
                 <p className="text-xs text-muted-foreground mt-2">
-                  Paste this code into your Lovable project or any website to embed the
-                  booking calendar.
+                  Paste this code into your website to embed the booking calendar.
                 </p>
-              </div>
-
-              <div className="p-4 bg-primary/5 border border-primary/20 rounded-lg">
-                <h4 className="font-medium flex items-center gap-2 mb-2">
-                  <Link2 className="h-4 w-4" />
-                  Google Calendar Integration
-                </h4>
-                <p className="text-sm text-muted-foreground mb-3">
-                  Connect your Google Calendar for two-way sync and automatic reminders.
-                </p>
-                <Button variant="outline" size="sm" disabled>
-                  Connect Google Calendar (Coming Soon)
-                </Button>
               </div>
             </div>
           </TabsContent>
