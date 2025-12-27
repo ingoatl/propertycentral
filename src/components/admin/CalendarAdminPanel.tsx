@@ -292,6 +292,30 @@ export function CalendarAdminPanel() {
     },
   });
 
+  // Sync discovery call to Google Calendar
+  const syncToCalendarMutation = useMutation({
+    mutationFn: async (callId: string) => {
+      const { data: user } = await supabase.auth.getUser();
+      if (!user.user) throw new Error("Not authenticated");
+      
+      const response = await supabase.functions.invoke("google-calendar-sync", {
+        body: { action: "create-event", callId, userId: user.user.id },
+      });
+      
+      if (response.error) throw new Error(response.error.message);
+      if (response.data?.error) throw new Error(response.data.error);
+      
+      return response.data;
+    },
+    onSuccess: () => {
+      toast.success("Discovery call synced to Google Calendar!");
+      queryClient.invalidateQueries({ queryKey: ["upcoming-discovery-calls"] });
+    },
+    onError: (error: any) => {
+      toast.error(`Failed to sync: ${error.message}`);
+    },
+  });
+
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
     setCopied(true);
@@ -487,7 +511,7 @@ export function CalendarAdminPanel() {
 
           {/* Upcoming Calls Tab */}
           <TabsContent value="upcoming" className="mt-4">
-            <ScrollArea className="h-64">
+            <ScrollArea className="h-80">
               {upcomingCalls.length === 0 ? (
                 <p className="text-sm text-muted-foreground py-8 text-center">
                   No upcoming discovery calls
@@ -496,16 +520,43 @@ export function CalendarAdminPanel() {
                 <div className="space-y-2">
                   {upcomingCalls.map((call: any) => (
                     <div key={call.id} className="p-3 border rounded-lg">
-                      <div className="flex justify-between items-start">
-                        <div>
+                      <div className="flex justify-between items-start gap-4">
+                        <div className="flex-1">
                           <p className="font-medium">{call.leads?.name || "Unknown"}</p>
                           <p className="text-sm text-muted-foreground">
                             {call.leads?.email} • {call.leads?.phone}
                           </p>
                         </div>
-                        <Badge>
-                          {format(new Date(call.scheduled_at), "MMM d 'at' h:mm a")}
-                        </Badge>
+                        <div className="flex items-center gap-2">
+                          {call.google_calendar_event_id ? (
+                            <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
+                              <CheckCircle2 className="h-3 w-3 mr-1" />
+                              Synced
+                            </Badge>
+                          ) : gcalStatus?.connected && gcalStatus?.verified ? (
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              onClick={() => syncToCalendarMutation.mutate(call.id)}
+                              disabled={syncToCalendarMutation.isPending}
+                            >
+                              {syncToCalendarMutation.isPending ? (
+                                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                              ) : (
+                                <Calendar className="h-3 w-3 mr-1" />
+                              )}
+                              Sync
+                            </Button>
+                          ) : (
+                            <Badge variant="secondary">
+                              <XCircle className="h-3 w-3 mr-1" />
+                              No Calendar
+                            </Badge>
+                          )}
+                          <Badge>
+                            {format(new Date(call.scheduled_at), "MMM d 'at' h:mm a")} EST
+                          </Badge>
+                        </div>
                       </div>
                     </div>
                   ))}
