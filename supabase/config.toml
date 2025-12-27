@@ -239,3 +239,6 @@ verify_jwt = true
 
 [functions.utility-provider-recommendations]
 verify_jwt = true
+
+[functions.mem0-memory]
+verify_jwt = true
