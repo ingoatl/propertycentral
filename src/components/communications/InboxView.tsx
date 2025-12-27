@@ -15,6 +15,9 @@ import {
   Trash2,
   Loader2,
   Sparkles,
+  Pencil,
+  X,
+  Save,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -60,6 +63,13 @@ export function InboxView() {
   const [showSmsReply, setShowSmsReply] = useState(false);
   const [showEmailReply, setShowEmailReply] = useState(false);
   const [showComposeEmail, setShowComposeEmail] = useState(false);
+  const [isEditingDraft, setIsEditingDraft] = useState(false);
+  const [editedDraft, setEditedDraft] = useState<{
+    to_email: string;
+    to_name: string;
+    subject: string;
+    body: string;
+  } | null>(null);
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
@@ -128,7 +138,50 @@ export function InboxView() {
     },
   });
 
-  // Fetch all communications (lead_communications + email_insights)
+  // Save draft mutation
+  const saveDraftMutation = useMutation({
+    mutationFn: async ({ draftId, updates }: { draftId: string; updates: { to_email: string; to_name: string; subject: string; body: string } }) => {
+      const { error } = await supabase
+        .from("email_drafts")
+        .update({
+          to_email: updates.to_email,
+          to_name: updates.to_name,
+          subject: updates.subject,
+          body: updates.body,
+          updated_at: new Date().toISOString()
+        })
+        .eq("id", draftId);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Draft saved");
+      setIsEditingDraft(false);
+      setEditedDraft(null);
+      queryClient.invalidateQueries({ queryKey: ["all-communications"] });
+    },
+    onError: (error: any) => {
+      toast.error(`Failed to save draft: ${error.message}`);
+    },
+  });
+
+  // Start editing a draft
+  const startEditingDraft = (message: CommunicationItem) => {
+    setEditedDraft({
+      to_email: message.contact_email || "",
+      to_name: message.contact_name || "",
+      subject: message.subject || "",
+      body: message.body || ""
+    });
+    setIsEditingDraft(true);
+  };
+
+  // Cancel editing
+  const cancelEditing = () => {
+    setIsEditingDraft(false);
+    setEditedDraft(null);
+  };
+
   const { data: communications = [], isLoading, refetch } = useQuery({
     queryKey: ["all-communications", search, channelFilter, typeFilter],
     refetchInterval: 10000, // Refetch every 10 seconds to catch new drafts
@@ -551,85 +604,170 @@ export function InboxView() {
                   )}
                 </div>
 
-                {selectedMessage.subject && (
-                  <div>
-                    <label className="text-sm font-medium">Subject</label>
-                    <p className="text-sm mt-1">{selectedMessage.subject}</p>
-                  </div>
-                )}
-
-                <div>
-                  <label className="text-sm font-medium">Message</label>
-                  <p className="text-sm mt-1 p-3 bg-muted rounded-md whitespace-pre-wrap">
-                    {selectedMessage.body}
-                  </p>
-                </div>
-
-                <div className="flex gap-2 pt-2 flex-wrap">
-                  {/* Draft actions */}
-                  {selectedMessage.is_draft && selectedMessage.draft_id && (
-                    <>
+                {/* Editable draft fields */}
+                {selectedMessage.is_draft && isEditingDraft && editedDraft ? (
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-sm font-medium">To Email</label>
+                      <Input
+                        value={editedDraft.to_email}
+                        onChange={(e) => setEditedDraft({ ...editedDraft, to_email: e.target.value })}
+                        placeholder="recipient@example.com"
+                        className="mt-1"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium">To Name</label>
+                      <Input
+                        value={editedDraft.to_name}
+                        onChange={(e) => setEditedDraft({ ...editedDraft, to_name: e.target.value })}
+                        placeholder="Recipient Name"
+                        className="mt-1"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium">Subject</label>
+                      <Input
+                        value={editedDraft.subject}
+                        onChange={(e) => setEditedDraft({ ...editedDraft, subject: e.target.value })}
+                        placeholder="Email subject"
+                        className="mt-1"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-sm font-medium">Message</label>
+                      <textarea
+                        value={editedDraft.body}
+                        onChange={(e) => setEditedDraft({ ...editedDraft, body: e.target.value })}
+                        rows={8}
+                        className="w-full mt-1 p-3 text-sm border rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-primary"
+                        placeholder="Email body..."
+                      />
+                    </div>
+                    <div className="flex gap-2">
                       <Button
                         size="sm"
-                        onClick={() => sendDraftMutation.mutate(selectedMessage.draft_id!)}
-                        disabled={sendDraftMutation.isPending}
+                        onClick={() => saveDraftMutation.mutate({ 
+                          draftId: selectedMessage.draft_id!, 
+                          updates: editedDraft 
+                        })}
+                        disabled={saveDraftMutation.isPending}
                         className="flex-1"
                       >
-                        {sendDraftMutation.isPending ? (
+                        {saveDraftMutation.isPending ? (
                           <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                         ) : (
-                          <Send className="h-4 w-4 mr-2" />
+                          <Save className="h-4 w-4 mr-2" />
                         )}
-                        Send Email
+                        Save Draft
                       </Button>
                       <Button
-                        variant="destructive"
+                        variant="outline"
                         size="sm"
-                        onClick={() => discardDraftMutation.mutate(selectedMessage.draft_id!)}
-                        disabled={discardDraftMutation.isPending}
+                        onClick={cancelEditing}
                       >
-                        {discardDraftMutation.isPending ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Trash2 className="h-4 w-4" />
-                        )}
+                        <X className="h-4 w-4 mr-2" />
+                        Cancel
                       </Button>
-                    </>
-                  )}
-                  {!selectedMessage.is_draft && selectedMessage.contact_phone && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setShowSmsReply(true)}
-                      className="flex-1"
-                    >
-                      <MessageSquare className="h-4 w-4 mr-2" />
-                      SMS
-                    </Button>
-                  )}
-                  {!selectedMessage.is_draft && (selectedMessage.contact_email || selectedMessage.sender_email) && selectedMessage.contact_type !== "external" && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setShowEmailReply(true)}
-                      className="flex-1"
-                    >
-                      <Mail className="h-4 w-4 mr-2" />
-                      Email
-                    </Button>
-                  )}
-                  {!selectedMessage.is_draft && selectedMessage.contact_id && selectedMessage.contact_type !== "draft" && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => navigate(selectedMessage.contact_type === "lead" ? "/leads" : "/property-owners")}
-                      className="flex-1"
-                    >
-                      <ArrowUpRight className="h-4 w-4 mr-2" />
-                      View {selectedMessage.contact_type}
-                    </Button>
-                  )}
-                </div>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    {selectedMessage.subject && (
+                      <div>
+                        <label className="text-sm font-medium">Subject</label>
+                        <p className="text-sm mt-1">{selectedMessage.subject}</p>
+                      </div>
+                    )}
+
+                    <div>
+                      <label className="text-sm font-medium">Message</label>
+                      <p className="text-sm mt-1 p-3 bg-muted rounded-md whitespace-pre-wrap">
+                        {selectedMessage.body}
+                      </p>
+                    </div>
+
+                    <div className="flex gap-2 pt-2 flex-wrap">
+                      {/* Draft actions */}
+                      {selectedMessage.is_draft && selectedMessage.draft_id && (
+                        <>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => startEditingDraft(selectedMessage)}
+                          >
+                            <Pencil className="h-4 w-4 mr-2" />
+                            Edit
+                          </Button>
+                          <Button
+                            size="sm"
+                            onClick={() => sendDraftMutation.mutate(selectedMessage.draft_id!)}
+                            disabled={sendDraftMutation.isPending}
+                            className="flex-1"
+                          >
+                            {sendDraftMutation.isPending ? (
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            ) : (
+                              <Send className="h-4 w-4 mr-2" />
+                            )}
+                            Send Email
+                          </Button>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => discardDraftMutation.mutate(selectedMessage.draft_id!)}
+                            disabled={discardDraftMutation.isPending}
+                          >
+                            {discardDraftMutation.isPending ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Trash2 className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  </>
+                )}
+                
+                {/* Non-draft action buttons */}
+                {!selectedMessage.is_draft && (
+                  <div className="flex gap-2 pt-2 flex-wrap">
+                    {selectedMessage.contact_phone && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowSmsReply(true)}
+                        className="flex-1"
+                      >
+                        <MessageSquare className="h-4 w-4 mr-2" />
+                        SMS
+                      </Button>
+                    )}
+                    {(selectedMessage.contact_email || selectedMessage.sender_email) && selectedMessage.contact_type !== "external" && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowEmailReply(true)}
+                        className="flex-1"
+                      >
+                        <Mail className="h-4 w-4 mr-2" />
+                        Email
+                      </Button>
+                    )}
+                    {selectedMessage.contact_id && selectedMessage.contact_type !== "draft" && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => navigate(selectedMessage.contact_type === "lead" ? "/leads" : "/property-owners")}
+                        className="flex-1"
+                      >
+                        <ArrowUpRight className="h-4 w-4 mr-2" />
+                        View {selectedMessage.contact_type}
+                      </Button>
+                    )}
+                  </div>
+                )}
               </div>
             ) : (
               <div className="text-center py-8 text-muted-foreground">
