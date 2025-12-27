@@ -78,60 +78,14 @@ async function createConnectToken(userId: string, successRedirectUri: string): P
   };
 }
 
-// Get user's connected accounts from Pipedream (with optional credentials)
-async function getUserAccounts(userId: string, includeCredentials: boolean = false): Promise<any[]> {
+// Get user's connected accounts from Pipedream
+async function getUserAccounts(userId: string): Promise<any[]> {
   const accessToken = await getPipedreamAccessToken();
 
-  console.log("Getting accounts for user:", userId, "includeCredentials:", includeCredentials);
+  console.log("Getting accounts for user:", userId);
 
-  // Add include_credentials=1 to get OAuth tokens in the response
-  const url = includeCredentials
-    ? `https://api.pipedream.com/v1/connect/${PIPEDREAM_PROJECT_ID}/users/${encodeURIComponent(userId)}/accounts?include_credentials=1`
-    : `https://api.pipedream.com/v1/connect/${PIPEDREAM_PROJECT_ID}/users/${encodeURIComponent(userId)}/accounts`;
-
-  const response = await fetch(url, {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "x-pd-environment": "development",
-    },
-  });
-
-  const data = await response.json();
-  console.log("Get accounts response status:", response.status);
-  console.log("Accounts data raw:", JSON.stringify(data));
-  
-  if (data.error) {
-    console.error("Get accounts error:", data);
-    return [];
-  }
-
-  // Pipedream returns { data: [...accounts...] } wrapper
-  // Check if data has a 'data' property that's an array, or if data itself is an array
-  let accounts: any[] = [];
-  if (data.data && Array.isArray(data.data)) {
-    accounts = data.data;
-  } else if (Array.isArray(data)) {
-    accounts = data;
-  } else if (data.accounts && Array.isArray(data.accounts)) {
-    accounts = data.accounts;
-  }
-  
-  console.log("Parsed accounts count:", accounts.length);
-  if (accounts.length > 0) {
-    console.log("First account:", JSON.stringify(accounts[0]));
-  }
-  
-  return accounts;
-}
-
-// Retrieve a single account with credentials from Pipedream
-async function getAccountWithCredentials(accountId: string): Promise<any | null> {
-  const accessToken = await getPipedreamAccessToken();
-  
-  console.log("Fetching account with credentials:", accountId);
-  
   const response = await fetch(
-    `https://api.pipedream.com/v1/connect/${PIPEDREAM_PROJECT_ID}/accounts/${accountId}`,
+    `https://api.pipedream.com/v1/connect/${PIPEDREAM_PROJECT_ID}/users/${encodeURIComponent(userId)}/accounts`,
     {
       headers: {
         Authorization: `Bearer ${accessToken}`,
@@ -141,58 +95,89 @@ async function getAccountWithCredentials(accountId: string): Promise<any | null>
   );
 
   const data = await response.json();
-  console.log("Single account response status:", response.status);
-  console.log("Single account data:", JSON.stringify(data));
+  console.log("Get accounts response status:", response.status);
   
-  if (!response.ok || data.error) {
-    console.error("Get single account error:", data);
-    return null;
+  if (data.error) {
+    console.error("Get accounts error:", data);
+    return [];
   }
 
-  return data;
+  // Parse accounts - API can return array directly or wrapped
+  let accounts: any[] = [];
+  if (Array.isArray(data)) {
+    accounts = data;
+  } else if (data.data && Array.isArray(data.data)) {
+    accounts = data.data;
+  } else if (data.accounts && Array.isArray(data.accounts)) {
+    accounts = data.accounts;
+  }
+  
+  console.log("Parsed accounts count:", accounts.length);
+  return accounts;
 }
 
-// Get Google Calendar credentials from Pipedream for a user
-async function getGoogleCalendarCredentials(userId: string): Promise<{ access_token: string; refresh_token?: string } | null> {
-  // First get the list of user accounts (without credentials)
-  const accounts = await getUserAccounts(userId, false);
-  console.log("User accounts count:", accounts.length);
-
-  // Find Google Calendar account - check both app object and app string
+// Find Google Calendar account for user
+async function getGoogleCalendarAccount(userId: string): Promise<{ accountId: string } | null> {
+  const accounts = await getUserAccounts(userId);
+  
+  // Find Google Calendar account
   const googleAccount = accounts.find((a: any) => {
-    // App can be a string or an object with name_slug
     const appSlug = typeof a.app === 'object' ? a.app?.name_slug : a.app;
     return appSlug === "google_calendar" || appSlug === "google" || a.name?.toLowerCase().includes("google");
   });
 
   if (!googleAccount) {
-    console.log("No Google Calendar account found for user, accounts:", JSON.stringify(accounts));
+    console.log("No Google Calendar account found for user");
     return null;
   }
 
   console.log("Found Google account:", googleAccount.id);
+  return { accountId: googleAccount.id };
+}
 
-  // Now fetch the individual account to get credentials
-  const accountWithCreds = await getAccountWithCredentials(googleAccount.id);
+// Make a request through Pipedream's API Proxy
+async function pipedreamProxyRequest(
+  userId: string,
+  accountId: string,
+  method: string,
+  url: string,
+  body?: any
+): Promise<any> {
+  const accessToken = await getPipedreamAccessToken();
   
-  if (!accountWithCreds) {
-    console.error("Failed to fetch account with credentials");
-    return null;
-  }
-
-  console.log("Account credentials:", JSON.stringify(accountWithCreds.credentials));
-
-  // Credentials are in the single account response
-  const creds = accountWithCreds.credentials;
-  if (!creds || !creds.oauth_access_token) {
-    console.error("No OAuth credentials found in account response");
-    return null;
-  }
-
-  return {
-    access_token: creds.oauth_access_token,
-    refresh_token: creds.oauth_refresh_token,
+  // Base64 encode the URL for the proxy
+  const encodedUrl = btoa(url);
+  
+  console.log(`Making proxy request: ${method} ${url}`);
+  
+  const proxyUrl = `https://api.pipedream.com/v1/connect/${PIPEDREAM_PROJECT_ID}/proxy/${encodedUrl}`;
+  
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${accessToken}`,
+    "x-pd-environment": "development",
+    "x-pd-external-user-id": userId,
+    "x-pd-account-id": accountId,
   };
+  
+  if (body) {
+    headers["Content-Type"] = "application/json";
+  }
+  
+  const response = await fetch(proxyUrl, {
+    method,
+    headers,
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  
+  const data = await response.json();
+  console.log("Proxy response status:", response.status);
+  
+  if (!response.ok) {
+    console.error("Proxy error:", data);
+    throw new Error(data.error?.message || data.message || "Proxy request failed");
+  }
+  
+  return data;
 }
 
 // Delete a user's Google Calendar connection
@@ -252,20 +237,26 @@ serve(async (req) => {
 
       // Check if user already has Google Calendar connected
       try {
-        const credentials = await getGoogleCalendarCredentials(userId);
-        if (credentials) {
-          // Test the connection
-          const testRes = await fetch(
-            "https://www.googleapis.com/calendar/v3/users/me/calendarList?maxResults=1",
-            { headers: { Authorization: `Bearer ${credentials.access_token}` } }
-          );
-          if (testRes.ok) {
-            return new Response(JSON.stringify({ 
-              success: true, 
-              message: "Google Calendar is already connected" 
-            }), {
-              headers: { ...corsHeaders, "Content-Type": "application/json" },
-            });
+        const gcalAccount = await getGoogleCalendarAccount(userId);
+        if (gcalAccount) {
+          // Try to verify the connection works via proxy
+          try {
+            const calendars = await pipedreamProxyRequest(
+              userId,
+              gcalAccount.accountId,
+              "GET",
+              "https://www.googleapis.com/calendar/v3/users/me/calendarList?maxResults=1"
+            );
+            if (calendars && !calendars.error) {
+              return new Response(JSON.stringify({ 
+                success: true, 
+                message: "Google Calendar is already connected" 
+              }), {
+                headers: { ...corsHeaders, "Content-Type": "application/json" },
+              });
+            }
+          } catch (e) {
+            console.log("Existing connection verification failed, will prompt for reconnect:", e);
           }
         }
       } catch (e) {
@@ -289,13 +280,64 @@ serve(async (req) => {
       });
     }
 
+    // Verify connection status
+    if (action === "verify-connection") {
+      try {
+        const gcalAccount = await getGoogleCalendarAccount(userId);
+        if (!gcalAccount) {
+          return new Response(JSON.stringify({ 
+            connected: false, 
+            verified: false,
+            error: "No Google Calendar account found"
+          }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        // Test the connection via proxy
+        try {
+          const calendars = await pipedreamProxyRequest(
+            userId,
+            gcalAccount.accountId,
+            "GET",
+            "https://www.googleapis.com/calendar/v3/users/me/calendarList?maxResults=10"
+          );
+
+          return new Response(JSON.stringify({ 
+            connected: true, 
+            verified: true,
+            calendarCount: calendars.items?.length || 0 
+          }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        } catch (proxyError) {
+          console.error("Proxy verification failed:", proxyError);
+          return new Response(JSON.stringify({ 
+            connected: true, 
+            verified: false,
+            error: "Could not verify calendar access"
+          }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      } catch (error: any) {
+        return new Response(JSON.stringify({ 
+          connected: false, 
+          verified: false,
+          error: error.message 
+        }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+
     // Create calendar event for discovery call
     if (action === "create-event") {
       const { callId } = body;
 
-      // Get credentials from Pipedream
-      const credentials = await getGoogleCalendarCredentials(userId);
-      if (!credentials) {
+      // Get Google Calendar account
+      const gcalAccount = await getGoogleCalendarAccount(userId);
+      if (!gcalAccount) {
         throw new Error("Google Calendar not connected via Pipedream");
       }
 
@@ -334,20 +376,15 @@ serve(async (req) => {
         attendees: call.leads?.email ? [{ email: call.leads.email }] : [],
       };
 
-      // Create event in Google Calendar
-      const calendarRes = await fetch(
-        `https://www.googleapis.com/calendar/v3/calendars/primary/events?sendUpdates=all`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${credentials.access_token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(event),
-        }
+      // Create event via Pipedream proxy
+      const calendarEvent = await pipedreamProxyRequest(
+        userId,
+        gcalAccount.accountId,
+        "POST",
+        "https://www.googleapis.com/calendar/v3/calendars/primary/events?sendUpdates=all",
+        event
       );
 
-      const calendarEvent = await calendarRes.json();
       if (calendarEvent.error) {
         throw new Error(calendarEvent.error.message);
       }
@@ -370,8 +407,8 @@ serve(async (req) => {
     if (action === "check-availability") {
       const { date } = body;
 
-      const credentials = await getGoogleCalendarCredentials(userId);
-      if (!credentials) {
+      const gcalAccount = await getGoogleCalendarAccount(userId);
+      if (!gcalAccount) {
         return new Response(JSON.stringify({ events: [] }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -383,15 +420,12 @@ serve(async (req) => {
       const endOfDay = new Date(date);
       endOfDay.setHours(23, 59, 59, 999);
 
-      const eventsRes = await fetch(
-        `https://www.googleapis.com/calendar/v3/calendars/primary/events?` +
-          `timeMin=${startOfDay.toISOString()}&timeMax=${endOfDay.toISOString()}&singleEvents=true`,
-        {
-          headers: { Authorization: `Bearer ${credentials.access_token}` },
-        }
+      const eventsData = await pipedreamProxyRequest(
+        userId,
+        gcalAccount.accountId,
+        "GET",
+        `https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=${startOfDay.toISOString()}&timeMax=${endOfDay.toISOString()}&singleEvents=true`
       );
-
-      const eventsData = await eventsRes.json();
 
       return new Response(
         JSON.stringify({
@@ -407,76 +441,44 @@ serve(async (req) => {
       );
     }
 
-    // Check connection status via Pipedream
-    if (action === "check-status" || action === "verify-connection") {
-      if (!PIPEDREAM_CLIENT_ID || !PIPEDREAM_CLIENT_SECRET || !PIPEDREAM_PROJECT_ID) {
-        return new Response(
-          JSON.stringify({ connected: false, verified: false, error: "Pipedream not configured" }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+    // List calendars
+    if (action === "list-calendars") {
+      const gcalAccount = await getGoogleCalendarAccount(userId);
+      if (!gcalAccount) {
+        throw new Error("Google Calendar not connected");
       }
 
-      try {
-        const credentials = await getGoogleCalendarCredentials(userId);
-        if (!credentials) {
-          return new Response(
-            JSON.stringify({ connected: false, verified: false }),
-            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
-        }
+      const calendars = await pipedreamProxyRequest(
+        userId,
+        gcalAccount.accountId,
+        "GET",
+        "https://www.googleapis.com/calendar/v3/users/me/calendarList"
+      );
 
-        // Verify the connection by making a test API call
-        const testRes = await fetch(
-          "https://www.googleapis.com/calendar/v3/users/me/calendarList?maxResults=10",
-          {
-            headers: { Authorization: `Bearer ${credentials.access_token}` },
-          }
-        );
-
-        if (!testRes.ok) {
-          const errData = await testRes.json();
-          console.error("Calendar verification failed:", errData);
-          return new Response(
-            JSON.stringify({ connected: true, verified: false, error: errData.error?.message || "API error" }),
-            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
-        }
-
-        const calendarData = await testRes.json();
-        console.log("Calendar verification successful, found calendars:", calendarData.items?.length || 0);
-
-        return new Response(
-          JSON.stringify({ 
-            connected: true, 
-            verified: true,
-            calendarCount: calendarData.items?.length || 0
-          }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      } catch (error: any) {
-        console.error("Verification error:", error);
-        return new Response(
-          JSON.stringify({ connected: false, verified: false, error: error.message }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-    }
-
-    // Disconnect Google Calendar via Pipedream
-    if (action === "disconnect") {
-      const deleted = await deleteUserAccount(userId);
       return new Response(
-        JSON.stringify({ success: deleted, message: deleted ? "Google Calendar disconnected" : "Failed to disconnect" }),
+        JSON.stringify({
+          calendars:
+            calendars.items?.map((c: any) => ({
+              id: c.id,
+              summary: c.summary,
+              primary: c.primary,
+            })) || [],
+        }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    return new Response(JSON.stringify({ error: "Unknown action" }), {
-      status: 400,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    // Disconnect Google Calendar
+    if (action === "disconnect") {
+      await deleteUserAccount(userId);
+      return new Response(JSON.stringify({ success: true }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    throw new Error(`Unknown action: ${action}`);
   } catch (error: any) {
-    console.error("Calendar sync error:", error);
+    console.error("Google Calendar Sync Error:", error);
     return new Response(JSON.stringify({ error: error.message }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
