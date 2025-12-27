@@ -360,6 +360,41 @@ export type Database = {
           },
         ]
       }
+      calendar_sync_queue: {
+        Row: {
+          created_at: string
+          discovery_call_id: string
+          error_message: string | null
+          id: string
+          processed_at: string | null
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          discovery_call_id: string
+          error_message?: string | null
+          id?: string
+          processed_at?: string | null
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          discovery_call_id?: string
+          error_message?: string | null
+          id?: string
+          processed_at?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calendar_sync_queue_discovery_call_id_fkey"
+            columns: ["discovery_call_id"]
+            isOneToOne: true
+            referencedRelation: "discovery_calls"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       charge_line_items: {
         Row: {
           amount: number
