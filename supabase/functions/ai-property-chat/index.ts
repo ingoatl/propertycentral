@@ -298,6 +298,54 @@ serve(async (req) => {
             required: ["query"]
           }
         }
+      },
+      {
+        type: "function",
+        function: {
+          name: "save_memory",
+          description: "Save important information to long-term memory. Use this when users say 'remember this', 'save this', 'from now on', give specific instructions, mention schedules/cron jobs, or explain processes. Categories: 'command' (instructions), 'cron_schedule' (recurring tasks), 'process' (workflows), 'preference' (how things should be done), 'general' (other important info).",
+          parameters: {
+            type: "object",
+            properties: {
+              content: { 
+                type: "string",
+                description: "The information to remember"
+              },
+              category: {
+                type: "string",
+                enum: ["command", "cron_schedule", "process", "preference", "general"],
+                description: "Category of the memory"
+              },
+              context: {
+                type: "string",
+                description: "Additional context about the memory (e.g., property name, specific situation)"
+              }
+            },
+            required: ["content", "category"]
+          }
+        }
+      },
+      {
+        type: "function",
+        function: {
+          name: "recall_memory",
+          description: "Search long-term memory for relevant information. Use this when users ask 'do you remember...', 'what did I say about...', or when you need context from past conversations. Also use at the start of conversations about specific topics to recall relevant past instructions.",
+          parameters: {
+            type: "object",
+            properties: {
+              query: { 
+                type: "string",
+                description: "Search query to find relevant memories"
+              },
+              category: {
+                type: "string",
+                enum: ["command", "cron_schedule", "process", "preference", "general"],
+                description: "Optional: filter by category"
+              }
+            },
+            required: ["query"]
+          }
+        }
       }
     ];
 
@@ -306,6 +354,17 @@ serve(async (req) => {
 SECURITY:
 - Never share credit card numbers, bank account numbers, or financial data
 - Respond with security error if you see such data
+
+MEMORY SYSTEM:
+You have long-term memory powered by Mem0. You should:
+1. Use recall_memory at the start of conversations to check for relevant past instructions
+2. When users say "remember this", "from now on", "always do X", use save_memory
+3. Save important information automatically:
+   - Commands/instructions → category: "command"
+   - Cron schedules, recurring tasks → category: "cron_schedule" 
+   - Business processes, workflows → category: "process"
+   - Preferences, how things should be done → category: "preference"
+4. Reference saved memories naturally: "As you mentioned before..." or "Following your preference..."
 
 KNOWLEDGE BASE:
 You have access to Peachhaus's internal knowledge base containing cleaning guides, HOA rules, property procedures, and operational documents. Use the search_business_knowledge tool when users ask about:
@@ -340,6 +399,8 @@ TOOLS:
 - get_visits: Scheduled visits
 - get_faqs: FAQs
 - search_business_knowledge: Search company knowledge base for policies, procedures, guides
+- save_memory: Save important information to long-term memory
+- recall_memory: Search past memories for relevant context
 
 When citing information from the knowledge base, mention the source document if available.
 Be helpful and concise.`;
@@ -617,6 +678,109 @@ Be helpful and concise.`;
                         } catch (error) {
                           console.error('Knowledge base search error:', error);
                           result = { error: "Knowledge base search failed", results: [] };
+                        }
+                        break;
+                      }
+                      case "save_memory": {
+                        const MEM0_API_KEY = Deno.env.get('MEM0_API_KEY');
+                        if (!MEM0_API_KEY) {
+                          result = { error: "Memory system not configured", saved: false };
+                          break;
+                        }
+                        
+                        try {
+                          const memoryResponse = await fetch('https://api.mem0.ai/v1/memories/', {
+                            method: 'POST',
+                            headers: {
+                              'Authorization': `Token ${MEM0_API_KEY}`,
+                              'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify({
+                              messages: [
+                                { role: 'user', content: args.content },
+                                { role: 'assistant', content: `Saved: ${args.content}` }
+                              ],
+                              user_id: 'peachhaus_team',
+                              metadata: {
+                                category: args.category || 'general',
+                                context: args.context || '',
+                              }
+                            }),
+                          });
+                          
+                          if (!memoryResponse.ok) {
+                            const errorText = await memoryResponse.text();
+                            console.error('Mem0 save error:', errorText);
+                            result = { error: "Failed to save memory", saved: false };
+                            break;
+                          }
+                          
+                          const saveResult = await memoryResponse.json();
+                          console.log('Memory saved:', JSON.stringify(saveResult, null, 2));
+                          result = {
+                            saved: true,
+                            category: args.category,
+                            message: `Memory saved to category: ${args.category}`
+                          };
+                        } catch (error) {
+                          console.error('Memory save error:', error);
+                          result = { error: "Failed to save memory", saved: false };
+                        }
+                        break;
+                      }
+                      case "recall_memory": {
+                        const MEM0_API_KEY = Deno.env.get('MEM0_API_KEY');
+                        if (!MEM0_API_KEY) {
+                          result = { error: "Memory system not configured", memories: [] };
+                          break;
+                        }
+                        
+                        try {
+                          const searchBody: any = {
+                            query: args.query,
+                            user_id: 'peachhaus_team',
+                            limit: 10,
+                          };
+                          
+                          if (args.category) {
+                            searchBody.filters = { category: args.category };
+                          }
+                          
+                          const memoryResponse = await fetch('https://api.mem0.ai/v1/memories/search/', {
+                            method: 'POST',
+                            headers: {
+                              'Authorization': `Token ${MEM0_API_KEY}`,
+                              'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify(searchBody),
+                          });
+                          
+                          if (!memoryResponse.ok) {
+                            const errorText = await memoryResponse.text();
+                            console.error('Mem0 search error:', errorText);
+                            result = { error: "Failed to search memories", memories: [] };
+                            break;
+                          }
+                          
+                          const searchResult = await memoryResponse.json();
+                          const memories = (searchResult.results || searchResult || []).map((m: any) => ({
+                            memory: m.memory,
+                            category: m.metadata?.category || 'general',
+                            score: m.score,
+                            created_at: m.created_at,
+                          }));
+                          
+                          console.log(`Memory search for "${args.query}" found ${memories.length} results`);
+                          result = {
+                            query: args.query,
+                            memories,
+                            message: memories.length > 0 
+                              ? `Found ${memories.length} relevant memories`
+                              : "No relevant memories found"
+                          };
+                        } catch (error) {
+                          console.error('Memory search error:', error);
+                          result = { error: "Failed to search memories", memories: [] };
                         }
                         break;
                       }
