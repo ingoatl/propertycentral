@@ -34,6 +34,7 @@ const Vendors = lazy(() => import("./pages/Vendors"));
 const Maintenance = lazy(() => import("./pages/Maintenance"));
 const Leads = lazy(() => import("./pages/Leads"));
 const Communications = lazy(() => import("./pages/Communications"));
+const BookDiscoveryCall = lazy(() => import("./pages/BookDiscoveryCall"));
 
 // Optimized QueryClient with caching and stale time
 const queryClient = new QueryClient({
@@ -75,6 +76,7 @@ const App = () => (
             <Route path="/inspect/settings" element={<InspectSettings />} />
             {/* Public job application page */}
             <Route path="/careers/property-inspector" element={<JobApplication />} />
+            <Route path="/book-discovery-call" element={<BookDiscoveryCall />} />
             <Route path="*" element={
               <Layout>
                 <Suspense fallback={<PageLoader />}>
