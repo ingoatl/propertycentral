@@ -796,6 +796,10 @@ const Admin = () => {
         <TabsContent value="calendar" className="mt-8">
           <CalendarAdminPanel />
         </TabsContent>
+
+        <TabsContent value="gbp" className="mt-8">
+          <GBPAdminPanel />
+        </TabsContent>
       </Tabs>
     </div>
   );
