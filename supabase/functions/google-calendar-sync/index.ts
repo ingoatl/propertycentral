@@ -17,7 +17,7 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 // Admin user ID for automatic calendar sync operations (cron jobs)
 const CALENDAR_SYNC_USER_ID = Deno.env.get("CALENDAR_SYNC_USER_ID");
 
-// Pipedream MCP Server URL
+// Pipedream MCP Server URL (same for all apps)
 const MCP_SERVER_URL = "https://remote.mcp.pipedream.net";
 
 // Get Pipedream access token using OAuth client credentials
@@ -124,15 +124,19 @@ async function parseSSEResponse(response: Response): Promise<any> {
   return lastData;
 }
 
-// Call MCP tool via Pipedream
+// Call MCP tool via Pipedream (for Google Calendar)
 async function callMCPTool(
   accessToken: string,
   userId: string,
   toolName: string,
-  args: Record<string, any>
+  args: Record<string, any>,
+  appSlug: string = "google_calendar"
 ): Promise<any> {
-  console.log(`Calling MCP tool: ${toolName}`);
+  console.log(`Calling MCP tool: ${toolName} for app: ${appSlug}`);
   console.log("Tool args:", JSON.stringify(args));
+
+  // Always use the same MCP server URL
+  console.log(`Using MCP server: ${MCP_SERVER_URL}`);
 
   const response = await fetch(MCP_SERVER_URL, {
     method: "POST",
@@ -143,7 +147,7 @@ async function callMCPTool(
       "x-pd-project-id": PIPEDREAM_PROJECT_ID!,
       "x-pd-environment": "development",
       "x-pd-external-user-id": userId,
-      "x-pd-app-slug": "google_calendar",
+      "x-pd-app-slug": appSlug,
       "x-pd-app-discovery": "true",
       "x-pd-tool-mode": "sub-agent",
     },
@@ -569,16 +573,69 @@ serve(async (req) => {
       
       const accessToken = await getPipedreamAccessToken();
       
-      const result = await callMCPTool(
-        accessToken,
-        slackUserId,
+      // First list available Slack tools
+      console.log("Listing available Slack tools...");
+      const toolsResponse = await fetch(MCP_SERVER_URL, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${accessToken}`,
+          "Accept": "application/json, text/event-stream",
+          "Content-Type": "application/json",
+          "x-pd-project-id": PIPEDREAM_PROJECT_ID!,
+          "x-pd-environment": "development",
+          "x-pd-external-user-id": slackUserId,
+          "x-pd-app-slug": "slack",
+          "x-pd-app-discovery": "true",
+        },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: Date.now(),
+          method: "tools/list",
+          params: {},
+        }),
+      });
+      
+      const toolsResult = await parseSSEResponse(toolsResponse);
+      console.log("Available Slack tools:", JSON.stringify(toolsResult).substring(0, 1000));
+      
+      // Try multiple possible tool names for posting messages
+      const possibleToolNames = [
         "slack-post-message",
-        {
-          channel: channel,
-          text: message,
-          instruction: `Send a Slack message to ${channel} with the text: "${message}"`
+        "slack_post_message", 
+        "slack-chat-postMessage",
+        "slack_chat_postMessage",
+        "slack-send-message",
+        "slack_send_message"
+      ];
+      
+      let result: any = null;
+      let lastError: string = "";
+      
+      for (const toolName of possibleToolNames) {
+        try {
+          console.log(`Trying Slack tool: ${toolName}`);
+          result = await callMCPTool(
+            accessToken,
+            slackUserId,
+            toolName,
+            {
+              channel: channel,
+              text: message,
+              instruction: `Send a Slack message to ${channel} with the text: "${message}"`
+            },
+            "slack"
+          );
+          console.log(`Slack tool ${toolName} succeeded!`);
+          break;
+        } catch (e: any) {
+          lastError = e.message;
+          console.log(`Slack tool ${toolName} failed: ${e.message}`);
         }
-      );
+      }
+      
+      if (!result) {
+        throw new Error(`All Slack tool attempts failed. Last error: ${lastError}. Available tools: ${JSON.stringify(toolsResult).substring(0, 500)}`);
+      }
 
       console.log("Slack MCP result:", JSON.stringify(result).substring(0, 500));
 
