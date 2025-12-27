@@ -53,7 +53,7 @@ async function createConnectToken(userId: string, successRedirectUri: string): P
     headers: {
       Authorization: `Bearer ${accessToken}`,
       "Content-Type": "application/json",
-      "x-pd-environment": "production",
+      "x-pd-environment": "development",
     },
     body: JSON.stringify({
       external_user_id: userId,
@@ -89,7 +89,7 @@ async function getUserAccounts(userId: string): Promise<any[]> {
     {
       headers: {
         Authorization: `Bearer ${accessToken}`,
-        "x-pd-environment": "production",
+        "x-pd-environment": "development",
       },
     }
   );
@@ -132,7 +132,7 @@ async function getGoogleCalendarCredentials(userId: string): Promise<{ access_to
     {
       headers: {
         Authorization: `Bearer ${accessToken}`,
-        "x-pd-environment": "production",
+        "x-pd-environment": "development",
       },
     }
   );
@@ -170,7 +170,7 @@ async function deleteUserAccount(userId: string): Promise<boolean> {
       method: "DELETE",
       headers: {
         Authorization: `Bearer ${accessToken}`,
-        "x-pd-environment": "production",
+        "x-pd-environment": "development",
       },
     }
   );
