@@ -322,12 +322,25 @@ export default function GBPAdminPanel() {
 
           {/* Reviews Tab */}
           <TabsContent value="reviews" className="space-y-4">
+            {/* Setup Alert */}
+            {settings && (!settings.gbp_account_id || !settings.gbp_location_id) && (
+              <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-lg flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-amber-500 mt-0.5" />
+                <div>
+                  <p className="font-medium text-amber-600">Setup Required</p>
+                  <p className="text-sm text-muted-foreground">
+                    Please configure your GBP Account ID and Location ID in the Settings tab to sync reviews and enable automation.
+                  </p>
+                </div>
+              </div>
+            )}
+
             <div className="flex justify-between items-center">
               <h3 className="text-lg font-semibold">Pending Reviews ({pendingReviews.length})</h3>
               <Button
                 variant="outline"
                 onClick={() => syncReviewsMutation.mutate()}
-                disabled={syncReviewsMutation.isPending}
+                disabled={syncReviewsMutation.isPending || !settings?.gbp_account_id || !settings?.gbp_location_id}
               >
                 {syncReviewsMutation.isPending ? (
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -344,7 +357,9 @@ export default function GBPAdminPanel() {
               </div>
             ) : pendingReviews.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
-                No pending reviews. All caught up!
+                {settings?.gbp_account_id && settings?.gbp_location_id 
+                  ? "No pending reviews. All caught up! Click 'Sync Reviews' to fetch the latest."
+                  : "Configure your GBP settings to start syncing reviews."}
               </div>
             ) : (
               <div className="space-y-4">

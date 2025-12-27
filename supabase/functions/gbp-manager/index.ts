@@ -13,6 +13,7 @@ const MCP_SERVER_URL = "https://remote.mcp.pipedream.net";
 const PIPEDREAM_CLIENT_ID = Deno.env.get("PIPEDREAM_CLIENT_ID");
 const PIPEDREAM_CLIENT_SECRET = Deno.env.get("PIPEDREAM_CLIENT_SECRET");
 const PIPEDREAM_PROJECT_ID = Deno.env.get("PIPEDREAM_PROJECT_ID");
+const PIPEDREAM_USER_ID = Deno.env.get("PIPEDREAM_USER_ID") || "admin";
 
 // Get Pipedream access token
 async function getPipedreamAccessToken(): Promise<string> {
@@ -255,7 +256,7 @@ serve(async (req) => {
       .select("*")
       .single();
 
-    const userId = params.userId || "admin";
+    const userId = params.userId || PIPEDREAM_USER_ID;
 
     switch (action) {
       case "list-tools": {
