@@ -126,7 +126,7 @@ const Auth = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-muted p-4">
+    <main className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-muted p-4">
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle>
@@ -237,7 +237,7 @@ const Auth = () => {
           </form>
         </CardContent>
       </Card>
-    </div>
+    </main>
   );
 };
 
