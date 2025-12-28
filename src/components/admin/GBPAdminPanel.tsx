@@ -67,9 +67,8 @@ interface GBPSettings {
   reply_delay_minutes: number;
 }
 
-// Hardcoded PeachHaus Group account/location IDs
+// Hardcoded PeachHaus Group account ID - location is auto-discovered
 const PEACHHAUS_ACCOUNT_ID = "106698735661379366674";
-const PEACHHAUS_LOCATION_ID = "106698735661379366674";
 
 export default function GBPAdminPanel() {
   const queryClient = useQueryClient();
@@ -687,7 +686,7 @@ export default function GBPAdminPanel() {
                       </div>
                       <div>
                         <span className="text-muted-foreground">Location ID:</span>
-                        <code className="ml-2 bg-background px-2 py-1 rounded">{settings?.gbp_location_id || PEACHHAUS_LOCATION_ID}</code>
+                        <code className="ml-2 bg-background px-2 py-1 rounded">{settings?.gbp_location_id || "Auto-discovered"}</code>
                       </div>
                     </div>
                   </div>

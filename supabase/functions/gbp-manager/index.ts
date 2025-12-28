@@ -575,84 +575,71 @@ serve(async (req) => {
         }
 
         const accessToken = await getPipedreamAccessToken();
+        const accountId = settings.gbp_account_id;
         
-        // First, fetch actual locations from the account to get the correct location ID
-        let locationId = settings.gbp_location_id;
+        // Try multiple formats for the parent parameter since GBP API formats vary
+        // Format 1: Just the account ID (for PERSONAL accounts)
+        // Format 2: accounts/{id}/locations/{id} (for business accounts with locations)
         
-        console.log("Fetching locations for account:", settings.gbp_account_id);
-        const locationsResult = await callMCPTool(
-          accessToken,
-          userId,
-          "google_my_business-list-locations",
-          {
-            instruction: `List all locations for account ${settings.gbp_account_id}`,
-            parent: `accounts/${settings.gbp_account_id}`,
-          }
-        );
+        let reviewsResult: any = null;
+        let successFormat: string | null = null;
         
-        console.log("Locations result:", JSON.stringify(locationsResult).substring(0, 1500));
-        
-        // Try to extract location ID from the response
-        const locContent = locationsResult?.result?.content?.[0]?.text || "";
-        
-        // Try parsing as JSON first
-        try {
-          const locParsed = JSON.parse(locContent);
-          if (locParsed?.locations?.length > 0) {
-            // Get the location name and extract the ID
-            const firstLocation = locParsed.locations[0];
-            const locName = firstLocation.name || "";
-            // Location name format: accounts/{accountId}/locations/{locationId}
-            const locMatch = locName.match(/locations\/(\d+)/);
-            if (locMatch) {
-              locationId = locMatch[1];
-              console.log("Found location ID from JSON:", locationId);
-            }
-          }
-        } catch {
-          // Try regex to find location ID from natural language response
-          const locIdMatch = locContent.match(/locations\/(\d+)/);
-          if (locIdMatch) {
-            locationId = locIdMatch[1];
-            console.log("Found location ID from regex:", locationId);
-          } else {
-            // Try another pattern - looking for numeric IDs mentioned as location
-            const altMatch = locContent.match(/location[^\d]*(\d{10,})/i);
-            if (altMatch) {
-              locationId = altMatch[1];
-              console.log("Found location ID from alt regex:", locationId);
-            }
-          }
-        }
-        
-        if (!locationId) {
-          return new Response(JSON.stringify({ 
-            success: false, 
-            error: "Could not determine location ID. Please check if your GBP account has any locations configured.",
-            locationsResponse: locContent.substring(0, 500),
-          }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 });
-        }
-        
-        // Update settings with discovered location ID if different
-        if (locationId !== settings.gbp_location_id) {
-          console.log(`Updating location ID from ${settings.gbp_location_id} to ${locationId}`);
-          await supabase
-            .from("gbp_settings")
-            .update({ gbp_location_id: locationId })
-            .eq("id", settings.id);
-        }
-        
-        // Now fetch reviews with the correct location ID
-        const reviewsResult = await callMCPTool(
+        // Try format 1: Direct account reference (works for some PERSONAL accounts)
+        console.log("Trying reviews with direct account reference...");
+        reviewsResult = await callMCPTool(
           accessToken,
           userId,
           "google_my_business-list-all-reviews",
           {
-            instruction: `List all reviews for location accounts/${settings.gbp_account_id}/locations/${locationId}`,
-            parent: `accounts/${settings.gbp_account_id}/locations/${locationId}`,
+            instruction: `List all reviews for PeachHaus Group business profile. The account ID is ${accountId}. Please fetch all available reviews.`,
+            parent: `accounts/${accountId}`,
             pageSize: 50,
           }
         );
+        
+        console.log("Reviews result (format 1):", JSON.stringify(reviewsResult).substring(0, 1500));
+        
+        // Check if we got an error - try to extract reviews or identify if we need a different format
+        const content1 = reviewsResult?.result?.content?.[0]?.text || "";
+        
+        // If we got a 404 or location error, the API might need a different approach
+        if (content1.includes("404") || content1.includes("not found") || content1.includes("location")) {
+          // Try format 2: Use the account ID as both account and location (some PERSONAL setups)
+          console.log("Format 1 failed, trying with account as location...");
+          
+          // Look for any location IDs mentioned in the error message
+          const locationMatch = content1.match(/locations?\/(\d+)/i) || content1.match(/location[^\d]*ID[^\d]*(\d{10,})/i);
+          if (locationMatch) {
+            const extractedLocationId = locationMatch[1];
+            console.log("Found location ID in error:", extractedLocationId);
+            
+            reviewsResult = await callMCPTool(
+              accessToken,
+              userId,
+              "google_my_business-list-all-reviews",
+              {
+                instruction: `List all reviews for location accounts/${accountId}/locations/${extractedLocationId}`,
+                parent: `accounts/${accountId}/locations/${extractedLocationId}`,
+                pageSize: 50,
+              }
+            );
+            successFormat = `accounts/${accountId}/locations/${extractedLocationId}`;
+          } else {
+            // Try asking MCP to figure out the right format
+            console.log("Trying MCP to auto-discover location...");
+            reviewsResult = await callMCPTool(
+              accessToken,
+              userId,
+              "google_my_business-list-all-reviews",
+              {
+                instruction: `I need to list all reviews for PeachHaus Group. The account ID is ${accountId}. Please first find the correct location under this account, then list all the reviews. Return the reviews in JSON format.`,
+                pageSize: 50,
+              }
+            );
+          }
+          
+          console.log("Reviews result (alternative):", JSON.stringify(reviewsResult).substring(0, 1500));
+        }
 
         console.log("Reviews result:", JSON.stringify(reviewsResult).substring(0, 1000));
 
