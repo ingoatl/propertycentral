@@ -753,23 +753,46 @@ serve(async (req) => {
       }
 
       case "update-settings": {
-        // Update GBP settings
+        // Update GBP settings - use upsert to handle case where no settings exist
         const { gbpAccountId, gbpLocationId, autoReplyEnabled, autoPostEnabled, postTime, replyDelayMinutes } = params;
         
-        const { data, error } = await supabase
-          .from("gbp_settings")
-          .update({
-            gbp_account_id: gbpAccountId,
-            gbp_location_id: gbpLocationId,
-            auto_reply_enabled: autoReplyEnabled,
-            auto_post_enabled: autoPostEnabled,
-            post_time: postTime,
-            reply_delay_minutes: replyDelayMinutes,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", settings?.id)
-          .select()
-          .single();
+        // Build update object with only provided fields
+        const updateData: Record<string, any> = {
+          updated_at: new Date().toISOString(),
+        };
+        
+        if (gbpAccountId !== undefined) updateData.gbp_account_id = gbpAccountId;
+        if (gbpLocationId !== undefined) updateData.gbp_location_id = gbpLocationId;
+        if (autoReplyEnabled !== undefined) updateData.auto_reply_enabled = autoReplyEnabled;
+        if (autoPostEnabled !== undefined) updateData.auto_post_enabled = autoPostEnabled;
+        if (postTime !== undefined) updateData.post_time = postTime;
+        if (replyDelayMinutes !== undefined) updateData.reply_delay_minutes = replyDelayMinutes;
+
+        let data, error;
+
+        if (settings?.id) {
+          // Update existing settings
+          const result = await supabase
+            .from("gbp_settings")
+            .update(updateData)
+            .eq("id", settings.id)
+            .select()
+            .single();
+          data = result.data;
+          error = result.error;
+        } else {
+          // Insert new settings record
+          const result = await supabase
+            .from("gbp_settings")
+            .insert({
+              ...updateData,
+              created_at: new Date().toISOString(),
+            })
+            .select()
+            .single();
+          data = result.data;
+          error = result.error;
+        }
 
         if (error) {
           return new Response(JSON.stringify({ 
