@@ -19,8 +19,8 @@ const PIPEDREAM_USER_ID = Deno.env.get("PIPEDREAM_USER_ID") || "admin";
 async function getPipedreamAccessToken(): Promise<string> {
   const response = await fetch("https://api.pipedream.com/v1/oauth/token", {
     method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
       grant_type: "client_credentials",
       client_id: PIPEDREAM_CLIENT_ID!,
       client_secret: PIPEDREAM_CLIENT_SECRET!,
@@ -35,19 +35,131 @@ async function getPipedreamAccessToken(): Promise<string> {
   return data.access_token;
 }
 
+// Create a Pipedream Connect token for the user (same as Google Calendar)
+async function createConnectToken(userId: string, successRedirectUri: string): Promise<{ token: string; connect_link_url: string; expires_at: string }> {
+  const accessToken = await getPipedreamAccessToken();
+
+  console.log("Creating Connect token for GBP user:", userId);
+  console.log("Success redirect URI:", successRedirectUri);
+  console.log("Project ID:", PIPEDREAM_PROJECT_ID);
+
+  const response = await fetch(`https://api.pipedream.com/v1/connect/${PIPEDREAM_PROJECT_ID}/tokens`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+      "x-pd-environment": "development",
+    },
+    body: JSON.stringify({
+      external_user_id: userId,
+      success_redirect_uri: successRedirectUri,
+      error_redirect_uri: successRedirectUri.replace("connected=true", "connected=false"),
+    }),
+  });
+
+  const data = await response.json();
+  console.log("Connect token response status:", response.status);
+  console.log("Connect token response:", JSON.stringify(data));
+  
+  if (!response.ok || data.error) {
+    console.error("Connect token error:", data);
+    throw new Error(data.error_description || data.error || data.message || "Failed to create connect token");
+  }
+
+  return { 
+    token: data.token, 
+    connect_link_url: data.connect_link_url,
+    expires_at: data.expires_at 
+  };
+}
+
+// Get user's connected accounts from Pipedream
+async function getUserAccounts(userId: string): Promise<any[]> {
+  const accessToken = await getPipedreamAccessToken();
+
+  console.log("Getting Pipedream accounts for user:", userId);
+
+  const response = await fetch(
+    `https://api.pipedream.com/v1/connect/${PIPEDREAM_PROJECT_ID}/users/${encodeURIComponent(userId)}/accounts`,
+    {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "x-pd-environment": "development",
+      },
+    }
+  );
+
+  const data = await response.json();
+  console.log("Get accounts response status:", response.status);
+  console.log("Get accounts response:", JSON.stringify(data).substring(0, 500));
+  
+  if (data.error) {
+    console.error("Get accounts error:", data);
+    return [];
+  }
+
+  let accounts: any[] = [];
+  if (Array.isArray(data)) {
+    accounts = data;
+  } else if (data.data && Array.isArray(data.data)) {
+    accounts = data.data;
+  } else if (data.accounts && Array.isArray(data.accounts)) {
+    accounts = data.accounts;
+  }
+  
+  console.log("Parsed accounts count:", accounts.length);
+  return accounts;
+}
+
+// Check if user has Google My Business connected
+async function hasGBPConnection(userId: string): Promise<boolean> {
+  const accounts = await getUserAccounts(userId);
+  
+  const gbpAccount = accounts.find((a: any) => {
+    const appSlug = typeof a.app === "object" ? a.app?.name_slug : a.app;
+    return appSlug === "google_my_business" || 
+           appSlug === "google-my-business" || 
+           a.name?.toLowerCase().includes("google my business") ||
+           a.name?.toLowerCase().includes("business profile");
+  });
+
+  console.log("GBP connection found:", !!gbpAccount, gbpAccount ? JSON.stringify(gbpAccount) : "none");
+  return !!gbpAccount;
+}
+
 // Parse SSE response from Pipedream MCP
 async function parseSSEResponse(response: Response): Promise<any> {
-  const text = await response.text();
-  const lines = text.split("\n");
-  let lastData = null;
+  const contentType = response.headers.get("content-type") || "";
   
-  for (const line of lines) {
-    if (line.startsWith("data: ")) {
-      const jsonStr = line.substring(6);
-      try {
-        lastData = JSON.parse(jsonStr);
-      } catch (e) {
-        console.log("Failed to parse SSE line:", jsonStr);
+  // If it's regular JSON, parse directly
+  if (contentType.includes("application/json")) {
+    return await response.json();
+  }
+  
+  // Handle SSE (Server-Sent Events) response
+  const reader = response.body!.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let lastData: any = null;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() || "";
+
+    for (const line of lines) {
+      if (line.startsWith("data: ")) {
+        const data = line.slice(6).trim();
+        if (data === "[DONE]") continue;
+        try {
+          lastData = JSON.parse(data);
+          console.log("SSE data parsed:", JSON.stringify(lastData).substring(0, 200));
+        } catch (e) {
+          console.log("SSE parse error for line:", data);
+        }
       }
     }
   }
@@ -261,6 +373,106 @@ serve(async (req) => {
     const userId = params.userId || PIPEDREAM_USER_ID;
 
     switch (action) {
+      case "get-auth-url": {
+        // Get Pipedream Connect URL for Google My Business OAuth
+        const { redirectUrl } = params;
+
+        if (!PIPEDREAM_CLIENT_ID || !PIPEDREAM_CLIENT_SECRET || !PIPEDREAM_PROJECT_ID) {
+          throw new Error("Pipedream credentials not configured. Please add PIPEDREAM_CLIENT_ID, PIPEDREAM_CLIENT_SECRET, and PIPEDREAM_PROJECT_ID.");
+        }
+
+        // Check if user already has Google My Business connected
+        const hasConnection = await hasGBPConnection(userId);
+        if (hasConnection) {
+          // Verify the connection works via MCP
+          try {
+            const accessToken = await getPipedreamAccessToken();
+            const tools = await listMCPTools(accessToken, userId);
+            
+            // If we can list tools, connection is working
+            if (tools && !tools.error) {
+              return new Response(JSON.stringify({ 
+                success: true, 
+                connected: true,
+                message: "Google Business Profile is already connected" 
+              }), {
+                headers: { ...corsHeaders, "Content-Type": "application/json" },
+              });
+            }
+          } catch (e) {
+            console.log("Existing connection verification failed, will prompt for reconnect:", e);
+          }
+        }
+
+        // Create success redirect URL
+        const baseRedirect = redirectUrl || "https://peachhaus.lovable.app";
+        const successRedirectUri = `${baseRedirect}/admin?tab=gbp&connected=true`;
+
+        // Create a Pipedream Connect token
+        const connectData = await createConnectToken(userId, successRedirectUri);
+        
+        // Build the Connect Link URL with app parameter for Google My Business
+        const authUrl = `${connectData.connect_link_url}&app=google_my_business`;
+
+        console.log("Generated Pipedream Connect auth URL for GBP:", authUrl);
+
+        return new Response(JSON.stringify({ authUrl, connected: false }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      case "check-connection": {
+        // Check if Google Business Profile is connected
+        try {
+          const hasConnection = await hasGBPConnection(userId);
+          
+          if (!hasConnection) {
+            return new Response(JSON.stringify({ 
+              connected: false, 
+              verified: false,
+              error: "No Google Business Profile account connected"
+            }), {
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+          }
+
+          // Verify connection works by listing tools via MCP
+          try {
+            const accessToken = await getPipedreamAccessToken();
+            const tools = await listMCPTools(accessToken, userId);
+            
+            // Check if we got a valid response
+            const hasTools = tools?.result?.tools || tools?.tools;
+            
+            return new Response(JSON.stringify({ 
+              connected: true, 
+              verified: !!hasTools,
+              message: hasTools ? "Google Business Profile connected and verified" : "Connection exists but could not verify tools"
+            }), {
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+          } catch (mcpError: any) {
+            console.error("MCP verification failed:", mcpError);
+            
+            return new Response(JSON.stringify({ 
+              connected: true, 
+              verified: false,
+              error: mcpError.message || "Could not verify GBP access via MCP"
+            }), {
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+            });
+          }
+        } catch (error: any) {
+          return new Response(JSON.stringify({ 
+            connected: false, 
+            verified: false,
+            error: error.message 
+          }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      }
+
       case "list-tools": {
         // List available GBP MCP tools
         const accessToken = await getPipedreamAccessToken();
