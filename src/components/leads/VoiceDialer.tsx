@@ -21,6 +21,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Device, Call } from "@twilio/voice-sdk";
 import { useQuery } from "@tanstack/react-query";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { cn } from "@/lib/utils";
 
 interface VoiceDialerProps {
   defaultMessage?: string;
@@ -44,6 +46,7 @@ const VoiceDialer = ({ defaultMessage }: VoiceDialerProps) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [isSendingSMS, setIsSendingSMS] = useState(false);
   const [selectedContact, setSelectedContact] = useState<ContactRecord | null>(null);
+  const isMobile = useIsMobile();
   
   const deviceRef = useRef<Device | null>(null);
   const callRef = useRef<Call | null>(null);
@@ -306,47 +309,82 @@ const VoiceDialer = ({ defaultMessage }: VoiceDialerProps) => {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" className="gap-2">
+        <Button 
+          variant="outline" 
+          size={isMobile ? "icon" : "default"}
+          className={cn(
+            "gap-2",
+            isMobile ? "h-10 w-10 min-h-[44px] min-w-[44px]" : ""
+          )}
+        >
           <Phone className="h-4 w-4" />
-          Dialer
+          {!isMobile && "Dialer"}
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[360px]">
-        <DialogHeader>
-          <DialogTitle className="text-center">Voice Dialer</DialogTitle>
+      <DialogContent 
+        className={cn(
+          "p-4",
+          isMobile 
+            ? "fixed inset-0 w-full h-full max-w-none max-h-none rounded-none m-0 flex flex-col" 
+            : "sm:max-w-[380px]"
+        )}
+      >
+        <DialogHeader className="shrink-0">
+          <DialogTitle className="text-center text-xl">Voice Dialer</DialogTitle>
         </DialogHeader>
         
-        <div className="space-y-4">
+        <div className={cn(
+          "space-y-4 flex-1 flex flex-col",
+          isMobile && "pb-[env(safe-area-inset-bottom)]"
+        )}>
           {view === 'search' && !isOnCall ? (
-            <>
-              <Command className="rounded-lg border">
+            <div className="flex-1 flex flex-col">
+              <Command className="rounded-xl border flex-1">
                 <CommandInput 
                   placeholder="Search owners, leads, addresses..." 
                   value={searchQuery}
                   onValueChange={setSearchQuery}
+                  className={isMobile ? "h-12 text-base" : ""}
                 />
-                <CommandList className="max-h-64">
+                <CommandList className={isMobile ? "max-h-none flex-1" : "max-h-64"}>
                   <CommandEmpty>No contacts found.</CommandEmpty>
                   <CommandGroup>
-                    {filteredContacts.slice(0, 15).map((contact) => (
+                    {filteredContacts.slice(0, isMobile ? 20 : 15).map((contact) => (
                       <CommandItem
                         key={`${contact.type}-${contact.id}`}
                         onSelect={() => handleSelectContact(contact)}
-                        className="cursor-pointer"
+                        className={cn(
+                          "cursor-pointer",
+                          isMobile ? "py-4 px-3" : ""
+                        )}
                       >
-                        <div className="flex items-center gap-2 flex-1">
-                          {contact.type === 'owner' ? (
-                            <Home className="h-4 w-4 text-muted-foreground shrink-0" />
-                          ) : (
-                            <User className="h-4 w-4 text-muted-foreground shrink-0" />
-                          )}
-                          <div className="flex-1 min-w-0">
-                            <p className="font-medium truncate">{contact.name}</p>
-                            {contact.address && (
-                              <p className="text-xs text-muted-foreground truncate">{contact.address}</p>
+                        <div className="flex items-center gap-3 flex-1">
+                          <div className={cn(
+                            "rounded-full bg-muted flex items-center justify-center shrink-0",
+                            isMobile ? "h-10 w-10" : "h-8 w-8"
+                          )}>
+                            {contact.type === 'owner' ? (
+                              <Home className={isMobile ? "h-5 w-5" : "h-4 w-4"} />
+                            ) : (
+                              <User className={isMobile ? "h-5 w-5" : "h-4 w-4"} />
                             )}
                           </div>
-                          <span className="text-xs text-muted-foreground shrink-0">{contact.phone}</span>
+                          <div className="flex-1 min-w-0">
+                            <p className={cn(
+                              "font-medium truncate",
+                              isMobile ? "text-base" : "text-sm"
+                            )}>{contact.name}</p>
+                            {contact.address && (
+                              <p className={cn(
+                                "text-muted-foreground truncate",
+                                isMobile ? "text-sm" : "text-xs"
+                              )}>{contact.address}</p>
+                            )}
+                          </div>
+                          <span className={cn(
+                            "text-muted-foreground shrink-0",
+                            isMobile ? "text-sm" : "text-xs"
+                          )}>{contact.phone}</span>
                         </div>
                       </CommandItem>
                     ))}
@@ -356,27 +394,44 @@ const VoiceDialer = ({ defaultMessage }: VoiceDialerProps) => {
               
               <Button 
                 variant="outline" 
-                className="w-full"
+                className={cn(
+                  "w-full mt-4",
+                  isMobile ? "h-14 text-base" : ""
+                )}
                 onClick={() => setView('dialer')}
               >
-                <Phone className="h-4 w-4 mr-2" />
+                <Phone className="h-5 w-5 mr-2" />
                 Manual dial
               </Button>
-            </>
+            </div>
           ) : (
-            <>
+            <div className={cn(
+              "flex-1 flex flex-col",
+              isMobile && "justify-center"
+            )}>
               {selectedContact && !isOnCall && (
-                <div className="p-3 bg-muted rounded-lg">
-                  <div className="flex items-center gap-2">
-                    {selectedContact.type === 'owner' ? (
-                      <Home className="h-4 w-4 text-muted-foreground" />
-                    ) : (
-                      <User className="h-4 w-4 text-muted-foreground" />
-                    )}
+                <div className="p-4 bg-muted rounded-xl mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className={cn(
+                      "rounded-full bg-primary/10 flex items-center justify-center",
+                      isMobile ? "h-12 w-12" : "h-10 w-10"
+                    )}>
+                      {selectedContact.type === 'owner' ? (
+                        <Home className={isMobile ? "h-6 w-6" : "h-5 w-5"} />
+                      ) : (
+                        <User className={isMobile ? "h-6 w-6" : "h-5 w-5"} />
+                      )}
+                    </div>
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium truncate">{selectedContact.name}</p>
+                      <p className={cn(
+                        "font-medium truncate",
+                        isMobile ? "text-lg" : "text-base"
+                      )}>{selectedContact.name}</p>
                       {selectedContact.address && (
-                        <p className="text-xs text-muted-foreground truncate">{selectedContact.address}</p>
+                        <p className={cn(
+                          "text-muted-foreground truncate",
+                          isMobile ? "text-sm" : "text-xs"
+                        )}>{selectedContact.address}</p>
                       )}
                     </div>
                   </div>
@@ -388,33 +443,42 @@ const VoiceDialer = ({ defaultMessage }: VoiceDialerProps) => {
                   value={formatPhoneDisplay(phoneNumber)}
                   onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, ""))}
                   placeholder="Enter phone number"
-                  className="text-center text-xl font-medium h-14 pr-10"
+                  className={cn(
+                    "text-center font-medium pr-12",
+                    isMobile ? "text-2xl h-16" : "text-xl h-14"
+                  )}
                   disabled={isOnCall}
                 />
                 {phoneNumber && !isOnCall && (
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 h-10 w-10"
                     onClick={handleBackspace}
                   >
-                    <Delete className="h-4 w-4" />
+                    <Delete className="h-5 w-5" />
                   </Button>
                 )}
               </div>
 
               {isOnCall && (
-                <div className="text-center text-green-600 font-medium">
+                <div className="text-center text-green-600 font-semibold text-lg py-3">
                   Connected • {formatDuration(callDuration)}
                 </div>
               )}
 
-              <div className="grid grid-cols-3 gap-2">
+              <div className={cn(
+                "grid grid-cols-3 my-4",
+                isMobile ? "gap-3" : "gap-2"
+              )}>
                 {dialPad.flat().map((digit) => (
                   <Button
                     key={digit}
                     variant="outline"
-                    className="h-12 text-xl font-medium"
+                    className={cn(
+                      "font-semibold rounded-2xl active:scale-95 transition-transform",
+                      isMobile ? "h-16 text-2xl" : "h-14 text-xl"
+                    )}
                     onClick={() => handleDigitPress(digit)}
                   >
                     {digit}
@@ -422,7 +486,10 @@ const VoiceDialer = ({ defaultMessage }: VoiceDialerProps) => {
                 ))}
               </div>
 
-              <div className="flex gap-2">
+              <div className={cn(
+                "flex gap-3",
+                isMobile ? "mt-auto" : ""
+              )}>
                 {!isOnCall && (
                   <>
                     <Button
@@ -430,19 +497,21 @@ const VoiceDialer = ({ defaultMessage }: VoiceDialerProps) => {
                       size="icon"
                       onClick={handleClear}
                       disabled={isConnecting}
+                      className={isMobile ? "h-14 w-14" : "h-12 w-12"}
                     >
-                      <Search className="h-4 w-4" />
+                      <Search className="h-5 w-5" />
                     </Button>
                     <Button
                       variant="outline"
                       size="icon"
                       onClick={handleSendSMS}
                       disabled={!phoneNumber || isSendingSMS || isConnecting}
+                      className={isMobile ? "h-14 w-14" : "h-12 w-12"}
                     >
                       {isSendingSMS ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
+                        <Loader2 className="h-5 w-5 animate-spin" />
                       ) : (
-                        <MessageSquare className="h-4 w-4" />
+                        <MessageSquare className="h-5 w-5" />
                       )}
                     </Button>
                   </>
@@ -451,30 +520,36 @@ const VoiceDialer = ({ defaultMessage }: VoiceDialerProps) => {
                 {isOnCall ? (
                   <Button
                     variant="destructive"
-                    className="flex-1"
+                    className={cn(
+                      "flex-1 font-semibold",
+                      isMobile ? "h-14 text-lg" : "h-12"
+                    )}
                     onClick={handleEndCall}
                   >
-                    <PhoneOff className="h-4 w-4 mr-2" />
+                    <PhoneOff className="h-5 w-5 mr-2" />
                     End Call
                   </Button>
                 ) : (
                   <Button
-                    className="flex-1 bg-green-600 hover:bg-green-700"
+                    className={cn(
+                      "flex-1 bg-green-600 hover:bg-green-700 font-semibold",
+                      isMobile ? "h-14 text-lg" : "h-12"
+                    )}
                     onClick={handleCall}
                     disabled={isConnecting || !phoneNumber}
                   >
                     {isConnecting ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <Loader2 className="h-5 w-5 animate-spin" />
                     ) : (
                       <>
-                        <PhoneCall className="h-4 w-4 mr-2" />
+                        <PhoneCall className="h-5 w-5 mr-2" />
                         Call
                       </>
                     )}
                   </Button>
                 )}
               </div>
-            </>
+            </div>
           )}
         </div>
       </DialogContent>

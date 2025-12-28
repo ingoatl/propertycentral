@@ -92,10 +92,10 @@ export const PhotoCaptureField: React.FC<PhotoCaptureFieldProps> = ({
   };
 
   return (
-    <div className="mt-3 space-y-2">
+    <div className="mt-4 space-y-3">
       {/* Photo Label */}
-      <p className="text-sm text-muted-foreground flex items-center gap-1">
-        <ImageIcon className="h-3.5 w-3.5" />
+      <p className="text-sm text-muted-foreground flex items-center gap-1.5">
+        <ImageIcon className="h-4 w-4" />
         {photoLabel}
       </p>
 
@@ -122,30 +122,30 @@ export const PhotoCaptureField: React.FC<PhotoCaptureFieldProps> = ({
           <img
             src={photoPreview}
             alt="Captured"
-            className="w-full h-40 object-cover"
+            className="w-full h-48 object-cover"
           />
-          <div className="absolute top-2 right-2 flex gap-1">
+          <div className="absolute top-2 right-2 flex gap-2">
             <Button
               size="icon"
               variant="secondary"
-              className="h-8 w-8 rounded-full bg-background/80 backdrop-blur-sm"
+              className="h-10 w-10 rounded-full bg-background/80 backdrop-blur-sm"
               onClick={handleRemovePhoto}
             >
-              <X className="h-4 w-4" />
+              <X className="h-5 w-5" />
             </Button>
           </div>
           <div className="absolute bottom-2 left-2">
-            <div className="flex items-center gap-1 px-2 py-1 bg-green-500/90 text-white rounded-full text-xs">
-              <Check className="h-3 w-3" />
+            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-green-500/90 text-white rounded-full text-sm font-medium">
+              <Check className="h-4 w-4" />
               Photo captured
             </div>
           </div>
         </div>
       ) : (
-        <div className="flex gap-2">
+        <div className="flex gap-3">
           {isUploading ? (
-            <div className="flex-1 h-24 rounded-xl border-2 border-dashed border-primary/30 flex items-center justify-center bg-muted/50">
-              <Loader2 className="h-6 w-6 animate-spin text-primary" />
+            <div className="flex-1 h-28 rounded-xl border-2 border-dashed border-primary/30 flex items-center justify-center bg-muted/50">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
           ) : (
             <>
@@ -155,12 +155,13 @@ export const PhotoCaptureField: React.FC<PhotoCaptureFieldProps> = ({
                   variant="outline"
                   onClick={triggerCamera}
                   className={cn(
-                    "flex-1 h-24 rounded-xl border-2 border-dashed flex-col gap-2",
-                    "hover:border-primary hover:bg-primary/5 transition-all"
+                    "flex-1 h-28 rounded-xl border-2 border-dashed flex-col gap-2",
+                    "hover:border-primary hover:bg-primary/5 transition-all",
+                    "active:scale-98 min-h-[112px]"
                   )}
                 >
-                  <Camera className="h-6 w-6 text-primary" />
-                  <span className="text-xs">Take Photo</span>
+                  <Camera className="h-8 w-8 text-primary" />
+                  <span className="text-sm font-medium">Take Photo</span>
                 </Button>
               )}
               {(photoType === 'upload' || photoType === 'both') && (
@@ -169,12 +170,13 @@ export const PhotoCaptureField: React.FC<PhotoCaptureFieldProps> = ({
                   variant="outline"
                   onClick={triggerFileUpload}
                   className={cn(
-                    "flex-1 h-24 rounded-xl border-2 border-dashed flex-col gap-2",
-                    "hover:border-primary hover:bg-primary/5 transition-all"
+                    "flex-1 h-28 rounded-xl border-2 border-dashed flex-col gap-2",
+                    "hover:border-primary hover:bg-primary/5 transition-all",
+                    "active:scale-98 min-h-[112px]"
                   )}
                 >
-                  <Upload className="h-6 w-6 text-primary" />
-                  <span className="text-xs">Upload</span>
+                  <Upload className="h-8 w-8 text-primary" />
+                  <span className="text-sm font-medium">Upload</span>
                 </Button>
               )}
             </>
