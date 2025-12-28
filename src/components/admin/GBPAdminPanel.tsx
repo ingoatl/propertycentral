@@ -100,16 +100,18 @@ export default function GBPAdminPanel() {
     },
   });
 
-  // Fetch settings
+  // Fetch settings (get first one since there should only be one global settings row)
   const { data: settings, isLoading: settingsLoading } = useQuery({
     queryKey: ["gbp-settings"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("gbp_settings")
         .select("*")
-        .single();
+        .order("created_at", { ascending: true })
+        .limit(1)
+        .maybeSingle();
       if (error) throw error;
-      return data as GBPSettings;
+      return data as GBPSettings | null;
     },
   });
 
