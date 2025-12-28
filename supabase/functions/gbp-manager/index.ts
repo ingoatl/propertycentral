@@ -567,24 +567,89 @@ serve(async (req) => {
 
       case "sync-reviews": {
         // Sync reviews from Google Business Profile
-        if (!settings?.gbp_account_id || !settings?.gbp_location_id) {
+        if (!settings?.gbp_account_id) {
           return new Response(JSON.stringify({ 
             success: false, 
-            error: "GBP Account ID and Location ID not configured" 
+            error: "GBP Account ID not configured" 
           }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 });
         }
 
         const accessToken = await getPipedreamAccessToken();
         
-        // Call the list reviews MCP tool (correct tool name: list-all-reviews)
-        // Pipedream MCP tools require an 'instruction' parameter
+        // First, fetch actual locations from the account to get the correct location ID
+        let locationId = settings.gbp_location_id;
+        
+        console.log("Fetching locations for account:", settings.gbp_account_id);
+        const locationsResult = await callMCPTool(
+          accessToken,
+          userId,
+          "google_my_business-list-locations",
+          {
+            instruction: `List all locations for account ${settings.gbp_account_id}`,
+            parent: `accounts/${settings.gbp_account_id}`,
+          }
+        );
+        
+        console.log("Locations result:", JSON.stringify(locationsResult).substring(0, 1500));
+        
+        // Try to extract location ID from the response
+        const locContent = locationsResult?.result?.content?.[0]?.text || "";
+        
+        // Try parsing as JSON first
+        try {
+          const locParsed = JSON.parse(locContent);
+          if (locParsed?.locations?.length > 0) {
+            // Get the location name and extract the ID
+            const firstLocation = locParsed.locations[0];
+            const locName = firstLocation.name || "";
+            // Location name format: accounts/{accountId}/locations/{locationId}
+            const locMatch = locName.match(/locations\/(\d+)/);
+            if (locMatch) {
+              locationId = locMatch[1];
+              console.log("Found location ID from JSON:", locationId);
+            }
+          }
+        } catch {
+          // Try regex to find location ID from natural language response
+          const locIdMatch = locContent.match(/locations\/(\d+)/);
+          if (locIdMatch) {
+            locationId = locIdMatch[1];
+            console.log("Found location ID from regex:", locationId);
+          } else {
+            // Try another pattern - looking for numeric IDs mentioned as location
+            const altMatch = locContent.match(/location[^\d]*(\d{10,})/i);
+            if (altMatch) {
+              locationId = altMatch[1];
+              console.log("Found location ID from alt regex:", locationId);
+            }
+          }
+        }
+        
+        if (!locationId) {
+          return new Response(JSON.stringify({ 
+            success: false, 
+            error: "Could not determine location ID. Please check if your GBP account has any locations configured.",
+            locationsResponse: locContent.substring(0, 500),
+          }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 });
+        }
+        
+        // Update settings with discovered location ID if different
+        if (locationId !== settings.gbp_location_id) {
+          console.log(`Updating location ID from ${settings.gbp_location_id} to ${locationId}`);
+          await supabase
+            .from("gbp_settings")
+            .update({ gbp_location_id: locationId })
+            .eq("id", settings.id);
+        }
+        
+        // Now fetch reviews with the correct location ID
         const reviewsResult = await callMCPTool(
           accessToken,
           userId,
           "google_my_business-list-all-reviews",
           {
-            instruction: `List all reviews for the location accounts/${settings.gbp_account_id}/locations/${settings.gbp_location_id}`,
-            parent: `accounts/${settings.gbp_account_id}/locations/${settings.gbp_location_id}`,
+            instruction: `List all reviews for location accounts/${settings.gbp_account_id}/locations/${locationId}`,
+            parent: `accounts/${settings.gbp_account_id}/locations/${locationId}`,
             pageSize: 50,
           }
         );
