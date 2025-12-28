@@ -569,7 +569,7 @@ serve(async (req) => {
         // Sync reviews from Google Business Profile
         const accessToken = await getPipedreamAccessToken();
         
-        // The MCP tools only accept an 'instruction' parameter - let the AI figure out the right format
+        // The MCP tools only accept an 'instruction' parameter - be very explicit to proceed automatically
         console.log("Fetching all reviews via MCP instruction...");
         
         const reviewsResult = await callMCPTool(
@@ -577,7 +577,13 @@ serve(async (req) => {
           userId,
           "google_my_business-list-all-reviews",
           {
-            instruction: `List all reviews for the PeachHaus Group business. First, list all available accounts and locations to find the correct business location. Then fetch and return all reviews in JSON format with fields: name, reviewer name, star rating (as number 1-5), review text, and any existing reply. If you encounter any errors finding locations, please include details about what accounts/locations you found.`,
+            instruction: `IMPORTANT: Do NOT ask for confirmation. Proceed automatically with these steps:
+1. Use account ID 106698735661379366674 (PeachHaus Group)
+2. List ALL locations under this account
+3. For EACH location found, fetch ALL reviews
+4. Return the reviews as a JSON array with these fields for each review: name (the review resource name), reviewerName, starRating (number 1-5), reviewText, and reviewReply (if any exists)
+5. If no locations are found, try listing reviews directly from the account
+6. Do NOT ask for confirmation at any step - just proceed and return results`,
           }
         );
         
