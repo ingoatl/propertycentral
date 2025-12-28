@@ -272,6 +272,85 @@ serve(async (req) => {
         }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
+      case "list-accounts": {
+        // List GBP accounts the user has access to
+        const accessToken = await getPipedreamAccessToken();
+        
+        console.log("Listing GBP accounts...");
+        
+        const accountsResult = await callMCPTool(
+          accessToken,
+          userId,
+          "google_my_business-list-accounts",
+          {}
+        );
+
+        console.log("Accounts result:", JSON.stringify(accountsResult).substring(0, 2000));
+
+        // Extract accounts from the response
+        let accounts = [];
+        try {
+          const content = accountsResult?.result?.content?.[0]?.text;
+          if (content) {
+            const parsed = JSON.parse(content);
+            accounts = parsed?.accounts || [];
+          }
+        } catch (e) {
+          console.error("Failed to parse accounts:", e);
+        }
+
+        return new Response(JSON.stringify({ 
+          success: true, 
+          accounts,
+          raw: accountsResult
+        }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      case "list-locations": {
+        // List locations for a specific account
+        const { accountId } = params;
+        
+        if (!accountId) {
+          return new Response(JSON.stringify({ 
+            success: false, 
+            error: "Account ID is required" 
+          }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 });
+        }
+
+        const accessToken = await getPipedreamAccessToken();
+        
+        console.log(`Listing locations for account: ${accountId}`);
+        
+        const locationsResult = await callMCPTool(
+          accessToken,
+          userId,
+          "google_my_business-list-locations",
+          {
+            parent: `accounts/${accountId}`,
+          }
+        );
+
+        console.log("Locations result:", JSON.stringify(locationsResult).substring(0, 2000));
+
+        // Extract locations from the response
+        let locations = [];
+        try {
+          const content = locationsResult?.result?.content?.[0]?.text;
+          if (content) {
+            const parsed = JSON.parse(content);
+            locations = parsed?.locations || [];
+          }
+        } catch (e) {
+          console.error("Failed to parse locations:", e);
+        }
+
+        return new Response(JSON.stringify({ 
+          success: true, 
+          locations,
+          raw: locationsResult
+        }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
       case "sync-reviews": {
         // Sync reviews from Google Business Profile
         if (!settings?.gbp_account_id || !settings?.gbp_location_id) {

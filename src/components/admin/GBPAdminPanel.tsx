@@ -4,11 +4,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { 
   Star, 
@@ -24,9 +25,27 @@ import {
   Building,
   Loader2,
   ExternalLink,
-  Plus
+  Plus,
+  List
 } from "lucide-react";
 import { format } from "date-fns";
+
+interface GBPAccount {
+  name: string;
+  accountName: string;
+  type: string;
+  accountNumber?: string;
+}
+
+interface GBPLocation {
+  name: string;
+  locationName?: string;
+  title?: string;
+  storefrontAddress?: {
+    locality?: string;
+    administrativeArea?: string;
+  };
+}
 
 interface GBPReview {
   id: string;
@@ -73,6 +92,10 @@ export default function GBPAdminPanel() {
   const [selectedReview, setSelectedReview] = useState<string | null>(null);
   const [customReply, setCustomReply] = useState("");
   const [newPostContent, setNewPostContent] = useState("");
+  const [accounts, setAccounts] = useState<GBPAccount[]>([]);
+  const [locations, setLocations] = useState<GBPLocation[]>([]);
+  const [selectedAccountId, setSelectedAccountId] = useState<string>("");
+  const [selectedLocationId, setSelectedLocationId] = useState<string>("");
 
   // Fetch reviews
   const { data: reviews, isLoading: reviewsLoading } = useQuery({
@@ -253,6 +276,68 @@ export default function GBPAdminPanel() {
       toast.error(error.message || "Failed to list tools");
     },
   });
+
+  // List accounts mutation
+  const listAccountsMutation = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke("gbp-manager", {
+        body: { action: "list-accounts" },
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      console.log("GBP Accounts:", data);
+      if (data.accounts && data.accounts.length > 0) {
+        setAccounts(data.accounts);
+        toast.success(`Found ${data.accounts.length} account(s)`);
+      } else {
+        toast.info("No accounts found. Check your GBP MCP connection.");
+      }
+    },
+    onError: (error: any) => {
+      console.error("List accounts error:", error);
+      toast.error(error.message || "Failed to list accounts");
+    },
+  });
+
+  // List locations mutation
+  const listLocationsMutation = useMutation({
+    mutationFn: async (accountId: string) => {
+      const { data, error } = await supabase.functions.invoke("gbp-manager", {
+        body: { action: "list-locations", accountId },
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      console.log("GBP Locations:", data);
+      if (data.locations && data.locations.length > 0) {
+        setLocations(data.locations);
+        toast.success(`Found ${data.locations.length} location(s)`);
+      } else {
+        toast.info("No locations found for this account.");
+      }
+    },
+    onError: (error: any) => {
+      console.error("List locations error:", error);
+      toast.error(error.message || "Failed to list locations");
+    },
+  });
+
+  // Helper to extract account ID from account name
+  const extractAccountId = (accountName: string): string => {
+    // Account name format: "accounts/123456789"
+    const match = accountName.match(/accounts\/(\d+)/);
+    return match ? match[1] : accountName;
+  };
+
+  // Helper to extract location ID from location name
+  const extractLocationId = (locationName: string): string => {
+    // Location name format: "accounts/123456789/locations/987654321"
+    const match = locationName.match(/locations\/(\d+)/);
+    return match ? match[1] : locationName;
+  };
 
   const renderStars = (rating: number) => {
     return Array.from({ length: 5 }, (_, i) => (
@@ -568,41 +653,152 @@ export default function GBPAdminPanel() {
             ) : (
               <>
                 <div className="space-y-4">
-                  <h3 className="text-lg font-semibold">Google Business Profile Connection</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="accountId">GBP Account ID</Label>
-                      <Input
-                        id="accountId"
-                        placeholder="e.g., 123456789"
-                        defaultValue={settings?.gbp_account_id || ""}
-                        onBlur={(e) => {
-                          if (e.target.value !== settings?.gbp_account_id) {
-                            updateSettingsMutation.mutate({ gbp_account_id: e.target.value });
-                          }
-                        }}
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        Find this in your Google Business Profile URL or API response
-                      </p>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="locationId">GBP Location ID</Label>
-                      <Input
-                        id="locationId"
-                        placeholder="e.g., 987654321"
-                        defaultValue={settings?.gbp_location_id || ""}
-                        onBlur={(e) => {
-                          if (e.target.value !== settings?.gbp_location_id) {
-                            updateSettingsMutation.mutate({ gbp_location_id: e.target.value });
-                          }
-                        }}
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        The specific location/business ID
-                      </p>
-                    </div>
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-semibold">Google Business Profile Connection</h3>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => listAccountsMutation.mutate()}
+                      disabled={listAccountsMutation.isPending}
+                    >
+                      {listAccountsMutation.isPending ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <List className="w-4 h-4 mr-2" />
+                      )}
+                      Fetch Accounts
+                    </Button>
                   </div>
+
+                  {/* Step 1: Select Account */}
+                  <div className="p-4 border rounded-lg space-y-4">
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="text-xs">Step 1</Badge>
+                      <Label className="font-medium">Select GBP Account</Label>
+                    </div>
+                    
+                    {accounts.length > 0 ? (
+                      <div className="space-y-3">
+                        <Select
+                          value={selectedAccountId || settings?.gbp_account_id || ""}
+                          onValueChange={(value) => {
+                            setSelectedAccountId(value);
+                            setLocations([]);
+                            setSelectedLocationId("");
+                            updateSettingsMutation.mutate({ gbp_account_id: value });
+                          }}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select an account..." />
+                          </SelectTrigger>
+                          <SelectContent className="bg-background border">
+                            {accounts.map((account) => {
+                              const accountId = extractAccountId(account.name);
+                              return (
+                                <SelectItem key={account.name} value={accountId}>
+                                  {account.accountName || account.name} ({accountId})
+                                </SelectItem>
+                              );
+                            })}
+                          </SelectContent>
+                        </Select>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => {
+                            const accountId = selectedAccountId || settings?.gbp_account_id;
+                            if (accountId) {
+                              listLocationsMutation.mutate(accountId);
+                            } else {
+                              toast.error("Please select an account first");
+                            }
+                          }}
+                          disabled={listLocationsMutation.isPending || (!selectedAccountId && !settings?.gbp_account_id)}
+                        >
+                          {listLocationsMutation.isPending ? (
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          ) : (
+                            <List className="w-4 h-4 mr-2" />
+                          )}
+                          Fetch Locations for Selected Account
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        <p className="text-sm text-muted-foreground">
+                          Click "Fetch Accounts" to load your connected GBP accounts.
+                        </p>
+                        {settings?.gbp_account_id && (
+                          <div className="flex items-center gap-2 p-2 bg-muted/50 rounded">
+                            <CheckCircle className="w-4 h-4 text-green-500" />
+                            <span className="text-sm">Current Account ID: <code className="bg-muted px-1 rounded">{settings.gbp_account_id}</code></span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Step 2: Select Location */}
+                  <div className="p-4 border rounded-lg space-y-4">
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="text-xs">Step 2</Badge>
+                      <Label className="font-medium">Select GBP Location</Label>
+                    </div>
+                    
+                    {locations.length > 0 ? (
+                      <Select
+                        value={selectedLocationId || settings?.gbp_location_id || ""}
+                        onValueChange={(value) => {
+                          setSelectedLocationId(value);
+                          updateSettingsMutation.mutate({ gbp_location_id: value });
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a location..." />
+                        </SelectTrigger>
+                        <SelectContent className="bg-background border">
+                          {locations.map((location) => {
+                            const locationId = extractLocationId(location.name);
+                            const displayName = location.title || location.locationName || location.name;
+                            const address = location.storefrontAddress 
+                              ? `${location.storefrontAddress.locality || ''}, ${location.storefrontAddress.administrativeArea || ''}`
+                              : '';
+                            return (
+                              <SelectItem key={location.name} value={locationId}>
+                                {displayName} {address && `- ${address}`} ({locationId})
+                              </SelectItem>
+                            );
+                          })}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <div className="space-y-3">
+                        <p className="text-sm text-muted-foreground">
+                          Select an account first, then click "Fetch Locations" to load locations.
+                        </p>
+                        {settings?.gbp_location_id && (
+                          <div className="flex items-center gap-2 p-2 bg-muted/50 rounded">
+                            <CheckCircle className="w-4 h-4 text-green-500" />
+                            <span className="text-sm">Current Location ID: <code className="bg-muted px-1 rounded">{settings.gbp_location_id}</code></span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Connection Status */}
+                  {settings?.gbp_account_id && settings?.gbp_location_id && (
+                    <div className="p-4 bg-green-500/10 border border-green-500/30 rounded-lg flex items-start gap-3">
+                      <CheckCircle className="w-5 h-5 text-green-500 mt-0.5" />
+                      <div>
+                        <p className="font-medium text-green-600">Connection Configured</p>
+                        <p className="text-sm text-muted-foreground">
+                          Account: <code className="bg-muted px-1 rounded">{settings.gbp_account_id}</code> | 
+                          Location: <code className="bg-muted px-1 rounded">{settings.gbp_location_id}</code>
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-4">
