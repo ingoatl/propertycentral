@@ -90,14 +90,14 @@ const Layout = ({ children }: LayoutProps) => {
   return (
     <div className="min-h-screen bg-gradient-subtle">
       <header className="bg-card/80 backdrop-blur-md border-b border-border shadow-sm sticky top-0 z-50">
-        <div className="container mx-auto px-4">
-          <div className="flex items-center justify-between h-16">
+        <div className="container mx-auto px-2 sm:px-4">
+          <div className="flex items-center justify-between h-14 sm:h-16">
             {/* Left side: Mobile menu + Logo */}
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 sm:gap-3">
               {canAccessNav && <MobileNavigation isAdmin={isAdmin} />}
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-gradient-primary flex items-center justify-center shadow-warm">
-                  <Building2 className="w-6 h-6 text-primary-foreground" />
+              <div className="flex items-center gap-2 sm:gap-3">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg bg-gradient-primary flex items-center justify-center shadow-warm">
+                  <Building2 className="w-5 h-5 sm:w-6 sm:h-6 text-primary-foreground" />
                 </div>
                 <div className="hidden sm:block">
                   <h1 className="text-lg font-bold text-foreground">Property Central</h1>
@@ -109,7 +109,7 @@ const Layout = ({ children }: LayoutProps) => {
             {canAccessNav && <MainNavigation isAdmin={isAdmin} />}
 
             {/* Right side: Quick Actions + User info + Logout */}
-            <div className="flex items-center gap-2 sm:gap-3">
+            <div className="flex items-center gap-1 sm:gap-2">
               {canAccessNav && (
                 <>
                   <QuickCommunicationButton />
@@ -121,7 +121,12 @@ const Layout = ({ children }: LayoutProps) => {
                   <span className="text-sm text-muted-foreground hidden lg:inline truncate max-w-[150px]">
                     {user.email}
                   </span>
-                  <Button variant="outline" size="sm" onClick={handleLogout} className="shrink-0">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={handleLogout} 
+                    className="shrink-0 h-9 min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0"
+                  >
                     <LogOut className="h-4 w-4 lg:mr-2" />
                     <span className="hidden lg:inline">Logout</span>
                   </Button>
@@ -132,7 +137,7 @@ const Layout = ({ children }: LayoutProps) => {
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-6 md:py-8 text-base">{children}</main>
+      <main className="container mx-auto px-3 sm:px-4 py-4 md:py-8 text-base">{children}</main>
       <FloatingChatButton />
     </div>
   );

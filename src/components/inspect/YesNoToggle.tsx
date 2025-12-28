@@ -14,23 +14,23 @@ export const YesNoToggle: React.FC<YesNoToggleProps> = ({
   disabled = false
 }) => {
   return (
-    <div className="flex gap-2">
+    <div className="flex gap-3">
       {/* Yes Button */}
       <button
         type="button"
         onClick={() => onChange(true)}
         disabled={disabled}
         className={cn(
-          "flex items-center justify-center gap-1.5 px-5 py-2.5 rounded-xl font-medium text-sm",
+          "flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-medium text-base",
           "transition-all duration-200 active:scale-95",
-          "min-w-[72px]",
+          "min-w-[88px] min-h-[48px]",
           value === true
             ? "bg-green-500 text-white shadow-lg shadow-green-500/30"
             : "bg-muted text-muted-foreground hover:bg-muted/80",
           disabled && "opacity-50 cursor-not-allowed"
         )}
       >
-        <Check className="h-4 w-4" />
+        <Check className="h-5 w-5" />
         Yes
       </button>
       
@@ -40,16 +40,16 @@ export const YesNoToggle: React.FC<YesNoToggleProps> = ({
         onClick={() => onChange(false)}
         disabled={disabled}
         className={cn(
-          "flex items-center justify-center gap-1.5 px-5 py-2.5 rounded-xl font-medium text-sm",
+          "flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-medium text-base",
           "transition-all duration-200 active:scale-95",
-          "min-w-[72px]",
+          "min-w-[88px] min-h-[48px]",
           value === false
             ? "bg-red-500 text-white shadow-lg shadow-red-500/30"
             : "bg-muted text-muted-foreground hover:bg-muted/80",
           disabled && "opacity-50 cursor-not-allowed"
         )}
       >
-        <X className="h-4 w-4" />
+        <X className="h-5 w-5" />
         No
       </button>
     </div>

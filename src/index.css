@@ -29,12 +29,20 @@ All colors MUST be HSL.
     @apply min-h-[44px] min-w-[44px] md:min-h-[40px] md:min-w-[40px];
   }
   
+  .touch-target-lg {
+    @apply min-h-[48px] min-w-[48px];
+  }
+  
   .mobile-input {
     @apply h-14 text-base md:h-10 md:text-sm;
   }
   
   .mobile-button {
     @apply h-12 text-base px-6 md:h-10 md:text-sm;
+  }
+  
+  .mobile-button-lg {
+    @apply h-14 text-lg px-8 md:h-12 md:text-base;
   }
   
   .mobile-copy-button {
@@ -61,6 +69,27 @@ All colors MUST be HSL.
   
   .mobile-gap {
     @apply gap-4 md:gap-6;
+  }
+  
+  /* Full-screen mobile dialog */
+  .mobile-dialog-fullscreen {
+    @apply fixed inset-0 w-full h-full max-w-none max-h-none rounded-none m-0;
+  }
+  
+  /* Safe area insets for notched devices */
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  
+  .safe-area-top {
+    padding-top: env(safe-area-inset-top);
+  }
+  
+  .safe-area-inset {
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
   }
   
   /* Hide scrollbar but keep functionality */
@@ -95,6 +124,15 @@ All colors MUST be HSL.
   
   .scrollbar-custom::-webkit-scrollbar-thumb:hover {
     background: hsl(var(--primary) / 0.7);
+  }
+  
+  /* Active state for better touch feedback */
+  .active-scale {
+    @apply active:scale-95 transition-transform;
+  }
+  
+  .active-scale-sm {
+    @apply active:scale-98 transition-transform;
   }
 }
 

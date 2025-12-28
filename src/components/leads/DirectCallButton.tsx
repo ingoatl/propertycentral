@@ -7,10 +7,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Phone, Delete, Loader2, PhoneOff, PhoneCall, User, Home } from "lucide-react";
+import { Phone, Delete, Loader2, PhoneOff, PhoneCall, User } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Device, Call } from "@twilio/voice-sdk";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { cn } from "@/lib/utils";
 
 interface DirectCallButtonProps {
   leadId: string;
@@ -25,6 +27,7 @@ const DirectCallButton = ({ leadId, leadPhone, leadName, leadAddress }: DirectCa
   const [isConnecting, setIsConnecting] = useState(false);
   const [isOnCall, setIsOnCall] = useState(false);
   const [callDuration, setCallDuration] = useState(0);
+  const isMobile = useIsMobile();
   
   const deviceRef = useRef<Device | null>(null);
   const callRef = useRef<Call | null>(null);
@@ -224,27 +227,40 @@ const DirectCallButton = ({ leadId, leadPhone, leadName, leadAddress }: DirectCa
       <Button 
         variant="ghost" 
         size="icon" 
-        className="h-6 w-6"
+        className="h-8 w-8 min-h-[44px] min-w-[44px]"
         onClick={handleClick}
       >
-        <Phone className="h-3 w-3" />
+        <Phone className="h-4 w-4" />
       </Button>
 
       <Dialog open={open} onOpenChange={handleOpenChange}>
-        <DialogContent className="sm:max-w-[360px]" onClick={(e) => e.stopPropagation()}>
-          <DialogHeader>
-            <DialogTitle className="text-center">Call {leadName}</DialogTitle>
+        <DialogContent 
+          className={cn(
+            "p-4",
+            isMobile 
+              ? "fixed inset-0 w-full h-full max-w-none max-h-none rounded-none m-0 flex flex-col" 
+              : "sm:max-w-[380px]"
+          )} 
+          onClick={(e) => e.stopPropagation()}
+        >
+          <DialogHeader className="shrink-0">
+            <DialogTitle className="text-center text-xl">Call {leadName}</DialogTitle>
           </DialogHeader>
           
-          <div className="space-y-4">
+          <div className={cn(
+            "space-y-4 flex-1 flex flex-col",
+            isMobile && "justify-center pb-[env(safe-area-inset-bottom)]"
+          )}>
             {/* Contact info */}
-            <div className="p-3 bg-muted rounded-lg">
-              <div className="flex items-center gap-2">
-                <User className="h-4 w-4 text-muted-foreground" />
+            <div className="p-4 bg-muted rounded-xl">
+              <div className="flex items-center gap-3">
+                <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
+                  <User className="h-6 w-6 text-primary" />
+                </div>
                 <div className="flex-1 min-w-0">
-                  <p className="font-medium truncate">{leadName}</p>
+                  <p className="font-medium text-lg truncate">{leadName}</p>
                   {leadAddress && (
-                    <p className="text-xs text-muted-foreground truncate">{leadAddress}</p>
+                    <p className="text-sm text-muted-foreground truncate">{leadAddress}</p>
                   )}
                 </div>
               </div>
@@ -256,34 +272,43 @@ const DirectCallButton = ({ leadId, leadPhone, leadName, leadAddress }: DirectCa
                 value={formatPhoneDisplay(phoneNumber)}
                 onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, ""))}
                 placeholder="Enter phone number"
-                className="text-center text-xl font-medium h-14 pr-10"
+                className={cn(
+                  "text-center font-medium pr-12",
+                  isMobile ? "text-2xl h-16" : "text-xl h-14"
+                )}
                 disabled={isOnCall}
               />
               {phoneNumber && !isOnCall && (
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 h-10 w-10"
                   onClick={handleBackspace}
                 >
-                  <Delete className="h-4 w-4" />
+                  <Delete className="h-5 w-5" />
                 </Button>
               )}
             </div>
 
             {isOnCall && (
-              <div className="text-center text-green-600 font-medium">
+              <div className="text-center text-green-600 font-semibold text-lg py-2">
                 Connected • {formatDuration(callDuration)}
               </div>
             )}
 
-            {/* Dial pad */}
-            <div className="grid grid-cols-3 gap-2">
+            {/* Dial pad - larger on mobile */}
+            <div className={cn(
+              "grid grid-cols-3",
+              isMobile ? "gap-3" : "gap-2"
+            )}>
               {dialPad.flat().map((digit) => (
                 <Button
                   key={digit}
                   variant="outline"
-                  className="h-12 text-xl font-medium"
+                  className={cn(
+                    "font-semibold rounded-2xl active:scale-95 transition-transform",
+                    isMobile ? "h-16 text-2xl" : "h-14 text-xl"
+                  )}
                   onClick={() => handleDigitPress(digit)}
                 >
                   {digit}
@@ -291,28 +316,34 @@ const DirectCallButton = ({ leadId, leadPhone, leadName, leadAddress }: DirectCa
               ))}
             </div>
 
-            {/* Call buttons */}
-            <div className="flex gap-2">
+            {/* Call buttons - larger on mobile */}
+            <div className="flex gap-3 pt-2">
               {isOnCall ? (
                 <Button
                   variant="destructive"
-                  className="flex-1"
+                  className={cn(
+                    "flex-1 font-semibold",
+                    isMobile ? "h-14 text-lg" : "h-12"
+                  )}
                   onClick={handleEndCall}
                 >
-                  <PhoneOff className="h-4 w-4 mr-2" />
+                  <PhoneOff className="h-5 w-5 mr-2" />
                   End Call
                 </Button>
               ) : (
                 <Button
-                  className="flex-1 bg-green-600 hover:bg-green-700"
+                  className={cn(
+                    "flex-1 bg-green-600 hover:bg-green-700 font-semibold",
+                    isMobile ? "h-14 text-lg" : "h-12"
+                  )}
                   onClick={handleCall}
                   disabled={isConnecting || !phoneNumber}
                 >
                   {isConnecting ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <Loader2 className="h-5 w-5 animate-spin" />
                   ) : (
                     <>
-                      <PhoneCall className="h-4 w-4 mr-2" />
+                      <PhoneCall className="h-5 w-5 mr-2" />
                       Call
                     </>
                   )}
