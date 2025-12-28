@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -96,6 +96,19 @@ export default function GBPAdminPanel() {
   const [locations, setLocations] = useState<GBPLocation[]>([]);
   const [selectedAccountId, setSelectedAccountId] = useState<string>("");
   const [selectedLocationId, setSelectedLocationId] = useState<string>("");
+  const [isConnecting, setIsConnecting] = useState(false);
+
+  // Check connection status
+  const { data: connectionStatus, isLoading: connectionLoading, refetch: refetchConnection } = useQuery({
+    queryKey: ["gbp-connection"],
+    queryFn: async () => {
+      const { data, error } = await supabase.functions.invoke("gbp-manager", {
+        body: { action: "check-connection" },
+      });
+      if (error) throw error;
+      return data as { connected: boolean; verified: boolean; error?: string };
+    },
+  });
 
   // Fetch reviews
   const { data: reviews, isLoading: reviewsLoading } = useQuery({
@@ -137,6 +150,54 @@ export default function GBPAdminPanel() {
       return data as GBPSettings | null;
     },
   });
+
+  // Handle connecting GBP
+  const handleConnectGBP = async () => {
+    setIsConnecting(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("gbp-manager", {
+        body: { 
+          action: "get-auth-url",
+          redirectUrl: window.location.origin,
+        },
+      });
+      
+      if (error) throw error;
+      
+      if (data.connected) {
+        toast.success("Google Business Profile is already connected!");
+        refetchConnection();
+      } else if (data.authUrl) {
+        // Redirect to Pipedream Connect
+        window.location.href = data.authUrl;
+      } else {
+        throw new Error("No auth URL returned");
+      }
+    } catch (err: any) {
+      console.error("Connect GBP error:", err);
+      toast.error(err.message || "Failed to initiate GBP connection");
+    } finally {
+      setIsConnecting(false);
+    }
+  };
+
+  // Check for connection callback
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get("connected") === "true") {
+      toast.success("Google Business Profile connected successfully!");
+      refetchConnection();
+      // Clean up URL
+      const newUrl = window.location.pathname + "?tab=gbp";
+      window.history.replaceState({}, "", newUrl);
+    } else if (urlParams.get("connected") === "false") {
+      toast.error("Failed to connect Google Business Profile");
+      // Clean up URL
+      const newUrl = window.location.pathname + "?tab=gbp";
+      window.history.replaceState({}, "", newUrl);
+    }
+  }, []);
+
 
   // Sync reviews mutation
   const syncReviewsMutation = useMutation({
@@ -652,23 +713,81 @@ export default function GBPAdminPanel() {
               </div>
             ) : (
               <>
+                {/* Connection Status Section */}
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-semibold">Google Business Profile Connection</h3>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => listAccountsMutation.mutate()}
-                      disabled={listAccountsMutation.isPending}
-                    >
-                      {listAccountsMutation.isPending ? (
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      ) : (
-                        <List className="w-4 h-4 mr-2" />
-                      )}
-                      Fetch Accounts
-                    </Button>
-                  </div>
+                  <h3 className="text-lg font-semibold">Google Business Profile Connection</h3>
+                  
+                  {connectionLoading ? (
+                    <div className="p-4 border rounded-lg flex items-center gap-3">
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      <span className="text-muted-foreground">Checking connection status...</span>
+                    </div>
+                  ) : connectionStatus?.connected && connectionStatus?.verified ? (
+                    <div className="p-4 bg-green-500/10 border border-green-500/30 rounded-lg flex items-start gap-3">
+                      <CheckCircle className="w-5 h-5 text-green-500 mt-0.5" />
+                      <div className="flex-1">
+                        <p className="font-medium text-green-600">Google Business Profile Connected</p>
+                        <p className="text-sm text-muted-foreground">
+                          Your Google Business Profile is connected and ready to use.
+                        </p>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => refetchConnection()}
+                      >
+                        <RefreshCw className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-lg space-y-3">
+                      <div className="flex items-start gap-3">
+                        <AlertCircle className="w-5 h-5 text-amber-500 mt-0.5" />
+                        <div>
+                          <p className="font-medium text-amber-600">Connection Required</p>
+                          <p className="text-sm text-muted-foreground">
+                            Connect your Google Business Profile to manage reviews and posts.
+                            {connectionStatus?.error && (
+                              <span className="block mt-1 text-xs text-red-500">{connectionStatus.error}</span>
+                            )}
+                          </p>
+                        </div>
+                      </div>
+                      <Button
+                        onClick={handleConnectGBP}
+                        disabled={isConnecting}
+                        className="w-full"
+                      >
+                        {isConnecting ? (
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        ) : (
+                          <ExternalLink className="w-4 h-4 mr-2" />
+                        )}
+                        Connect Google Business Profile
+                      </Button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Only show account/location selection if connected */}
+                {connectionStatus?.connected && (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-lg font-semibold">Account & Location Selection</h3>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => listAccountsMutation.mutate()}
+                        disabled={listAccountsMutation.isPending}
+                      >
+                        {listAccountsMutation.isPending ? (
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        ) : (
+                          <List className="w-4 h-4 mr-2" />
+                        )}
+                        Fetch Accounts
+                      </Button>
+                    </div>
 
                   {/* Step 1: Select Account */}
                   <div className="p-4 border rounded-lg space-y-4">
@@ -799,7 +918,8 @@ export default function GBPAdminPanel() {
                       </div>
                     </div>
                   )}
-                </div>
+                  </div>
+                )}
 
                 <div className="space-y-4">
                   <h3 className="text-lg font-semibold">Automation Settings</h3>
