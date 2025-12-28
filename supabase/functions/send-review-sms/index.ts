@@ -6,21 +6,20 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Google Reviews dedicated phone number
+const GOOGLE_REVIEWS_PHONE = "+14049247251";
+
 // Helper to check if current time is within send window (11am-3pm EST)
 const isWithinSendWindow = (): boolean => {
   const now = new Date();
-  // Convert to EST (UTC-5, or UTC-4 during DST)
-  const estOffset = -5 * 60; // EST in minutes
+  const estOffset = -5 * 60;
   const utcMinutes = now.getUTCHours() * 60 + now.getUTCMinutes();
   const estMinutes = utcMinutes + estOffset;
   const estHour = Math.floor(((estMinutes % 1440) + 1440) % 1440 / 60);
-  
-  // Send window: 11am (11) to 3pm (15) EST
   return estHour >= 11 && estHour < 15;
 };
 
 serve(async (req) => {
-  // Handle CORS preflight
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -30,16 +29,14 @@ serve(async (req) => {
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const twilioSid = Deno.env.get("TWILIO_ACCOUNT_SID")!;
-    const twilioAuth = Deno.env.get("TWILIO_AUTH_TOKEN")!;
-    const twilioPhone = Deno.env.get("TWILIO_PHONE_NUMBER")!;
+    const telnyxApiKey = Deno.env.get("TELNYX_API_KEY")!;
     const googleReviewUrl = Deno.env.get("GOOGLE_REVIEW_URL") || "https://g.page/r/YOUR_REVIEW_LINK";
 
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     console.log(`Processing SMS action: ${action} for review: ${reviewId || requestId}`);
 
-    // Check time window for non-test messages (skip if forceTime is true)
+    // Check time window for non-test messages
     if (action !== "test" && !forceTime && !isWithinSendWindow()) {
       console.log("Outside send window (11am-3pm EST), SMS queued");
       return new Response(
@@ -52,45 +49,42 @@ serve(async (req) => {
       );
     }
 
-    // Helper function to send SMS via Twilio with status callback
-    const sendSms = async (to: string, body: string, contactId?: string): Promise<{ success: boolean; sid?: string; error?: string; optedOut?: boolean }> => {
-      const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${twilioSid}/Messages.json`;
-      const statusCallbackUrl = `${supabaseUrl}/functions/v1/twilio-status-callback`;
-      
+    // Helper function to send SMS via Telnyx
+    const sendSms = async (to: string, body: string, contactId?: string): Promise<{ success: boolean; messageId?: string; error?: string; optedOut?: boolean }> => {
       try {
-        const params = new URLSearchParams({
-          To: to,
-          From: twilioPhone,
-          Body: body,
-          StatusCallback: statusCallbackUrl,
-        });
-
-        const response = await fetch(twilioUrl, {
+        // Format phone number for Telnyx (needs + prefix)
+        const formattedTo = to.startsWith('+') ? to : `+1${to.replace(/\D/g, '')}`;
+        
+        console.log(`Sending SMS via Telnyx from ${GOOGLE_REVIEWS_PHONE} to ${formattedTo}`);
+        
+        const response = await fetch("https://api.telnyx.com/v2/messages", {
           method: "POST",
           headers: {
-            Authorization: `Basic ${btoa(`${twilioSid}:${twilioAuth}`)}`,
-            "Content-Type": "application/x-www-form-urlencoded",
+            "Authorization": `Bearer ${telnyxApiKey}`,
+            "Content-Type": "application/json",
           },
-          body: params,
+          body: JSON.stringify({
+            from: GOOGLE_REVIEWS_PHONE,
+            to: formattedTo,
+            text: body,
+          }),
         });
 
         if (!response.ok) {
           const errorText = await response.text();
-          console.error("Twilio error:", errorText);
+          console.error("Telnyx error:", errorText);
           
-          // Parse error to check for specific codes
           try {
             const errorData = JSON.parse(errorText);
-            
-            // Handle carrier-level unsubscribe (error 21610)
-            if (errorData.code === 21610) {
-              console.log(`Contact ${to} has unsubscribed at carrier level`);
+            // Check for opt-out/blocked errors
+            if (errorData.errors?.[0]?.code === "40300" || 
+                errorData.errors?.[0]?.detail?.includes("opted out") ||
+                errorData.errors?.[0]?.detail?.includes("blocked")) {
+              console.log(`Contact ${to} has unsubscribed`);
               
-              // Clean phone for matching
               const cleanPhone = to.replace(/[\s\-\(\)\+]/g, "");
               const phoneDigits = cleanPhone.slice(-10);
               
-              // Update opt-out status
               await supabase
                 .from("google_review_requests")
                 .update({
@@ -101,7 +95,7 @@ serve(async (req) => {
                 })
                 .ilike("guest_phone", `%${phoneDigits}`);
               
-              return { success: false, error: "Contact has unsubscribed at carrier level", optedOut: true };
+              return { success: false, error: "Contact has unsubscribed", optedOut: true };
             }
           } catch (parseError) {
             // Continue with generic error
@@ -111,17 +105,16 @@ serve(async (req) => {
         }
 
         const data = await response.json();
-        console.log(`SMS sent successfully, SID: ${data.sid}`);
-        return { success: true, sid: data.sid };
+        console.log(`SMS sent successfully via Telnyx, ID: ${data.data?.id}`);
+        return { success: true, messageId: data.data?.id };
       } catch (error) {
-        console.error("Twilio exception:", error);
+        console.error("Telnyx exception:", error);
         return { success: false, error: String(error) };
       }
     };
 
     // Handle different actions
     if (action === "permission_ask") {
-      // Get review details
       const { data: review, error: reviewError } = await supabase
         .from("ownerrez_reviews")
         .select("*")
@@ -136,14 +129,12 @@ serve(async (req) => {
         throw new Error("Guest phone number not available");
       }
 
-      // Check if request already exists
       let { data: request } = await supabase
         .from("google_review_requests")
         .select("*")
         .eq("review_id", reviewId)
         .single();
 
-      // CRITICAL: Check opt-out status before sending
       if (request?.opted_out) {
         console.log(`Guest ${review.guest_phone} has opted out, skipping SMS`);
         return new Response(
@@ -153,7 +144,6 @@ serve(async (req) => {
       }
 
       if (!request) {
-        // Create new request
         const { data: newRequest, error: createError } = await supabase
           .from("google_review_requests")
           .insert({
@@ -169,15 +159,12 @@ serve(async (req) => {
         request = newRequest;
       }
 
-      // Compose permission ask message
       const source = review.review_source || "Airbnb";
       const message = `Thanks again for the wonderful ${source} review — it truly means a lot. Google reviews help future guests trust us when booking directly. If you're open to it, I can send you a link plus a copy of your original review so you can paste it in seconds. Would that be okay?`;
 
-      // Send SMS
       const result = await sendSms(review.guest_phone, message, request.id);
 
       if (!result.success) {
-        // Log failed attempt
         await supabase.from("sms_log").insert({
           request_id: request.id,
           phone_number: review.guest_phone,
@@ -197,17 +184,15 @@ serve(async (req) => {
         throw new Error(result.error || "Failed to send SMS");
       }
 
-      // Log the SMS with Twilio SID
       await supabase.from("sms_log").insert({
         request_id: request.id,
         phone_number: review.guest_phone,
         message_type: "permission_ask",
         message_body: message,
-        twilio_message_sid: result.sid,
+        telnyx_message_id: result.messageId,
         status: "sent",
       });
 
-      // Update request status
       await supabase
         .from("google_review_requests")
         .update({
@@ -226,7 +211,6 @@ serve(async (req) => {
     }
 
     if (action === "send_link") {
-      // Get request and review
       const { data: request, error: requestError } = await supabase
         .from("google_review_requests")
         .select("*, ownerrez_reviews(*)")
@@ -237,7 +221,6 @@ serve(async (req) => {
         throw new Error("Request not found");
       }
 
-      // CRITICAL: Check opt-out status
       if (request.opted_out) {
         console.log(`Guest ${request.guest_phone} has opted out, skipping link send`);
         return new Response(
@@ -250,7 +233,6 @@ serve(async (req) => {
       const source = review?.review_source || "Airbnb";
       const reviewText = review?.review_text || "";
 
-      // Send Google link message
       const linkMessage = `Amazing — thank you! Here's the direct link to leave the Google review: ${googleReviewUrl}`;
       const linkResult = await sendSms(request.guest_phone, linkMessage, request.id);
 
@@ -274,17 +256,15 @@ serve(async (req) => {
         throw new Error(linkResult.error || "Failed to send link SMS");
       }
 
-      // Log the SMS with Twilio SID
       await supabase.from("sms_log").insert({
         request_id: request.id,
         phone_number: request.guest_phone,
         message_type: "link_delivery",
         message_body: linkMessage,
-        twilio_message_sid: linkResult.sid,
+        telnyx_message_id: linkResult.messageId,
         status: "sent",
       });
 
-      // Send review text if available
       if (reviewText) {
         const reviewMessage = `And here's the text of your ${source} review so you can copy/paste:\n\n"${reviewText}"`;
         const reviewResult = await sendSms(request.guest_phone, reviewMessage, request.id);
@@ -294,13 +274,12 @@ serve(async (req) => {
           phone_number: request.guest_phone,
           message_type: "review_text",
           message_body: reviewMessage,
-          twilio_message_sid: reviewResult.sid,
+          telnyx_message_id: reviewResult.messageId,
           status: reviewResult.success ? "sent" : "failed",
           error_message: reviewResult.error,
         });
       }
 
-      // Update status
       await supabase
         .from("google_review_requests")
         .update({
@@ -329,7 +308,6 @@ serve(async (req) => {
         throw new Error("Request not found");
       }
 
-      // CRITICAL: Check opt-out status
       if (request.opted_out) {
         console.log(`Guest ${request.guest_phone} has opted out, skipping nudge`);
         return new Response(
@@ -369,7 +347,7 @@ serve(async (req) => {
         phone_number: request.guest_phone,
         message_type: request.nudge_count === 0 ? "nudge" : "final_reminder",
         message_body: nudgeMessage,
-        twilio_message_sid: nudgeResult.sid,
+        telnyx_message_id: nudgeResult.messageId,
         status: "sent",
       });
 
@@ -391,9 +369,8 @@ serve(async (req) => {
     }
 
     if (action === "test") {
-      // Send test SMS to admin phone
       const adminPhone = "+17709065022";
-      const testMessage = "Test SMS from PeachHaus Google Review system. If you received this, the SMS integration is working correctly!";
+      const testMessage = "Test SMS from PeachHaus Google Review system (via Telnyx). If you received this, the SMS integration is working correctly!";
       
       const testResult = await sendSms(adminPhone, testMessage);
       
@@ -401,7 +378,7 @@ serve(async (req) => {
         phone_number: adminPhone,
         message_type: "test",
         message_body: testMessage,
-        twilio_message_sid: testResult.sid,
+        telnyx_message_id: testResult.messageId,
         status: testResult.success ? "sent" : "failed",
         error_message: testResult.error,
       });
@@ -410,7 +387,7 @@ serve(async (req) => {
         throw new Error(testResult.error || "Failed to send test SMS");
       }
 
-      console.log(`Test SMS sent to admin`);
+      console.log(`Test SMS sent to admin via Telnyx`);
 
       return new Response(
         JSON.stringify({ success: true, action: "test" }),
