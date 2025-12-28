@@ -574,11 +574,11 @@ serve(async (req) => {
 
         const accessToken = await getPipedreamAccessToken();
         
-        // Call the list reviews MCP tool
+        // Call the list reviews MCP tool (correct tool name: list-all-reviews)
         const reviewsResult = await callMCPTool(
           accessToken,
           userId,
-          "google_my_business-list-reviews",
+          "google_my_business-list-all-reviews",
           {
             parent: `accounts/${settings.gbp_account_id}/locations/${settings.gbp_location_id}`,
             pageSize: 50,
@@ -709,13 +709,13 @@ serve(async (req) => {
 
         const accessToken = await getPipedreamAccessToken();
         
-        // Post the reply using MCP
+        // Post the reply using MCP (correct tool name: create-update-reply-to-review)
         const replyResult = await callMCPTool(
           accessToken,
           userId,
-          "google_my_business-reply-to-review",
+          "google_my_business-create-update-reply-to-review",
           {
-            name: review.gbp_review_name,
+            reviewName: review.gbp_review_name,
             comment: reply || review.ai_generated_reply,
           }
         );
