@@ -108,6 +108,7 @@ export default function GBPAdminPanel() {
       if (error) throw error;
       return data as { connected: boolean; verified: boolean; error?: string };
     },
+    refetchInterval: isConnecting ? 5000 : false, // Poll while connecting
   });
 
   // Fetch reviews
@@ -743,7 +744,7 @@ export default function GBPAdminPanel() {
                     <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-lg space-y-3">
                       <div className="flex items-start gap-3">
                         <AlertCircle className="w-5 h-5 text-amber-500 mt-0.5" />
-                        <div>
+                        <div className="flex-1">
                           <p className="font-medium text-amber-600">Connection Required</p>
                           <p className="text-sm text-muted-foreground">
                             Connect your Google Business Profile to manage reviews and posts.
@@ -751,20 +752,37 @@ export default function GBPAdminPanel() {
                               <span className="block mt-1 text-xs text-red-500">{connectionStatus.error}</span>
                             )}
                           </p>
+                          <p className="text-xs text-muted-foreground mt-2">
+                            After completing the OAuth flow, close the popup and click "Check Again".
+                          </p>
                         </div>
                       </div>
-                      <Button
-                        onClick={handleConnectGBP}
-                        disabled={isConnecting}
-                        className="w-full"
-                      >
-                        {isConnecting ? (
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        ) : (
-                          <ExternalLink className="w-4 h-4 mr-2" />
-                        )}
-                        Connect Google Business Profile
-                      </Button>
+                      <div className="flex gap-2">
+                        <Button
+                          onClick={handleConnectGBP}
+                          disabled={isConnecting}
+                          className="flex-1"
+                        >
+                          {isConnecting ? (
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          ) : (
+                            <ExternalLink className="w-4 h-4 mr-2" />
+                          )}
+                          Connect Google Business Profile
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={() => refetchConnection()}
+                          disabled={connectionLoading}
+                        >
+                          {connectionLoading ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <RefreshCw className="w-4 h-4" />
+                          )}
+                          Check Again
+                        </Button>
+                      </div>
                     </div>
                   )}
                 </div>
