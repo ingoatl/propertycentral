@@ -67,10 +67,25 @@ serve(async (req) => {
     }
 
     if (!fromNumber) {
-      return new Response(JSON.stringify({ error: 'No phone number assigned to user' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+      // Try to get any available company phone number as fallback
+      const { data: anyAssignment } = await supabase
+        .from('user_phone_assignments')
+        .select('phone_number')
+        .eq('is_active', true)
+        .limit(1)
+        .maybeSingle();
+
+      if (anyAssignment) {
+        fromNumber = anyAssignment.phone_number;
+      } else {
+        return new Response(JSON.stringify({ 
+          error: 'No phone numbers configured. Please assign phone numbers in Admin > Phone Assignments first.',
+          hint: 'Go to Admin panel and add phone assignments for team members'
+        }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
     }
 
     // Format phone number
