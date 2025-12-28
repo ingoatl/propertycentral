@@ -575,11 +575,13 @@ serve(async (req) => {
         const accessToken = await getPipedreamAccessToken();
         
         // Call the list reviews MCP tool (correct tool name: list-all-reviews)
+        // Pipedream MCP tools require an 'instruction' parameter
         const reviewsResult = await callMCPTool(
           accessToken,
           userId,
           "google_my_business-list-all-reviews",
           {
+            instruction: `List all reviews for the location accounts/${settings.gbp_account_id}/locations/${settings.gbp_location_id}`,
             parent: `accounts/${settings.gbp_account_id}/locations/${settings.gbp_location_id}`,
             pageSize: 50,
           }
@@ -587,10 +589,29 @@ serve(async (req) => {
 
         console.log("Reviews result:", JSON.stringify(reviewsResult).substring(0, 1000));
 
-        // Extract reviews from the response
-        const reviews = reviewsResult?.result?.content?.[0]?.text 
-          ? JSON.parse(reviewsResult.result.content[0].text)?.reviews || []
-          : [];
+        // Extract reviews from the response - handle error responses gracefully
+        let reviews: any[] = [];
+        try {
+          const contentText = reviewsResult?.result?.content?.[0]?.text;
+          if (contentText) {
+            // Check if it's an error response
+            if (contentText.startsWith("Error")) {
+              console.error("MCP tool returned error:", contentText);
+              return new Response(JSON.stringify({ 
+                success: false, 
+                error: `GBP API error: ${contentText.substring(0, 200)}`,
+              }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 });
+            }
+            const parsed = JSON.parse(contentText);
+            reviews = parsed?.reviews || [];
+          }
+        } catch (parseErr) {
+          console.error("Failed to parse reviews response:", parseErr);
+          return new Response(JSON.stringify({ 
+            success: false, 
+            error: "Failed to parse reviews from GBP API",
+          }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 });
+        }
 
         let syncedCount = 0;
         let newReviewsCount = 0;
