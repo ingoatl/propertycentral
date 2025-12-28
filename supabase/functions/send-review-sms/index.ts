@@ -369,8 +369,11 @@ serve(async (req) => {
     }
 
     if (action === "test") {
+      // Send test to Ingo's phone
       const adminPhone = "+17709065022";
-      const testMessage = "Test SMS from PeachHaus Google Review system (via Telnyx). If you received this, the SMS integration is working correctly!";
+      const testMessage = `🧪 Test SMS from PeachHaus Google Review system (via Telnyx from ${GOOGLE_REVIEWS_PHONE}). If you received this, the SMS integration is working! Reply to test inbound handling.`;
+      
+      console.log(`Sending test SMS to ${adminPhone} from ${GOOGLE_REVIEWS_PHONE}`);
       
       const testResult = await sendSms(adminPhone, testMessage);
       
@@ -384,13 +387,14 @@ serve(async (req) => {
       });
 
       if (!testResult.success) {
+        console.error(`Test SMS failed: ${testResult.error}`);
         throw new Error(testResult.error || "Failed to send test SMS");
       }
 
-      console.log(`Test SMS sent to admin via Telnyx`);
+      console.log(`Test SMS sent successfully via Telnyx, message ID: ${testResult.messageId}`);
 
       return new Response(
-        JSON.stringify({ success: true, action: "test" }),
+        JSON.stringify({ success: true, action: "test", messageId: testResult.messageId }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
