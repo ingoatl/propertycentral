@@ -567,79 +567,21 @@ serve(async (req) => {
 
       case "sync-reviews": {
         // Sync reviews from Google Business Profile
-        if (!settings?.gbp_account_id) {
-          return new Response(JSON.stringify({ 
-            success: false, 
-            error: "GBP Account ID not configured" 
-          }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 });
-        }
-
         const accessToken = await getPipedreamAccessToken();
-        const accountId = settings.gbp_account_id;
         
-        // Try multiple formats for the parent parameter since GBP API formats vary
-        // Format 1: Just the account ID (for PERSONAL accounts)
-        // Format 2: accounts/{id}/locations/{id} (for business accounts with locations)
+        // The MCP tools only accept an 'instruction' parameter - let the AI figure out the right format
+        console.log("Fetching all reviews via MCP instruction...");
         
-        let reviewsResult: any = null;
-        let successFormat: string | null = null;
-        
-        // Try format 1: Direct account reference (works for some PERSONAL accounts)
-        console.log("Trying reviews with direct account reference...");
-        reviewsResult = await callMCPTool(
+        const reviewsResult = await callMCPTool(
           accessToken,
           userId,
           "google_my_business-list-all-reviews",
           {
-            instruction: `List all reviews for PeachHaus Group business profile. The account ID is ${accountId}. Please fetch all available reviews.`,
-            parent: `accounts/${accountId}`,
-            pageSize: 50,
+            instruction: `List all reviews for the PeachHaus Group business. First, list all available accounts and locations to find the correct business location. Then fetch and return all reviews in JSON format with fields: name, reviewer name, star rating (as number 1-5), review text, and any existing reply. If you encounter any errors finding locations, please include details about what accounts/locations you found.`,
           }
         );
         
-        console.log("Reviews result (format 1):", JSON.stringify(reviewsResult).substring(0, 1500));
-        
-        // Check if we got an error - try to extract reviews or identify if we need a different format
-        const content1 = reviewsResult?.result?.content?.[0]?.text || "";
-        
-        // If we got a 404 or location error, the API might need a different approach
-        if (content1.includes("404") || content1.includes("not found") || content1.includes("location")) {
-          // Try format 2: Use the account ID as both account and location (some PERSONAL setups)
-          console.log("Format 1 failed, trying with account as location...");
-          
-          // Look for any location IDs mentioned in the error message
-          const locationMatch = content1.match(/locations?\/(\d+)/i) || content1.match(/location[^\d]*ID[^\d]*(\d{10,})/i);
-          if (locationMatch) {
-            const extractedLocationId = locationMatch[1];
-            console.log("Found location ID in error:", extractedLocationId);
-            
-            reviewsResult = await callMCPTool(
-              accessToken,
-              userId,
-              "google_my_business-list-all-reviews",
-              {
-                instruction: `List all reviews for location accounts/${accountId}/locations/${extractedLocationId}`,
-                parent: `accounts/${accountId}/locations/${extractedLocationId}`,
-                pageSize: 50,
-              }
-            );
-            successFormat = `accounts/${accountId}/locations/${extractedLocationId}`;
-          } else {
-            // Try asking MCP to figure out the right format
-            console.log("Trying MCP to auto-discover location...");
-            reviewsResult = await callMCPTool(
-              accessToken,
-              userId,
-              "google_my_business-list-all-reviews",
-              {
-                instruction: `I need to list all reviews for PeachHaus Group. The account ID is ${accountId}. Please first find the correct location under this account, then list all the reviews. Return the reviews in JSON format.`,
-                pageSize: 50,
-              }
-            );
-          }
-          
-          console.log("Reviews result (alternative):", JSON.stringify(reviewsResult).substring(0, 1500));
-        }
+        console.log("Reviews result:", JSON.stringify(reviewsResult).substring(0, 2000));
 
         console.log("Reviews result:", JSON.stringify(reviewsResult).substring(0, 1000));
 
