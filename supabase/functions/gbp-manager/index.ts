@@ -250,11 +250,13 @@ serve(async (req) => {
     console.log(`GBP Manager action: ${action}`);
     console.log("Params:", JSON.stringify(params));
 
-    // Get GBP settings
+    // Get GBP settings (get first one since there should only be one global settings row)
     const { data: settings } = await supabase
       .from("gbp_settings")
       .select("*")
-      .single();
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle();
 
     const userId = params.userId || PIPEDREAM_USER_ID;
 
