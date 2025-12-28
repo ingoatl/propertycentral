@@ -494,7 +494,9 @@ serve(async (req) => {
           accessToken,
           userId,
           "google_my_business-list-accounts",
-          {}
+          {
+            instruction: "List all Google Business Profile accounts I have access to"
+          }
         );
 
         console.log("Accounts result:", JSON.stringify(accountsResult).substring(0, 2000));
@@ -594,22 +596,30 @@ serve(async (req) => {
         try {
           const contentText = reviewsResult?.result?.content?.[0]?.text;
           if (contentText) {
-            // Check if it's an error response
-            if (contentText.startsWith("Error")) {
-              console.error("MCP tool returned error:", contentText);
+            // Check if it's a natural language response (not JSON)
+            if (contentText.startsWith("I could not") || contentText.startsWith("Error") || !contentText.startsWith("{") && !contentText.startsWith("[")) {
+              console.error("MCP tool returned message:", contentText);
+              // Extract useful info from the response
+              const accountMatch = contentText.match(/ID: (\d+)/);
+              const suggestedAccountId = accountMatch ? accountMatch[1] : null;
+              
               return new Response(JSON.stringify({ 
                 success: false, 
-                error: `GBP API error: ${contentText.substring(0, 200)}`,
-              }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 });
+                error: "Invalid account/location configuration. Please update your GBP settings.",
+                message: contentText,
+                suggestedAccountId,
+              }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 });
             }
             const parsed = JSON.parse(contentText);
             reviews = parsed?.reviews || [];
           }
         } catch (parseErr) {
           console.error("Failed to parse reviews response:", parseErr);
+          const contentText = reviewsResult?.result?.content?.[0]?.text || "";
           return new Response(JSON.stringify({ 
             success: false, 
-            error: "Failed to parse reviews from GBP API",
+            error: "Failed to parse reviews from GBP API. The account/location IDs may be incorrect.",
+            rawResponse: contentText.substring(0, 500),
           }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 });
         }
 
