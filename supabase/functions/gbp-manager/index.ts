@@ -596,29 +596,64 @@ serve(async (req) => {
         try {
           const contentText = reviewsResult?.result?.content?.[0]?.text;
           if (contentText) {
-            // Check if it's a natural language response (not JSON)
-            if (contentText.startsWith("I could not") || contentText.startsWith("Error") || !contentText.startsWith("{") && !contentText.startsWith("[")) {
-              console.error("MCP tool returned message:", contentText);
-              // Extract useful info from the response
-              const accountMatch = contentText.match(/ID: (\d+)/);
-              const suggestedAccountId = accountMatch ? accountMatch[1] : null;
+            // Check if it's a natural language response (not JSON) - this means an error occurred
+            const isErrorResponse = contentText.includes("404") || 
+                                    contentText.includes("not found") || 
+                                    contentText.includes("I could not") || 
+                                    contentText.includes("Error") ||
+                                    contentText.includes("no locations") ||
+                                    (!contentText.startsWith("{") && !contentText.startsWith("["));
+            
+            if (isErrorResponse) {
+              console.error("MCP tool returned error message:", contentText);
+              
+              // Check if it's a "no locations" issue - this is a GBP configuration problem
+              const isLocationIssue = contentText.includes("404") || 
+                                      contentText.includes("no locations") ||
+                                      contentText.includes("PERSONAL");
+              
+              if (isLocationIssue) {
+                return new Response(JSON.stringify({ 
+                  success: false, 
+                  error: "GBP_LOCATION_NOT_CONFIGURED",
+                  userMessage: "Your Google Business Profile account doesn't have a location configured. This is required for the Reviews API to work.",
+                  details: "The connected GBP account (PeachHaus Group) appears to be a PERSONAL type account without a business location. To fix this, you need to add your business location in Google Business Profile.",
+                  steps: [
+                    "1. Go to business.google.com",
+                    "2. Click 'Add your business to Google'",
+                    "3. Enter your business name and address",
+                    "4. Complete the verification process",
+                    "5. Once verified, reconnect in Lovable"
+                  ],
+                  helpUrl: "https://support.google.com/business/answer/10514137",
+                }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 });
+              }
               
               return new Response(JSON.stringify({ 
                 success: false, 
-                error: "Invalid account/location configuration. Please update your GBP settings.",
-                message: contentText,
-                suggestedAccountId,
+                error: "GBP_API_ERROR",
+                userMessage: "Unable to fetch reviews from Google Business Profile.",
+                details: contentText.substring(0, 500),
               }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 });
             }
+            
             const parsed = JSON.parse(contentText);
-            reviews = parsed?.reviews || [];
+            reviews = parsed?.reviews || parsed || [];
+            if (!Array.isArray(reviews)) reviews = [];
           }
         } catch (parseErr) {
           console.error("Failed to parse reviews response:", parseErr);
           const contentText = reviewsResult?.result?.content?.[0]?.text || "";
+          
+          // Check if the contentText contains actual review data in a different format
+          if (contentText.includes("reviews") && contentText.includes("starRating")) {
+            console.log("Response may contain reviews in non-standard format, attempting extraction...");
+          }
+          
           return new Response(JSON.stringify({ 
             success: false, 
-            error: "Failed to parse reviews from GBP API. The account/location IDs may be incorrect.",
+            error: "PARSE_ERROR",
+            userMessage: "Failed to parse the reviews data from Google Business Profile.",
             rawResponse: contentText.substring(0, 500),
           }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 });
         }

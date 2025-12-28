@@ -9,6 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { toast } from "sonner";
 import { 
   Star, 
@@ -24,6 +25,7 @@ import {
   Building,
   Loader2,
   ExternalLink,
+  AlertTriangle,
 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -171,6 +173,15 @@ export default function GBPAdminPanel() {
     }
   };
 
+  // State for configuration error
+  const [configError, setConfigError] = useState<{
+    error: string;
+    userMessage: string;
+    details: string;
+    steps?: string[];
+    helpUrl?: string;
+  } | null>(null);
+
   // Sync reviews mutation
   const syncReviewsMutation = useMutation({
     mutationFn: async () => {
@@ -178,7 +189,21 @@ export default function GBPAdminPanel() {
         body: { action: "sync-reviews" },
       });
       if (error) throw error;
-      if (!data.success) throw new Error(data.error || "Sync failed");
+      if (!data.success) {
+        // Check for specific error types
+        if (data.error === "GBP_LOCATION_NOT_CONFIGURED") {
+          setConfigError({
+            error: data.error,
+            userMessage: data.userMessage,
+            details: data.details,
+            steps: data.steps,
+            helpUrl: data.helpUrl,
+          });
+          throw new Error(data.userMessage);
+        }
+        throw new Error(data.userMessage || data.error || "Sync failed");
+      }
+      setConfigError(null);
       return data;
     },
     onSuccess: (data) => {
@@ -372,6 +397,38 @@ export default function GBPAdminPanel() {
                 Sync Reviews
               </Button>
             </div>
+
+            {/* Configuration Error Alert */}
+            {configError && (
+              <Alert variant="destructive" className="border-amber-500/50 bg-amber-500/10">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertTitle className="text-amber-400">Google Business Profile Configuration Required</AlertTitle>
+                <AlertDescription className="space-y-3">
+                  <p className="text-sm">{configError.details}</p>
+                  {configError.steps && (
+                    <div className="space-y-1">
+                      <p className="text-sm font-medium">To fix this:</p>
+                      <ul className="text-sm space-y-1 ml-4 list-disc">
+                        {configError.steps.map((step, i) => (
+                          <li key={i}>{step.replace(/^\d+\.\s*/, '')}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {configError.helpUrl && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="mt-2"
+                      onClick={() => window.open(configError.helpUrl, '_blank')}
+                    >
+                      <ExternalLink className="w-4 h-4 mr-2" />
+                      Google Business Profile Help
+                    </Button>
+                  )}
+                </AlertDescription>
+              </Alert>
+            )}
 
             {reviewsLoading ? (
               <div className="flex justify-center py-8">
