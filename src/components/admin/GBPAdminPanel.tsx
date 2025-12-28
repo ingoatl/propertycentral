@@ -181,6 +181,10 @@ export default function GBPAdminPanel() {
     steps?: string[];
     helpUrl?: string;
   } | null>(null);
+  
+  // State for manual location ID input
+  const [manualLocationId, setManualLocationId] = useState("");
+  const [isDiscovering, setIsDiscovering] = useState(false);
 
   // Sync reviews mutation
   const syncReviewsMutation = useMutation({
@@ -317,6 +321,74 @@ export default function GBPAdminPanel() {
       toast.error(error.message || "Failed to update settings");
     },
   });
+
+  // Discover locations mutation
+  const discoverLocationsMutation = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke("gbp-manager", {
+        body: { action: "discover-locations" },
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["gbp-settings"] });
+      if (data.savedLocationId) {
+        toast.success(`Location discovered and saved: ${data.savedLocationId}`);
+        setConfigError(null);
+      } else if (data.locations?.length === 0) {
+        toast.warning("No locations found. You may need to add a business location in Google Business Profile.");
+      } else {
+        toast.info(`Found ${data.accounts?.length || 0} accounts, ${data.locations?.length || 0} locations`);
+      }
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Failed to discover locations");
+    },
+  });
+
+  // Reconnect GBP (force re-auth)
+  const handleReconnectGBP = async () => {
+    try {
+      setIsConnecting(true);
+      // Clear existing settings to force fresh setup
+      if (settings?.id) {
+        await supabase
+          .from("gbp_settings")
+          .update({ gbp_location_id: null })
+          .eq("id", settings.id);
+      }
+      
+      const { data, error } = await supabase.functions.invoke("gbp-manager", {
+        body: { action: "get-auth-url", forceReconnect: true },
+      });
+      
+      if (error) throw error;
+      
+      if (data?.authUrl) {
+        window.open(data.authUrl, '_blank', 'width=600,height=700');
+      } else {
+        throw new Error("No auth URL returned");
+      }
+    } catch (error: any) {
+      toast.error(error.message || "Failed to reconnect");
+      setIsConnecting(false);
+    }
+  };
+
+  // Save manual location ID
+  const handleSaveManualLocationId = () => {
+    if (!manualLocationId.trim()) {
+      toast.error("Please enter a location ID");
+      return;
+    }
+    updateSettingsMutation.mutate({ 
+      gbp_location_id: manualLocationId.trim(),
+      gbp_account_id: PEACHHAUS_ACCOUNT_ID 
+    });
+    setManualLocationId("");
+    setConfigError(null);
+  };
 
   const renderStars = (rating: number) => {
     return Array.from({ length: 5 }, (_, i) => (
@@ -732,9 +804,9 @@ export default function GBPAdminPanel() {
                   )}
                 </div>
 
-                {/* Account Configuration - Read Only */}
+                {/* Account Configuration */}
                 {connectionStatus?.connected && (
-                  <div className="p-4 bg-muted/50 border rounded-lg space-y-2">
+                  <div className="p-4 bg-muted/50 border rounded-lg space-y-4">
                     <h4 className="font-medium">Account Configuration</h4>
                     <div className="grid grid-cols-2 gap-4 text-sm">
                       <div>
@@ -743,7 +815,68 @@ export default function GBPAdminPanel() {
                       </div>
                       <div>
                         <span className="text-muted-foreground">Location ID:</span>
-                        <code className="ml-2 bg-background px-2 py-1 rounded">{settings?.gbp_location_id || "Auto-discovered"}</code>
+                        <code className="ml-2 bg-background px-2 py-1 rounded">
+                          {settings?.gbp_location_id || <span className="text-amber-500">Not configured</span>}
+                        </code>
+                      </div>
+                    </div>
+                    
+                    {/* Location Discovery Section */}
+                    <div className="pt-3 border-t space-y-3">
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => discoverLocationsMutation.mutate()}
+                          disabled={discoverLocationsMutation.isPending}
+                        >
+                          {discoverLocationsMutation.isPending ? (
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          ) : (
+                            <RefreshCw className="w-4 h-4 mr-2" />
+                          )}
+                          Auto-Discover Location
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleReconnectGBP}
+                          disabled={isConnecting}
+                        >
+                          {isConnecting ? (
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          ) : (
+                            <ExternalLink className="w-4 h-4 mr-2" />
+                          )}
+                          Reconnect GBP
+                        </Button>
+                      </div>
+                      
+                      {/* Manual Location ID Input */}
+                      <div className="space-y-2">
+                        <Label className="text-sm">Manual Location ID (if auto-discovery fails)</Label>
+                        <div className="flex gap-2">
+                          <Input
+                            placeholder="e.g., 12345678901234567890"
+                            value={manualLocationId}
+                            onChange={(e) => setManualLocationId(e.target.value)}
+                            className="flex-1"
+                          />
+                          <Button
+                            size="sm"
+                            onClick={handleSaveManualLocationId}
+                            disabled={updateSettingsMutation.isPending || !manualLocationId.trim()}
+                          >
+                            {updateSettingsMutation.isPending ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              "Save"
+                            )}
+                          </Button>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          Find your Location ID: Go to business.google.com → Select your business → The URL will contain your location ID (the long number after /locations/)
+                        </p>
                       </div>
                     </div>
                   </div>

@@ -14,6 +14,7 @@ const PIPEDREAM_CLIENT_ID = Deno.env.get("PIPEDREAM_CLIENT_ID");
 const PIPEDREAM_CLIENT_SECRET = Deno.env.get("PIPEDREAM_CLIENT_SECRET");
 const PIPEDREAM_PROJECT_ID = Deno.env.get("PIPEDREAM_PROJECT_ID");
 const PIPEDREAM_USER_ID = Deno.env.get("PIPEDREAM_USER_ID") || "admin";
+const PEACHHAUS_ACCOUNT_ID = "106698735661379366674";
 
 // Get Pipedream access token
 async function getPipedreamAccessToken(): Promise<string> {
@@ -565,31 +566,145 @@ serve(async (req) => {
         }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
+      case "discover-locations": {
+        // Explicitly discover and list all locations for the connected account
+        const accessToken = await getPipedreamAccessToken();
+        const accountId = params.accountId || PEACHHAUS_ACCOUNT_ID;
+        
+        console.log(`Discovering locations for account: ${accountId}`);
+        
+        // First, list accounts to verify we have access
+        const accountsResult = await callMCPTool(
+          accessToken,
+          userId,
+          "google_my_business-list-accounts",
+          {
+            instruction: "List all Google Business Profile accounts I have access to. Return as JSON with accounts array."
+          }
+        );
+        
+        console.log("Accounts discovery result:", JSON.stringify(accountsResult).substring(0, 1500));
+        
+        // Try to get locations using the MCP tool
+        const locationsResult = await callMCPTool(
+          accessToken,
+          userId,
+          "google_my_business-list-locations",
+          {
+            instruction: `List ALL locations under account ID ${accountId}. Return as JSON array with each location having: name (resource name), locationName, address, and primaryPhone if available.`,
+            parent: `accounts/${accountId}`
+          }
+        );
+        
+        console.log("Locations discovery result:", JSON.stringify(locationsResult).substring(0, 1500));
+        
+        // Parse the response
+        let locations: any[] = [];
+        let accounts: any[] = [];
+        let rawAccountsResponse = "";
+        let rawLocationsResponse = "";
+        
+        try {
+          rawAccountsResponse = accountsResult?.result?.content?.[0]?.text || "";
+          if (rawAccountsResponse.startsWith("{") || rawAccountsResponse.startsWith("[")) {
+            const parsed = JSON.parse(rawAccountsResponse);
+            accounts = parsed?.accounts || (Array.isArray(parsed) ? parsed : []);
+          }
+        } catch (e) {
+          console.log("Failed to parse accounts:", e);
+        }
+        
+        try {
+          rawLocationsResponse = locationsResult?.result?.content?.[0]?.text || "";
+          if (rawLocationsResponse.startsWith("{") || rawLocationsResponse.startsWith("[")) {
+            const parsed = JSON.parse(rawLocationsResponse);
+            locations = parsed?.locations || (Array.isArray(parsed) ? parsed : []);
+          }
+        } catch (e) {
+          console.log("Failed to parse locations:", e);
+        }
+        
+        // If we found locations, save the first one to settings
+        if (locations.length > 0) {
+          const firstLocation = locations[0];
+          // Extract location ID from name (format: accounts/xxx/locations/yyy)
+          const locationName = firstLocation.name || "";
+          const locationIdMatch = locationName.match(/locations\/(\d+)/);
+          const locationId = locationIdMatch?.[1] || firstLocation.locationId;
+          
+          if (locationId) {
+            // Save to settings
+            if (settings?.id) {
+              await supabase
+                .from("gbp_settings")
+                .update({ 
+                  gbp_location_id: locationId,
+                  gbp_account_id: accountId,
+                  updated_at: new Date().toISOString()
+                })
+                .eq("id", settings.id);
+            } else {
+              await supabase
+                .from("gbp_settings")
+                .insert({
+                  gbp_account_id: accountId,
+                  gbp_location_id: locationId,
+                  created_at: new Date().toISOString(),
+                });
+            }
+          }
+        }
+        
+        return new Response(JSON.stringify({ 
+          success: true,
+          accounts,
+          locations,
+          rawAccountsResponse: rawAccountsResponse.substring(0, 500),
+          rawLocationsResponse: rawLocationsResponse.substring(0, 500),
+          savedLocationId: locations[0]?.name?.match(/locations\/(\d+)/)?.[1] || null
+        }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
       case "sync-reviews": {
         // Sync reviews from Google Business Profile
         const accessToken = await getPipedreamAccessToken();
         
-        // The MCP tools only accept an 'instruction' parameter - be very explicit to proceed automatically
-        console.log("Fetching all reviews via MCP instruction...");
+        // Check if we have a location ID configured
+        const configuredLocationId = settings?.gbp_location_id;
+        const configuredAccountId = settings?.gbp_account_id || PEACHHAUS_ACCOUNT_ID;
         
+        console.log(`Syncing reviews - Account: ${configuredAccountId}, Location: ${configuredLocationId || "not configured"}`);
+        
+        // If no location ID, try to discover it first
+        if (!configuredLocationId) {
+          console.log("No location ID configured, attempting discovery...");
+        }
+          
+        // Try different approaches to get reviews
         const reviewsResult = await callMCPTool(
           accessToken,
           userId,
           "google_my_business-list-all-reviews",
           {
-            instruction: `IMPORTANT: Do NOT ask for confirmation. Proceed automatically with these steps:
-1. Use account ID 106698735661379366674 (PeachHaus Group)
-2. List ALL locations under this account
-3. For EACH location found, fetch ALL reviews
-4. Return the reviews as a JSON array with these fields for each review: name (the review resource name), reviewerName, starRating (number 1-5), reviewText, and reviewReply (if any exists)
-5. If no locations are found, try listing reviews directly from the account
-6. Do NOT ask for confirmation at any step - just proceed and return results`,
+            instruction: `You are helping me fetch Google Business Profile reviews. IMPORTANT: Follow these steps IN ORDER and do NOT stop to ask for confirmation:
+
+STEP 1: Call accounts.list to get all accounts I have access to.
+STEP 2: For account ID ${configuredAccountId}, call accounts.locations.list to get all locations.
+STEP 3: For EACH location found, call accounts.locations.reviews.list to get reviews.
+STEP 4: Return ALL reviews as a JSON array with format:
+{
+  "reviews": [
+    {"name": "accounts/.../reviews/...", "reviewer": {"displayName": "..."}, "starRating": "FIVE", "comment": "...", "reviewReply": {"comment": "..."}, "createTime": "..."}
+  ]
+}
+
+If you get a 404 error at any step, include that in your response as: {"error": "404", "step": "<which step failed>", "details": "<error message>"}
+
+Proceed automatically without asking for confirmation.`
           }
         );
         
         console.log("Reviews result:", JSON.stringify(reviewsResult).substring(0, 2000));
-
-        console.log("Reviews result:", JSON.stringify(reviewsResult).substring(0, 1000));
 
         // Extract reviews from the response - handle error responses gracefully
         let reviews: any[] = [];
