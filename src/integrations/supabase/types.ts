@@ -6420,6 +6420,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      refresh_all_holiday_email_queues: { Args: never; Returns: undefined }
     }
     Enums: {
       account_status: "pending" | "approved" | "rejected"
