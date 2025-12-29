@@ -2561,7 +2561,9 @@ export type Database = {
           id: string
           is_multi_line: boolean | null
           owner_id: string
+          property_id: string | null
           receipt_path: string | null
+          reconciliation_id: string | null
           statement_date: string | null
           statement_notes: string | null
           stripe_invoice_id: string | null
@@ -2578,7 +2580,9 @@ export type Database = {
           id?: string
           is_multi_line?: boolean | null
           owner_id: string
+          property_id?: string | null
           receipt_path?: string | null
+          reconciliation_id?: string | null
           statement_date?: string | null
           statement_notes?: string | null
           stripe_invoice_id?: string | null
@@ -2595,7 +2599,9 @@ export type Database = {
           id?: string
           is_multi_line?: boolean | null
           owner_id?: string
+          property_id?: string | null
           receipt_path?: string | null
+          reconciliation_id?: string | null
           statement_date?: string | null
           statement_notes?: string | null
           stripe_invoice_id?: string | null
@@ -2610,6 +2616,27 @@ export type Database = {
             referencedRelation: "property_owners"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "monthly_charges_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "comprehensive_property_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "monthly_charges_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "monthly_charges_reconciliation_id_fkey"
+            columns: ["reconciliation_id"]
+            isOneToOne: false
+            referencedRelation: "monthly_reconciliations"
+            referencedColumns: ["id"]
+          },
         ]
       }
       monthly_reconciliations: {
@@ -2621,6 +2648,7 @@ export type Database = {
           created_at: string
           dispute_detected_at: string | null
           dispute_reason: string | null
+          due_from_owner: number | null
           id: string
           management_fee: number
           mid_term_revenue: number | null
@@ -2631,6 +2659,11 @@ export type Database = {
           owner_disputed: boolean | null
           owner_id: string
           owner_response_deadline: string | null
+          payment_reminder_sent_at: string | null
+          payout_at: string | null
+          payout_reference: string | null
+          payout_status: string | null
+          payout_to_owner: number | null
           property_id: string
           reconciliation_month: string
           revenue_override: number | null
@@ -2652,6 +2685,7 @@ export type Database = {
           created_at?: string
           dispute_detected_at?: string | null
           dispute_reason?: string | null
+          due_from_owner?: number | null
           id?: string
           management_fee?: number
           mid_term_revenue?: number | null
@@ -2662,6 +2696,11 @@ export type Database = {
           owner_disputed?: boolean | null
           owner_id: string
           owner_response_deadline?: string | null
+          payment_reminder_sent_at?: string | null
+          payout_at?: string | null
+          payout_reference?: string | null
+          payout_status?: string | null
+          payout_to_owner?: number | null
           property_id: string
           reconciliation_month: string
           revenue_override?: number | null
@@ -2683,6 +2722,7 @@ export type Database = {
           created_at?: string
           dispute_detected_at?: string | null
           dispute_reason?: string | null
+          due_from_owner?: number | null
           id?: string
           management_fee?: number
           mid_term_revenue?: number | null
@@ -2693,6 +2733,11 @@ export type Database = {
           owner_disputed?: boolean | null
           owner_id?: string
           owner_response_deadline?: string | null
+          payment_reminder_sent_at?: string | null
+          payout_at?: string | null
+          payout_reference?: string | null
+          payout_status?: string | null
+          payout_to_owner?: number | null
           property_id?: string
           reconciliation_month?: string
           revenue_override?: number | null
@@ -4728,9 +4773,12 @@ export type Database = {
           id: string
           name: string
           payment_method: string
+          payout_bank_account_id: string | null
+          payout_method: string | null
           phone: string | null
           second_owner_email: string | null
           second_owner_name: string | null
+          service_type: string
           stripe_customer_id: string | null
           updated_at: string
         }
@@ -4740,9 +4788,12 @@ export type Database = {
           id?: string
           name: string
           payment_method: string
+          payout_bank_account_id?: string | null
+          payout_method?: string | null
           phone?: string | null
           second_owner_email?: string | null
           second_owner_name?: string | null
+          service_type?: string
           stripe_customer_id?: string | null
           updated_at?: string
         }
@@ -4752,9 +4803,12 @@ export type Database = {
           id?: string
           name?: string
           payment_method?: string
+          payout_bank_account_id?: string | null
+          payout_method?: string | null
           phone?: string | null
           second_owner_email?: string | null
           second_owner_name?: string | null
+          service_type?: string
           stripe_customer_id?: string | null
           updated_at?: string
         }

@@ -11,10 +11,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
-import { Check, Home, DollarSign, Eye, RotateCcw, AlertTriangle, RefreshCw } from "lucide-react";
+import { Check, Home, DollarSign, Eye, RotateCcw, AlertTriangle, RefreshCw, CreditCard } from "lucide-react";
 import { toast } from "sonner";
 import { MonthlyEmailPreviewModal } from "./MonthlyEmailPreviewModal";
-import { calculateDueFromOwnerFromLineItems } from "@/lib/reconciliationCalculations";
+import { calculateDueFromOwnerFromLineItems, ServiceType } from "@/lib/reconciliationCalculations";
 import { VisitValidationPreview } from "./VisitValidationPreview";
 
 interface ReconciliationReviewModalProps {
@@ -32,6 +32,7 @@ export const ReconciliationReviewModal = ({
 }: ReconciliationReviewModalProps) => {
   const [notes, setNotes] = useState("");
   const [isApproving, setIsApproving] = useState(false);
+  const [isCharging, setIsCharging] = useState(false);
   const [showEmailPreview, setShowEmailPreview] = useState(false);
   const [revenueOverride, setRevenueOverride] = useState<string>("");
   const [showOverrideInput, setShowOverrideInput] = useState(false);
@@ -75,7 +76,7 @@ export const ReconciliationReviewModal = ({
         .select(`
           *,
           properties(id, name, address, management_fee_percentage, order_minimum_fee),
-          property_owners(name, email)
+          property_owners(id, name, email, stripe_customer_id, payment_method, service_type)
         `)
         .eq("id", reconciliationId)
         .single();
@@ -667,11 +668,17 @@ export const ReconciliationReviewModal = ({
 
   const { reconciliation, lineItems, unbilledVisits, unbilledExpenses } = data;
   
+  // Get service type from owner
+  const serviceType: ServiceType = (reconciliation.property_owners?.service_type as ServiceType) || 'cohosting';
+  const isCohosting = serviceType === 'cohosting';
+  
   // Calculate actual totals from verified line items
   // Note: management_fee already includes minimum fee if applicable, don't add order_minimum_fee separately
   const calculated = calculateDueFromOwnerFromLineItems(
     lineItems,
-    reconciliation.management_fee
+    reconciliation.management_fee,
+    reconciliation.total_revenue,
+    serviceType
   );
 
   // No longer show mismatch warnings - the Live Financial Calculator is the source of truth
@@ -813,7 +820,9 @@ export const ReconciliationReviewModal = ({
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <p className="text-sm font-medium text-muted-foreground mb-3">Amount Due from Owner</p>
+                  <p className="text-sm font-medium text-muted-foreground mb-3">
+                    {isCohosting ? 'Amount Due from Owner' : 'Net Payout to Owner'}
+                  </p>
                   <div className="space-y-1">
                     {(() => {
                       const percentage = reconciliation.properties?.management_fee_percentage || 15;
@@ -855,10 +864,15 @@ export const ReconciliationReviewModal = ({
                       </>
                     )}
                   </div>
-                  <div className="flex justify-between font-bold pt-2 border-t text-primary text-lg">
-                    <span>Total Due:</span>
-                    <span>${calculated.dueFromOwner.toFixed(2)}</span>
+                  <div className={`flex justify-between font-bold pt-2 border-t text-lg ${isCohosting ? 'text-primary' : 'text-green-600'}`}>
+                    <span>{isCohosting ? 'Total Due:' : 'Net Payout:'}</span>
+                    <span>${isCohosting ? calculated.dueFromOwner.toFixed(2) : calculated.payoutToOwner.toFixed(2)}</span>
                   </div>
+                  {!isCohosting && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Full-service client: Revenue collected by PeachHaus, net amount paid to owner
+                    </p>
+                  )}
                 </div>
               </div>
               <div className="mt-4 pt-4 border-t flex items-center justify-between">

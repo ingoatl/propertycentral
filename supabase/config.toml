@@ -42,6 +42,9 @@ verify_jwt = false
 [functions.cleanup-contaminated-expenses]
 verify_jwt = true
 
+[functions.charge-from-reconciliation]
+verify_jwt = true
+
 [functions.create-reconciliation]
 verify_jwt = true
 
