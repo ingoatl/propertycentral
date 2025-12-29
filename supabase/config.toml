@@ -296,3 +296,9 @@ verify_jwt = true
 
 [functions.pre-generate-holiday-images]
 verify_jwt = false
+
+[functions.analyze-permit]
+verify_jwt = true
+
+[functions.send-permit-reminders]
+verify_jwt = false

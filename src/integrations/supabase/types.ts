@@ -4068,6 +4068,67 @@ export type Database = {
         }
         Relationships: []
       }
+      permit_reminders: {
+        Row: {
+          created_at: string
+          document_id: string
+          id: string
+          permit_expiration_date: string
+          permit_number: string | null
+          property_id: string
+          reminder_email_to: string | null
+          reminder_sent_at: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          document_id: string
+          id?: string
+          permit_expiration_date: string
+          permit_number?: string | null
+          property_id: string
+          reminder_email_to?: string | null
+          reminder_sent_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          document_id?: string
+          id?: string
+          permit_expiration_date?: string
+          permit_number?: string | null
+          property_id?: string
+          reminder_email_to?: string | null
+          reminder_sent_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "permit_reminders_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "property_documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "permit_reminders_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "comprehensive_property_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "permit_reminders_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       phase_role_assignments: {
         Row: {
           created_at: string
@@ -4479,6 +4540,7 @@ export type Database = {
       }
       property_documents: {
         Row: {
+          ai_extracted_data: Json | null
           created_at: string
           description: string | null
           document_type: string | null
@@ -4487,12 +4549,15 @@ export type Database = {
           file_size: number | null
           file_type: string | null
           id: string
+          permit_expiration_date: string | null
+          permit_reminder_sent: boolean | null
           project_id: string | null
           property_id: string | null
           updated_at: string
           uploaded_by: string | null
         }
         Insert: {
+          ai_extracted_data?: Json | null
           created_at?: string
           description?: string | null
           document_type?: string | null
@@ -4501,12 +4566,15 @@ export type Database = {
           file_size?: number | null
           file_type?: string | null
           id?: string
+          permit_expiration_date?: string | null
+          permit_reminder_sent?: boolean | null
           project_id?: string | null
           property_id?: string | null
           updated_at?: string
           uploaded_by?: string | null
         }
         Update: {
+          ai_extracted_data?: Json | null
           created_at?: string
           description?: string | null
           document_type?: string | null
@@ -4515,6 +4583,8 @@ export type Database = {
           file_size?: number | null
           file_type?: string | null
           id?: string
+          permit_expiration_date?: string | null
+          permit_reminder_sent?: boolean | null
           project_id?: string | null
           property_id?: string | null
           updated_at?: string

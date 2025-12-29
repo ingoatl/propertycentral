@@ -10,11 +10,11 @@ export const ONBOARDING_PHASES: PhaseDefinition[] = [
       { title: "Owner Email", field_type: "text" },
       { title: "Owner Phone", field_type: "phone" },
       { title: "STR Permit Number", field_type: "text" },
-      { title: "Upload STR License/Permit", field_type: "file" },
+      { title: "Upload STR License/Permit", field_type: "file", description: "AI will extract expiration date and set auto-reminder" },
+      { title: "Permit Expiration Date", field_type: "date", description: "Auto-extracted from permit (or enter manually)" },
       { title: "Signed Management Agreement Link", field_type: "text", description: "Google Drive link to signed agreement (Admin Only)" },
       { title: "ACH Details", field_type: "file", description: "Upload ACH authorization form (Admin Only)" },
       { title: "HOA Information", field_type: "textarea", description: "If applicable" },
-      { title: "Insurance Provider & Policy Number", field_type: "textarea", description: "Provider name and policy number" },
       { title: "Upload Insurance Policy", field_type: "file" },
       { title: "PeachHaus Listed as Additional Insured", field_type: "radio", options: ["Yes", "No"] },
     ]
