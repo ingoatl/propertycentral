@@ -169,6 +169,24 @@ serve(async (req) => {
 
     console.log(`Found ${properties?.length || 0} properties to send emails for`);
 
+    // Fetch pre-generated images from queue for all recipients
+    const { data: queueItems } = await supabase
+      .from('holiday_email_queue')
+      .select('recipient_email, pre_generated_image_url')
+      .eq('template_id', holidayTemplateId)
+      .eq('status', 'pending')
+      .not('pre_generated_image_url', 'is', null);
+
+    // Create a map of email -> pre-generated image URL
+    const preGeneratedImageMap = new Map<string, string>();
+    queueItems?.forEach((item: { recipient_email: string; pre_generated_image_url: string }) => {
+      if (item.pre_generated_image_url) {
+        preGeneratedImageMap.set(item.recipient_email, item.pre_generated_image_url);
+      }
+    });
+
+    console.log(`Found ${preGeneratedImageMap.size} pre-generated images`);
+
     const results: any[] = [];
     const processedEmails = new Set<string>();
 
@@ -200,6 +218,7 @@ serve(async (req) => {
           isTest: false,
           lovableApiKey: LOVABLE_API_KEY,
           supabaseUrl,
+          preGeneratedImageUrl: preGeneratedImageMap.get(owner.email),
         });
 
         results.push({ email: owner.email, success: true, ...result });
@@ -228,6 +247,7 @@ serve(async (req) => {
             isTest: false,
             lovableApiKey: LOVABLE_API_KEY,
             supabaseUrl,
+            preGeneratedImageUrl: preGeneratedImageMap.get(owner.second_owner_email),
           });
           
           results.push({ email: owner.second_owner_email, success: true, ...secondResult });
@@ -281,6 +301,7 @@ async function sendHolidayEmail({
   isTest,
   lovableApiKey,
   supabaseUrl,
+  preGeneratedImageUrl,
 }: {
   supabase: any;
   resend: any;
@@ -290,39 +311,45 @@ async function sendHolidayEmail({
   isTest: boolean;
   lovableApiKey: string;
   supabaseUrl: string;
+  preGeneratedImageUrl?: string | null;
 }) {
   const ownerFirstName = owner.name.split(' ')[0];
 
-  console.log(`Generating image for ${ownerFirstName} - ${property.name}`);
+  // Use pre-generated image if available, otherwise generate on-the-fly
+  let generatedImageUrl: string | null = null;
 
-  // Generate personalized holiday image
-  let generatedImageUrl = null;
+  if (preGeneratedImageUrl) {
+    console.log(`Using pre-generated image for ${ownerFirstName} - ${property.name}`);
+    generatedImageUrl = preGeneratedImageUrl;
+  } else {
+    console.log(`Generating image on-the-fly for ${ownerFirstName} - ${property.name}`);
 
-  try {
-    // Call generate-holiday-image function with proper template
-    const imageResponse = await fetch(`${supabaseUrl}/functions/v1/generate-holiday-image`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
-      },
-      body: JSON.stringify({
-        ownerFirstName,
-        propertyName: property.name,
-        promptTemplate: template.image_prompt_template,
-        holidayName: template.holiday_name,
-      }),
-    });
+    try {
+      // Call generate-holiday-image function with proper template
+      const imageResponse = await fetch(`${supabaseUrl}/functions/v1/generate-holiday-image`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+        },
+        body: JSON.stringify({
+          ownerFirstName,
+          propertyName: property.name,
+          promptTemplate: template.image_prompt_template,
+          holidayName: template.holiday_name,
+        }),
+      });
 
-    if (imageResponse.ok) {
-      const imageData = await imageResponse.json();
-      generatedImageUrl = imageData.imageUrl;
-      console.log('Image generated successfully:', generatedImageUrl);
-    } else {
-      console.error('Image generation failed:', await imageResponse.text());
+      if (imageResponse.ok) {
+        const imageData = await imageResponse.json();
+        generatedImageUrl = imageData.imageUrl;
+        console.log('Image generated successfully:', generatedImageUrl);
+      } else {
+        console.error('Image generation failed:', await imageResponse.text());
+      }
+    } catch (error) {
+      console.error('Error generating image:', error);
     }
-  } catch (error) {
-    console.error('Error generating image:', error);
   }
 
   // Personalize the message and remove any greeting/closing lines since we add them in HTML
@@ -440,16 +467,18 @@ function buildHolidayEmailHtml({
             </td>
           </tr>
           
-          <!-- Holiday Image - Elegant presentation with subtle border -->
+          <!-- Holiday Image - Optimized for instant display -->
           ${imageUrl ? `
           <tr>
             <td style="padding: 0 32px;">
-              <table cellpadding="0" cellspacing="0" width="100%">
+              <table cellpadding="0" cellspacing="0" width="100%" style="background-color: #f5f3ef;">
                 <tr>
                   <td style="border-radius: 8px; overflow: hidden; box-shadow: 0 8px 32px rgba(0,0,0,0.08);">
                     <img src="${imageUrl}" 
-                         alt="Season's Greetings" 
-                         style="width: 100%; height: auto; display: block; border-radius: 8px;">
+                         alt="Season's Greetings from PeachHaus"
+                         width="556"
+                         height="371"
+                         style="width: 100%; max-width: 556px; height: auto; display: block; border-radius: 8px; background-color: #f5f3ef;">
                   </td>
                 </tr>
               </table>

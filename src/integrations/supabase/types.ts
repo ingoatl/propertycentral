@@ -1424,6 +1424,7 @@ export type Database = {
           generated_image_url: string | null
           id: string
           owner_id: string | null
+          pre_generated_image_url: string | null
           property_id: string | null
           recipient_email: string
           recipient_name: string
@@ -1439,6 +1440,7 @@ export type Database = {
           generated_image_url?: string | null
           id?: string
           owner_id?: string | null
+          pre_generated_image_url?: string | null
           property_id?: string | null
           recipient_email: string
           recipient_name: string
@@ -1454,6 +1456,7 @@ export type Database = {
           generated_image_url?: string | null
           id?: string
           owner_id?: string | null
+          pre_generated_image_url?: string | null
           property_id?: string | null
           recipient_email?: string
           recipient_name?: string

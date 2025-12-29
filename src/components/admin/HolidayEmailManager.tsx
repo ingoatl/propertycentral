@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Progress } from "@/components/ui/progress";
 import { toast } from "@/components/ui/use-toast";
 import { format, parseISO, isAfter, isBefore, addYears } from "date-fns";
 import { 
@@ -31,7 +32,9 @@ import {
   Phone,
   Home,
   Edit,
-  UserPlus
+  UserPlus,
+  Zap,
+  ImagePlus
 } from "lucide-react";
 
 interface HolidayTemplate {
@@ -103,6 +106,8 @@ export function HolidayEmailManager() {
     second_owner_email: "",
   });
   const [isUpdatingOwner, setIsUpdatingOwner] = useState(false);
+  const [isPreGenerating, setIsPreGenerating] = useState(false);
+  const [preGenProgress, setPreGenProgress] = useState({ current: 0, total: 0 });
 
   // Fetch holiday templates
   const { data: templates, isLoading: templatesLoading } = useQuery({
@@ -156,6 +161,29 @@ export function HolidayEmailManager() {
       if (error) throw error;
       return data as PropertyWithOwner[];
     }
+  });
+
+  // Fetch queue stats for selected template
+  const { data: queueStats, refetch: refetchQueueStats } = useQuery({
+    queryKey: ['holiday-queue-stats', selectedTemplate?.id],
+    queryFn: async () => {
+      if (!selectedTemplate?.id) return null;
+      
+      const { data, error } = await supabase
+        .from('holiday_email_queue')
+        .select('id, recipient_email, pre_generated_image_url, status')
+        .eq('template_id', selectedTemplate.id)
+        .eq('status', 'pending');
+      
+      if (error) throw error;
+      
+      const total = data?.length || 0;
+      const withImages = data?.filter(q => q.pre_generated_image_url)?.length || 0;
+      const withoutImages = total - withImages;
+      
+      return { total, withImages, withoutImages, items: data || [] };
+    },
+    enabled: !!selectedTemplate?.id,
   });
 
   // Compute owner count and missing info stats
@@ -283,6 +311,66 @@ export function HolidayEmailManager() {
       });
     } finally {
       setIsSending(false);
+    }
+  };
+
+  // Pre-generate images for selected template
+  const preGenerateImages = async () => {
+    if (!selectedTemplate) {
+      toast({ title: "Error", description: "Please select a template first", variant: "destructive" });
+      return;
+    }
+
+    setIsPreGenerating(true);
+    setPreGenProgress({ current: 0, total: queueStats?.withoutImages || 0 });
+
+    try {
+      // Process in batches
+      let totalGenerated = 0;
+      let totalFailed = 0;
+      const batchSize = 10;
+      const itemsToProcess = queueStats?.withoutImages || 0;
+
+      while (totalGenerated + totalFailed < itemsToProcess) {
+        const { data, error } = await supabase.functions.invoke('pre-generate-holiday-images', {
+          body: {
+            templateId: selectedTemplate.id,
+            limit: batchSize
+          }
+        });
+
+        if (error) throw error;
+
+        totalGenerated += data.generated || 0;
+        totalFailed += data.failed || 0;
+        setPreGenProgress({ current: totalGenerated + totalFailed, total: itemsToProcess });
+
+        // If no more items to process, break
+        if (data.generated === 0 && data.failed === 0) break;
+
+        // Refetch queue stats
+        await refetchQueueStats();
+
+        // Small delay between batches
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+
+      toast({ 
+        title: "Images Pre-Generated! 🎨", 
+        description: `Successfully generated ${totalGenerated} images. ${totalFailed > 0 ? `${totalFailed} failed.` : ''}`
+      });
+
+      refetchQueueStats();
+    } catch (error) {
+      console.error('Error pre-generating images:', error);
+      toast({ 
+        title: "Pre-Generation Error", 
+        description: error instanceof Error ? error.message : "Failed to pre-generate images", 
+        variant: "destructive" 
+      });
+    } finally {
+      setIsPreGenerating(false);
+      setPreGenProgress({ current: 0, total: 0 });
     }
   };
 
@@ -801,6 +889,45 @@ export function HolidayEmailManager() {
                         {selectedTemplate.message_template.substring(0, 200)}...
                       </p>
                     </div>
+
+                    {/* Pre-Generation Status */}
+                    {queueStats && queueStats.total > 0 && (
+                      <div className="border rounded-lg p-4 bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-950/20 dark:to-blue-950/20">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <Zap className="h-4 w-4 text-purple-600" />
+                            <span className="font-medium text-sm">Image Pre-Generation</span>
+                          </div>
+                          <Badge variant={queueStats.withoutImages === 0 ? "default" : "secondary"} className={queueStats.withoutImages === 0 ? "bg-green-500" : ""}>
+                            {queueStats.withImages}/{queueStats.total} ready
+                          </Badge>
+                        </div>
+                        
+                        <Progress value={(queueStats.withImages / queueStats.total) * 100} className="h-2 mb-2" />
+                        
+                        {isPreGenerating ? (
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                            Generating... {preGenProgress.current}/{preGenProgress.total}
+                          </div>
+                        ) : queueStats.withoutImages > 0 ? (
+                          <Button 
+                            size="sm" 
+                            variant="secondary"
+                            onClick={preGenerateImages}
+                            className="w-full mt-2"
+                          >
+                            <ImagePlus className="h-3 w-3 mr-1" />
+                            Pre-Generate {queueStats.withoutImages} Images
+                          </Button>
+                        ) : (
+                          <p className="text-xs text-green-600 flex items-center gap-1">
+                            <CheckCircle2 className="h-3 w-3" />
+                            All images ready - emails will load instantly!
+                          </p>
+                        )}
+                      </div>
+                    )}
 
                     <div className="space-y-2">
                       <Label htmlFor="testEmail">Test Email Address</Label>
