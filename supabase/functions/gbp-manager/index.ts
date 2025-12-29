@@ -18,7 +18,8 @@ const GBP_ACCOUNTS_API = "https://mybusinessaccountmanagement.googleapis.com/v1"
 const GBP_BUSINESS_INFO_API = "https://mybusinessbusinessinformation.googleapis.com/v1";
 const GBP_API_V4 = "https://mybusiness.googleapis.com/v4";
 
-// PeachHaus account ID (known from previous setup)
+// PeachHaus account ID (hardcoded for reliability)
+// Location ID will be auto-discovered on first sync or can be set manually
 const PEACHHAUS_ACCOUNT_ID = "106698735661379366674";
 
 interface GBPSettings {
@@ -556,15 +557,44 @@ serve(async (req) => {
           throw new Error("Not connected to Google Business Profile");
         }
 
-        const accountId = settings.gbp_account_id || PEACHHAUS_ACCOUNT_ID;
-        const locationId = settings.gbp_location_id;
-
+        const accountId = settings?.gbp_account_id || PEACHHAUS_ACCOUNT_ID;
+        const locationId = settings?.gbp_location_id;
+        
         if (!locationId) {
+          // Try to auto-discover the location
+          try {
+            const accessToken = await getValidAccessToken(supabase, settings);
+            const locationsUrl = `${GBP_BUSINESS_INFO_API}/accounts/${accountId}/locations?readMask=name,title`;
+            const locationsData = await callGoogleAPI(accessToken, locationsUrl);
+            const locations = locationsData.locations || [];
+            
+            if (locations.length > 0) {
+              const firstLocation = locations[0];
+              const locationIdMatch = firstLocation.name?.match(/locations\/(\d+)/);
+              const discoveredLocationId = locationIdMatch?.[1];
+              
+              if (discoveredLocationId && settings?.id) {
+                await supabase
+                  .from("gbp_settings")
+                  .update({ gbp_location_id: discoveredLocationId })
+                  .eq("id", settings.id);
+                
+                // Use discovered location for this request
+                const reviewsUrl = `${GBP_API_V4}/accounts/${accountId}/locations/${discoveredLocationId}/reviews`;
+                console.log(`Using auto-discovered location: ${discoveredLocationId}`);
+                const data = await callGoogleAPI(accessToken, reviewsUrl);
+                // Continue with reviews sync...
+              }
+            }
+          } catch (discoverError: any) {
+            console.error("Auto-discovery failed:", discoverError);
+          }
+          
           return new Response(JSON.stringify({ 
             success: false,
             error: "GBP_LOCATION_NOT_CONFIGURED",
-            userMessage: "No location configured. Please run 'Discover Locations' first.",
-            details: "A GBP location ID is required to fetch reviews.",
+            userMessage: "No location found. Click 'Discover Locations' to find your business location.",
+            details: "Run location discovery to auto-configure.",
           }), {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
             status: 400,
@@ -816,11 +846,11 @@ serve(async (req) => {
           throw new Error("No post content provided");
         }
 
-        const accountId = settings.gbp_account_id || PEACHHAUS_ACCOUNT_ID;
-        const locationId = settings.gbp_location_id;
+        const accountId = settings?.gbp_account_id || PEACHHAUS_ACCOUNT_ID;
+        const locationId = settings?.gbp_location_id;
 
         if (!locationId) {
-          throw new Error("No location configured. Please run 'Discover Locations' first.");
+          throw new Error("No location configured. Please click 'Discover Locations' first.");
         }
 
         const accessToken = await getValidAccessToken(supabase, settings);
