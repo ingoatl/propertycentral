@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { CheckCircle, XCircle, Clock, Shield, UserPlus, Key, Users, MessageCircleQuestion, UserCog, Bug, Mail, Database, Briefcase, Sparkles, Star, Calendar, Building, Phone } from "lucide-react";
+import { CheckCircle, XCircle, Clock, Shield, UserPlus, Key, Users, MessageCircleQuestion, UserCog, Bug, Mail, Database, Briefcase, Sparkles, Star, Calendar, Phone } from "lucide-react";
 import { RescheduleLogsTab } from "@/components/admin/RescheduleLogsTab";
 import { z } from "zod";
 import { TeamMatrixTab } from "@/components/admin/TeamMatrixTab";
@@ -22,7 +22,6 @@ import { HolidayEmailManager } from "@/components/admin/HolidayEmailManager";
 import { HolidayEmailWatchdogCard } from "@/components/admin/HolidayEmailWatchdogCard";
 import GoogleReviewsTab from "@/components/bookings/GoogleReviewsTab";
 import { CalendarAdminPanel } from "@/components/admin/CalendarAdminPanel";
-import GBPAdminPanel from "@/components/admin/GBPAdminPanel";
 import { PhoneAssignmentsManager } from "@/components/admin/PhoneAssignmentsManager";
 
 const createUserSchema = z.object({
@@ -439,10 +438,6 @@ const Admin = () => {
             <Calendar className="w-4 h-4 mr-2" />
             Calendar
           </TabsTrigger>
-          <TabsTrigger value="gbp">
-            <Building className="w-4 h-4 mr-2" />
-            Google Business
-          </TabsTrigger>
           <TabsTrigger value="phones">
             <Phone className="w-4 h-4 mr-2" />
             Phone Assignments
@@ -800,10 +795,6 @@ const Admin = () => {
 
         <TabsContent value="calendar" className="mt-8">
           <CalendarAdminPanel />
-        </TabsContent>
-
-        <TabsContent value="gbp" className="mt-8">
-          <GBPAdminPanel />
         </TabsContent>
 
         <TabsContent value="phones" className="mt-8">
