@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -11,10 +12,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
-import { Check, Home, DollarSign, Eye, RotateCcw, AlertTriangle, RefreshCw, CreditCard } from "lucide-react";
+import { Check, Home, DollarSign, Eye, RotateCcw, AlertTriangle, RefreshCw, CreditCard, Loader2, Banknote } from "lucide-react";
 import { toast } from "sonner";
 import { MonthlyEmailPreviewModal } from "./MonthlyEmailPreviewModal";
-import { calculateDueFromOwnerFromLineItems, ServiceType } from "@/lib/reconciliationCalculations";
+import { calculateDueFromOwnerFromLineItems, ServiceType, getSettlementAmount, getSettlementLabel, formatCurrency } from "@/lib/reconciliationCalculations";
 import { VisitValidationPreview } from "./VisitValidationPreview";
 
 interface ReconciliationReviewModalProps {
@@ -33,6 +34,7 @@ export const ReconciliationReviewModal = ({
   const [notes, setNotes] = useState("");
   const [isApproving, setIsApproving] = useState(false);
   const [isCharging, setIsCharging] = useState(false);
+  const [isProcessingPayout, setIsProcessingPayout] = useState(false);
   const [showEmailPreview, setShowEmailPreview] = useState(false);
   const [revenueOverride, setRevenueOverride] = useState<string>("");
   const [showOverrideInput, setShowOverrideInput] = useState(false);
@@ -1029,6 +1031,47 @@ export const ReconciliationReviewModal = ({
           </Card>
         )}
 
+        {/* Service Type and Payment Info Banner */}
+        {(reconciliation.status === "approved" || reconciliation.status === "statement_sent") && (
+          <Card className={`p-4 ${isCohosting ? 'bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800' : 'bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800'}`}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Badge variant={isCohosting ? "default" : "secondary"} className="text-sm">
+                  {isCohosting ? "Co-Hosting" : "Full-Service"}
+                </Badge>
+                <div className="text-sm">
+                  {isCohosting ? (
+                    <>
+                      <span className="font-medium">Owner Payment Method:</span>{" "}
+                      {reconciliation.property_owners?.payment_method === "credit_card" ? (
+                        <span className="text-blue-600 dark:text-blue-400">
+                          <CreditCard className="w-4 h-4 inline mr-1" />
+                          Credit Card (3% fee applies)
+                        </span>
+                      ) : (
+                        <span className="text-green-600 dark:text-green-400">
+                          <Banknote className="w-4 h-4 inline mr-1" />
+                          ACH / Bank Transfer
+                        </span>
+                      )}
+                    </>
+                  ) : (
+                    <span className="font-medium text-green-700 dark:text-green-300">
+                      Payout to owner via bank transfer
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-xs text-muted-foreground">{getSettlementLabel(serviceType)}</p>
+                <p className={`text-xl font-bold ${isCohosting ? 'text-blue-600' : 'text-green-600'}`}>
+                  {formatCurrency(getSettlementAmount(calculated, serviceType))}
+                </p>
+              </div>
+            </div>
+          </Card>
+        )}
+
         <div className="flex justify-between pt-4 border-t gap-2">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Close
@@ -1041,10 +1084,195 @@ export const ReconciliationReviewModal = ({
               </Button>
             )}
             {(reconciliation.status === "approved" || reconciliation.status === "statement_sent") && (
-              <Button onClick={() => setShowEmailPreview(true)}>
-                <RefreshCw className="w-4 h-4 mr-2" />
-                Recreate Email Preview
-              </Button>
+              <>
+                <Button variant="outline" onClick={() => setShowEmailPreview(true)}>
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  Recreate Email Preview
+                </Button>
+                
+                {/* Charge Owner Button (Co-hosting only) */}
+                {isCohosting && (
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button disabled={isCharging || calculated.dueFromOwner <= 0}>
+                        {isCharging ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Charging...
+                          </>
+                        ) : (
+                          <>
+                            <CreditCard className="w-4 h-4 mr-2" />
+                            Charge Owner {formatCurrency(calculated.dueFromOwner)}
+                          </>
+                        )}
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Confirm Charge to Owner</AlertDialogTitle>
+                        <AlertDialogDescription asChild>
+                          <div className="space-y-4">
+                            <p>You are about to charge {reconciliation.property_owners?.name} for the following:</p>
+                            <div className="bg-muted p-4 rounded-lg space-y-2 text-sm">
+                              <div className="flex justify-between">
+                                <span>Management Fee:</span>
+                                <span className="font-medium">{formatCurrency(reconciliation.management_fee || 0)}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span>Visit Fees:</span>
+                                <span className="font-medium">{formatCurrency(calculated.visitFees)}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span>Expenses:</span>
+                                <span className="font-medium">{formatCurrency(calculated.totalExpenses)}</span>
+                              </div>
+                              {(calculated.cleaningFees > 0 || calculated.petFees > 0) && (
+                                <div className="flex justify-between">
+                                  <span>Pass-through Fees:</span>
+                                  <span className="font-medium">{formatCurrency(calculated.cleaningFees + calculated.petFees)}</span>
+                                </div>
+                              )}
+                              {reconciliation.property_owners?.payment_method === "credit_card" && (
+                                <div className="flex justify-between text-amber-600">
+                                  <span>CC Processing Fee (3%):</span>
+                                  <span className="font-medium">{formatCurrency(calculated.dueFromOwner * 0.03)}</span>
+                                </div>
+                              )}
+                              <div className="flex justify-between border-t pt-2 font-bold">
+                                <span>Total Charge:</span>
+                                <span className="text-primary">
+                                  {formatCurrency(
+                                    reconciliation.property_owners?.payment_method === "credit_card"
+                                      ? calculated.dueFromOwner * 1.03
+                                      : calculated.dueFromOwner
+                                  )}
+                                </span>
+                              </div>
+                            </div>
+                            <p className="text-sm text-muted-foreground">
+                              This will charge the owner's saved {reconciliation.property_owners?.payment_method === "credit_card" ? "credit card" : "bank account"}.
+                            </p>
+                          </div>
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={async () => {
+                            setIsCharging(true);
+                            try {
+                              const { data: result, error } = await supabase.functions.invoke('charge-from-reconciliation', {
+                                body: { reconciliation_id: reconciliationId }
+                              });
+                              
+                              if (error) throw error;
+                              
+                              toast.success(`Successfully charged owner ${formatCurrency(result.amount / 100)}`);
+                              await refetch();
+                              onSuccess();
+                            } catch (error: any) {
+                              console.error('Charge error:', error);
+                              toast.error(error.message || "Failed to charge owner");
+                            } finally {
+                              setIsCharging(false);
+                            }
+                          }}
+                        >
+                          <CreditCard className="w-4 h-4 mr-2" />
+                          Confirm Charge
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                )}
+                
+                {/* Process Payout Button (Full-service only) */}
+                {!isCohosting && reconciliation.payout_status !== "completed" && (
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="default" className="bg-green-600 hover:bg-green-700" disabled={isProcessingPayout || (calculated.payoutToOwner || 0) <= 0}>
+                        {isProcessingPayout ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Processing...
+                          </>
+                        ) : (
+                          <>
+                            <Banknote className="w-4 h-4 mr-2" />
+                            Process Payout {formatCurrency(calculated.payoutToOwner || 0)}
+                          </>
+                        )}
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Confirm Payout to Owner</AlertDialogTitle>
+                        <AlertDialogDescription asChild>
+                          <div className="space-y-4">
+                            <p>You are about to record a payout to {reconciliation.property_owners?.name}:</p>
+                            <div className="bg-muted p-4 rounded-lg space-y-2 text-sm">
+                              <div className="flex justify-between">
+                                <span>Total Revenue:</span>
+                                <span className="font-medium text-green-600">{formatCurrency(reconciliation.total_revenue || 0)}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span>Management Fee:</span>
+                                <span className="font-medium text-red-600">-{formatCurrency(reconciliation.management_fee || 0)}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span>Visit Fees:</span>
+                                <span className="font-medium text-red-600">-{formatCurrency(calculated.visitFees)}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span>Expenses:</span>
+                                <span className="font-medium text-red-600">-{formatCurrency(calculated.totalExpenses)}</span>
+                              </div>
+                              <div className="flex justify-between border-t pt-2 font-bold">
+                                <span>Net Payout:</span>
+                                <span className="text-green-600">{formatCurrency(calculated.payoutToOwner || 0)}</span>
+                              </div>
+                            </div>
+                            <p className="text-sm text-muted-foreground">
+                              This will record the payout. Please ensure the bank transfer has been initiated.
+                            </p>
+                          </div>
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                          className="bg-green-600 hover:bg-green-700"
+                          onClick={async () => {
+                            setIsProcessingPayout(true);
+                            try {
+                              const { data: result, error } = await supabase.functions.invoke('process-owner-payout', {
+                                body: { reconciliation_id: reconciliationId }
+                              });
+                              
+                              if (error) throw error;
+                              
+                              toast.success(`Payout of ${formatCurrency(result.amount)} recorded successfully`);
+                              await refetch();
+                              onSuccess();
+                            } catch (error: any) {
+                              console.error('Payout error:', error);
+                              toast.error(error.message || "Failed to record payout");
+                            } finally {
+                              setIsProcessingPayout(false);
+                            }
+                          }}
+                        >
+                          <Banknote className="w-4 h-4 mr-2" />
+                          Confirm Payout
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                )}
+                
+                {/* Status badges are shown in the banner above */}
+              </>
             )}
           </div>
         </div>
