@@ -1899,6 +1899,47 @@ export type Database = {
           },
         ]
       }
+      lead_event_log: {
+        Row: {
+          created_at: string | null
+          event_data: Json | null
+          event_source: string
+          event_type: string
+          id: string
+          lead_id: string | null
+          processed: boolean | null
+          stage_changed_to: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          event_data?: Json | null
+          event_source: string
+          event_type: string
+          id?: string
+          lead_id?: string | null
+          processed?: boolean | null
+          stage_changed_to?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          event_data?: Json | null
+          event_source?: string
+          event_type?: string
+          id?: string
+          lead_id?: string | null
+          processed?: boolean | null
+          stage_changed_to?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_event_log_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lead_follow_up_schedules: {
         Row: {
           attempt_count: number | null
@@ -2103,6 +2144,7 @@ export type Database = {
           ai_qualification_score: number | null
           ai_summary: string | null
           assigned_to: string | null
+          auto_stage_reason: string | null
           calendar_event_id: string | null
           created_at: string
           email: string | null
@@ -2110,9 +2152,11 @@ export type Database = {
           id: string
           last_contacted_at: string | null
           last_response_at: string | null
+          last_stage_auto_update_at: string | null
           lead_number: number
           name: string
           notes: string | null
+          onboarding_submission_id: string | null
           opportunity_source: string | null
           opportunity_value: number | null
           owner_id: string | null
@@ -2124,6 +2168,7 @@ export type Database = {
           signwell_document_id: string | null
           stage: Database["public"]["Enums"]["lead_stage"]
           stage_changed_at: string | null
+          stripe_setup_intent_id: string | null
           tags: string[] | null
           updated_at: string
         }
@@ -2133,6 +2178,7 @@ export type Database = {
           ai_qualification_score?: number | null
           ai_summary?: string | null
           assigned_to?: string | null
+          auto_stage_reason?: string | null
           calendar_event_id?: string | null
           created_at?: string
           email?: string | null
@@ -2140,9 +2186,11 @@ export type Database = {
           id?: string
           last_contacted_at?: string | null
           last_response_at?: string | null
+          last_stage_auto_update_at?: string | null
           lead_number?: number
           name: string
           notes?: string | null
+          onboarding_submission_id?: string | null
           opportunity_source?: string | null
           opportunity_value?: number | null
           owner_id?: string | null
@@ -2154,6 +2202,7 @@ export type Database = {
           signwell_document_id?: string | null
           stage?: Database["public"]["Enums"]["lead_stage"]
           stage_changed_at?: string | null
+          stripe_setup_intent_id?: string | null
           tags?: string[] | null
           updated_at?: string
         }
@@ -2163,6 +2212,7 @@ export type Database = {
           ai_qualification_score?: number | null
           ai_summary?: string | null
           assigned_to?: string | null
+          auto_stage_reason?: string | null
           calendar_event_id?: string | null
           created_at?: string
           email?: string | null
@@ -2170,9 +2220,11 @@ export type Database = {
           id?: string
           last_contacted_at?: string | null
           last_response_at?: string | null
+          last_stage_auto_update_at?: string | null
           lead_number?: number
           name?: string
           notes?: string | null
+          onboarding_submission_id?: string | null
           opportunity_source?: string | null
           opportunity_value?: number | null
           owner_id?: string | null
@@ -2184,6 +2236,7 @@ export type Database = {
           signwell_document_id?: string | null
           stage?: Database["public"]["Enums"]["lead_stage"]
           stage_changed_at?: string | null
+          stripe_setup_intent_id?: string | null
           tags?: string[] | null
           updated_at?: string
         }
