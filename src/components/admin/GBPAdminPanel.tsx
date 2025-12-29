@@ -134,49 +134,22 @@ export default function GBPAdminPanel() {
     },
   });
 
-  // Handle OAuth callback from Google
+  // Handle OAuth success callback (tokens are now exchanged server-side via gbp-oauth edge function)
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
-    const oauthCallback = urlParams.get('oauth_callback');
-    const code = urlParams.get('code');
+    const oauthSuccess = urlParams.get('oauth_success');
     const error = urlParams.get('error');
     
-    if (oauthCallback === 'true' && code) {
-      // Exchange the code for tokens
-      const exchangeCode = async () => {
-        try {
-          setIsConnecting(true);
-          const redirectUri = `${window.location.origin}/admin?tab=gbp&oauth_callback=true`;
-          
-          const { data, error: invokeError } = await supabase.functions.invoke("gbp-manager", {
-            body: { 
-              action: "exchange-code", 
-              code,
-              redirectUri,
-            },
-          });
-          
-          if (invokeError) throw invokeError;
-          
-          toast.success("Google Business Profile connected successfully!");
-          refetchConnection();
-          
-          // Clean up URL
-          window.history.replaceState({}, '', `${window.location.pathname}?tab=gbp`);
-        } catch (err: any) {
-          console.error("OAuth exchange error:", err);
-          toast.error(err.message || "Failed to connect Google Business Profile");
-        } finally {
-          setIsConnecting(false);
-        }
-      };
-      
-      exchangeCode();
+    if (oauthSuccess === 'true') {
+      toast.success("Google Business Profile connected successfully!");
+      refetchConnection();
+      // Clean up URL
+      window.history.replaceState({}, '', `${window.location.pathname}?tab=gbp`);
     } else if (error) {
       toast.error(`OAuth error: ${error}`);
       window.history.replaceState({}, '', `${window.location.pathname}?tab=gbp`);
     }
-  }, []);
+  }, [refetchConnection]);
 
   // Handle Connect GBP button
   const handleConnectGBP = async () => {
