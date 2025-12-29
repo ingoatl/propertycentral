@@ -35,6 +35,7 @@ export const ReconciliationReviewModal = ({
   const [isApproving, setIsApproving] = useState(false);
   const [isCharging, setIsCharging] = useState(false);
   const [isProcessingPayout, setIsProcessingPayout] = useState(false);
+  const [payoutReference, setPayoutReference] = useState("");
   const [showEmailPreview, setShowEmailPreview] = useState(false);
   const [revenueOverride, setRevenueOverride] = useState<string>("");
   const [showOverrideInput, setShowOverrideInput] = useState(false);
@@ -1187,30 +1188,41 @@ export const ReconciliationReviewModal = ({
                   </AlertDialog>
                 )}
                 
-                {/* Process Payout Button (Full-service only) */}
+                {/* Record Payout Button (Full-service only) */}
                 {!isCohosting && reconciliation.payout_status !== "completed" && (
-                  <AlertDialog>
+                  <AlertDialog onOpenChange={(open) => {
+                    if (!open) setPayoutReference("");
+                  }}>
                     <AlertDialogTrigger asChild>
                       <Button variant="default" className="bg-green-600 hover:bg-green-700" disabled={isProcessingPayout || (calculated.payoutToOwner || 0) <= 0}>
                         {isProcessingPayout ? (
                           <>
                             <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                            Processing...
+                            Recording...
                           </>
                         ) : (
                           <>
                             <Banknote className="w-4 h-4 mr-2" />
-                            Process Payout {formatCurrency(calculated.payoutToOwner || 0)}
+                            Record Payout {formatCurrency(calculated.payoutToOwner || 0)}
                           </>
                         )}
                       </Button>
                     </AlertDialogTrigger>
                     <AlertDialogContent>
                       <AlertDialogHeader>
-                        <AlertDialogTitle>Confirm Payout to Owner</AlertDialogTitle>
+                        <AlertDialogTitle>Record Payout to Owner</AlertDialogTitle>
                         <AlertDialogDescription asChild>
                           <div className="space-y-4">
-                            <p>You are about to record a payout to {reconciliation.property_owners?.name}:</p>
+                            <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
+                              <p className="text-sm text-amber-800 dark:text-amber-200 font-medium">
+                                ⚠️ Manual Transfer Required
+                              </p>
+                              <p className="text-xs text-amber-700 dark:text-amber-300 mt-1">
+                                Please initiate the bank transfer before recording. This action logs the payout for records only.
+                              </p>
+                            </div>
+                            
+                            <p>Recording payout to {reconciliation.property_owners?.name}:</p>
                             <div className="bg-muted p-4 rounded-lg space-y-2 text-sm">
                               <div className="flex justify-between">
                                 <span>Total Revenue:</span>
@@ -1233,9 +1245,19 @@ export const ReconciliationReviewModal = ({
                                 <span className="text-green-600">{formatCurrency(calculated.payoutToOwner || 0)}</span>
                               </div>
                             </div>
-                            <p className="text-sm text-muted-foreground">
-                              This will record the payout. Please ensure the bank transfer has been initiated.
-                            </p>
+                            
+                            <div className="space-y-2">
+                              <Label htmlFor="payout-reference" className="text-foreground">Transfer Reference (optional)</Label>
+                              <Input
+                                id="payout-reference"
+                                placeholder="e.g. ACH-123456 or Check #789"
+                                value={payoutReference}
+                                onChange={(e) => setPayoutReference(e.target.value)}
+                              />
+                              <p className="text-xs text-muted-foreground">
+                                Enter your bank's confirmation number for tracking
+                              </p>
+                            </div>
                           </div>
                         </AlertDialogDescription>
                       </AlertDialogHeader>
@@ -1247,12 +1269,16 @@ export const ReconciliationReviewModal = ({
                             setIsProcessingPayout(true);
                             try {
                               const { data: result, error } = await supabase.functions.invoke('process-owner-payout', {
-                                body: { reconciliation_id: reconciliationId }
+                                body: { 
+                                  reconciliation_id: reconciliationId,
+                                  payout_reference: payoutReference || undefined
+                                }
                               });
                               
                               if (error) throw error;
                               
                               toast.success(`Payout of ${formatCurrency(result.amount)} recorded successfully`);
+                              setPayoutReference("");
                               await refetch();
                               onSuccess();
                             } catch (error: any) {
@@ -1263,8 +1289,8 @@ export const ReconciliationReviewModal = ({
                             }
                           }}
                         >
-                          <Banknote className="w-4 h-4 mr-2" />
-                          Confirm Payout
+                          <Check className="w-4 h-4 mr-2" />
+                          Confirm Payout Recorded
                         </AlertDialogAction>
                       </AlertDialogFooter>
                     </AlertDialogContent>

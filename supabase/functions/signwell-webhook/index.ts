@@ -182,6 +182,53 @@ serve(async (req) => {
           });
         }
         
+        // === AUTO-SET OWNER SERVICE TYPE BASED ON CONTRACT TYPE ===
+        // Check if document has a contract_type and owner_id
+        const contractType = bookingDoc.contract_type;
+        const ownerId = bookingDoc.owner_id;
+        
+        if (contractType && ownerId) {
+          let newServiceType: string | null = null;
+          
+          if (contractType === 'cohosting_agreement') {
+            newServiceType = 'cohosting';
+          } else if (contractType === 'management_agreement') {
+            newServiceType = 'full_service';
+          }
+          
+          if (newServiceType) {
+            console.log(`Auto-setting owner ${ownerId} service_type to ${newServiceType} based on ${contractType}`);
+            
+            const { error: ownerUpdateError } = await supabase
+              .from('property_owners')
+              .update({ 
+                service_type: newServiceType,
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', ownerId);
+            
+            if (ownerUpdateError) {
+              console.error('Error updating owner service_type:', ownerUpdateError);
+            } else {
+              console.log(`Successfully updated owner ${ownerId} to ${newServiceType}`);
+              
+              // Add timeline entry for lead if exists
+              if (lead) {
+                await supabase.from('lead_timeline').insert({
+                  lead_id: lead.id,
+                  action: 'service_type_set',
+                  metadata: {
+                    owner_id: ownerId,
+                    service_type: newServiceType,
+                    contract_type: contractType,
+                    document_id: bookingDoc.id,
+                  },
+                });
+              }
+            }
+          }
+        }
+        
         // Auto-create mid-term booking when document is fully signed
         if (bookingDoc.property_id && !bookingDoc.booking_id) {
           try {
