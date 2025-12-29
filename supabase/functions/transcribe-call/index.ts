@@ -6,6 +6,10 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Lead stages for reference
+type LeadStage = 'new_lead' | 'unreached' | 'call_scheduled' | 'call_attended' | 'send_contract' | 
+  'contract_out' | 'contract_signed' | 'ach_form_signed' | 'onboarding' | 'insurance_requested' | 'ops_handoff';
+
 // Helper to normalize phone numbers for comparison
 function normalizePhone(phone: string | null | undefined): string[] {
   if (!phone) return [];
@@ -77,6 +81,72 @@ function isSpamOrNoise(text: string): boolean {
   return false;
 }
 
+// Determine if we should auto-advance to call_attended
+function shouldAdvanceToCallAttended(insights: any, callDuration: number): { shouldAdvance: boolean; reason: string } {
+  // Must have meaningful call duration (> 3 minutes)
+  if (callDuration < 180) {
+    return { shouldAdvance: false, reason: 'Call duration under 3 minutes' };
+  }
+  
+  // Check for positive engagement signals
+  if (insights?.interest_level === 'high' || insights?.interest_level === 'medium') {
+    if (insights?.sentiment === 'positive' || insights?.sentiment === 'neutral') {
+      return { 
+        shouldAdvance: true, 
+        reason: `${insights.interest_level} interest with ${insights.sentiment} sentiment, ${Math.floor(callDuration/60)}min call` 
+      };
+    }
+  }
+  
+  // Check for SPIN selling signals
+  if (insights?.buying_signals && insights.buying_signals.length > 0) {
+    return { 
+      shouldAdvance: true, 
+      reason: `Detected buying signals: ${insights.buying_signals.slice(0, 2).join(', ')}` 
+    };
+  }
+  
+  // Check for agreed next steps
+  if (insights?.next_steps && insights.next_steps.toLowerCase().includes('contract')) {
+    return { 
+      shouldAdvance: true, 
+      reason: 'Next steps include contract discussion' 
+    };
+  }
+  
+  return { shouldAdvance: false, reason: 'No advancement criteria met' };
+}
+
+// Determine recommended stage based on call analysis
+function getRecommendedStage(insights: any, currentStage: string, callDuration: number): LeadStage | null {
+  // If lead requested to stop contact
+  if (insights?.pause_follow_ups === true || insights?.interest_level === 'none') {
+    return null; // Don't change stage, just pause
+  }
+  
+  // If delay was requested, stay in current stage
+  if (insights?.delay_requested === true) {
+    return null;
+  }
+  
+  // Determine if call was successful/attended
+  const { shouldAdvance } = shouldAdvanceToCallAttended(insights, callDuration);
+  
+  if (shouldAdvance && ['new_lead', 'unreached', 'call_scheduled'].includes(currentStage)) {
+    return 'call_attended';
+  }
+  
+  // If contract was discussed and ready to send
+  if (insights?.next_steps?.toLowerCase().includes('send contract') || 
+      insights?.recommended_stage === 'send_contract') {
+    if (currentStage === 'call_attended') {
+      return 'send_contract';
+    }
+  }
+  
+  return null;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -100,15 +170,14 @@ serve(async (req) => {
     const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
     const TWILIO_ACCOUNT_SID = Deno.env.get('TWILIO_ACCOUNT_SID');
     const TWILIO_AUTH_TOKEN = Deno.env.get('TWILIO_AUTH_TOKEN');
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
 
     if (!OPENAI_API_KEY) {
       throw new Error('OPENAI_API_KEY not configured');
     }
 
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Get all phone variants to search
     const phoneVariants = [...normalizePhone(fromNumber), ...normalizePhone(toNumber)];
@@ -204,7 +273,7 @@ serve(async (req) => {
       );
     }
 
-    // Only analyze meaningful transcriptions with AI
+    // Enhanced AI analysis with SPIN selling and psychology-driven insights
     let insights = null;
     if (transcriptText && transcriptText.length > 50) {
       try {
@@ -219,29 +288,55 @@ serve(async (req) => {
             messages: [
               {
                 role: 'system',
-                content: `You are analyzing a phone call transcript or voicemail between a property management company (Peachhaus) and a potential lead interested in their short-term rental management services. Extract key insights from the conversation.
+                content: `You are an expert sales analyst analyzing a phone call transcript between a property management company (Peachhaus) and a potential lead interested in their short-term rental management services.
+
+Your goal is to extract key insights using SPIN Selling methodology and psychological sales principles.
 
 Return a JSON object with these fields:
+
+BASIC INFO:
 - caller_name: name of the caller if mentioned (first and last if available)
 - property_address: any property address mentioned in the call
-- interest_level: "high", "medium", "low", or "none"
 - property_details: any details mentioned about their property (bedrooms, type, location, etc.)
-- concerns: array of any concerns or objections mentioned
-- timeline: when they're looking to start (if mentioned) - be specific about dates/timeframes
-- delay_requested: boolean - true if the caller asks to wait, call back later, or mentions needing more time
-- delay_until: if delay_requested is true, specify when to follow up (e.g., "next week", "after holidays", "in 2 weeks")
 - budget_expectations: any pricing or fee discussions
-- next_steps: what was agreed upon for follow-up
-- key_points: array of 2-5 bullet points summarizing the conversation
-- sentiment: "positive", "neutral", or "negative"
-- recommended_stage: suggested lead stage ("new_lead", "contacted", "qualifying", "proposal_sent", "negotiating", "closed_won", "closed_lost")
-- pause_follow_ups: boolean - true if the lead explicitly asked to stop contact or needs a break
 
-Always include at least caller_name (if mentioned), interest_level, sentiment, key_points, and recommended_stage.`
+INTEREST & ENGAGEMENT:
+- interest_level: "high", "medium", "low", or "none" - based on engagement signals
+- sentiment: "positive", "neutral", or "negative"
+- engagement_score: 1-10 rating of how engaged the prospect was
+
+SPIN SELLING ANALYSIS:
+- situation_discussed: What is their current property management situation?
+- problems_identified: array of pain points or problems they mentioned
+- implications: What are the consequences of their problems (financial, time, stress)?
+- needs_payoff: What benefits got them excited? What value proposition resonated?
+
+NEGOTIATION SIGNALS (Never Split the Difference style):
+- buying_signals: array of statements indicating interest/readiness
+- objections: array of specific concerns or pushback
+- thats_right_moments: key agreements or "that's exactly it" moments
+- mirroring_opportunities: key phrases they used that we should mirror back
+
+FOLLOW-UP GUIDANCE:
+- concerns: array of any concerns or objections mentioned
+- timeline: when they're looking to start (if mentioned)
+- delay_requested: boolean - true if they ask to wait or need more time
+- delay_until: if delay_requested, specify when to follow up
+- next_steps: what was agreed upon for follow-up
+- recommended_action: "send_contract", "schedule_follow_up", "send_info", "disqualify", or "continue_nurture"
+- key_points: array of 2-5 bullet points summarizing the conversation
+
+AUTOMATION FLAGS:
+- pause_follow_ups: boolean - true if lead explicitly asked to stop contact
+- call_was_successful: boolean - true if meaningful conversation happened (>3min, discussed property, showed interest)
+- ready_for_contract: boolean - true if they expressed readiness to move forward
+- needs_more_info: boolean - true if they need additional information before deciding
+
+Always provide at least: caller_name (if mentioned), interest_level, sentiment, key_points, call_was_successful, and recommended_action.`
               },
               {
                 role: 'user',
-                content: `Analyze this call transcript or voicemail:\n\n${transcriptText}`
+                content: `Analyze this call transcript (${callDuration} seconds):\n\n${transcriptText}`
               }
             ],
             response_format: { type: 'json_object' },
@@ -302,6 +397,11 @@ Always include at least caller_name (if mentioned), interest_level, sentiment, k
       }
     }
 
+    // Track stage changes for response
+    let stageChanged = false;
+    let newStage: LeadStage | null = null;
+    let stageChangeReason = '';
+
     // Update the lead with transcription and insights
     if (lead) {
       // Update/create the communication record with the transcription
@@ -359,9 +459,9 @@ Always include at least caller_name (if mentioned), interest_level, sentiment, k
           updateData.property_address = insights.property_address;
         }
 
-        // Update stage if recommended
-        if (insights.recommended_stage && insights.interest_level !== 'none') {
-          updateData.stage = insights.recommended_stage;
+        // AI next action from the analysis
+        if (insights.recommended_action) {
+          updateData.ai_next_action = insights.recommended_action;
         }
 
         // Handle follow-up pausing if requested
@@ -370,10 +470,79 @@ Always include at least caller_name (if mentioned), interest_level, sentiment, k
           console.log('Pausing follow-ups as requested by lead');
         }
 
+        // === AUTO STAGE ADVANCEMENT ===
+        // Determine if we should auto-advance the stage
+        const recommendedStage = getRecommendedStage(insights, lead.stage, callDuration);
+        const { shouldAdvance, reason } = shouldAdvanceToCallAttended(insights, callDuration);
+        
+        if (recommendedStage && recommendedStage !== lead.stage) {
+          updateData.stage = recommendedStage;
+          updateData.stage_changed_at = new Date().toISOString();
+          updateData.last_stage_auto_update_at = new Date().toISOString();
+          updateData.auto_stage_reason = reason;
+          
+          stageChanged = true;
+          newStage = recommendedStage;
+          stageChangeReason = reason;
+          
+          console.log(`Auto-advancing lead from ${lead.stage} to ${recommendedStage}: ${reason}`);
+        }
+
         await supabase
           .from('leads')
           .update(updateData)
           .eq('id', lead.id);
+
+        // === TRIGGER STAGE CHANGE AUTOMATION ===
+        if (stageChanged && newStage) {
+          // Log the event
+          await supabase.from('lead_event_log').insert({
+            lead_id: lead.id,
+            event_type: 'stage_auto_changed',
+            event_source: 'transcribe-call',
+            event_data: {
+              previous_stage: lead.stage,
+              new_stage: newStage,
+              reason: stageChangeReason,
+              call_duration: callDuration,
+              interest_level: insights.interest_level,
+              call_was_successful: insights.call_was_successful,
+            },
+            processed: false,
+            stage_changed_to: newStage,
+          });
+
+          // Trigger the stage change automations
+          try {
+            console.log(`Triggering process-lead-stage-change for ${lead.id}: ${lead.stage} -> ${newStage}`);
+            await fetch(`${supabaseUrl}/functions/v1/process-lead-stage-change`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${supabaseServiceKey}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                leadId: lead.id,
+                newStage: newStage,
+                previousStage: lead.stage,
+              }),
+            });
+            
+            // Add timeline entry for auto-stage change
+            await supabase.from('lead_timeline').insert({
+              lead_id: lead.id,
+              action: 'stage_auto_changed',
+              metadata: {
+                previous_stage: lead.stage,
+                new_stage: newStage,
+                reason: stageChangeReason,
+                triggered_by: 'transcribe-call',
+              },
+            });
+          } catch (stageChangeError) {
+            console.error('Error triggering stage change automation:', stageChangeError);
+          }
+        }
 
         // If delay was requested, update pending follow-up schedules
         if (insights.delay_requested === true && insights.delay_until) {
@@ -450,6 +619,9 @@ Always include at least caller_name (if mentioned), interest_level, sentiment, k
         insights: insights,
         leadId: lead?.id,
         matched: !!lead,
+        stageChanged: stageChanged,
+        newStage: newStage,
+        stageChangeReason: stageChangeReason,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

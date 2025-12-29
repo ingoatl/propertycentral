@@ -6,6 +6,10 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Lead stages that can be triggered by contract events
+type LeadStage = 'new_lead' | 'unreached' | 'call_scheduled' | 'call_attended' | 'send_contract' | 
+  'contract_out' | 'contract_signed' | 'ach_form_signed' | 'onboarding' | 'insurance_requested' | 'ops_handoff';
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -43,14 +47,75 @@ serve(async (req) => {
       });
     }
 
+    // === FIND ASSOCIATED LEAD ===
+    // Try to find a lead by the signwell_document_id or by recipient email/name
+    let lead = null;
+    
+    // First try by signwell_document_id on leads table
+    const { data: leadByDoc } = await supabase
+      .from('leads')
+      .select('id, name, email, stage, phone')
+      .eq('signwell_document_id', signwellDocumentId)
+      .maybeSingle();
+    
+    if (leadByDoc) {
+      lead = leadByDoc;
+      console.log('Found lead by signwell_document_id:', lead.name);
+    }
+    
+    // If not found, try by recipient email
+    if (!lead && bookingDoc.recipient_email) {
+      const { data: leadByEmail } = await supabase
+        .from('leads')
+        .select('id, name, email, stage, phone')
+        .eq('email', bookingDoc.recipient_email)
+        .maybeSingle();
+      
+      if (leadByEmail) {
+        lead = leadByEmail;
+        console.log('Found lead by recipient email:', lead.name);
+        
+        // Link the document to the lead for future reference
+        await supabase
+          .from('leads')
+          .update({ signwell_document_id: signwellDocumentId })
+          .eq('id', lead.id);
+      }
+    }
+
     let updateData: any = {};
     let auditAction = '';
     let performedBy = '';
+    
+    // Track lead stage changes
+    let leadStageChanged = false;
+    let newLeadStage: LeadStage | null = null;
+    let stageChangeReason = '';
 
     switch (event) {
       case 'document_viewed':
         auditAction = 'guest_viewed';
         performedBy = data.recipient?.email || 'Unknown';
+        
+        // If lead exists and is in send_contract, move to contract_out
+        if (lead && lead.stage === 'send_contract') {
+          newLeadStage = 'contract_out';
+          leadStageChanged = true;
+          stageChangeReason = 'Contract was viewed by recipient';
+        }
+        
+        // Add timeline entry for lead
+        if (lead) {
+          await supabase.from('lead_timeline').insert({
+            lead_id: lead.id,
+            action: 'contract_viewed',
+            metadata: {
+              document_id: bookingDoc.id,
+              signwell_id: signwellDocumentId,
+              viewed_by: performedBy,
+            },
+          });
+        }
         break;
 
       case 'document_signed':
@@ -59,9 +124,33 @@ serve(async (req) => {
           updateData.guest_signed_at = new Date().toISOString();
           updateData.status = 'pending_host';
           auditAction = 'guest_signed';
+          
+          // Add timeline entry for lead
+          if (lead) {
+            await supabase.from('lead_timeline').insert({
+              lead_id: lead.id,
+              action: 'contract_guest_signed',
+              metadata: {
+                document_id: bookingDoc.id,
+                signwell_id: signwellDocumentId,
+                signed_by: data.recipient?.email,
+              },
+            });
+          }
         } else if (signerPlaceholder === 'Host') {
           updateData.host_signed_at = new Date().toISOString();
           auditAction = 'host_signed';
+          
+          if (lead) {
+            await supabase.from('lead_timeline').insert({
+              lead_id: lead.id,
+              action: 'contract_host_signed',
+              metadata: {
+                document_id: bookingDoc.id,
+                signwell_id: signwellDocumentId,
+              },
+            });
+          }
         }
         performedBy = data.recipient?.email || 'Unknown';
         break;
@@ -71,6 +160,27 @@ serve(async (req) => {
         updateData.completed_at = new Date().toISOString();
         auditAction = 'completed';
         performedBy = 'System';
+        
+        // === AUTO-ADVANCE LEAD TO CONTRACT_SIGNED ===
+        if (lead && ['send_contract', 'contract_out'].includes(lead.stage)) {
+          newLeadStage = 'contract_signed';
+          leadStageChanged = true;
+          stageChangeReason = 'Contract fully signed by all parties';
+        }
+        
+        // Add comprehensive timeline entry for lead
+        if (lead) {
+          await supabase.from('lead_timeline').insert({
+            lead_id: lead.id,
+            action: 'contract_completed',
+            metadata: {
+              document_id: bookingDoc.id,
+              signwell_id: signwellDocumentId,
+              document_name: bookingDoc.document_name,
+              completed_at: new Date().toISOString(),
+            },
+          });
+        }
         
         // Auto-create mid-term booking when document is fully signed
         if (bookingDoc.property_id && !bookingDoc.booking_id) {
@@ -147,12 +257,50 @@ serve(async (req) => {
         updateData.status = 'declined';
         auditAction = 'declined';
         performedBy = data.recipient?.email || 'Unknown';
+        
+        // Move lead back to call_attended if contract was declined
+        if (lead && ['send_contract', 'contract_out'].includes(lead.stage)) {
+          newLeadStage = 'call_attended';
+          leadStageChanged = true;
+          stageChangeReason = `Contract declined by ${performedBy}`;
+        }
+        
+        if (lead) {
+          await supabase.from('lead_timeline').insert({
+            lead_id: lead.id,
+            action: 'contract_declined',
+            metadata: {
+              document_id: bookingDoc.id,
+              signwell_id: signwellDocumentId,
+              declined_by: performedBy,
+              reason: data.decline_reason,
+            },
+          });
+        }
         break;
 
       case 'document_expired':
         updateData.status = 'expired';
         auditAction = 'expired';
         performedBy = 'System';
+        
+        // Move lead back to send_contract so a new one can be sent
+        if (lead && ['contract_out'].includes(lead.stage)) {
+          newLeadStage = 'send_contract';
+          leadStageChanged = true;
+          stageChangeReason = 'Contract expired without signature';
+        }
+        
+        if (lead) {
+          await supabase.from('lead_timeline').insert({
+            lead_id: lead.id,
+            action: 'contract_expired',
+            metadata: {
+              document_id: bookingDoc.id,
+              signwell_id: signwellDocumentId,
+            },
+          });
+        }
         break;
 
       default:
@@ -189,9 +337,77 @@ serve(async (req) => {
       });
     }
 
+    // === PROCESS LEAD STAGE CHANGE ===
+    if (lead && leadStageChanged && newLeadStage) {
+      console.log(`Auto-advancing lead ${lead.id} from ${lead.stage} to ${newLeadStage}: ${stageChangeReason}`);
+      
+      // Update lead stage
+      await supabase
+        .from('leads')
+        .update({
+          stage: newLeadStage,
+          stage_changed_at: new Date().toISOString(),
+          last_stage_auto_update_at: new Date().toISOString(),
+          auto_stage_reason: stageChangeReason,
+        })
+        .eq('id', lead.id);
+      
+      // Log the event
+      await supabase.from('lead_event_log').insert({
+        lead_id: lead.id,
+        event_type: 'stage_auto_changed',
+        event_source: 'signwell-webhook',
+        event_data: {
+          previous_stage: lead.stage,
+          new_stage: newLeadStage,
+          reason: stageChangeReason,
+          signwell_event: event,
+          document_id: bookingDoc.id,
+        },
+        processed: false,
+        stage_changed_to: newLeadStage,
+      });
+      
+      // Add timeline entry for stage change
+      await supabase.from('lead_timeline').insert({
+        lead_id: lead.id,
+        action: 'stage_auto_changed',
+        metadata: {
+          previous_stage: lead.stage,
+          new_stage: newLeadStage,
+          reason: stageChangeReason,
+          triggered_by: 'signwell-webhook',
+          event: event,
+        },
+      });
+      
+      // Trigger the stage change automations
+      try {
+        await fetch(`${supabaseUrl}/functions/v1/process-lead-stage-change`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${supabaseServiceKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            leadId: lead.id,
+            newStage: newLeadStage,
+            previousStage: lead.stage,
+          }),
+        });
+        console.log(`Triggered process-lead-stage-change for lead ${lead.id}`);
+      } catch (stageChangeError) {
+        console.error('Error triggering stage change automation:', stageChangeError);
+      }
+    }
+
     console.log('Webhook processed successfully for document:', bookingDoc.id);
 
-    return new Response(JSON.stringify({ success: true }), {
+    return new Response(JSON.stringify({ 
+      success: true,
+      leadStageChanged,
+      newLeadStage,
+    }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
