@@ -391,11 +391,90 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
       setShowNAField(false);
       setTaskStatus("completed");
       toast.success("File uploaded successfully");
+
+      // If this is a permit upload, trigger AI analysis
+      if (task.title.toLowerCase().includes("permit") || task.title.toLowerCase().includes("license")) {
+        await triggerPermitAnalysis(fileName);
+      }
     } catch (error: any) {
       console.error("Failed to upload file:", error);
       toast.error("Failed to upload file");
     } finally {
       setUploading(false);
+    }
+  };
+
+  const triggerPermitAnalysis = async (filePath: string) => {
+    try {
+      // Get the project to find the property_id
+      const { data: project } = await supabase
+        .from("onboarding_projects")
+        .select("property_id")
+        .eq("id", task.project_id)
+        .maybeSingle();
+
+      if (!project?.property_id) {
+        console.log("No property_id found for permit analysis");
+        return;
+      }
+
+      // Create a property_documents entry for the permit
+      const { data: docEntry, error: docError } = await supabase
+        .from("property_documents")
+        .insert({
+          property_id: project.property_id,
+          project_id: task.project_id,
+          file_name: task.field_value || "permit.pdf",
+          file_path: filePath,
+          file_type: filePath.split('.').pop() || "pdf",
+          document_type: "str_permit",
+        })
+        .select()
+        .single();
+
+      if (docError) {
+        console.error("Failed to create document entry:", docError);
+        return;
+      }
+
+      toast.info("Analyzing permit with AI...", { duration: 3000 });
+
+      // Call the AI analysis function
+      const { data: result, error: analysisError } = await supabase.functions.invoke("analyze-permit", {
+        body: {
+          documentId: docEntry.id,
+          propertyId: project.property_id,
+          filePath: filePath,
+        },
+      });
+
+      if (analysisError) {
+        console.error("Permit analysis error:", analysisError);
+        toast.error("Failed to analyze permit");
+        return;
+      }
+
+      if (result?.success) {
+        toast.success(result.message || "Permit analyzed successfully");
+        
+        // If expiration date was extracted, update the related task
+        if (result.extractedData?.expiration_date) {
+          // Find and update the "Permit Expiration Date" task in this project
+          await supabase
+            .from("onboarding_tasks")
+            .update({
+              field_value: result.extractedData.expiration_date,
+              status: "completed",
+              notes: "Auto-extracted from permit by AI",
+            })
+            .eq("project_id", task.project_id)
+            .eq("title", "Permit Expiration Date");
+        }
+      } else {
+        toast.warning("Could not extract permit details. Please enter expiration date manually.");
+      }
+    } catch (error) {
+      console.error("Permit analysis failed:", error);
     }
   };
 
