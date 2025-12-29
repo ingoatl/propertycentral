@@ -69,7 +69,7 @@ export const ProfessionalPhotosUpload = ({ taskId, onFilesUploaded }: Profession
 
       if (dbError) throw dbError;
 
-      toast.success(`${PHOTO_REQUIREMENTS[photoIndex]} uploaded successfully`);
+      // Visual feedback - green checkmark shows in button, no toast needed
       setUploadedFiles(prev => ({ ...prev, [photoIndex]: file.name }));
       
       // Trigger callback to refresh the preview
