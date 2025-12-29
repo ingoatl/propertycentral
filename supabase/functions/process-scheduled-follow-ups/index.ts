@@ -232,6 +232,42 @@ serve(async (req) => {
 
         let sendSuccess = false;
 
+        // Send AI Voice Call if applicable
+        if (actionType === "voice_call" && lead.phone) {
+          try {
+            console.log(`Initiating AI voice call for lead ${lead.id}`);
+            
+            // Invoke the lead-ai-voice-call function
+            const voiceCallResponse = await fetch(
+              `${supabaseUrl}/functions/v1/lead-ai-voice-call`,
+              {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${supabaseServiceKey}`,
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  leadId: lead.id,
+                  callType: 'follow_up',
+                }),
+              }
+            );
+
+            const voiceCallResult = await voiceCallResponse.json();
+            
+            if (voiceCallResponse.ok && voiceCallResult.success) {
+              console.log(`AI voice call initiated for lead ${lead.id}: ${voiceCallResult.callSid}`);
+              sendSuccess = true;
+              
+              // Record is already created by lead-ai-voice-call function
+            } else {
+              console.error(`Failed to initiate voice call for lead ${lead.id}:`, voiceCallResult.error);
+            }
+          } catch (voiceError) {
+            console.error(`Error initiating voice call for lead ${lead.id}:`, voiceError);
+          }
+        }
+
         // Send SMS if applicable
         if ((actionType === "sms" || actionType === "both") && lead.phone) {
           const twilioAccountSid = Deno.env.get("TWILIO_ACCOUNT_SID");

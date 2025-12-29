@@ -40,7 +40,7 @@ serve(async (req) => {
     // Look up the lead by phone number
     const { data: lead } = await supabase
       .from('leads')
-      .select('id, name, property_address, property_type, phone')
+      .select('id, name, property_address, property_type, phone, stage')
       .or(`phone.eq.${fromNumber},phone.eq.${normalizedPhone},phone.eq.+1${normalizedPhone},phone.ilike.%${normalizedPhone}%`)
       .maybeSingle();
 
@@ -48,15 +48,42 @@ serve(async (req) => {
     // Convert https:// to wss:// for WebSocket URL
     const bridgeUrl = SUPABASE_URL?.replace('https://', 'wss://') + '/functions/v1/twilio-elevenlabs-bridge';
 
+    // Check if there's a scheduled discovery call within the next 30 minutes
+    let hasScheduledCall = false;
+    let discoveryCallId: string | null = null;
+    
     if (lead) {
-      console.log('Found lead for inbound call:', lead.id, lead.name);
+      const now = new Date();
+      const thirtyMinutesFromNow = new Date(now.getTime() + 30 * 60 * 1000);
+      const thirtyMinutesAgo = new Date(now.getTime() - 30 * 60 * 1000);
+      
+      const { data: scheduledCall } = await supabase
+        .from('discovery_calls')
+        .select('id, scheduled_at')
+        .eq('lead_id', lead.id)
+        .eq('status', 'scheduled')
+        .gte('scheduled_at', thirtyMinutesAgo.toISOString())
+        .lte('scheduled_at', thirtyMinutesFromNow.toISOString())
+        .maybeSingle();
+      
+      if (scheduledCall) {
+        hasScheduledCall = true;
+        discoveryCallId = scheduledCall.id;
+        console.log('Found scheduled discovery call:', discoveryCallId);
+      }
+    }
+
+    if (lead) {
+      console.log('Found lead for inbound call:', lead.id, lead.name, 'scheduled call:', hasScheduledCall);
 
       // Record the inbound call in lead_communications
       await supabase.from('lead_communications').insert({
         lead_id: lead.id,
         communication_type: 'call',
         direction: 'inbound',
-        body: 'Inbound call - connected to AI agent',
+        body: hasScheduledCall 
+          ? 'Inbound call - scheduled discovery call connected to AI agent'
+          : 'Inbound call - connected to AI agent',
         external_id: callSid,
         status: 'answered',
       });
@@ -64,12 +91,43 @@ serve(async (req) => {
       // Add timeline entry
       await supabase.from('lead_timeline').insert({
         lead_id: lead.id,
-        action: 'inbound_call_received',
+        action: hasScheduledCall ? 'scheduled_discovery_call_answered' : 'inbound_call_received',
         metadata: { 
           call_sid: callSid,
           from_number: fromNumber,
+          discovery_call_id: discoveryCallId,
+          had_scheduled_call: hasScheduledCall,
         },
       });
+
+      // If this was a scheduled call, update the discovery call status and advance lead stage
+      if (hasScheduledCall && discoveryCallId) {
+        await supabase
+          .from('discovery_calls')
+          .update({ status: 'completed' })
+          .eq('id', discoveryCallId);
+        
+        // Auto-advance to call_attended if currently at call_scheduled
+        if (lead.stage === 'call_scheduled') {
+          await supabase
+            .from('leads')
+            .update({ 
+              stage: 'call_attended',
+              stage_changed_at: new Date().toISOString(),
+              last_response_at: new Date().toISOString(),
+            })
+            .eq('id', lead.id);
+          
+          await supabase.from('lead_timeline').insert({
+            lead_id: lead.id,
+            action: 'Stage auto-advanced to Call Attended (discovery call completed)',
+            previous_stage: 'call_scheduled',
+            new_stage: 'call_attended',
+          });
+          
+          console.log('Auto-advanced lead to call_attended stage');
+        }
+      }
     } else {
       console.log('No lead found for phone:', fromNumber);
     }

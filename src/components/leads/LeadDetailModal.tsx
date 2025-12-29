@@ -39,6 +39,8 @@ import FollowUpManager from "./FollowUpManager";
 import TestEmailButton from "./TestEmailButton";
 import TestVoiceCallButton from "./TestVoiceCallButton";
 import { ScheduleDiscoveryCallDialog } from "./ScheduleDiscoveryCallDialog";
+import { SendContractButton } from "./SendContractButton";
+import { AIVoiceCallButton } from "./AIVoiceCallButton";
 
 interface LeadDetailModalProps {
   lead: Lead | null;
@@ -299,6 +301,13 @@ const LeadDetailModal = ({ lead, open, onOpenChange, onRefresh }: LeadDetailModa
             propertyAddress={lead.property_address}
           />
 
+          <AIVoiceCallButton
+            leadId={lead.id}
+            leadPhone={lead.phone}
+            leadName={lead.name}
+            leadStage={lead.stage}
+          />
+
           <Button
             variant="outline"
             size="sm"
@@ -307,6 +316,8 @@ const LeadDetailModal = ({ lead, open, onOpenChange, onRefresh }: LeadDetailModa
             <Calendar className="h-4 w-4 mr-2" />
             Schedule Call
           </Button>
+
+          <SendContractButton lead={lead} onContractSent={onRefresh} />
         </div>
 
         {/* Schedule Discovery Call Dialog */}
