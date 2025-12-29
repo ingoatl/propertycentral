@@ -45,8 +45,14 @@ verify_jwt = true
 [functions.create-reconciliation]
 verify_jwt = true
 
+[functions.create-payment-checkout]
+verify_jwt = true
+
 [functions.create-setup-intent]
 verify_jwt = true
+
+[functions.stripe-setup-webhook]
+verify_jwt = false
 
 [functions.create-user]
 verify_jwt = true
