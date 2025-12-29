@@ -1,10 +1,16 @@
 /**
  * Shared reconciliation calculation utilities
- * Ensures consistent "Due from Owner" calculations across:
+ * Ensures consistent calculations across:
  * - ReconciliationList cards
  * - Email preview modal
  * - Backend email generation
+ * 
+ * Supports two service types:
+ * - Co-hosting: Owner keeps revenue, pays PeachHaus for services
+ * - Full-service: PeachHaus collects revenue, pays owner net amount
  */
+
+export type ServiceType = 'cohosting' | 'full_service';
 
 export interface ReconciliationLineItem {
   id: string;
@@ -26,23 +32,32 @@ export interface ReconciliationData {
   net_to_owner: number;
 }
 
-/**
- * Calculate "Due from Owner" from line items - ONLY APPROVED ITEMS
- * Formula: Mgmt Fee + Visit Fees + Expenses + Cleaning Fees + Pet Fees
- * Note: Cleaning/Pet fees are pass-through (owner received from guest, pays back to us)
- */
-export function calculateDueFromOwnerFromLineItems(
-  lineItems: ReconciliationLineItem[],
-  managementFee: number
-): {
+export interface CalculationResult {
   visitFees: number;
   totalExpenses: number;
   cleaningFees: number;
   petFees: number;
   dueFromOwner: number;
+  payoutToOwner: number;
   duplicatesDetected?: number;
   error?: string;
-} {
+}
+
+/**
+ * Calculate amounts from line items - supports both service types
+ * 
+ * For Co-Hosting: Owner pays us
+ *   Due from Owner = Management Fee + Visit Fees + Expenses + Pass-through Fees
+ * 
+ * For Full-Service: We pay owner
+ *   Payout to Owner = Total Revenue - Management Fee - Visit Fees - Expenses - Pass-through Fees
+ */
+export function calculateDueFromOwnerFromLineItems(
+  lineItems: ReconciliationLineItem[],
+  managementFee: number,
+  totalRevenue: number = 0,
+  serviceType: ServiceType = 'cohosting'
+): CalculationResult {
   try {
     // ONLY include APPROVED items: verified=true AND excluded=false
     const approvedItems = lineItems.filter(
@@ -108,8 +123,22 @@ export function calculateDueFromOwnerFromLineItems(
                         (item.description || '').toLowerCase().includes('pet')))
       .reduce((sum, item) => sum + Math.abs(item.amount), 0);
 
-    // Calculate total due from owner
-    const dueFromOwner = managementFee + visitFees + totalExpenses + cleaningFees + petFees;
+    // Calculate total charges (what owner owes us for services)
+    const totalCharges = managementFee + visitFees + totalExpenses + cleaningFees + petFees;
+    
+    // Calculate amounts based on service type
+    let dueFromOwner = 0;
+    let payoutToOwner = 0;
+    
+    if (serviceType === 'cohosting') {
+      // Co-hosting: Owner keeps revenue, pays us for services
+      dueFromOwner = totalCharges;
+      payoutToOwner = 0;
+    } else {
+      // Full-service: We collected revenue, pay owner the net
+      payoutToOwner = totalRevenue - totalCharges;
+      dueFromOwner = 0;
+    }
 
     return {
       visitFees,
@@ -117,6 +146,7 @@ export function calculateDueFromOwnerFromLineItems(
       cleaningFees,
       petFees,
       dueFromOwner,
+      payoutToOwner,
       duplicatesDetected: duplicatesDetected > 0 ? duplicatesDetected : undefined,
     };
   } catch (error) {
@@ -127,6 +157,7 @@ export function calculateDueFromOwnerFromLineItems(
       cleaningFees: 0,
       petFees: 0,
       dueFromOwner: managementFee,
+      payoutToOwner: 0,
       error: "Failed to calculate totals from approved items"
     };
   }
@@ -140,4 +171,18 @@ export function formatCurrency(amount: number): string {
     style: "currency",
     currency: "USD",
   }).format(amount);
+}
+
+/**
+ * Get the appropriate label for the settlement amount based on service type
+ */
+export function getSettlementLabel(serviceType: ServiceType): string {
+  return serviceType === 'cohosting' ? 'Due from Owner' : 'Payout to Owner';
+}
+
+/**
+ * Get the settlement amount based on service type
+ */
+export function getSettlementAmount(result: CalculationResult, serviceType: ServiceType): number {
+  return serviceType === 'cohosting' ? result.dueFromOwner : result.payoutToOwner;
 }
