@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import Stripe from "https://esm.sh/stripe@14.21.0";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import Stripe from "https://esm.sh/stripe@18.5.0";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
 import { Resend } from "https://esm.sh/resend@2.0.0";
 
 const corsHeaders = {
@@ -31,10 +31,14 @@ const QBO_ACCOUNT_MAPPING: Record<string, string> = {
   "Late Fee": "4090",
   "Service Fee": "4090",
   "Design Setup": "4030",
+  "CC Processing Fee": "4095",
   "Other": "4090",
 };
 
 const LOGO_URL = "https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/peachhaus-logo.png";
+
+// 3% CC processing fee
+const CC_FEE_PERCENTAGE = 0.03;
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -68,45 +72,106 @@ serve(async (req) => {
     }
 
     // Calculate total
-    const totalAmount = lineItems.reduce((sum, item) => sum + item.amount, 0);
-    console.log("Total amount:", totalAmount);
+    let totalAmount = lineItems.reduce((sum, item) => sum + item.amount, 0);
+    
+    // Add CC processing fee if payment method is credit card
+    const isUsingCC = owner.payment_method === "cc" || owner.payment_method === "card";
+    let ccFeeAmount = 0;
+    let adjustedLineItems = [...lineItems];
+    
+    if (isUsingCC && !isDraft) {
+      ccFeeAmount = Math.round(totalAmount * CC_FEE_PERCENTAGE * 100) / 100;
+      totalAmount += ccFeeAmount;
+      
+      // Add CC fee as a line item
+      adjustedLineItems.push({
+        category: "CC Processing Fee",
+        description: `3% credit card processing fee`,
+        amount: ccFeeAmount
+      });
+      
+      console.log(`Added CC processing fee: $${ccFeeAmount}`);
+    }
+    
+    console.log("Total amount (with fees):", totalAmount);
 
     let chargeStatus = isDraft ? "draft" : (isTest ? "test" : "pending");
     let stripePaymentIntentId = null;
     let chargeId = null;
 
-    // If not a draft, not a test, and owner has Stripe, charge them
-    if (!isDraft && !isTest && owner.stripe_customer_id && owner.payment_method === "stripe") {
-      const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
-        apiVersion: "2023-10-16",
-      });
+    // Initialize Stripe
+    const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", {
+      apiVersion: "2025-08-27.basil",
+    });
 
-      // Get payment methods
-      const paymentMethods = await stripe.paymentMethods.list({
-        customer: owner.stripe_customer_id,
-        type: "us_bank_account",
-      });
+    // If not a draft, not a test, and owner has Stripe customer, charge them
+    if (!isDraft && !isTest && owner.stripe_customer_id) {
+      try {
+        // Get the customer's default payment method or any payment method
+        const customer = await stripe.customers.retrieve(owner.stripe_customer_id);
+        
+        let paymentMethodId: string | null = null;
+        
+        // Try to get default payment method
+        if (customer && !customer.deleted && customer.invoice_settings?.default_payment_method) {
+          paymentMethodId = customer.invoice_settings.default_payment_method as string;
+        }
+        
+        // If no default, try to find any attached payment method
+        if (!paymentMethodId) {
+          // Try cards first
+          const cardMethods = await stripe.paymentMethods.list({
+            customer: owner.stripe_customer_id,
+            type: "card",
+            limit: 1
+          });
+          
+          if (cardMethods.data.length > 0) {
+            paymentMethodId = cardMethods.data[0].id;
+          } else {
+            // Try bank accounts
+            const bankMethods = await stripe.paymentMethods.list({
+              customer: owner.stripe_customer_id,
+              type: "us_bank_account",
+              limit: 1
+            });
+            
+            if (bankMethods.data.length > 0) {
+              paymentMethodId = bankMethods.data[0].id;
+            }
+          }
+        }
 
-      if (paymentMethods.data.length > 0) {
-        const paymentIntent = await stripe.paymentIntents.create({
-          amount: Math.round(totalAmount * 100),
-          currency: "usd",
-          customer: owner.stripe_customer_id,
-          payment_method: paymentMethods.data[0].id,
-          off_session: true,
-          confirm: true,
-          description: `PeachHaus Fees - ${lineItems.map(i => i.category).join(", ")}`,
-          metadata: {
-            owner_id: ownerId,
-            owner_name: owner.name,
-          },
-        });
+        if (paymentMethodId) {
+          console.log(`Charging payment method: ${paymentMethodId}`);
+          
+          const paymentIntent = await stripe.paymentIntents.create({
+            amount: Math.round(totalAmount * 100), // Convert to cents
+            currency: "usd",
+            customer: owner.stripe_customer_id,
+            payment_method: paymentMethodId,
+            off_session: true,
+            confirm: true,
+            description: `PeachHaus Fees - ${adjustedLineItems.map(i => i.category).join(", ")}`,
+            metadata: {
+              owner_id: ownerId,
+              owner_name: owner.name,
+              cc_fee: ccFeeAmount.toString(),
+              original_amount: (totalAmount - ccFeeAmount).toString()
+            },
+          });
 
-        stripePaymentIntentId = paymentIntent.id;
-        chargeStatus = paymentIntent.status === "succeeded" ? "paid" : "pending";
-        console.log("Stripe payment created:", paymentIntent.id, paymentIntent.status);
-      } else {
-        console.log("No payment method found, creating pending charge");
+          stripePaymentIntentId = paymentIntent.id;
+          chargeStatus = paymentIntent.status === "succeeded" ? "paid" : "pending";
+          console.log("Stripe payment created:", paymentIntent.id, paymentIntent.status);
+        } else {
+          console.log("No payment method found for customer, creating pending charge");
+          chargeStatus = "pending_payment_method";
+        }
+      } catch (stripeError: any) {
+        console.error("Stripe charge failed:", stripeError.message);
+        chargeStatus = "failed";
+        // Continue to create the charge record even if payment fails
       }
     }
 
@@ -124,7 +189,7 @@ serve(async (req) => {
           is_multi_line: true,
           statement_notes: statementNotes,
           statement_date: statementDate,
-          category: lineItems.length === 1 ? lineItems[0].category : "Multiple Fees",
+          category: adjustedLineItems.length === 1 ? adjustedLineItems[0].category : "Multiple Fees",
         })
         .select()
         .single();
@@ -136,8 +201,8 @@ serve(async (req) => {
       console.log("Charge created:", charge.id);
       chargeId = charge.id;
 
-      // Create line items
-      const lineItemsToInsert = lineItems.map(item => ({
+      // Create line items (including CC fee if applicable)
+      const lineItemsToInsert = adjustedLineItems.map(item => ({
         charge_id: charge.id,
         category: item.category,
         description: item.description,
@@ -159,7 +224,7 @@ serve(async (req) => {
       try {
         const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
 
-        const lineItemsHtml = lineItems.map(item => `
+        const lineItemsHtml = adjustedLineItems.map(item => `
           <tr>
             <td style="padding: 16px 20px; border-bottom: 1px solid #eaeaea; font-size: 15px;">
               <div style="font-weight: 600; color: #1a1a1a; margin-bottom: 4px;">${item.category}</div>
@@ -336,8 +401,11 @@ serve(async (req) => {
         chargeId,
         status: chargeStatus,
         totalAmount,
+        originalAmount: totalAmount - ccFeeAmount,
+        ccFeeAmount,
         stripePaymentIntentId,
         isTest,
+        paymentMethod: owner.payment_method
       }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
