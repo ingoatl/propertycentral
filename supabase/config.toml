@@ -30,7 +30,13 @@ verify_jwt = false
 [functions.charge-owner-fees]
 verify_jwt = true
 
+[functions.check-lead-inactivity]
+verify_jwt = false
+
 [functions.check-review-eligible-tenants]
+verify_jwt = false
+
+[functions.scan-lead-emails]
 verify_jwt = false
 
 [functions.cleanup-contaminated-expenses]
