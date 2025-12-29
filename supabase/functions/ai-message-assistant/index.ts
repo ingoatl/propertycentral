@@ -16,9 +16,9 @@ serve(async (req) => {
 
     console.log("AI Message Assistant request:", { action, contactName, messageType });
 
-    const lovableApiKey = Deno.env.get("LOVABLE_API_KEY");
-    if (!lovableApiKey) {
-      throw new Error("LOVABLE_API_KEY not configured");
+    const openaiApiKey = Deno.env.get("OPENAI_API_KEY");
+    if (!openaiApiKey) {
+      throw new Error("OPENAI_API_KEY not configured");
     }
 
     let systemPrompt = `You are a professional property management assistant helping compose ${messageType === "sms" ? "SMS messages" : "emails"}. 
@@ -60,16 +60,14 @@ Be helpful and professional.`;
         throw new Error(`Unknown action: ${action}`);
     }
 
-    // Use Lovable AI (OpenRouter)
-    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${lovableApiKey}`,
+        "Authorization": `Bearer ${openaiApiKey}`,
         "Content-Type": "application/json",
-        "HTTP-Referer": "https://lovable.dev",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: "gpt-4o-mini",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
@@ -81,8 +79,8 @@ Be helpful and professional.`;
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("AI API error:", errorText);
-      throw new Error(`AI API error: ${response.status}`);
+      console.error("OpenAI API error:", errorText);
+      throw new Error(`OpenAI API error: ${response.status}`);
     }
 
     const data = await response.json();
