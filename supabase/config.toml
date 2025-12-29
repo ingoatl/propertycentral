@@ -252,6 +252,9 @@ verify_jwt = true
 [functions.gbp-manager]
 verify_jwt = false
 
+[functions.gbp-oauth]
+verify_jwt = false
+
 [functions.telnyx-inbound-sms]
 verify_jwt = false
 

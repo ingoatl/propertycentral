@@ -324,20 +324,25 @@ serve(async (req) => {
 
     switch (action) {
       case "get-auth-url": {
-        // Generate Google OAuth URL for GBP access
-        const { redirectUrl } = params;
+        // Generate Google OAuth URL for GBP access using edge function as callback
+        // This is the same pattern used by Gmail OAuth - stable redirect URI
         
         if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
           throw new Error("Google OAuth credentials not configured");
         }
 
-        const baseUrl = redirectUrl || "https://peachhaus.lovable.app";
-        const callbackUrl = `${baseUrl}/admin?tab=gbp&oauth_callback=true`;
+        // Use edge function as the redirect URI (same pattern as gmail-oauth)
+        const callbackUrl = `${SUPABASE_URL}/functions/v1/gbp-oauth`;
         
         // Required scopes for Google Business Profile
         const scopes = [
           "https://www.googleapis.com/auth/business.manage",
         ].join(" ");
+
+        // State contains the return URL for redirect after OAuth
+        const state = JSON.stringify({
+          returnUrl: "/admin?tab=gbp"
+        });
 
         const authUrl = new URL("https://accounts.google.com/o/oauth2/v2/auth");
         authUrl.searchParams.set("client_id", GOOGLE_CLIENT_ID);
@@ -346,9 +351,10 @@ serve(async (req) => {
         authUrl.searchParams.set("scope", scopes);
         authUrl.searchParams.set("access_type", "offline");
         authUrl.searchParams.set("prompt", "consent"); // Force consent to get refresh token
-        authUrl.searchParams.set("state", "gbp_connect");
+        authUrl.searchParams.set("state", encodeURIComponent(state));
 
-        console.log("Generated OAuth URL:", authUrl.toString());
+        console.log("Generated OAuth URL with edge function callback:", authUrl.toString());
+        console.log("Redirect URI:", callbackUrl);
 
         return new Response(JSON.stringify({ 
           authUrl: authUrl.toString(),
