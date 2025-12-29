@@ -8,7 +8,7 @@ const corsHeaders = {
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY")!;
+const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY")!;
 const GOOGLE_CLIENT_ID = Deno.env.get("GOOGLE_CLIENT_ID")!;
 const GOOGLE_CLIENT_SECRET = Deno.env.get("GOOGLE_CLIENT_SECRET")!;
 
@@ -183,7 +183,7 @@ async function exchangeCodeForTokens(code: string, redirectUri: string): Promise
   };
 }
 
-// Generate AI reply using Lovable AI
+// Generate AI reply using OpenAI
 async function generateAIReply(
   reviewerName: string,
   starRating: number,
@@ -209,14 +209,14 @@ Reviewer: ${reviewerName || "Guest"}
 Rating: ${starRating} stars
 Review: ${reviewText || "(No written review, just a star rating)"}`;
 
-  const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+  const response = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${LOVABLE_API_KEY}`,
+      Authorization: `Bearer ${OPENAI_API_KEY}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: "google/gemini-2.5-flash",
+      model: "gpt-4o-mini",
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },
@@ -226,14 +226,16 @@ Review: ${reviewText || "(No written review, just a star rating)"}`;
   });
 
   if (!response.ok) {
-    throw new Error(`AI generation failed: ${await response.text()}`);
+    const errorText = await response.text();
+    console.error("OpenAI API error:", errorText);
+    throw new Error(`AI generation failed: ${errorText}`);
   }
 
   const data = await response.json();
   return data.choices[0]?.message?.content || "Thank you for your review! We appreciate your feedback.";
 }
 
-// Generate daily post content using Lovable AI
+// Generate daily post content using OpenAI
 async function generateDailyPost(
   category: string,
   topic: string,
@@ -264,14 +266,14 @@ Return your response in this format:
 POST: [Your post content here]
 CTA: [Call to action - one of: LEARN_MORE, BOOK, CALL, GET_DIRECTIONS]`;
 
-  const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+  const response = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${LOVABLE_API_KEY}`,
+      Authorization: `Bearer ${OPENAI_API_KEY}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: "google/gemini-2.5-flash",
+      model: "gpt-4o-mini",
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },
@@ -281,7 +283,9 @@ CTA: [Call to action - one of: LEARN_MORE, BOOK, CALL, GET_DIRECTIONS]`;
   });
 
   if (!response.ok) {
-    throw new Error(`AI generation failed: ${await response.text()}`);
+    const errorText = await response.text();
+    console.error("OpenAI API error:", errorText);
+    throw new Error(`AI generation failed: ${errorText}`);
   }
 
   const data = await response.json();
