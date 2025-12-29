@@ -1379,6 +1379,7 @@ export type Database = {
       }
       gbp_settings: {
         Row: {
+          access_token: string | null
           auto_post_enabled: boolean | null
           auto_reply_enabled: boolean | null
           created_at: string | null
@@ -1386,10 +1387,13 @@ export type Database = {
           gbp_location_id: string | null
           id: string
           post_time: string | null
+          refresh_token: string | null
           reply_delay_minutes: number | null
+          token_expires_at: string | null
           updated_at: string | null
         }
         Insert: {
+          access_token?: string | null
           auto_post_enabled?: boolean | null
           auto_reply_enabled?: boolean | null
           created_at?: string | null
@@ -1397,10 +1401,13 @@ export type Database = {
           gbp_location_id?: string | null
           id?: string
           post_time?: string | null
+          refresh_token?: string | null
           reply_delay_minutes?: number | null
+          token_expires_at?: string | null
           updated_at?: string | null
         }
         Update: {
+          access_token?: string | null
           auto_post_enabled?: boolean | null
           auto_reply_enabled?: boolean | null
           created_at?: string | null
@@ -1408,7 +1415,9 @@ export type Database = {
           gbp_location_id?: string | null
           id?: string
           post_time?: string | null
+          refresh_token?: string | null
           reply_delay_minutes?: number | null
+          token_expires_at?: string | null
           updated_at?: string | null
         }
         Relationships: []

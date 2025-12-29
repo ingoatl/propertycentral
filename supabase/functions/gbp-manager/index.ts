@@ -9,232 +9,177 @@ const corsHeaders = {
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY")!;
-const MCP_SERVER_URL = "https://remote.mcp.pipedream.net";
-const PIPEDREAM_CLIENT_ID = Deno.env.get("PIPEDREAM_CLIENT_ID");
-const PIPEDREAM_CLIENT_SECRET = Deno.env.get("PIPEDREAM_CLIENT_SECRET");
-const PIPEDREAM_PROJECT_ID = Deno.env.get("PIPEDREAM_PROJECT_ID");
-const PIPEDREAM_USER_ID = Deno.env.get("PIPEDREAM_USER_ID") || "admin";
+const GOOGLE_CLIENT_ID = Deno.env.get("GOOGLE_CLIENT_ID")!;
+const GOOGLE_CLIENT_SECRET = Deno.env.get("GOOGLE_CLIENT_SECRET")!;
+
+// Google API endpoints
+const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
+const GBP_ACCOUNTS_API = "https://mybusinessaccountmanagement.googleapis.com/v1";
+const GBP_BUSINESS_INFO_API = "https://mybusinessbusinessinformation.googleapis.com/v1";
+const GBP_API_V4 = "https://mybusiness.googleapis.com/v4";
+
+// PeachHaus account ID (known from previous setup)
 const PEACHHAUS_ACCOUNT_ID = "106698735661379366674";
 
-// Get Pipedream access token
-async function getPipedreamAccessToken(): Promise<string> {
-  const response = await fetch("https://api.pipedream.com/v1/oauth/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      grant_type: "client_credentials",
-      client_id: PIPEDREAM_CLIENT_ID!,
-      client_secret: PIPEDREAM_CLIENT_SECRET!,
-    }),
-  });
-  
-  if (!response.ok) {
-    throw new Error(`Failed to get Pipedream token: ${await response.text()}`);
-  }
-  
-  const data = await response.json();
-  return data.access_token;
+interface GBPSettings {
+  id: string;
+  gbp_account_id: string | null;
+  gbp_location_id: string | null;
+  auto_reply_enabled: boolean;
+  auto_post_enabled: boolean;
+  post_time: string;
+  reply_delay_minutes: number;
+  access_token: string | null;
+  refresh_token: string | null;
+  token_expires_at: string | null;
 }
 
-// Create a Pipedream Connect token for the user (same as Google Calendar)
-async function createConnectToken(userId: string, successRedirectUri: string): Promise<{ token: string; connect_link_url: string; expires_at: string }> {
-  const accessToken = await getPipedreamAccessToken();
+// Get or create GBP settings
+async function getSettings(supabase: any): Promise<GBPSettings | null> {
+  const { data } = await supabase
+    .from("gbp_settings")
+    .select("*")
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  return data;
+}
 
-  console.log("Creating Connect token for GBP user:", userId);
-  console.log("Success redirect URI:", successRedirectUri);
-  console.log("Project ID:", PIPEDREAM_PROJECT_ID);
-
-  const response = await fetch(`https://api.pipedream.com/v1/connect/${PIPEDREAM_PROJECT_ID}/tokens`, {
+// Refresh the access token using refresh token
+async function refreshAccessToken(refreshToken: string): Promise<{ access_token: string; expires_in: number }> {
+  console.log("Refreshing Google access token...");
+  
+  const response = await fetch(GOOGLE_TOKEN_URL, {
     method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_id: GOOGLE_CLIENT_ID,
+      client_secret: GOOGLE_CLIENT_SECRET,
+      refresh_token: refreshToken,
+      grant_type: "refresh_token",
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    console.error("Token refresh failed:", error);
+    throw new Error(`Failed to refresh token: ${error}`);
+  }
+
+  const data = await response.json();
+  console.log("Token refreshed successfully");
+  return { access_token: data.access_token, expires_in: data.expires_in };
+}
+
+// Get a valid access token, refreshing if needed
+async function getValidAccessToken(supabase: any, settings: GBPSettings): Promise<string> {
+  if (!settings.refresh_token) {
+    throw new Error("No refresh token stored. Please reconnect Google Business Profile.");
+  }
+
+  // Check if token is still valid (with 5 min buffer)
+  if (settings.access_token && settings.token_expires_at) {
+    const expiresAt = new Date(settings.token_expires_at);
+    const now = new Date();
+    const bufferMs = 5 * 60 * 1000; // 5 minutes
+    
+    if (expiresAt.getTime() - now.getTime() > bufferMs) {
+      console.log("Using existing access token (still valid)");
+      return settings.access_token;
+    }
+  }
+
+  // Token expired or about to expire - refresh it
+  const { access_token, expires_in } = await refreshAccessToken(settings.refresh_token);
+  
+  // Calculate new expiry time
+  const expiresAt = new Date(Date.now() + expires_in * 1000).toISOString();
+  
+  // Update in database
+  await supabase
+    .from("gbp_settings")
+    .update({
+      access_token,
+      token_expires_at: expiresAt,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", settings.id);
+
+  return access_token;
+}
+
+// Make authenticated request to Google APIs
+async function callGoogleAPI(
+  accessToken: string,
+  url: string,
+  method: string = "GET",
+  body?: any
+): Promise<any> {
+  console.log(`Calling Google API: ${method} ${url}`);
+  
+  const options: RequestInit = {
+    method,
     headers: {
       Authorization: `Bearer ${accessToken}`,
       "Content-Type": "application/json",
-      "x-pd-environment": "development",
     },
-    body: JSON.stringify({
-      external_user_id: userId,
-      success_redirect_uri: successRedirectUri,
-      error_redirect_uri: successRedirectUri.replace("connected=true", "connected=false"),
-    }),
-  });
-
-  const data = await response.json();
-  console.log("Connect token response status:", response.status);
-  console.log("Connect token response:", JSON.stringify(data));
-  
-  if (!response.ok || data.error) {
-    console.error("Connect token error:", data);
-    throw new Error(data.error_description || data.error || data.message || "Failed to create connect token");
-  }
-
-  return { 
-    token: data.token, 
-    connect_link_url: data.connect_link_url,
-    expires_at: data.expires_at 
   };
-}
 
-// Get user's connected accounts from Pipedream
-async function getUserAccounts(userId: string): Promise<any[]> {
-  const accessToken = await getPipedreamAccessToken();
-
-  console.log("Getting Pipedream accounts for user:", userId);
-
-  const response = await fetch(
-    `https://api.pipedream.com/v1/connect/${PIPEDREAM_PROJECT_ID}/users/${encodeURIComponent(userId)}/accounts`,
-    {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "x-pd-environment": "development",
-      },
-    }
-  );
-
-  const data = await response.json();
-  console.log("Get accounts response status:", response.status);
-  console.log("Get accounts response:", JSON.stringify(data).substring(0, 500));
-  
-  if (data.error) {
-    console.error("Get accounts error:", data);
-    return [];
+  if (body) {
+    options.body = JSON.stringify(body);
   }
 
-  let accounts: any[] = [];
-  if (Array.isArray(data)) {
-    accounts = data;
-  } else if (data.data && Array.isArray(data.data)) {
-    accounts = data.data;
-  } else if (data.accounts && Array.isArray(data.accounts)) {
-    accounts = data.accounts;
-  }
+  const response = await fetch(url, options);
+  const responseText = await response.text();
   
-  console.log("Parsed accounts count:", accounts.length);
-  return accounts;
-}
-
-// Check if user has Google My Business connected
-async function hasGBPConnection(userId: string): Promise<boolean> {
-  const accounts = await getUserAccounts(userId);
-  
-  const gbpAccount = accounts.find((a: any) => {
-    const appSlug = typeof a.app === "object" ? a.app?.name_slug : a.app;
-    return appSlug === "google_my_business" || 
-           appSlug === "google-my-business" || 
-           a.name?.toLowerCase().includes("google my business") ||
-           a.name?.toLowerCase().includes("business profile");
-  });
-
-  console.log("GBP connection found:", !!gbpAccount, gbpAccount ? JSON.stringify(gbpAccount) : "none");
-  return !!gbpAccount;
-}
-
-// Parse SSE response from Pipedream MCP
-async function parseSSEResponse(response: Response): Promise<any> {
-  const contentType = response.headers.get("content-type") || "";
-  
-  // If it's regular JSON, parse directly
-  if (contentType.includes("application/json")) {
-    return await response.json();
-  }
-  
-  // Handle SSE (Server-Sent Events) response
-  const reader = response.body!.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-  let lastData: any = null;
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-
-    buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split("\n");
-    buffer = lines.pop() || "";
-
-    for (const line of lines) {
-      if (line.startsWith("data: ")) {
-        const data = line.slice(6).trim();
-        if (data === "[DONE]") continue;
-        try {
-          lastData = JSON.parse(data);
-          console.log("SSE data parsed:", JSON.stringify(lastData).substring(0, 200));
-        } catch (e) {
-          console.log("SSE parse error for line:", data);
-        }
-      }
-    }
-  }
-  
-  return lastData;
-}
-
-// Call MCP tool via Pipedream
-async function callMCPTool(
-  accessToken: string,
-  userId: string,
-  toolName: string,
-  args: Record<string, any>
-): Promise<any> {
-  console.log(`Calling MCP tool: ${toolName}`);
-  console.log("Tool args:", JSON.stringify(args));
-  
-  const response = await fetch(MCP_SERVER_URL, {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${accessToken}`,
-      "Accept": "application/json, text/event-stream",
-      "Content-Type": "application/json",
-      "x-pd-project-id": PIPEDREAM_PROJECT_ID!,
-      "x-pd-environment": "development",
-      "x-pd-external-user-id": userId,
-      "x-pd-app-slug": "google_my_business",
-      "x-pd-app-discovery": "true",
-      "x-pd-tool-mode": "sub-agent",
-    },
-    body: JSON.stringify({
-      jsonrpc: "2.0",
-      id: Date.now(),
-      method: "tools/call",
-      params: {
-        name: toolName,
-        arguments: args,
-      },
-    }),
-  });
+  console.log(`Google API response status: ${response.status}`);
   
   if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`MCP tool call failed: ${response.status} - ${errorText}`);
+    console.error(`Google API error: ${responseText}`);
+    throw new Error(`Google API error (${response.status}): ${responseText}`);
   }
-  
-  return parseSSEResponse(response);
+
+  return responseText ? JSON.parse(responseText) : {};
 }
 
-// List available MCP tools
-async function listMCPTools(accessToken: string, userId: string): Promise<any> {
-  console.log("Listing available GBP MCP tools...");
+// Exchange authorization code for tokens
+async function exchangeCodeForTokens(code: string, redirectUri: string): Promise<{
+  access_token: string;
+  refresh_token: string;
+  expires_in: number;
+}> {
+  console.log("Exchanging authorization code for tokens...");
   
-  const response = await fetch(MCP_SERVER_URL, {
+  const response = await fetch(GOOGLE_TOKEN_URL, {
     method: "POST",
-    headers: {
-      "Authorization": `Bearer ${accessToken}`,
-      "Accept": "application/json, text/event-stream",
-      "Content-Type": "application/json",
-      "x-pd-project-id": PIPEDREAM_PROJECT_ID!,
-      "x-pd-environment": "development",
-      "x-pd-external-user-id": userId,
-      "x-pd-app-slug": "google_my_business",
-      "x-pd-app-discovery": "true",
-    },
-    body: JSON.stringify({
-      jsonrpc: "2.0",
-      id: Date.now(),
-      method: "tools/list",
-      params: {},
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_id: GOOGLE_CLIENT_ID,
+      client_secret: GOOGLE_CLIENT_SECRET,
+      code,
+      redirect_uri: redirectUri,
+      grant_type: "authorization_code",
     }),
   });
+
+  if (!response.ok) {
+    const error = await response.text();
+    console.error("Token exchange failed:", error);
+    throw new Error(`Failed to exchange code: ${error}`);
+  }
+
+  const data = await response.json();
+  console.log("Token exchange successful");
   
-  return parseSSEResponse(response);
+  if (!data.refresh_token) {
+    console.warn("No refresh token returned - user may have already authorized this app");
+  }
+  
+  return {
+    access_token: data.access_token,
+    refresh_token: data.refresh_token,
+    expires_in: data.expires_in,
+  };
 }
 
 // Generate AI reply using Lovable AI
@@ -266,7 +211,7 @@ Review: ${reviewText || "(No written review, just a star rating)"}`;
   const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
     method: "POST",
     headers: {
-      "Authorization": `Bearer ${LOVABLE_API_KEY}`,
+      Authorization: `Bearer ${LOVABLE_API_KEY}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
@@ -321,7 +266,7 @@ CTA: [Call to action - one of: LEARN_MORE, BOOK, CALL, GET_DIRECTIONS]`;
   const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
     method: "POST",
     headers: {
-      "Authorization": `Bearer ${LOVABLE_API_KEY}`,
+      Authorization: `Bearer ${LOVABLE_API_KEY}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
@@ -341,7 +286,6 @@ CTA: [Call to action - one of: LEARN_MORE, BOOK, CALL, GET_DIRECTIONS]`;
   const data = await response.json();
   const content = data.choices[0]?.message?.content || "";
   
-  // Parse the response
   const postMatch = content.match(/POST:\s*(.+?)(?=CTA:|$)/s);
   const ctaMatch = content.match(/CTA:\s*(\w+)/);
   
@@ -349,6 +293,18 @@ CTA: [Call to action - one of: LEARN_MORE, BOOK, CALL, GET_DIRECTIONS]`;
     summary: postMatch?.[1]?.trim() || content.substring(0, 1500),
     callToAction: ctaMatch?.[1]?.trim() || "LEARN_MORE",
   };
+}
+
+// Convert star rating string to number
+function parseStarRating(rating: string): number {
+  const ratingMap: Record<string, number> = {
+    "FIVE": 5,
+    "FOUR": 4,
+    "THREE": 3,
+    "TWO": 2,
+    "ONE": 1,
+  };
+  return ratingMap[rating] || 3;
 }
 
 serve(async (req) => {
@@ -363,414 +319,283 @@ serve(async (req) => {
     console.log(`GBP Manager action: ${action}`);
     console.log("Params:", JSON.stringify(params));
 
-    // Get GBP settings (get first one since there should only be one global settings row)
-    const { data: settings } = await supabase
-      .from("gbp_settings")
-      .select("*")
-      .order("created_at", { ascending: true })
-      .limit(1)
-      .maybeSingle();
-
-    const userId = params.userId || PIPEDREAM_USER_ID;
+    const settings = await getSettings(supabase);
 
     switch (action) {
       case "get-auth-url": {
-        // Get Pipedream Connect URL for Google My Business OAuth
+        // Generate Google OAuth URL for GBP access
         const { redirectUrl } = params;
-
-        if (!PIPEDREAM_CLIENT_ID || !PIPEDREAM_CLIENT_SECRET || !PIPEDREAM_PROJECT_ID) {
-          throw new Error("Pipedream credentials not configured. Please add PIPEDREAM_CLIENT_ID, PIPEDREAM_CLIENT_SECRET, and PIPEDREAM_PROJECT_ID.");
-        }
-
-        // Check if user already has Google My Business connected
-        const hasConnection = await hasGBPConnection(userId);
-        if (hasConnection) {
-          // Verify the connection works via MCP
-          try {
-            const accessToken = await getPipedreamAccessToken();
-            const tools = await listMCPTools(accessToken, userId);
-            
-            // If we can list tools, connection is working
-            if (tools && !tools.error) {
-              return new Response(JSON.stringify({ 
-                success: true, 
-                connected: true,
-                message: "Google Business Profile is already connected" 
-              }), {
-                headers: { ...corsHeaders, "Content-Type": "application/json" },
-              });
-            }
-          } catch (e) {
-            console.log("Existing connection verification failed, will prompt for reconnect:", e);
-          }
-        }
-
-        // Create success redirect URL
-        const baseRedirect = redirectUrl || "https://peachhaus.lovable.app";
-        const successRedirectUri = `${baseRedirect}/admin?tab=gbp&connected=true`;
-
-        // Create a Pipedream Connect token
-        const connectData = await createConnectToken(userId, successRedirectUri);
         
-        // Build the Connect Link URL with app parameter for Google My Business
-        const authUrl = `${connectData.connect_link_url}&app=google_my_business`;
+        if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
+          throw new Error("Google OAuth credentials not configured");
+        }
 
-        console.log("Generated Pipedream Connect auth URL for GBP:", authUrl);
+        const baseUrl = redirectUrl || "https://peachhaus.lovable.app";
+        const callbackUrl = `${baseUrl}/admin?tab=gbp&oauth_callback=true`;
+        
+        // Required scopes for Google Business Profile
+        const scopes = [
+          "https://www.googleapis.com/auth/business.manage",
+        ].join(" ");
 
-        return new Response(JSON.stringify({ authUrl, connected: false }), {
+        const authUrl = new URL("https://accounts.google.com/o/oauth2/v2/auth");
+        authUrl.searchParams.set("client_id", GOOGLE_CLIENT_ID);
+        authUrl.searchParams.set("redirect_uri", callbackUrl);
+        authUrl.searchParams.set("response_type", "code");
+        authUrl.searchParams.set("scope", scopes);
+        authUrl.searchParams.set("access_type", "offline");
+        authUrl.searchParams.set("prompt", "consent"); // Force consent to get refresh token
+        authUrl.searchParams.set("state", "gbp_connect");
+
+        console.log("Generated OAuth URL:", authUrl.toString());
+
+        return new Response(JSON.stringify({ 
+          authUrl: authUrl.toString(),
+          redirectUri: callbackUrl,
+        }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      case "exchange-code": {
+        // Exchange authorization code for tokens
+        const { code, redirectUri } = params;
+        
+        if (!code) {
+          throw new Error("Authorization code is required");
+        }
+
+        const tokens = await exchangeCodeForTokens(code, redirectUri);
+        const expiresAt = new Date(Date.now() + tokens.expires_in * 1000).toISOString();
+
+        // Update or create settings with tokens
+        if (settings?.id) {
+          await supabase
+            .from("gbp_settings")
+            .update({
+              access_token: tokens.access_token,
+              refresh_token: tokens.refresh_token || settings.refresh_token,
+              token_expires_at: expiresAt,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", settings.id);
+        } else {
+          await supabase.from("gbp_settings").insert({
+            access_token: tokens.access_token,
+            refresh_token: tokens.refresh_token,
+            token_expires_at: expiresAt,
+            gbp_account_id: PEACHHAUS_ACCOUNT_ID,
+          });
+        }
+
+        return new Response(JSON.stringify({ 
+          success: true,
+          message: "Google Business Profile connected successfully",
+        }), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
       case "check-connection": {
-        // Check if Google Business Profile is connected
-        try {
-          const hasConnection = await hasGBPConnection(userId);
-          
-          if (!hasConnection) {
-            return new Response(JSON.stringify({ 
-              connected: false, 
-              verified: false,
-              error: "No Google Business Profile account connected"
-            }), {
-              headers: { ...corsHeaders, "Content-Type": "application/json" },
-            });
-          }
-
-          // Verify connection works by listing tools via MCP
-          try {
-            const accessToken = await getPipedreamAccessToken();
-            const tools = await listMCPTools(accessToken, userId);
-            
-            // Check if we got a valid response
-            const hasTools = tools?.result?.tools || tools?.tools;
-            
-            return new Response(JSON.stringify({ 
-              connected: true, 
-              verified: !!hasTools,
-              message: hasTools ? "Google Business Profile connected and verified" : "Connection exists but could not verify tools"
-            }), {
-              headers: { ...corsHeaders, "Content-Type": "application/json" },
-            });
-          } catch (mcpError: any) {
-            console.error("MCP verification failed:", mcpError);
-            
-            return new Response(JSON.stringify({ 
-              connected: true, 
-              verified: false,
-              error: mcpError.message || "Could not verify GBP access via MCP"
-            }), {
-              headers: { ...corsHeaders, "Content-Type": "application/json" },
-            });
-          }
-        } catch (error: any) {
+        // Check if we have valid tokens stored
+        if (!settings?.refresh_token) {
           return new Response(JSON.stringify({ 
-            connected: false, 
+            connected: false,
             verified: false,
-            error: error.message 
+            error: "No Google Business Profile connection",
+          }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
+        try {
+          // Try to get a valid access token (will refresh if needed)
+          const accessToken = await getValidAccessToken(supabase, settings);
+          
+          // Test the connection by listing accounts
+          const accountsUrl = `${GBP_ACCOUNTS_API}/accounts`;
+          await callGoogleAPI(accessToken, accountsUrl);
+
+          return new Response(JSON.stringify({ 
+            connected: true,
+            verified: true,
+            hasLocation: !!settings.gbp_location_id,
+            message: "Google Business Profile connected and verified",
+          }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        } catch (error: any) {
+          console.error("Connection verification failed:", error);
+          
+          return new Response(JSON.stringify({ 
+            connected: !!settings.refresh_token,
+            verified: false,
+            error: error.message,
           }), {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
         }
       }
 
-      case "list-tools": {
-        // List available GBP MCP tools
-        const accessToken = await getPipedreamAccessToken();
-        const tools = await listMCPTools(accessToken, userId);
-        
-        return new Response(JSON.stringify({ 
-          success: true, 
-          tools 
-        }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      }
-
       case "list-accounts": {
-        // List GBP accounts the user has access to
-        const accessToken = await getPipedreamAccessToken();
-        
-        console.log("Listing GBP accounts...");
-        
-        const accountsResult = await callMCPTool(
-          accessToken,
-          userId,
-          "google_my_business-list-accounts",
-          {
-            instruction: "List all Google Business Profile accounts I have access to"
-          }
-        );
-
-        console.log("Accounts result:", JSON.stringify(accountsResult).substring(0, 2000));
-
-        // Extract accounts from the response
-        let accounts = [];
-        try {
-          const content = accountsResult?.result?.content?.[0]?.text;
-          if (content) {
-            const parsed = JSON.parse(content);
-            accounts = parsed?.accounts || [];
-          }
-        } catch (e) {
-          console.error("Failed to parse accounts:", e);
+        // List all GBP accounts the user has access to
+        if (!settings?.refresh_token) {
+          throw new Error("Not connected to Google Business Profile");
         }
 
+        const accessToken = await getValidAccessToken(supabase, settings);
+        const accountsUrl = `${GBP_ACCOUNTS_API}/accounts`;
+        const data = await callGoogleAPI(accessToken, accountsUrl);
+
         return new Response(JSON.stringify({ 
-          success: true, 
-          accounts,
-          raw: accountsResult
-        }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+          success: true,
+          accounts: data.accounts || [],
+        }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
 
       case "list-locations": {
         // List locations for a specific account
-        const { accountId } = params;
-        
-        if (!accountId) {
-          return new Response(JSON.stringify({ 
-            success: false, 
-            error: "Account ID is required" 
-          }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 });
+        if (!settings?.refresh_token) {
+          throw new Error("Not connected to Google Business Profile");
         }
 
-        const accessToken = await getPipedreamAccessToken();
+        const accountId = params.accountId || settings.gbp_account_id || PEACHHAUS_ACCOUNT_ID;
+        const accessToken = await getValidAccessToken(supabase, settings);
         
-        console.log(`Listing locations for account: ${accountId}`);
-        
-        const locationsResult = await callMCPTool(
-          accessToken,
-          userId,
-          "google_my_business-list-locations",
-          {
-            parent: `accounts/${accountId}`,
-          }
-        );
-
-        console.log("Locations result:", JSON.stringify(locationsResult).substring(0, 2000));
-
-        // Extract locations from the response
-        let locations = [];
-        try {
-          const content = locationsResult?.result?.content?.[0]?.text;
-          if (content) {
-            const parsed = JSON.parse(content);
-            locations = parsed?.locations || [];
-          }
-        } catch (e) {
-          console.error("Failed to parse locations:", e);
-        }
+        const locationsUrl = `${GBP_BUSINESS_INFO_API}/accounts/${accountId}/locations?readMask=name,title,storefrontAddress`;
+        const data = await callGoogleAPI(accessToken, locationsUrl);
 
         return new Response(JSON.stringify({ 
-          success: true, 
-          locations,
-          raw: locationsResult
-        }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+          success: true,
+          locations: data.locations || [],
+        }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
 
       case "discover-locations": {
-        // Explicitly discover and list all locations for the connected account
-        const accessToken = await getPipedreamAccessToken();
-        const accountId = params.accountId || PEACHHAUS_ACCOUNT_ID;
-        
-        console.log(`Discovering locations for account: ${accountId}`);
-        
-        // First, list accounts to verify we have access
-        const accountsResult = await callMCPTool(
-          accessToken,
-          userId,
-          "google_my_business-list-accounts",
-          {
-            instruction: "List all Google Business Profile accounts I have access to. Return as JSON with accounts array."
-          }
-        );
-        
-        console.log("Accounts discovery result:", JSON.stringify(accountsResult).substring(0, 1500));
-        
-        // Try to get locations using the MCP tool
-        const locationsResult = await callMCPTool(
-          accessToken,
-          userId,
-          "google_my_business-list-locations",
-          {
-            instruction: `List ALL locations under account ID ${accountId}. Return as JSON array with each location having: name (resource name), locationName, address, and primaryPhone if available.`,
-            parent: `accounts/${accountId}`
-          }
-        );
-        
-        console.log("Locations discovery result:", JSON.stringify(locationsResult).substring(0, 1500));
-        
-        // Parse the response
-        let locations: any[] = [];
-        let accounts: any[] = [];
-        let rawAccountsResponse = "";
-        let rawLocationsResponse = "";
-        
-        try {
-          rawAccountsResponse = accountsResult?.result?.content?.[0]?.text || "";
-          if (rawAccountsResponse.startsWith("{") || rawAccountsResponse.startsWith("[")) {
-            const parsed = JSON.parse(rawAccountsResponse);
-            accounts = parsed?.accounts || (Array.isArray(parsed) ? parsed : []);
-          }
-        } catch (e) {
-          console.log("Failed to parse accounts:", e);
+        // Auto-discover and save the first location
+        if (!settings?.refresh_token) {
+          throw new Error("Not connected to Google Business Profile");
         }
+
+        const accessToken = await getValidAccessToken(supabase, settings);
         
-        try {
-          rawLocationsResponse = locationsResult?.result?.content?.[0]?.text || "";
-          if (rawLocationsResponse.startsWith("{") || rawLocationsResponse.startsWith("[")) {
-            const parsed = JSON.parse(rawLocationsResponse);
-            locations = parsed?.locations || (Array.isArray(parsed) ? parsed : []);
-          }
-        } catch (e) {
-          console.log("Failed to parse locations:", e);
-        }
+        // First list accounts
+        const accountsUrl = `${GBP_ACCOUNTS_API}/accounts`;
+        const accountsData = await callGoogleAPI(accessToken, accountsUrl);
+        const accounts = accountsData.accounts || [];
         
-        // If we found locations, save the first one to settings
-        if (locations.length > 0) {
-          const firstLocation = locations[0];
-          // Extract location ID from name (format: accounts/xxx/locations/yyy)
-          const locationName = firstLocation.name || "";
-          const locationIdMatch = locationName.match(/locations\/(\d+)/);
-          const locationId = locationIdMatch?.[1] || firstLocation.locationId;
+        console.log(`Found ${accounts.length} accounts`);
+
+        let allLocations: any[] = [];
+        let savedAccountId = null;
+        let savedLocationId = null;
+
+        // For each account, list locations
+        for (const account of accounts) {
+          const accountName = account.name; // Format: accounts/123
+          const accountId = accountName.replace("accounts/", "");
           
-          if (locationId) {
-            // Save to settings
-            if (settings?.id) {
-              await supabase
-                .from("gbp_settings")
-                .update({ 
-                  gbp_location_id: locationId,
-                  gbp_account_id: accountId,
-                  updated_at: new Date().toISOString()
-                })
-                .eq("id", settings.id);
-            } else {
-              await supabase
-                .from("gbp_settings")
-                .insert({
-                  gbp_account_id: accountId,
-                  gbp_location_id: locationId,
-                  created_at: new Date().toISOString(),
-                });
+          try {
+            const locationsUrl = `${GBP_BUSINESS_INFO_API}/${accountName}/locations?readMask=name,title,storefrontAddress`;
+            const locationsData = await callGoogleAPI(accessToken, locationsUrl);
+            const locations = locationsData.locations || [];
+            
+            console.log(`Account ${accountId} has ${locations.length} locations`);
+            
+            for (const loc of locations) {
+              allLocations.push({
+                ...loc,
+                accountId,
+                accountName: account.accountName,
+              });
+              
+              // Save the first location found
+              if (!savedLocationId && loc.name) {
+                const locationIdMatch = loc.name.match(/locations\/(\d+)/);
+                if (locationIdMatch) {
+                  savedLocationId = locationIdMatch[1];
+                  savedAccountId = accountId;
+                }
+              }
             }
+          } catch (locError: any) {
+            console.error(`Failed to list locations for account ${accountId}:`, locError.message);
           }
         }
-        
+
+        // Save to settings
+        if (savedLocationId && settings?.id) {
+          await supabase
+            .from("gbp_settings")
+            .update({
+              gbp_account_id: savedAccountId,
+              gbp_location_id: savedLocationId,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", settings.id);
+        }
+
         return new Response(JSON.stringify({ 
           success: true,
           accounts,
-          locations,
-          rawAccountsResponse: rawAccountsResponse.substring(0, 500),
-          rawLocationsResponse: rawLocationsResponse.substring(0, 500),
-          savedLocationId: locations[0]?.name?.match(/locations\/(\d+)/)?.[1] || null
-        }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+          locations: allLocations,
+          savedAccountId,
+          savedLocationId,
+        }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
 
       case "sync-reviews": {
         // Sync reviews from Google Business Profile
-        const accessToken = await getPipedreamAccessToken();
-        
-        // Check if we have a location ID configured
-        const configuredLocationId = settings?.gbp_location_id;
-        const configuredAccountId = settings?.gbp_account_id || PEACHHAUS_ACCOUNT_ID;
-        
-        console.log(`Syncing reviews - Account: ${configuredAccountId}, Location: ${configuredLocationId || "not configured"}`);
-        
-        // If no location ID, try to discover it first
-        if (!configuredLocationId) {
-          console.log("No location ID configured, attempting discovery...");
+        if (!settings?.refresh_token) {
+          throw new Error("Not connected to Google Business Profile");
         }
-          
-        // Try different approaches to get reviews
-        const reviewsResult = await callMCPTool(
-          accessToken,
-          userId,
-          "google_my_business-list-all-reviews",
-          {
-            instruction: `You are helping me fetch Google Business Profile reviews. IMPORTANT: Follow these steps IN ORDER and do NOT stop to ask for confirmation:
 
-STEP 1: Call accounts.list to get all accounts I have access to.
-STEP 2: For account ID ${configuredAccountId}, call accounts.locations.list to get all locations.
-STEP 3: For EACH location found, call accounts.locations.reviews.list to get reviews.
-STEP 4: Return ALL reviews as a JSON array with format:
-{
-  "reviews": [
-    {"name": "accounts/.../reviews/...", "reviewer": {"displayName": "..."}, "starRating": "FIVE", "comment": "...", "reviewReply": {"comment": "..."}, "createTime": "..."}
-  ]
-}
+        const accountId = settings.gbp_account_id || PEACHHAUS_ACCOUNT_ID;
+        const locationId = settings.gbp_location_id;
 
-If you get a 404 error at any step, include that in your response as: {"error": "404", "step": "<which step failed>", "details": "<error message>"}
+        if (!locationId) {
+          return new Response(JSON.stringify({ 
+            success: false,
+            error: "GBP_LOCATION_NOT_CONFIGURED",
+            userMessage: "No location configured. Please run 'Discover Locations' first.",
+            details: "A GBP location ID is required to fetch reviews.",
+          }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+            status: 400,
+          });
+        }
 
-Proceed automatically without asking for confirmation.`
-          }
-        );
+        const accessToken = await getValidAccessToken(supabase, settings);
         
-        console.log("Reviews result:", JSON.stringify(reviewsResult).substring(0, 2000));
-
-        // Extract reviews from the response - handle error responses gracefully
+        // Fetch reviews using the v4 API
+        const reviewsUrl = `${GBP_API_V4}/accounts/${accountId}/locations/${locationId}/reviews`;
+        console.log(`Fetching reviews from: ${reviewsUrl}`);
+        
         let reviews: any[] = [];
         try {
-          const contentText = reviewsResult?.result?.content?.[0]?.text;
-          if (contentText) {
-            // Check if it's a natural language response (not JSON) - this means an error occurred
-            const isErrorResponse = contentText.includes("404") || 
-                                    contentText.includes("not found") || 
-                                    contentText.includes("I could not") || 
-                                    contentText.includes("Error") ||
-                                    contentText.includes("no locations") ||
-                                    (!contentText.startsWith("{") && !contentText.startsWith("["));
-            
-            if (isErrorResponse) {
-              console.error("MCP tool returned error message:", contentText);
-              
-              // Check if it's a "no locations" issue - this is a GBP configuration problem
-              const isLocationIssue = contentText.includes("404") || 
-                                      contentText.includes("no locations") ||
-                                      contentText.includes("PERSONAL");
-              
-              if (isLocationIssue) {
-                return new Response(JSON.stringify({ 
-                  success: false, 
-                  error: "GBP_LOCATION_NOT_CONFIGURED",
-                  userMessage: "Your Google Business Profile account doesn't have a location configured. This is required for the Reviews API to work.",
-                  details: "The connected GBP account (PeachHaus Group) appears to be a PERSONAL type account without a business location. To fix this, you need to add your business location in Google Business Profile.",
-                  steps: [
-                    "1. Go to business.google.com",
-                    "2. Click 'Add your business to Google'",
-                    "3. Enter your business name and address",
-                    "4. Complete the verification process",
-                    "5. Once verified, reconnect in Lovable"
-                  ],
-                  helpUrl: "https://support.google.com/business/answer/10514137",
-                }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 });
-              }
-              
-              return new Response(JSON.stringify({ 
-                success: false, 
-                error: "GBP_API_ERROR",
-                userMessage: "Unable to fetch reviews from Google Business Profile.",
-                details: contentText.substring(0, 500),
-              }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 });
-            }
-            
-            const parsed = JSON.parse(contentText);
-            reviews = parsed?.reviews || parsed || [];
-            if (!Array.isArray(reviews)) reviews = [];
+          const data = await callGoogleAPI(accessToken, reviewsUrl);
+          reviews = data.reviews || [];
+          console.log(`Fetched ${reviews.length} reviews from GBP`);
+        } catch (apiError: any) {
+          // Check for specific error types
+          if (apiError.message.includes("404")) {
+            return new Response(JSON.stringify({ 
+              success: false,
+              error: "GBP_LOCATION_NOT_FOUND",
+              userMessage: "Location not found. The location ID may be incorrect or the location may have been removed.",
+              details: apiError.message,
+            }), {
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+              status: 400,
+            });
           }
-        } catch (parseErr) {
-          console.error("Failed to parse reviews response:", parseErr);
-          const contentText = reviewsResult?.result?.content?.[0]?.text || "";
-          
-          // Check if the contentText contains actual review data in a different format
-          if (contentText.includes("reviews") && contentText.includes("starRating")) {
-            console.log("Response may contain reviews in non-standard format, attempting extraction...");
-          }
-          
-          return new Response(JSON.stringify({ 
-            success: false, 
-            error: "PARSE_ERROR",
-            userMessage: "Failed to parse the reviews data from Google Business Profile.",
-            rawResponse: contentText.substring(0, 500),
-          }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 });
+          throw apiError;
         }
 
         let syncedCount = 0;
@@ -778,12 +603,9 @@ Proceed automatically without asking for confirmation.`
 
         for (const review of reviews) {
           const reviewName = review.name;
-          const starRating = review.starRating === "FIVE" ? 5 
-            : review.starRating === "FOUR" ? 4 
-            : review.starRating === "THREE" ? 3 
-            : review.starRating === "TWO" ? 2 : 1;
+          const starRating = parseStarRating(review.starRating);
 
-          // Upsert review
+          // Check if review exists
           const { data: existingReview } = await supabase
             .from("gbp_reviews")
             .select("id, review_reply")
@@ -798,10 +620,11 @@ Proceed automatically without asking for confirmation.`
               reviewer_profile_photo_url: review.reviewer?.profilePhotoUrl,
               star_rating: starRating,
               review_text: review.comment,
-              review_reply: review.reviewReply?.comment,
-              reply_posted_at: review.reviewReply?.updateTime,
+              review_reply: review.reviewReply?.comment || null,
+              reply_posted_at: review.reviewReply?.updateTime || null,
               review_created_at: review.createTime,
               needs_reply: !review.reviewReply,
+              synced_at: new Date().toISOString(),
             });
             newReviewsCount++;
           } else {
@@ -809,27 +632,32 @@ Proceed automatically without asking for confirmation.`
             await supabase
               .from("gbp_reviews")
               .update({
-                review_reply: review.reviewReply?.comment,
-                reply_posted_at: review.reviewReply?.updateTime,
+                star_rating: starRating,
+                review_text: review.comment,
+                review_reply: review.reviewReply?.comment || existingReview.review_reply,
+                reply_posted_at: review.reviewReply?.updateTime || null,
                 needs_reply: !review.reviewReply && !existingReview.review_reply,
                 synced_at: new Date().toISOString(),
               })
-              .eq("gbp_review_name", reviewName);
+              .eq("id", existingReview.id);
           }
           syncedCount++;
         }
 
         return new Response(JSON.stringify({ 
-          success: true, 
+          success: true,
           synced: syncedCount,
           newReviews: newReviewsCount,
-        }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+          totalFromGBP: reviews.length,
+        }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
 
       case "generate-reply": {
-        // Generate AI reply for a specific review
+        // Generate AI reply for a review
         const { reviewId } = params;
-        
+
         const { data: review, error } = await supabase
           .from("gbp_reviews")
           .select("*")
@@ -837,459 +665,278 @@ Proceed automatically without asking for confirmation.`
           .single();
 
         if (error || !review) {
-          return new Response(JSON.stringify({ 
-            success: false, 
-            error: "Review not found" 
-          }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 404 });
+          throw new Error("Review not found");
         }
 
-        const aiReply = await generateAIReply(
-          review.reviewer_name,
+        const reply = await generateAIReply(
+          review.reviewer_name || "Guest",
           review.star_rating,
-          review.review_text
+          review.review_text || ""
         );
 
-        // Save the AI-generated reply
-        await supabase
-          .from("gbp_reviews")
-          .update({ 
-            ai_generated_reply: aiReply,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", reviewId);
-
-        return new Response(JSON.stringify({ 
-          success: true, 
-          reply: aiReply 
-        }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      }
-
-      case "post-reply": {
-        // Post a reply to Google Business Profile
-        const { reviewId, reply } = params;
-        
-        if (!settings?.gbp_account_id || !settings?.gbp_location_id) {
-          return new Response(JSON.stringify({ 
-            success: false, 
-            error: "GBP Account ID and Location ID not configured" 
-          }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 });
-        }
-
-        const { data: review, error } = await supabase
-          .from("gbp_reviews")
-          .select("*")
-          .eq("id", reviewId)
-          .single();
-
-        if (error || !review) {
-          return new Response(JSON.stringify({ 
-            success: false, 
-            error: "Review not found" 
-          }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 404 });
-        }
-
-        const accessToken = await getPipedreamAccessToken();
-        
-        // Post the reply using MCP (correct tool name: create-update-reply-to-review)
-        const replyResult = await callMCPTool(
-          accessToken,
-          userId,
-          "google_my_business-create-update-reply-to-review",
-          {
-            reviewName: review.gbp_review_name,
-            comment: reply || review.ai_generated_reply,
-          }
-        );
-
-        console.log("Reply result:", JSON.stringify(replyResult).substring(0, 500));
-
-        // Update the review record
+        // Save the generated reply
         await supabase
           .from("gbp_reviews")
           .update({
-            review_reply: reply || review.ai_generated_reply,
-            reply_posted_at: new Date().toISOString(),
-            needs_reply: false,
-            auto_replied: !reply,
+            ai_generated_reply: reply,
             updated_at: new Date().toISOString(),
           })
           .eq("id", reviewId);
 
         return new Response(JSON.stringify({ 
-          success: true, 
-          result: replyResult 
-        }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+          success: true,
+          reply,
+        }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      case "post-reply": {
+        // Post a reply to a review on Google
+        if (!settings?.refresh_token) {
+          throw new Error("Not connected to Google Business Profile");
+        }
+
+        const { reviewId, reply } = params;
+
+        const { data: review, error } = await supabase
+          .from("gbp_reviews")
+          .select("*")
+          .eq("id", reviewId)
+          .single();
+
+        if (error || !review) {
+          throw new Error("Review not found");
+        }
+
+        const replyText = reply || review.ai_generated_reply;
+        if (!replyText) {
+          throw new Error("No reply text provided");
+        }
+
+        const accessToken = await getValidAccessToken(supabase, settings);
+        
+        // Post reply using v4 API
+        const replyUrl = `${GBP_API_V4}/${review.gbp_review_name}/reply`;
+        console.log(`Posting reply to: ${replyUrl}`);
+        
+        await callGoogleAPI(accessToken, replyUrl, "PUT", {
+          comment: replyText,
+        });
+
+        // Update the review in database
+        await supabase
+          .from("gbp_reviews")
+          .update({
+            review_reply: replyText,
+            reply_posted_at: new Date().toISOString(),
+            needs_reply: false,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", reviewId);
+
+        return new Response(JSON.stringify({ 
+          success: true,
+          message: "Reply posted successfully",
+        }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
 
       case "generate-daily-post": {
-        // Generate content for daily post
-        const dayOfWeek = new Date().getDay();
-        
-        // Content rotation based on day of week
-        const categoryByDay: Record<number, string> = {
-          0: "seasonal", // Sunday
-          1: "property_highlight", // Monday
-          2: "local_area", // Tuesday
-          3: "testimonial", // Wednesday
-          4: "behind_scenes", // Thursday
-          5: "tip", // Friday
-          6: "amenity", // Saturday
-        };
-        
-        const category = params.category || categoryByDay[dayOfWeek];
-        
-        // Get a random unused content idea
-        const { data: idea } = await supabase
+        // Generate content for a daily post
+        // Get a random content idea
+        const { data: ideas } = await supabase
           .from("gbp_content_ideas")
-          .select("*, properties(name)")
-          .eq("category", category)
+          .select("*")
           .eq("is_active", true)
           .is("used_at", null)
-          .limit(1)
-          .single();
+          .limit(5);
 
-        if (!idea) {
-          // If no unused ideas, get any idea from the category
-          const { data: anyIdea } = await supabase
-            .from("gbp_content_ideas")
-            .select("*, properties(name)")
-            .eq("category", category)
-            .eq("is_active", true)
-            .order("used_at", { ascending: true, nullsFirst: true })
-            .limit(1)
-            .single();
+        const randomIdea = ideas?.[Math.floor(Math.random() * (ideas?.length || 1))];
+        const category = randomIdea?.category || "General";
+        const topic = randomIdea?.topic || "Guest experience at PeachHaus properties";
 
-          if (!anyIdea) {
-            return new Response(JSON.stringify({ 
-              success: false, 
-              error: `No content ideas found for category: ${category}` 
-            }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 404 });
-          }
+        const { summary, callToAction } = await generateDailyPost(category, topic);
 
-          // Use this idea
-          const { summary, callToAction } = await generateDailyPost(
-            anyIdea.category,
-            anyIdea.topic,
-            anyIdea.properties?.name
-          );
-
-          // Mark idea as used
+        // Mark the idea as used
+        if (randomIdea?.id) {
           await supabase
             .from("gbp_content_ideas")
             .update({ used_at: new Date().toISOString() })
-            .eq("id", anyIdea.id);
-
-          // Create draft post
-          const { data: post, error: postError } = await supabase
-            .from("gbp_posts")
-            .insert({
-              content_type: "STANDARD",
-              summary,
-              call_to_action_type: callToAction,
-              call_to_action_url: "https://peachhausgroup.com",
-              status: "draft",
-              ai_generated: true,
-              scheduled_for: params.scheduleFor || null,
-            })
-            .select()
-            .single();
-
-          return new Response(JSON.stringify({ 
-            success: true, 
-            post,
-            idea: anyIdea,
-          }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+            .eq("id", randomIdea.id);
         }
 
-        // Use the fresh idea
-        const { summary, callToAction } = await generateDailyPost(
-          idea.category,
-          idea.topic,
-          idea.properties?.name
-        );
-
-        // Mark idea as used
-        await supabase
-          .from("gbp_content_ideas")
-          .update({ used_at: new Date().toISOString() })
-          .eq("id", idea.id);
-
-        // Create draft post
+        // Save the generated post as draft
         const { data: post } = await supabase
           .from("gbp_posts")
           .insert({
             content_type: "STANDARD",
             summary,
             call_to_action_type: callToAction,
-            call_to_action_url: "https://peachhausgroup.com",
             status: "draft",
             ai_generated: true,
-            scheduled_for: params.scheduleFor || null,
           })
           .select()
           .single();
 
         return new Response(JSON.stringify({ 
-          success: true, 
-          post,
-          idea,
-        }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+          success: true,
+          postId: post?.id,
+          content: summary,
+          callToAction,
+        }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
 
       case "create-post": {
-        // Post content to Google Business Profile
-        const { postId } = params;
-        
-        if (!settings?.gbp_account_id || !settings?.gbp_location_id) {
-          return new Response(JSON.stringify({ 
-            success: false, 
-            error: "GBP Account ID and Location ID not configured" 
-          }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 });
+        // Create a post on Google Business Profile
+        if (!settings?.refresh_token) {
+          throw new Error("Not connected to Google Business Profile");
         }
 
-        const { data: post, error } = await supabase
-          .from("gbp_posts")
-          .select("*")
-          .eq("id", postId)
-          .single();
+        const { postId, content } = params;
+        let postContent = content;
 
-        if (error || !post) {
-          return new Response(JSON.stringify({ 
-            success: false, 
-            error: "Post not found" 
-          }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 404 });
-        }
-
-        const accessToken = await getPipedreamAccessToken();
-        
-        // Create the post using MCP
-        const postResult = await callMCPTool(
-          accessToken,
-          userId,
-          "google_my_business-create-post",
-          {
-            parent: `accounts/${settings.gbp_account_id}/locations/${settings.gbp_location_id}`,
-            localPost: {
-              topicType: "STANDARD",
-              languageCode: "en-US",
-              summary: post.summary,
-              callToAction: post.call_to_action_type ? {
-                actionType: post.call_to_action_type,
-                url: post.call_to_action_url || "https://peachhausgroup.com",
-              } : undefined,
-            },
-          }
-        );
-
-        console.log("Post result:", JSON.stringify(postResult).substring(0, 500));
-
-        // Parse response to get post name
-        const postResponse = postResult?.result?.content?.[0]?.text
-          ? JSON.parse(postResult.result.content[0].text)
-          : null;
-
-        // Update the post record
-        await supabase
-          .from("gbp_posts")
-          .update({
-            gbp_post_name: postResponse?.name,
-            posted_at: new Date().toISOString(),
-            status: "posted",
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", postId);
-
-        return new Response(JSON.stringify({ 
-          success: true, 
-          result: postResult 
-        }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      }
-
-      case "process-queue": {
-        // Process auto-reply and auto-post queue (called by cron)
-        const results = {
-          reviewsProcessed: 0,
-          repliesPosted: 0,
-          postsCreated: 0,
-          errors: [] as string[],
-        };
-
-        // Auto-reply to reviews if enabled
-        if (settings?.auto_reply_enabled) {
-          const { data: pendingReviews } = await supabase
-            .from("gbp_reviews")
-            .select("*")
-            .eq("needs_reply", true)
-            .is("ai_generated_reply", null)
-            .limit(5);
-
-          for (const review of pendingReviews || []) {
-            try {
-              // Generate AI reply
-              const aiReply = await generateAIReply(
-                review.reviewer_name,
-                review.star_rating,
-                review.review_text
-              );
-
-              await supabase
-                .from("gbp_reviews")
-                .update({ ai_generated_reply: aiReply })
-                .eq("id", review.id);
-
-              results.reviewsProcessed++;
-
-              // Post the reply after a delay (configured in settings)
-              const accessToken = await getPipedreamAccessToken();
-              
-              await callMCPTool(
-                accessToken,
-                userId,
-                "google_my_business-reply-to-review",
-                {
-                  name: review.gbp_review_name,
-                  comment: aiReply,
-                }
-              );
-
-              await supabase
-                .from("gbp_reviews")
-                .update({
-                  review_reply: aiReply,
-                  reply_posted_at: new Date().toISOString(),
-                  needs_reply: false,
-                  auto_replied: true,
-                })
-                .eq("id", review.id);
-
-              results.repliesPosted++;
-            } catch (e: any) {
-              results.errors.push(`Review ${review.id}: ${e.message}`);
-            }
-          }
-        }
-
-        // Auto-create daily post if enabled and not already posted today
-        if (settings?.auto_post_enabled) {
-          const today = new Date().toISOString().split("T")[0];
-          
-          const { data: todaysPost } = await supabase
+        // If postId provided, get content from database
+        if (postId) {
+          const { data: post } = await supabase
             .from("gbp_posts")
-            .select("id")
-            .gte("posted_at", `${today}T00:00:00`)
-            .lte("posted_at", `${today}T23:59:59`)
+            .select("*")
+            .eq("id", postId)
             .single();
-
-          if (!todaysPost) {
-            try {
-              // Generate and post daily content
-              const generateResponse = await fetch(`${SUPABASE_URL}/functions/v1/gbp-manager`, {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  "Authorization": `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-                },
-                body: JSON.stringify({ action: "generate-daily-post", userId }),
-              });
-
-              const generateResult = await generateResponse.json();
-              
-              if (generateResult.success && generateResult.post) {
-                // Post it
-                const postResponse = await fetch(`${SUPABASE_URL}/functions/v1/gbp-manager`, {
-                  method: "POST",
-                  headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
-                  },
-                  body: JSON.stringify({ 
-                    action: "create-post", 
-                    postId: generateResult.post.id,
-                    userId,
-                  }),
-                });
-
-                const postResult = await postResponse.json();
-                if (postResult.success) {
-                  results.postsCreated++;
-                }
-              }
-            } catch (e: any) {
-              results.errors.push(`Daily post: ${e.message}`);
-            }
+          
+          if (post) {
+            postContent = post.summary;
           }
         }
 
+        if (!postContent) {
+          throw new Error("No post content provided");
+        }
+
+        const accountId = settings.gbp_account_id || PEACHHAUS_ACCOUNT_ID;
+        const locationId = settings.gbp_location_id;
+
+        if (!locationId) {
+          throw new Error("No location configured. Please run 'Discover Locations' first.");
+        }
+
+        const accessToken = await getValidAccessToken(supabase, settings);
+        
+        // Create post using v4 API
+        const postsUrl = `${GBP_API_V4}/accounts/${accountId}/locations/${locationId}/localPosts`;
+        console.log(`Creating post at: ${postsUrl}`);
+        
+        const postData = await callGoogleAPI(accessToken, postsUrl, "POST", {
+          languageCode: "en-US",
+          summary: postContent,
+          topicType: "STANDARD",
+        });
+
+        // Update post in database
+        if (postId) {
+          await supabase
+            .from("gbp_posts")
+            .update({
+              status: "posted",
+              posted_at: new Date().toISOString(),
+              gbp_post_name: postData.name,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", postId);
+        }
+
         return new Response(JSON.stringify({ 
-          success: true, 
-          results 
-        }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+          success: true,
+          message: "Post created successfully",
+          gbpPostName: postData.name,
+        }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
 
       case "update-settings": {
-        // Update GBP settings - use upsert to handle case where no settings exist
-        const { gbpAccountId, gbpLocationId, autoReplyEnabled, autoPostEnabled, postTime, replyDelayMinutes } = params;
-        
-        // Build update object with only provided fields
-        const updateData: Record<string, any> = {
+        // Update GBP settings
+        const {
+          gbpAccountId,
+          gbpLocationId,
+          autoReplyEnabled,
+          autoPostEnabled,
+          postTime,
+          replyDelayMinutes,
+        } = params;
+
+        const updates: any = {
           updated_at: new Date().toISOString(),
         };
-        
-        if (gbpAccountId !== undefined) updateData.gbp_account_id = gbpAccountId;
-        if (gbpLocationId !== undefined) updateData.gbp_location_id = gbpLocationId;
-        if (autoReplyEnabled !== undefined) updateData.auto_reply_enabled = autoReplyEnabled;
-        if (autoPostEnabled !== undefined) updateData.auto_post_enabled = autoPostEnabled;
-        if (postTime !== undefined) updateData.post_time = postTime;
-        if (replyDelayMinutes !== undefined) updateData.reply_delay_minutes = replyDelayMinutes;
 
-        let data, error;
+        if (gbpAccountId !== undefined) updates.gbp_account_id = gbpAccountId;
+        if (gbpLocationId !== undefined) updates.gbp_location_id = gbpLocationId;
+        if (autoReplyEnabled !== undefined) updates.auto_reply_enabled = autoReplyEnabled;
+        if (autoPostEnabled !== undefined) updates.auto_post_enabled = autoPostEnabled;
+        if (postTime !== undefined) updates.post_time = postTime;
+        if (replyDelayMinutes !== undefined) updates.reply_delay_minutes = replyDelayMinutes;
 
         if (settings?.id) {
-          // Update existing settings
-          const result = await supabase
+          await supabase
             .from("gbp_settings")
-            .update(updateData)
-            .eq("id", settings.id)
-            .select()
-            .single();
-          data = result.data;
-          error = result.error;
+            .update(updates)
+            .eq("id", settings.id);
         } else {
-          // Insert new settings record
-          const result = await supabase
-            .from("gbp_settings")
-            .insert({
-              ...updateData,
-              created_at: new Date().toISOString(),
-            })
-            .select()
-            .single();
-          data = result.data;
-          error = result.error;
-        }
-
-        if (error) {
-          return new Response(JSON.stringify({ 
-            success: false, 
-            error: error.message 
-          }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 });
+          await supabase.from("gbp_settings").insert({
+            ...updates,
+            gbp_account_id: gbpAccountId || PEACHHAUS_ACCOUNT_ID,
+          });
         }
 
         return new Response(JSON.stringify({ 
-          success: true, 
-          settings: data 
-        }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+          success: true,
+          message: "Settings updated",
+        }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      case "disconnect": {
+        // Clear stored tokens
+        if (settings?.id) {
+          await supabase
+            .from("gbp_settings")
+            .update({
+              access_token: null,
+              refresh_token: null,
+              token_expires_at: null,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", settings.id);
+        }
+
+        return new Response(JSON.stringify({ 
+          success: true,
+          message: "Disconnected from Google Business Profile",
+        }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
 
       default:
         return new Response(JSON.stringify({ 
           error: `Unknown action: ${action}` 
-        }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 });
+        }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 400,
+        });
     }
   } catch (error: any) {
     console.error("GBP Manager error:", error);
     return new Response(JSON.stringify({ 
+      success: false,
       error: error.message 
-    }), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 });
+    }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 500,
+    });
   }
 });

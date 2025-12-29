@@ -26,6 +26,7 @@ import {
   Loader2,
   ExternalLink,
   AlertTriangle,
+  Unlink,
 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -69,15 +70,13 @@ interface GBPSettings {
   reply_delay_minutes: number;
 }
 
-// Hardcoded PeachHaus Group account ID - location is auto-discovered
-const PEACHHAUS_ACCOUNT_ID = "106698735661379366674";
-
 export default function GBPAdminPanel() {
   const queryClient = useQueryClient();
   const [selectedReview, setSelectedReview] = useState<string | null>(null);
   const [customReply, setCustomReply] = useState("");
   const [newPostContent, setNewPostContent] = useState("");
   const [isConnecting, setIsConnecting] = useState(false);
+  const [manualLocationId, setManualLocationId] = useState("");
 
   // Check GBP connection status
   const { 
@@ -91,9 +90,9 @@ export default function GBPAdminPanel() {
         body: { action: "check-connection" },
       });
       if (error) throw error;
-      return data as { connected: boolean; verified: boolean; error?: string };
+      return data as { connected: boolean; verified: boolean; hasLocation?: boolean; error?: string };
     },
-    refetchInterval: isConnecting ? 5000 : false,
+    refetchInterval: isConnecting ? 3000 : false,
   });
 
   // Fetch reviews from database
@@ -135,20 +134,47 @@ export default function GBPAdminPanel() {
     },
   });
 
-  // Handle callback from Pipedream OAuth
+  // Handle OAuth callback from Google
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
-    const connected = urlParams.get('connected');
+    const oauthCallback = urlParams.get('oauth_callback');
+    const code = urlParams.get('code');
+    const error = urlParams.get('error');
     
-    if (connected === 'true') {
-      toast.success("Google Business Profile connected!");
-      setIsConnecting(false);
-      refetchConnection();
-      window.history.replaceState({}, '', window.location.pathname + '?tab=gbp');
-    } else if (connected === 'false') {
-      toast.error("Failed to connect Google Business Profile");
-      setIsConnecting(false);
-      window.history.replaceState({}, '', window.location.pathname + '?tab=gbp');
+    if (oauthCallback === 'true' && code) {
+      // Exchange the code for tokens
+      const exchangeCode = async () => {
+        try {
+          setIsConnecting(true);
+          const redirectUri = `${window.location.origin}/admin?tab=gbp&oauth_callback=true`;
+          
+          const { data, error: invokeError } = await supabase.functions.invoke("gbp-manager", {
+            body: { 
+              action: "exchange-code", 
+              code,
+              redirectUri,
+            },
+          });
+          
+          if (invokeError) throw invokeError;
+          
+          toast.success("Google Business Profile connected successfully!");
+          refetchConnection();
+          
+          // Clean up URL
+          window.history.replaceState({}, '', `${window.location.pathname}?tab=gbp`);
+        } catch (err: any) {
+          console.error("OAuth exchange error:", err);
+          toast.error(err.message || "Failed to connect Google Business Profile");
+        } finally {
+          setIsConnecting(false);
+        }
+      };
+      
+      exchangeCode();
+    } else if (error) {
+      toast.error(`OAuth error: ${error}`);
+      window.history.replaceState({}, '', `${window.location.pathname}?tab=gbp`);
     }
   }, []);
 
@@ -157,13 +183,14 @@ export default function GBPAdminPanel() {
     try {
       setIsConnecting(true);
       const { data, error } = await supabase.functions.invoke("gbp-manager", {
-        body: { action: "get-auth-url" },
+        body: { action: "get-auth-url", redirectUrl: window.location.origin },
       });
       
       if (error) throw error;
       
       if (data?.authUrl) {
-        window.open(data.authUrl, '_blank', 'width=600,height=700');
+        // Redirect to Google OAuth
+        window.location.href = data.authUrl;
       } else {
         throw new Error("No auth URL returned");
       }
@@ -181,10 +208,6 @@ export default function GBPAdminPanel() {
     steps?: string[];
     helpUrl?: string;
   } | null>(null);
-  
-  // State for manual location ID input
-  const [manualLocationId, setManualLocationId] = useState("");
-  const [isDiscovering, setIsDiscovering] = useState(false);
 
   // Sync reviews mutation
   const syncReviewsMutation = useMutation({
@@ -194,14 +217,11 @@ export default function GBPAdminPanel() {
       });
       if (error) throw error;
       if (!data.success) {
-        // Check for specific error types
-        if (data.error === "GBP_LOCATION_NOT_CONFIGURED") {
+        if (data.error === "GBP_LOCATION_NOT_CONFIGURED" || data.error === "GBP_LOCATION_NOT_FOUND") {
           setConfigError({
             error: data.error,
             userMessage: data.userMessage,
             details: data.details,
-            steps: data.steps,
-            helpUrl: data.helpUrl,
           });
           throw new Error(data.userMessage);
         }
@@ -333,6 +353,7 @@ export default function GBPAdminPanel() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["gbp-settings"] });
+      queryClient.invalidateQueries({ queryKey: ["gbp-connection"] });
       if (data.savedLocationId) {
         toast.success(`Location discovered and saved: ${data.savedLocationId}`);
         setConfigError(null);
@@ -347,34 +368,24 @@ export default function GBPAdminPanel() {
     },
   });
 
-  // Reconnect GBP (force re-auth)
-  const handleReconnectGBP = async () => {
-    try {
-      setIsConnecting(true);
-      // Clear existing settings to force fresh setup
-      if (settings?.id) {
-        await supabase
-          .from("gbp_settings")
-          .update({ gbp_location_id: null })
-          .eq("id", settings.id);
-      }
-      
+  // Disconnect mutation
+  const disconnectMutation = useMutation({
+    mutationFn: async () => {
       const { data, error } = await supabase.functions.invoke("gbp-manager", {
-        body: { action: "get-auth-url", forceReconnect: true },
+        body: { action: "disconnect" },
       });
-      
       if (error) throw error;
-      
-      if (data?.authUrl) {
-        window.open(data.authUrl, '_blank', 'width=600,height=700');
-      } else {
-        throw new Error("No auth URL returned");
-      }
-    } catch (error: any) {
-      toast.error(error.message || "Failed to reconnect");
-      setIsConnecting(false);
-    }
-  };
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["gbp-connection"] });
+      queryClient.invalidateQueries({ queryKey: ["gbp-settings"] });
+      toast.success("Disconnected from Google Business Profile");
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Failed to disconnect");
+    },
+  });
 
   // Save manual location ID
   const handleSaveManualLocationId = () => {
@@ -384,7 +395,6 @@ export default function GBPAdminPanel() {
     }
     updateSettingsMutation.mutate({ 
       gbp_location_id: manualLocationId.trim(),
-      gbp_account_id: PEACHHAUS_ACCOUNT_ID 
     });
     setManualLocationId("");
     setConfigError(null);
@@ -428,6 +438,21 @@ export default function GBPAdminPanel() {
               Manage reviews and posts for your Google Business Profile
             </CardDescription>
           </div>
+          <div className="flex items-center gap-2">
+            {connectionStatus?.connected && connectionStatus?.verified ? (
+              <Badge className="bg-green-500/20 text-green-400">
+                <CheckCircle className="w-3 h-3 mr-1" />
+                Connected
+              </Badge>
+            ) : connectionStatus?.connected ? (
+              <Badge className="bg-yellow-500/20 text-yellow-400">
+                <AlertCircle className="w-3 h-3 mr-1" />
+                Connection Issue
+              </Badge>
+            ) : (
+              <Badge variant="secondary">Not Connected</Badge>
+            )}
+          </div>
         </div>
       </CardHeader>
       <CardContent>
@@ -454,376 +479,48 @@ export default function GBPAdminPanel() {
 
           {/* Reviews Tab */}
           <TabsContent value="reviews" className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold">Pending Reviews ({pendingReviews.length})</h3>
-              <Button
-                onClick={() => syncReviewsMutation.mutate()}
-                disabled={syncReviewsMutation.isPending}
-                variant="outline"
-              >
-                {syncReviewsMutation.isPending ? (
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                ) : (
-                  <RefreshCw className="w-4 h-4 mr-2" />
-                )}
-                Sync Reviews
-              </Button>
-            </div>
-
-            {/* Configuration Error Alert */}
-            {configError && (
-              <Alert variant="destructive" className="border-amber-500/50 bg-amber-500/10">
-                <AlertTriangle className="h-4 w-4" />
-                <AlertTitle className="text-amber-400">Google Business Profile Configuration Required</AlertTitle>
+            {!connectionStatus?.connected ? (
+              <Alert>
+                <Building className="h-4 w-4" />
+                <AlertTitle>Connect Google Business Profile</AlertTitle>
                 <AlertDescription className="space-y-3">
-                  <p className="text-sm">{configError.details}</p>
-                  {configError.steps && (
-                    <div className="space-y-1">
-                      <p className="text-sm font-medium">To fix this:</p>
-                      <ul className="text-sm space-y-1 ml-4 list-disc">
-                        {configError.steps.map((step, i) => (
-                          <li key={i}>{step.replace(/^\d+\.\s*/, '')}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                  {configError.helpUrl && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="mt-2"
-                      onClick={() => window.open(configError.helpUrl, '_blank')}
-                    >
-                      <ExternalLink className="w-4 h-4 mr-2" />
-                      Google Business Profile Help
-                    </Button>
-                  )}
+                  <p>Connect your Google Business Profile to sync and respond to reviews.</p>
+                  <Button onClick={handleConnectGBP} disabled={isConnecting}>
+                    {isConnecting ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <Building className="w-4 h-4 mr-2" />
+                    )}
+                    Connect Google Business Profile
+                  </Button>
                 </AlertDescription>
               </Alert>
-            )}
-
-            {reviewsLoading ? (
-              <div className="flex justify-center py-8">
-                <Loader2 className="w-6 h-6 animate-spin" />
-              </div>
-            ) : pendingReviews.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                <MessageSquare className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                <p>No pending reviews</p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {pendingReviews.map((review) => (
-                  <Card key={review.id} className="p-4">
-                    <div className="flex items-start justify-between">
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium">{review.reviewer_name || "Anonymous"}</span>
-                          <div className="flex">{renderStars(review.star_rating)}</div>
-                          {review.review_created_at && (
-                            <span className="text-xs text-muted-foreground">
-                              {format(new Date(review.review_created_at), "MMM d, yyyy")}
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-sm">{review.review_text || "No review text"}</p>
-                        
-                        {selectedReview === review.id && (
-                          <div className="space-y-2 mt-4">
-                            {review.ai_generated_reply && (
-                              <div className="p-2 bg-blue-500/10 rounded text-sm">
-                                <p className="font-medium text-blue-400 mb-1">AI Suggested Reply:</p>
-                                <p>{review.ai_generated_reply}</p>
-                              </div>
-                            )}
-                            <Textarea
-                              value={customReply}
-                              onChange={(e) => setCustomReply(e.target.value)}
-                              placeholder="Write your reply..."
-                              className="min-h-[100px]"
-                            />
-                            <div className="flex gap-2">
-                              <Button
-                                size="sm"
-                                onClick={() => postReplyMutation.mutate({ 
-                                  reviewId: review.id, 
-                                  reply: customReply || undefined 
-                                })}
-                                disabled={postReplyMutation.isPending}
-                              >
-                                {postReplyMutation.isPending ? (
-                                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                ) : (
-                                  <Send className="w-4 h-4 mr-2" />
-                                )}
-                                Post Reply
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => {
-                                  setSelectedReview(null);
-                                  setCustomReply("");
-                                }}
-                              >
-                                Cancel
-                              </Button>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                      
-                      {selectedReview !== review.id && (
-                        <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => {
-                              setSelectedReview(review.id);
-                              generateReplyMutation.mutate(review.id);
-                            }}
-                            disabled={generateReplyMutation.isPending}
-                          >
-                            {generateReplyMutation.isPending ? (
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                            ) : (
-                              <Sparkles className="w-4 h-4" />
-                            )}
-                          </Button>
-                          <Button
-                            size="sm"
-                            onClick={() => setSelectedReview(review.id)}
-                          >
-                            Reply
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  </Card>
-                ))}
-              </div>
-            )}
-
-            {repliedReviews.length > 0 && (
-              <div className="mt-8">
-                <h3 className="text-lg font-semibold mb-4">Recent Replies</h3>
-                <div className="space-y-4">
-                  {repliedReviews.slice(0, 5).map((review) => (
-                    <Card key={review.id} className="p-4 opacity-75">
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium">{review.reviewer_name || "Anonymous"}</span>
-                          <div className="flex">{renderStars(review.star_rating)}</div>
-                          <Badge variant="outline" className="text-green-500">
-                            <CheckCircle className="w-3 h-3 mr-1" />
-                            Replied
-                          </Badge>
-                        </div>
-                        <p className="text-sm">{review.review_text || "No review text"}</p>
-                        {review.review_reply && (
-                          <div className="p-2 bg-muted rounded text-sm">
-                            <p className="font-medium mb-1">Your reply:</p>
-                            <p>{review.review_reply}</p>
-                          </div>
-                        )}
-                      </div>
-                    </Card>
-                  ))}
-                </div>
-              </div>
-            )}
-          </TabsContent>
-
-          {/* Posts Tab */}
-          <TabsContent value="posts" className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold">Content Management</h3>
-              <Button
-                onClick={() => generatePostMutation.mutate()}
-                disabled={generatePostMutation.isPending}
-                variant="outline"
-              >
-                {generatePostMutation.isPending ? (
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                ) : (
-                  <Sparkles className="w-4 h-4 mr-2" />
-                )}
-                Generate Post
-              </Button>
-            </div>
-
-            {newPostContent && (
-              <Card className="p-4 border-primary/50">
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <Badge>Draft</Badge>
-                  </div>
-                  <p className="text-sm">{newPostContent}</p>
-                  <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      onClick={() => {
-                        toast.info("Post would be published here");
-                      }}
-                    >
-                      <Send className="w-4 h-4 mr-2" />
-                      Publish Now
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => setNewPostContent("")}
-                    >
-                      Discard
-                    </Button>
-                  </div>
-                </div>
-              </Card>
-            )}
-
-            {postsLoading ? (
-              <div className="flex justify-center py-8">
-                <Loader2 className="w-6 h-6 animate-spin" />
-              </div>
-            ) : !posts || posts.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                <Calendar className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                <p>No posts yet</p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {posts.map((post) => (
-                  <Card key={post.id} className="p-4">
-                    <CardContent className="p-0 space-y-3">
-                      <div className="flex items-center justify-between">
-                        {getStatusBadge(post.status)}
-                        <span className="text-xs text-muted-foreground">
-                          {post.posted_at 
-                            ? format(new Date(post.posted_at), "MMM d, yyyy h:mm a")
-                            : post.scheduled_for
-                            ? `Scheduled: ${format(new Date(post.scheduled_for), "MMM d, yyyy h:mm a")}`
-                            : format(new Date(post.created_at), "MMM d, yyyy")}
-                        </span>
-                      </div>
-                      <p className="text-sm">{post.summary}</p>
-                      {post.status === "draft" && (
-                        <Button
-                          size="sm"
-                          onClick={() => publishPostMutation.mutate(post.id)}
-                          disabled={publishPostMutation.isPending}
-                        >
-                          {publishPostMutation.isPending ? (
-                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          ) : (
-                            <Send className="w-4 h-4 mr-2" />
-                          )}
-                          Publish
-                        </Button>
-                      )}
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
-          </TabsContent>
-
-          {/* Settings Tab */}
-          <TabsContent value="settings" className="space-y-6">
-            {settingsLoading ? (
-              <div className="flex justify-center py-8">
-                <Loader2 className="w-6 h-6 animate-spin" />
-              </div>
             ) : (
               <>
-                {/* Connection Status Section */}
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold">Google Business Profile Connection</h3>
-                  
-                  {connectionLoading ? (
-                    <div className="p-4 border rounded-lg flex items-center gap-3">
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                      <span className="text-muted-foreground">Checking connection status...</span>
-                    </div>
-                  ) : connectionStatus?.connected && connectionStatus?.verified ? (
-                    <div className="p-4 bg-green-500/10 border border-green-500/30 rounded-lg flex items-start gap-3">
-                      <CheckCircle className="w-5 h-5 text-green-500 mt-0.5" />
-                      <div className="flex-1">
-                        <p className="font-medium text-green-600">Google Business Profile Connected</p>
-                        <p className="text-sm text-muted-foreground">
-                          Connected to PeachHaus Group (ID: {PEACHHAUS_ACCOUNT_ID})
-                        </p>
-                      </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => refetchConnection()}
-                      >
-                        <RefreshCw className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-lg space-y-3">
-                      <div className="flex items-start gap-3">
-                        <AlertCircle className="w-5 h-5 text-amber-500 mt-0.5" />
-                        <div className="flex-1">
-                          <p className="font-medium text-amber-600">Connection Required</p>
-                          <p className="text-sm text-muted-foreground">
-                            Connect your Google Business Profile to manage reviews and posts.
-                            {connectionStatus?.error && (
-                              <span className="block mt-1 text-xs text-red-500">{connectionStatus.error}</span>
-                            )}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button
-                          onClick={handleConnectGBP}
-                          disabled={isConnecting}
-                          className="flex-1"
-                        >
-                          {isConnecting ? (
-                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          ) : (
-                            <ExternalLink className="w-4 h-4 mr-2" />
-                          )}
-                          Connect Google Business Profile
-                        </Button>
-                        <Button
-                          variant="outline"
-                          onClick={() => refetchConnection()}
-                          disabled={connectionLoading}
-                        >
-                          {connectionLoading ? (
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                          ) : (
-                            <RefreshCw className="w-4 h-4" />
-                          )}
-                        </Button>
-                      </div>
-                    </div>
-                  )}
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold">Pending Reviews ({pendingReviews.length})</h3>
+                  <Button
+                    onClick={() => syncReviewsMutation.mutate()}
+                    disabled={syncReviewsMutation.isPending}
+                    variant="outline"
+                  >
+                    {syncReviewsMutation.isPending ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <RefreshCw className="w-4 h-4 mr-2" />
+                    )}
+                    Sync Reviews
+                  </Button>
                 </div>
 
-                {/* Account Configuration */}
-                {connectionStatus?.connected && (
-                  <div className="p-4 bg-muted/50 border rounded-lg space-y-4">
-                    <h4 className="font-medium">Account Configuration</h4>
-                    <div className="grid grid-cols-2 gap-4 text-sm">
-                      <div>
-                        <span className="text-muted-foreground">Account ID:</span>
-                        <code className="ml-2 bg-background px-2 py-1 rounded">{settings?.gbp_account_id || PEACHHAUS_ACCOUNT_ID}</code>
-                      </div>
-                      <div>
-                        <span className="text-muted-foreground">Location ID:</span>
-                        <code className="ml-2 bg-background px-2 py-1 rounded">
-                          {settings?.gbp_location_id || <span className="text-amber-500">Not configured</span>}
-                        </code>
-                      </div>
-                    </div>
-                    
-                    {/* Location Discovery Section */}
-                    <div className="pt-3 border-t space-y-3">
-                      <div className="flex items-center gap-2">
+                {/* Configuration Error Alert */}
+                {configError && (
+                  <Alert variant="destructive" className="border-amber-500/50 bg-amber-500/10">
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertTitle className="text-amber-400">Configuration Required</AlertTitle>
+                    <AlertDescription className="space-y-3">
+                      <p className="text-sm">{configError.details}</p>
+                      <div className="flex gap-2">
                         <Button
                           variant="outline"
                           size="sm"
@@ -835,105 +532,392 @@ export default function GBPAdminPanel() {
                           ) : (
                             <RefreshCw className="w-4 h-4 mr-2" />
                           )}
-                          Auto-Discover Location
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={handleReconnectGBP}
-                          disabled={isConnecting}
-                        >
-                          {isConnecting ? (
-                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          ) : (
-                            <ExternalLink className="w-4 h-4 mr-2" />
-                          )}
-                          Reconnect GBP
+                          Discover Locations
                         </Button>
                       </div>
-                      
-                      {/* Manual Location ID Input */}
-                      <div className="space-y-2">
-                        <Label className="text-sm">Manual Location ID (if auto-discovery fails)</Label>
-                        <div className="flex gap-2">
-                          <Input
-                            placeholder="e.g., 12345678901234567890"
-                            value={manualLocationId}
-                            onChange={(e) => setManualLocationId(e.target.value)}
-                            className="flex-1"
-                          />
+                    </AlertDescription>
+                  </Alert>
+                )}
+
+                {/* Pending Reviews */}
+                <div className="space-y-3">
+                  {pendingReviews.length === 0 ? (
+                    <p className="text-muted-foreground text-center py-8">
+                      No pending reviews. All caught up! 🎉
+                    </p>
+                  ) : (
+                    pendingReviews.map((review) => (
+                      <div
+                        key={review.id}
+                        className="p-4 border rounded-lg space-y-3 bg-card"
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
+                              {review.reviewer_name?.[0]?.toUpperCase() || "G"}
+                            </div>
+                            <div>
+                              <p className="font-medium">{review.reviewer_name || "Guest"}</p>
+                              <div className="flex items-center gap-1">
+                                {renderStars(review.star_rating)}
+                              </div>
+                            </div>
+                          </div>
+                          <span className="text-xs text-muted-foreground">
+                            {review.review_created_at 
+                              ? format(new Date(review.review_created_at), "MMM d, yyyy")
+                              : "Unknown date"}
+                          </span>
+                        </div>
+
+                        {review.review_text && (
+                          <p className="text-sm text-muted-foreground">{review.review_text}</p>
+                        )}
+
+                        {selectedReview === review.id ? (
+                          <div className="space-y-3">
+                            <Textarea
+                              value={customReply}
+                              onChange={(e) => setCustomReply(e.target.value)}
+                              placeholder="Write your reply..."
+                              rows={3}
+                            />
+                            <div className="flex gap-2">
+                              <Button
+                                size="sm"
+                                onClick={() => generateReplyMutation.mutate(review.id)}
+                                disabled={generateReplyMutation.isPending}
+                                variant="outline"
+                              >
+                                {generateReplyMutation.isPending ? (
+                                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                ) : (
+                                  <Sparkles className="w-4 h-4 mr-2" />
+                                )}
+                                Generate AI Reply
+                              </Button>
+                              <Button
+                                size="sm"
+                                onClick={() => postReplyMutation.mutate({ reviewId: review.id, reply: customReply })}
+                                disabled={postReplyMutation.isPending || !customReply}
+                              >
+                                {postReplyMutation.isPending ? (
+                                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                ) : (
+                                  <Send className="w-4 h-4 mr-2" />
+                                )}
+                                Post Reply
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => {
+                                  setSelectedReview(null);
+                                  setCustomReply("");
+                                }}
+                              >
+                                Cancel
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
                           <Button
                             size="sm"
-                            onClick={handleSaveManualLocationId}
-                            disabled={updateSettingsMutation.isPending || !manualLocationId.trim()}
+                            variant="outline"
+                            onClick={() => {
+                              setSelectedReview(review.id);
+                              setCustomReply(review.ai_generated_reply || "");
+                            }}
                           >
-                            {updateSettingsMutation.isPending ? (
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                            ) : (
-                              "Save"
-                            )}
+                            <MessageSquare className="w-4 h-4 mr-2" />
+                            Reply
                           </Button>
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                          Find your Location ID: Go to business.google.com → Select your business → The URL will contain your location ID (the long number after /locations/)
-                        </p>
+                        )}
                       </div>
+                    ))
+                  )}
+                </div>
+
+                {/* Replied Reviews */}
+                {repliedReviews.length > 0 && (
+                  <>
+                    <h3 className="text-lg font-semibold mt-6">Replied Reviews ({repliedReviews.length})</h3>
+                    <div className="space-y-3">
+                      {repliedReviews.slice(0, 5).map((review) => (
+                        <div
+                          key={review.id}
+                          className="p-4 border rounded-lg space-y-2 bg-card/50"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium">{review.reviewer_name || "Guest"}</span>
+                              <div className="flex items-center gap-0.5">
+                                {renderStars(review.star_rating)}
+                              </div>
+                            </div>
+                            <Badge className="bg-green-500/20 text-green-400">
+                              <CheckCircle className="w-3 h-3 mr-1" />
+                              Replied
+                            </Badge>
+                          </div>
+                          {review.review_text && (
+                            <p className="text-sm text-muted-foreground line-clamp-2">{review.review_text}</p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </>
+            )}
+          </TabsContent>
+
+          {/* Posts Tab */}
+          <TabsContent value="posts" className="space-y-4">
+            {!connectionStatus?.connected ? (
+              <Alert>
+                <Building className="h-4 w-4" />
+                <AlertTitle>Connect Google Business Profile</AlertTitle>
+                <AlertDescription>
+                  Connect your Google Business Profile to create and publish posts.
+                </AlertDescription>
+              </Alert>
+            ) : (
+              <>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold">Posts</h3>
+                  <Button
+                    onClick={() => generatePostMutation.mutate()}
+                    disabled={generatePostMutation.isPending}
+                  >
+                    {generatePostMutation.isPending ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <Sparkles className="w-4 h-4 mr-2" />
+                    )}
+                    Generate Post
+                  </Button>
+                </div>
+
+                {newPostContent && (
+                  <div className="p-4 border rounded-lg space-y-3 bg-card">
+                    <h4 className="font-medium">Generated Post</h4>
+                    <p className="text-sm">{newPostContent}</p>
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="outline" onClick={() => setNewPostContent("")}>
+                        Discard
+                      </Button>
                     </div>
                   </div>
                 )}
 
-                {/* Automation Settings */}
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold">Automation Settings</h3>
-                  
-                  <div className="flex items-center justify-between p-4 border rounded-lg">
-                    <div>
-                      <p className="font-medium">Auto-Reply to Reviews</p>
-                      <p className="text-sm text-muted-foreground">
-                        Automatically generate and post AI replies to new reviews
-                      </p>
-                    </div>
-                    <Switch
-                      checked={settings?.auto_reply_enabled || false}
-                      onCheckedChange={(checked) => {
-                        updateSettingsMutation.mutate({ auto_reply_enabled: checked });
-                      }}
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between p-4 border rounded-lg">
-                    <div>
-                      <p className="font-medium">Auto-Post Daily Content</p>
-                      <p className="text-sm text-muted-foreground">
-                        Automatically generate and publish daily posts
-                      </p>
-                    </div>
-                    <Switch
-                      checked={settings?.auto_post_enabled || false}
-                      onCheckedChange={(checked) => {
-                        updateSettingsMutation.mutate({ auto_post_enabled: checked });
-                      }}
-                    />
-                  </div>
-
-                  {settings?.auto_post_enabled && (
-                    <div className="space-y-2 ml-4">
-                      <Label htmlFor="postTime">Daily Post Time (EST)</Label>
-                      <Input
-                        id="postTime"
-                        type="time"
-                        defaultValue={settings?.post_time || "10:00"}
-                        onBlur={(e) => {
-                          if (e.target.value !== settings?.post_time) {
-                            updateSettingsMutation.mutate({ post_time: e.target.value });
-                          }
-                        }}
-                        className="w-32"
-                      />
-                    </div>
+                <div className="space-y-3">
+                  {posts?.length === 0 ? (
+                    <p className="text-muted-foreground text-center py-8">
+                      No posts yet. Generate your first post!
+                    </p>
+                  ) : (
+                    posts?.map((post) => (
+                      <div
+                        key={post.id}
+                        className="p-4 border rounded-lg space-y-3 bg-card"
+                      >
+                        <div className="flex items-start justify-between">
+                          <p className="text-sm line-clamp-3">{post.summary}</p>
+                          {getStatusBadge(post.status)}
+                        </div>
+                        <div className="flex items-center justify-between text-xs text-muted-foreground">
+                          <span>
+                            {post.posted_at 
+                              ? `Posted ${format(new Date(post.posted_at), "MMM d, yyyy")}`
+                              : `Created ${format(new Date(post.created_at), "MMM d, yyyy")}`}
+                          </span>
+                          {post.status === "draft" && (
+                            <Button
+                              size="sm"
+                              onClick={() => publishPostMutation.mutate(post.id)}
+                              disabled={publishPostMutation.isPending}
+                            >
+                              {publishPostMutation.isPending ? (
+                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              ) : (
+                                <Send className="w-4 h-4 mr-2" />
+                              )}
+                              Publish
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    ))
                   )}
                 </div>
               </>
+            )}
+          </TabsContent>
+
+          {/* Settings Tab */}
+          <TabsContent value="settings" className="space-y-6">
+            {/* Connection Status */}
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold">Connection</h3>
+              
+              {connectionLoading ? (
+                <div className="flex items-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Checking connection...</span>
+                </div>
+              ) : connectionStatus?.connected && connectionStatus?.verified ? (
+                <div className="space-y-4">
+                  <Alert className="border-green-500/50 bg-green-500/10">
+                    <CheckCircle className="h-4 w-4 text-green-500" />
+                    <AlertTitle className="text-green-400">Connected to Google Business Profile</AlertTitle>
+                    <AlertDescription>
+                      <p>Your account is connected and verified.</p>
+                      {settings?.gbp_location_id && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Location ID: {settings.gbp_location_id}
+                        </p>
+                      )}
+                    </AlertDescription>
+                  </Alert>
+                  
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => discoverLocationsMutation.mutate()}
+                      disabled={discoverLocationsMutation.isPending}
+                    >
+                      {discoverLocationsMutation.isPending ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <RefreshCw className="w-4 h-4 mr-2" />
+                      )}
+                      Refresh Locations
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => disconnectMutation.mutate()}
+                      disabled={disconnectMutation.isPending}
+                      className="text-destructive"
+                    >
+                      {disconnectMutation.isPending ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <Unlink className="w-4 h-4 mr-2" />
+                      )}
+                      Disconnect
+                    </Button>
+                  </div>
+                </div>
+              ) : connectionStatus?.connected ? (
+                <Alert className="border-yellow-500/50 bg-yellow-500/10">
+                  <AlertTriangle className="h-4 w-4 text-yellow-500" />
+                  <AlertTitle className="text-yellow-400">Connection Issue</AlertTitle>
+                  <AlertDescription className="space-y-3">
+                    <p>{connectionStatus.error || "Could not verify connection"}</p>
+                    <Button onClick={handleConnectGBP} disabled={isConnecting}>
+                      {isConnecting ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <Building className="w-4 h-4 mr-2" />
+                      )}
+                      Reconnect
+                    </Button>
+                  </AlertDescription>
+                </Alert>
+              ) : (
+                <Alert>
+                  <Building className="h-4 w-4" />
+                  <AlertTitle>Not Connected</AlertTitle>
+                  <AlertDescription className="space-y-3">
+                    <p>Connect your Google Business Profile to manage reviews and posts.</p>
+                    <Button onClick={handleConnectGBP} disabled={isConnecting}>
+                      {isConnecting ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <Building className="w-4 h-4 mr-2" />
+                      )}
+                      Connect Google Business Profile
+                    </Button>
+                  </AlertDescription>
+                </Alert>
+              )}
+            </div>
+
+            {/* Manual Location ID */}
+            {connectionStatus?.connected && !connectionStatus?.hasLocation && (
+              <div className="space-y-3">
+                <h3 className="text-lg font-semibold">Manual Location Setup</h3>
+                <p className="text-sm text-muted-foreground">
+                  If auto-discovery doesn't find your location, you can enter the location ID manually.
+                </p>
+                <div className="flex gap-2">
+                  <Input
+                    value={manualLocationId}
+                    onChange={(e) => setManualLocationId(e.target.value)}
+                    placeholder="Enter GBP Location ID"
+                    className="max-w-xs"
+                  />
+                  <Button
+                    onClick={handleSaveManualLocationId}
+                    disabled={updateSettingsMutation.isPending}
+                  >
+                    {updateSettingsMutation.isPending ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : null}
+                    Save
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Automation Settings */}
+            {connectionStatus?.connected && (
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold">Automation</h3>
+                
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label>Auto-Reply to Reviews</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Automatically generate and post AI replies to new reviews
+                    </p>
+                  </div>
+                  <Switch
+                    checked={settings?.auto_reply_enabled || false}
+                    onCheckedChange={(checked) => 
+                      updateSettingsMutation.mutate({ auto_reply_enabled: checked })
+                    }
+                  />
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label>Auto-Post Daily Updates</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Automatically generate and post daily content
+                    </p>
+                  </div>
+                  <Switch
+                    checked={settings?.auto_post_enabled || false}
+                    onCheckedChange={(checked) => 
+                      updateSettingsMutation.mutate({ auto_post_enabled: checked })
+                    }
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Daily Post Time</Label>
+                  <Input
+                    type="time"
+                    value={settings?.post_time || "10:00"}
+                    onChange={(e) => 
+                      updateSettingsMutation.mutate({ post_time: e.target.value })
+                    }
+                    className="max-w-[150px]"
+                  />
+                </div>
+              </div>
             )}
           </TabsContent>
         </Tabs>
