@@ -6,7 +6,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Check if current time is within allowed sending window (11am-5pm EST)
+// Check if current time is within allowed sending window (9am-12pm EST)
 function isWithinSendingWindow(): { allowed: boolean; currentHourEST: number; message: string } {
   // Get current time in EST/EDT
   const now = new Date();
@@ -18,9 +18,9 @@ function isWithinSendingWindow(): { allowed: boolean; currentHourEST: number; me
   
   const currentHourEST = parseInt(estFormatter.format(now), 10);
   
-  // Allowed window: 11am (11) to 5pm (17) EST
-  const START_HOUR = 11;
-  const END_HOUR = 17;
+  // Allowed window: 9am (9) to 12pm (12) EST
+  const START_HOUR = 9;
+  const END_HOUR = 12;
   
   const allowed = currentHourEST >= START_HOUR && currentHourEST < END_HOUR;
   
@@ -44,7 +44,7 @@ serve(async (req) => {
     const today = new Date().toISOString().split('T')[0];
     console.log(`=== HOLIDAY EMAIL SCHEDULER - ${today} ===`);
 
-    // Check if we're within the sending window (11am-5pm EST)
+    // Check if we're within the sending window (9am-12pm EST)
     const { allowed, currentHourEST, message: windowMessage } = isWithinSendingWindow();
     console.log(windowMessage);
     
@@ -55,8 +55,8 @@ serve(async (req) => {
           message: `Skipping: ${windowMessage}. Will retry later.`,
           sent: 0,
           currentHourEST,
-          windowStart: 11,
-          windowEnd: 17
+          windowStart: 9,
+          windowEnd: 12
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
@@ -73,6 +73,7 @@ serve(async (req) => {
         recipient_email,
         recipient_name,
         scheduled_date,
+        pre_generated_image_url,
         holiday_email_templates(id, holiday_name, subject_template, message_template, emoji, image_prompt_template)
       `)
       .eq('scheduled_date', today)
@@ -89,6 +90,40 @@ serve(async (req) => {
         JSON.stringify({ success: true, message: 'No emails scheduled for today', sent: 0 }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
+    }
+
+    // First, pre-generate any missing images
+    const needsImages = pendingEmails.filter(e => !e.pre_generated_image_url);
+    if (needsImages.length > 0) {
+      console.log(`Pre-generating ${needsImages.length} missing images...`);
+      
+      // Group by template for efficient processing
+      const templateIds = [...new Set(needsImages.map(e => e.template_id))];
+      
+      for (const templateId of templateIds) {
+        try {
+          const response = await fetch(`${supabaseUrl}/functions/v1/pre-generate-holiday-images`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${supabaseServiceKey}`,
+            },
+            body: JSON.stringify({ templateId, limit: 20 }),
+          });
+          
+          if (response.ok) {
+            const result = await response.json();
+            console.log(`Pre-generated ${result.generated} images for template ${templateId}`);
+          } else {
+            console.error(`Pre-generation failed for template ${templateId}:`, await response.text());
+          }
+        } catch (error) {
+          console.error(`Pre-generation error for template ${templateId}:`, error);
+        }
+      }
+      
+      // Wait a moment for images to be ready
+      await new Promise(resolve => setTimeout(resolve, 1000));
     }
 
     // Group by template to batch process

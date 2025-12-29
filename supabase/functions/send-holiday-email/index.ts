@@ -20,10 +20,8 @@ serve(async (req) => {
 
   try {
     const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     
     if (!RESEND_API_KEY) throw new Error('RESEND_API_KEY not configured');
-    if (!LOVABLE_API_KEY) throw new Error('LOVABLE_API_KEY not configured');
 
     const resend = new Resend(RESEND_API_KEY);
 
@@ -92,7 +90,6 @@ serve(async (req) => {
           image_path: property.image_path,
         },
         isTest: true,
-        lovableApiKey: LOVABLE_API_KEY,
         supabaseUrl,
       });
 
@@ -123,7 +120,6 @@ serve(async (req) => {
           image_path: null,
         },
         isTest: true,
-        lovableApiKey: LOVABLE_API_KEY,
         supabaseUrl,
       });
 
@@ -216,7 +212,6 @@ serve(async (req) => {
             image_path: property.image_path,
           },
           isTest: false,
-          lovableApiKey: LOVABLE_API_KEY,
           supabaseUrl,
           preGeneratedImageUrl: preGeneratedImageMap.get(owner.email),
         });
@@ -245,7 +240,6 @@ serve(async (req) => {
               image_path: property.image_path,
             },
             isTest: false,
-            lovableApiKey: LOVABLE_API_KEY,
             supabaseUrl,
             preGeneratedImageUrl: preGeneratedImageMap.get(owner.second_owner_email),
           });
@@ -299,7 +293,6 @@ async function sendHolidayEmail({
   owner,
   property,
   isTest,
-  lovableApiKey,
   supabaseUrl,
   preGeneratedImageUrl,
 }: {
@@ -309,7 +302,6 @@ async function sendHolidayEmail({
   owner: { id: string; name: string; email: string };
   property: { id: string; name: string; image_path: string | null };
   isTest: boolean;
-  lovableApiKey: string;
   supabaseUrl: string;
   preGeneratedImageUrl?: string | null;
 }) {
