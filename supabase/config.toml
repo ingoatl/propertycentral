@@ -264,6 +264,9 @@ verify_jwt = true
 [functions.mem0-memory]
 verify_jwt = true
 
+[functions.process-owner-payout]
+verify_jwt = true
+
 [functions.gbp-manager]
 verify_jwt = false
 

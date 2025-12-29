@@ -4,11 +4,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Eye, Send, Mail, Loader2 } from "lucide-react";
+import { Calendar, Eye, Send, Mail, Loader2, CreditCard, Banknote, Check } from "lucide-react";
 import { format } from "date-fns";
 import { CreateReconciliationDialog } from "./CreateReconciliationDialog";
 import { ReconciliationReviewModal } from "./ReconciliationReviewModal";
 import { toast } from "sonner";
+import { ServiceType, formatCurrency } from "@/lib/reconciliationCalculations";
 
 export const ReconciliationList = () => {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
@@ -47,7 +48,7 @@ export const ReconciliationList = () => {
         .select(`
           *,
           properties(name, address, management_fee_percentage),
-          property_owners(name, email)
+          property_owners(name, email, service_type, payment_method)
         `)
         .order("reconciliation_month", { ascending: false });
 
@@ -72,9 +73,12 @@ export const ReconciliationList = () => {
 
         // Use shared calculation utility - only approved items
         const { calculateDueFromOwnerFromLineItems } = await import("@/lib/reconciliationCalculations");
+        const serviceType: ServiceType = rec.property_owners?.service_type || 'cohosting';
         const calculated = calculateDueFromOwnerFromLineItems(
           lineItems || [],
-          rec.management_fee || 0
+          rec.management_fee || 0,
+          rec.total_revenue,
+          serviceType
         );
 
         return {
@@ -82,6 +86,8 @@ export const ReconciliationList = () => {
           calculated_visit_fees: calculated.visitFees,
           calculated_total_expenses: calculated.totalExpenses,
           calculated_due_from_owner: calculated.dueFromOwner,
+          calculated_payout_to_owner: calculated.payoutToOwner,
+          service_type: serviceType,
           calculator_error: calculated.error
         };
       }));
@@ -90,17 +96,39 @@ export const ReconciliationList = () => {
     },
   });
 
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (status: string, payoutStatus?: string, serviceType?: string) => {
+    // For full-service, show payout status
+    if (serviceType === 'full_service' && payoutStatus === 'completed') {
+      return <Badge className="bg-green-600"><Check className="w-3 h-3 mr-1" />Paid Out</Badge>;
+    }
+    
     const variants: Record<string, { variant: "default" | "secondary" | "destructive" | "outline", label: string }> = {
       draft: { variant: "secondary", label: "Draft" },
       approved: { variant: "default", label: "Approved" },
       statement_sent: { variant: "outline", label: "Sent to Owner" },
       ready_to_charge: { variant: "default", label: "Ready to Charge" },
-      charged: { variant: "default", label: "Charged" },
+      charged: { variant: "default", label: serviceType === 'full_service' ? "Paid Out" : "Charged" },
       disputed: { variant: "destructive", label: "Disputed" },
     };
     const config = variants[status] || { variant: "outline" as const, label: status };
     return <Badge variant={config.variant}>{config.label}</Badge>;
+  };
+
+  const getServiceTypeBadge = (serviceType: string) => {
+    if (serviceType === 'full_service') {
+      return (
+        <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 dark:bg-green-950 dark:text-green-300 dark:border-green-800">
+          <Banknote className="w-3 h-3 mr-1" />
+          Full-Service
+        </Badge>
+      );
+    }
+    return (
+      <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-300 dark:border-blue-800">
+        <CreditCard className="w-3 h-3 mr-1" />
+        Co-Hosting
+      </Badge>
+    );
   };
 
   const handleSendPerformanceEmail = async (rec: any) => {
@@ -175,7 +203,8 @@ export const ReconciliationList = () => {
                 <div className="space-y-2 flex-1">
                   <div className="flex items-center gap-3">
                     <h3 className="font-semibold text-lg">{rec.properties?.name}</h3>
-                    {getStatusBadge(rec.status)}
+                    {getServiceTypeBadge(rec.service_type)}
+                    {getStatusBadge(rec.status, rec.payout_status, rec.service_type)}
                   </div>
                   <div className="text-sm text-muted-foreground space-y-1">
                     <p>Owner: {rec.property_owners?.name}</p>
@@ -185,48 +214,53 @@ export const ReconciliationList = () => {
                     <div>
                       <p className="text-xs text-muted-foreground">Revenue</p>
                       <p className="font-semibold text-green-600">
-                        ${Number(rec.total_revenue || 0).toFixed(2)}
+                        {formatCurrency(rec.total_revenue || 0)}
                       </p>
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground">Visit Fees</p>
                       <p className="font-semibold text-red-600">
-                        ${Number(rec.calculated_visit_fees || 0).toFixed(2)}
+                        {formatCurrency(rec.calculated_visit_fees || 0)}
                       </p>
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground">Expenses</p>
                       <p className="font-semibold text-red-600">
-                        ${Number(rec.calculated_total_expenses || 0).toFixed(2)}
+                        {formatCurrency(rec.calculated_total_expenses || 0)}
                       </p>
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground">Mgmt Fee</p>
                       <p className="font-semibold text-amber-600">
-                        ${Number(rec.management_fee || 0).toFixed(2)}
+                        {formatCurrency(rec.management_fee || 0)}
                       </p>
                     </div>
                     <div>
                       <p className="text-xs text-muted-foreground">Order Min</p>
                       <p className="font-semibold text-amber-600">
-                        ${Number(rec.order_minimum_fee || 0).toFixed(2)}
+                        {formatCurrency(rec.order_minimum_fee || 0)}
                       </p>
                     </div>
                     <div className="col-span-2">
                       <div className="flex items-center gap-2">
                         <div className="flex-1">
-                          <p className="text-xs text-muted-foreground">Due from Owner (Live Calculator)</p>
+                          <p className="text-xs text-muted-foreground">
+                            {rec.service_type === 'full_service' ? 'Payout to Owner' : 'Due from Owner'} (Live)
+                          </p>
                           {rec.calculator_error ? (
                             <p className="font-semibold text-destructive text-sm">
                               Error: {rec.calculator_error}
                             </p>
                           ) : (
                             <>
-                              <p className="font-bold text-primary text-lg">
-                                ${Number(rec.calculated_due_from_owner || 0).toFixed(2)}
+                              <p className={`font-bold text-lg ${rec.service_type === 'full_service' ? 'text-green-600' : 'text-primary'}`}>
+                                {formatCurrency(rec.service_type === 'full_service' 
+                                  ? (rec.calculated_payout_to_owner || 0) 
+                                  : (rec.calculated_due_from_owner || 0)
+                                )}
                               </p>
                               <p className="text-xs text-muted-foreground mt-1">
-                                Only approved charges included
+                                Only approved items included
                               </p>
                             </>
                           )}
