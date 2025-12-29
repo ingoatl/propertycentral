@@ -390,7 +390,7 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
       setFieldValue(file.name);
       setShowNAField(false);
       setTaskStatus("completed");
-      toast.success("File uploaded successfully");
+      // Visual feedback only - card stays open, green checkmark shows completion
 
       // If this is a permit upload, trigger AI analysis
       if (task.title.toLowerCase().includes("permit") || task.title.toLowerCase().includes("license")) {
@@ -501,8 +501,8 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
       setNotes(naReason);
       setShowNAField(false);
       setTaskStatus("completed");
-      toast.success("Marked as not applicable");
-      onUpdate(); // Trigger progress update
+      // Visual feedback only - no toast, card stays open
+      // Progress bar updates when card is collapsed
     } catch (error) {
       console.error("Failed to mark as N/A:", error);
       toast.error("Failed to save");
@@ -743,7 +743,7 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
                 taskId={task.id} 
                 onFilesChange={() => {
                   setAttachmentsKey(prev => prev + 1);
-                  onUpdate();
+                  // Don't call onUpdate() - keeps card open
                 }} 
               />
               
@@ -752,7 +752,7 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
                 onFilesUploaded={() => {
                   setUploading(false);
                   setAttachmentsKey(prev => prev + 1);
-                  onUpdate();
+                  // Don't call onUpdate() - keeps card open
                 }} 
               />
             </div>
@@ -768,7 +768,7 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
               taskId={task.id} 
               onFilesChange={() => {
                 setAttachmentsKey(prev => prev + 1);
-                onUpdate();
+                // Don't call onUpdate() - keeps card open
               }} 
             />
             
@@ -777,7 +777,7 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
               onFilesUploaded={() => {
                 setUploading(false);
                 setAttachmentsKey(prev => prev + 1);
-                onUpdate();
+                // Don't call onUpdate() - keeps card open
               }} 
             />
             
@@ -1142,6 +1142,12 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
     return renderField();
   }
 
+  // When collapsing, trigger parent update to refresh progress bar
+  const handleCollapse = () => {
+    setIsCollapsed(true);
+    onUpdate(); // Update progress bar when card closes
+  };
+
   // COLLAPSED VIEW (for all tasks)
   if (isCollapsed) {
     return (
@@ -1252,11 +1258,16 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
       >
         {/* HEADER SECTION - Click to collapse */}
         <div 
-          className="bg-muted/30 p-4 border-b cursor-pointer hover:bg-muted/40 transition-colors max-md:cursor-default max-md:hover:bg-muted/30"
+          className={cn(
+            "p-4 border-b cursor-pointer transition-colors max-md:cursor-default",
+            taskStatus === "completed" 
+              ? "bg-green-100/50 hover:bg-green-100/70" 
+              : "bg-muted/30 hover:bg-muted/40 max-md:hover:bg-muted/30"
+          )}
           onClick={() => {
             // Only collapse on desktop, prevent accidental collapse on mobile
             if (window.innerWidth >= 768) {
-              setIsCollapsed(true);
+              handleCollapse();
             }
           }}
         >
@@ -1290,7 +1301,7 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
                 className="md:hidden h-10 w-10"
                 onClick={(e) => {
                   e.stopPropagation();
-                  setIsCollapsed(true);
+                  handleCollapse();
                 }}
               >
                 <ChevronDown className="w-5 h-5" />
@@ -1393,8 +1404,7 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
                           .eq("id", task.id);
                         
                         setTaskStatus('completed');
-                        toast.success("Task marked as complete");
-                        onUpdate();
+                        // Visual feedback only - card stays open, green styling shows completion
                       } catch (error) {
                         console.error("Failed to mark as complete:", error);
                         toast.error("Failed to update task");

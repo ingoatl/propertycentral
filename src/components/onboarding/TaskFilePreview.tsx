@@ -81,7 +81,7 @@ export const TaskFilePreview = ({ taskId, onFilesChange }: TaskFilePreviewProps)
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
-      toast.success("File downloaded");
+      // File downloads automatically - no toast needed
     } catch (error) {
       console.error("Download error:", error);
       toast.error("Failed to download file");
@@ -107,7 +107,7 @@ export const TaskFilePreview = ({ taskId, onFilesChange }: TaskFilePreviewProps)
 
       if (dbError) throw dbError;
 
-      toast.success("File deleted");
+      // Visual feedback - file disappears from list
       loadAttachments();
       onFilesChange?.();
     } catch (error) {

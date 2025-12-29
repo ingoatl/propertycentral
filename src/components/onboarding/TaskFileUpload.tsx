@@ -73,7 +73,7 @@ export const TaskFileUpload = ({ taskId, onFilesUploaded }: TaskFileUploadProps)
 
       await Promise.all(uploadPromises);
 
-      toast.success(`${selectedFiles.length} file(s) uploaded successfully`);
+      // Visual feedback only - no toast, parent will see files in preview
       setSelectedFiles([]);
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
