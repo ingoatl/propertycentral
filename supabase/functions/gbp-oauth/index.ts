@@ -49,8 +49,8 @@ serve(async (req) => {
       );
     }
     
-    const GOOGLE_CLIENT_ID = Deno.env.get('GBP_CLIENT_ID');
-    const GOOGLE_CLIENT_SECRET = Deno.env.get('GBP_CLIENT_SECRET');
+    const GOOGLE_CLIENT_ID = Deno.env.get('GOOGLE_CLIENT_ID');
+    const GOOGLE_CLIENT_SECRET = Deno.env.get('GOOGLE_CLIENT_SECRET');
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
     const REDIRECT_URI = `${SUPABASE_URL}/functions/v1/gbp-oauth`;
 
