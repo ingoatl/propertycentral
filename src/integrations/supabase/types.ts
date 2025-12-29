@@ -171,6 +171,7 @@ export type Database = {
         Row: {
           booking_id: string | null
           completed_at: string | null
+          contract_type: string | null
           created_at: string | null
           created_by: string | null
           document_name: string | null
@@ -184,6 +185,7 @@ export type Database = {
           host_signing_url: string | null
           id: string
           is_draft: boolean | null
+          owner_id: string | null
           property_id: string | null
           recipient_email: string | null
           recipient_name: string | null
@@ -196,6 +198,7 @@ export type Database = {
         Insert: {
           booking_id?: string | null
           completed_at?: string | null
+          contract_type?: string | null
           created_at?: string | null
           created_by?: string | null
           document_name?: string | null
@@ -209,6 +212,7 @@ export type Database = {
           host_signing_url?: string | null
           id?: string
           is_draft?: boolean | null
+          owner_id?: string | null
           property_id?: string | null
           recipient_email?: string | null
           recipient_name?: string | null
@@ -221,6 +225,7 @@ export type Database = {
         Update: {
           booking_id?: string | null
           completed_at?: string | null
+          contract_type?: string | null
           created_at?: string | null
           created_by?: string | null
           document_name?: string | null
@@ -234,6 +239,7 @@ export type Database = {
           host_signing_url?: string | null
           id?: string
           is_draft?: boolean | null
+          owner_id?: string | null
           property_id?: string | null
           recipient_email?: string | null
           recipient_name?: string | null
@@ -249,6 +255,13 @@ export type Database = {
             columns: ["booking_id"]
             isOneToOne: false
             referencedRelation: "mid_term_bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booking_documents_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "property_owners"
             referencedColumns: ["id"]
           },
           {
@@ -619,6 +632,7 @@ export type Database = {
       }
       document_templates: {
         Row: {
+          contract_type: string | null
           created_at: string | null
           created_by: string | null
           description: string | null
@@ -631,6 +645,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          contract_type?: string | null
           created_at?: string | null
           created_by?: string | null
           description?: string | null
@@ -643,6 +658,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          contract_type?: string | null
           created_at?: string | null
           created_by?: string | null
           description?: string | null
