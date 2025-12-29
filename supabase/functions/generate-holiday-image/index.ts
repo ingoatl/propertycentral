@@ -45,39 +45,15 @@ const getHolidayGreeting = (name: string): string => {
   return `Happy ${name}`;
 };
 
-// Convert PNG to optimized JPEG using canvas
-async function optimizeImage(base64Data: string): Promise<{ buffer: Uint8Array; mimeType: string }> {
-  // Remove data URL prefix if present
-  const cleanBase64 = base64Data.replace(/^data:image\/\w+;base64,/, '');
-  const imageBuffer = Uint8Array.from(atob(cleanBase64), c => c.charCodeAt(0));
-  
-  // For now, return as-is but with proper JPEG content type hint
-  // The AI already generates reasonably sized images
-  // In production, you'd use a proper image processing library
-  
-  // Check if it's already small enough (under 200KB is good for email)
-  const sizeKB = imageBuffer.length / 1024;
-  console.log(`Original image size: ${Math.round(sizeKB)}KB`);
-  
-  if (sizeKB < 200) {
-    // Already optimized enough
-    return { buffer: imageBuffer, mimeType: 'image/png' };
-  }
-  
-  // For larger images, we'll still use PNG but log a warning
-  console.log('Image is larger than ideal for email, but proceeding with PNG');
-  return { buffer: imageBuffer, mimeType: 'image/png' };
-}
-
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    if (!LOVABLE_API_KEY) {
-      throw new Error('LOVABLE_API_KEY is not configured');
+    const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
+    if (!OPENAI_API_KEY) {
+      throw new Error('OPENAI_API_KEY is not configured');
     }
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -86,7 +62,7 @@ serve(async (req) => {
 
     const { ownerFirstName, propertyName, promptTemplate, holidayName } = await req.json();
 
-    console.log('=== HOLIDAY IMAGE GENERATION ===');
+    console.log('=== HOLIDAY IMAGE GENERATION (OpenAI) ===');
     console.log('Holiday:', holidayName);
     console.log('Owner:', ownerFirstName);
 
@@ -94,111 +70,80 @@ serve(async (req) => {
     const holidayGreeting = getHolidayGreeting(cleanHolidayName);
     console.log('Greeting:', holidayGreeting);
 
-    // Build prompt using the holiday-specific template if provided, otherwise use default
     const ownerName = ownerFirstName || 'Friend';
     
-    // Use the custom prompt template if provided, otherwise build a default one
-    // Request smaller dimensions for faster loading in email clients
+    // Build prompt for OpenAI gpt-image-1
     let imagePrompt: string;
     if (promptTemplate && promptTemplate.trim()) {
-      // Replace placeholders in the custom template
       imagePrompt = promptTemplate
         .replace(/{owner_first_name}/g, ownerName)
         .replace(/{owner_name}/g, ownerName)
         .replace(/{holiday_name}/g, cleanHolidayName)
         .replace(/{holiday_greeting}/g, holidayGreeting);
       
-      // Ensure the greeting text is included
       if (!imagePrompt.toLowerCase().includes(ownerName.toLowerCase())) {
         imagePrompt += ` The image MUST prominently display "${holidayGreeting}, ${ownerName}!" in elegant text.`;
       }
     } else {
-      // Default prompt with cozy house theme - optimized for email (600px wide)
-      imagePrompt = `Create a beautiful ${cleanHolidayName} greeting card featuring a cozy, elegant house decorated for ${cleanHolidayName}. The house should have warm lighting from windows, festive ${cleanHolidayName} decorations appropriate to the holiday, and a welcoming atmosphere. The image MUST prominently display the text "${holidayGreeting}, ${ownerName}!" in an elegant, easy-to-read script font overlaid on the scene. Use warm, inviting colors and imagery specifically appropriate for ${cleanHolidayName}. Professional property management holiday card style. Horizontal banner format 600x400 pixels, optimized for email viewing.`;
+      imagePrompt = `Create a beautiful ${cleanHolidayName} greeting card featuring a cozy, elegant house decorated for ${cleanHolidayName}. The house should have warm lighting from windows, festive ${cleanHolidayName} decorations appropriate to the holiday, and a welcoming atmosphere. The image MUST prominently display the text "${holidayGreeting}, ${ownerName}!" in an elegant, easy-to-read script font overlaid on the scene. Use warm, inviting colors and imagery specifically appropriate for ${cleanHolidayName}. Professional property management holiday card style.`;
     }
-    
-    // Add optimization hints to prompt
-    imagePrompt += " Create a compact, email-optimized image around 600 pixels wide.";
     
     console.log('Image prompt:', imagePrompt.substring(0, 200) + '...');
+    console.log('Calling OpenAI gpt-image-1 API...');
 
-    console.log('Calling Gemini image API...');
+    // Call OpenAI image generation API
+    const response = await fetch('https://api.openai.com/v1/images/generations', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${OPENAI_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-image-1',
+        prompt: imagePrompt,
+        n: 1,
+        size: '1024x1024',
+        quality: 'medium',
+        response_format: 'b64_json'
+      }),
+    });
 
-    // Try up to 3 times with the Gemini model
-    let imageData: string | null = null;
-    let lastError: string = '';
-    
-    for (let attempt = 1; attempt <= 3; attempt++) {
-      console.log(`Attempt ${attempt}/3`);
-      
-      try {
-        const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${LOVABLE_API_KEY}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            model: "google/gemini-2.5-flash-image-preview",
-            messages: [{ role: "user", content: imagePrompt }],
-            modalities: ["image", "text"]
-          }),
-        });
-
-        if (!response.ok) {
-          lastError = `API error: ${response.status}`;
-          console.error(lastError);
-          if (response.status === 429 || response.status === 402) {
-            throw new Error(response.status === 429 ? 'Rate limit exceeded' : 'Credits exhausted');
-          }
-          await new Promise(r => setTimeout(r, 1000));
-          continue;
-        }
-
-        const data = await response.json();
-        imageData = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
-        
-        if (imageData) {
-          console.log('Image generated successfully');
-          break;
-        }
-        
-        lastError = 'No image in response';
-        console.log(lastError, '- retrying...');
-        await new Promise(r => setTimeout(r, 500));
-        
-      } catch (e) {
-        lastError = e instanceof Error ? e.message : 'Unknown error';
-        console.error('Attempt failed:', lastError);
-        if (lastError.includes('Rate limit') || lastError.includes('Credits')) {
-          throw e;
-        }
-      }
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('OpenAI API error:', response.status, errorText);
+      throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
     }
 
-    if (!imageData) {
-      throw new Error(`Image generation failed after 3 attempts: ${lastError}`);
+    const data = await response.json();
+    const base64Image = data.data?.[0]?.b64_json;
+
+    if (!base64Image) {
+      console.error('No image data in response:', JSON.stringify(data).substring(0, 500));
+      throw new Error('No image data returned from OpenAI');
     }
 
-    // Optimize and process image
-    const { buffer: imageBuffer, mimeType } = await optimizeImage(imageData);
-    const extension = mimeType === 'image/jpeg' ? 'jpg' : 'png';
-    console.log('Final image size:', Math.round(imageBuffer.length / 1024), 'KB');
+    console.log('Image generated successfully');
 
+    // Convert base64 to buffer
+    const imageBuffer = Uint8Array.from(atob(base64Image), c => c.charCodeAt(0));
+    console.log('Image size:', Math.round(imageBuffer.length / 1024), 'KB');
+
+    // Upload to storage
     const timestamp = Date.now();
     const holidaySlug = cleanHolidayName.replace(/\s+/g, '-').toLowerCase().replace(/[^a-z0-9-]/g, '');
     const ownerSlug = (ownerFirstName || 'owner').replace(/[^a-zA-Z0-9]/g, '');
-    const filePath = `generated/${timestamp}-${holidaySlug}-${ownerSlug}.${extension}`;
+    const filePath = `generated/${timestamp}-${holidaySlug}-${ownerSlug}.png`;
 
     const { error: uploadError } = await supabase.storage
       .from('holiday-images')
       .upload(filePath, imageBuffer, {
-        contentType: mimeType,
-        cacheControl: '31536000', // 1 year cache for CDN
+        contentType: 'image/png',
+        cacheControl: '31536000', // 1 year cache
         upsert: true
       });
 
     if (uploadError) {
+      console.error('Upload error:', uploadError);
       throw new Error(`Upload failed: ${uploadError.message}`);
     }
 
@@ -206,7 +151,7 @@ serve(async (req) => {
       .from('holiday-images')
       .getPublicUrl(filePath);
 
-    console.log('SUCCESS:', publicUrl);
+    console.log('SUCCESS - Image URL:', publicUrl);
 
     return new Response(
       JSON.stringify({ success: true, imageUrl: publicUrl, holidayName }),
