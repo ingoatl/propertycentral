@@ -284,3 +284,15 @@ verify_jwt = true
 
 [functions.telnyx-voicemail]
 verify_jwt = false
+
+[functions.lead-ai-voice-call]
+verify_jwt = true
+
+[functions.ai-message-assistant]
+verify_jwt = true
+
+[functions.link-message-to-property]
+verify_jwt = true
+
+[functions.pre-generate-holiday-images]
+verify_jwt = false
