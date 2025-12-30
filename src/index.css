@@ -271,3 +271,40 @@ All colors MUST be HSL.
     height: auto;
   }
 }
+
+/* Premium Collapsible Animations - Apple-quality spring easing */
+@keyframes collapsible-down {
+  from {
+    height: 0;
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    height: var(--radix-collapsible-content-height);
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes collapsible-up {
+  from {
+    height: var(--radix-collapsible-content-height);
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    height: 0;
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+[data-state="open"] > .animate-collapsible-down,
+[data-state="open"].animate-collapsible-down {
+  animation: collapsible-down 500ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+[data-state="closed"] > .animate-collapsible-up,
+[data-state="closed"].animate-collapsible-up {
+  animation: collapsible-up 400ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}

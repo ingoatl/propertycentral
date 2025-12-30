@@ -1,5 +1,4 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { encode as base64Encode } from "https://deno.land/std@0.190.0/encoding/base64.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
@@ -11,7 +10,7 @@ interface PermitAnalysisRequest {
   documentId: string;
   propertyId: string;
   filePath: string;
-  bucket?: string; // Optional: defaults to "onboarding-documents"
+  bucket?: string;
 }
 
 serve(async (req) => {
@@ -22,27 +21,34 @@ serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const openaiKey = Deno.env.get("OPENAI_API_KEY")!;
+    const lovableApiKey = Deno.env.get("LOVABLE_API_KEY");
 
     const supabase = createClient(supabaseUrl, supabaseKey);
     const { documentId, propertyId, filePath, bucket = "onboarding-documents" }: PermitAnalysisRequest = await req.json();
 
     console.log(`Analyzing permit for document ${documentId}, property ${propertyId}, bucket: ${bucket}`);
 
-  // Download the permit file from storage (support both buckets)
-  const { data: fileData, error: downloadError } = await supabase.storage
-    .from(bucket)
-    .download(filePath);
+    // Download the permit file from storage
+    const { data: fileData, error: downloadError } = await supabase.storage
+      .from(bucket)
+      .download(filePath);
 
-  if (downloadError) {
-    console.error("Error downloading file:", downloadError);
-    throw new Error(`Failed to download permit file: ${downloadError.message}`);
-  }
+    if (downloadError) {
+      console.error("Error downloading file:", downloadError);
+      throw new Error(`Failed to download permit file: ${downloadError.message}`);
+    }
 
-    // Convert to base64 using Deno's native encoding (handles large files without stack overflow)
+    // Convert file to base64 for Gemini
     const arrayBuffer = await fileData.arrayBuffer();
-    const base64 = base64Encode(arrayBuffer);
-    
+    const uint8Array = new Uint8Array(arrayBuffer);
+    let binaryString = '';
+    const chunkSize = 8192;
+    for (let i = 0; i < uint8Array.length; i += chunkSize) {
+      const chunk = uint8Array.slice(i, i + chunkSize);
+      binaryString += String.fromCharCode.apply(null, Array.from(chunk));
+    }
+    const base64 = btoa(binaryString);
+
     // Determine MIME type
     const ext = filePath.split('.').pop()?.toLowerCase();
     let mimeType = 'application/pdf';
@@ -50,19 +56,19 @@ serve(async (req) => {
     else if (ext === 'png') mimeType = 'image/png';
     else if (ext === 'webp') mimeType = 'image/webp';
 
-    // Use OpenAI to analyze the permit
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    // Use Lovable AI (Gemini) which supports PDFs natively
+    const response = await fetch("https://ai.lovable.dev/api/v1/chat/completions", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${openaiKey}`,
+        "Authorization": `Bearer ${lovableApiKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "gpt-4o",
+        model: "google/gemini-2.5-flash",
         messages: [
           {
             role: "system",
-            content: `You are an expert at analyzing short-term rental permits and licenses. Extract all relevant information from the permit document. Return your response as a valid JSON object with these fields:
+            content: `You are an expert at analyzing short-term rental permits and licenses. Extract all relevant information from the permit document. Return your response as a valid JSON object ONLY (no markdown, no explanation) with these fields:
 - permit_number: The permit/license number
 - expiration_date: The expiration date in YYYY-MM-DD format (CRITICAL: find this date)
 - issue_date: The issue date in YYYY-MM-DD format if visible
@@ -80,7 +86,7 @@ If you cannot find a field, set it to null. The expiration_date is the most impo
             content: [
               {
                 type: "text",
-                text: "Please analyze this short-term rental permit and extract all relevant information, especially the expiration date."
+                text: "Please analyze this short-term rental permit and extract all relevant information, especially the expiration date. Return ONLY a JSON object, no other text."
               },
               {
                 type: "image_url",
@@ -97,8 +103,8 @@ If you cannot find a field, set it to null. The expiration_date is the most impo
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("OpenAI API error:", errorText);
-      throw new Error(`OpenAI API error: ${response.status}`);
+      console.error("Lovable AI API error:", errorText);
+      throw new Error(`AI API error: ${response.status}`);
     }
 
     const aiResult = await response.json();
@@ -139,14 +145,12 @@ If you cannot find a field, set it to null. The expiration_date is the most impo
 
     // If we have an expiration date, create a permit reminder
     if (extractedData.expiration_date) {
-      // Get property info for the email
       const { data: property } = await supabase
         .from("properties")
         .select("name, address")
         .eq("id", propertyId)
         .single();
 
-      // Create permit reminder entry
       const { error: reminderError } = await supabase
         .from("permit_reminders")
         .upsert({

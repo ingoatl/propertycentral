@@ -9,17 +9,25 @@ const CollapsibleTrigger = CollapsiblePrimitive.CollapsibleTrigger;
 const CollapsibleContent = React.forwardRef<
   React.ElementRef<typeof CollapsiblePrimitive.CollapsibleContent>,
   React.ComponentPropsWithoutRef<typeof CollapsiblePrimitive.CollapsibleContent>
->(({ className, ...props }, ref) => (
+>(({ className, children, ...props }, ref) => (
   <CollapsiblePrimitive.CollapsibleContent
     ref={ref}
     className={cn(
-      "overflow-hidden will-change-[height,opacity,transform]",
+      "overflow-hidden",
       "data-[state=open]:animate-collapsible-down",
       "data-[state=closed]:animate-collapsible-up",
       className
     )}
+    style={{
+      // GPU acceleration hints
+      willChange: "height, opacity",
+      // Prevent content flash
+      contain: "layout",
+    }}
     {...props}
-  />
+  >
+    {children}
+  </CollapsiblePrimitive.CollapsibleContent>
 ));
 CollapsibleContent.displayName = "CollapsibleContent";
 
