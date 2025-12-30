@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -32,7 +32,8 @@ import {
   FileText,
   Send,
   CalendarClock,
-  Calendar
+  Calendar,
+  Circle
 } from "lucide-react";
 import { Lead, LeadStage, LeadTimeline, LeadCommunication, LEAD_STAGES, STAGE_CONFIG } from "@/types/leads";
 import FollowUpManager from "./FollowUpManager";
@@ -41,6 +42,7 @@ import TestVoiceCallButton from "./TestVoiceCallButton";
 import { ScheduleDiscoveryCallDialog } from "./ScheduleDiscoveryCallDialog";
 import { SendContractButton } from "./SendContractButton";
 import { AIVoiceCallButton } from "./AIVoiceCallButton";
+import { LeadConversationThread } from "./LeadConversationThread";
 
 interface LeadDetailModalProps {
   lead: Lead | null;
@@ -364,9 +366,12 @@ const LeadDetailModal = ({ lead, open, onOpenChange, onRefresh }: LeadDetailModa
               <CalendarClock className="h-4 w-4 mr-2" />
               Follow-ups
             </TabsTrigger>
-            <TabsTrigger value="messages">
+            <TabsTrigger value="messages" className="relative">
               <MessageSquare className="h-4 w-4 mr-2" />
               Messages
+              {(lead as any).has_unread_messages && (
+                <Circle className="h-2 w-2 fill-destructive text-destructive absolute -top-1 -right-1" />
+              )}
             </TabsTrigger>
             <TabsTrigger value="notes">
               <FileText className="h-4 w-4 mr-2" />
@@ -489,7 +494,14 @@ const LeadDetailModal = ({ lead, open, onOpenChange, onRefresh }: LeadDetailModa
 
           <TabsContent value="messages" className="mt-4">
             <div className="space-y-4">
-              <div className="flex gap-2">
+              {/* Chat bubble conversation thread */}
+              <LeadConversationThread 
+                communications={communications || []}
+                leadName={lead.name}
+              />
+              
+              {/* Message input */}
+              <div className="flex gap-2 pt-2 border-t">
                 <Select value={messageType} onValueChange={(v) => setMessageType(v as "sms" | "email")}>
                   <SelectTrigger className="w-24">
                     <SelectValue />
@@ -503,53 +515,18 @@ const LeadDetailModal = ({ lead, open, onOpenChange, onRefresh }: LeadDetailModa
                   value={newMessage}
                   onChange={(e) => setNewMessage(e.target.value)}
                   placeholder={`Type your ${messageType} message...`}
-                  className="flex-1"
+                  className="flex-1 min-h-[60px] resize-none"
                   rows={2}
                 />
                 <Button 
                   onClick={() => sendMessage.mutate()}
                   disabled={sendMessage.isPending || !newMessage.trim()}
+                  size="icon"
+                  className="self-end"
                 >
                   <Send className="h-4 w-4" />
                 </Button>
               </div>
-              
-              <ScrollArea className="h-[180px]">
-                {communications && communications.length > 0 ? (
-                  <div className="space-y-3">
-                    {communications.map((comm) => (
-                      <div 
-                        key={comm.id} 
-                        className={`p-3 rounded-lg text-sm ${
-                          comm.direction === 'outbound' 
-                            ? 'bg-primary/10 ml-4' 
-                            : 'bg-muted mr-4'
-                        }`}
-                      >
-                        <div className="flex items-center gap-2 mb-1">
-                          <Badge variant="outline" className="text-xs">
-                            {comm.communication_type.toUpperCase()}
-                          </Badge>
-                          <Badge 
-                            variant={comm.status === 'delivered' ? 'default' : 'secondary'}
-                            className="text-xs"
-                          >
-                            {comm.status}
-                          </Badge>
-                        </div>
-                        <p>{comm.body}</p>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {format(new Date(comm.created_at), 'MMM d, h:mm a')}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground text-center py-8">
-                    No messages yet
-                  </p>
-                )}
-              </ScrollArea>
             </div>
           </TabsContent>
 

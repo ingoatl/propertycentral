@@ -10,6 +10,7 @@ import { MainNavigation } from "@/components/navigation/MainNavigation";
 import { MobileNavigation } from "@/components/navigation/MobileNavigation";
 import { QuickCommunicationButton } from "@/components/communications/QuickCommunicationButton";
 import VoiceDialer from "@/components/leads/VoiceDialer";
+import { useLeadRealtimeMessages } from "@/hooks/useLeadRealtimeMessages";
 
 interface LayoutProps {
   children: ReactNode;
@@ -19,6 +20,9 @@ const Layout = ({ children }: LayoutProps) => {
   const { user, loading, pendingApproval } = useAuth() as any;
   const [isAdmin, setIsAdmin] = useState(false);
   const [hasUserRole, setHasUserRole] = useState(false);
+  
+  // Real-time notifications for inbound lead messages
+  useLeadRealtimeMessages();
 
   useEffect(() => {
     const checkRoles = async () => {
