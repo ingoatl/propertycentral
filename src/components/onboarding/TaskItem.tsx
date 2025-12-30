@@ -1164,177 +1164,137 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
     onUpdate(); // Update progress bar when card closes
   };
 
-  // COLLAPSED VIEW (for all tasks)
-  if (isCollapsed) {
-    return (
-      <>
+  // Use a single component with Collapsible for smooth animations
+  return (
+    <>
+      <Collapsible 
+        open={!isCollapsed} 
+        onOpenChange={(open) => {
+          if (!open) {
+            handleCollapse();
+          } else {
+            setIsCollapsed(false);
+          }
+        }}
+      >
         <Card 
           id={`task-${task.id}`}
           className={cn(
-            "hover:bg-accent/50 transition-colors cursor-pointer touch-manipulation",
-            taskStatus === "completed" && "bg-green-50 border-green-500"
+            "transition-all duration-300 overflow-hidden",
+            taskStatus === "completed" && "bg-green-50/30 border-green-500",
+            isCollapsed && "hover:bg-accent/50 cursor-pointer"
           )}
-          onClick={() => setIsCollapsed(false)}
         >
-          <div className="p-3">
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex items-center gap-3 flex-1 min-w-0">
-                {taskStatus === "completed" ? (
-                  <CheckCircle2 className="w-5 h-5 text-green-600 flex-shrink-0" />
-                ) : (
-                  <div className="w-5 h-5 flex-shrink-0" />
-                )}
-                <div className="flex items-center gap-2 min-w-0 flex-1">
-                  <span className="font-semibold text-sm truncate">{task.title}</span>
-                  {sop && (
-                    <button
-                      type="button"
-                      className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-700 text-xs font-medium hover:underline flex-shrink-0"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setShowSOPDialog(true);
-                      }}
-                    >
-                      <BookOpen className="w-3 h-3" />
-                      SOP
-                    </button>
+          {/* HEADER - Always visible, clickable to expand/collapse */}
+          <CollapsibleTrigger asChild>
+            <div 
+              className={cn(
+                "p-3 transition-colors cursor-pointer touch-manipulation",
+                !isCollapsed && "border-b",
+                !isCollapsed && (taskStatus === "completed" 
+                  ? "bg-green-100/50 hover:bg-green-100/70" 
+                  : "bg-muted/30 hover:bg-muted/40")
+              )}
+            >
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  {taskStatus === "completed" ? (
+                    <CheckCircle2 className="w-5 h-5 text-green-600 flex-shrink-0" />
+                  ) : (
+                    <div className="w-5 h-5 flex-shrink-0" />
                   )}
-                  {task.field_value && (
-                    <>
-                      <span className="text-muted-foreground">|</span>
-                      <span className="text-xs text-muted-foreground truncate">
-                        {getDisplayValue()}
-                      </span>
-                      <Button
-                        variant="ghost"
-                        size="sm"
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <span className={cn(
+                      "font-semibold truncate transition-all",
+                      isCollapsed ? "text-sm" : "text-[20px] leading-tight"
+                    )}>{task.title}</span>
+                    {sop && (
+                      <button
+                        type="button"
+                        className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-700 text-xs font-medium hover:underline flex-shrink-0"
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleCopy();
+                          setShowSOPDialog(true);
                         }}
-                        className="h-6 px-2 ml-1 flex-shrink-0"
                       >
-                        {copied ? (
-                          <Check className="w-3 h-3 text-green-600" />
-                        ) : (
-                          <Copy className="w-3 h-3" />
-                        )}
-                      </Button>
-                    </>
+                        <BookOpen className="w-3 h-3" />
+                        SOP
+                      </button>
+                    )}
+                    {isCollapsed && task.field_value && (
+                      <>
+                        <span className="text-muted-foreground">|</span>
+                        <span className="text-xs text-muted-foreground truncate">
+                          {getDisplayValue()}
+                        </span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleCopy();
+                          }}
+                          className="h-6 px-2 ml-1 flex-shrink-0"
+                        >
+                          {copied ? (
+                            <Check className="w-3 h-3 text-green-600" />
+                          ) : (
+                            <Copy className="w-3 h-3" />
+                          )}
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  {isCollapsed && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowBugDialog(true);
+                      }}
+                      className="h-7 px-2 text-xs gap-1"
+                      title="Submit a bug or improvement request"
+                    >
+                      <Bug className="w-3 h-3" />
+                    </Button>
                   )}
+                  {isCollapsed && task.due_date && (() => {
+                    try {
+                      const dueDate = new Date(task.due_date);
+                      if (isNaN(dueDate.getTime())) return null;
+                      return (
+                        <div className="text-xs text-muted-foreground flex items-center gap-1">
+                          <Clock className="w-3 h-3" />
+                          {format(dueDate, "MMM d")}
+                        </div>
+                      );
+                    } catch {
+                      return null;
+                    }
+                  })()}
+                  <TaskStatusBadge status={taskStatus} dueDate={task.due_date} />
+                  <ChevronDown className={cn(
+                    "w-4 h-4 text-muted-foreground transition-transform duration-500 ease-out",
+                    !isCollapsed && "rotate-180"
+                  )} />
                 </div>
               </div>
-              
-              <div className="flex items-center gap-2 flex-shrink-0">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setShowBugDialog(true);
-                  }}
-                  className="h-7 px-2 text-xs gap-1"
-                  title="Submit a bug or improvement request"
-                >
-                  <Bug className="w-3 h-3" />
-                </Button>
-                {task.due_date && (() => {
-                  try {
-                    const dueDate = new Date(task.due_date);
-                    if (isNaN(dueDate.getTime())) return null;
-                    return (
-                      <div className="text-xs text-muted-foreground flex items-center gap-1">
-                        <Clock className="w-3 h-3" />
-                        {format(dueDate, "MMM d")}
-                      </div>
-                    );
-                  } catch {
-                    return null;
-                  }
-                })()}
-                <TaskStatusBadge status={taskStatus} dueDate={task.due_date} />
-                <ChevronDown className={cn(
-                  "w-4 h-4 text-muted-foreground transition-transform duration-500 ease-out",
-                  !isCollapsed && "rotate-180"
-                )} />
-              </div>
-            </div>
-          </div>
-        </Card>
-      </>
-    );
-  }
-
-  // EXPANDED VIEW
-  return (
-    <>
-      <Card 
-        id={`task-${task.id}`}
-        className={cn(
-          "transition-colors overflow-hidden",
-          taskStatus === "completed" && "bg-green-50/30 border-green-500"
-        )}
-      >
-        {/* HEADER SECTION - Click to collapse */}
-        <div 
-          className={cn(
-            "p-4 border-b cursor-pointer transition-colors max-md:cursor-default",
-            taskStatus === "completed" 
-              ? "bg-green-100/50 hover:bg-green-100/70" 
-              : "bg-muted/30 hover:bg-muted/40 max-md:hover:bg-muted/30"
-          )}
-          onClick={() => {
-            // Only collapse on desktop, prevent accidental collapse on mobile
-            if (window.innerWidth >= 768) {
-              handleCollapse();
-            }
-          }}
-        >
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex-1">
-              <div className="flex items-center gap-3 mb-1">
-                <h3 className="text-[20px] font-bold leading-tight">{task.title}</h3>
-                {sop && (
-                  <button
-                    type="button"
-                    className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-700 text-sm font-medium hover:underline"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setShowSOPDialog(true);
-                    }}
-                  >
-                    <BookOpen className="w-4 h-4" />
-                    View SOP
-                  </button>
-                )}
-              </div>
-              {task.description && (
-                <p className="text-sm text-muted-foreground">{task.description}</p>
+              {!isCollapsed && task.description && (
+                <p className="text-sm text-muted-foreground mt-1 ml-8">{task.description}</p>
               )}
             </div>
-            <div className="flex items-center gap-2 flex-shrink-0">
-              <TaskStatusBadge status={taskStatus} dueDate={task.due_date} />
-              <Button
-                variant="ghost"
-                size="icon"
-                className="md:hidden h-10 w-10"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleCollapse();
-                }}
-              >
-                <ChevronDown className="w-5 h-5 rotate-180 transition-transform duration-500 ease-out" />
-              </Button>
-              <ChevronDown className="w-4 h-4 text-muted-foreground rotate-180 transition-transform duration-500 ease-out max-md:hidden" />
-            </div>
-          </div>
-        </div>
+          </CollapsibleTrigger>
 
-        {/* MAIN CONTENT + ADMIN SIDEBAR - Click events don't collapse */}
-        <div 
-          className="flex"
-          onClick={(e) => e.stopPropagation()}
-        >
+          {/* EXPANDABLE CONTENT - Animated */}
+          <CollapsibleContent>
+            <div 
+              className="flex"
+              onClick={(e) => e.stopPropagation()}
+            >
           {/* LEFT: Main Content (VA-focused) */}
           <div className="flex-1 p-4 space-y-4">
             {/* Due Date & Assignment Info */}
@@ -1571,8 +1531,10 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
             onUpdateDueDate={handleDueDateClick}
             onAddFAQ={() => setShowFAQDialog(true)}
           />
-        </div>
-      </Card>
+            </div>
+          </CollapsibleContent>
+        </Card>
+      </Collapsible>
 
       <PinVerificationDialog
         open={showPinDialog}
