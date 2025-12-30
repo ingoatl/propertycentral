@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Send, Mail, Loader2 } from "lucide-react";
 import {
   Dialog,
@@ -33,8 +33,7 @@ I wanted to follow up on our recent conversation about property management servi
 
 Do you have any questions I can help answer? I'm happy to schedule a call at your convenience.
 
-Best regards,
-The PeachHaus Team`,
+Best regards`,
   },
   {
     label: "Property Info",
@@ -47,8 +46,7 @@ I'd love to learn more about your property and discuss how we can help maximize 
 
 Would you be available for a brief call this week?
 
-Best regards,
-The PeachHaus Team`,
+Best regards`,
   },
   {
     label: "Thank You",
@@ -59,8 +57,7 @@ Thank you for taking the time to speak with me today. I really enjoyed learning 
 
 As discussed, I'll follow up with the next steps shortly. In the meantime, please don't hesitate to reach out if you have any questions.
 
-Best regards,
-The PeachHaus Team`,
+Best regards`,
   },
 ];
 
@@ -74,7 +71,27 @@ export function SendEmailDialog({
 }: SendEmailDialogProps) {
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
+  const [currentUserEmail, setCurrentUserEmail] = useState<string | null>(null);
+  const [currentUserName, setCurrentUserName] = useState<string | null>(null);
   const queryClient = useQueryClient();
+
+  // Get current user's email for the from field
+  useEffect(() => {
+    const fetchUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user?.email) {
+        setCurrentUserEmail(user.email);
+        // Get profile name
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("first_name")
+          .eq("id", user.id)
+          .single();
+        setCurrentUserName(profile?.first_name || user.email.split("@")[0]);
+      }
+    };
+    if (open) fetchUser();
+  }, [open]);
 
   const sendEmail = useMutation({
     mutationFn: async () => {
@@ -86,6 +103,8 @@ export function SendEmailDialog({
           body,
           contactType,
           contactId,
+          senderEmail: currentUserEmail,
+          senderName: currentUserName,
         },
       });
 

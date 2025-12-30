@@ -21,6 +21,7 @@ import {
   FileText,
   Info,
   MoreHorizontal,
+  User,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -34,6 +35,7 @@ import { EmojiPicker } from "./EmojiPicker";
 import { ContactInfoModal } from "./ContactInfoModal";
 import { ConversationNotes } from "./ConversationNotes";
 import { AdminInboxSelector } from "./AdminInboxSelector";
+import LeadDetailModal from "@/components/leads/LeadDetailModal";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useAdminCheck } from "@/hooks/useAdminCheck";
@@ -97,6 +99,7 @@ export function InboxView() {
   const [showNotes, setShowNotes] = useState(false);
   const [selectedInboxUserId, setSelectedInboxUserId] = useState<string | null>(null);
   const [viewAllInboxes, setViewAllInboxes] = useState(false);
+  const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -287,6 +290,22 @@ export function InboxView() {
     setSelectedInboxUserId(userId);
     setViewAllInboxes(viewAll);
   };
+
+  // Fetch lead data when a lead is selected for the modal
+  const { data: selectedLead } = useQuery({
+    queryKey: ["lead-for-modal", selectedLeadId],
+    queryFn: async () => {
+      if (!selectedLeadId) return null;
+      const { data, error } = await supabase
+        .from("leads")
+        .select("*")
+        .eq("id", selectedLeadId)
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!selectedLeadId,
+  });
 
   const { data: communications = [], isLoading } = useQuery({
     queryKey: ["all-communications", search, activeTab, activeFilter, selectedInboxUserId, viewAllInboxes],
@@ -519,7 +538,13 @@ export function InboxView() {
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-9 w-9"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => navigate(selectedMessage.contact_type === "lead" ? "/leads" : "/property-owners")}>View Contact</DropdownMenuItem>
+                    {selectedMessage.contact_type === "lead" ? (
+                      <DropdownMenuItem onClick={() => setSelectedLeadId(selectedMessage.contact_id)}>
+                        <User className="h-4 w-4 mr-2" />View Lead
+                      </DropdownMenuItem>
+                    ) : (
+                      <DropdownMenuItem onClick={() => navigate("/property-owners")}>View Contact</DropdownMenuItem>
+                    )}
                     <DropdownMenuItem onClick={() => setShowNotes(true)}>Add Note</DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
@@ -570,8 +595,11 @@ export function InboxView() {
                       <div className="flex justify-center gap-2 pt-4">
                         {selectedMessage.contact_phone && <Button variant="outline" size="sm" onClick={() => setShowSmsReply(true)}><MessageSquare className="h-4 w-4 mr-2" />Reply SMS</Button>}
                         {(selectedMessage.contact_email || selectedMessage.sender_email) && selectedMessage.contact_type !== "external" && <Button variant="outline" size="sm" onClick={() => setShowEmailReply(true)}><Mail className="h-4 w-4 mr-2" />Reply Email</Button>}
-                        {selectedMessage.contact_id && selectedMessage.contact_type !== "draft" && selectedMessage.contact_type !== "external" && (
-                          <Button variant="outline" size="sm" onClick={() => navigate(selectedMessage.contact_type === "lead" ? "/leads" : "/property-owners")}><ArrowUpRight className="h-4 w-4 mr-2" />View {selectedMessage.contact_type}</Button>
+                        {selectedMessage.contact_id && selectedMessage.contact_type === "lead" && (
+                          <Button variant="outline" size="sm" onClick={() => setSelectedLeadId(selectedMessage.contact_id)}><User className="h-4 w-4 mr-2" />View Lead</Button>
+                        )}
+                        {selectedMessage.contact_id && selectedMessage.contact_type === "owner" && (
+                          <Button variant="outline" size="sm" onClick={() => navigate("/property-owners")}><ArrowUpRight className="h-4 w-4 mr-2" />View Owner</Button>
                         )}
                       </div>
                     )}
@@ -613,6 +641,14 @@ export function InboxView() {
       <ComposeEmailDialog open={showComposeEmail} onOpenChange={setShowComposeEmail} />
       {selectedMessage && <ContactInfoModal open={showContactInfo} onOpenChange={setShowContactInfo} contactId={selectedMessage.contact_id} contactType={selectedMessage.contact_type} contactName={selectedMessage.contact_name} contactPhone={selectedMessage.contact_phone} contactEmail={selectedMessage.contact_email} />}
       {selectedMessage && <ConversationNotes open={showNotes} onOpenChange={setShowNotes} contactPhone={selectedMessage.contact_phone} contactEmail={selectedMessage.contact_email} contactName={selectedMessage.contact_name} />}
+      
+      {/* Lead Detail Modal */}
+      <LeadDetailModal
+        lead={selectedLead || null}
+        open={!!selectedLeadId}
+        onOpenChange={(open) => !open && setSelectedLeadId(null)}
+        onRefresh={() => queryClient.invalidateQueries({ queryKey: ["lead-for-modal", selectedLeadId] })}
+      />
     </div>
   );
 }

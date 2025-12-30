@@ -18,6 +18,67 @@ interface EmailRequest {
   body: string;
   contactType: "lead" | "owner";
   contactId: string;
+  senderEmail?: string;
+  senderName?: string;
+}
+
+// Team signatures based on email
+const SIGNATURES: Record<string, string> = {
+  "ingo@peachhausgroup.com": `
+<table cellpadding="0" cellspacing="0" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 14px; color: #333;">
+  <tr>
+    <td style="padding-top: 20px; border-top: 2px solid #e5a653;">
+      <strong style="font-size: 16px; color: #333;">INGO SCHAER</strong><br/>
+      <span style="color: #666; font-size: 12px;">CO-FOUNDER, OPERATIONS</span><br/>
+      <span style="font-weight: 600; color: #e5a653;">PEACHHAUS GROUP LLC</span>
+    </td>
+  </tr>
+  <tr>
+    <td style="padding-top: 12px; font-size: 13px; color: #666;">
+      <strong>website</strong> <a href="https://www.peachhausgroup.com" style="color: #e5a653; text-decoration: none;">www.peachhausgroup.com</a><br/>
+      <strong>phone</strong> (404) 800-5932<br/>
+      <strong>email</strong> <a href="mailto:ingo@peachhausgroup.com" style="color: #e5a653; text-decoration: none;">ingo@peachhausgroup.com</a>
+    </td>
+  </tr>
+</table>`,
+  "anja@peachhausgroup.com": `
+<table cellpadding="0" cellspacing="0" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 14px; color: #333;">
+  <tr>
+    <td style="padding-top: 20px; border-top: 2px solid #e5a653;">
+      <strong style="font-size: 16px; color: #333;">ANJA SCHAER</strong><br/>
+      <span style="color: #666; font-size: 12px;">CO-FOUNDER, GA REAL ESTATE BROKER</span><br/>
+      <span style="font-weight: 600; color: #e5a653;">PEACHHAUS GROUP LLC</span>
+    </td>
+  </tr>
+  <tr>
+    <td style="padding-top: 12px; font-size: 13px; color: #666;">
+      <strong>website</strong> <a href="https://www.peachhausgroup.com" style="color: #e5a653; text-decoration: none;">www.peachhausgroup.com</a><br/>
+      <strong>phone</strong> (404) 800-5932<br/>
+      <strong>email</strong> <a href="mailto:anja@peachhausgroup.com" style="color: #e5a653; text-decoration: none;">anja@peachhausgroup.com</a>
+    </td>
+  </tr>
+</table>`,
+};
+
+// Default signature for other team members
+function getDefaultSignature(name: string, email: string): string {
+  const firstName = name?.split(' ')[0]?.toUpperCase() || email.split('@')[0].toUpperCase();
+  return `
+<table cellpadding="0" cellspacing="0" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 14px; color: #333;">
+  <tr>
+    <td style="padding-top: 20px; border-top: 2px solid #e5a653;">
+      <strong style="font-size: 16px; color: #333;">${firstName}</strong><br/>
+      <span style="font-weight: 600; color: #e5a653;">PEACHHAUS GROUP LLC</span>
+    </td>
+  </tr>
+  <tr>
+    <td style="padding-top: 12px; font-size: 13px; color: #666;">
+      <strong>website</strong> <a href="https://www.peachhausgroup.com" style="color: #e5a653; text-decoration: none;">www.peachhausgroup.com</a><br/>
+      <strong>phone</strong> (404) 800-5932<br/>
+      <strong>email</strong> <a href="mailto:${email}" style="color: #e5a653; text-decoration: none;">${email}</a>
+    </td>
+  </tr>
+</table>`;
 }
 
 serve(async (req) => {
@@ -26,22 +87,33 @@ serve(async (req) => {
   }
 
   try {
-    const { to, toName, subject, body, contactType, contactId }: EmailRequest = await req.json();
+    const { to, toName, subject, body, contactType, contactId, senderEmail, senderName }: EmailRequest = await req.json();
 
     if (!to || !subject || !body) {
       throw new Error("Missing required fields: to, subject, body");
     }
 
-    console.log(`Sending email to ${to} (${toName}) - Subject: ${subject}`);
+    // Determine sender - use provided email or fallback to noreply
+    const fromEmail = senderEmail && senderEmail.endsWith("@peachhausgroup.com") 
+      ? senderEmail 
+      : "noreply@peachhausgroup.com";
+    
+    const fromName = senderName || (senderEmail ? senderEmail.split('@')[0] : "PeachHaus");
+    
+    console.log(`Sending email from ${fromEmail} (${fromName}) to ${to} (${toName}) - Subject: ${subject}`);
+
+    // Get signature for the sender
+    const signature = SIGNATURES[fromEmail.toLowerCase()] || 
+      (senderEmail ? getDefaultSignature(senderName || "", senderEmail) : "");
 
     // Convert plain text body to HTML
     const htmlBody = body
       .split("\n")
-      .map((line: string) => (line.trim() ? `<p>${line}</p>` : "<br/>"))
+      .map((line: string) => (line.trim() ? `<p style="margin: 0 0 10px 0;">${line}</p>` : "<br/>"))
       .join("");
 
     const emailResponse = await resend.emails.send({
-      from: "PeachHaus <noreply@peachhausgroup.com>",
+      from: `${fromName} <${fromEmail}>`,
       to: [to],
       subject: subject,
       html: `
@@ -53,6 +125,7 @@ serve(async (req) => {
         </head>
         <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
           ${htmlBody}
+          ${signature}
         </body>
         </html>
       `,
@@ -72,6 +145,7 @@ serve(async (req) => {
         body: body,
         status: "sent",
         sent_at: new Date().toISOString(),
+        metadata: { sender_email: fromEmail, sender_name: fromName },
       });
 
       console.log("Communication logged for lead:", contactId);
