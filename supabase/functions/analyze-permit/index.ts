@@ -35,29 +35,41 @@ serve(async (req) => {
     const filenameToAnalyze = originalFileName || filePath.split('/').pop() || '';
     console.log(`Analyzing filename: ${filenameToAnalyze}`);
     
-    // Try date extraction from filename
-    const datePatterns = [
-      { regex: /(\d{1,2})[-\/](\d{1,2})[-\/](\d{4})/, format: 'MDY' },
-      { regex: /(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})/, format: 'YMD' },
-      { regex: /(\d{1,2})[-_](\d{1,2})[-_](\d{4})/, format: 'MDY' },
-    ];
+    // PRIORITY 1: Check if filename STARTS with a year (e.g., "2026 - ...")
+    // This pattern means "valid for year 2026" and expires Dec 31 of that year
+    const leadingYearMatch = filenameToAnalyze.match(/^(20[2-9]\d)\s*[-–—]/);
+    if (leadingYearMatch) {
+      const year = leadingYearMatch[1];
+      extractedData.expiration_date = `${year}-12-31`;
+      console.log(`Found leading year in filename, permit valid until end of ${year}: ${extractedData.expiration_date}`);
+    }
     
-    for (const { regex, format } of datePatterns) {
-      const match = filenameToAnalyze.match(regex);
-      if (match) {
-        let year, month, day;
-        if (format === 'YMD') {
-          [, year, month, day] = match;
-        } else {
-          [, month, day, year] = match;
+    // PRIORITY 2: If no leading year, try date extraction from filename
+    // But skip this if we already have a leading year, as the date in filename might be issue date
+    if (!extractedData.expiration_date) {
+      const datePatterns = [
+        { regex: /(\d{1,2})[-\/](\d{1,2})[-\/](\d{4})/, format: 'MDY' },
+        { regex: /(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})/, format: 'YMD' },
+        { regex: /(\d{1,2})[-_](\d{1,2})[-_](\d{4})/, format: 'MDY' },
+      ];
+      
+      for (const { regex, format } of datePatterns) {
+        const match = filenameToAnalyze.match(regex);
+        if (match) {
+          let year, month, day;
+          if (format === 'YMD') {
+            [, year, month, day] = match;
+          } else {
+            [, month, day, year] = match;
+          }
+          extractedData.expiration_date = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+          console.log(`Extracted date from filename: ${extractedData.expiration_date}`);
+          break;
         }
-        extractedData.expiration_date = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-        console.log(`Extracted date from filename: ${extractedData.expiration_date}`);
-        break;
       }
     }
     
-    // Check for year-only pattern (e.g., "2026" means expires end of that year)
+    // PRIORITY 3: Check for year-only pattern anywhere in filename
     if (!extractedData.expiration_date) {
       const yearMatch = filenameToAnalyze.match(/\b(20[2-9]\d)\b/);
       if (yearMatch) {
@@ -281,14 +293,14 @@ Rules:
           status: "pending",
           updated_at: new Date().toISOString(),
         }, { 
-          onConflict: "document_id",
+          onConflict: "property_id,document_id",
           ignoreDuplicates: false 
         });
       
       if (reminderError) {
         console.error("Error creating reminder:", reminderError);
       } else {
-        console.log("Permit reminder created/updated");
+        console.log("Permit reminder created/updated successfully");
       }
     }
     
