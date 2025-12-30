@@ -37,12 +37,13 @@ import {
 } from "lucide-react";
 import { Lead, LeadStage, LeadTimeline, LeadCommunication, LEAD_STAGES, STAGE_CONFIG } from "@/types/leads";
 import FollowUpManager from "./FollowUpManager";
-import TestEmailButton from "./TestEmailButton";
 import TestVoiceCallButton from "./TestVoiceCallButton";
 import { ScheduleDiscoveryCallDialog } from "./ScheduleDiscoveryCallDialog";
 import { SendContractButton } from "./SendContractButton";
 import { AIVoiceCallButton } from "./AIVoiceCallButton";
 import { LeadConversationThread } from "./LeadConversationThread";
+import { SendEmailDialog } from "@/components/communications/SendEmailDialog";
+import { SendSMSDialog } from "@/components/communications/SendSMSDialog";
 
 interface LeadDetailModalProps {
   lead: Lead | null;
@@ -57,6 +58,8 @@ const LeadDetailModal = ({ lead, open, onOpenChange, onRefresh }: LeadDetailModa
   const [newMessage, setNewMessage] = useState("");
   const [messageType, setMessageType] = useState<"sms" | "email">("sms");
   const [showScheduleCall, setShowScheduleCall] = useState(false);
+  const [showEmailDialog, setShowEmailDialog] = useState(false);
+  const [showSMSDialog, setShowSMSDialog] = useState(false);
 
   // Fetch timeline
   const { data: timeline } = useQuery({
@@ -246,39 +249,63 @@ const LeadDetailModal = ({ lead, open, onOpenChange, onRefresh }: LeadDetailModa
         </DialogHeader>
 
         <ScrollArea className="flex-1 overflow-y-auto pr-4">
-        <div className="grid grid-cols-3 gap-4 py-4">
+        {/* Quick Action Buttons */}
+        <div className="flex items-center gap-3 py-4 border-b mb-4">
           {lead.phone && (
-            <Button variant="outline" size="sm" asChild>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              asChild
+              className="flex-1"
+            >
               <a href={`tel:${lead.phone}`}>
                 <Phone className="h-4 w-4 mr-2" />
-                {lead.phone}
+                Call
               </a>
             </Button>
           )}
           {lead.email && (
-            <Button variant="outline" size="sm" asChild>
-              <a href={`mailto:${lead.email}`}>
-                <Mail className="h-4 w-4 mr-2" />
-                Email
-              </a>
+            <Button 
+              variant="outline" 
+              size="sm"
+              className="flex-1"
+              onClick={() => setShowEmailDialog(true)}
+            >
+              <Mail className="h-4 w-4 mr-2" />
+              Email
             </Button>
           )}
+          {lead.phone && (
+            <Button 
+              variant="outline" 
+              size="sm"
+              className="flex-1"
+              onClick={() => setShowSMSDialog(true)}
+            >
+              <MessageSquare className="h-4 w-4 mr-2" />
+              Text
+            </Button>
+          )}
+        </div>
+
+        {/* Lead Info */}
+        <div className="flex items-center gap-4 pb-4">
           {lead.opportunity_value > 0 && (
             <div className="flex items-center gap-2 text-green-600 font-medium">
               <DollarSign className="h-4 w-4" />
               ${lead.opportunity_value.toLocaleString()}
             </div>
           )}
+          {lead.property_address && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <MapPin className="h-4 w-4" />
+              {lead.property_address}
+            </div>
+          )}
         </div>
 
-        {lead.property_address && (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground pb-4">
-            <MapPin className="h-4 w-4" />
-            {lead.property_address}
-          </div>
-        )}
-
-        <div className="flex items-center gap-4 pb-4">
+        {/* Stage and Actions */}
+        <div className="flex flex-wrap items-center gap-3 pb-4">
           <Select
             value={lead.stage}
             onValueChange={(value) => updateStage.mutate(value as LeadStage)}
@@ -304,12 +331,6 @@ const LeadDetailModal = ({ lead, open, onOpenChange, onRefresh }: LeadDetailModa
             <Sparkles className="h-4 w-4 mr-2" />
             {aiQualify.isPending ? "Analyzing..." : "AI Qualify"}
           </Button>
-
-          <TestEmailButton 
-            leadId={lead.id} 
-            leadEmail={lead.email} 
-            currentStage={lead.stage} 
-          />
 
           <TestVoiceCallButton
             leadId={lead.id}
@@ -337,7 +358,7 @@ const LeadDetailModal = ({ lead, open, onOpenChange, onRefresh }: LeadDetailModa
           <SendContractButton lead={lead} onContractSent={onRefresh} />
         </div>
 
-        {/* Schedule Discovery Call Dialog */}
+        {/* Dialogs */}
         <ScheduleDiscoveryCallDialog
           open={showScheduleCall}
           onOpenChange={setShowScheduleCall}
@@ -346,6 +367,28 @@ const LeadDetailModal = ({ lead, open, onOpenChange, onRefresh }: LeadDetailModa
           leadPhone={lead.phone || undefined}
           onScheduled={onRefresh}
         />
+
+        {lead.email && (
+          <SendEmailDialog
+            open={showEmailDialog}
+            onOpenChange={setShowEmailDialog}
+            contactName={lead.name}
+            contactEmail={lead.email}
+            contactType="lead"
+            contactId={lead.id}
+          />
+        )}
+
+        {lead.phone && (
+          <SendSMSDialog
+            open={showSMSDialog}
+            onOpenChange={setShowSMSDialog}
+            contactName={lead.name}
+            contactPhone={lead.phone}
+            contactType="lead"
+            contactId={lead.id}
+          />
+        )}
 
         {(lead.ai_summary || lead.ai_next_action) && (
           <div className="p-3 bg-muted/50 rounded-lg mb-4">
