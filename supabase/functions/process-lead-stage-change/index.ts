@@ -390,7 +390,7 @@ serve(async (req) => {
                 "Content-Type": "application/json",
               },
               body: JSON.stringify({
-                from: "PeachHaus <hello@peachhaus.co>",
+                from: "PeachHaus <info@peachhausgroup.com>",
                 to: [lead.email],
                 subject: emailSubject || "Message from PeachHaus",
                 text: messageBody,

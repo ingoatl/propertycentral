@@ -285,7 +285,7 @@ async function sendNewPropertyAlert(property: any, projectId: string, fieldsPopu
     `;
 
     const result = await resend.emails.send({
-      from: "PeachHaus Property Central <onboarding@resend.dev>",
+      from: "PeachHaus Property Central <info@peachhausgroup.com>",
       to: ["chris@peachhausgroup.com"],
       cc: ["info@peachhausgroup.com"],
       subject: `🏠 New Property: ${property.property_title || 'Partner Property'} - Complete Phase 7`,
