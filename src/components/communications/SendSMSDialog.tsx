@@ -78,17 +78,30 @@ export function SendSMSDialog({
 
   const sendSMS = useMutation({
     mutationFn: async () => {
-      const { data, error } = await supabase.functions.invoke("send-review-sms", {
-        body: {
-          to: contactPhone,
-          message: message,
-          contactType,
-          contactId,
-        },
-      });
-
-      if (error) throw error;
-      return data;
+      // Use GHL for sending SMS to leads
+      if (contactType === "lead") {
+        const { data, error } = await supabase.functions.invoke("ghl-send-sms", {
+          body: {
+            leadId: contactId,
+            phone: contactPhone,
+            message: message,
+            fromNumber: "+14048005932", // GHL number
+          },
+        });
+        if (error) throw error;
+        if (!data?.success) throw new Error(data?.error || "Failed to send SMS");
+        return data;
+      } else {
+        // For owners, use telnyx
+        const { data, error } = await supabase.functions.invoke("telnyx-send-sms", {
+          body: {
+            to: contactPhone,
+            message: message,
+          },
+        });
+        if (error) throw error;
+        return data;
+      }
     },
     onSuccess: () => {
       toast.success("SMS sent successfully!");
