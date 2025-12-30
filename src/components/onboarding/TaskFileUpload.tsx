@@ -89,22 +89,59 @@ export const TaskFileUpload = ({
       }
 
       if (actualPropertyId) {
-        // Create a property_documents entry for the permit
+        // Create a property_documents entry for the permit (use upsert to handle duplicates)
         const { data: docEntry, error: docError } = await supabase
           .from("property_documents")
-          .insert({
+          .upsert({
             property_id: actualPropertyId,
             project_id: projectId,
             file_name: file.name,
             file_path: fileName,
             file_type: fileExt || "pdf",
             document_type: "str_permit",
+            updated_at: new Date().toISOString(),
+          }, {
+            onConflict: "property_id,file_name",
+            ignoreDuplicates: false,
           })
           .select()
           .single();
 
         if (docError) {
-          console.error("Failed to create document entry:", docError);
+          console.error("Failed to create/update document entry:", docError);
+          // Try to find existing document entry
+          const { data: existingDoc } = await supabase
+            .from("property_documents")
+            .select("id")
+            .eq("property_id", actualPropertyId)
+            .eq("document_type", "str_permit")
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (existingDoc) {
+            // Use existing document, trigger analysis
+            onAnalysisStarted?.();
+            toast.info("Analyzing permit with AI...", { duration: 3000 });
+
+            const { data: result, error: analysisError } = await supabase.functions.invoke("analyze-permit", {
+              body: {
+                documentId: existingDoc.id,
+                propertyId: actualPropertyId,
+                filePath: fileName,
+                bucket: "task-attachments",
+              },
+            });
+
+            if (analysisError) {
+              console.error("Permit analysis error:", analysisError);
+              toast.error("Failed to analyze permit");
+            } else if (result?.success) {
+              toast.success(result.message || "Permit analyzed successfully");
+            } else {
+              toast.warning("Could not extract permit details. Please enter expiration date manually.");
+            }
+          }
           continue;
         }
 
