@@ -76,8 +76,12 @@ const TestEmailButton = ({ leadId, leadEmail, currentStage }: TestEmailButtonPro
         .replace(/\{\{phone\}\}/g, lead?.phone || "")
         .replace(/\{\{property_address\}\}/g, lead?.property_address || "your property")
         .replace(/\{\{opportunity_value\}\}/g, lead?.opportunity_value?.toString() || "0")
-        .replace(/\{\{ach_link\}\}/g, `https://peachhaus.co/payment-setup`)
-        .replace(/\{\{onboarding_link\}\}/g, `https://peachhaus.co/onboard/existing-str`);
+        .replace(/\{\{ach_link\}\}/g, `https://propertycentral.lovable.app/payment-setup?lead=${leadId}`)
+        .replace(/\{\{payment_link\}\}/g, `https://propertycentral.lovable.app/payment-setup?lead=${leadId}`)
+        .replace(/\{\{stripe_link\}\}/g, `https://propertycentral.lovable.app/payment-setup?lead=${leadId}`)
+        .replace(/\{\{onboarding_link\}\}/g, `https://propertycentral.lovable.app/onboard/existing-str`)
+        .replace(/\{\{existing_str_onboarding\}\}/g, `https://propertycentral.lovable.app/onboard/existing-str`)
+        .replace(/\{\{new_str_onboarding\}\}/g, `https://propertycentral.lovable.app/onboard/new-str`);
 
       const processedSubject = subject
         .replace(/\{\{name\}\}/g, lead?.name || "")

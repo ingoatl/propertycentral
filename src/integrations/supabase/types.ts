@@ -1240,6 +1240,48 @@ export type Database = {
           },
         ]
       }
+      ghl_phone_numbers: {
+        Row: {
+          capabilities: Json | null
+          created_at: string
+          friendly_name: string | null
+          ghl_phone_id: string
+          id: string
+          is_active: boolean | null
+          location_id: string
+          phone_number: string
+          synced_at: string | null
+          type: string | null
+          updated_at: string
+        }
+        Insert: {
+          capabilities?: Json | null
+          created_at?: string
+          friendly_name?: string | null
+          ghl_phone_id: string
+          id?: string
+          is_active?: boolean | null
+          location_id: string
+          phone_number: string
+          synced_at?: string | null
+          type?: string | null
+          updated_at?: string
+        }
+        Update: {
+          capabilities?: Json | null
+          created_at?: string
+          friendly_name?: string | null
+          ghl_phone_id?: string
+          id?: string
+          is_active?: boolean | null
+          location_id?: string
+          phone_number?: string
+          synced_at?: string | null
+          type?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       gmail_oauth_tokens: {
         Row: {
           access_token: string
@@ -1840,6 +1882,8 @@ export type Database = {
       lead_communications: {
         Row: {
           body: string
+          call_duration: number | null
+          call_recording_url: string | null
           clicked_at: string | null
           communication_type: string
           created_at: string
@@ -1848,8 +1892,10 @@ export type Database = {
           direction: string
           error_message: string | null
           external_id: string | null
+          ghl_call_id: string | null
           id: string
           lead_id: string
+          metadata: Json | null
           opened_at: string | null
           replied_at: string | null
           sent_at: string | null
@@ -1860,6 +1906,8 @@ export type Database = {
         }
         Insert: {
           body: string
+          call_duration?: number | null
+          call_recording_url?: string | null
           clicked_at?: string | null
           communication_type: string
           created_at?: string
@@ -1868,8 +1916,10 @@ export type Database = {
           direction?: string
           error_message?: string | null
           external_id?: string | null
+          ghl_call_id?: string | null
           id?: string
           lead_id: string
+          metadata?: Json | null
           opened_at?: string | null
           replied_at?: string | null
           sent_at?: string | null
@@ -1880,6 +1930,8 @@ export type Database = {
         }
         Update: {
           body?: string
+          call_duration?: number | null
+          call_recording_url?: string | null
           clicked_at?: string | null
           communication_type?: string
           created_at?: string
@@ -1888,8 +1940,10 @@ export type Database = {
           direction?: string
           error_message?: string | null
           external_id?: string | null
+          ghl_call_id?: string | null
           id?: string
           lead_id?: string
+          metadata?: Json | null
           opened_at?: string | null
           replied_at?: string | null
           sent_at?: string | null
