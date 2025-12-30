@@ -327,69 +327,172 @@ serve(async (req) => {
         }
 
         if (automation.action_type === "sms" && lead.phone && messageBody) {
-          // Send SMS via Twilio or Telnyx
-          const telnyxApiKey = Deno.env.get("TELNYX_API_KEY");
-          const twilioAccountSid = Deno.env.get("TWILIO_ACCOUNT_SID");
-          const twilioAuthToken = Deno.env.get("TWILIO_AUTH_TOKEN");
+          // Send SMS via GoHighLevel (preferred) with fallback to Telnyx/Twilio
+          const ghlApiKey = Deno.env.get("GHL_API_KEY");
+          const ghlLocationId = Deno.env.get("GHL_LOCATION_ID");
           
           let smsSent = false;
           let externalId = "";
           let errorMessage = "";
+          let provider = "";
 
           // Format destination phone to E.164
           const formattedPhone = formatPhoneE164(lead.phone);
           console.log(`Sending SMS to ${formattedPhone} (original: ${lead.phone})`);
 
-          // Try Telnyx first (preferred), then fall back to Twilio
-          if (telnyxApiKey) {
+          // Try GoHighLevel first (preferred for 404-800-5932 number)
+          if (ghlApiKey && ghlLocationId) {
             try {
-              const fromPhone = formatPhoneE164(Deno.env.get("TELNYX_PHONE_NUMBER") || "+14049247251");
-              console.log(`Telnyx from phone: ${fromPhone}`);
+              const fromPhone = "+14048005932"; // 404-800-5932
+              console.log(`GHL from phone: ${fromPhone}`);
               
-              const telnyxResponse = await fetch("https://api.telnyx.com/v2/messages", {
-                method: "POST",
-                headers: {
-                  "Authorization": `Bearer ${telnyxApiKey}`,
-                  "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                  from: fromPhone,
-                  to: formattedPhone,
-                  text: messageBody,
-                }),
-              });
-              const telnyxResult = await telnyxResponse.json();
-              smsSent = telnyxResponse.ok;
-              externalId = telnyxResult.data?.id || "";
-              if (!smsSent) errorMessage = JSON.stringify(telnyxResult.errors || telnyxResult);
+              // Step 1: Find or create contact in GHL
+              const searchResponse = await fetch(
+                `https://services.leadconnectorhq.com/contacts/search/duplicate?locationId=${ghlLocationId}&phone=${encodeURIComponent(formattedPhone)}`,
+                {
+                  method: "GET",
+                  headers: {
+                    "Authorization": `Bearer ${ghlApiKey}`,
+                    "Version": "2021-07-28",
+                    "Content-Type": "application/json",
+                  },
+                }
+              );
+
+              let contactId = null;
+              if (searchResponse.ok) {
+                const searchData = await searchResponse.json();
+                if (searchData.contact?.id) {
+                  contactId = searchData.contact.id;
+                  console.log(`Found existing GHL contact: ${contactId}`);
+                }
+              }
+
+              // Create contact if not found
+              if (!contactId) {
+                const createContactResponse = await fetch(
+                  `https://services.leadconnectorhq.com/contacts/`,
+                  {
+                    method: "POST",
+                    headers: {
+                      "Authorization": `Bearer ${ghlApiKey}`,
+                      "Version": "2021-07-28",
+                      "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                      locationId: ghlLocationId,
+                      phone: formattedPhone,
+                      name: lead.name || "Lead",
+                      email: lead.email || undefined,
+                      source: "PropertyCentral",
+                    }),
+                  }
+                );
+
+                if (createContactResponse.ok) {
+                  const createData = await createContactResponse.json();
+                  contactId = createData.contact?.id;
+                  console.log(`Created new GHL contact: ${contactId}`);
+                }
+              }
+
+              if (contactId) {
+                // Step 2: Send SMS message via GHL
+                const sendResponse = await fetch(
+                  `https://services.leadconnectorhq.com/conversations/messages`,
+                  {
+                    method: "POST",
+                    headers: {
+                      "Authorization": `Bearer ${ghlApiKey}`,
+                      "Version": "2021-04-15",
+                      "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                      type: "SMS",
+                      contactId: contactId,
+                      message: messageBody,
+                      fromNumber: fromPhone,
+                    }),
+                  }
+                );
+
+                if (sendResponse.ok) {
+                  const sendData = await sendResponse.json();
+                  smsSent = true;
+                  externalId = sendData.messageId || sendData.conversationId || "";
+                  provider = "gohighlevel";
+                  console.log(`SMS sent via GHL. Message ID: ${externalId}`);
+                } else {
+                  const errorText = await sendResponse.text();
+                  console.error("GHL SMS send error:", errorText);
+                  errorMessage = errorText;
+                }
+              }
             } catch (e) {
-              console.error("Telnyx SMS error:", e);
+              console.error("GHL SMS error:", e);
+              errorMessage = e instanceof Error ? e.message : String(e);
+            }
+          }
+
+          // Fallback to Telnyx if GHL failed
+          if (!smsSent) {
+            const telnyxApiKey = Deno.env.get("TELNYX_API_KEY");
+            if (telnyxApiKey) {
+              try {
+                const fromPhone = formatPhoneE164(Deno.env.get("TELNYX_PHONE_NUMBER") || "+14049247251");
+                console.log(`Fallback to Telnyx from phone: ${fromPhone}`);
+                
+                const telnyxResponse = await fetch("https://api.telnyx.com/v2/messages", {
+                  method: "POST",
+                  headers: {
+                    "Authorization": `Bearer ${telnyxApiKey}`,
+                    "Content-Type": "application/json",
+                  },
+                  body: JSON.stringify({
+                    from: fromPhone,
+                    to: formattedPhone,
+                    text: messageBody,
+                  }),
+                });
+                const telnyxResult = await telnyxResponse.json();
+                smsSent = telnyxResponse.ok;
+                externalId = telnyxResult.data?.id || "";
+                provider = "telnyx";
+                if (!smsSent) errorMessage = JSON.stringify(telnyxResult.errors || telnyxResult);
+              } catch (e) {
+                console.error("Telnyx SMS error:", e);
+              }
             }
           }
           
-          // Fallback to Twilio
-          if (!smsSent && twilioAccountSid && twilioAuthToken) {
-            const twilioPhone = Deno.env.get("TWILIO_VENDOR_PHONE_NUMBER") || Deno.env.get("TWILIO_PHONE_NUMBER");
-            const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${twilioAccountSid}/Messages.json`;
-            
-            const formData = new URLSearchParams();
-            formData.append("To", formattedPhone);
-            formData.append("From", formatPhoneE164(twilioPhone!));
-            formData.append("Body", messageBody);
+          // Final fallback to Twilio
+          if (!smsSent) {
+            const twilioAccountSid = Deno.env.get("TWILIO_ACCOUNT_SID");
+            const twilioAuthToken = Deno.env.get("TWILIO_AUTH_TOKEN");
+            if (twilioAccountSid && twilioAuthToken) {
+              const twilioPhone = Deno.env.get("TWILIO_VENDOR_PHONE_NUMBER") || Deno.env.get("TWILIO_PHONE_NUMBER");
+              const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${twilioAccountSid}/Messages.json`;
+              
+              const formData = new URLSearchParams();
+              formData.append("To", formattedPhone);
+              formData.append("From", formatPhoneE164(twilioPhone!));
+              formData.append("Body", messageBody);
 
-            const twilioResponse = await fetch(twilioUrl, {
-              method: "POST",
-              headers: {
-                "Authorization": `Basic ${btoa(`${twilioAccountSid}:${twilioAuthToken}`)}`,
-                "Content-Type": "application/x-www-form-urlencoded",
-              },
-              body: formData.toString(),
-            });
+              const twilioResponse = await fetch(twilioUrl, {
+                method: "POST",
+                headers: {
+                  "Authorization": `Basic ${btoa(`${twilioAccountSid}:${twilioAuthToken}`)}`,
+                  "Content-Type": "application/x-www-form-urlencoded",
+                },
+                body: formData.toString(),
+              });
 
-            const twilioResult = await twilioResponse.json();
-            smsSent = twilioResponse.ok;
-            externalId = twilioResult.sid || "";
-            if (!smsSent) errorMessage = twilioResult.error_message || "";
+              const twilioResult = await twilioResponse.json();
+              smsSent = twilioResponse.ok;
+              externalId = twilioResult.sid || "";
+              provider = "twilio";
+              if (!smsSent) errorMessage = twilioResult.error_message || "";
+            }
           }
 
           // Record communication
@@ -401,21 +504,24 @@ serve(async (req) => {
             status: smsSent ? "sent" : "failed",
             external_id: externalId,
             error_message: errorMessage || null,
+            metadata: { provider, from_number: provider === "gohighlevel" ? "+14048005932" : undefined },
           });
 
           // Add timeline entry
           await supabase.from("lead_timeline").insert({
             lead_id: leadId,
-            action: `Automated SMS sent: "${automation.name}"`,
+            action: `Automated SMS sent via ${provider || 'unknown'}: "${automation.name}"`,
             metadata: { 
               automation_id: automation.id, 
               message_id: externalId,
+              provider,
               psychology_principle: psychologyTemplate?.principle,
               ai_personalized: automation.ai_enabled
             },
           });
 
-          console.log(`SMS ${smsSent ? 'sent' : 'failed'} for automation "${automation.name}"`);
+          console.log(`SMS ${smsSent ? 'sent' : 'failed'} via ${provider} for automation "${automation.name}"`);
+          
           
         } else if (automation.action_type === "email" && lead.email && messageBody) {
           // Send email via Resend
