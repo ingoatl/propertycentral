@@ -28,61 +28,33 @@ serve(async (req) => {
     const payload = await req.json();
     console.log("GHL Inbound Webhook received:", JSON.stringify(payload, null, 2));
 
-    // GHL InboundMessage webhook structure
+    // GHL Workflow webhook structure (from "Customer replied" trigger)
+    // The payload comes with message object and contact details directly
     const {
-      type,
-      body: messageBody,
-      contactId: ghlContactId,
-      conversationId: ghlConversationId,
-      direction,
-      messageType,
-      dateAdded,
-      locationId,
+      message,
+      contact_id: ghlContactId,
+      phone: rawPhone,
+      first_name: firstName,
+      last_name: lastName,
+      full_name: fullName,
     } = payload;
 
-    // Only process inbound SMS messages
-    if (type !== "InboundMessage" || messageType !== "TYPE_SMS" || direction !== "inbound") {
-      console.log("Ignoring non-inbound SMS event:", type, messageType, direction);
-      return new Response(JSON.stringify({ success: true, message: "Event ignored" }), {
+    // Check if this is a valid SMS message from the workflow
+    if (!message || !message.body) {
+      console.log("No message body found in payload");
+      return new Response(JSON.stringify({ success: true, message: "No message body" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Get contact phone from GHL API
-    const ghlApiKey = Deno.env.get("GHL_API_KEY");
-    if (!ghlApiKey) {
-      throw new Error("GHL_API_KEY not configured");
-    }
-
-    let contactPhone: string | null = null;
-    let contactName: string | null = null;
-
-    // Fetch contact details from GHL
-    try {
-      const contactResponse = await fetch(
-        `https://services.leadconnectorhq.com/contacts/${ghlContactId}`,
-        {
-          headers: {
-            Authorization: `Bearer ${ghlApiKey}`,
-            Version: "2021-07-28",
-          },
-        }
-      );
-
-      if (contactResponse.ok) {
-        const contactData = await contactResponse.json();
-        contactPhone = contactData.contact?.phone || null;
-        contactName = contactData.contact?.name || contactData.contact?.firstName || null;
-        console.log("GHL contact fetched:", { phone: contactPhone, name: contactName });
-      } else {
-        console.error("Failed to fetch GHL contact:", await contactResponse.text());
-      }
-    } catch (e) {
-      console.error("Error fetching GHL contact:", e);
-    }
+    const messageBody = message.body;
+    const contactPhone = rawPhone;
+    const contactName = fullName || firstName || "Lead";
+    
+    console.log("Processing inbound SMS:", { messageBody, contactPhone, contactName });
 
     if (!contactPhone) {
-      console.log("No phone number found for GHL contact");
+      console.log("No phone number found in payload");
       return new Response(JSON.stringify({ success: false, message: "No phone number found" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -108,7 +80,6 @@ serve(async (req) => {
 
     if (!lead) {
       console.log("No matching lead found for phone:", normalizedPhone);
-      // Still log the message for manual review
       return new Response(
         JSON.stringify({ success: true, message: "No matching lead found", phone: normalizedPhone }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -126,7 +97,6 @@ serve(async (req) => {
         direction: "inbound",
         body: messageBody,
         status: "received",
-        ghl_conversation_id: ghlConversationId,
         ghl_contact_id: ghlContactId,
         is_read: false,
       })
@@ -191,7 +161,7 @@ serve(async (req) => {
     await supabase.from("lead_timeline").insert({
       lead_id: lead.id,
       action: `SMS received: "${messagePreview}"`,
-      performed_by_name: lead.name || contactName || "Lead",
+      performed_by_name: contactName,
     });
 
     console.log("GHL inbound SMS processed successfully for lead:", lead.id);
