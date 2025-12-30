@@ -40,10 +40,8 @@ const LeadKanbanBoard = ({ leads, onSelectLead, onRefresh }: LeadKanbanBoardProp
   );
 
   const updateStageMutation = useMutation({
-    mutationFn: async ({ leadId, newStage }: { leadId: string; newStage: LeadStage }) => {
-      const lead = leads.find((l) => l.id === leadId);
-      if (!lead) throw new Error("Lead not found");
-
+    mutationFn: async ({ leadId, newStage, previousStage }: { leadId: string; newStage: LeadStage; previousStage: LeadStage }) => {
+      // Update stage immediately in DB
       const { error } = await supabase
         .from("leads")
         .update({ stage: newStage, stage_changed_at: new Date().toISOString() })
@@ -51,25 +49,30 @@ const LeadKanbanBoard = ({ leads, onSelectLead, onRefresh }: LeadKanbanBoardProp
 
       if (error) throw error;
 
-      // Log timeline entry
-      const { data: userData } = await supabase.auth.getUser();
-      await supabase.from("lead_timeline").insert({
-        lead_id: leadId,
-        action: "stage_changed",
-        performed_by_user_id: userData?.user?.id,
-        performed_by_name: userData?.user?.email,
-        previous_stage: lead.stage,
-        new_stage: newStage,
-        metadata: { source: "kanban_drag" },
-      });
+      // Fire and forget: Log timeline + trigger automation in background
+      const bgTasks = async () => {
+        const { data: userData } = await supabase.auth.getUser();
+        await supabase.from("lead_timeline").insert({
+          lead_id: leadId,
+          action: "stage_changed",
+          performed_by_user_id: userData?.user?.id,
+          performed_by_name: userData?.user?.email,
+          previous_stage: previousStage,
+          new_stage: newStage,
+          metadata: { source: "kanban_drag" },
+        });
 
-      // Trigger automation
-      await supabase.functions.invoke("process-lead-stage-change", {
-        body: { leadId, newStage },
-      });
+        // Trigger automation with previousStage
+        await supabase.functions.invoke("process-lead-stage-change", {
+          body: { leadId, newStage, previousStage },
+        });
+      };
+
+      // Don't await - let it run in background
+      bgTasks().catch(console.error);
     },
     onSuccess: () => {
-      toast.success("Lead moved successfully");
+      toast.success("Lead moved");
       onRefresh();
     },
     onError: (error) => {
@@ -99,7 +102,8 @@ const LeadKanbanBoard = ({ leads, onSelectLead, onRefresh }: LeadKanbanBoardProp
       const lead = leads.find((l) => l.id === leadId);
       if (!lead || lead.stage === newStage) return;
 
-      updateStageMutation.mutate({ leadId, newStage });
+      // Pass previous stage for automation
+      updateStageMutation.mutate({ leadId, newStage, previousStage: lead.stage });
     },
     [leads, updateStageMutation]
   );
