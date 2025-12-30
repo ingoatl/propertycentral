@@ -347,6 +347,7 @@ serve(async (req) => {
               console.log(`GHL from phone: ${fromPhone}`);
               
               // Step 1: Find or create contact in GHL
+              console.log(`Searching for GHL contact with phone: ${formattedPhone}`);
               const searchResponse = await fetch(
                 `https://services.leadconnectorhq.com/contacts/search/duplicate?locationId=${ghlLocationId}&phone=${encodeURIComponent(formattedPhone)}`,
                 {
@@ -360,16 +361,24 @@ serve(async (req) => {
               );
 
               let contactId = null;
+              const searchText = await searchResponse.text();
+              console.log(`GHL search response status: ${searchResponse.status}, body: ${searchText}`);
+              
               if (searchResponse.ok) {
-                const searchData = await searchResponse.json();
-                if (searchData.contact?.id) {
-                  contactId = searchData.contact.id;
-                  console.log(`Found existing GHL contact: ${contactId}`);
+                try {
+                  const searchData = JSON.parse(searchText);
+                  if (searchData.contact?.id) {
+                    contactId = searchData.contact.id;
+                    console.log(`Found existing GHL contact: ${contactId}`);
+                  }
+                } catch (e) {
+                  console.error(`Failed to parse GHL search response: ${e}`);
                 }
               }
 
               // Create contact if not found
               if (!contactId) {
+                console.log(`Creating new GHL contact for ${lead.name}`);
                 const createContactResponse = await fetch(
                   `https://services.leadconnectorhq.com/contacts/`,
                   {
@@ -389,15 +398,25 @@ serve(async (req) => {
                   }
                 );
 
+                const createText = await createContactResponse.text();
+                console.log(`GHL create contact response status: ${createContactResponse.status}, body: ${createText}`);
+                
                 if (createContactResponse.ok) {
-                  const createData = await createContactResponse.json();
-                  contactId = createData.contact?.id;
-                  console.log(`Created new GHL contact: ${contactId}`);
+                  try {
+                    const createData = JSON.parse(createText);
+                    contactId = createData.contact?.id;
+                    console.log(`Created new GHL contact: ${contactId}`);
+                  } catch (e) {
+                    console.error(`Failed to parse GHL create response: ${e}`);
+                  }
+                } else {
+                  console.error(`GHL create contact failed: ${createContactResponse.status} - ${createText}`);
                 }
               }
 
               if (contactId) {
                 // Step 2: Send SMS message via GHL
+                console.log(`Sending SMS via GHL to contact ${contactId}`);
                 const sendResponse = await fetch(
                   `https://services.leadconnectorhq.com/conversations/messages`,
                   {
@@ -416,22 +435,33 @@ serve(async (req) => {
                   }
                 );
 
+                const sendText = await sendResponse.text();
+                console.log(`GHL send SMS response status: ${sendResponse.status}, body: ${sendText}`);
+                
                 if (sendResponse.ok) {
-                  const sendData = await sendResponse.json();
-                  smsSent = true;
-                  externalId = sendData.messageId || sendData.conversationId || "";
-                  provider = "gohighlevel";
-                  console.log(`SMS sent via GHL. Message ID: ${externalId}`);
+                  try {
+                    const sendData = JSON.parse(sendText);
+                    smsSent = true;
+                    externalId = sendData.messageId || sendData.conversationId || "";
+                    provider = "gohighlevel";
+                    console.log(`SMS sent via GHL. Message ID: ${externalId}`);
+                  } catch (e) {
+                    console.error(`Failed to parse GHL send response: ${e}`);
+                  }
                 } else {
-                  const errorText = await sendResponse.text();
-                  console.error("GHL SMS send error:", errorText);
-                  errorMessage = errorText;
+                  console.error("GHL SMS send error:", sendText);
+                  errorMessage = sendText;
                 }
+              } else {
+                console.error("Failed to get GHL contact ID, skipping GHL SMS");
+                errorMessage = "No GHL contact ID";
               }
             } catch (e) {
               console.error("GHL SMS error:", e);
               errorMessage = e instanceof Error ? e.message : String(e);
             }
+          } else {
+            console.log("GHL credentials not configured, skipping GHL SMS");
           }
 
           // Fallback to Telnyx if GHL failed
