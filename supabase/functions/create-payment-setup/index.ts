@@ -54,7 +54,7 @@ serve(async (req) => {
 
     // Create a Stripe Checkout session for setting up a payment method
     // Always use the production site URL for customer-facing redirects
-    const siteUrl = "https://www.peachhausgroup.com";
+    const siteUrl = "https://propertycentral.lovable.app";
     
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
