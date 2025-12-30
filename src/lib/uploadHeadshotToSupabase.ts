@@ -1,20 +1,19 @@
 import { supabase } from "@/integrations/supabase/client";
 
-export const uploadHeadshotToSupabase = async () => {
+export const uploadImageToSupabase = async (imagePath: string, fileName: string) => {
   try {
-    console.log("Fetching Ingo's headshot from public folder...");
+    console.log(`Fetching ${fileName} from public folder...`);
     
     // Fetch the image from the public folder
-    const response = await fetch('/images/ingo-headshot.png');
+    const response = await fetch(imagePath);
     if (!response.ok) {
       throw new Error(`Failed to fetch image: ${response.statusText}`);
     }
     
     const blob = await response.blob();
-    console.log("Headshot fetched, size:", blob.size);
+    console.log(`${fileName} fetched, size:`, blob.size);
     
     // Upload to Supabase storage
-    const fileName = 'ingo-headshot.png';
     const { data, error } = await supabase.storage
       .from('property-images')
       .upload(fileName, blob, {
@@ -26,7 +25,7 @@ export const uploadHeadshotToSupabase = async () => {
       throw error;
     }
     
-    console.log("Headshot uploaded successfully:", data);
+    console.log(`${fileName} uploaded successfully:`, data);
     
     // Get the public URL
     const { data: urlData } = supabase.storage
@@ -41,7 +40,7 @@ export const uploadHeadshotToSupabase = async () => {
       publicUrl: urlData.publicUrl
     };
   } catch (error) {
-    console.error("Error uploading headshot:", error);
+    console.error(`Error uploading ${fileName}:`, error);
     return {
       success: false,
       error: error instanceof Error ? error.message : String(error)
@@ -49,10 +48,20 @@ export const uploadHeadshotToSupabase = async () => {
   }
 };
 
+export const uploadHeadshotToSupabase = async () => {
+  return uploadImageToSupabase('/images/ingo-headshot.png', 'ingo-headshot.png');
+};
+
+export const uploadSignatureToSupabase = async () => {
+  return uploadImageToSupabase('/images/ingo-signature.png', 'ingo-signature.png');
+};
+
 // Auto-run if this module is imported
 if (typeof window !== 'undefined') {
-  // Check if already uploaded by trying to fetch the image
-  fetch('https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/ingo-headshot.png')
+  const storageBaseUrl = 'https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images';
+  
+  // Check and upload headshot
+  fetch(`${storageBaseUrl}/ingo-headshot.png`)
     .then(res => {
       if (!res.ok) {
         console.log("Headshot not found in storage, uploading...");
@@ -64,5 +73,20 @@ if (typeof window !== 'undefined') {
     .catch(() => {
       console.log("Error checking headshot, attempting upload...");
       uploadHeadshotToSupabase();
+    });
+
+  // Check and upload signature
+  fetch(`${storageBaseUrl}/ingo-signature.png`)
+    .then(res => {
+      if (!res.ok) {
+        console.log("Signature not found in storage, uploading...");
+        uploadSignatureToSupabase();
+      } else {
+        console.log("Signature already exists in storage");
+      }
+    })
+    .catch(() => {
+      console.log("Error checking signature, attempting upload...");
+      uploadSignatureToSupabase();
     });
 }
