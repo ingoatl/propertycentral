@@ -1158,10 +1158,13 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
     return renderField();
   }
 
-  // When collapsing, trigger parent update to refresh progress bar
+  // When collapsing, delay parent update to allow animation to complete
   const handleCollapse = () => {
     setIsCollapsed(true);
-    onUpdate(); // Update progress bar when card closes
+    // Delay the update call to not interfere with closing animation
+    setTimeout(() => {
+      onUpdate(); // Update progress bar after animation completes
+    }, 500);
   };
 
   // Use a single component with Collapsible for smooth animations
