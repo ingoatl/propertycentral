@@ -123,7 +123,7 @@ serve(async (req: Request): Promise<Response> => {
     `;
 
     const emailResponse = await resend.emails.send({
-      from: "PeachHaus <noreply@peachhaus.co>",
+      from: "PeachHaus <info@peachhausgroup.com>",
       to: [ownerEmail],
       subject: `Action Required: ${pendingTasks.length} Setup Task${pendingTasks.length !== 1 ? 's' : ''} for ${propertyName}`,
       html: emailHtml,

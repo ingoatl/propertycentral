@@ -192,7 +192,7 @@ serve(async (req) => {
 
     try {
       await resend.emails.send({
-        from: "PeachHaus <onboarding@resend.dev>",
+        from: "PeachHaus <info@peachhausgroup.com>",
         to: [owner.email],
         subject: `Payment Confirmation - ${new Date(chargeMonth).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`,
         html: emailHtml,
