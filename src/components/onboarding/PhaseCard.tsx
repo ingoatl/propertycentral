@@ -80,9 +80,10 @@ export const PhaseCard = ({
 
   return (
     <Card className={cn(
-      "transition-all max-md:shadow-lg",
+      "transition-all duration-300 ease-out max-md:shadow-lg hover:shadow-md",
       isComplete && "bg-green-50 border-green-500",
-      highlighted && "ring-2 ring-blue-500 shadow-lg"
+      highlighted && "ring-2 ring-blue-500 shadow-lg",
+      expanded && "shadow-lg"
     )}>
       <Collapsible open={expanded} onOpenChange={onToggle}>
         <CollapsibleTrigger asChild>
@@ -145,8 +146,8 @@ export const PhaseCard = ({
                     </div>
                   </div>
                   <ChevronDown className={cn(
-                    "w-5 h-5 transition-transform duration-500 ease-out max-md:w-6 max-md:h-6",
-                    expanded && "transform rotate-180"
+                    "w-5 h-5 transition-transform duration-500 ease-[cubic-bezier(0.34,1.56,0.64,1)] max-md:w-6 max-md:h-6",
+                    expanded && "rotate-180"
                   )} />
                 </div>
               </div>

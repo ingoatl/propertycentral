@@ -54,12 +54,13 @@ export const TaskFileUpload = ({
   const handlePermitUpload = async (userId: string) => {
     for (const file of selectedFiles) {
       const fileExt = file.name.split('.').pop();
-      const fileName = `${userId}/${taskId}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+      const storagePath = `${userId}/${taskId}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+      const originalFileName = file.name; // Keep the original filename for AI analysis
       
       // Upload to task-attachments bucket
       const { error: uploadError } = await supabase.storage
         .from('task-attachments')
-        .upload(fileName, file);
+        .upload(storagePath, file);
 
       if (uploadError) throw uploadError;
 
@@ -68,8 +69,8 @@ export const TaskFileUpload = ({
         .from('task_attachments')
         .insert({
           task_id: taskId,
-          file_name: file.name,
-          file_path: fileName,
+          file_name: originalFileName,
+          file_path: storagePath,
           file_size: file.size,
           file_type: file.type,
           uploaded_by: userId,
@@ -95,8 +96,8 @@ export const TaskFileUpload = ({
           .upsert({
             property_id: actualPropertyId,
             project_id: projectId,
-            file_name: file.name,
-            file_path: fileName,
+            file_name: originalFileName,
+            file_path: storagePath,
             file_type: fileExt || "pdf",
             document_type: "str_permit",
             updated_at: new Date().toISOString(),
@@ -128,8 +129,9 @@ export const TaskFileUpload = ({
               body: {
                 documentId: existingDoc.id,
                 propertyId: actualPropertyId,
-                filePath: fileName,
+                filePath: storagePath,
                 bucket: "task-attachments",
+                originalFileName: originalFileName, // Pass original filename for better AI analysis
               },
             });
 
@@ -154,8 +156,9 @@ export const TaskFileUpload = ({
           body: {
             documentId: docEntry.id,
             propertyId: actualPropertyId,
-            filePath: fileName,
+            filePath: storagePath,
             bucket: "task-attachments",
+            originalFileName: originalFileName, // Pass original filename for better AI analysis
           },
         });
 

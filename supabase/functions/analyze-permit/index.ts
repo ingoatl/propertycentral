@@ -1,3 +1,4 @@
+import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -12,7 +13,7 @@ serve(async (req) => {
   }
 
   try {
-    const { documentId, propertyId, filePath, bucket = "onboarding-documents" } = await req.json();
+    const { documentId, propertyId, filePath, bucket = "task-attachments", originalFileName } = await req.json();
     
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -20,25 +21,29 @@ serve(async (req) => {
     
     const supabase = createClient(supabaseUrl, supabaseKey);
     
-    console.log(`Analyzing permit for document ${documentId}, file: ${filePath}`);
+    console.log(`Analyzing permit for document ${documentId}, property ${propertyId}`);
+    console.log(`File path: ${filePath}, bucket: ${bucket}`);
+    console.log(`Original filename: ${originalFileName || "not provided"}`);
     
-    // Extract information from filename
-    const filename = filePath.split('/').pop() || '';
     let extractedData: Record<string, string | null> = {
       permit_number: null,
       expiration_date: null,
       jurisdiction: null,
     };
+
+    // First try to extract from the original filename if provided
+    const filenameToAnalyze = originalFileName || filePath.split('/').pop() || '';
+    console.log(`Analyzing filename: ${filenameToAnalyze}`);
     
-    // Try multiple date formats from filename
+    // Try date extraction from filename
     const datePatterns = [
-      { regex: /(\d{1,2})[-\/](\d{1,2})[-\/](\d{4})/, format: 'MDY' },  // MM-DD-YYYY or MM/DD/YYYY
-      { regex: /(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})/, format: 'YMD' },  // YYYY-MM-DD
-      { regex: /(\d{1,2})[-_](\d{1,2})[-_](\d{4})/, format: 'MDY' },    // MM_DD_YYYY
+      { regex: /(\d{1,2})[-\/](\d{1,2})[-\/](\d{4})/, format: 'MDY' },
+      { regex: /(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})/, format: 'YMD' },
+      { regex: /(\d{1,2})[-_](\d{1,2})[-_](\d{4})/, format: 'MDY' },
     ];
     
     for (const { regex, format } of datePatterns) {
-      const match = filename.match(regex);
+      const match = filenameToAnalyze.match(regex);
       if (match) {
         let year, month, day;
         if (format === 'YMD') {
@@ -47,44 +52,146 @@ serve(async (req) => {
           [, month, day, year] = match;
         }
         extractedData.expiration_date = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-        console.log(`Extracted full date from filename: ${extractedData.expiration_date}`);
+        console.log(`Extracted date from filename: ${extractedData.expiration_date}`);
         break;
       }
     }
     
-    // If no full date found, check for year-only pattern (e.g., "2026" in filename)
-    // A standalone year means the permit expires at the end of that year
+    // Check for year-only pattern (e.g., "2026" means expires end of that year)
     if (!extractedData.expiration_date) {
-      const yearOnlyMatch = filename.match(/\b(20[2-9]\d)\b/);
-      if (yearOnlyMatch) {
-        const year = yearOnlyMatch[1];
-        // If only a year is specified, assume it expires at the end of that year
+      const yearMatch = filenameToAnalyze.match(/\b(20[2-9]\d)\b/);
+      if (yearMatch) {
+        const year = yearMatch[1];
         extractedData.expiration_date = `${year}-12-31`;
-        console.log(`Extracted year-only from filename, assuming end of year: ${extractedData.expiration_date}`);
+        console.log(`Extracted year-only from filename, set to end of year: ${extractedData.expiration_date}`);
       }
     }
     
-    // Extract permit number patterns from filename
+    // Extract permit number from filename
     const permitPatterns = [
       /STR[-_]?\d+/i,
       /PERMIT[-_]?\d+/i,
       /LICENSE[-_]?\d+/i,
       /\b[A-Z]{2,3}[-_]?\d{4,}/i,
-      /STR\d+/i,
     ];
     
     for (const pattern of permitPatterns) {
-      const match = filename.match(pattern);
+      const match = filenameToAnalyze.match(pattern);
       if (match) {
         extractedData.permit_number = match[0].replace(/[-_]/g, '');
         console.log(`Extracted permit number from filename: ${extractedData.permit_number}`);
         break;
       }
     }
+
+    // If we still don't have an expiration date, try to read the PDF content with AI
+    if (!extractedData.expiration_date && openaiKey) {
+      console.log("No date found in filename, attempting to read PDF content with AI...");
+      
+      try {
+        // Download the PDF file
+        const { data: fileData, error: downloadError } = await supabase.storage
+          .from(bucket)
+          .download(filePath);
+        
+        if (downloadError) {
+          console.error("Failed to download file:", downloadError);
+        } else if (fileData) {
+          // Convert blob to base64 for GPT-4 Vision
+          const arrayBuffer = await fileData.arrayBuffer();
+          const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+          const fileType = filePath.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'image/jpeg';
+          
+          console.log("Sending document to GPT-4o for analysis...");
+          
+          // Use GPT-4o with vision capabilities to analyze the document
+          const response = await fetch("https://api.openai.com/v1/chat/completions", {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${openaiKey}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              model: "gpt-4o",
+              messages: [
+                {
+                  role: "system",
+                  content: `You are a permit document analyzer. Extract the following information from this document:
+1. Permit/License Number - Look for "Permit No.", "License #", "Registration Number", etc.
+2. Expiration Date - Look for "Expires", "Valid Until", "Expiration Date", "Good Through", etc.
+3. Jurisdiction - The city, county, or state that issued the permit
+
+IMPORTANT DATE RULES:
+- If you see a year alone (like "2026" or "Valid for 2026"), the permit expires December 31 of that year
+- If you see "1 year from issue date", calculate the expiration
+- Convert all dates to YYYY-MM-DD format
+
+Return ONLY a valid JSON object with this exact structure (no markdown, no code blocks):
+{"permit_number": "string or null", "expiration_date": "YYYY-MM-DD or null", "jurisdiction": "string or null"}`
+                },
+                {
+                  role: "user",
+                  content: [
+                    {
+                      type: "text",
+                      text: `Analyze this permit document and extract the permit number, expiration date, and jurisdiction. The original filename was: "${filenameToAnalyze}"`
+                    },
+                    {
+                      type: "image_url",
+                      image_url: {
+                        url: `data:${fileType};base64,${base64}`,
+                        detail: "high"
+                      }
+                    }
+                  ]
+                }
+              ],
+              max_tokens: 500,
+              temperature: 0,
+            }),
+          });
+          
+          if (response.ok) {
+            const result = await response.json();
+            const content = result.choices[0]?.message?.content || '';
+            console.log("GPT-4o response:", content);
+            
+            // Parse JSON from response (handle potential markdown code blocks)
+            let cleanContent = content.trim();
+            if (cleanContent.startsWith('```')) {
+              cleanContent = cleanContent.replace(/```json?\n?/g, '').replace(/```/g, '').trim();
+            }
+            
+            try {
+              const parsed = JSON.parse(cleanContent);
+              if (parsed.permit_number && !extractedData.permit_number) {
+                extractedData.permit_number = parsed.permit_number;
+                console.log(`AI extracted permit number: ${extractedData.permit_number}`);
+              }
+              if (parsed.expiration_date) {
+                extractedData.expiration_date = parsed.expiration_date;
+                console.log(`AI extracted expiration date: ${extractedData.expiration_date}`);
+              }
+              if (parsed.jurisdiction) {
+                extractedData.jurisdiction = parsed.jurisdiction;
+                console.log(`AI extracted jurisdiction: ${extractedData.jurisdiction}`);
+              }
+            } catch (parseError) {
+              console.error("Failed to parse AI response:", parseError);
+            }
+          } else {
+            const errorText = await response.text();
+            console.error("GPT-4o request failed:", response.status, errorText);
+          }
+        }
+      } catch (aiError) {
+        console.error("AI analysis failed:", aiError);
+      }
+    }
     
-    // If we have OpenAI key and missing data, try GPT for smarter filename analysis
-    if (openaiKey && (!extractedData.expiration_date || !extractedData.permit_number)) {
-      console.log("Using GPT-4o-mini for enhanced filename analysis");
+    // If still no expiration date but we have a filename with valid-looking content, use GPT to analyze filename
+    if (!extractedData.expiration_date && openaiKey && filenameToAnalyze.length > 10) {
+      console.log("Using GPT-4o-mini for enhanced filename analysis as fallback");
       try {
         const response = await fetch("https://api.openai.com/v1/chat/completions", {
           method: "POST",
@@ -97,20 +204,17 @@ serve(async (req) => {
             messages: [
               {
                 role: "system",
-                content: `You are a permit document analyzer. Extract permit information from the filename. 
-Return ONLY valid JSON with this exact structure:
+                content: `Extract permit information from filename. Return ONLY valid JSON:
 {"permit_number": "string or null", "expiration_date": "YYYY-MM-DD or null", "jurisdiction": "string or null"}
 
 Rules:
-- Dates like "10-24-2025" or "10_24_2025" mean October 24, 2025 -> "2025-10-24"
-- If ONLY a year is mentioned (e.g., "2026" in the filename), the permit expires at the END of that year -> "2026-12-31"
-- STR000287 is a permit number
-- Look for city/county names for jurisdiction
-- Return null for any field you can't determine`
+- A year alone (e.g., "2026") means expires Dec 31 of that year -> "2026-12-31"
+- STR000287 format is a permit number
+- City/county names indicate jurisdiction`
               },
               {
                 role: "user",
-                content: `Analyze this permit filename: "${filename}"`
+                content: `Filename: "${filenameToAnalyze}"`
               }
             ],
             max_tokens: 150,
@@ -121,28 +225,24 @@ Rules:
         if (response.ok) {
           const result = await response.json();
           const content = result.choices[0]?.message?.content || '';
-          console.log("GPT response:", content);
+          console.log("GPT-4o-mini response:", content);
           
-          // Parse JSON from response
           const jsonMatch = content.match(/\{[\s\S]*\}/);
           if (jsonMatch) {
             const parsed = JSON.parse(jsonMatch[0]);
-            // Only update if we got better data
             if (parsed.permit_number && !extractedData.permit_number) {
               extractedData.permit_number = parsed.permit_number;
             }
             if (parsed.expiration_date && !extractedData.expiration_date) {
               extractedData.expiration_date = parsed.expiration_date;
             }
-            if (parsed.jurisdiction) {
+            if (parsed.jurisdiction && !extractedData.jurisdiction) {
               extractedData.jurisdiction = parsed.jurisdiction;
             }
           }
-        } else {
-          console.log("GPT request failed:", await response.text());
         }
       } catch (e) {
-        console.log("GPT analysis failed, using regex extraction only:", e);
+        console.log("GPT-4o-mini analysis failed:", e);
       }
     }
     
@@ -193,8 +293,8 @@ Rules:
     }
     
     const message = extractedData.expiration_date 
-      ? `Permit analyzed successfully. Expiration: ${extractedData.expiration_date}${extractedData.permit_number ? `, Permit #: ${extractedData.permit_number}` : ''}`
-      : "Could not auto-detect expiration date from filename. Please enter manually.";
+      ? `Permit analyzed successfully. Expiration: ${extractedData.expiration_date}${extractedData.permit_number ? `, Permit #: ${extractedData.permit_number}` : ''}${extractedData.jurisdiction ? ` (${extractedData.jurisdiction})` : ''}`
+      : "Could not detect expiration date. Please enter manually.";
     
     return new Response(JSON.stringify({
       success: true,
