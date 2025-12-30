@@ -90,8 +90,8 @@ export function LeadConversationThread({ communications, leadName }: LeadConvers
   };
 
   return (
-    <ScrollArea className="h-[350px] pr-2" ref={scrollRef}>
-      <div className="space-y-3 pb-4 px-1">
+    <ScrollArea className="h-[400px]" ref={scrollRef}>
+      <div className="space-y-3 pb-4 pr-4">
         {groupedMessages.map((group, groupIndex) => (
           <div key={groupIndex}>
             {/* Date Header */}
@@ -106,27 +106,35 @@ export function LeadConversationThread({ communications, leadName }: LeadConvers
               {group.messages.map((comm) => {
                 const isOutbound = comm.direction === "outbound";
                 const isVoiceCall = comm.communication_type === "call" || comm.communication_type === "voice_call";
+                const isAutoMessage = comm.status === "sent" && isOutbound;
 
                 return (
                   <div
                     key={comm.id}
                     className={cn(
-                      "flex",
-                      isOutbound ? "justify-end" : "justify-start"
+                      "flex flex-col",
+                      isOutbound ? "items-end" : "items-start"
                     )}
                   >
+                    {/* Stage/Auto label for automated messages */}
+                    {isAutoMessage && comm.communication_type !== "voice_call" && (
+                      <span className="text-[10px] text-muted-foreground mb-0.5 px-1">
+                        Auto {comm.communication_type.toUpperCase()}
+                      </span>
+                    )}
+                    
                     <div
                       className={cn(
-                        "max-w-[280px] rounded-xl px-3 py-2",
+                        "w-full max-w-[85%] rounded-lg px-3 py-2.5",
                         isOutbound
-                          ? "bg-primary text-primary-foreground rounded-br-sm"
-                          : "bg-muted text-foreground rounded-bl-sm",
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-muted text-foreground",
                         isVoiceCall && "bg-muted/60 border border-dashed border-border"
                       )}
                     >
                       {/* Sender label for inbound */}
                       {!isOutbound && (
-                        <p className="text-[10px] font-medium text-primary mb-0.5">
+                        <p className="text-[10px] font-medium text-primary mb-1">
                           {leadName}
                         </p>
                       )}
@@ -147,7 +155,7 @@ export function LeadConversationThread({ communications, leadName }: LeadConvers
                       {/* Email Subject */}
                       {comm.communication_type === "email" && comm.subject && (
                         <p className={cn(
-                          "font-medium text-xs mb-1",
+                          "font-medium text-sm mb-1.5 break-words",
                           isOutbound ? "text-primary-foreground/90" : "text-foreground"
                         )}>
                           {comm.subject}
@@ -155,17 +163,15 @@ export function LeadConversationThread({ communications, leadName }: LeadConvers
                       )}
 
                       {/* Message Body */}
-                      <p className={cn(
-                        "whitespace-pre-wrap break-words text-[13px] leading-snug"
-                      )}>
+                      <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">
                         {comm.body}
                       </p>
 
                       {/* Timestamp and Status */}
                       <div
                         className={cn(
-                          "flex items-center gap-1 mt-1.5",
-                          isOutbound ? "justify-end opacity-60" : "justify-start text-muted-foreground"
+                          "flex items-center gap-1.5 mt-2",
+                          isOutbound ? "justify-end opacity-70" : "justify-start text-muted-foreground"
                         )}
                       >
                         <span className="text-[10px]">
