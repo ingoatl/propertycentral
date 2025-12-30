@@ -44,6 +44,16 @@ import { AIVoiceCallButton } from "./AIVoiceCallButton";
 import { LeadConversationThread } from "./LeadConversationThread";
 import { SendEmailDialog } from "@/components/communications/SendEmailDialog";
 import { SendSMSDialog } from "@/components/communications/SendSMSDialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface LeadDetailModalProps {
   lead: Lead | null;
@@ -60,6 +70,8 @@ const LeadDetailModal = ({ lead, open, onOpenChange, onRefresh }: LeadDetailModa
   const [showScheduleCall, setShowScheduleCall] = useState(false);
   const [showEmailDialog, setShowEmailDialog] = useState(false);
   const [showSMSDialog, setShowSMSDialog] = useState(false);
+  const [showCallConfirm, setShowCallConfirm] = useState(false);
+  const [isPlacingCall, setIsPlacingCall] = useState(false);
 
   // Fetch timeline
   const { data: timeline } = useQuery({
@@ -227,6 +239,41 @@ const LeadDetailModal = ({ lead, open, onOpenChange, onRefresh }: LeadDetailModa
     },
   });
 
+  // Handle placing a call through GHL
+  const handlePlaceCall = async () => {
+    if (!lead?.phone) return;
+    
+    setIsPlacingCall(true);
+    try {
+      // Format phone number
+      let formattedPhone = lead.phone.replace(/\D/g, '');
+      if (!formattedPhone.startsWith('1') && formattedPhone.length === 10) {
+        formattedPhone = '1' + formattedPhone;
+      }
+      formattedPhone = '+' + formattedPhone;
+
+      // Log the call attempt to timeline
+      const { data: { user } } = await supabase.auth.getUser();
+      await supabase.from("lead_timeline").insert({
+        lead_id: lead.id,
+        action: `Initiated call to ${lead.name}`,
+        performed_by_user_id: user?.id,
+        performed_by_name: user?.email,
+      });
+
+      // Open phone dialer with the number (this works on both mobile and desktop)
+      window.location.href = `tel:${formattedPhone}`;
+      
+      toast.success(`Calling ${lead.name}...`);
+      setShowCallConfirm(false);
+    } catch (error) {
+      console.error('Failed to place call:', error);
+      toast.error('Failed to initiate call');
+    } finally {
+      setIsPlacingCall(false);
+    }
+  };
+
   if (!lead) return null;
 
   const stageConfig = STAGE_CONFIG[lead.stage];
@@ -255,13 +302,11 @@ const LeadDetailModal = ({ lead, open, onOpenChange, onRefresh }: LeadDetailModa
             <Button 
               variant="outline" 
               size="sm" 
-              asChild
               className="flex-1"
+              onClick={() => setShowCallConfirm(true)}
             >
-              <a href={`tel:${lead.phone}`}>
-                <Phone className="h-4 w-4 mr-2" />
-                Call
-              </a>
+              <Phone className="h-4 w-4 mr-2" />
+              Call
             </Button>
           )}
           {lead.email && (
@@ -389,6 +434,29 @@ const LeadDetailModal = ({ lead, open, onOpenChange, onRefresh }: LeadDetailModa
             contactId={lead.id}
           />
         )}
+
+        {/* Call Confirmation Dialog */}
+        <AlertDialog open={showCallConfirm} onOpenChange={setShowCallConfirm}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Call {lead.name}?</AlertDialogTitle>
+              <AlertDialogDescription>
+                You are about to call {lead.name} at {lead.phone}. This will open your phone dialer.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction 
+                onClick={handlePlaceCall}
+                disabled={isPlacingCall}
+                className="bg-green-600 hover:bg-green-700"
+              >
+                <Phone className="h-4 w-4 mr-2" />
+                {isPlacingCall ? "Calling..." : "Call Now"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         {(lead.ai_summary || lead.ai_next_action) && (
           <div className="p-3 bg-muted/50 rounded-lg mb-4">
