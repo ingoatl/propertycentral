@@ -272,40 +272,33 @@ All colors MUST be HSL.
   }
 }
 
-/* Premium Collapsible Animations - Apple-quality spring easing */
-@keyframes collapsible-down {
-  from {
-    height: 0;
-    opacity: 0;
-    transform: translateY(-8px);
-  }
-  to {
-    height: var(--radix-collapsible-content-height);
-    opacity: 1;
-    transform: translateY(0);
-  }
+/* Premium Collapsible Animations - CSS Grid based for reliability */
+/* CSS Grid row transitions are immune to JavaScript interference from Radix */
+
+.collapsible-content {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 500ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-@keyframes collapsible-up {
-  from {
-    height: var(--radix-collapsible-content-height);
-    opacity: 1;
-    transform: translateY(0);
-  }
-  to {
-    height: 0;
-    opacity: 0;
-    transform: translateY(-4px);
-  }
-}
-
-/* Apply animations directly to Radix CollapsibleContent */
 .collapsible-content[data-state="open"] {
-  animation: collapsible-down 500ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
-  will-change: height, opacity, transform;
+  grid-template-rows: 1fr;
 }
 
 .collapsible-content[data-state="closed"] {
-  animation: collapsible-up 400ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
-  will-change: height, opacity, transform;
+  grid-template-rows: 0fr;
+}
+
+.collapsible-content > .collapsible-content-inner {
+  overflow: hidden;
+  opacity: 0;
+  transition: opacity 400ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.collapsible-content[data-state="open"] > .collapsible-content-inner {
+  opacity: 1;
+}
+
+.collapsible-content[data-state="closed"] > .collapsible-content-inner {
+  opacity: 0;
 }
