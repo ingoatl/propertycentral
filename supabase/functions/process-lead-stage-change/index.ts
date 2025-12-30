@@ -344,79 +344,44 @@ serve(async (req) => {
           if (ghlApiKey && ghlLocationId) {
             try {
               const fromPhone = "+14048005932"; // 404-800-5932
-              console.log(`GHL from phone: ${fromPhone}`);
+              console.log(`Sending SMS via GHL from: ${fromPhone} to: ${formattedPhone}`);
               
-              // Step 1: Find or create contact in GHL
-              console.log(`Searching for GHL contact with phone: ${formattedPhone}`);
-              const searchResponse = await fetch(
-                `https://services.leadconnectorhq.com/contacts/search/duplicate?locationId=${ghlLocationId}&phone=${encodeURIComponent(formattedPhone)}`,
+              // Use upsert endpoint to find or create contact in one call
+              const upsertResponse = await fetch(
+                `https://services.leadconnectorhq.com/contacts/upsert`,
                 {
-                  method: "GET",
+                  method: "POST",
                   headers: {
                     "Authorization": `Bearer ${ghlApiKey}`,
                     "Version": "2021-07-28",
                     "Content-Type": "application/json",
                   },
+                  body: JSON.stringify({
+                    locationId: ghlLocationId,
+                    phone: formattedPhone,
+                    name: lead.name || "Lead",
+                    email: lead.email || undefined,
+                    source: "PropertyCentral",
+                  }),
                 }
               );
 
-              let contactId = null;
-              const searchText = await searchResponse.text();
-              console.log(`GHL search response status: ${searchResponse.status}, body: ${searchText}`);
+              const upsertText = await upsertResponse.text();
+              console.log(`GHL upsert response: ${upsertResponse.status} - ${upsertText}`);
               
-              if (searchResponse.ok) {
+              let contactId = null;
+              if (upsertResponse.ok) {
                 try {
-                  const searchData = JSON.parse(searchText);
-                  if (searchData.contact?.id) {
-                    contactId = searchData.contact.id;
-                    console.log(`Found existing GHL contact: ${contactId}`);
-                  }
+                  const upsertData = JSON.parse(upsertText);
+                  contactId = upsertData.contact?.id;
+                  console.log(`GHL contact ID: ${contactId}`);
                 } catch (e) {
-                  console.error(`Failed to parse GHL search response: ${e}`);
-                }
-              }
-
-              // Create contact if not found
-              if (!contactId) {
-                console.log(`Creating new GHL contact for ${lead.name}`);
-                const createContactResponse = await fetch(
-                  `https://services.leadconnectorhq.com/contacts/`,
-                  {
-                    method: "POST",
-                    headers: {
-                      "Authorization": `Bearer ${ghlApiKey}`,
-                      "Version": "2021-07-28",
-                      "Content-Type": "application/json",
-                    },
-                    body: JSON.stringify({
-                      locationId: ghlLocationId,
-                      phone: formattedPhone,
-                      name: lead.name || "Lead",
-                      email: lead.email || undefined,
-                      source: "PropertyCentral",
-                    }),
-                  }
-                );
-
-                const createText = await createContactResponse.text();
-                console.log(`GHL create contact response status: ${createContactResponse.status}, body: ${createText}`);
-                
-                if (createContactResponse.ok) {
-                  try {
-                    const createData = JSON.parse(createText);
-                    contactId = createData.contact?.id;
-                    console.log(`Created new GHL contact: ${contactId}`);
-                  } catch (e) {
-                    console.error(`Failed to parse GHL create response: ${e}`);
-                  }
-                } else {
-                  console.error(`GHL create contact failed: ${createContactResponse.status} - ${createText}`);
+                  console.error(`Failed to parse GHL upsert response: ${e}`);
                 }
               }
 
               if (contactId) {
-                // Step 2: Send SMS message via GHL
-                console.log(`Sending SMS via GHL to contact ${contactId}`);
+                // Send SMS message via GHL
                 const sendResponse = await fetch(
                   `https://services.leadconnectorhq.com/conversations/messages`,
                   {
@@ -430,13 +395,12 @@ serve(async (req) => {
                       type: "SMS",
                       contactId: contactId,
                       message: messageBody,
-                      fromNumber: fromPhone,
                     }),
                   }
                 );
 
                 const sendText = await sendResponse.text();
-                console.log(`GHL send SMS response status: ${sendResponse.status}, body: ${sendText}`);
+                console.log(`GHL send SMS response: ${sendResponse.status} - ${sendText}`);
                 
                 if (sendResponse.ok) {
                   try {
@@ -453,8 +417,8 @@ serve(async (req) => {
                   errorMessage = sendText;
                 }
               } else {
-                console.error("Failed to get GHL contact ID, skipping GHL SMS");
-                errorMessage = "No GHL contact ID";
+                console.error("Failed to get GHL contact ID from upsert");
+                errorMessage = "No GHL contact ID from upsert";
               }
             } catch (e) {
               console.error("GHL SMS error:", e);
