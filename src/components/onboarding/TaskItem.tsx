@@ -1253,7 +1253,10 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
                   }
                 })()}
                 <TaskStatusBadge status={taskStatus} dueDate={task.due_date} />
-                <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                <ChevronDown className={cn(
+                  "w-4 h-4 text-muted-foreground transition-transform duration-300",
+                  !isCollapsed && "rotate-180"
+                )} />
               </div>
             </div>
           </div>
@@ -1320,9 +1323,9 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
                   handleCollapse();
                 }}
               >
-                <ChevronDown className="w-5 h-5" />
+                <ChevronDown className="w-5 h-5 rotate-180 transition-transform duration-300" />
               </Button>
-              <ChevronDown className="w-4 h-4 text-muted-foreground rotate-180 transition-transform max-md:hidden" />
+              <ChevronDown className="w-4 h-4 text-muted-foreground rotate-180 transition-transform duration-300 max-md:hidden" />
             </div>
           </div>
         </div>
