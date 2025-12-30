@@ -91,7 +91,7 @@ export function LeadConversationThread({ communications, leadName }: LeadConvers
 
   return (
     <ScrollArea className="h-full" ref={scrollRef}>
-      <div className="space-y-3 pb-4 pr-4">
+      <div className="space-y-3 pb-4 pr-2">
         {groupedMessages.map((group, groupIndex) => (
           <div key={groupIndex}>
             {/* Date Header */}
@@ -125,7 +125,7 @@ export function LeadConversationThread({ communications, leadName }: LeadConvers
                     
                     <div
                       className={cn(
-                        "w-full max-w-[85%] rounded-lg px-3 py-2.5",
+                        "max-w-[80%] rounded-lg px-3 py-2.5 break-words overflow-hidden",
                         isOutbound
                           ? "bg-primary text-primary-foreground"
                           : "bg-muted text-foreground",
