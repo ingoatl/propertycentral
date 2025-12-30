@@ -305,3 +305,6 @@ verify_jwt = true
 
 [functions.send-permit-reminders]
 verify_jwt = false
+
+[functions.get-lead-for-payment]
+verify_jwt = false

@@ -23,14 +23,15 @@ const PaymentSetup = () => {
       }
 
       try {
-        const { data, error } = await supabase
-          .from("leads")
-          .select("name, email")
-          .eq("id", leadId)
-          .single();
+        // Use edge function to fetch lead data without requiring auth
+        const { data, error } = await supabase.functions.invoke("get-lead-for-payment", {
+          body: { leadId },
+        });
 
         if (error) throw error;
-        setLeadData(data);
+        if (data.error) throw new Error(data.error);
+        
+        setLeadData({ name: data.name, email: data.email });
       } catch (error) {
         console.error("Error fetching lead:", error);
         toast.error("Could not find your information");
