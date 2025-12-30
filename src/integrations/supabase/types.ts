@@ -1893,7 +1893,10 @@ export type Database = {
           error_message: string | null
           external_id: string | null
           ghl_call_id: string | null
+          ghl_contact_id: string | null
+          ghl_conversation_id: string | null
           id: string
+          is_read: boolean | null
           lead_id: string
           metadata: Json | null
           opened_at: string | null
@@ -1917,7 +1920,10 @@ export type Database = {
           error_message?: string | null
           external_id?: string | null
           ghl_call_id?: string | null
+          ghl_contact_id?: string | null
+          ghl_conversation_id?: string | null
           id?: string
+          is_read?: boolean | null
           lead_id: string
           metadata?: Json | null
           opened_at?: string | null
@@ -1941,7 +1947,10 @@ export type Database = {
           error_message?: string | null
           external_id?: string | null
           ghl_call_id?: string | null
+          ghl_contact_id?: string | null
+          ghl_conversation_id?: string | null
           id?: string
+          is_read?: boolean | null
           lead_id?: string
           metadata?: Json | null
           opened_at?: string | null
@@ -2283,6 +2292,7 @@ export type Database = {
           created_at: string
           email: string | null
           follow_up_paused: boolean | null
+          has_unread_messages: boolean | null
           id: string
           last_contacted_at: string | null
           last_response_at: string | null
@@ -2317,6 +2327,7 @@ export type Database = {
           created_at?: string
           email?: string | null
           follow_up_paused?: boolean | null
+          has_unread_messages?: boolean | null
           id?: string
           last_contacted_at?: string | null
           last_response_at?: string | null
@@ -2351,6 +2362,7 @@ export type Database = {
           created_at?: string
           email?: string | null
           follow_up_paused?: boolean | null
+          has_unread_messages?: boolean | null
           id?: string
           last_contacted_at?: string | null
           last_response_at?: string | null

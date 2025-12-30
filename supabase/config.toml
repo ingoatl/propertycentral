@@ -326,3 +326,6 @@ verify_jwt = true
 
 [functions.enhance-email-with-ai]
 verify_jwt = true
+
+[functions.ghl-inbound-webhook]
+verify_jwt = false
