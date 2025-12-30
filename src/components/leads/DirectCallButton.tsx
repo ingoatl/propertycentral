@@ -225,12 +225,13 @@ const DirectCallButton = ({ leadId, leadPhone, leadName, leadAddress }: DirectCa
   return (
     <>
       <Button 
-        variant="ghost" 
-        size="icon" 
-        className="h-8 w-8 min-h-[44px] min-w-[44px]"
+        variant="outline" 
+        size="sm" 
+        className="flex-1"
         onClick={handleClick}
       >
-        <Phone className="h-4 w-4" />
+        <Phone className="h-4 w-4 mr-2" />
+        Call
       </Button>
 
       <Dialog open={open} onOpenChange={handleOpenChange}>
