@@ -36,6 +36,7 @@ import { SubmitBugDialog } from "@/components/bugs/SubmitBugDialog";
 import { TaskFilePreview } from "./TaskFilePreview";
 import { TaskFileUpload } from "./TaskFileUpload";
 import { ProfessionalPhotosUpload } from "./ProfessionalPhotosUpload";
+import { PermitStatusDisplay } from "./PermitStatusDisplay";
 import { StableFieldWrapper } from "@/components/ui/stable-form";
 import { TaskSaveIndicator } from "./TaskSaveIndicator";
 
@@ -760,8 +761,21 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
         }
         
         // Standard file upload for other file tasks
+        // Check if this is a permit task
+        const isPermitTask = task.title.toLowerCase().includes("permit") || 
+                             task.title.toLowerCase().includes("license") ||
+                             task.title.toLowerCase().includes("str license");
+        
         return (
           <div className="space-y-3">
+            {/* Show permit status if this is a permit task */}
+            {isPermitTask && (
+              <PermitStatusDisplay 
+                projectId={task.project_id} 
+                taskId={task.id} 
+              />
+            )}
+            
             {/* Multiple file upload system */}
             <TaskFilePreview 
               key={attachmentsKey}
@@ -773,7 +787,9 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
             />
             
             <TaskFileUpload 
-              taskId={task.id} 
+              taskId={task.id}
+              taskTitle={task.title}
+              projectId={task.project_id}
               onFilesUploaded={() => {
                 setUploading(false);
                 setAttachmentsKey(prev => prev + 1);

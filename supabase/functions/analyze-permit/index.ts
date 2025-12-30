@@ -10,6 +10,7 @@ interface PermitAnalysisRequest {
   documentId: string;
   propertyId: string;
   filePath: string;
+  bucket?: string; // Optional: defaults to "onboarding-documents"
 }
 
 serve(async (req) => {
@@ -23,13 +24,13 @@ serve(async (req) => {
     const openaiKey = Deno.env.get("OPENAI_API_KEY")!;
 
     const supabase = createClient(supabaseUrl, supabaseKey);
-    const { documentId, propertyId, filePath }: PermitAnalysisRequest = await req.json();
+    const { documentId, propertyId, filePath, bucket = "onboarding-documents" }: PermitAnalysisRequest = await req.json();
 
-    console.log(`Analyzing permit for document ${documentId}, property ${propertyId}`);
+    console.log(`Analyzing permit for document ${documentId}, property ${propertyId}, bucket: ${bucket}`);
 
-    // Download the permit file from storage
+    // Download the permit file from storage (support both buckets)
     const { data: fileData, error: downloadError } = await supabase.storage
-      .from("onboarding-documents")
+      .from(bucket)
       .download(filePath);
 
     if (downloadError) {
