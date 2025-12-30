@@ -3,6 +3,9 @@ project_id = "ijsxcaaqphaciaenlegl"
 [functions.ai-property-chat]
 verify_jwt = true
 
+[functions.build-lead-context]
+verify_jwt = true
+
 [functions.analyze-document-fields]
 verify_jwt = true
 

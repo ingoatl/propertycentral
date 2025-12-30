@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Mail, Sparkles, Edit, Eye, Send, Plus, Shield, X } from "lucide-react";
+import { Mail, Sparkles, Edit, Eye, Send, Plus, Shield, X, Image } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface EmailTemplate {
@@ -28,6 +28,7 @@ interface EmailTemplate {
   creativity_level: number;
   signature_type: string;
   is_active: boolean;
+  header_image_url: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -53,6 +54,13 @@ const AVAILABLE_VARIABLES = [
   { name: "{{phone}}", description: "Lead's phone" },
   { name: "{{new_str_onboarding_url}}", description: "New STR onboarding form URL" },
   { name: "{{existing_str_onboarding_url}}", description: "Existing STR onboarding form URL" },
+];
+
+const CONTEXT_VARIABLES = [
+  { name: "{{engagement_greeting}}", description: "Dynamic greeting based on engagement level" },
+  { name: "{{call_reference}}", description: "Reference to discovery call if available" },
+  { name: "{{days_since_contact}}", description: "Days since last contact" },
+  { name: "{{journey_summary}}", description: "Brief summary of their journey with PeachHaus" },
 ];
 
 export function LeadEmailTemplatesManager() {
@@ -98,6 +106,7 @@ export function LeadEmailTemplatesManager() {
           creativity_level: template.creativity_level,
           signature_type: template.signature_type,
           is_active: template.is_active,
+          header_image_url: template.header_image_url,
         })
         .eq("id", template.id);
       
@@ -129,6 +138,7 @@ export function LeadEmailTemplatesManager() {
           creativity_level: template.creativity_level ?? 50,
           signature_type: template.signature_type || "ingo",
           is_active: template.is_active ?? true,
+          header_image_url: template.header_image_url,
         });
       
       if (error) throw error;
@@ -184,6 +194,7 @@ export function LeadEmailTemplatesManager() {
         creativity_level: 50,
         signature_type: "ingo",
         is_active: true,
+        header_image_url: null,
       });
     }
     setIsEditorOpen(true);
@@ -303,6 +314,12 @@ export function LeadEmailTemplatesManager() {
                             AI Enhanced
                           </Badge>
                         )}
+                        {template.header_image_url && (
+                          <Badge variant="outline" className="text-xs gap-1">
+                            <Image className="w-3 h-3" />
+                            Has Image
+                          </Badge>
+                        )}
                         {!template.is_active && (
                           <Badge variant="destructive" className="text-xs">
                             Inactive
@@ -415,6 +432,32 @@ export function LeadEmailTemplatesManager() {
                 </div>
               </div>
 
+              {/* Header Image */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Image className="w-4 h-4 text-primary" />
+                  <Label>Header Image (Optional)</Label>
+                </div>
+                <Input
+                  value={formData.header_image_url || ""}
+                  onChange={(e) => setFormData({ ...formData, header_image_url: e.target.value || null })}
+                  placeholder="https://example.com/image.gif"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Add a GIF or image URL to display at the top of the email (great for celebratory emails)
+                </p>
+                {formData.header_image_url && (
+                  <div className="mt-2 p-2 bg-muted rounded-lg">
+                    <img 
+                      src={formData.header_image_url} 
+                      alt="Header preview" 
+                      className="max-h-24 mx-auto rounded"
+                      onError={(e) => (e.currentTarget.style.display = 'none')}
+                    />
+                  </div>
+                )}
+              </div>
+
               {/* Subject */}
               <div className="space-y-2">
                 <Label>Subject Line</Label>
@@ -429,13 +472,34 @@ export function LeadEmailTemplatesManager() {
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <Label>Email Body</Label>
-                  <div className="flex gap-1 flex-wrap">
-                    {AVAILABLE_VARIABLES.map((v) => (
+                </div>
+                <div className="flex flex-wrap gap-1 mb-2">
+                  <span className="text-xs text-muted-foreground mr-2">Lead Variables:</span>
+                  {AVAILABLE_VARIABLES.map((v) => (
+                    <Button
+                      key={v.name}
+                      variant="outline"
+                      size="sm"
+                      className="text-xs h-6"
+                      onClick={() => insertVariable(v.name)}
+                      title={v.description}
+                    >
+                      {v.name}
+                    </Button>
+                  ))}
+                </div>
+                {formData.use_ai_enhancement && (
+                  <div className="flex flex-wrap gap-1 mb-2 p-2 bg-primary/5 rounded">
+                    <span className="text-xs text-muted-foreground mr-2 flex items-center gap-1">
+                      <Sparkles className="w-3 h-3" />
+                      Context Variables (AI-generated):
+                    </span>
+                    {CONTEXT_VARIABLES.map((v) => (
                       <Button
                         key={v.name}
-                        variant="outline"
+                        variant="ghost"
                         size="sm"
-                        className="text-xs h-6"
+                        className="text-xs h-6 bg-primary/10"
                         onClick={() => insertVariable(v.name)}
                         title={v.description}
                       >
@@ -443,7 +507,7 @@ export function LeadEmailTemplatesManager() {
                       </Button>
                     ))}
                   </div>
-                </div>
+                )}
                 <Textarea
                   value={formData.body_content || ""}
                   onChange={(e) => setFormData({ ...formData, body_content: e.target.value })}

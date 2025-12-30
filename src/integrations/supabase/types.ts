@@ -1975,6 +1975,7 @@ export type Database = {
           body_content: string
           created_at: string
           creativity_level: number | null
+          header_image_url: string | null
           id: string
           is_active: boolean | null
           protected_sections: Json | null
@@ -1991,6 +1992,7 @@ export type Database = {
           body_content: string
           created_at?: string
           creativity_level?: number | null
+          header_image_url?: string | null
           id?: string
           is_active?: boolean | null
           protected_sections?: Json | null
@@ -2007,6 +2009,7 @@ export type Database = {
           body_content?: string
           created_at?: string
           creativity_level?: number | null
+          header_image_url?: string | null
           id?: string
           is_active?: boolean | null
           protected_sections?: Json | null
@@ -2174,6 +2177,7 @@ export type Database = {
           sequence_id: string | null
           step_number: number
           template_content: string
+          template_id: string | null
           template_subject: string | null
         }
         Insert: {
@@ -2188,6 +2192,7 @@ export type Database = {
           sequence_id?: string | null
           step_number: number
           template_content: string
+          template_id?: string | null
           template_subject?: string | null
         }
         Update: {
@@ -2202,6 +2207,7 @@ export type Database = {
           sequence_id?: string | null
           step_number?: number
           template_content?: string
+          template_id?: string | null
           template_subject?: string | null
         }
         Relationships: [
@@ -2210,6 +2216,13 @@ export type Database = {
             columns: ["sequence_id"]
             isOneToOne: false
             referencedRelation: "lead_follow_up_sequences"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_follow_up_steps_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "lead_email_templates"
             referencedColumns: ["id"]
           },
         ]
