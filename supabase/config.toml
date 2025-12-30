@@ -308,3 +308,9 @@ verify_jwt = false
 
 [functions.get-lead-for-payment]
 verify_jwt = false
+
+[functions.ghl-sync-phone-numbers]
+verify_jwt = true
+
+[functions.ghl-fetch-call-transcripts]
+verify_jwt = true
