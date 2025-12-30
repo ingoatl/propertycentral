@@ -90,19 +90,19 @@ export function LeadConversationThread({ communications, leadName }: LeadConvers
   };
 
   return (
-    <ScrollArea className="h-[250px] pr-4" ref={scrollRef}>
-      <div className="space-y-4">
+    <ScrollArea className="h-[300px] pr-4" ref={scrollRef}>
+      <div className="space-y-4 pb-4">
         {groupedMessages.map((group, groupIndex) => (
           <div key={groupIndex}>
             {/* Date Header */}
-            <div className="flex items-center justify-center my-3">
-              <span className="text-xs text-muted-foreground bg-muted px-3 py-1 rounded-full">
+            <div className="flex items-center justify-center my-4">
+              <span className="text-xs text-muted-foreground bg-muted/60 px-3 py-1.5 rounded-full font-medium">
                 {formatDateHeader(group.date)}
               </span>
             </div>
 
             {/* Messages for this date */}
-            <div className="space-y-2">
+            <div className="space-y-3">
               {group.messages.map((comm) => {
                 const isOutbound = comm.direction === "outbound";
                 const isVoiceCall = comm.communication_type === "call" || comm.communication_type === "voice_call";
@@ -117,18 +117,28 @@ export function LeadConversationThread({ communications, leadName }: LeadConvers
                   >
                     <div
                       className={cn(
-                        "max-w-[80%] rounded-2xl px-4 py-2.5 text-sm",
+                        "max-w-[75%] rounded-2xl px-4 py-3 shadow-sm",
                         isOutbound
-                          ? "bg-primary text-primary-foreground rounded-br-md"
-                          : "bg-muted text-foreground rounded-bl-md",
-                        isVoiceCall && "bg-muted/50 border border-border"
+                          ? "bg-blue-600 text-white rounded-br-sm"
+                          : "bg-slate-100 dark:bg-slate-800 text-foreground rounded-bl-sm border border-border/50",
+                        isVoiceCall && "bg-muted/80 border-2 border-dashed border-border"
                       )}
                     >
+                      {/* Sender label for inbound */}
+                      {!isOutbound && (
+                        <p className="text-xs font-semibold text-primary mb-1">
+                          {leadName}
+                        </p>
+                      )}
+
                       {/* Message Header for special types */}
                       {(comm.communication_type !== "sms" || isVoiceCall) && (
-                        <div className="flex items-center gap-1.5 mb-1 opacity-70">
+                        <div className={cn(
+                          "flex items-center gap-1.5 mb-1.5",
+                          isOutbound ? "text-white/80" : "text-muted-foreground"
+                        )}>
                           {getTypeIcon(comm.communication_type)}
-                          <span className="text-xs uppercase tracking-wide">
+                          <span className="text-xs uppercase tracking-wide font-medium">
                             {comm.communication_type.replace("_", " ")}
                           </span>
                         </div>
@@ -136,22 +146,30 @@ export function LeadConversationThread({ communications, leadName }: LeadConvers
 
                       {/* Email Subject */}
                       {comm.communication_type === "email" && comm.subject && (
-                        <p className="font-medium text-xs mb-1 opacity-80">
+                        <p className={cn(
+                          "font-semibold text-sm mb-2",
+                          isOutbound ? "text-white/90" : "text-foreground"
+                        )}>
                           {comm.subject}
                         </p>
                       )}
 
                       {/* Message Body */}
-                      <p className="whitespace-pre-wrap break-words">{comm.body}</p>
+                      <p className={cn(
+                        "whitespace-pre-wrap break-words text-sm leading-relaxed",
+                        isOutbound ? "text-white" : "text-foreground"
+                      )}>
+                        {comm.body}
+                      </p>
 
                       {/* Timestamp and Status */}
                       <div
                         className={cn(
-                          "flex items-center gap-1.5 mt-1.5",
-                          isOutbound ? "justify-end" : "justify-start"
+                          "flex items-center gap-1.5 mt-2",
+                          isOutbound ? "justify-end text-white/60" : "justify-start text-muted-foreground"
                         )}
                       >
-                        <span className="text-[10px] opacity-60">
+                        <span className="text-[10px]">
                           {format(new Date(comm.created_at), "h:mm a")}
                         </span>
                         {isOutbound && getStatusIcon(comm.status)}

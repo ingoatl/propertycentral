@@ -60,23 +60,28 @@ serve(async (req) => {
       });
     }
 
-    // Normalize phone for matching
+    // Normalize phone for matching - extract last 10 digits
     const normalizedPhone = normalizePhone(contactPhone);
-    console.log("Looking for lead with phone:", normalizedPhone);
+    const last10Digits = normalizedPhone.replace(/\D/g, "").slice(-10);
+    console.log("Looking for lead with phone:", normalizedPhone, "last 10:", last10Digits);
 
-    // Find matching lead by phone number
+    // Find matching lead by phone number - use flexible matching
     const { data: leads, error: leadError } = await supabase
       .from("leads")
       .select("id, name, phone, stage, active_sequence_id")
-      .or(`phone.eq.${normalizedPhone},phone.eq.${contactPhone},phone.ilike.%${normalizedPhone.slice(-10)}%`)
-      .limit(1);
+      .or(`phone.ilike.%${last10Digits.slice(-7)}%`)
+      .limit(5);
 
     if (leadError) {
       console.error("Error finding lead:", leadError);
       throw leadError;
     }
 
-    const lead = leads?.[0];
+    // Find the best match by comparing normalized digits
+    const lead = leads?.find(l => {
+      const leadDigits = l.phone?.replace(/\D/g, "").slice(-10);
+      return leadDigits === last10Digits;
+    }) || leads?.[0];
 
     if (!lead) {
       console.log("No matching lead found for phone:", normalizedPhone);
