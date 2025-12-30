@@ -508,15 +508,17 @@ const LeadDetailModal = ({ lead, open, onOpenChange, onRefresh }: LeadDetailModa
           </TabsContent>
 
           <TabsContent value="messages" className="mt-4">
-            <div className="space-y-4">
-              {/* Chat bubble conversation thread */}
-              <LeadConversationThread 
-                communications={communications || []}
-                leadName={lead.name}
-              />
+            <div className="flex flex-col h-[350px]">
+              {/* Chat bubble conversation thread - scrollable */}
+              <div className="flex-1 min-h-0 overflow-hidden">
+                <LeadConversationThread 
+                  communications={communications || []}
+                  leadName={lead.name}
+                />
+              </div>
               
-              {/* Message input */}
-              <div className="flex gap-2 pt-2 border-t">
+              {/* Message input - always visible at bottom */}
+              <div className="flex gap-2 pt-3 mt-3 border-t flex-shrink-0">
                 <Select value={messageType} onValueChange={(v) => setMessageType(v as "sms" | "email")}>
                   <SelectTrigger className="w-24">
                     <SelectValue />
@@ -536,10 +538,10 @@ const LeadDetailModal = ({ lead, open, onOpenChange, onRefresh }: LeadDetailModa
                 <Button 
                   onClick={() => sendMessage.mutate()}
                   disabled={sendMessage.isPending || !newMessage.trim()}
-                  size="icon"
                   className="self-end"
                 >
-                  <Send className="h-4 w-4" />
+                  <Send className="h-4 w-4 mr-2" />
+                  Send
                 </Button>
               </div>
             </div>
