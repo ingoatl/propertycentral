@@ -414,6 +414,36 @@ serve(async (req) => {
               .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
               .replace(/✓/g, '✅');
 
+            // Ingo's email signature
+            const signature = `
+              <table cellpadding="0" cellspacing="0" style="font-family: Arial, sans-serif; margin-top: 30px; border-top: 2px solid #e5e5e5; padding-top: 20px;">
+                <tr>
+                  <td style="padding-right: 15px; vertical-align: top;">
+                    <img src="https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/peachhaus-logo.png" alt="PeachHaus" style="width: 80px; height: auto;" />
+                  </td>
+                  <td style="vertical-align: top;">
+                    <p style="margin: 0; font-weight: bold; font-size: 14px; color: #333;">INGO SCHAER</p>
+                    <p style="margin: 2px 0 8px 0; font-size: 12px; color: #666;">CO-FOUNDER, OPERATIONS MANAGER</p>
+                    <p style="margin: 0 0 4px 0; font-size: 12px; color: #333; font-weight: bold;">PEACHHAUS GROUP LLC</p>
+                    <p style="margin: 8px 0 4px 0; font-size: 12px;">
+                      <a href="https://www.peachhausgroup.com" style="color: #1a73e8; text-decoration: none;">www.peachhausgroup.com</a>
+                    </p>
+                    <p style="margin: 4px 0; font-size: 12px; color: #333;">
+                      <a href="tel:+14048005932" style="color: #333; text-decoration: none;">(404) 800-5932</a>
+                    </p>
+                    <p style="margin: 4px 0; font-size: 12px;">
+                      <a href="mailto:ingo@peachhausgroup.com" style="color: #333; text-decoration: none;">ingo@peachhausgroup.com</a>
+                    </p>
+                    <p style="margin: 10px 0 0 0; font-size: 12px;">
+                      <a href="https://www.facebook.com/peachhausgroup" style="color: #1877f2; text-decoration: none; margin-right: 10px;">Facebook</a>
+                      <a href="https://www.linkedin.com/company/peachhausgroup" style="color: #0a66c2; text-decoration: none; margin-right: 10px;">LinkedIn</a>
+                      <a href="https://www.biggerpockets.com/users/peachhausgroup" style="color: #39aa55; text-decoration: none;">BiggerPockets</a>
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            `;
+
             const emailResponse = await fetch("https://api.resend.com/emails", {
               method: "POST",
               headers: {
@@ -421,11 +451,11 @@ serve(async (req) => {
                 "Content-Type": "application/json",
               },
               body: JSON.stringify({
-                from: "PeachHaus <info@peachhausgroup.com>",
+                from: "Ingo Schaer <ingo@peachhausgroup.com>",
                 to: [lead.email],
                 subject: emailSubject || "Message from PeachHaus",
-                text: messageBody,
-                html: `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;"><p>${htmlBody}</p><br><p style="color: #666;">Best regards,<br>The PeachHaus Team</p></div>`,
+                text: messageBody + "\n\n--\nIngo Schaer\nCo-Founder, Operations Manager\nPeachHaus Group LLC\n(404) 800-5932\ningo@peachhausgroup.com",
+                html: `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;"><p>${htmlBody}</p>${signature}</div>`,
               }),
             });
 
