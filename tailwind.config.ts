@@ -96,28 +96,32 @@ export default {
           from: {
             height: "0",
             opacity: "0",
+            transform: "translateY(-8px)",
           },
           to: {
             height: "var(--radix-collapsible-content-height)",
             opacity: "1",
+            transform: "translateY(0)",
           },
         },
         "collapsible-up": {
           from: {
             height: "var(--radix-collapsible-content-height)",
             opacity: "1",
+            transform: "translateY(0)",
           },
           to: {
             height: "0",
             opacity: "0",
+            transform: "translateY(-4px)",
           },
         },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
-        "collapsible-down": "collapsible-down 400ms cubic-bezier(0.32, 0.72, 0, 1)",
-        "collapsible-up": "collapsible-up 350ms cubic-bezier(0.32, 0.72, 0, 1)",
+        "collapsible-down": "collapsible-down 500ms cubic-bezier(0.16, 1, 0.3, 1)",
+        "collapsible-up": "collapsible-up 400ms cubic-bezier(0.16, 1, 0.3, 1)",
       },
     },
   },

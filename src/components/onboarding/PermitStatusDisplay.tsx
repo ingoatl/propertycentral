@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
-import { CalendarClock, Shield, Loader2, AlertTriangle, CheckCircle2 } from "lucide-react";
-import { format, differenceInDays, parseISO } from "date-fns";
+import { CalendarClock, Shield, Loader2, AlertTriangle, CheckCircle2, Bell, Sparkles } from "lucide-react";
+import { format, differenceInDays, parseISO, subDays } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 
@@ -117,9 +117,9 @@ export const PermitStatusDisplay = ({ projectId, taskId }: PermitStatusDisplayPr
 
   if (analyzing) {
     return (
-      <div className="flex items-center gap-2 text-xs text-muted-foreground animate-pulse">
-        <Loader2 className="w-3 h-3 animate-spin" />
-        <span>Analyzing permit with AI...</span>
+      <div className="flex items-center gap-2 text-xs text-muted-foreground p-3 rounded-lg border border-primary/20 bg-primary/5">
+        <Loader2 className="w-4 h-4 animate-spin text-primary" />
+        <span className="font-medium">AI is analyzing your permit...</span>
       </div>
     );
   }
@@ -163,8 +163,22 @@ export const PermitStatusDisplay = ({ projectId, taskId }: PermitStatusDisplayPr
     return <CheckCircle2 className="w-3.5 h-3.5 text-green-600" />;
   };
 
+  // Calculate reminder date (30 days before expiry)
+  const reminderDate = subDays(expirationDate, 30);
+
   return (
-    <div className={cn("p-3 rounded-lg border space-y-2", getExpiryBgClass())}>
+    <div className={cn(
+      "p-3 rounded-lg border space-y-2 animate-in fade-in-50 slide-in-from-top-2 duration-300",
+      getExpiryBgClass()
+    )}>
+      {/* AI Analyzed Badge */}
+      <div className="flex items-center gap-2 mb-1">
+        <Badge variant="outline" className="text-xs gap-1 bg-white/50">
+          <Sparkles className="w-3 h-3 text-primary" />
+          AI Analyzed
+        </Badge>
+      </div>
+
       <div className="flex items-center gap-2">
         {getExpiryIcon()}
         <span className={cn("text-sm font-medium", getExpiryTextClass())}>
@@ -195,10 +209,12 @@ export const PermitStatusDisplay = ({ projectId, taskId }: PermitStatusDisplayPr
         )}
       </div>
 
-      {permitData.reminderScheduled && (
-        <div className="flex items-center gap-1.5 text-xs text-green-700">
-          <CheckCircle2 className="w-3 h-3" />
-          <span>Reminder scheduled (30 days before expiry)</span>
+      {permitData.reminderScheduled && daysUntilExpiry >= 0 && (
+        <div className="flex items-center gap-1.5 text-xs text-green-700 bg-green-100/50 px-2 py-1 rounded-md w-fit">
+          <Bell className="w-3 h-3" />
+          <span>
+            Reminder auto-scheduled for <span className="font-semibold">{format(reminderDate, "MMM d, yyyy")}</span>
+          </span>
         </div>
       )}
     </div>

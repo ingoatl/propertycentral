@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { encode as base64Encode } from "https://deno.land/std@0.190.0/encoding/base64.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
@@ -28,18 +29,6 @@ serve(async (req) => {
 
     console.log(`Analyzing permit for document ${documentId}, property ${propertyId}, bucket: ${bucket}`);
 
-  // Helper function to convert ArrayBuffer to base64 in chunks (avoids stack overflow)
-  function arrayBufferToBase64(buffer: ArrayBuffer): string {
-    const bytes = new Uint8Array(buffer);
-    let binary = '';
-    const chunkSize = 8192; // Process in 8KB chunks to avoid stack overflow
-    for (let i = 0; i < bytes.length; i += chunkSize) {
-      const chunk = bytes.subarray(i, Math.min(i + chunkSize, bytes.length));
-      binary += String.fromCharCode.apply(null, [...chunk]);
-    }
-    return btoa(binary);
-  }
-
   // Download the permit file from storage (support both buckets)
   const { data: fileData, error: downloadError } = await supabase.storage
     .from(bucket)
@@ -50,9 +39,9 @@ serve(async (req) => {
     throw new Error(`Failed to download permit file: ${downloadError.message}`);
   }
 
-  // Convert to base64 for OpenAI vision using chunked approach
-  const arrayBuffer = await fileData.arrayBuffer();
-  const base64 = arrayBufferToBase64(arrayBuffer);
+    // Convert to base64 using Deno's native encoding (handles large files without stack overflow)
+    const arrayBuffer = await fileData.arrayBuffer();
+    const base64 = base64Encode(arrayBuffer);
     
     // Determine MIME type
     const ext = filePath.split('.').pop()?.toLowerCase();
