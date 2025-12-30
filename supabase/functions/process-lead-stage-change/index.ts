@@ -433,12 +433,15 @@ serve(async (req) => {
               return `<p style="margin: 0 0 16px 0; text-align: left;">${formatted}</p>`;
             }).join('');
 
-            // Gmail-style email signature with headshot - left aligned
+            // Gmail-style email signature with headshot and signature image - left aligned
             const signature = `
               <table cellpadding="0" cellspacing="0" style="font-family: Arial, sans-serif; margin-top: 24px; border-collapse: collapse;">
                 <tr>
                   <td style="padding-right: 12px; vertical-align: top;">
-                    <img src="https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/ingo-headshot.png" alt="Ingo Schaer" style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover;" />
+                    <div style="display: flex; flex-direction: column; align-items: center;">
+                      <img src="https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/ingo-headshot.png" alt="Ingo Schaer" style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover; display: block;" />
+                      <img src="https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/ingo-signature.png" alt="Signature" style="width: 100px; height: auto; margin-top: 8px; display: block;" />
+                    </div>
                   </td>
                   <td style="vertical-align: top; border-left: 2px solid #f59e0b; padding-left: 12px;">
                     <p style="margin: 0 0 2px 0; font-weight: bold; font-size: 14px; color: #1a1a1a; text-align: left;">Ingo Schaer</p>
