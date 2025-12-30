@@ -59,7 +59,15 @@ serve(async (req) => {
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       mode: "setup",
+      currency: "usd",
       payment_method_types: ["us_bank_account", "card"],
+      payment_method_options: {
+        us_bank_account: {
+          financial_connections: {
+            permissions: ["payment_method"],
+          },
+        },
+      },
       success_url: `${siteUrl}/payment-success?lead=${leadId}&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${siteUrl}/payment-setup?lead=${leadId}&canceled=true`,
       metadata: {
