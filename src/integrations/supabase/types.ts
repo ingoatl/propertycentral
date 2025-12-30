@@ -1969,6 +1969,57 @@ export type Database = {
           },
         ]
       }
+      lead_email_templates: {
+        Row: {
+          ai_enhancement_prompt: string | null
+          body_content: string
+          created_at: string
+          creativity_level: number | null
+          id: string
+          is_active: boolean | null
+          protected_sections: Json | null
+          signature_type: string
+          stage: string
+          step_number: number
+          subject: string
+          template_name: string
+          updated_at: string
+          use_ai_enhancement: boolean | null
+        }
+        Insert: {
+          ai_enhancement_prompt?: string | null
+          body_content: string
+          created_at?: string
+          creativity_level?: number | null
+          id?: string
+          is_active?: boolean | null
+          protected_sections?: Json | null
+          signature_type?: string
+          stage: string
+          step_number?: number
+          subject: string
+          template_name: string
+          updated_at?: string
+          use_ai_enhancement?: boolean | null
+        }
+        Update: {
+          ai_enhancement_prompt?: string | null
+          body_content?: string
+          created_at?: string
+          creativity_level?: number | null
+          id?: string
+          is_active?: boolean | null
+          protected_sections?: Json | null
+          signature_type?: string
+          stage?: string
+          step_number?: number
+          subject?: string
+          template_name?: string
+          updated_at?: string
+          use_ai_enhancement?: boolean | null
+        }
+        Relationships: []
+      }
       lead_event_log: {
         Row: {
           created_at: string | null
