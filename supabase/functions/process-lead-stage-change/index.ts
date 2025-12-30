@@ -115,14 +115,14 @@ Ready when you are!`,
     principle: "Clarity + Momentum"
   },
   contract_signed: {
-    sms: "Welcome to PeachHaus, {{name}}! 🎉 Your agreement is signed. Next up: setting up your direct deposit for rental income. Check your email!",
+    sms: "Welcome to PeachHaus, {{name}}! 🎉 Your agreement is signed. Next up: setting up your payment method for rental income. Check your email!",
     email_subject: "Welcome to the PeachHaus Family! 🎉",
     email_body: `Congratulations {{name}}!
 
 Welcome to PeachHaus! Your management agreement is now complete, and we're thrilled to have you on board.
 
 **Immediate Next Step:**
-Please complete your ACH setup so we can deposit your rental income directly: {{ach_link}}
+Please set up your payment method so we can deposit your rental income directly: {{stripe_link}}
 
 **Coming Soon:**
 - Your onboarding coordinator will reach out within 24 hours
@@ -133,14 +133,18 @@ Thank you for trusting us with your property!`,
     principle: "Celebration + Momentum"
   },
   ach_form_signed: {
-    sms: "Perfect, {{name}}! ACH is set up. Last step: complete your property info so we can start marketing. Link in your email!",
-    email_subject: "ACH Complete - One More Step!",
+    sms: "Perfect, {{name}}! Payment method is set up. Last step: complete your property info so we can start marketing. Link in your email!",
+    email_subject: "Payment Complete - One More Step!",
     email_body: `Great news {{name}}!
 
-Your direct deposit is all set up. You're almost ready to start earning.
+Your payment method is all set up. You're almost ready to start earning.
 
 **Final Step:**
-Complete your property information form so we can begin marketing: {{onboarding_link}}
+Complete your property information form so we can begin marketing.
+
+**Choose the form that fits your property:**
+- Already renting on Airbnb/VRBO? Use this form: {{existing_str_onboarding}}
+- New to short-term rentals? Use this form: {{new_str_onboarding}}
 
 This takes about 10-15 minutes and helps us create the best listing for your property.
 
@@ -273,8 +277,12 @@ serve(async (req) => {
       try {
         // Replace template variables with enhanced placeholders
         const processTemplate = (template: string) => {
-          // Use the live site URL for customer-facing links
-          const siteUrl = "https://www.peachhausgroup.com";
+          // Property Central onboarding URLs
+          const existingStrOnboardingUrl = "https://propertycentral.io/owner-onboarding";
+          const newStrOnboardingUrl = "https://propertycentral.io/new-str-onboarding";
+          // Stripe payment setup URL
+          const stripePaymentUrl = `https://www.peachhausgroup.com/payment-setup?lead=${leadId}`;
+          
           return template
             .replace(/\{\{name\}\}/g, lead.name?.split(' ')[0] || lead.name || "") // First name only
             .replace(/\{\{full_name\}\}/g, lead.name || "")
@@ -283,8 +291,12 @@ serve(async (req) => {
             .replace(/\{\{property_address\}\}/g, lead.property_address || "your property")
             .replace(/\{\{property_type\}\}/g, lead.property_type || "property")
             .replace(/\{\{opportunity_value\}\}/g, lead.opportunity_value?.toString() || "0")
-            .replace(/\{\{ach_link\}\}/g, `${siteUrl}/payment-setup?lead=${leadId}`)
-            .replace(/\{\{onboarding_link\}\}/g, `${siteUrl}/onboard/existing-str?lead=${leadId}`)
+            .replace(/\{\{ach_link\}\}/g, stripePaymentUrl)
+            .replace(/\{\{payment_link\}\}/g, stripePaymentUrl)
+            .replace(/\{\{stripe_link\}\}/g, stripePaymentUrl)
+            .replace(/\{\{onboarding_link\}\}/g, existingStrOnboardingUrl)
+            .replace(/\{\{existing_str_onboarding\}\}/g, existingStrOnboardingUrl)
+            .replace(/\{\{new_str_onboarding\}\}/g, newStrOnboardingUrl)
             .replace(/\{\{sender\}\}/g, "Ingo")
             .replace(/\{\{ai_call_summary\}\}/g, lead.ai_summary || "We discussed your property management needs and goals.")
             .replace(/\{\{ai_next_action\}\}/g, lead.ai_next_action || "Review and sign the management agreement")
@@ -453,7 +465,7 @@ serve(async (req) => {
                 "Content-Type": "application/json",
               },
               body: JSON.stringify({
-                from: "Ingo Schaer <ingo@peachhausgroup.com>",
+                from: "PeachHaus Group LLC - Ingo Schaer <ingo@peachhausgroup.com>",
                 to: [lead.email],
                 subject: emailSubject || "Message from PeachHaus",
                 text: messageBody + "\n\n--\nIngo Schaer\nCo-Founder, Operations Manager\nPeachHaus Group LLC\n(404) 800-5932\ningo@peachhausgroup.com",
