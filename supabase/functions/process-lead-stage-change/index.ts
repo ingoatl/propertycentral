@@ -274,7 +274,7 @@ serve(async (req) => {
         // Replace template variables with enhanced placeholders
         const processTemplate = (template: string) => {
           // Use the live site URL for customer-facing links
-          const siteUrl = "https://peachhaus.co";
+          const siteUrl = "https://www.peachhausgroup.com";
           return template
             .replace(/\{\{name\}\}/g, lead.name?.split(' ')[0] || lead.name || "") // First name only
             .replace(/\{\{full_name\}\}/g, lead.name || "")

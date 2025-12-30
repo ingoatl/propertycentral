@@ -48,3 +48,21 @@ export const uploadHeadshotToSupabase = async () => {
     };
   }
 };
+
+// Auto-run if this module is imported
+if (typeof window !== 'undefined') {
+  // Check if already uploaded by trying to fetch the image
+  fetch('https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/ingo-headshot.png')
+    .then(res => {
+      if (!res.ok) {
+        console.log("Headshot not found in storage, uploading...");
+        uploadHeadshotToSupabase();
+      } else {
+        console.log("Headshot already exists in storage");
+      }
+    })
+    .catch(() => {
+      console.log("Error checking headshot, attempting upload...");
+      uploadHeadshotToSupabase();
+    });
+}
