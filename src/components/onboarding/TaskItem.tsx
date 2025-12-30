@@ -1158,13 +1158,16 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
     return renderField();
   }
 
-  // When collapsing, delay parent update to allow animation to complete
+  // When collapsing, DON'T trigger parent update - just close smoothly
+  // Parent update only happens on actual data changes (save), not on collapse
   const handleCollapse = () => {
     setIsCollapsed(true);
-    // Delay the update call to not interfere with closing animation
-    setTimeout(() => {
-      onUpdate(); // Update progress bar after animation completes
-    }, 500);
+    // Only update parent if there were unsaved changes that got auto-saved
+    if (hasUnsavedChanges) {
+      setTimeout(() => {
+        onUpdate();
+      }, 600); // Wait for animation to complete
+    }
   };
 
   // Use a single component with Collapsible for smooth animations
