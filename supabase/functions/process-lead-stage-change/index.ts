@@ -421,37 +421,37 @@ serve(async (req) => {
           const resendApiKey = Deno.env.get("RESEND_API_KEY");
           
           if (resendApiKey) {
-            // Convert plain text to HTML with nice formatting
-            const htmlBody = messageBody
-              .replace(/\n\n/g, '</p><p>')
-              .replace(/\n/g, '<br>')
-              .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-              .replace(/✓/g, '✅');
+            // Convert plain text to HTML with Gmail-style left-aligned formatting
+            // Split by double newlines for paragraphs, single newlines for line breaks
+            const paragraphs = messageBody.split('\n\n');
+            const htmlBody = paragraphs.map(para => {
+              const formatted = para
+                .replace(/\n/g, '<br>')
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                .replace(/✓/g, '✅')
+                .replace(/•/g, '&bull;');
+              return `<p style="margin: 0 0 16px 0; text-align: left;">${formatted}</p>`;
+            }).join('');
 
-            // Gmail-style email signature with headshot
+            // Gmail-style email signature with headshot - left aligned
             const signature = `
-              <table cellpadding="0" cellspacing="0" style="font-family: Arial, sans-serif; margin-top: 20px; border-collapse: collapse;">
+              <table cellpadding="0" cellspacing="0" style="font-family: Arial, sans-serif; margin-top: 24px; border-collapse: collapse;">
                 <tr>
                   <td style="padding-right: 12px; vertical-align: top;">
-                    <img src="https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/ingo-headshot.png" alt="Ingo Schaer" style="width: 90px; height: 90px; border-radius: 50%; object-fit: cover;" />
+                    <img src="https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/ingo-headshot.png" alt="Ingo Schaer" style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover;" />
                   </td>
-                  <td style="vertical-align: top; border-left: 3px solid #f59e0b; padding-left: 12px;">
-                    <p style="margin: 0 0 2px 0; font-weight: bold; font-size: 15px; color: #1a1a1a;">Ingo Schaer</p>
-                    <p style="margin: 0 0 6px 0; font-size: 13px; color: #666;">Co-Founder, Operations Manager</p>
-                    <p style="margin: 0 0 2px 0; font-size: 13px; color: #1a1a1a; font-weight: 500;">PeachHaus Group LLC</p>
-                    <p style="margin: 6px 0 2px 0; font-size: 12px; color: #555;">
-                      <span style="color: #888;">M:</span> <a href="tel:+14048005932" style="color: #1a1a1a; text-decoration: none;">(404) 800-5932</a>
+                  <td style="vertical-align: top; border-left: 2px solid #f59e0b; padding-left: 12px;">
+                    <p style="margin: 0 0 2px 0; font-weight: bold; font-size: 14px; color: #1a1a1a; text-align: left;">Ingo Schaer</p>
+                    <p style="margin: 0 0 4px 0; font-size: 12px; color: #666; text-align: left;">Co-Founder, Operations Manager</p>
+                    <p style="margin: 0 0 2px 0; font-size: 12px; color: #1a1a1a; font-weight: 500; text-align: left;">PeachHaus Group LLC</p>
+                    <p style="margin: 4px 0 2px 0; font-size: 11px; color: #555; text-align: left;">
+                      <a href="tel:+14048005932" style="color: #1a1a1a; text-decoration: none;">(404) 800-5932</a>
                     </p>
-                    <p style="margin: 2px 0; font-size: 12px; color: #555;">
-                      <span style="color: #888;">E:</span> <a href="mailto:ingo@peachhausgroup.com" style="color: #1a73e8; text-decoration: none;">ingo@peachhausgroup.com</a>
+                    <p style="margin: 2px 0; font-size: 11px; color: #555; text-align: left;">
+                      <a href="mailto:ingo@peachhausgroup.com" style="color: #1a73e8; text-decoration: none;">ingo@peachhausgroup.com</a>
                     </p>
-                    <p style="margin: 2px 0; font-size: 12px; color: #555;">
-                      <span style="color: #888;">W:</span> <a href="https://www.peachhausgroup.com" style="color: #1a73e8; text-decoration: none;">www.peachhausgroup.com</a>
-                    </p>
-                    <p style="margin: 8px 0 0 0;">
-                      <a href="https://www.facebook.com/peachhausgroup" style="text-decoration: none; margin-right: 8px;"><img src="https://cdn-icons-png.flaticon.com/16/733/733547.png" alt="Facebook" style="width: 16px; height: 16px;" /></a>
-                      <a href="https://www.linkedin.com/company/peachhausgroup" style="text-decoration: none; margin-right: 8px;"><img src="https://cdn-icons-png.flaticon.com/16/733/733561.png" alt="LinkedIn" style="width: 16px; height: 16px;" /></a>
-                      <a href="https://www.biggerpockets.com/users/peachhausgroup" style="text-decoration: none;"><img src="https://cdn-icons-png.flaticon.com/16/2111/2111463.png" alt="BiggerPockets" style="width: 16px; height: 16px;" /></a>
+                    <p style="margin: 2px 0; font-size: 11px; color: #555; text-align: left;">
+                      <a href="https://www.peachhausgroup.com" style="color: #1a73e8; text-decoration: none;">www.peachhausgroup.com</a>
                     </p>
                   </td>
                 </tr>
@@ -469,7 +469,7 @@ serve(async (req) => {
                 to: [lead.email],
                 subject: emailSubject || "Message from PeachHaus",
                 text: messageBody + "\n\n--\nIngo Schaer\nCo-Founder, Operations Manager\nPeachHaus Group LLC\n(404) 800-5932\ningo@peachhausgroup.com",
-                html: `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;"><p>${htmlBody}</p>${signature}</div>`,
+                html: `<div style="font-family: Arial, sans-serif; max-width: 600px; padding: 0; text-align: left;">${htmlBody}${signature}</div>`,
               }),
             });
 
