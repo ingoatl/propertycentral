@@ -53,14 +53,15 @@ serve(async (req) => {
     }
 
     // Create a Stripe Checkout session for setting up a payment method
-    const origin = req.headers.get("origin") || "https://peachhaus.co";
+    // Always use the production site URL for customer-facing redirects
+    const siteUrl = "https://www.peachhausgroup.com";
     
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       mode: "setup",
       payment_method_types: ["us_bank_account", "card"],
-      success_url: `${origin}/payment-success?lead=${leadId}&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${origin}/payment-setup?lead=${leadId}&canceled=true`,
+      success_url: `${siteUrl}/payment-success?lead=${leadId}&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${siteUrl}/payment-setup?lead=${leadId}&canceled=true`,
       metadata: {
         lead_id: leadId,
       },
