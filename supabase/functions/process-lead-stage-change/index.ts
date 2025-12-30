@@ -212,6 +212,34 @@ async function personalizeMessageWithAI(
   }
 }
 
+// Reset DND settings for a GHL contact before sending SMS
+async function resetGhlContactDnd(contactId: string, ghlApiKey: string): Promise<void> {
+  try {
+    console.log(`Resetting DND for GHL contact ${contactId}`);
+    const dndResponse = await fetch(
+      `https://services.leadconnectorhq.com/contacts/${contactId}`,
+      {
+        method: "PUT",
+        headers: {
+          "Authorization": `Bearer ${ghlApiKey}`,
+          "Version": "2021-07-28",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          dndSettings: {
+            SMS: { status: "inactive", message: "" },
+            Call: { status: "inactive", message: "" },
+          },
+        }),
+      }
+    );
+    const dndText = await dndResponse.text();
+    console.log(`GHL DND reset response: ${dndResponse.status} - ${dndText.substring(0, 200)}`);
+  } catch (dndError) {
+    console.error("Failed to reset DND:", dndError);
+  }
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -381,6 +409,9 @@ serve(async (req) => {
               }
 
               if (contactId) {
+                // Reset DND before sending SMS to prevent blocking
+                await resetGhlContactDnd(contactId, ghlApiKey);
+
                 // Send SMS message via GHL
                 const sendResponse = await fetch(
                   `https://services.leadconnectorhq.com/conversations/messages`,
