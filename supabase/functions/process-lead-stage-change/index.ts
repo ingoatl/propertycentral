@@ -1,6 +1,30 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+// Format phone number to E.164 format (e.g., +17709065022)
+function formatPhoneE164(phone: string): string {
+  // Remove all non-digit characters
+  const digits = phone.replace(/\D/g, '');
+  
+  // If it's already 11 digits starting with 1, just add +
+  if (digits.length === 11 && digits.startsWith('1')) {
+    return `+${digits}`;
+  }
+  
+  // If it's 10 digits, assume US and add +1
+  if (digits.length === 10) {
+    return `+1${digits}`;
+  }
+  
+  // Return as-is with + if it has more digits (international)
+  if (digits.length > 10) {
+    return `+${digits}`;
+  }
+  
+  // Return original if we can't parse it
+  return phone;
+}
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -297,9 +321,16 @@ serve(async (req) => {
           let externalId = "";
           let errorMessage = "";
 
+          // Format destination phone to E.164
+          const formattedPhone = formatPhoneE164(lead.phone);
+          console.log(`Sending SMS to ${formattedPhone} (original: ${lead.phone})`);
+
           // Try Telnyx first (preferred), then fall back to Twilio
           if (telnyxApiKey) {
             try {
+              const fromPhone = formatPhoneE164(Deno.env.get("TELNYX_PHONE_NUMBER") || "+14049247251");
+              console.log(`Telnyx from phone: ${fromPhone}`);
+              
               const telnyxResponse = await fetch("https://api.telnyx.com/v2/messages", {
                 method: "POST",
                 headers: {
@@ -307,8 +338,8 @@ serve(async (req) => {
                   "Content-Type": "application/json",
                 },
                 body: JSON.stringify({
-                  from: Deno.env.get("TELNYX_PHONE_NUMBER") || "+14044919458",
-                  to: lead.phone,
+                  from: fromPhone,
+                  to: formattedPhone,
                   text: messageBody,
                 }),
               });
@@ -327,8 +358,8 @@ serve(async (req) => {
             const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${twilioAccountSid}/Messages.json`;
             
             const formData = new URLSearchParams();
-            formData.append("To", lead.phone);
-            formData.append("From", twilioPhone!);
+            formData.append("To", formattedPhone);
+            formData.append("From", formatPhoneE164(twilioPhone!));
             formData.append("Body", messageBody);
 
             const twilioResponse = await fetch(twilioUrl, {
