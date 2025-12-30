@@ -28,19 +28,31 @@ serve(async (req) => {
 
     console.log(`Analyzing permit for document ${documentId}, property ${propertyId}, bucket: ${bucket}`);
 
-    // Download the permit file from storage (support both buckets)
-    const { data: fileData, error: downloadError } = await supabase.storage
-      .from(bucket)
-      .download(filePath);
-
-    if (downloadError) {
-      console.error("Error downloading file:", downloadError);
-      throw new Error(`Failed to download permit file: ${downloadError.message}`);
+  // Helper function to convert ArrayBuffer to base64 in chunks (avoids stack overflow)
+  function arrayBufferToBase64(buffer: ArrayBuffer): string {
+    const bytes = new Uint8Array(buffer);
+    let binary = '';
+    const chunkSize = 8192; // Process in 8KB chunks to avoid stack overflow
+    for (let i = 0; i < bytes.length; i += chunkSize) {
+      const chunk = bytes.subarray(i, Math.min(i + chunkSize, bytes.length));
+      binary += String.fromCharCode.apply(null, [...chunk]);
     }
+    return btoa(binary);
+  }
 
-    // Convert to base64 for OpenAI vision
-    const arrayBuffer = await fileData.arrayBuffer();
-    const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+  // Download the permit file from storage (support both buckets)
+  const { data: fileData, error: downloadError } = await supabase.storage
+    .from(bucket)
+    .download(filePath);
+
+  if (downloadError) {
+    console.error("Error downloading file:", downloadError);
+    throw new Error(`Failed to download permit file: ${downloadError.message}`);
+  }
+
+  // Convert to base64 for OpenAI vision using chunked approach
+  const arrayBuffer = await fileData.arrayBuffer();
+  const base64 = arrayBufferToBase64(arrayBuffer);
     
     // Determine MIME type
     const ext = filePath.split('.').pop()?.toLowerCase();
