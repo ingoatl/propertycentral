@@ -136,13 +136,16 @@ export const PhaseCard = ({
                       {(() => {
                         // Exclude section headers from task count
                         const completableTasks = tasks.filter(t => t.field_type !== 'section_header');
-                        const completedCount = completableTasks.filter(t => t.status === "completed").length;
+                        // Count tasks that are completed OR have data filled in (matching progress calculation)
+                        const completedCount = completableTasks.filter(
+                          t => t.status === "completed" || (t.field_value && t.field_value.trim() !== "")
+                        ).length;
                         return `${completedCount} of ${completableTasks.length} tasks`;
                       })()}
                     </div>
                   </div>
                   <ChevronDown className={cn(
-                    "w-5 h-5 transition-transform max-md:w-6 max-md:h-6",
+                    "w-5 h-5 transition-transform duration-300 max-md:w-6 max-md:h-6",
                     expanded && "transform rotate-180"
                   )} />
                 </div>

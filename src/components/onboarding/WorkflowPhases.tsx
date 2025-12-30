@@ -35,8 +35,14 @@ export const WorkflowPhases = ({ projectId, tasks, onTaskUpdate, searchQuery = "
       t.phase_number === phaseNumber && t.field_type !== 'section_header'
     );
     if (phaseTasks.length === 0) return 0;
-    const completed = phaseTasks.filter(t => t.status === "completed").length;
-    return (completed / phaseTasks.length) * 100;
+    
+    // Count tasks that are completed OR have field_value filled in
+    // This matches the project-level progress calculation logic
+    const tasksWithProgress = phaseTasks.filter(
+      t => t.status === "completed" || (t.field_value && t.field_value.trim() !== "")
+    ).length;
+    
+    return (tasksWithProgress / phaseTasks.length) * 100;
   };
 
   const togglePhase = (phaseNumber: number) => {
