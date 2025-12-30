@@ -51,6 +51,9 @@ verify_jwt = true
 [functions.create-payment-checkout]
 verify_jwt = true
 
+[functions.create-payment-setup]
+verify_jwt = false
+
 [functions.create-setup-intent]
 verify_jwt = true
 
