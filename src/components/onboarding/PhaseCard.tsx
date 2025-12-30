@@ -145,7 +145,7 @@ export const PhaseCard = ({
                     </div>
                   </div>
                   <ChevronDown className={cn(
-                    "w-5 h-5 transition-transform duration-300 max-md:w-6 max-md:h-6",
+                    "w-5 h-5 transition-transform duration-500 ease-out max-md:w-6 max-md:h-6",
                     expanded && "transform rotate-180"
                   )} />
                 </div>
