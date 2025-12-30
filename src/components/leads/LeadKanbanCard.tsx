@@ -1,7 +1,7 @@
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Lead, STAGE_CONFIG } from "@/types/leads";
-import { Phone, Mail, MapPin, DollarSign, Calendar, GripVertical } from "lucide-react";
+import { Phone, Mail, MapPin, DollarSign, Calendar } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 
@@ -40,28 +40,26 @@ const LeadKanbanCard = ({ lead, onClick }: LeadKanbanCardProps) => {
     <div
       ref={setNodeRef}
       style={style}
+      {...attributes}
+      {...listeners}
       className={cn(
-        "group relative bg-card rounded-lg border shadow-sm transition-all duration-200 cursor-pointer",
+        "group relative bg-card rounded-lg border shadow-sm transition-all duration-200",
         "hover:shadow-md hover:scale-[1.02] hover:-translate-y-0.5",
+        "cursor-grab active:cursor-grabbing touch-none",
         isDragging && "opacity-50 shadow-xl scale-105 z-50 rotate-2"
       )}
-      onClick={onClick}
+      onClick={(e) => {
+        // Only trigger click if not dragging
+        if (!isDragging) {
+          onClick();
+        }
+      }}
     >
       {/* Color accent bar */}
       <div
         className="absolute left-0 top-0 bottom-0 w-1 rounded-l-lg"
         style={{ backgroundColor: stageConfig.accentColor }}
       />
-
-      {/* Drag handle */}
-      <div
-        {...attributes}
-        {...listeners}
-        className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing p-1 rounded hover:bg-muted"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <GripVertical className="h-4 w-4 text-muted-foreground" />
-      </div>
 
       <div className="p-3 pl-4">
         {/* Header */}
