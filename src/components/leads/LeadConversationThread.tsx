@@ -90,7 +90,7 @@ export function LeadConversationThread({ communications, leadName }: LeadConvers
   };
 
   return (
-    <ScrollArea className="h-[400px]" ref={scrollRef}>
+    <ScrollArea className="h-full" ref={scrollRef}>
       <div className="space-y-3 pb-4 pr-4">
         {groupedMessages.map((group, groupIndex) => (
           <div key={groupIndex}>
