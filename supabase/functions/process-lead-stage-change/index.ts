@@ -273,7 +273,8 @@ serve(async (req) => {
       try {
         // Replace template variables with enhanced placeholders
         const processTemplate = (template: string) => {
-          const baseUrl = supabaseUrl.replace('.supabase.co', '');
+          // Use the full Supabase URL for links (don't strip .supabase.co!)
+          const appUrl = supabaseUrl; // Keep the full URL
           return template
             .replace(/\{\{name\}\}/g, lead.name?.split(' ')[0] || lead.name || "") // First name only
             .replace(/\{\{full_name\}\}/g, lead.name || "")
@@ -282,11 +283,12 @@ serve(async (req) => {
             .replace(/\{\{property_address\}\}/g, lead.property_address || "your property")
             .replace(/\{\{property_type\}\}/g, lead.property_type || "property")
             .replace(/\{\{opportunity_value\}\}/g, lead.opportunity_value?.toString() || "0")
-            .replace(/\{\{ach_link\}\}/g, `${baseUrl}/payment-setup?lead=${leadId}`)
-            .replace(/\{\{onboarding_link\}\}/g, `${baseUrl}/onboard/existing-str?lead=${leadId}`)
-            .replace(/\{\{sender\}\}/g, "Anja")
+            .replace(/\{\{ach_link\}\}/g, `${appUrl}/payment-setup?lead=${leadId}`)
+            .replace(/\{\{onboarding_link\}\}/g, `${appUrl}/onboard/existing-str?lead=${leadId}`)
+            .replace(/\{\{sender\}\}/g, "Ingo")
             .replace(/\{\{ai_call_summary\}\}/g, lead.ai_summary || "We discussed your property management needs and goals.")
-            .replace(/\{\{ai_next_action\}\}/g, lead.ai_next_action || "Review and sign the management agreement");
+            .replace(/\{\{ai_next_action\}\}/g, lead.ai_next_action || "Review and sign the management agreement")
+            .replace(/\\n/g, "\n"); // Convert escaped newlines to actual newlines
         };
 
         // Determine message content - use automation template or fall back to psychology template
