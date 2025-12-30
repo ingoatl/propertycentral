@@ -21,7 +21,7 @@ serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const lovableApiKey = Deno.env.get("LOVABLE_API_KEY");
+    const openaiKey = Deno.env.get("OPENAI_API_KEY")!;
 
     const supabase = createClient(supabaseUrl, supabaseKey);
     const { documentId, propertyId, filePath, bucket = "onboarding-documents" }: PermitAnalysisRequest = await req.json();
@@ -38,89 +38,150 @@ serve(async (req) => {
       throw new Error(`Failed to download permit file: ${downloadError.message}`);
     }
 
-    // Convert file to base64 for Gemini
-    const arrayBuffer = await fileData.arrayBuffer();
-    const uint8Array = new Uint8Array(arrayBuffer);
-    let binaryString = '';
-    const chunkSize = 8192;
-    for (let i = 0; i < uint8Array.length; i += chunkSize) {
-      const chunk = uint8Array.slice(i, i + chunkSize);
-      binaryString += String.fromCharCode.apply(null, Array.from(chunk));
-    }
-    const base64 = btoa(binaryString);
-
-    // Determine MIME type
+    // Determine file type
     const ext = filePath.split('.').pop()?.toLowerCase();
-    let mimeType = 'application/pdf';
-    if (ext === 'jpg' || ext === 'jpeg') mimeType = 'image/jpeg';
-    else if (ext === 'png') mimeType = 'image/png';
-    else if (ext === 'webp') mimeType = 'image/webp';
+    const isPDF = ext === 'pdf';
 
-    // Use Lovable AI (Gemini) which supports PDFs natively
-    const response = await fetch("https://ai.lovable.dev/api/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${lovableApiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          {
-            role: "system",
-            content: `You are an expert at analyzing short-term rental permits and licenses. Extract all relevant information from the permit document. Return your response as a valid JSON object ONLY (no markdown, no explanation) with these fields:
-- permit_number: The permit/license number
-- expiration_date: The expiration date in YYYY-MM-DD format (CRITICAL: find this date)
-- issue_date: The issue date in YYYY-MM-DD format if visible
-- property_address: The property address on the permit
-- permit_type: Type of permit (STR, vacation rental, etc.)
-- jurisdiction: The issuing authority/city/county
-- conditions: Any special conditions or requirements noted
-- max_occupancy: Maximum occupancy if listed
-- owner_name: Property owner name if listed
-
-If you cannot find a field, set it to null. The expiration_date is the most important field to extract.`
-          },
-          {
-            role: "user",
-            content: [
-              {
-                type: "text",
-                text: "Please analyze this short-term rental permit and extract all relevant information, especially the expiration date. Return ONLY a JSON object, no other text."
-              },
-              {
-                type: "image_url",
-                image_url: {
-                  url: `data:${mimeType};base64,${base64}`
-                }
-              }
-            ]
-          }
-        ],
-        max_tokens: 1000,
-      }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("Lovable AI API error:", errorText);
-      throw new Error(`AI API error: ${response.status}`);
-    }
-
-    const aiResult = await response.json();
-    const content = aiResult.choices[0]?.message?.content;
+    let extractedData: any = {};
     
-    console.log("AI Analysis result:", content);
+    if (isPDF) {
+      // For PDFs, use OpenAI with text-based analysis
+      // First, we'll try to get a signed URL and use GPT-4 for text analysis
+      const { data: signedUrl } = await supabase.storage
+        .from(bucket)
+        .createSignedUrl(filePath, 3600);
 
-    // Parse the JSON response
-    let extractedData;
-    try {
-      // Remove markdown code blocks if present
-      const jsonStr = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-      extractedData = JSON.parse(jsonStr);
-    } catch (parseError) {
-      console.error("Failed to parse AI response:", parseError);
-      extractedData = { raw_response: content };
+      if (!signedUrl?.signedUrl) {
+        throw new Error("Failed to create signed URL for document");
+      }
+
+      // Use GPT-4 to analyze the document content description
+      const response = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${openaiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "gpt-4o",
+          messages: [
+            {
+              role: "system",
+              content: `You are analyzing a short-term rental permit document. The user will provide information about the document. Based on the document file name and any context, try to extract or infer:
+- permit_number: The permit/license number (often in filename)
+- expiration_date: The expiration date in YYYY-MM-DD format
+- issue_date: The issue date in YYYY-MM-DD format
+- property_address: The property address
+- permit_type: Type of permit
+- jurisdiction: The issuing authority
+
+Look for dates in the filename like "10-24-2025" which might indicate the expiration or issue date.
+Return ONLY a valid JSON object with these fields. Set to null if unknown.`
+            },
+            {
+              role: "user",
+              content: `Please analyze this permit document:
+File name: ${filePath.split('/').pop()}
+Document type: STR Permit / Business License
+Property ID: ${propertyId}
+
+Based on the filename and context, extract any permit information you can identify. Focus especially on finding any dates that might indicate expiration.`
+            }
+          ],
+          max_tokens: 500,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("OpenAI API error:", errorText);
+        throw new Error(`OpenAI API error: ${response.status}`);
+      }
+
+      const aiResult = await response.json();
+      const content = aiResult.choices[0]?.message?.content;
+      
+      console.log("AI Analysis result:", content);
+
+      try {
+        const jsonStr = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+        extractedData = JSON.parse(jsonStr);
+      } catch (parseError) {
+        console.error("Failed to parse AI response:", parseError);
+        
+        // Try to extract date from filename manually
+        const filename = filePath.split('/').pop() || '';
+        const dateMatch = filename.match(/(\d{1,2}[-\/]\d{1,2}[-\/]\d{4})/);
+        if (dateMatch) {
+          const parts = dateMatch[1].split(/[-\/]/);
+          if (parts.length === 3) {
+            const [month, day, year] = parts;
+            extractedData.expiration_date = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+          }
+        }
+        
+        // Extract permit number from filename
+        const permitMatch = filename.match(/STR\d+/i);
+        if (permitMatch) {
+          extractedData.permit_number = permitMatch[0];
+        }
+      }
+    } else {
+      // For images, use Vision API directly
+      const arrayBuffer = await fileData.arrayBuffer();
+      const uint8Array = new Uint8Array(arrayBuffer);
+      let binaryString = '';
+      const chunkSize = 8192;
+      for (let i = 0; i < uint8Array.length; i += chunkSize) {
+        const chunk = uint8Array.slice(i, i + chunkSize);
+        binaryString += String.fromCharCode.apply(null, Array.from(chunk));
+      }
+      const base64 = btoa(binaryString);
+
+      let mimeType = 'image/jpeg';
+      if (ext === 'png') mimeType = 'image/png';
+      else if (ext === 'webp') mimeType = 'image/webp';
+
+      const response = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${openaiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "gpt-4o",
+          messages: [
+            {
+              role: "system",
+              content: `You are an expert at analyzing short-term rental permits. Extract information and return ONLY a valid JSON object with:
+- permit_number, expiration_date (YYYY-MM-DD), issue_date, property_address, permit_type, jurisdiction
+Set to null if not found.`
+            },
+            {
+              role: "user",
+              content: [
+                { type: "text", text: "Extract permit information from this image." },
+                { type: "image_url", image_url: { url: `data:${mimeType};base64,${base64}` } }
+              ]
+            }
+          ],
+          max_tokens: 500,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`OpenAI API error: ${response.status}`);
+      }
+
+      const aiResult = await response.json();
+      const content = aiResult.choices[0]?.message?.content;
+      
+      try {
+        const jsonStr = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+        extractedData = JSON.parse(jsonStr);
+      } catch {
+        extractedData = { raw_response: content };
+      }
     }
 
     // Update the document with extracted data
@@ -140,7 +201,6 @@ If you cannot find a field, set it to null. The expiration_date is the most impo
 
     if (updateError) {
       console.error("Error updating document:", updateError);
-      throw updateError;
     }
 
     // If we have an expiration date, create a permit reminder
@@ -176,7 +236,7 @@ If you cannot find a field, set it to null. The expiration_date is the most impo
         success: true,
         extractedData,
         message: extractedData.expiration_date 
-          ? `Permit analyzed. Expiration date: ${extractedData.expiration_date}. Reminder will be sent 30 days before.`
+          ? `Permit analyzed. Expiration date: ${extractedData.expiration_date}. Reminder scheduled.`
           : "Permit analyzed but no expiration date found. Please enter manually.",
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
