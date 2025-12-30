@@ -1,20 +1,36 @@
 import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Upload, X, File, Download, Loader2 } from "lucide-react";
+import { Upload, X, File, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 interface TaskFileUploadProps {
   taskId: string;
+  taskTitle?: string;
+  projectId?: string;
+  propertyId?: string;
   onFilesUploaded?: () => void;
+  onAnalysisStarted?: () => void;
 }
 
-export const TaskFileUpload = ({ taskId, onFilesUploaded }: TaskFileUploadProps) => {
+export const TaskFileUpload = ({ 
+  taskId, 
+  taskTitle = "", 
+  projectId, 
+  propertyId,
+  onFilesUploaded, 
+  onAnalysisStarted 
+}: TaskFileUploadProps) => {
   const [uploading, setUploading] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Check if this is a permit/license task
+  const isPermitTask = taskTitle.toLowerCase().includes("permit") || 
+                       taskTitle.toLowerCase().includes("license") ||
+                       taskTitle.toLowerCase().includes("str license");
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -34,6 +50,90 @@ export const TaskFileUpload = ({ taskId, onFilesUploaded }: TaskFileUploadProps)
     setSelectedFiles(prev => prev.filter((_, i) => i !== index));
   };
 
+  // Handle permit upload with AI analysis
+  const handlePermitUpload = async (userId: string) => {
+    for (const file of selectedFiles) {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${userId}/${taskId}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+      
+      // Upload to task-attachments bucket
+      const { error: uploadError } = await supabase.storage
+        .from('task-attachments')
+        .upload(fileName, file);
+
+      if (uploadError) throw uploadError;
+
+      // Save metadata to task_attachments table
+      const { error: dbError } = await supabase
+        .from('task_attachments')
+        .insert({
+          task_id: taskId,
+          file_name: file.name,
+          file_path: fileName,
+          file_size: file.size,
+          file_type: file.type,
+          uploaded_by: userId,
+        });
+
+      if (dbError) throw dbError;
+
+      // Get property_id from project if not provided
+      let actualPropertyId = propertyId;
+      if (!actualPropertyId && projectId) {
+        const { data: project } = await supabase
+          .from("onboarding_projects")
+          .select("property_id")
+          .eq("id", projectId)
+          .maybeSingle();
+        actualPropertyId = project?.property_id || undefined;
+      }
+
+      if (actualPropertyId) {
+        // Create a property_documents entry for the permit
+        const { data: docEntry, error: docError } = await supabase
+          .from("property_documents")
+          .insert({
+            property_id: actualPropertyId,
+            project_id: projectId,
+            file_name: file.name,
+            file_path: fileName,
+            file_type: fileExt || "pdf",
+            document_type: "str_permit",
+          })
+          .select()
+          .single();
+
+        if (docError) {
+          console.error("Failed to create document entry:", docError);
+          continue;
+        }
+
+        // Notify that analysis is starting
+        onAnalysisStarted?.();
+        toast.info("Analyzing permit with AI...", { duration: 3000 });
+
+        // Call the AI analysis function with the task-attachments bucket
+        const { data: result, error: analysisError } = await supabase.functions.invoke("analyze-permit", {
+          body: {
+            documentId: docEntry.id,
+            propertyId: actualPropertyId,
+            filePath: fileName,
+            bucket: "task-attachments",
+          },
+        });
+
+        if (analysisError) {
+          console.error("Permit analysis error:", analysisError);
+          toast.error("Failed to analyze permit");
+        } else if (result?.success) {
+          toast.success(result.message || "Permit analyzed successfully");
+        } else {
+          toast.warning("Could not extract permit details. Please enter expiration date manually.");
+        }
+      }
+    }
+  };
+
   const uploadFiles = async () => {
     if (selectedFiles.length === 0) {
       toast.error("Please select files to upload");
@@ -45,33 +145,40 @@ export const TaskFileUpload = ({ taskId, onFilesUploaded }: TaskFileUploadProps)
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
-      const uploadPromises = selectedFiles.map(async (file) => {
-        const fileExt = file.name.split('.').pop();
-        const fileName = `${user.id}/${taskId}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-        
-        // Upload to storage
-        const { error: uploadError } = await supabase.storage
-          .from('task-attachments')
-          .upload(fileName, file);
+      // For permit tasks, we need to handle differently
+      if (isPermitTask && projectId) {
+        // Upload to task-attachments but also trigger permit analysis
+        await handlePermitUpload(user.id);
+      } else {
+        // Standard upload flow
+        const uploadPromises = selectedFiles.map(async (file) => {
+          const fileExt = file.name.split('.').pop();
+          const fileName = `${user.id}/${taskId}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+          
+          // Upload to storage
+          const { error: uploadError } = await supabase.storage
+            .from('task-attachments')
+            .upload(fileName, file);
 
-        if (uploadError) throw uploadError;
+          if (uploadError) throw uploadError;
 
-        // Save metadata to database
-        const { error: dbError } = await supabase
-          .from('task_attachments')
-          .insert({
-            task_id: taskId,
-            file_name: file.name,
-            file_path: fileName,
-            file_size: file.size,
-            file_type: file.type,
-            uploaded_by: user.id,
-          });
+          // Save metadata to database
+          const { error: dbError } = await supabase
+            .from('task_attachments')
+            .insert({
+              task_id: taskId,
+              file_name: file.name,
+              file_path: fileName,
+              file_size: file.size,
+              file_type: file.type,
+              uploaded_by: user.id,
+            });
 
-        if (dbError) throw dbError;
-      });
+          if (dbError) throw dbError;
+        });
 
-      await Promise.all(uploadPromises);
+        await Promise.all(uploadPromises);
+      }
 
       // Visual feedback only - no toast, parent will see files in preview
       setSelectedFiles([]);

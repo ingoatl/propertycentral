@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Download, X, File, Image as ImageIcon, FileText, Loader2 } from "lucide-react";
+import { Download, X, File, Image as ImageIcon, FileText, Loader2, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { DocumentViewer } from "@/components/documents/DocumentViewer";
 
 interface TaskAttachment {
   id: string;
@@ -25,6 +26,9 @@ export const TaskFilePreview = ({ taskId, onFilesChange }: TaskFilePreviewProps)
   const [loading, setLoading] = useState(true);
   const [hoveredFile, setHoveredFile] = useState<string | null>(null);
   const [imageUrls, setImageUrls] = useState<Record<string, string>>({});
+  const [viewerOpen, setViewerOpen] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<TaskAttachment | null>(null);
+  const [selectedFileUrl, setSelectedFileUrl] = useState<string | null>(null);
 
   useEffect(() => {
     loadAttachments();
@@ -122,6 +126,21 @@ export const TaskFilePreview = ({ taskId, onFilesChange }: TaskFilePreviewProps)
     return File;
   };
 
+  const handleViewFile = async (attachment: TaskAttachment) => {
+    // Get a fresh signed URL for viewing
+    const { data: urlData } = await supabase.storage
+      .from('task-attachments')
+      .createSignedUrl(attachment.file_path, 3600);
+
+    if (urlData?.signedUrl) {
+      setSelectedFile(attachment);
+      setSelectedFileUrl(urlData.signedUrl);
+      setViewerOpen(true);
+    } else {
+      toast.error("Failed to load file preview");
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-4">
@@ -148,6 +167,7 @@ export const TaskFilePreview = ({ taskId, onFilesChange }: TaskFilePreviewProps)
               className="relative group"
               onMouseEnter={() => setHoveredFile(attachment.id)}
               onMouseLeave={() => setHoveredFile(null)}
+              onClick={() => handleViewFile(attachment)}
             >
               {/* Small preview - always visible */}
               <div className={cn(
@@ -176,6 +196,18 @@ export const TaskFilePreview = ({ taskId, onFilesChange }: TaskFilePreviewProps)
 
                 {/* Actions overlay - shows on hover */}
                 <div className="absolute inset-0 bg-black/70 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleViewFile(attachment);
+                  }}
+                  className="h-5 w-5 p-0"
+                  title="View"
+                >
+                  <Eye className="w-2.5 h-2.5" />
+                </Button>
                 <Button
                   size="sm"
                   variant="secondary"
@@ -241,6 +273,17 @@ export const TaskFilePreview = ({ taskId, onFilesChange }: TaskFilePreviewProps)
           );
         })}
       </div>
+
+      {/* Document Viewer Modal */}
+      {selectedFile && (
+        <DocumentViewer
+          open={viewerOpen}
+          onOpenChange={setViewerOpen}
+          filePath={selectedFileUrl || ''}
+          fileName={selectedFile.file_name}
+          fileType={selectedFile.file_type}
+        />
+      )}
     </div>
   );
 };
