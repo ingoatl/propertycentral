@@ -159,26 +159,41 @@ const LeadDetailModal = ({ lead, open, onOpenChange, onRefresh }: LeadDetailModa
     mutationFn: async () => {
       if (!lead || !newMessage.trim()) return;
       
-      // First, create the communication record
-      const { error: commError } = await supabase.from("lead_communications").insert({
-        lead_id: lead.id,
-        communication_type: messageType,
-        direction: 'outbound',
-        body: newMessage,
-        status: 'pending',
-      });
-      if (commError) throw commError;
+      if (messageType === "sms" && lead.phone) {
+        // Use GHL for SMS (404-800-6804 number)
+        const { data, error } = await supabase.functions.invoke('ghl-send-sms', {
+          body: {
+            leadId: lead.id,
+            phone: lead.phone,
+            message: newMessage,
+            fromNumber: "+14048006804", // The GHL number
+          }
+        });
+        if (error) throw error;
+        if (!data?.success) throw new Error(data?.error || "Failed to send SMS");
+      } else if (messageType === "email" && lead.email) {
+        // Use existing email flow
+        const { error: commError } = await supabase.from("lead_communications").insert({
+          lead_id: lead.id,
+          communication_type: "email",
+          direction: 'outbound',
+          body: newMessage,
+          status: 'pending',
+        });
+        if (commError) throw commError;
 
-      // Then trigger the send via edge function
-      const { error } = await supabase.functions.invoke('send-lead-notification', {
-        body: {
-          leadId: lead.id,
-          type: messageType,
-          message: newMessage,
-          subject: messageType === 'email' ? 'Message from PeachHaus' : undefined,
-        }
-      });
-      if (error) throw error;
+        const { error } = await supabase.functions.invoke('send-lead-notification', {
+          body: {
+            leadId: lead.id,
+            type: "email",
+            message: newMessage,
+            subject: 'Message from PeachHaus',
+          }
+        });
+        if (error) throw error;
+      } else {
+        throw new Error("Missing contact info for " + messageType);
+      }
     },
     onSuccess: () => {
       toast.success(`${messageType.toUpperCase()} sent`);
