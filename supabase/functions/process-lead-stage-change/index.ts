@@ -278,10 +278,11 @@ serve(async (req) => {
         // Replace template variables with enhanced placeholders
         const processTemplate = (template: string) => {
           // Property Central onboarding URLs
-          const existingStrOnboardingUrl = "https://propertycentral.io/owner-onboarding";
-          const newStrOnboardingUrl = "https://propertycentral.io/new-str-onboarding";
+          const siteUrl = "https://propertycentral.lovable.app";
+          const existingStrOnboardingUrl = `${siteUrl}/owner-onboarding`;
+          const newStrOnboardingUrl = `${siteUrl}/new-str-onboarding`;
           // Stripe payment setup URL
-          const stripePaymentUrl = `https://www.peachhausgroup.com/payment-setup?lead=${leadId}`;
+          const stripePaymentUrl = `${siteUrl}/payment-setup?lead=${leadId}`;
           
           return template
             .replace(/\{\{name\}\}/g, lead.name?.split(' ')[0] || lead.name || "") // First name only
@@ -433,29 +434,37 @@ serve(async (req) => {
               return `<p style="margin: 0 0 16px 0; text-align: left;">${formatted}</p>`;
             }).join('');
 
-            // Gmail-style email signature with headshot and signature image - left aligned
+            // Gmail-style email signature with headshot and signature image underneath - left aligned
             const signature = `
               <table cellpadding="0" cellspacing="0" style="font-family: Arial, sans-serif; margin-top: 24px; border-collapse: collapse;">
                 <tr>
-                  <td style="padding-right: 12px; vertical-align: top;">
-                    <div style="display: flex; flex-direction: column; align-items: center;">
-                      <img src="https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/ingo-headshot.png" alt="Ingo Schaer" style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover; display: block;" />
-                      <img src="https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/ingo-signature.png" alt="Signature" style="width: 100px; height: auto; margin-top: 8px; display: block;" />
-                    </div>
-                  </td>
-                  <td style="vertical-align: top; border-left: 2px solid #f59e0b; padding-left: 12px;">
-                    <p style="margin: 0 0 2px 0; font-weight: bold; font-size: 14px; color: #1a1a1a; text-align: left;">Ingo Schaer</p>
-                    <p style="margin: 0 0 4px 0; font-size: 12px; color: #666; text-align: left;">Co-Founder, Operations Manager</p>
-                    <p style="margin: 0 0 2px 0; font-size: 12px; color: #1a1a1a; font-weight: 500; text-align: left;">PeachHaus Group LLC</p>
-                    <p style="margin: 4px 0 2px 0; font-size: 11px; color: #555; text-align: left;">
-                      <a href="tel:+14048005932" style="color: #1a1a1a; text-decoration: none;">(404) 800-5932</a>
-                    </p>
-                    <p style="margin: 2px 0; font-size: 11px; color: #555; text-align: left;">
-                      <a href="mailto:ingo@peachhausgroup.com" style="color: #1a73e8; text-decoration: none;">ingo@peachhausgroup.com</a>
-                    </p>
-                    <p style="margin: 2px 0; font-size: 11px; color: #555; text-align: left;">
-                      <a href="https://www.peachhausgroup.com" style="color: #1a73e8; text-decoration: none;">www.peachhausgroup.com</a>
-                    </p>
+                  <td style="vertical-align: top;">
+                    <table cellpadding="0" cellspacing="0" style="border-collapse: collapse;">
+                      <tr>
+                        <td style="padding-right: 12px; vertical-align: top;">
+                          <img src="https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/ingo-headshot.png" alt="Ingo Schaer" style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover; display: block;" />
+                        </td>
+                        <td style="vertical-align: top; border-left: 2px solid #f59e0b; padding-left: 12px;">
+                          <p style="margin: 0 0 2px 0; font-weight: bold; font-size: 14px; color: #1a1a1a; text-align: left;">Ingo Schaer</p>
+                          <p style="margin: 0 0 4px 0; font-size: 12px; color: #666; text-align: left;">Co-Founder, Operations Manager</p>
+                          <p style="margin: 0 0 2px 0; font-size: 12px; color: #1a1a1a; font-weight: 500; text-align: left;">PeachHaus Group LLC</p>
+                          <p style="margin: 4px 0 2px 0; font-size: 11px; color: #555; text-align: left;">
+                            <a href="tel:+14048005932" style="color: #1a1a1a; text-decoration: none;">(404) 800-5932</a>
+                          </p>
+                          <p style="margin: 2px 0; font-size: 11px; color: #555; text-align: left;">
+                            <a href="mailto:ingo@peachhausgroup.com" style="color: #1a73e8; text-decoration: none;">ingo@peachhausgroup.com</a>
+                          </p>
+                          <p style="margin: 2px 0; font-size: 11px; color: #555; text-align: left;">
+                            <a href="https://www.peachhausgroup.com" style="color: #1a73e8; text-decoration: none;">www.peachhausgroup.com</a>
+                          </p>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td colspan="2" style="padding-top: 8px;">
+                          <img src="https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/ingo-signature.png" alt="Signature" style="width: 120px; height: auto; display: block;" />
+                        </td>
+                      </tr>
+                    </table>
                   </td>
                 </tr>
               </table>
