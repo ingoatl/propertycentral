@@ -34,7 +34,7 @@ serve(async (req) => {
         id,
         property_id,
         reconciliation_month,
-        properties!inner(id, name, management_fee_percentage, order_minimum_fee),
+        properties!inner(id, name, management_fee_percentage, order_minimum_fee, first_listing_live_at),
         property_owners(service_type)
       `)
       .eq("status", "preview")
@@ -42,7 +42,7 @@ serve(async (req) => {
         id: string;
         property_id: string;
         reconciliation_month: string;
-        properties: { id: string; name: string; management_fee_percentage: number; order_minimum_fee: number };
+        properties: { id: string; name: string; management_fee_percentage: number; order_minimum_fee: number; first_listing_live_at: string | null };
         property_owners: { service_type: string } | null;
       }> | null; error: any };
 
@@ -295,13 +295,17 @@ serve(async (req) => {
         const managementFeePercentage = rec.properties?.management_fee_percentage || 15;
         const hasMidTerm = (midTermBookings?.length || 0) > 0;
         
+        // Only charge minimum fee if property is actually live on a platform
+        const isPropertyLive = rec.properties?.first_listing_live_at != null;
+        
         let orderMinimumFee = 0;
-        if (!hasMidTerm) {
+        if (!hasMidTerm && isPropertyLive) {
           const nightlyRate = totalNights > 0 ? accommodationRevenueTotal / totalNights : 0;
           if (nightlyRate < 200) orderMinimumFee = 250;
           else if (nightlyRate <= 400) orderMinimumFee = 400;
           else orderMinimumFee = 750;
         }
+        // Properties without first_listing_live_at = no minimum fee (not yet listed)
 
         const managementFeeBase = accommodationRevenueTotal + midTermRevenue;
         const calculatedFee = managementFeeBase * (managementFeePercentage / 100);
