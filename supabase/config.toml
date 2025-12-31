@@ -338,3 +338,6 @@ verify_jwt = true
 
 [functions.get-owner-for-payment]
 verify_jwt = false
+
+[functions.auto-finalize-previews]
+verify_jwt = false
