@@ -19,6 +19,7 @@ import { DashboardBugReportsCard } from "@/components/admin/DashboardBugReportsC
 import { ExpenseWatchdogCard } from "@/components/admin/ExpenseWatchdogCard";
 import { VisitPriceWatchdogCard } from "@/components/admin/VisitPriceWatchdogCard";
 import { PartnerSyncWatchdogCard } from "@/components/admin/PartnerSyncWatchdogCard";
+import { GmailHealthWatchdog } from "@/components/dashboard/GmailHealthWatchdog";
 import { EmailInsightsCard } from "@/components/EmailInsightsCard";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -463,7 +464,8 @@ export const AdminDashboard = ({ summaries, onExport, onSync, syncing, onSendOve
         </div>
 
         {/* Watchdog Section - Critical for catching data issues */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 max-md:gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 max-md:gap-4">
+          <GmailHealthWatchdog />
           <VisitPriceWatchdogCard />
           <ExpenseWatchdogCard />
           <PartnerSyncWatchdogCard />
