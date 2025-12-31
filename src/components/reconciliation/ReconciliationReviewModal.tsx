@@ -11,12 +11,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { format } from "date-fns";
+import { format, startOfMonth, endOfMonth, parseISO } from "date-fns";
 import { Check, Home, DollarSign, Eye, RotateCcw, AlertTriangle, RefreshCw, CreditCard, Loader2, Banknote } from "lucide-react";
 import { toast } from "sonner";
 import { MonthlyEmailPreviewModal } from "./MonthlyEmailPreviewModal";
 import { calculateDueFromOwnerFromLineItems, ServiceType, getSettlementAmount, getSettlementLabel, formatCurrency } from "@/lib/reconciliationCalculations";
 import { VisitValidationPreview } from "./VisitValidationPreview";
+import { TenantPaymentReview } from "./TenantPaymentReview";
 
 interface ReconciliationReviewModalProps {
   reconciliationId: string;
@@ -395,12 +396,26 @@ export const ReconciliationReviewModal = ({
         }
       }
 
+      // Fetch active mid-term bookings for this property and month
+      const monthDate = new Date(rec.reconciliation_month + 'T00:00:00');
+      const monthStart = startOfMonth(monthDate);
+      const monthEnd = endOfMonth(monthDate);
+      
+      const { data: midTermBookings } = await supabase
+        .from("mid_term_bookings")
+        .select("*")
+        .eq("property_id", rec.property_id)
+        .lte("start_date", format(monthEnd, "yyyy-MM-dd"))
+        .gte("end_date", format(monthStart, "yyyy-MM-dd"))
+        .in("status", ["active", "completed"]);
+
       return { 
         reconciliation: rec, 
         lineItems: items, 
         unbilledVisits: filteredUnbilledVisits,
         unbilledExpenses: filteredUnbilledExpenses,
-        visitDetailsMap
+        visitDetailsMap,
+        midTermBookings: midTermBookings || []
       };
     },
     enabled: open,
@@ -890,6 +905,22 @@ export const ReconciliationReviewModal = ({
             </>
           )}
         </Card>
+
+        {/* Tenant Payment Review - Only show for mid-term rentals */}
+        {data?.midTermBookings && data.midTermBookings.length > 0 && (
+          <div className="mt-4">
+            {data.midTermBookings.map((booking: any) => (
+              <TenantPaymentReview
+                key={booking.id}
+                propertyId={reconciliation.property_id}
+                reconciliationMonth={reconciliation.reconciliation_month}
+                expectedRent={Number(booking.monthly_rent) || 0}
+                bookingId={booking.id}
+                tenantName={booking.tenant_name}
+              />
+            ))}
+          </div>
+        )}
 
         <Tabs defaultValue="unapproved" className="mt-4">
           <TabsList>

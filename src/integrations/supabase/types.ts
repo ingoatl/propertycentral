@@ -5679,6 +5679,80 @@ export type Database = {
         }
         Relationships: []
       }
+      tenant_payments: {
+        Row: {
+          amount: number
+          booking_id: string | null
+          created_at: string
+          email_insight_id: string | null
+          entered_by: string | null
+          id: string
+          notes: string | null
+          payment_date: string
+          payment_method: string | null
+          property_id: string
+          reference_number: string | null
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          booking_id?: string | null
+          created_at?: string
+          email_insight_id?: string | null
+          entered_by?: string | null
+          id?: string
+          notes?: string | null
+          payment_date: string
+          payment_method?: string | null
+          property_id: string
+          reference_number?: string | null
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          booking_id?: string | null
+          created_at?: string
+          email_insight_id?: string | null
+          entered_by?: string | null
+          id?: string
+          notes?: string | null
+          payment_date?: string
+          payment_method?: string | null
+          property_id?: string
+          reference_number?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tenant_payments_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "mid_term_bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tenant_payments_email_insight_id_fkey"
+            columns: ["email_insight_id"]
+            isOneToOne: false
+            referencedRelation: "email_insights"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tenant_payments_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "comprehensive_property_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tenant_payments_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_phone_assignments: {
         Row: {
           created_at: string
