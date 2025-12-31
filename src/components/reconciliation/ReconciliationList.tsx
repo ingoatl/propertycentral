@@ -150,10 +150,14 @@ export const ReconciliationList = () => {
     };
   }, [refetch]);
 
-  // Fetch Client-Managed properties that have ACTIVE LISTINGS (ownerrez or mid-term bookings)
+  // Fetch Client-Managed properties that have ACTIVE LISTINGS OR unbilled charges
   const { data: activeProperties } = useQuery({
-    queryKey: ["managed-properties-with-listings-for-reconciliation"],
+    queryKey: ["managed-properties-with-listings-for-reconciliation", selectedMonth],
     queryFn: async () => {
+      const monthDate = new Date(selectedMonth + "T00:00:00");
+      const startDate = format(startOfMonth(monthDate), "yyyy-MM-dd");
+      const endDate = format(endOfMonth(monthDate), "yyyy-MM-dd");
+      
       // Get all Client-Managed properties
       const { data: properties, error } = await supabase
         .from("properties")
@@ -188,10 +192,42 @@ export const ReconciliationList = () => {
       
       const midtermPropertyIds = new Set((midtermProperties || []).map((b: any) => b.property_id));
 
-      // Filter to only include properties that have listings/bookings
+      // Get properties with unbilled expenses in the selected month
+      const { data: expenseProperties } = await supabase
+        .from("expenses")
+        .select("property_id")
+        .eq("exported", false)
+        .gte("date", startDate)
+        .lte("date", endDate);
+      
+      const expensePropertyIds = new Set((expenseProperties || []).map((e: any) => e.property_id));
+
+      // Get properties with unbilled visits in the selected month
+      const { data: visitProperties } = await supabase
+        .from("visits")
+        .select("property_id")
+        .eq("billed", false)
+        .gte("date", startDate)
+        .lte("date", endDate);
+      
+      const visitPropertyIds = new Set((visitProperties || []).map((v: any) => v.property_id));
+
+      // Include properties that have:
+      // 1. OwnerRez bookings, OR
+      // 2. Mid-term bookings, OR
+      // 3. Unbilled expenses for the month, OR
+      // 4. Unbilled visits for the month
       return properties.filter((p: any) => 
-        ownerrezPropertyIds.has(p.id) || midtermPropertyIds.has(p.id)
-      );
+        ownerrezPropertyIds.has(p.id) || 
+        midtermPropertyIds.has(p.id) ||
+        expensePropertyIds.has(p.id) ||
+        visitPropertyIds.has(p.id)
+      ).map((p: any) => ({
+        ...p,
+        hasBookings: ownerrezPropertyIds.has(p.id) || midtermPropertyIds.has(p.id),
+        hasExpensesOnly: !ownerrezPropertyIds.has(p.id) && !midtermPropertyIds.has(p.id) && 
+                         (expensePropertyIds.has(p.id) || visitPropertyIds.has(p.id))
+      }));
     },
   });
 
@@ -578,6 +614,16 @@ export const ReconciliationList = () => {
     return activeProperties.filter((prop: any) => !existingPropertyIds.has(prop.id));
   }, [selectedMonth, activeProperties, reconciliations]);
 
+  // Count past month previews that need finalization
+  const pastMonthPreviews = useMemo(() => {
+    const currentMonthStr = monthOptions[0]?.value;
+    if (!currentMonthStr) return [];
+    
+    return reconciliations?.filter((rec: any) => 
+      rec.status === 'preview' && rec.reconciliation_month < currentMonthStr
+    ) || [];
+  }, [reconciliations, monthOptions]);
+
   // Get selected month label for display
   const selectedMonthLabel = monthOptions.find(m => m.value === selectedMonth)?.label || "All Months";
   const isSelectedMonthCurrent = isCurrentMonth(selectedMonth);
@@ -721,6 +767,24 @@ export const ReconciliationList = () => {
                   <p className="text-sm text-indigo-700 dark:text-indigo-300">
                     Start approving expenses now. Revenue will be finalized on the 1st of next month when all bookings are complete.
                   </p>
+                </div>
+              </div>
+            </div>
+          )}
+          
+          {/* Banner for past month previews that need finalization */}
+          {pastMonthPreviews.length > 0 && (
+            <div className="mb-4 p-4 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5" />
+                  <div>
+                    <h4 className="font-medium text-amber-900 dark:text-amber-100">Past Month Previews Need Finalization</h4>
+                    <p className="text-sm text-amber-700 dark:text-amber-300">
+                      {pastMonthPreviews.length} preview{pastMonthPreviews.length !== 1 ? 's' : ''} from previous months should be finalized. 
+                      These will auto-finalize on the 1st of each month.
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>
