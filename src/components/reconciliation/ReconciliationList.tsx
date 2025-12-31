@@ -6,10 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Calendar, Eye, Send, Mail, Loader2, CreditCard, Banknote, Check, UserMinus, AlertTriangle } from "lucide-react";
+import { Calendar, Check, CreditCard, Banknote, AlertTriangle, Archive, TrendingUp, TrendingDown, DollarSign, Home } from "lucide-react";
 import { format } from "date-fns";
 import { CreateReconciliationDialog } from "./CreateReconciliationDialog";
 import { ReconciliationReviewModal } from "./ReconciliationReviewModal";
+import { ReconciliationCardActions } from "./ReconciliationCardActions";
 import { OffboardPropertyDialog } from "@/components/properties/OffboardPropertyDialog";
 import { toast } from "sonner";
 import { ServiceType, formatCurrency } from "@/lib/reconciliationCalculations";
@@ -199,7 +200,7 @@ export const ReconciliationList = () => {
 
   return (
     <div className="space-y-4">
-      <div className="flex justify-between items-center">
+      <div className="flex justify-between items-center flex-wrap gap-4">
         <div>
           <h2 className="text-2xl font-bold">Monthly Reconciliations</h2>
           <p className="text-sm text-muted-foreground">
@@ -214,7 +215,7 @@ export const ReconciliationList = () => {
               onCheckedChange={setShowOffboarded}
             />
             <Label htmlFor="show-offboarded" className="text-sm text-muted-foreground">
-              Show offboarded
+              Show archived
             </Label>
           </div>
           <Button onClick={() => setShowCreateDialog(true)}>
@@ -229,151 +230,153 @@ export const ReconciliationList = () => {
           <p className="text-center text-muted-foreground">Loading reconciliations...</p>
         </Card>
       ) : filteredReconciliations && filteredReconciliations.length > 0 ? (
-        <div className="grid gap-4">
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {filteredReconciliations.map((rec: any) => {
             const isOffboarded = !!rec.properties?.offboarded_at;
+            const isFullService = rec.service_type === 'full_service';
+            
             return (
-            <Card key={rec.id} className={`p-6 ${isOffboarded ? 'opacity-60 border-dashed' : ''}`}>
-              <div className="flex items-start justify-between">
-                <div className="space-y-2 flex-1">
-                  <div className="flex items-center gap-3">
-                    <h3 className="font-semibold text-lg">{rec.properties?.name}</h3>
-                    {isOffboarded && (
-                      <Badge variant="outline" className="bg-muted text-muted-foreground border-muted-foreground/30">
-                        <AlertTriangle className="w-3 h-3 mr-1" />
-                        Offboarded
-                      </Badge>
-                    )}
-                    {getServiceTypeBadge(rec.service_type)}
-                    {getStatusBadge(rec.status, rec.payout_status, rec.service_type)}
+              <Card 
+                key={rec.id} 
+                className={`overflow-hidden transition-all duration-200 hover:shadow-md ${
+                  isOffboarded 
+                    ? 'opacity-75 border-dashed border-muted-foreground/30 bg-muted/20' 
+                    : ''
+                }`}
+              >
+                {/* Archived Banner */}
+                {isOffboarded && (
+                  <div className="bg-muted/50 border-b border-dashed px-4 py-2 flex items-center gap-2">
+                    <Archive className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-xs text-muted-foreground font-medium">
+                      Archived {rec.properties?.offboarded_at && format(new Date(rec.properties.offboarded_at), "MMM dd, yyyy")}
+                    </span>
                   </div>
-                  <div className="text-sm text-muted-foreground space-y-1">
-                    <p>Owner: {rec.property_owners?.name}</p>
-                    <p>Month: {format(new Date(rec.reconciliation_month + "T00:00:00"), "MMMM yyyy")}</p>
+                )}
+                
+                {/* Header Section */}
+                <div className="p-4 border-b bg-muted/30">
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                      <Home className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                      <h3 className="font-semibold truncate">{rec.properties?.name}</h3>
+                    </div>
+                    <div className="flex gap-1.5 flex-shrink-0 flex-wrap justify-end">
+                      {getServiceTypeBadge(rec.service_type)}
+                      {getStatusBadge(rec.status, rec.payout_status, rec.service_type)}
+                    </div>
                   </div>
-                  <div className="grid grid-cols-6 gap-4 mt-4 pt-4 border-t">
-                    <div>
-                      <p className="text-xs text-muted-foreground">Revenue</p>
-                      <p className="font-semibold text-green-600">
+                  <div className="text-sm text-muted-foreground space-y-0.5">
+                    <p className="flex items-center gap-1">
+                      <span className="font-medium">Owner:</span> {rec.property_owners?.name}
+                    </p>
+                    <p className="flex items-center gap-1">
+                      <span className="font-medium">Period:</span> {format(new Date(rec.reconciliation_month + "T00:00:00"), "MMMM yyyy")}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Financial Metrics Grid */}
+                <div className="p-4">
+                  <div className="grid grid-cols-3 gap-3 mb-4">
+                    {/* Revenue */}
+                    <div className="bg-green-50 dark:bg-green-950/30 rounded-lg p-3 text-center">
+                      <div className="flex items-center justify-center gap-1 mb-1">
+                        <TrendingUp className="w-3 h-3 text-green-600" />
+                        <p className="text-xs text-muted-foreground font-medium">Revenue</p>
+                      </div>
+                      <p className="font-bold text-green-600 text-sm">
                         {formatCurrency(rec.total_revenue || 0)}
                       </p>
                     </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground">Visit Fees</p>
-                      <p className="font-semibold text-red-600">
+                    
+                    {/* Visit Fees */}
+                    <div className="bg-red-50 dark:bg-red-950/30 rounded-lg p-3 text-center">
+                      <div className="flex items-center justify-center gap-1 mb-1">
+                        <TrendingDown className="w-3 h-3 text-red-600" />
+                        <p className="text-xs text-muted-foreground font-medium">Visits</p>
+                      </div>
+                      <p className="font-bold text-red-600 text-sm">
                         {formatCurrency(rec.calculated_visit_fees || 0)}
                       </p>
                     </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground">Expenses</p>
-                      <p className="font-semibold text-red-600">
+                    
+                    {/* Expenses */}
+                    <div className="bg-red-50 dark:bg-red-950/30 rounded-lg p-3 text-center">
+                      <div className="flex items-center justify-center gap-1 mb-1">
+                        <TrendingDown className="w-3 h-3 text-red-600" />
+                        <p className="text-xs text-muted-foreground font-medium">Expenses</p>
+                      </div>
+                      <p className="font-bold text-red-600 text-sm">
                         {formatCurrency(rec.calculated_total_expenses || 0)}
                       </p>
                     </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground">Mgmt Fee</p>
-                      <p className="font-semibold text-amber-600">
+                    
+                    {/* Mgmt Fee */}
+                    <div className="bg-amber-50 dark:bg-amber-950/30 rounded-lg p-3 text-center">
+                      <div className="flex items-center justify-center gap-1 mb-1">
+                        <DollarSign className="w-3 h-3 text-amber-600" />
+                        <p className="text-xs text-muted-foreground font-medium">Mgmt Fee</p>
+                      </div>
+                      <p className="font-bold text-amber-600 text-sm">
                         {formatCurrency(rec.management_fee || 0)}
                       </p>
                     </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground">Order Min</p>
-                      <p className="font-semibold text-amber-600">
+                    
+                    {/* Order Min */}
+                    <div className="bg-amber-50 dark:bg-amber-950/30 rounded-lg p-3 text-center">
+                      <div className="flex items-center justify-center gap-1 mb-1">
+                        <DollarSign className="w-3 h-3 text-amber-600" />
+                        <p className="text-xs text-muted-foreground font-medium">Order Min</p>
+                      </div>
+                      <p className="font-bold text-amber-600 text-sm">
                         {formatCurrency(rec.order_minimum_fee || 0)}
                       </p>
                     </div>
-                    <div className="col-span-2">
-                      <div className="flex items-center gap-2">
-                        <div className="flex-1">
-                          <p className="text-xs text-muted-foreground">
-                            {rec.service_type === 'full_service' ? 'Payout to Owner' : 'Due from Owner'} (Live)
-                          </p>
-                          {rec.calculator_error ? (
-                            <p className="font-semibold text-destructive text-sm">
-                              Error: {rec.calculator_error}
-                            </p>
-                          ) : (
-                            <>
-                              <p className={`font-bold text-lg ${rec.service_type === 'full_service' ? 'text-green-600' : 'text-primary'}`}>
-                                {formatCurrency(rec.service_type === 'full_service' 
-                                  ? (rec.calculated_payout_to_owner || 0) 
-                                  : (rec.calculated_due_from_owner || 0)
-                                )}
-                              </p>
-                              <p className="text-xs text-muted-foreground mt-1">
-                                Only approved items included
-                              </p>
-                            </>
-                          )}
+                    
+                    {/* Settlement Amount */}
+                    <div className={`rounded-lg p-3 text-center ${
+                      isFullService 
+                        ? 'bg-green-100 dark:bg-green-950/50 ring-1 ring-green-200 dark:ring-green-800' 
+                        : 'bg-primary/10 ring-1 ring-primary/20'
+                    }`}>
+                      <p className="text-xs text-muted-foreground font-medium mb-1">
+                        {isFullService ? 'Payout' : 'Due'}
+                      </p>
+                      {rec.calculator_error ? (
+                        <div className="flex items-center justify-center gap-1">
+                          <AlertTriangle className="w-3 h-3 text-destructive" />
+                          <p className="text-xs text-destructive">Error</p>
                         </div>
-                      </div>
+                      ) : (
+                        <p className={`font-bold text-sm ${isFullService ? 'text-green-600' : 'text-primary'}`}>
+                          {formatCurrency(isFullService 
+                            ? (rec.calculated_payout_to_owner || 0) 
+                            : (rec.calculated_due_from_owner || 0)
+                          )}
+                        </p>
+                      )}
                     </div>
                   </div>
+                  
+                  <p className="text-xs text-muted-foreground text-center mb-4 italic">
+                    Only approved items included in calculations
+                  </p>
+
+                  {/* Actions */}
+                  <ReconciliationCardActions
+                    reconciliation={rec}
+                    isOffboarded={isOffboarded}
+                    onReview={() => setSelectedReconciliation(rec.id)}
+                    onOffboard={() => handleOffboardClick(rec)}
+                    onSendPerformanceEmail={() => handleSendPerformanceEmail(rec)}
+                    onSendOwnerStatement={() => handleSendOwnerStatement(rec.id)}
+                    sendingPerformance={sendingPerformance === rec.id}
+                    sendingStatement={sendingStatement === rec.id}
+                  />
                 </div>
-                <div className="flex gap-2 ml-4">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setSelectedReconciliation(rec.id)}
-                  >
-                    <Eye className="w-4 h-4 mr-2" />
-                    Review
-                  </Button>
-                  {!isOffboarded && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                      onClick={() => handleOffboardClick(rec)}
-                    >
-                      <UserMinus className="w-4 h-4 mr-2" />
-                      Offboard
-                    </Button>
-                  )}
-                  {(rec.status === "approved" || rec.status === "statement_sent") && !isOffboarded && (
-                    <>
-                      <Button 
-                        size="sm" 
-                        variant="outline"
-                        onClick={() => handleSendPerformanceEmail(rec)}
-                        disabled={sendingPerformance === rec.id || sendingStatement === rec.id}
-                      >
-                        {sendingPerformance === rec.id ? (
-                          <>
-                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                            Sending...
-                          </>
-                        ) : (
-                          <>
-                            <Mail className="w-4 h-4 mr-2" />
-                            Send Performance Email
-                          </>
-                        )}
-                      </Button>
-                      <Button 
-                        size="sm" 
-                        variant="default"
-                        onClick={() => handleSendOwnerStatement(rec.id)}
-                        disabled={sendingPerformance === rec.id || sendingStatement === rec.id}
-                      >
-                        {sendingStatement === rec.id ? (
-                          <>
-                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                            Sending...
-                          </>
-                        ) : (
-                          <>
-                            <Send className="w-4 h-4 mr-2" />
-                            {rec.status === "statement_sent" ? "Resend" : "Send"} Owner Statement
-                          </>
-                        )}
-                      </Button>
-                    </>
-                  )}
-                </div>
-              </div>
-            </Card>
-          );
+              </Card>
+            );
           })}
         </div>
       ) : (
