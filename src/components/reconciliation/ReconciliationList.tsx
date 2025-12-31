@@ -147,11 +147,12 @@ export const ReconciliationList = () => {
     },
   });
 
-  // Fetch all Client-Managed properties (the 11 managed properties)
+  // Fetch Client-Managed properties that have ACTIVE LISTINGS (ownerrez or mid-term bookings)
   const { data: activeProperties } = useQuery({
-    queryKey: ["managed-properties-for-reconciliation"],
+    queryKey: ["managed-properties-with-listings-for-reconciliation"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      // Get all Client-Managed properties
+      const { data: properties, error } = await supabase
         .from("properties")
         .select(`
           id,
@@ -166,11 +167,32 @@ export const ReconciliationList = () => {
         .is("offboarded_at", null);
 
       if (error) throw error;
-      return data || [];
+      if (!properties || properties.length === 0) return [];
+
+      // Get properties with OwnerRez bookings
+      const { data: ownerrezProperties } = await supabase
+        .from("ownerrez_bookings")
+        .select("property_id")
+        .not("property_id", "is", null);
+      
+      const ownerrezPropertyIds = new Set((ownerrezProperties || []).map((b: any) => b.property_id));
+
+      // Get properties with active mid-term bookings
+      const { data: midtermProperties } = await supabase
+        .from("mid_term_bookings")
+        .select("property_id")
+        .eq("status", "active");
+      
+      const midtermPropertyIds = new Set((midtermProperties || []).map((b: any) => b.property_id));
+
+      // Filter to only include properties that have listings/bookings
+      return properties.filter((p: any) => 
+        ownerrezPropertyIds.has(p.id) || midtermPropertyIds.has(p.id)
+      );
     },
   });
 
-  // Fetch current month revenue from OwnerRez bookings and mid-term bookings
+  // Fetch current month revenue from OwnerRez bookings and ACTUAL tenant payments for mid-term
   const { data: currentMonthRevenue } = useQuery({
     queryKey: ["current-month-revenue", selectedMonth],
     queryFn: async () => {
@@ -191,24 +213,41 @@ export const ReconciliationList = () => {
       
       if (ownerrezError) console.error("Error fetching OwnerRez revenue:", ownerrezError);
       
-      // Get mid-term bookings active during current month
+      // Get mid-term bookings active during current month (for expected rent reference)
       const { data: midtermData, error: midtermError } = await supabase
         .from("mid_term_bookings")
-        .select("property_id, monthly_rent, start_date, end_date")
+        .select("id, property_id, monthly_rent, start_date, end_date, tenant_name")
         .lte("start_date", endDate)
         .gte("end_date", startDate)
         .eq("status", "active");
       
       if (midtermError) console.error("Error fetching mid-term revenue:", midtermError);
+
+      // Get ACTUAL tenant payments for the month (this is what was actually received!)
+      const { data: tenantPayments, error: paymentsError } = await supabase
+        .from("tenant_payments")
+        .select("property_id, amount, payment_date")
+        .gte("payment_date", startDate)
+        .lte("payment_date", endDate);
+      
+      if (paymentsError) console.error("Error fetching tenant payments:", paymentsError);
       
       // Calculate revenue per property
-      const revenueByProperty: Record<string, { ownerrez: number; midterm: number; total: number }> = {};
+      const revenueByProperty: Record<string, { 
+        ownerrez: number; 
+        midtermExpected: number; 
+        midtermReceived: number;
+        total: number;
+        hasDiscrepancy: boolean;
+      }> = {};
       
       // Add OwnerRez revenue (for properties that have property_id set)
       (ownerrezData || []).forEach((booking: any) => {
         if (booking.property_id) {
           if (!revenueByProperty[booking.property_id]) {
-            revenueByProperty[booking.property_id] = { ownerrez: 0, midterm: 0, total: 0 };
+            revenueByProperty[booking.property_id] = { 
+              ownerrez: 0, midtermExpected: 0, midtermReceived: 0, total: 0, hasDiscrepancy: false 
+            };
           }
           const amount = booking.accommodation_revenue || booking.total_amount || 0;
           revenueByProperty[booking.property_id].ownerrez += amount;
@@ -216,29 +255,37 @@ export const ReconciliationList = () => {
         }
       });
       
-      // Add mid-term revenue (prorated for current month)
+      // Add mid-term expected rent
       (midtermData || []).forEach((booking: any) => {
         if (booking.property_id) {
           if (!revenueByProperty[booking.property_id]) {
-            revenueByProperty[booking.property_id] = { ownerrez: 0, midterm: 0, total: 0 };
+            revenueByProperty[booking.property_id] = { 
+              ownerrez: 0, midtermExpected: 0, midtermReceived: 0, total: 0, hasDiscrepancy: false 
+            };
           }
-          // Prorate monthly rent based on days in month
-          const bookingStart = new Date(booking.start_date);
-          const bookingEnd = new Date(booking.end_date);
-          const monthStart = startOfMonth(monthDate);
-          const monthEnd = endOfMonth(monthDate);
-          const todayDate = new Date();
-          
-          const effectiveStart = bookingStart > monthStart ? bookingStart : monthStart;
-          const effectiveEnd = bookingEnd < monthEnd ? bookingEnd : (todayDate < monthEnd ? todayDate : monthEnd);
-          
-          const daysInMonth = Math.ceil((monthEnd.getTime() - monthStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-          const activeDays = Math.max(0, Math.ceil((effectiveEnd.getTime() - effectiveStart.getTime()) / (1000 * 60 * 60 * 24)) + 1);
-          
-          const proratedRent = (booking.monthly_rent / daysInMonth) * activeDays;
-          revenueByProperty[booking.property_id].midterm += proratedRent;
-          revenueByProperty[booking.property_id].total += proratedRent;
+          revenueByProperty[booking.property_id].midtermExpected += booking.monthly_rent || 0;
         }
+      });
+
+      // Add actual tenant payments received
+      (tenantPayments || []).forEach((payment: any) => {
+        if (payment.property_id) {
+          if (!revenueByProperty[payment.property_id]) {
+            revenueByProperty[payment.property_id] = { 
+              ownerrez: 0, midtermExpected: 0, midtermReceived: 0, total: 0, hasDiscrepancy: false 
+            };
+          }
+          revenueByProperty[payment.property_id].midtermReceived += payment.amount || 0;
+        }
+      });
+
+      // Calculate total and discrepancy for each property
+      Object.keys(revenueByProperty).forEach((propId) => {
+        const prop = revenueByProperty[propId];
+        // For mid-term: use actual received payments, not expected
+        prop.total = prop.ownerrez + prop.midtermReceived;
+        prop.hasDiscrepancy = prop.midtermExpected > 0 && 
+          Math.abs(prop.midtermExpected - prop.midtermReceived) > 1; // $1 tolerance
       });
       
       return revenueByProperty;
@@ -624,6 +671,9 @@ export const ReconciliationList = () => {
                       const isPreview = isCurrentMonth(rec.reconciliation_month) || rec.status === 'preview';
                       const propertyRevenue = currentMonthRevenue?.[rec.property_id];
                       const currentRevenue = propertyRevenue?.total || 0;
+                      const hasDiscrepancy = propertyRevenue?.hasDiscrepancy || false;
+                      const expectedRent = propertyRevenue?.midtermExpected || 0;
+                      const receivedRent = propertyRevenue?.midtermReceived || 0;
                       
                       return (
                         <Card 
@@ -631,11 +681,23 @@ export const ReconciliationList = () => {
                           className={`overflow-hidden transition-all duration-200 hover:shadow-md ${
                             isOffboarded 
                               ? 'opacity-75 border-dashed border-muted-foreground/30 bg-muted/20' 
-                              : isPreview
-                                ? 'border-indigo-300 dark:border-indigo-700 bg-indigo-50/30 dark:bg-indigo-950/10'
-                                : 'border-amber-300 dark:border-amber-700 bg-amber-50/30 dark:bg-amber-950/10'
+                              : hasDiscrepancy
+                                ? 'border-red-300 dark:border-red-700 bg-red-50/30 dark:bg-red-950/10'
+                                : isPreview
+                                  ? 'border-indigo-300 dark:border-indigo-700 bg-indigo-50/30 dark:bg-indigo-950/10'
+                                  : 'border-amber-300 dark:border-amber-700 bg-amber-50/30 dark:bg-amber-950/10'
                           }`}
                         >
+                          {/* Payment Discrepancy Banner */}
+                          {hasDiscrepancy && (
+                            <div className="bg-red-50 dark:bg-red-950/50 border-b border-red-200 dark:border-red-800 px-4 py-2 flex items-center gap-2">
+                              <AlertTriangle className="w-4 h-4 text-red-600" />
+                              <span className="text-xs text-red-700 dark:text-red-300 font-medium">
+                                Payment Discrepancy: Expected {formatCurrency(expectedRent)}, Received {formatCurrency(receivedRent)}
+                              </span>
+                            </div>
+                          )}
+                          
                           {/* Archived Banner */}
                           {isOffboarded && (
                             <div className="bg-muted/50 border-b border-dashed px-4 py-2 flex items-center gap-2">
@@ -647,14 +709,14 @@ export const ReconciliationList = () => {
                           )}
                           
                           {/* Header Section */}
-                          <div className={`p-4 border-b ${isPreview ? 'bg-indigo-50/50 dark:bg-indigo-950/20' : 'bg-amber-50/50 dark:bg-amber-950/20'}`}>
+                          <div className={`p-4 border-b ${hasDiscrepancy ? 'bg-red-50/50 dark:bg-red-950/20' : isPreview ? 'bg-indigo-50/50 dark:bg-indigo-950/20' : 'bg-amber-50/50 dark:bg-amber-950/20'}`}>
                             <div className="flex items-start justify-between gap-2 mb-2">
                               <div className="flex items-center gap-2 min-w-0 flex-1">
                                 <Home className="w-4 h-4 text-muted-foreground flex-shrink-0" />
                                 <h3 className="font-semibold truncate">{rec.properties?.name}</h3>
                               </div>
                               <div className="flex gap-1.5 flex-shrink-0 flex-wrap justify-end">
-                                <Badge variant="outline" className={`font-medium ${isPreview ? 'bg-indigo-100 text-indigo-700 border-indigo-300 dark:bg-indigo-900 dark:text-indigo-300' : 'bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-900 dark:text-amber-300'}`}>
+                                <Badge variant="outline" className={`font-medium ${hasDiscrepancy ? 'bg-red-100 text-red-700 border-red-300 dark:bg-red-900 dark:text-red-300' : isPreview ? 'bg-indigo-100 text-indigo-700 border-indigo-300 dark:bg-indigo-900 dark:text-indigo-300' : 'bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-900 dark:text-amber-300'}`}>
                                   {format(new Date(rec.reconciliation_month + "T00:00:00"), "MMM yyyy").toUpperCase()}
                                   {isPreview ? " - PREVIEW" : " - DRAFT"}
                                 </Badge>
@@ -673,14 +735,19 @@ export const ReconciliationList = () => {
                           <div className="p-4">
                             <div className="space-y-4">
                               <div className="grid grid-cols-2 gap-3">
-                                <div className="bg-green-50 dark:bg-green-950/30 rounded-lg p-3 text-center">
+                                <div className={`rounded-lg p-3 text-center ${hasDiscrepancy ? 'bg-red-50 dark:bg-red-950/30' : 'bg-green-50 dark:bg-green-950/30'}`}>
                                   <p className="text-xs text-muted-foreground font-medium mb-1">
-                                    Revenue {isPreview && "(MTD)"}
+                                    {expectedRent > 0 ? 'Rent Received' : 'Revenue'} {isPreview && "(MTD)"}
                                   </p>
-                                  <p className={`font-bold text-sm text-green-600`}>
+                                  <p className={`font-bold text-sm ${hasDiscrepancy ? 'text-red-600' : 'text-green-600'}`}>
                                     {isPreview ? formatCurrency(currentRevenue) : formatCurrency(rec.total_revenue || 0)}
                                   </p>
-                                  {isPreview && currentRevenue > 0 && (
+                                  {isPreview && expectedRent > 0 && (
+                                    <p className={`text-xs mt-0.5 ${hasDiscrepancy ? 'text-red-600' : 'text-muted-foreground'}`}>
+                                      of {formatCurrency(expectedRent)} expected
+                                    </p>
+                                  )}
+                                  {isPreview && !expectedRent && currentRevenue > 0 && (
                                     <p className="text-xs text-muted-foreground mt-0.5">
                                       as of today
                                     </p>
