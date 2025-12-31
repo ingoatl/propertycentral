@@ -54,10 +54,12 @@ serve(async (req) => {
     console.log(`Token expires at: ${expiresAt.toISOString()}`);
     console.log(`Is expired: ${isExpired}, Is expiring soon: ${isExpiringSoon}`);
 
-    // Try to refresh the token to verify it's still valid
+    // ALWAYS try to refresh if expired OR expiring soon
     let tokenValid = true;
-    if (isExpiringSoon && token.refresh_token) {
+    let wasRefreshed = false;
+    if ((isExpired || isExpiringSoon) && token.refresh_token) {
       try {
+        console.log('Attempting to refresh token...');
         const refreshResponse = await fetch('https://oauth2.googleapis.com/token', {
           method: 'POST',
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -86,7 +88,9 @@ serve(async (req) => {
             })
             .eq('id', token.id);
           
-          console.log('Token refreshed successfully');
+          console.log('Token refreshed successfully, new expiry:', newExpiresAt.toISOString());
+          wasRefreshed = true;
+          tokenValid = true;
         }
       } catch (refreshError) {
         console.error('Error refreshing token:', refreshError);
@@ -218,13 +222,14 @@ serve(async (req) => {
       );
     }
 
-    // Token is healthy
+    // Token is healthy (or was just refreshed)
     return new Response(
       JSON.stringify({ 
         status: 'healthy',
-        message: 'Gmail token is valid',
-        expires_at: token.expires_at,
-        last_updated: token.updated_at
+        message: wasRefreshed ? 'Gmail token was refreshed successfully!' : 'Gmail token is valid',
+        expires_at: wasRefreshed ? new Date(Date.now() + 3600 * 1000).toISOString() : token.expires_at,
+        last_updated: new Date().toISOString(),
+        was_refreshed: wasRefreshed
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
