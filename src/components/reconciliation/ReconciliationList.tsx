@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar, Check, CreditCard, Banknote, AlertTriangle, Archive, TrendingUp, TrendingDown, DollarSign, Home } from "lucide-react";
 import { format } from "date-fns";
 import { CreateReconciliationDialog } from "./CreateReconciliationDialog";
@@ -24,11 +25,31 @@ export const ReconciliationList = () => {
   const [showOffboarded, setShowOffboarded] = useState(false);
   const [offboardDialogOpen, setOffboardDialogOpen] = useState(false);
   const [propertyToOffboard, setPropertyToOffboard] = useState<any>(null);
+  const [selectedMonth, setSelectedMonth] = useState<string>("all");
   
   // Email confirmation dialog state
   const [emailConfirmOpen, setEmailConfirmOpen] = useState(false);
   const [emailConfirmType, setEmailConfirmType] = useState<"performance" | "statement">("performance");
   const [emailConfirmRec, setEmailConfirmRec] = useState<any>(null);
+
+  // Generate last 6 months for filter - start from LAST month
+  const monthOptions = useMemo(() => {
+    return Array.from({ length: 6 }, (_, i) => {
+      const date = new Date();
+      date.setMonth(date.getMonth() - 1 - i);
+      return {
+        value: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-01`,
+        label: date.toLocaleDateString("en-US", { month: "long", year: "numeric" }),
+      };
+    });
+  }, []);
+
+  // Default to last month
+  useEffect(() => {
+    if (monthOptions.length > 0 && selectedMonth === "all") {
+      setSelectedMonth(monthOptions[0].value);
+    }
+  }, [monthOptions]);
 
   // Real-time subscription for line item changes
   useEffect(() => {
@@ -217,13 +238,19 @@ export const ReconciliationList = () => {
     }
   };
 
-  // Filter reconciliations based on offboarded status
-  // When showOffboarded is true, show ONLY offboarded properties
-  // When showOffboarded is false, show ONLY active properties
+  // Filter reconciliations based on offboarded status AND selected month
   const filteredReconciliations = reconciliations?.filter((rec: any) => {
     const isOffboarded = !!rec.properties?.offboarded_at;
-    return showOffboarded ? isOffboarded : !isOffboarded;
+    const offboardedMatch = showOffboarded ? isOffboarded : !isOffboarded;
+    
+    // Month filter
+    const monthMatch = selectedMonth === "all" || rec.reconciliation_month === selectedMonth;
+    
+    return offboardedMatch && monthMatch;
   });
+
+  // Get selected month label for display
+  const selectedMonthLabel = monthOptions.find(m => m.value === selectedMonth)?.label || "All Months";
 
   const handleOffboardClick = (rec: any) => {
     setPropertyToOffboard({
@@ -243,7 +270,22 @@ export const ReconciliationList = () => {
             Review property performance before sending statements to owners
           </p>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 flex-wrap">
+          {/* Month Filter */}
+          <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Select month" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Months</SelectItem>
+              {monthOptions.map((month) => (
+                <SelectItem key={month.value} value={month.value}>
+                  {month.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
           <div className="flex items-center gap-2">
             <Switch
               id="show-offboarded"
@@ -298,16 +340,18 @@ export const ReconciliationList = () => {
                       <h3 className="font-semibold truncate">{rec.properties?.name}</h3>
                     </div>
                     <div className="flex gap-1.5 flex-shrink-0 flex-wrap justify-end">
+                      {/* Month Badge - prominent display */}
+                      <Badge variant="outline" className="bg-background font-medium">
+                        {format(new Date(rec.reconciliation_month + "T00:00:00"), "MMM yyyy").toUpperCase()}
+                      </Badge>
                       {getServiceTypeBadge(rec.service_type)}
                       {getStatusBadge(rec.status, rec.payout_status, rec.service_type)}
                     </div>
                   </div>
                   <div className="text-sm text-muted-foreground space-y-0.5">
+                    <p className="truncate">{rec.properties?.address}</p>
                     <p className="flex items-center gap-1">
                       <span className="font-medium">Owner:</span> {rec.property_owners?.name}
-                    </p>
-                    <p className="flex items-center gap-1">
-                      <span className="font-medium">Period:</span> {format(new Date(rec.reconciliation_month + "T00:00:00"), "MMMM yyyy")}
                     </p>
                   </div>
                 </div>
@@ -429,6 +473,7 @@ export const ReconciliationList = () => {
         open={showCreateDialog}
         onOpenChange={setShowCreateDialog}
         onSuccess={refetch}
+        defaultMonth={selectedMonth !== "all" ? selectedMonth : undefined}
       />
 
       {selectedReconciliation && (
