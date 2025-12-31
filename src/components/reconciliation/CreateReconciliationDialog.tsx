@@ -7,7 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { CheckCircle2, AlertCircle } from "lucide-react";
+import { CheckCircle2, AlertCircle, Eye } from "lucide-react";
+import { isSameMonth } from "date-fns";
 
 interface CreateReconciliationDialogProps {
   open: boolean;
@@ -26,22 +27,31 @@ export const CreateReconciliationDialog = ({
   const [selectedMonth, setSelectedMonth] = useState("");
   const [isCreating, setIsCreating] = useState(false);
 
-  // Generate last 6 months - start from LAST month (not current month)
-  const months = Array.from({ length: 6 }, (_, i) => {
+  // Generate current month + last 6 months
+  const months = Array.from({ length: 7 }, (_, i) => {
     const date = new Date();
-    date.setMonth(date.getMonth() - 1 - i);
+    date.setMonth(date.getMonth() - i);
+    date.setDate(1);
     return {
       value: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-01`,
       label: date.toLocaleDateString("en-US", { month: "long", year: "numeric" }),
+      isCurrent: i === 0,
     };
   });
+
+  // Helper to check if a month is current
+  const isCurrentMonth = (monthValue: string) => {
+    const monthDate = new Date(monthValue + "T00:00:00");
+    return isSameMonth(monthDate, new Date());
+  };
 
   // Set default month when dialog opens
   useEffect(() => {
     if (open && defaultMonth) {
       setSelectedMonth(defaultMonth);
     } else if (open && !selectedMonth) {
-      setSelectedMonth(months[0].value);
+      // Default to last month (index 1), not current month
+      setSelectedMonth(months[1]?.value || months[0].value);
     }
   }, [open, defaultMonth]);
 
@@ -96,16 +106,22 @@ export const CreateReconciliationDialog = ({
 
     setIsCreating(true);
     try {
+      const isPreview = isCurrentMonth(selectedMonth);
+      
       const response = await supabase.functions.invoke("create-reconciliation", {
         body: {
           property_id: selectedProperty,
           month: selectedMonth,
+          is_preview: isPreview,
         },
       });
 
       // Check for successful creation
       if (response.data?.success) {
-        toast.success("Reconciliation created successfully");
+        toast.success(isPreview 
+          ? "Preview reconciliation created! You can start approving expenses."
+          : "Reconciliation created successfully"
+        );
         onSuccess();
         onOpenChange(false);
         setSelectedProperty("");
@@ -136,9 +152,9 @@ export const CreateReconciliationDialog = ({
             .eq("reconciliation_month", monthString)
             .maybeSingle();
 
-          if (existingRec && existingRec.status === "draft") {
+          if (existingRec && (existingRec.status === "draft" || existingRec.status === "preview")) {
             const shouldReplace = window.confirm(
-              `A draft reconciliation already exists for this property and month. Do you want to delete it and create a new one?`
+              `A ${existingRec.status} reconciliation already exists for this property and month. Do you want to delete it and create a new one?`
             );
             
             if (shouldReplace) {
@@ -158,6 +174,7 @@ export const CreateReconciliationDialog = ({
                 body: {
                   property_id: selectedProperty,
                   month: selectedMonth,
+                  is_preview: isCurrentMonth(selectedMonth),
                 },
               });
               
@@ -191,27 +208,49 @@ export const CreateReconciliationDialog = ({
   };
 
   const selectedMonthLabel = months.find(m => m.value === selectedMonth)?.label || "";
+  const isSelectedMonthCurrent = selectedMonth && isCurrentMonth(selectedMonth);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>Start New Reconciliation</DialogTitle>
+          <DialogTitle>
+            {isSelectedMonthCurrent ? "Start Preview Reconciliation" : "Start New Reconciliation"}
+          </DialogTitle>
           <DialogDescription>
-            Create a monthly reconciliation for an active property
+            {isSelectedMonthCurrent 
+              ? "Create a preview to start approving expenses. Revenue will be finalized next month."
+              : "Create a monthly reconciliation for an active property"
+            }
           </DialogDescription>
         </DialogHeader>
         
         <div className="space-y-4 py-4">
           {/* Progress indicator */}
           {selectedMonth && totalProperties > 0 && (
-            <div className="bg-muted/50 rounded-lg p-3 flex items-center justify-between">
+            <div className={`rounded-lg p-3 flex items-center justify-between ${
+              isSelectedMonthCurrent 
+                ? "bg-indigo-50 dark:bg-indigo-950/30" 
+                : "bg-muted/50"
+            }`}>
               <span className="text-sm text-muted-foreground">
-                {selectedMonthLabel} progress
+                {selectedMonthLabel} {isSelectedMonthCurrent && <Badge className="ml-2 bg-indigo-600">Preview</Badge>}
               </span>
               <Badge variant={reconciledCount === totalProperties ? "default" : "secondary"}>
-                {reconciledCount} of {totalProperties} reconciled
+                {reconciledCount} of {totalProperties} {isSelectedMonthCurrent ? "previewing" : "reconciled"}
               </Badge>
+            </div>
+          )}
+
+          {/* Current month info */}
+          {isSelectedMonthCurrent && (
+            <div className="bg-indigo-50 dark:bg-indigo-950/20 border border-indigo-200 dark:border-indigo-800 rounded-lg p-3">
+              <div className="flex items-start gap-2">
+                <Eye className="w-4 h-4 text-indigo-600 mt-0.5" />
+                <p className="text-sm text-indigo-700 dark:text-indigo-300">
+                  Preview mode lets you approve expenses before month-end. Revenue will be calculated on the 1st.
+                </p>
+              </div>
             </div>
           )}
 
@@ -225,7 +264,14 @@ export const CreateReconciliationDialog = ({
               <SelectContent>
                 {months.map((month) => (
                   <SelectItem key={month.value} value={month.value}>
-                    {month.label}
+                    <div className="flex items-center gap-2">
+                      {month.label}
+                      {month.isCurrent && (
+                        <Badge variant="outline" className="text-xs bg-indigo-50 text-indigo-700 border-indigo-200">
+                          Preview
+                        </Badge>
+                      )}
+                    </div>
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -275,9 +321,14 @@ export const CreateReconciliationDialog = ({
           <Button
             onClick={handleCreate}
             disabled={isCreating || !selectedProperty || !selectedMonth}
-            className="w-full"
+            className={`w-full ${isSelectedMonthCurrent ? 'bg-indigo-600 hover:bg-indigo-700' : ''}`}
           >
-            {isCreating ? "Creating..." : "Generate Reconciliation"}
+            {isCreating 
+              ? "Creating..." 
+              : isSelectedMonthCurrent 
+                ? "Start Preview Reconciliation" 
+                : "Generate Reconciliation"
+            }
           </Button>
         </div>
       </DialogContent>
