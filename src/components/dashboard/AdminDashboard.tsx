@@ -378,6 +378,9 @@ export const AdminDashboard = ({ summaries, onExport, onSync, syncing, onSendOve
           </div>
         </div>
 
+        {/* Gmail Integration - Prominent Position */}
+        <EmailInsightsCard />
+
         {/* KPI Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6 max-md:gap-4">
           <KPICard
@@ -465,9 +468,6 @@ export const AdminDashboard = ({ summaries, onExport, onSync, syncing, onSendOve
           <ExpenseWatchdogCard />
           <PartnerSyncWatchdogCard />
         </div>
-
-        {/* Email Insights */}
-        <EmailInsightsCard />
 
         {/* Admin Cards */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 max-md:gap-4">
