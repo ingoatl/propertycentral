@@ -192,7 +192,7 @@ export const ReconciliationList = () => {
     },
   });
 
-  // Fetch current month revenue from OwnerRez bookings and ACTUAL tenant payments for mid-term
+  // Fetch current month revenue from OwnerRez bookings and detect payments from emails
   const { data: currentMonthRevenue } = useQuery({
     queryKey: ["current-month-revenue", selectedMonth],
     queryFn: async () => {
@@ -231,14 +231,54 @@ export const ReconciliationList = () => {
         .lte("payment_date", endDate);
       
       if (paymentsError) console.error("Error fetching tenant payments:", paymentsError);
+
+      // INTELLIGENT PAYMENT DETECTION from email_insights
+      // Look for payment confirmation emails (Zelle, Venmo, ACH, etc.)
+      const { data: paymentEmails, error: emailError } = await supabase
+        .from("email_insights")
+        .select("property_id, summary, subject, email_date, category")
+        .gte("email_date", startDate)
+        .lte("email_date", endDate)
+        .or("category.eq.payment,subject.ilike.%payment%,subject.ilike.%zelle%,subject.ilike.%venmo%,subject.ilike.%ACH%,summary.ilike.%payment received%,summary.ilike.%confirmed receipt%");
+      
+      if (emailError) console.error("Error fetching payment emails:", emailError);
+      
+      // Parse payment amounts from email summaries using regex patterns
+      const extractPaymentFromEmail = (summary: string): number | null => {
+        // Match patterns like "$6,800", "$6800", "totaling $6,800", "$7,515.00"
+        const patterns = [
+          /\$([0-9,]+(?:\.[0-9]{2})?)/g,  // Standard dollar amounts
+          /totaling \$([0-9,]+(?:\.[0-9]{2})?)/i,
+          /payment of \$([0-9,]+(?:\.[0-9]{2})?)/i,
+          /received.*\$([0-9,]+(?:\.[0-9]{2})?)/i,
+          /confirmed.*\$([0-9,]+(?:\.[0-9]{2})?)/i,
+        ];
+        
+        let maxAmount = 0;
+        for (const pattern of patterns) {
+          const matches = summary.match(pattern);
+          if (matches) {
+            for (const match of matches) {
+              const numStr = match.replace(/[$,]/g, '');
+              const num = parseFloat(numStr);
+              if (!isNaN(num) && num > maxAmount && num < 50000) { // Sanity check
+                maxAmount = num;
+              }
+            }
+          }
+        }
+        return maxAmount > 0 ? maxAmount : null;
+      };
       
       // Calculate revenue per property
       const revenueByProperty: Record<string, { 
         ownerrez: number; 
         midtermExpected: number; 
         midtermReceived: number;
+        emailDetected: number;
         total: number;
         hasDiscrepancy: boolean;
+        paymentSource: string;
       }> = {};
       
       // Add OwnerRez revenue (for properties that have property_id set)
@@ -246,12 +286,11 @@ export const ReconciliationList = () => {
         if (booking.property_id) {
           if (!revenueByProperty[booking.property_id]) {
             revenueByProperty[booking.property_id] = { 
-              ownerrez: 0, midtermExpected: 0, midtermReceived: 0, total: 0, hasDiscrepancy: false 
+              ownerrez: 0, midtermExpected: 0, midtermReceived: 0, emailDetected: 0, total: 0, hasDiscrepancy: false, paymentSource: ''
             };
           }
           const amount = booking.accommodation_revenue || booking.total_amount || 0;
           revenueByProperty[booking.property_id].ownerrez += amount;
-          revenueByProperty[booking.property_id].total += amount;
         }
       });
       
@@ -260,30 +299,59 @@ export const ReconciliationList = () => {
         if (booking.property_id) {
           if (!revenueByProperty[booking.property_id]) {
             revenueByProperty[booking.property_id] = { 
-              ownerrez: 0, midtermExpected: 0, midtermReceived: 0, total: 0, hasDiscrepancy: false 
+              ownerrez: 0, midtermExpected: 0, midtermReceived: 0, emailDetected: 0, total: 0, hasDiscrepancy: false, paymentSource: ''
             };
           }
           revenueByProperty[booking.property_id].midtermExpected += booking.monthly_rent || 0;
         }
       });
 
-      // Add actual tenant payments received
+      // Add actual tenant payments received from tenant_payments table
       (tenantPayments || []).forEach((payment: any) => {
         if (payment.property_id) {
           if (!revenueByProperty[payment.property_id]) {
             revenueByProperty[payment.property_id] = { 
-              ownerrez: 0, midtermExpected: 0, midtermReceived: 0, total: 0, hasDiscrepancy: false 
+              ownerrez: 0, midtermExpected: 0, midtermReceived: 0, emailDetected: 0, total: 0, hasDiscrepancy: false, paymentSource: ''
             };
           }
           revenueByProperty[payment.property_id].midtermReceived += payment.amount || 0;
+          revenueByProperty[payment.property_id].paymentSource = 'recorded';
+        }
+      });
+
+      // Detect payments from email insights (intelligent fallback)
+      (paymentEmails || []).forEach((email: any) => {
+        if (email.property_id && email.summary) {
+          if (!revenueByProperty[email.property_id]) {
+            revenueByProperty[email.property_id] = { 
+              ownerrez: 0, midtermExpected: 0, midtermReceived: 0, emailDetected: 0, total: 0, hasDiscrepancy: false, paymentSource: ''
+            };
+          }
+          
+          const prop = revenueByProperty[email.property_id];
+          // Only use email detection if no recorded payment exists
+          if (prop.midtermReceived === 0 && prop.midtermExpected > 0) {
+            const detected = extractPaymentFromEmail(email.summary);
+            if (detected && detected > prop.emailDetected) {
+              prop.emailDetected = detected;
+              prop.paymentSource = 'email';
+            }
+          }
         }
       });
 
       // Calculate total and discrepancy for each property
       Object.keys(revenueByProperty).forEach((propId) => {
         const prop = revenueByProperty[propId];
-        // For mid-term: use actual received payments, not expected
-        prop.total = prop.ownerrez + prop.midtermReceived;
+        // Use recorded payments first, fall back to email-detected
+        const receivedAmount = prop.midtermReceived > 0 ? prop.midtermReceived : prop.emailDetected;
+        prop.total = prop.ownerrez + receivedAmount;
+        
+        // Update midtermReceived to include email-detected for display
+        if (prop.midtermReceived === 0 && prop.emailDetected > 0) {
+          prop.midtermReceived = prop.emailDetected;
+        }
+        
         prop.hasDiscrepancy = prop.midtermExpected > 0 && 
           Math.abs(prop.midtermExpected - prop.midtermReceived) > 1; // $1 tolerance
       });
@@ -601,19 +669,28 @@ export const ReconciliationList = () => {
               </div>
               <div className="flex items-center gap-3 text-sm">
                 <span className="text-muted-foreground">
-                  {managedCount} managed properties
+                  {managedCount} properties with live listings
                 </span>
                 <span className="text-muted-foreground">•</span>
                 {isSelectedMonthCurrent ? (
                   <>
                     {previewCount > 0 && (
-                      <span className="text-indigo-600 font-medium">
-                        {previewCount} in progress
+                      <>
+                        <span className="text-indigo-600 font-medium">
+                          {previewCount} in progress
+                        </span>
+                        <span className="text-muted-foreground">•</span>
+                      </>
+                    )}
+                    {pendingCount > 0 ? (
+                      <span className="text-amber-600 font-medium">
+                        {pendingCount} not started
+                      </span>
+                    ) : (
+                      <span className="text-green-600 font-medium">
+                        All started
                       </span>
                     )}
-                    <span className="text-amber-600 font-medium">
-                      {pendingCount} not started
-                    </span>
                   </>
                 ) : (
                   <>
@@ -740,30 +817,45 @@ export const ReconciliationList = () => {
                                       of {formatCurrency(expectedRent)} expected
                                     </p>
                                   )}
-                                  {isPreview && !expectedRent && currentRevenue > 0 && (
-                                    <p className="text-xs text-muted-foreground mt-0.5">
-                                      as of today
+                                  {isPreview && propertyRevenue?.paymentSource === 'email' && (
+                                    <p className="text-xs text-indigo-600 mt-0.5">
+                                      detected from email
                                     </p>
                                   )}
                                 </div>
-                                <div className="bg-amber-50 dark:bg-amber-950/30 rounded-lg p-3 text-center">
-                                  <p className="text-xs text-muted-foreground font-medium mb-1">Pending Items</p>
-                                  <p className="font-bold text-amber-600 text-sm">
-                                    {rec.pending_items_count || 0}
+                                <div className="bg-primary/10 dark:bg-primary/20 rounded-lg p-3 text-center ring-1 ring-primary/20">
+                                  <p className="text-xs text-muted-foreground font-medium mb-1">
+                                    Total Due
+                                  </p>
+                                  <p className="font-bold text-primary text-sm">
+                                    {formatCurrency(
+                                      (rec.management_fee || 0) + 
+                                      (rec.calculated_total_expenses || 0) + 
+                                      (rec.calculated_visit_fees || 0)
+                                    )}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground mt-0.5">
+                                    to charge owner
                                   </p>
                                 </div>
                               </div>
                               
-                              <div className="grid grid-cols-2 gap-3">
-                                <div className="bg-red-50 dark:bg-red-950/30 rounded-lg p-3 text-center">
-                                  <p className="text-xs text-muted-foreground font-medium mb-1">Expenses</p>
-                                  <p className="font-bold text-red-600 text-sm">
+                              <div className="grid grid-cols-3 gap-2">
+                                <div className="bg-amber-50 dark:bg-amber-950/30 rounded-lg p-2 text-center">
+                                  <p className="text-xs text-muted-foreground font-medium mb-0.5">Mgmt Fee</p>
+                                  <p className="font-bold text-amber-600 text-xs">
+                                    {formatCurrency(rec.management_fee || 0)}
+                                  </p>
+                                </div>
+                                <div className="bg-red-50 dark:bg-red-950/30 rounded-lg p-2 text-center">
+                                  <p className="text-xs text-muted-foreground font-medium mb-0.5">Expenses</p>
+                                  <p className="font-bold text-red-600 text-xs">
                                     {formatCurrency(rec.calculated_total_expenses || 0)}
                                   </p>
                                 </div>
-                                <div className="bg-red-50 dark:bg-red-950/30 rounded-lg p-3 text-center">
-                                  <p className="text-xs text-muted-foreground font-medium mb-1">Visits</p>
-                                  <p className="font-bold text-red-600 text-sm">
+                                <div className="bg-red-50 dark:bg-red-950/30 rounded-lg p-2 text-center">
+                                  <p className="text-xs text-muted-foreground font-medium mb-0.5">Visits</p>
+                                  <p className="font-bold text-red-600 text-xs">
                                     {formatCurrency(rec.calculated_visit_fees || 0)}
                                   </p>
                                 </div>
