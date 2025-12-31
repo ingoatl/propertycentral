@@ -149,15 +149,7 @@ export function EmailInsightsCard({ propertyId, showHeader = true }: EmailInsigh
 
         console.log('OAuth URL:', authUrl);
         
-        // Try popup first, fallback to direct navigation
-        const authWindow = window.open(authUrl, '_blank', 'width=600,height=700,popup=yes');
-        
-        if (!authWindow || authWindow.closed || typeof authWindow.closed === 'undefined') {
-          // Popup was blocked, open in current window
-          toast.info('Opening Google authorization...');
-          window.location.href = authUrl;
-          return;
-        }
+        const authWindow = window.open(authUrl, 'gmail-auth', 'width=600,height=700');
         
         const pollTimer = setInterval(() => {
           if (authWindow?.closed) {
