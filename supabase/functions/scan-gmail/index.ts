@@ -168,7 +168,18 @@ serve(async (req) => {
   }
 
   try {
-    const { forceRescan } = req.method === 'POST' ? await req.json() : { forceRescan: false };
+    let forceRescan = false;
+    if (req.method === 'POST') {
+      try {
+        const body = await req.text();
+        if (body) {
+          const parsed = JSON.parse(body);
+          forceRescan = parsed.forceRescan || false;
+        }
+      } catch {
+        // Empty body or invalid JSON, use defaults
+      }
+    }
     
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
