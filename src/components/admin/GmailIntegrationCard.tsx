@@ -75,34 +75,35 @@ export const GmailIntegrationCard = () => {
   const handleReconnectGmail = async () => {
     setReconnecting(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
         toast.error('Please log in first');
+        setReconnecting(false);
         return;
       }
 
-      const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-      const REDIRECT_URI = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/gmail-oauth`;
+      // Call edge function to get OAuth URL
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/gmail-oauth-init`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session.access_token}`,
+          },
+        }
+      );
 
-      if (!GOOGLE_CLIENT_ID) {
-        toast.error('Google Client ID not configured');
+      const result = await response.json();
+
+      if (!response.ok) {
+        toast.error(result.error || 'Failed to initialize Gmail connection');
+        setReconnecting(false);
         return;
       }
 
-      const params = new URLSearchParams({
-        client_id: GOOGLE_CLIENT_ID,
-        redirect_uri: REDIRECT_URI,
-        response_type: 'code',
-        scope: 'https://www.googleapis.com/auth/gmail.readonly',
-        access_type: 'offline',
-        prompt: 'consent',
-        state: user.id,
-      });
-
-      const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
-      
       // Open in popup
-      const popup = window.open(authUrl, 'gmail-auth', 'width=600,height=700,scrollbars=yes');
+      const popup = window.open(result.authUrl, 'gmail-auth', 'width=600,height=700,scrollbars=yes');
       
       // Listen for popup close
       const checkPopup = setInterval(() => {
