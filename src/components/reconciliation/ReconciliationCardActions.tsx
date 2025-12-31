@@ -26,8 +26,8 @@ interface ReconciliationCardActionsProps {
   isOffboarded: boolean;
   onReview: () => void;
   onOffboard: () => void;
-  onSendPerformanceEmail: () => Promise<void>;
-  onSendOwnerStatement: () => Promise<void>;
+  onSendPerformanceEmail: () => void;
+  onSendOwnerStatement: () => void;
   sendingPerformance: boolean;
   sendingStatement: boolean;
 }
