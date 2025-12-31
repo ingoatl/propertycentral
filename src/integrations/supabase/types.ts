@@ -4378,7 +4378,12 @@ export type Database = {
       properties: {
         Row: {
           address: string
+          billing_status: string | null
+          contract_document_id: string | null
+          contract_signed_at: string | null
           created_at: string
+          first_listing_live_at: string | null
+          first_minimum_charged_at: string | null
           ical_url: string | null
           id: string
           image_path: string | null
@@ -4388,6 +4393,8 @@ export type Database = {
           offboarded_at: string | null
           offboarding_notes: string | null
           offboarding_reason: string | null
+          onboarding_fee_amount: number | null
+          onboarding_fee_charged_at: string | null
           order_minimum_fee: number | null
           owner_id: string | null
           property_type: Database["public"]["Enums"]["property_type"] | null
@@ -4397,7 +4404,12 @@ export type Database = {
         }
         Insert: {
           address: string
+          billing_status?: string | null
+          contract_document_id?: string | null
+          contract_signed_at?: string | null
           created_at?: string
+          first_listing_live_at?: string | null
+          first_minimum_charged_at?: string | null
           ical_url?: string | null
           id?: string
           image_path?: string | null
@@ -4407,6 +4419,8 @@ export type Database = {
           offboarded_at?: string | null
           offboarding_notes?: string | null
           offboarding_reason?: string | null
+          onboarding_fee_amount?: number | null
+          onboarding_fee_charged_at?: string | null
           order_minimum_fee?: number | null
           owner_id?: string | null
           property_type?: Database["public"]["Enums"]["property_type"] | null
@@ -4416,7 +4430,12 @@ export type Database = {
         }
         Update: {
           address?: string
+          billing_status?: string | null
+          contract_document_id?: string | null
+          contract_signed_at?: string | null
           created_at?: string
+          first_listing_live_at?: string | null
+          first_minimum_charged_at?: string | null
           ical_url?: string | null
           id?: string
           image_path?: string | null
@@ -4426,6 +4445,8 @@ export type Database = {
           offboarded_at?: string | null
           offboarding_notes?: string | null
           offboarding_reason?: string | null
+          onboarding_fee_amount?: number | null
+          onboarding_fee_charged_at?: string | null
           order_minimum_fee?: number | null
           owner_id?: string | null
           property_type?: Database["public"]["Enums"]["property_type"] | null
@@ -4434,6 +4455,13 @@ export type Database = {
           visit_price?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "properties_contract_document_id_fkey"
+            columns: ["contract_document_id"]
+            isOneToOne: false
+            referencedRelation: "booking_documents"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "properties_owner_id_fkey"
             columns: ["owner_id"]
