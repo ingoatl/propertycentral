@@ -346,16 +346,26 @@ export const ReconciliationList = () => {
     }
   };
 
-  // Filter reconciliations based on offboarded status AND selected month
-  const filteredReconciliations = reconciliations?.filter((rec: any) => {
-    const isOffboarded = !!rec.properties?.offboarded_at;
-    const offboardedMatch = showOffboarded ? isOffboarded : !isOffboarded;
-    
-    // Month filter
-    const monthMatch = selectedMonth === "all" || rec.reconciliation_month === selectedMonth;
-    
-    return offboardedMatch && monthMatch;
-  });
+  // Filter reconciliations: only managed properties (billing_status = 'active')
+  const filteredReconciliations = useMemo(() => {
+    return reconciliations?.filter((rec: any) => {
+      // Only show properties with billing_status = 'active' (managed properties)
+      // We need to check via the properties table - join isn't available so we filter by offboarded_at
+      const isOffboarded = !!rec.properties?.offboarded_at;
+      const offboardedMatch = showOffboarded ? isOffboarded : !isOffboarded;
+      
+      // Month filter
+      const monthMatch = selectedMonth === "all" || rec.reconciliation_month === selectedMonth;
+      
+      return offboardedMatch && monthMatch;
+    }) || [];
+  }, [reconciliations, showOffboarded, selectedMonth]);
+
+  // Get only reconciliations for managed (active) properties
+  const managedReconciliations = useMemo(() => {
+    const managedPropertyIds = new Set(activeProperties?.map((p: any) => p.id) || []);
+    return filteredReconciliations.filter((rec: any) => managedPropertyIds.has(rec.property_id));
+  }, [filteredReconciliations, activeProperties]);
 
   // Get properties missing reconciliations for the selected month
   const propertiesMissingReconciliation = useMemo(() => {
@@ -374,9 +384,10 @@ export const ReconciliationList = () => {
   const selectedMonthLabel = monthOptions.find(m => m.value === selectedMonth)?.label || "All Months";
   const isSelectedMonthCurrent = isCurrentMonth(selectedMonth);
 
-  // Count stats for the selected month
-  const reconciledCount = filteredReconciliations?.length || 0;
-  const previewCount = filteredReconciliations?.filter((r: any) => r.status === 'preview').length || 0;
+  // Count stats for the selected month - only managed properties
+  const managedCount = activeProperties?.length || 0;
+  const reconciledCount = managedReconciliations.length;
+  const previewCount = managedReconciliations.filter((r: any) => r.status === 'preview' || r.status === 'draft').length;
   const pendingCount = propertiesMissingReconciliation.length;
 
   const handleOffboardClick = (rec: any) => {
@@ -462,11 +473,15 @@ export const ReconciliationList = () => {
                 </p>
               </div>
               <div className="flex items-center gap-3 text-sm">
+                <span className="text-muted-foreground">
+                  {managedCount} managed properties
+                </span>
+                <span className="text-muted-foreground">•</span>
                 {isSelectedMonthCurrent ? (
                   <>
                     {previewCount > 0 && (
                       <span className="text-indigo-600 font-medium">
-                        {previewCount} in preview
+                        {previewCount} in progress
                       </span>
                     )}
                     <span className="text-amber-600 font-medium">
@@ -476,7 +491,7 @@ export const ReconciliationList = () => {
                 ) : (
                   <>
                     <span className="text-green-600 font-medium">
-                      {reconciledCount} reconciled
+                      {reconciledCount} completed
                     </span>
                     {pendingCount > 0 && (
                       <span className="text-amber-600 font-medium">
@@ -504,11 +519,12 @@ export const ReconciliationList = () => {
             </div>
           )}
           
-          {/* SECTION 1: Preview/Draft Cards (Active Work) */}
+          {/* SECTION 1: Preview/Draft Cards (Active Work) - show drafts from ANY month on top */}
           {(() => {
-            const previewAndDraftRecs = filteredReconciliations?.filter(
-              (rec: any) => rec.status === 'preview' || rec.status === 'draft' || isCurrentMonth(rec.reconciliation_month)
-            ) || [];
+            // Show preview/draft reconciliations for the selected month OR current month previews
+            const previewAndDraftRecs = managedReconciliations.filter(
+              (rec: any) => rec.status === 'preview' || rec.status === 'draft'
+            );
             const missingPropertiesForSection = isSelectedMonthCurrent ? propertiesMissingReconciliation : [];
             
             if (previewAndDraftRecs.length > 0 || missingPropertiesForSection.length > 0) {
@@ -698,9 +714,9 @@ export const ReconciliationList = () => {
 
           {/* SECTION 2: Completed Reconciliations (grouped by month if viewing "all") */}
           {(() => {
-            const completedRecs = filteredReconciliations?.filter(
-              (rec: any) => rec.status !== 'preview' && rec.status !== 'draft' && !isCurrentMonth(rec.reconciliation_month)
-            ) || [];
+            const completedRecs = managedReconciliations.filter(
+              (rec: any) => rec.status !== 'preview' && rec.status !== 'draft'
+            );
             
             // Also include missing properties for past months
             const missingForPastMonths = !isSelectedMonthCurrent ? propertiesMissingReconciliation : [];
