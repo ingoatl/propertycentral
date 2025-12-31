@@ -23,12 +23,13 @@ export const CreateReconciliationDialog = ({
   const [isCreating, setIsCreating] = useState(false);
 
   const { data: properties } = useQuery({
-    queryKey: ["properties-with-owners"],
+    queryKey: ["properties-with-owners-active"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("properties")
         .select("id, name, address, owner_id, property_owners(name)")
         .not("owner_id", "is", null)
+        .is("offboarded_at", null) // Exclude offboarded properties
         .order("name");
 
       if (error) throw error;

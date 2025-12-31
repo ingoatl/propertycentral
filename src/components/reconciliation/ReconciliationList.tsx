@@ -4,10 +4,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Eye, Send, Mail, Loader2, CreditCard, Banknote, Check } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { Calendar, Eye, Send, Mail, Loader2, CreditCard, Banknote, Check, UserMinus, AlertTriangle } from "lucide-react";
 import { format } from "date-fns";
 import { CreateReconciliationDialog } from "./CreateReconciliationDialog";
 import { ReconciliationReviewModal } from "./ReconciliationReviewModal";
+import { OffboardPropertyDialog } from "@/components/properties/OffboardPropertyDialog";
 import { toast } from "sonner";
 import { ServiceType, formatCurrency } from "@/lib/reconciliationCalculations";
 
@@ -16,6 +19,9 @@ export const ReconciliationList = () => {
   const [selectedReconciliation, setSelectedReconciliation] = useState<string | null>(null);
   const [sendingPerformance, setSendingPerformance] = useState<string | null>(null);
   const [sendingStatement, setSendingStatement] = useState<string | null>(null);
+  const [showOffboarded, setShowOffboarded] = useState(false);
+  const [offboardDialogOpen, setOffboardDialogOpen] = useState(false);
+  const [propertyToOffboard, setPropertyToOffboard] = useState<any>(null);
 
   // Real-time subscription for line item changes
   useEffect(() => {
@@ -47,7 +53,7 @@ export const ReconciliationList = () => {
         .from("monthly_reconciliations")
         .select(`
           *,
-          properties(name, address, management_fee_percentage),
+          properties(id, name, address, management_fee_percentage, offboarded_at, offboarding_reason),
           property_owners(name, email, service_type, payment_method)
         `)
         .order("reconciliation_month", { ascending: false });
@@ -176,6 +182,21 @@ export const ReconciliationList = () => {
     }
   };
 
+  // Filter reconciliations based on offboarded status
+  const filteredReconciliations = reconciliations?.filter((rec: any) => {
+    const isOffboarded = !!rec.properties?.offboarded_at;
+    return showOffboarded ? true : !isOffboarded;
+  });
+
+  const handleOffboardClick = (rec: any) => {
+    setPropertyToOffboard({
+      id: rec.properties?.id || rec.property_id,
+      name: rec.properties?.name,
+      address: rec.properties?.address
+    });
+    setOffboardDialogOpen(true);
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
@@ -185,24 +206,44 @@ export const ReconciliationList = () => {
             Review property performance before sending statements to owners
           </p>
         </div>
-        <Button onClick={() => setShowCreateDialog(true)}>
-          <Calendar className="w-4 h-4 mr-2" />
-          Start Reconciliation
-        </Button>
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <Switch
+              id="show-offboarded"
+              checked={showOffboarded}
+              onCheckedChange={setShowOffboarded}
+            />
+            <Label htmlFor="show-offboarded" className="text-sm text-muted-foreground">
+              Show offboarded
+            </Label>
+          </div>
+          <Button onClick={() => setShowCreateDialog(true)}>
+            <Calendar className="w-4 h-4 mr-2" />
+            Start Reconciliation
+          </Button>
+        </div>
       </div>
 
       {isLoading ? (
         <Card className="p-6">
           <p className="text-center text-muted-foreground">Loading reconciliations...</p>
         </Card>
-      ) : reconciliations && reconciliations.length > 0 ? (
+      ) : filteredReconciliations && filteredReconciliations.length > 0 ? (
         <div className="grid gap-4">
-          {reconciliations.map((rec: any) => (
-            <Card key={rec.id} className="p-6">
+          {filteredReconciliations.map((rec: any) => {
+            const isOffboarded = !!rec.properties?.offboarded_at;
+            return (
+            <Card key={rec.id} className={`p-6 ${isOffboarded ? 'opacity-60 border-dashed' : ''}`}>
               <div className="flex items-start justify-between">
                 <div className="space-y-2 flex-1">
                   <div className="flex items-center gap-3">
                     <h3 className="font-semibold text-lg">{rec.properties?.name}</h3>
+                    {isOffboarded && (
+                      <Badge variant="outline" className="bg-muted text-muted-foreground border-muted-foreground/30">
+                        <AlertTriangle className="w-3 h-3 mr-1" />
+                        Offboarded
+                      </Badge>
+                    )}
                     {getServiceTypeBadge(rec.service_type)}
                     {getStatusBadge(rec.status, rec.payout_status, rec.service_type)}
                   </div>
@@ -278,7 +319,18 @@ export const ReconciliationList = () => {
                     <Eye className="w-4 h-4 mr-2" />
                     Review
                   </Button>
-                  {(rec.status === "approved" || rec.status === "statement_sent") && (
+                  {!isOffboarded && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                      onClick={() => handleOffboardClick(rec)}
+                    >
+                      <UserMinus className="w-4 h-4 mr-2" />
+                      Offboard
+                    </Button>
+                  )}
+                  {(rec.status === "approved" || rec.status === "statement_sent") && !isOffboarded && (
                     <>
                       <Button 
                         size="sm" 
@@ -321,7 +373,8 @@ export const ReconciliationList = () => {
                 </div>
               </div>
             </Card>
-          ))}
+          );
+          })}
         </div>
       ) : (
         <Card className="p-12 text-center">
@@ -345,6 +398,18 @@ export const ReconciliationList = () => {
           open={!!selectedReconciliation}
           onOpenChange={(open) => !open && setSelectedReconciliation(null)}
           onSuccess={refetch}
+        />
+      )}
+
+      {propertyToOffboard && (
+        <OffboardPropertyDialog
+          open={offboardDialogOpen}
+          onOpenChange={setOffboardDialogOpen}
+          property={propertyToOffboard}
+          onSuccess={() => {
+            refetch();
+            setPropertyToOffboard(null);
+          }}
         />
       )}
     </div>
