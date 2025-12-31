@@ -91,7 +91,7 @@ serve(async (req) => {
     console.log('Image prompt:', imagePrompt.substring(0, 200) + '...');
     console.log('Calling OpenAI gpt-image-1 API...');
 
-    // Call OpenAI image generation API
+    // Call OpenAI image generation API (DALL-E 3)
     const response = await fetch('https://api.openai.com/v1/images/generations', {
       method: 'POST',
       headers: {
@@ -99,12 +99,11 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-image-1',
+        model: 'dall-e-3',
         prompt: imagePrompt,
         n: 1,
         size: '1024x1024',
-        quality: 'medium',
-        response_format: 'b64_json'
+        quality: 'standard',
       }),
     });
 
@@ -115,17 +114,22 @@ serve(async (req) => {
     }
 
     const data = await response.json();
-    const base64Image = data.data?.[0]?.b64_json;
+    const imageUrl = data.data?.[0]?.url;
 
-    if (!base64Image) {
-      console.error('No image data in response:', JSON.stringify(data).substring(0, 500));
-      throw new Error('No image data returned from OpenAI');
+    if (!imageUrl) {
+      console.error('No image URL in response:', JSON.stringify(data).substring(0, 500));
+      throw new Error('No image URL returned from OpenAI');
     }
 
-    console.log('Image generated successfully');
+    console.log('Image generated successfully, downloading...');
 
-    // Convert base64 to buffer
-    const imageBuffer = Uint8Array.from(atob(base64Image), c => c.charCodeAt(0));
+    // Download the image from OpenAI URL
+    const imageResponse = await fetch(imageUrl);
+    if (!imageResponse.ok) {
+      throw new Error(`Failed to download image: ${imageResponse.status}`);
+    }
+
+    const imageBuffer = new Uint8Array(await imageResponse.arrayBuffer());
     console.log('Image size:', Math.round(imageBuffer.length / 1024), 'KB');
 
     // Upload to storage
@@ -138,7 +142,7 @@ serve(async (req) => {
       .from('holiday-images')
       .upload(filePath, imageBuffer, {
         contentType: 'image/png',
-        cacheControl: '31536000', // 1 year cache
+        cacheControl: '31536000',
         upsert: true
       });
 
