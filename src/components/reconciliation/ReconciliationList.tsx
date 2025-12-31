@@ -11,6 +11,7 @@ import { format } from "date-fns";
 import { CreateReconciliationDialog } from "./CreateReconciliationDialog";
 import { ReconciliationReviewModal } from "./ReconciliationReviewModal";
 import { ReconciliationCardActions } from "./ReconciliationCardActions";
+import { EmailConfirmationDialog } from "./EmailConfirmationDialog";
 import { OffboardPropertyDialog } from "@/components/properties/OffboardPropertyDialog";
 import { toast } from "sonner";
 import { ServiceType, formatCurrency } from "@/lib/reconciliationCalculations";
@@ -23,6 +24,11 @@ export const ReconciliationList = () => {
   const [showOffboarded, setShowOffboarded] = useState(false);
   const [offboardDialogOpen, setOffboardDialogOpen] = useState(false);
   const [propertyToOffboard, setPropertyToOffboard] = useState<any>(null);
+  
+  // Email confirmation dialog state
+  const [emailConfirmOpen, setEmailConfirmOpen] = useState(false);
+  const [emailConfirmType, setEmailConfirmType] = useState<"performance" | "statement">("performance");
+  const [emailConfirmRec, setEmailConfirmRec] = useState<any>(null);
 
   // Real-time subscription for line item changes
   useEffect(() => {
@@ -138,6 +144,34 @@ export const ReconciliationList = () => {
     );
   };
 
+  // Open confirmation dialog for performance email
+  const handlePerformanceEmailClick = (rec: any) => {
+    setEmailConfirmRec(rec);
+    setEmailConfirmType("performance");
+    setEmailConfirmOpen(true);
+  };
+
+  // Open confirmation dialog for statement email
+  const handleStatementEmailClick = (rec: any) => {
+    setEmailConfirmRec(rec);
+    setEmailConfirmType("statement");
+    setEmailConfirmOpen(true);
+  };
+
+  // Actually send the email after confirmation
+  const handleConfirmSendEmail = async () => {
+    if (!emailConfirmRec) return;
+    
+    if (emailConfirmType === "performance") {
+      await handleSendPerformanceEmail(emailConfirmRec);
+    } else {
+      await handleSendOwnerStatement(emailConfirmRec.id);
+    }
+    
+    setEmailConfirmOpen(false);
+    setEmailConfirmRec(null);
+  };
+
   const handleSendPerformanceEmail = async (rec: any) => {
     try {
       setSendingPerformance(rec.id);
@@ -184,9 +218,11 @@ export const ReconciliationList = () => {
   };
 
   // Filter reconciliations based on offboarded status
+  // When showOffboarded is true, show ONLY offboarded properties
+  // When showOffboarded is false, show ONLY active properties
   const filteredReconciliations = reconciliations?.filter((rec: any) => {
     const isOffboarded = !!rec.properties?.offboarded_at;
-    return showOffboarded ? true : !isOffboarded;
+    return showOffboarded ? isOffboarded : !isOffboarded;
   });
 
   const handleOffboardClick = (rec: any) => {
@@ -369,8 +405,8 @@ export const ReconciliationList = () => {
                     isOffboarded={isOffboarded}
                     onReview={() => setSelectedReconciliation(rec.id)}
                     onOffboard={() => handleOffboardClick(rec)}
-                    onSendPerformanceEmail={() => handleSendPerformanceEmail(rec)}
-                    onSendOwnerStatement={() => handleSendOwnerStatement(rec.id)}
+                    onSendPerformanceEmail={() => handlePerformanceEmailClick(rec)}
+                    onSendOwnerStatement={() => handleStatementEmailClick(rec)}
                     sendingPerformance={sendingPerformance === rec.id}
                     sendingStatement={sendingStatement === rec.id}
                   />
@@ -413,6 +449,27 @@ export const ReconciliationList = () => {
             refetch();
             setPropertyToOffboard(null);
           }}
+        />
+      )}
+
+      {/* Email Confirmation Dialog */}
+      {emailConfirmRec && (
+        <EmailConfirmationDialog
+          open={emailConfirmOpen}
+          onOpenChange={(open) => {
+            setEmailConfirmOpen(open);
+            if (!open) setEmailConfirmRec(null);
+          }}
+          onConfirm={handleConfirmSendEmail}
+          isLoading={sendingPerformance === emailConfirmRec?.id || sendingStatement === emailConfirmRec?.id}
+          emailType={emailConfirmType}
+          propertyName={emailConfirmRec?.properties?.name || "Unknown Property"}
+          ownerName={emailConfirmRec?.property_owners?.name || "Unknown Owner"}
+          ownerEmail={emailConfirmRec?.property_owners?.email || "No email"}
+          month={emailConfirmRec?.reconciliation_month 
+            ? format(new Date(emailConfirmRec.reconciliation_month + "T00:00:00"), "MMMM yyyy")
+            : "Unknown"
+          }
         />
       )}
     </div>
