@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { generateAuditReport } from "@/lib/exportAuditReport";
+import { AuditTrailDialog } from "./AuditTrailDialog";
 
 interface ReconciliationCardActionsProps {
   reconciliation: any;
@@ -43,6 +44,7 @@ export const ReconciliationCardActions = ({
   sendingStatement,
 }: ReconciliationCardActionsProps) => {
   const [isExporting, setIsExporting] = useState(false);
+  const [showAuditTrail, setShowAuditTrail] = useState(false);
   
   const canSendEmails = 
     (reconciliation.status === "approved" || reconciliation.status === "statement_sent") && 
@@ -62,105 +64,114 @@ export const ReconciliationCardActions = ({
   };
 
   return (
-    <div className="flex flex-col gap-2 w-full">
-      {/* Primary Action - Review Button */}
-      <Button
-        onClick={onReview}
-        className="w-full"
-        size="lg"
-      >
-        <Eye className="w-4 h-4 mr-2" />
-        Review Reconciliation
-      </Button>
+    <>
+      <div className="flex flex-col gap-2 w-full">
+        {/* Primary Action - Review Button */}
+        <Button
+          onClick={onReview}
+          className="w-full"
+          size="lg"
+        >
+          <Eye className="w-4 h-4 mr-2" />
+          Review Reconciliation
+        </Button>
 
-      {/* Secondary Actions Row */}
-      <div className="flex gap-2">
-        {canSendEmails && (
-          <>
-            <Button
-              variant="outline"
-              size="sm"
-              className="flex-1"
-              onClick={onSendPerformanceEmail}
-              disabled={sendingPerformance || sendingStatement}
-            >
-              {sendingPerformance ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
+        {/* Secondary Actions Row */}
+        <div className="flex gap-2">
+          {canSendEmails && (
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex-1"
+                onClick={onSendPerformanceEmail}
+                disabled={sendingPerformance || sendingStatement}
+              >
+                {sendingPerformance ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <>
+                    <Mail className="w-4 h-4 mr-1" />
+                    <span className="hidden sm:inline">Performance</span>
+                  </>
+                )}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex-1"
+                onClick={onSendOwnerStatement}
+                disabled={sendingPerformance || sendingStatement}
+              >
+                {sendingStatement ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <>
+                    <Send className="w-4 h-4 mr-1" />
+                    <span className="hidden sm:inline">
+                      {reconciliation.status === "statement_sent" ? "Resend" : "Statement"}
+                    </span>
+                  </>
+                )}
+              </Button>
+            </>
+          )}
+
+          {/* More Actions Dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className={canSendEmails ? "" : "flex-1"}>
+                <MoreHorizontal className="w-4 h-4" />
+                <span className="ml-1 hidden sm:inline">More</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuItem onClick={() => setShowAuditTrail(true)}>
+                <History className="w-4 h-4 mr-2" />
+                View Audit Trail
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleExportAuditReport} disabled={isExporting}>
+                {isExporting ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <FileSpreadsheet className="w-4 h-4 mr-2" />
+                )}
+                Export GREC Report
+              </DropdownMenuItem>
+              
+              {!isOffboarded && (
                 <>
-                  <Mail className="w-4 h-4 mr-1" />
-                  <span className="hidden sm:inline">Performance</span>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem 
+                    onClick={onOffboard}
+                    className="text-destructive focus:text-destructive"
+                  >
+                    <UserMinus className="w-4 h-4 mr-2" />
+                    Offboard Property
+                  </DropdownMenuItem>
                 </>
               )}
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="flex-1"
-              onClick={onSendOwnerStatement}
-              disabled={sendingPerformance || sendingStatement}
-            >
-              {sendingStatement ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
+              
+              {isOffboarded && (
                 <>
-                  <Send className="w-4 h-4 mr-1" />
-                  <span className="hidden sm:inline">
-                    {reconciliation.status === "statement_sent" ? "Resend" : "Statement"}
-                  </span>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem disabled>
+                    <Archive className="w-4 h-4 mr-2" />
+                    Archived Property
+                  </DropdownMenuItem>
                 </>
               )}
-            </Button>
-          </>
-        )}
-
-        {/* More Actions Dropdown */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" className={canSendEmails ? "" : "flex-1"}>
-              <MoreHorizontal className="w-4 h-4" />
-              <span className="ml-1 hidden sm:inline">More</span>
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-48">
-            <DropdownMenuItem onClick={handleExportAuditReport} disabled={isExporting}>
-              {isExporting ? (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              ) : (
-                <FileSpreadsheet className="w-4 h-4 mr-2" />
-              )}
-              Export Audit Report
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={onReview}>
-              <History className="w-4 h-4 mr-2" />
-              View Audit Trail
-            </DropdownMenuItem>
-            
-            {!isOffboarded && (
-              <>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem 
-                  onClick={onOffboard}
-                  className="text-destructive focus:text-destructive"
-                >
-                  <UserMinus className="w-4 h-4 mr-2" />
-                  Offboard Property
-                </DropdownMenuItem>
-              </>
-            )}
-            
-            {isOffboarded && (
-              <>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem disabled>
-                  <Archive className="w-4 h-4 mr-2" />
-                  Archived Property
-                </DropdownMenuItem>
-              </>
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
-    </div>
+
+      {/* Audit Trail Dialog */}
+      <AuditTrailDialog
+        reconciliationId={reconciliation.id}
+        open={showAuditTrail}
+        onOpenChange={setShowAuditTrail}
+      />
+    </>
   );
 };
