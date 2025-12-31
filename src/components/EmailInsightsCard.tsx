@@ -129,7 +129,7 @@ export function EmailInsightsCard({ propertyId, showHeader = true }: EmailInsigh
 
   const connectGmail = () => {
     try {
-      const GOOGLE_CLIENT_ID = '599562846826-470vh7o74po5flfvg3s61a4592rp3ijl.apps.googleusercontent.com';
+      const GOOGLE_CLIENT_ID = '875247515146-89f318c262h205d5r7ducao9f1ih4aas.apps.googleusercontent.com';
       const REDIRECT_URI = 'https://ijsxcaaqphaciaenlegl.supabase.co/functions/v1/gmail-oauth';
       
       supabase.auth.getUser().then(({ data: { user } }) => {
