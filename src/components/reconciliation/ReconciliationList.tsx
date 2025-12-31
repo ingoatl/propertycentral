@@ -504,324 +504,459 @@ export const ReconciliationList = () => {
             </div>
           )}
           
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {/* Existing reconciliation cards */}
-            {filteredReconciliations?.map((rec: any) => {
-              const isOffboarded = !!rec.properties?.offboarded_at;
-              const isFullService = rec.service_type === 'full_service';
-              const isPreview = isCurrentMonth(rec.reconciliation_month) || rec.status === 'preview';
-              
+          {/* SECTION 1: Preview/Draft Cards (Active Work) */}
+          {(() => {
+            const previewAndDraftRecs = filteredReconciliations?.filter(
+              (rec: any) => rec.status === 'preview' || rec.status === 'draft' || isCurrentMonth(rec.reconciliation_month)
+            ) || [];
+            const missingPropertiesForSection = isSelectedMonthCurrent ? propertiesMissingReconciliation : [];
+            
+            if (previewAndDraftRecs.length > 0 || missingPropertiesForSection.length > 0) {
               return (
-                <Card 
-                  key={rec.id} 
-                  className={`overflow-hidden transition-all duration-200 hover:shadow-md ${
-                    isOffboarded 
-                      ? 'opacity-75 border-dashed border-muted-foreground/30 bg-muted/20' 
-                      : isPreview
-                        ? 'border-indigo-300 dark:border-indigo-700 bg-indigo-50/30 dark:bg-indigo-950/10'
-                        : ''
-                  }`}
-                >
-                  {/* Archived Banner */}
-                  {isOffboarded && (
-                    <div className="bg-muted/50 border-b border-dashed px-4 py-2 flex items-center gap-2">
-                      <Archive className="w-4 h-4 text-muted-foreground" />
-                      <span className="text-xs text-muted-foreground font-medium">
-                        Archived {rec.properties?.offboarded_at && format(new Date(rec.properties.offboarded_at), "MMM dd, yyyy")}
-                      </span>
-                    </div>
-                  )}
-                  
-                  {/* Header Section */}
-                  <div className={`p-4 border-b ${isPreview ? 'bg-indigo-50/50 dark:bg-indigo-950/20' : 'bg-muted/30'}`}>
-                    <div className="flex items-start justify-between gap-2 mb-2">
-                      <div className="flex items-center gap-2 min-w-0 flex-1">
-                        <Home className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                        <h3 className="font-semibold truncate">{rec.properties?.name}</h3>
-                      </div>
-                      <div className="flex gap-1.5 flex-shrink-0 flex-wrap justify-end">
-                        {/* Month Badge */}
-                        <Badge variant="outline" className={`font-medium ${isPreview ? 'bg-indigo-100 text-indigo-700 border-indigo-300 dark:bg-indigo-900 dark:text-indigo-300' : 'bg-background'}`}>
-                          {format(new Date(rec.reconciliation_month + "T00:00:00"), "MMM yyyy").toUpperCase()}
-                          {isPreview && " - PREVIEW"}
-                        </Badge>
-                        {getServiceTypeBadge(rec.service_type)}
-                        {getStatusBadge(rec.status, rec.payout_status, rec.service_type, isPreview)}
-                      </div>
-                    </div>
-                    <div className="text-sm text-muted-foreground space-y-0.5">
-                      <p className="truncate">{rec.properties?.address}</p>
-                      <p className="flex items-center gap-1">
-                        <span className="font-medium">Owner:</span> {rec.property_owners?.name}
-                      </p>
-                    </div>
+                <div className="mb-8">
+                  <div className="flex items-center gap-2 mb-4">
+                    <div className="h-px flex-1 bg-indigo-200 dark:bg-indigo-800" />
+                    <h3 className="text-sm font-semibold text-indigo-600 dark:text-indigo-400 px-3 flex items-center gap-2">
+                      <Eye className="w-4 h-4" />
+                      Active Work - Needs Attention
+                    </h3>
+                    <div className="h-px flex-1 bg-indigo-200 dark:bg-indigo-800" />
                   </div>
-
-                  {/* Financial Metrics Grid */}
-                  <div className="p-4">
-                    {isPreview ? (
-                      // Preview card content
-                      <div className="space-y-4">
-                        <div className="grid grid-cols-2 gap-3">
-                          {/* Revenue - TBD for preview */}
-                          <div className="bg-gray-50 dark:bg-gray-950/30 rounded-lg p-3 text-center">
-                            <p className="text-xs text-muted-foreground font-medium mb-1">Revenue</p>
-                            <p className="font-bold text-muted-foreground text-sm">
-                              TBD
-                            </p>
-                          </div>
-                          
-                          {/* Pending Items */}
-                          <div className="bg-amber-50 dark:bg-amber-950/30 rounded-lg p-3 text-center">
-                            <p className="text-xs text-muted-foreground font-medium mb-1">Pending Items</p>
-                            <p className="font-bold text-amber-600 text-sm">
-                              {rec.pending_items_count || 0}
-                            </p>
-                          </div>
-                        </div>
-                        
-                        {/* Expenses & Visits preview */}
-                        <div className="grid grid-cols-2 gap-3">
-                          <div className="bg-red-50 dark:bg-red-950/30 rounded-lg p-3 text-center">
-                            <p className="text-xs text-muted-foreground font-medium mb-1">Expenses</p>
-                            <p className="font-bold text-red-600 text-sm">
-                              {formatCurrency(rec.calculated_total_expenses || 0)}
-                            </p>
-                          </div>
-                          <div className="bg-red-50 dark:bg-red-950/30 rounded-lg p-3 text-center">
-                            <p className="text-xs text-muted-foreground font-medium mb-1">Visits</p>
-                            <p className="font-bold text-red-600 text-sm">
-                              {formatCurrency(rec.calculated_visit_fees || 0)}
-                            </p>
-                          </div>
-                        </div>
-
-                        {rec.pending_items_count > 0 && (
-                          <p className="text-xs text-amber-600 text-center font-medium">
-                            {rec.pending_items_count} items pending approval
-                          </p>
-                        )}
-
-                        <Button 
-                          className="w-full"
-                          onClick={() => setSelectedReconciliation(rec.id)}
+                  
+                  <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                    {/* Preview/Draft reconciliation cards */}
+                    {previewAndDraftRecs.map((rec: any) => {
+                      const isOffboarded = !!rec.properties?.offboarded_at;
+                      const isFullService = rec.service_type === 'full_service';
+                      const isPreview = isCurrentMonth(rec.reconciliation_month) || rec.status === 'preview';
+                      
+                      return (
+                        <Card 
+                          key={rec.id} 
+                          className={`overflow-hidden transition-all duration-200 hover:shadow-md ${
+                            isOffboarded 
+                              ? 'opacity-75 border-dashed border-muted-foreground/30 bg-muted/20' 
+                              : isPreview
+                                ? 'border-indigo-300 dark:border-indigo-700 bg-indigo-50/30 dark:bg-indigo-950/10'
+                                : 'border-amber-300 dark:border-amber-700 bg-amber-50/30 dark:bg-amber-950/10'
+                          }`}
                         >
-                          <Eye className="w-4 h-4 mr-2" />
-                          Review & Approve Expenses
-                        </Button>
-                      </div>
-                    ) : (
-                      // Regular reconciliation card content
-                      <>
-                        <div className="grid grid-cols-3 gap-3 mb-4">
-                          {/* Revenue */}
-                          <div className="bg-green-50 dark:bg-green-950/30 rounded-lg p-3 text-center">
-                            <div className="flex items-center justify-center gap-1 mb-1">
-                              <TrendingUp className="w-3 h-3 text-green-600" />
-                              <p className="text-xs text-muted-foreground font-medium">Revenue</p>
+                          {/* Archived Banner */}
+                          {isOffboarded && (
+                            <div className="bg-muted/50 border-b border-dashed px-4 py-2 flex items-center gap-2">
+                              <Archive className="w-4 h-4 text-muted-foreground" />
+                              <span className="text-xs text-muted-foreground font-medium">
+                                Archived {rec.properties?.offboarded_at && format(new Date(rec.properties.offboarded_at), "MMM dd, yyyy")}
+                              </span>
                             </div>
-                            <p className="font-bold text-green-600 text-sm">
-                              {formatCurrency(rec.total_revenue || 0)}
-                            </p>
-                          </div>
+                          )}
                           
-                          {/* Visit Fees */}
-                          <div className="bg-red-50 dark:bg-red-950/30 rounded-lg p-3 text-center">
-                            <div className="flex items-center justify-center gap-1 mb-1">
-                              <TrendingDown className="w-3 h-3 text-red-600" />
-                              <p className="text-xs text-muted-foreground font-medium">Visits</p>
-                            </div>
-                            <p className="font-bold text-red-600 text-sm">
-                              {formatCurrency(rec.calculated_visit_fees || 0)}
-                            </p>
-                          </div>
-                          
-                          {/* Expenses */}
-                          <div className="bg-red-50 dark:bg-red-950/30 rounded-lg p-3 text-center">
-                            <div className="flex items-center justify-center gap-1 mb-1">
-                              <TrendingDown className="w-3 h-3 text-red-600" />
-                              <p className="text-xs text-muted-foreground font-medium">Expenses</p>
-                            </div>
-                            <p className="font-bold text-red-600 text-sm">
-                              {formatCurrency(rec.calculated_total_expenses || 0)}
-                            </p>
-                          </div>
-                          
-                          {/* Mgmt Fee */}
-                          <div className="bg-amber-50 dark:bg-amber-950/30 rounded-lg p-3 text-center">
-                            <div className="flex items-center justify-center gap-1 mb-1">
-                              <DollarSign className="w-3 h-3 text-amber-600" />
-                              <p className="text-xs text-muted-foreground font-medium">Mgmt Fee</p>
-                            </div>
-                            <p className="font-bold text-amber-600 text-sm">
-                              {formatCurrency(rec.management_fee || 0)}
-                            </p>
-                          </div>
-                          
-                          {/* Order Min */}
-                          <div className="bg-amber-50 dark:bg-amber-950/30 rounded-lg p-3 text-center">
-                            <div className="flex items-center justify-center gap-1 mb-1">
-                              <DollarSign className="w-3 h-3 text-amber-600" />
-                              <p className="text-xs text-muted-foreground font-medium">Order Min</p>
-                            </div>
-                            <p className="font-bold text-amber-600 text-sm">
-                              {formatCurrency(rec.order_minimum_fee || 0)}
-                            </p>
-                          </div>
-                          
-                          {/* Settlement Amount */}
-                          <div className={`rounded-lg p-3 text-center ${
-                            isFullService 
-                              ? 'bg-green-100 dark:bg-green-950/50 ring-1 ring-green-200 dark:ring-green-800' 
-                              : 'bg-primary/10 ring-1 ring-primary/20'
-                          }`}>
-                            <p className="text-xs text-muted-foreground font-medium mb-1">
-                              {isFullService ? 'Payout' : 'Due'}
-                            </p>
-                            {rec.calculator_error ? (
-                              <div className="flex items-center justify-center gap-1">
-                                <AlertTriangle className="w-3 h-3 text-destructive" />
-                                <p className="text-xs text-destructive">Error</p>
+                          {/* Header Section */}
+                          <div className={`p-4 border-b ${isPreview ? 'bg-indigo-50/50 dark:bg-indigo-950/20' : 'bg-amber-50/50 dark:bg-amber-950/20'}`}>
+                            <div className="flex items-start justify-between gap-2 mb-2">
+                              <div className="flex items-center gap-2 min-w-0 flex-1">
+                                <Home className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                                <h3 className="font-semibold truncate">{rec.properties?.name}</h3>
                               </div>
-                            ) : (
-                              <p className={`font-bold text-sm ${isFullService ? 'text-green-600' : 'text-primary'}`}>
-                                {formatCurrency(isFullService 
-                                  ? (rec.calculated_payout_to_owner || 0) 
-                                  : (rec.calculated_due_from_owner || 0)
-                                )}
+                              <div className="flex gap-1.5 flex-shrink-0 flex-wrap justify-end">
+                                <Badge variant="outline" className={`font-medium ${isPreview ? 'bg-indigo-100 text-indigo-700 border-indigo-300 dark:bg-indigo-900 dark:text-indigo-300' : 'bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-900 dark:text-amber-300'}`}>
+                                  {format(new Date(rec.reconciliation_month + "T00:00:00"), "MMM yyyy").toUpperCase()}
+                                  {isPreview ? " - PREVIEW" : " - DRAFT"}
+                                </Badge>
+                                {getServiceTypeBadge(rec.service_type)}
+                              </div>
+                            </div>
+                            <div className="text-sm text-muted-foreground space-y-0.5">
+                              <p className="truncate">{rec.properties?.address}</p>
+                              <p className="flex items-center gap-1">
+                                <span className="font-medium">Owner:</span> {rec.property_owners?.name}
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Financial Metrics */}
+                          <div className="p-4">
+                            <div className="space-y-4">
+                              <div className="grid grid-cols-2 gap-3">
+                                <div className="bg-gray-50 dark:bg-gray-950/30 rounded-lg p-3 text-center">
+                                  <p className="text-xs text-muted-foreground font-medium mb-1">Revenue</p>
+                                  <p className={`font-bold text-sm ${isPreview ? 'text-muted-foreground' : 'text-green-600'}`}>
+                                    {isPreview ? "TBD" : formatCurrency(rec.total_revenue || 0)}
+                                  </p>
+                                </div>
+                                <div className="bg-amber-50 dark:bg-amber-950/30 rounded-lg p-3 text-center">
+                                  <p className="text-xs text-muted-foreground font-medium mb-1">Pending Items</p>
+                                  <p className="font-bold text-amber-600 text-sm">
+                                    {rec.pending_items_count || 0}
+                                  </p>
+                                </div>
+                              </div>
+                              
+                              <div className="grid grid-cols-2 gap-3">
+                                <div className="bg-red-50 dark:bg-red-950/30 rounded-lg p-3 text-center">
+                                  <p className="text-xs text-muted-foreground font-medium mb-1">Expenses</p>
+                                  <p className="font-bold text-red-600 text-sm">
+                                    {formatCurrency(rec.calculated_total_expenses || 0)}
+                                  </p>
+                                </div>
+                                <div className="bg-red-50 dark:bg-red-950/30 rounded-lg p-3 text-center">
+                                  <p className="text-xs text-muted-foreground font-medium mb-1">Visits</p>
+                                  <p className="font-bold text-red-600 text-sm">
+                                    {formatCurrency(rec.calculated_visit_fees || 0)}
+                                  </p>
+                                </div>
+                              </div>
+
+                              {rec.pending_items_count > 0 && (
+                                <p className="text-xs text-amber-600 text-center font-medium">
+                                  {rec.pending_items_count} items pending approval
+                                </p>
+                              )}
+
+                              <Button 
+                                className="w-full"
+                                onClick={() => setSelectedReconciliation(rec.id)}
+                              >
+                                <Eye className="w-4 h-4 mr-2" />
+                                Review & Approve Expenses
+                              </Button>
+                            </div>
+                          </div>
+                        </Card>
+                      );
+                    })}
+                    
+                    {/* Placeholder cards for properties missing preview (current month only) */}
+                    {missingPropertiesForSection.map((prop: any) => {
+                      const expenseCount = pendingExpensesCount?.[prop.id] || 0;
+                      
+                      return (
+                        <Card 
+                          key={`missing-${prop.id}`}
+                          className="overflow-hidden border-indigo-300 dark:border-indigo-700 bg-indigo-50/20 dark:bg-indigo-950/10"
+                        >
+                          <div className="p-4 border-b border-indigo-200 dark:border-indigo-800 bg-indigo-50/50 dark:bg-indigo-950/20">
+                            <div className="flex items-start justify-between gap-2 mb-2">
+                              <div className="flex items-center gap-2 min-w-0 flex-1">
+                                <Home className="w-4 h-4 flex-shrink-0 text-indigo-600" />
+                                <h3 className="font-semibold truncate text-indigo-800 dark:text-indigo-200">
+                                  {prop.name}
+                                </h3>
+                              </div>
+                              <Badge variant="outline" className="bg-indigo-100 text-indigo-700 border-indigo-300 dark:bg-indigo-900 dark:text-indigo-300 dark:border-indigo-700">
+                                START PREVIEW
+                              </Badge>
+                            </div>
+                            <div className="text-sm text-muted-foreground space-y-0.5">
+                              <p className="truncate">{prop.address}</p>
+                              <p className="flex items-center gap-1">
+                                <span className="font-medium">Owner:</span> {prop.property_owners?.name || "No owner assigned"}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="p-6 flex flex-col items-center justify-center text-center">
+                            <div className="w-12 h-12 rounded-full flex items-center justify-center mb-3 bg-indigo-100 dark:bg-indigo-900/50">
+                              <Eye className="w-6 h-6 text-indigo-600" />
+                            </div>
+                            
+                            {expenseCount > 0 && (
+                              <p className="text-sm text-indigo-600 font-medium mb-2">
+                                {expenseCount} expense{expenseCount !== 1 ? 's' : ''} pending approval
                               </p>
                             )}
+                            <p className="text-sm text-muted-foreground mb-4">
+                              Start approving expenses for <span className="font-medium">{selectedMonthLabel}</span>
+                            </p>
+                            <Button 
+                              className="bg-indigo-600 hover:bg-indigo-700"
+                              onClick={() => handleCreatePreview(prop.id)}
+                              disabled={creatingPreviewFor === prop.id}
+                            >
+                              {creatingPreviewFor === prop.id ? (
+                                <>
+                                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                  Creating...
+                                </>
+                              ) : (
+                                <>
+                                  <Plus className="w-4 h-4 mr-2" />
+                                  Start Preview
+                                </>
+                              )}
+                            </Button>
                           </div>
-                        </div>
-                        
-                        <p className="text-xs text-muted-foreground text-center mb-4 italic">
-                          Only approved items included in calculations
-                        </p>
-
-                        {/* Actions */}
-                        <ReconciliationCardActions
-                          reconciliation={rec}
-                          isOffboarded={isOffboarded}
-                          onReview={() => setSelectedReconciliation(rec.id)}
-                          onOffboard={() => handleOffboardClick(rec)}
-                          onSendPerformanceEmail={() => handlePerformanceEmailClick(rec)}
-                          onSendOwnerStatement={() => handleStatementEmailClick(rec)}
-                          sendingPerformance={sendingPerformance === rec.id}
-                          sendingStatement={sendingStatement === rec.id}
-                        />
-                      </>
-                    )}
+                        </Card>
+                      );
+                    })}
                   </div>
-                </Card>
+                </div>
               );
-            })}
+            }
+            return null;
+          })()}
+
+          {/* SECTION 2: Completed Reconciliations (grouped by month if viewing "all") */}
+          {(() => {
+            const completedRecs = filteredReconciliations?.filter(
+              (rec: any) => rec.status !== 'preview' && rec.status !== 'draft' && !isCurrentMonth(rec.reconciliation_month)
+            ) || [];
             
-            {/* Placeholder cards for properties missing reconciliations */}
-            {selectedMonth !== "all" && propertiesMissingReconciliation.map((prop: any) => {
-              const expenseCount = pendingExpensesCount?.[prop.id] || 0;
-              
-              return (
-                <Card 
-                  key={`missing-${prop.id}`}
-                  className={`overflow-hidden ${
-                    isSelectedMonthCurrent
-                      ? "border-indigo-300 dark:border-indigo-700 bg-indigo-50/20 dark:bg-indigo-950/10"
-                      : "border-dashed border-amber-300 dark:border-amber-700 bg-amber-50/30 dark:bg-amber-950/10"
-                  }`}
-                >
-                  {/* Header Section */}
-                  <div className={`p-4 border-b ${
-                    isSelectedMonthCurrent
-                      ? "border-indigo-200 dark:border-indigo-800 bg-indigo-50/50 dark:bg-indigo-950/20"
-                      : "border-dashed border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-950/20"
-                  }`}>
-                    <div className="flex items-start justify-between gap-2 mb-2">
-                      <div className="flex items-center gap-2 min-w-0 flex-1">
-                        <Home className={`w-4 h-4 flex-shrink-0 ${isSelectedMonthCurrent ? 'text-indigo-600' : 'text-amber-600'}`} />
-                        <h3 className={`font-semibold truncate ${isSelectedMonthCurrent ? 'text-indigo-800 dark:text-indigo-200' : 'text-amber-800 dark:text-amber-200'}`}>
-                          {prop.name}
-                        </h3>
-                      </div>
-                      <div className="flex gap-1.5 flex-shrink-0">
-                        <Badge variant="outline" className={
-                          isSelectedMonthCurrent
-                            ? "bg-indigo-100 text-indigo-700 border-indigo-300 dark:bg-indigo-900 dark:text-indigo-300 dark:border-indigo-700"
-                            : "bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-900 dark:text-amber-300 dark:border-amber-700"
-                        }>
-                          {isSelectedMonthCurrent ? "START PREVIEW" : "NOT STARTED"}
-                        </Badge>
-                      </div>
-                    </div>
-                    <div className="text-sm text-muted-foreground space-y-0.5">
-                      <p className="truncate">{prop.address}</p>
-                      <p className="flex items-center gap-1">
-                        <span className="font-medium">Owner:</span> {prop.property_owners?.name || "No owner assigned"}
-                      </p>
+            // Also include missing properties for past months
+            const missingForPastMonths = !isSelectedMonthCurrent ? propertiesMissingReconciliation : [];
+            
+            if (completedRecs.length === 0 && missingForPastMonths.length === 0) return null;
+            
+            // Group by month if viewing "all"
+            const groupedByMonth = selectedMonth === "all" 
+              ? completedRecs.reduce((acc: Record<string, any[]>, rec: any) => {
+                  const month = rec.reconciliation_month;
+                  if (!acc[month]) acc[month] = [];
+                  acc[month].push(rec);
+                  return acc;
+                }, {})
+              : { [selectedMonth]: completedRecs };
+            
+            const sortedMonths = Object.keys(groupedByMonth).sort((a, b) => 
+              new Date(b).getTime() - new Date(a).getTime()
+            );
+            
+            return (
+              <div>
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="h-px flex-1 bg-green-200 dark:bg-green-800" />
+                  <h3 className="text-sm font-semibold text-green-600 dark:text-green-400 px-3 flex items-center gap-2">
+                    <Check className="w-4 h-4" />
+                    Completed Reconciliations
+                  </h3>
+                  <div className="h-px flex-1 bg-green-200 dark:bg-green-800" />
+                </div>
+                
+                {sortedMonths.map((month) => (
+                  <div key={month} className="mb-6">
+                    {selectedMonth === "all" && (
+                      <h4 className="text-sm font-medium text-muted-foreground mb-3 flex items-center gap-2">
+                        <Calendar className="w-4 h-4" />
+                        {format(new Date(month + "T00:00:00"), "MMMM yyyy")}
+                        <Badge variant="outline" className="text-xs">{groupedByMonth[month].length} properties</Badge>
+                      </h4>
+                    )}
+                    
+                    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                      {groupedByMonth[month].map((rec: any) => {
+                        const isOffboarded = !!rec.properties?.offboarded_at;
+                        const isFullService = rec.service_type === 'full_service';
+                        
+                        return (
+                          <Card 
+                            key={rec.id} 
+                            className={`overflow-hidden transition-all duration-200 hover:shadow-md ${
+                              isOffboarded 
+                                ? 'opacity-75 border-dashed border-muted-foreground/30 bg-muted/20' 
+                                : ''
+                            }`}
+                          >
+                            {/* Archived Banner */}
+                            {isOffboarded && (
+                              <div className="bg-muted/50 border-b border-dashed px-4 py-2 flex items-center gap-2">
+                                <Archive className="w-4 h-4 text-muted-foreground" />
+                                <span className="text-xs text-muted-foreground font-medium">
+                                  Archived {rec.properties?.offboarded_at && format(new Date(rec.properties.offboarded_at), "MMM dd, yyyy")}
+                                </span>
+                              </div>
+                            )}
+                            
+                            {/* Header Section */}
+                            <div className="p-4 border-b bg-muted/30">
+                              <div className="flex items-start justify-between gap-2 mb-2">
+                                <div className="flex items-center gap-2 min-w-0 flex-1">
+                                  <Home className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                                  <h3 className="font-semibold truncate">{rec.properties?.name}</h3>
+                                </div>
+                                <div className="flex gap-1.5 flex-shrink-0 flex-wrap justify-end">
+                                  <Badge variant="outline" className="font-medium bg-background">
+                                    {format(new Date(rec.reconciliation_month + "T00:00:00"), "MMM yyyy").toUpperCase()}
+                                  </Badge>
+                                  {getServiceTypeBadge(rec.service_type)}
+                                  {getStatusBadge(rec.status, rec.payout_status, rec.service_type, false)}
+                                </div>
+                              </div>
+                              <div className="text-sm text-muted-foreground space-y-0.5">
+                                <p className="truncate">{rec.properties?.address}</p>
+                                <p className="flex items-center gap-1">
+                                  <span className="font-medium">Owner:</span> {rec.property_owners?.name}
+                                </p>
+                              </div>
+                            </div>
+
+                            {/* Financial Metrics Grid */}
+                            <div className="p-4">
+                              <div className="grid grid-cols-3 gap-3 mb-4">
+                                {/* Revenue */}
+                                <div className="bg-green-50 dark:bg-green-950/30 rounded-lg p-3 text-center">
+                                  <div className="flex items-center justify-center gap-1 mb-1">
+                                    <TrendingUp className="w-3 h-3 text-green-600" />
+                                    <p className="text-xs text-muted-foreground font-medium">Revenue</p>
+                                  </div>
+                                  <p className="font-bold text-green-600 text-sm">
+                                    {formatCurrency(rec.total_revenue || 0)}
+                                  </p>
+                                </div>
+                                
+                                {/* Visit Fees */}
+                                <div className="bg-red-50 dark:bg-red-950/30 rounded-lg p-3 text-center">
+                                  <div className="flex items-center justify-center gap-1 mb-1">
+                                    <TrendingDown className="w-3 h-3 text-red-600" />
+                                    <p className="text-xs text-muted-foreground font-medium">Visits</p>
+                                  </div>
+                                  <p className="font-bold text-red-600 text-sm">
+                                    {formatCurrency(rec.calculated_visit_fees || 0)}
+                                  </p>
+                                </div>
+                                
+                                {/* Expenses */}
+                                <div className="bg-red-50 dark:bg-red-950/30 rounded-lg p-3 text-center">
+                                  <div className="flex items-center justify-center gap-1 mb-1">
+                                    <TrendingDown className="w-3 h-3 text-red-600" />
+                                    <p className="text-xs text-muted-foreground font-medium">Expenses</p>
+                                  </div>
+                                  <p className="font-bold text-red-600 text-sm">
+                                    {formatCurrency(rec.calculated_total_expenses || 0)}
+                                  </p>
+                                </div>
+                                
+                                {/* Mgmt Fee */}
+                                <div className="bg-amber-50 dark:bg-amber-950/30 rounded-lg p-3 text-center">
+                                  <div className="flex items-center justify-center gap-1 mb-1">
+                                    <DollarSign className="w-3 h-3 text-amber-600" />
+                                    <p className="text-xs text-muted-foreground font-medium">Mgmt Fee</p>
+                                  </div>
+                                  <p className="font-bold text-amber-600 text-sm">
+                                    {formatCurrency(rec.management_fee || 0)}
+                                  </p>
+                                </div>
+                                
+                                {/* Order Min */}
+                                <div className="bg-amber-50 dark:bg-amber-950/30 rounded-lg p-3 text-center">
+                                  <div className="flex items-center justify-center gap-1 mb-1">
+                                    <DollarSign className="w-3 h-3 text-amber-600" />
+                                    <p className="text-xs text-muted-foreground font-medium">Order Min</p>
+                                  </div>
+                                  <p className="font-bold text-amber-600 text-sm">
+                                    {formatCurrency(rec.order_minimum_fee || 0)}
+                                  </p>
+                                </div>
+                                
+                                {/* Settlement Amount */}
+                                <div className={`rounded-lg p-3 text-center ${
+                                  isFullService 
+                                    ? 'bg-green-100 dark:bg-green-950/50 ring-1 ring-green-200 dark:ring-green-800' 
+                                    : 'bg-primary/10 ring-1 ring-primary/20'
+                                }`}>
+                                  <p className="text-xs text-muted-foreground font-medium mb-1">
+                                    {isFullService ? 'Payout' : 'Due'}
+                                  </p>
+                                  {rec.calculator_error ? (
+                                    <div className="flex items-center justify-center gap-1">
+                                      <AlertTriangle className="w-3 h-3 text-destructive" />
+                                      <p className="text-xs text-destructive">Error</p>
+                                    </div>
+                                  ) : (
+                                    <p className={`font-bold text-sm ${isFullService ? 'text-green-600' : 'text-primary'}`}>
+                                      {formatCurrency(isFullService 
+                                        ? (rec.calculated_payout_to_owner || 0) 
+                                        : (rec.calculated_due_from_owner || 0)
+                                      )}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                              
+                              <p className="text-xs text-muted-foreground text-center mb-4 italic">
+                                Only approved items included in calculations
+                              </p>
+
+                              {/* Actions */}
+                              <ReconciliationCardActions
+                                reconciliation={rec}
+                                isOffboarded={isOffboarded}
+                                onReview={() => setSelectedReconciliation(rec.id)}
+                                onOffboard={() => handleOffboardClick(rec)}
+                                onSendPerformanceEmail={() => handlePerformanceEmailClick(rec)}
+                                onSendOwnerStatement={() => handleStatementEmailClick(rec)}
+                                sendingPerformance={sendingPerformance === rec.id}
+                                sendingStatement={sendingStatement === rec.id}
+                              />
+                            </div>
+                          </Card>
+                        );
+                      })}
                     </div>
                   </div>
-
-                  {/* Empty State */}
-                  <div className="p-6 flex flex-col items-center justify-center text-center">
-                    <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-3 ${
-                      isSelectedMonthCurrent
-                        ? "bg-indigo-100 dark:bg-indigo-900/50"
-                        : "bg-amber-100 dark:bg-amber-900/50"
-                    }`}>
-                      {isSelectedMonthCurrent ? (
-                        <Eye className="w-6 h-6 text-indigo-600" />
-                      ) : (
-                        <Calendar className="w-6 h-6 text-amber-600" />
-                      )}
+                ))}
+                
+                {/* Missing properties for past months */}
+                {missingForPastMonths.length > 0 && (
+                  <div className="mt-6">
+                    <div className="flex items-center gap-2 mb-4">
+                      <div className="h-px flex-1 bg-amber-200 dark:bg-amber-800" />
+                      <h3 className="text-sm font-semibold text-amber-600 dark:text-amber-400 px-3 flex items-center gap-2">
+                        <AlertTriangle className="w-4 h-4" />
+                        Not Yet Reconciled
+                      </h3>
+                      <div className="h-px flex-1 bg-amber-200 dark:bg-amber-800" />
                     </div>
                     
-                    {isSelectedMonthCurrent ? (
-                      <>
-                        {expenseCount > 0 && (
-                          <p className="text-sm text-indigo-600 font-medium mb-2">
-                            {expenseCount} expense{expenseCount !== 1 ? 's' : ''} pending approval
-                          </p>
-                        )}
-                        <p className="text-sm text-muted-foreground mb-4">
-                          Start approving expenses for <span className="font-medium">{selectedMonthLabel}</span>
-                        </p>
-                        <Button 
-                          className="bg-indigo-600 hover:bg-indigo-700"
-                          onClick={() => handleCreatePreview(prop.id)}
-                          disabled={creatingPreviewFor === prop.id}
+                    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                      {missingForPastMonths.map((prop: any) => (
+                        <Card 
+                          key={`missing-${prop.id}`}
+                          className="overflow-hidden border-dashed border-amber-300 dark:border-amber-700 bg-amber-50/30 dark:bg-amber-950/10"
                         >
-                          {creatingPreviewFor === prop.id ? (
-                            <>
-                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                              Creating...
-                            </>
-                          ) : (
-                            <>
+                          <div className="p-4 border-b border-dashed border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-950/20">
+                            <div className="flex items-start justify-between gap-2 mb-2">
+                              <div className="flex items-center gap-2 min-w-0 flex-1">
+                                <Home className="w-4 h-4 flex-shrink-0 text-amber-600" />
+                                <h3 className="font-semibold truncate text-amber-800 dark:text-amber-200">
+                                  {prop.name}
+                                </h3>
+                              </div>
+                              <Badge variant="outline" className="bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-900 dark:text-amber-300 dark:border-amber-700">
+                                NOT STARTED
+                              </Badge>
+                            </div>
+                            <div className="text-sm text-muted-foreground space-y-0.5">
+                              <p className="truncate">{prop.address}</p>
+                              <p className="flex items-center gap-1">
+                                <span className="font-medium">Owner:</span> {prop.property_owners?.name || "No owner assigned"}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="p-6 flex flex-col items-center justify-center text-center">
+                            <div className="w-12 h-12 rounded-full flex items-center justify-center mb-3 bg-amber-100 dark:bg-amber-900/50">
+                              <Calendar className="w-6 h-6 text-amber-600" />
+                            </div>
+                            <p className="text-sm text-muted-foreground mb-4">
+                              No reconciliation for <span className="font-medium">{selectedMonthLabel}</span>
+                            </p>
+                            <Button 
+                              variant="outline" 
+                              className="border-amber-300 hover:bg-amber-100 dark:border-amber-700 dark:hover:bg-amber-900"
+                              onClick={() => setShowCreateDialog(true)}
+                            >
                               <Plus className="w-4 h-4 mr-2" />
-                              Start Preview
-                            </>
-                          )}
-                        </Button>
-                      </>
-                    ) : (
-                      <>
-                        <p className="text-sm text-muted-foreground mb-4">
-                          No reconciliation for <span className="font-medium">{selectedMonthLabel}</span>
-                        </p>
-                        <Button 
-                          variant="outline" 
-                          className="border-amber-300 hover:bg-amber-100 dark:border-amber-700 dark:hover:bg-amber-900"
-                          onClick={() => setShowCreateDialog(true)}
-                        >
-                          <Plus className="w-4 h-4 mr-2" />
-                          Create Reconciliation
-                        </Button>
-                      </>
-                    )}
+                              Create Reconciliation
+                            </Button>
+                          </div>
+                        </Card>
+                      ))}
+                    </div>
                   </div>
-                </Card>
-              );
-            })}
-          </div>
+                )}
+              </div>
+            );
+          })()}
           
           {/* Empty state when no reconciliations AND no missing properties */}
           {(!filteredReconciliations || filteredReconciliations.length === 0) && propertiesMissingReconciliation.length === 0 && (
