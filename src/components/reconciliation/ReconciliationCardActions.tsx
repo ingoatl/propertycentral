@@ -16,11 +16,13 @@ import {
   UserMinus, 
   FileSpreadsheet, 
   History,
-  Archive
+  Archive,
+  CreditCard
 } from "lucide-react";
 import { toast } from "sonner";
 import { generateAuditReport } from "@/lib/exportAuditReport";
 import { AuditTrailDialog } from "./AuditTrailDialog";
+import { supabase } from "@/integrations/supabase/client";
 
 interface ReconciliationCardActionsProps {
   reconciliation: any;
@@ -45,6 +47,7 @@ export const ReconciliationCardActions = ({
 }: ReconciliationCardActionsProps) => {
   const [isExporting, setIsExporting] = useState(false);
   const [showAuditTrail, setShowAuditTrail] = useState(false);
+  const [sendingPaymentEmail, setSendingPaymentEmail] = useState(false);
   
   const canSendEmails = 
     (reconciliation.status === "approved" || reconciliation.status === "statement_sent") && 
@@ -60,6 +63,41 @@ export const ReconciliationCardActions = ({
       toast.error("Failed to export audit report");
     } finally {
       setIsExporting(false);
+    }
+  };
+
+  const handleSendPaymentTransitionEmail = async () => {
+    const owner = reconciliation.properties?.property_owners;
+    if (!owner) {
+      toast.error("No owner found for this property");
+      return;
+    }
+
+    if (!owner.email) {
+      toast.error("Owner has no email address");
+      return;
+    }
+
+    try {
+      setSendingPaymentEmail(true);
+      
+      const { data, error } = await supabase.functions.invoke('send-billing-transition-email', {
+        body: {
+          ownerName: owner.name,
+          ownerEmail: owner.email,
+          ownerId: owner.id,
+          propertyName: reconciliation.properties?.name || 'Your Property'
+        }
+      });
+
+      if (error) throw error;
+
+      toast.success(`Payment setup email sent to ${owner.email}`);
+    } catch (error: any) {
+      console.error("Error sending payment transition email:", error);
+      toast.error("Failed to send payment setup email");
+    } finally {
+      setSendingPaymentEmail(false);
     }
   };
 
@@ -137,6 +175,19 @@ export const ReconciliationCardActions = ({
                   <FileSpreadsheet className="w-4 h-4 mr-2" />
                 )}
                 Export GREC Report
+              </DropdownMenuItem>
+              
+              <DropdownMenuSeparator />
+              <DropdownMenuItem 
+                onClick={handleSendPaymentTransitionEmail} 
+                disabled={sendingPaymentEmail}
+              >
+                {sendingPaymentEmail ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <CreditCard className="w-4 h-4 mr-2" />
+                )}
+                Send Payment Setup Email
               </DropdownMenuItem>
               
               {!isOffboarded && (
