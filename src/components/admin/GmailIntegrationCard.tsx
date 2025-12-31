@@ -27,6 +27,7 @@ export const GmailIntegrationCard = () => {
   const [loading, setLoading] = useState(true);
   const [reconnecting, setReconnecting] = useState(false);
   const [checkingHealth, setCheckingHealth] = useState(false);
+  const [scanning, setScanning] = useState(false);
 
   useEffect(() => {
     loadGmailStatus();
@@ -146,7 +147,11 @@ export const GmailIntegrationCard = () => {
       const result = await response.json();
 
       if (result.status === 'healthy') {
-        toast.success('Gmail connection is healthy!');
+        if (result.was_refreshed) {
+          toast.success('Gmail token was refreshed successfully!');
+        } else {
+          toast.success('Gmail connection is healthy!');
+        }
         await loadGmailStatus();
       } else if (result.status === 'expired') {
         toast.error('Gmail token expired. Please reconnect.');
@@ -161,6 +166,44 @@ export const GmailIntegrationCard = () => {
       toast.error('Failed to check Gmail health');
     } finally {
       setCheckingHealth(false);
+    }
+  };
+
+  const handleScanGmail = async () => {
+    setScanning(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error('Not authenticated');
+        return;
+      }
+
+      toast.info('Starting Gmail scan...');
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/scan-gmail`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session.access_token}`,
+          },
+        }
+      );
+
+      const result = await response.json();
+
+      if (response.ok) {
+        toast.success(result.message || 'Gmail scan completed!');
+        await loadGmailStatus();
+      } else {
+        toast.error(result.error || 'Gmail scan failed');
+      }
+    } catch (error) {
+      console.error('Error scanning Gmail:', error);
+      toast.error('Failed to scan Gmail');
+    } finally {
+      setScanning(false);
     }
   };
 
@@ -287,7 +330,27 @@ export const GmailIntegrationCard = () => {
               ) : (
                 <>
                   <RefreshCw className="w-4 h-4 mr-2" />
-                  Check Health
+                  Refresh Token
+                </>
+              )}
+            </Button>
+          )}
+
+          {status.connected && !status.isExpired && (
+            <Button 
+              variant="secondary" 
+              onClick={handleScanGmail}
+              disabled={scanning}
+            >
+              {scanning ? (
+                <>
+                  <Mail className="w-4 h-4 mr-2 animate-pulse" />
+                  Scanning...
+                </>
+              ) : (
+                <>
+                  <Mail className="w-4 h-4 mr-2" />
+                  Scan Gmail Now
                 </>
               )}
             </Button>
