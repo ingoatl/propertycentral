@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Calendar, Check, CreditCard, Banknote, AlertTriangle, Archive, TrendingUp, TrendingDown, DollarSign, Home } from "lucide-react";
+import { Calendar, Check, CreditCard, Banknote, AlertTriangle, Archive, TrendingUp, TrendingDown, DollarSign, Home, Plus } from "lucide-react";
 import { format } from "date-fns";
 import { CreateReconciliationDialog } from "./CreateReconciliationDialog";
 import { ReconciliationReviewModal } from "./ReconciliationReviewModal";
@@ -130,6 +130,28 @@ export const ReconciliationList = () => {
     },
   });
 
+  // Fetch all active properties for showing "missing reconciliation" placeholders
+  const { data: activeProperties } = useQuery({
+    queryKey: ["active-properties-for-reconciliation"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("properties")
+        .select(`
+          id,
+          name,
+          address,
+          owner_id,
+          billing_status,
+          property_owners(name, email, service_type)
+        `)
+        .eq("billing_status", "active")
+        .is("offboarded_at", null);
+
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
   const getStatusBadge = (status: string, payoutStatus?: string, serviceType?: string) => {
     // For full-service, show payout status
     if (serviceType === 'full_service' && payoutStatus === 'completed') {
@@ -249,8 +271,27 @@ export const ReconciliationList = () => {
     return offboardedMatch && monthMatch;
   });
 
+  // Get properties missing reconciliations for the selected month
+  const propertiesMissingReconciliation = useMemo(() => {
+    if (selectedMonth === "all" || !activeProperties) return [];
+    
+    const existingPropertyIds = new Set(
+      reconciliations
+        ?.filter((rec: any) => rec.reconciliation_month === selectedMonth)
+        .map((rec: any) => rec.property_id) || []
+    );
+    
+    return activeProperties.filter((prop: any) => !existingPropertyIds.has(prop.id));
+  }, [selectedMonth, activeProperties, reconciliations]);
+
   // Get selected month label for display
   const selectedMonthLabel = monthOptions.find(m => m.value === selectedMonth)?.label || "All Months";
+
+  // Handle creating reconciliation for a specific property
+  const handleCreateForProperty = (propertyId: string) => {
+    // Open the create dialog with the property pre-selected
+    setShowCreateDialog(true);
+  };
 
   const handleOffboardClick = (rec: any) => {
     setPropertyToOffboard({
@@ -307,166 +348,240 @@ export const ReconciliationList = () => {
         <Card className="p-6">
           <p className="text-center text-muted-foreground">Loading reconciliations...</p>
         </Card>
-      ) : filteredReconciliations && filteredReconciliations.length > 0 ? (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {filteredReconciliations.map((rec: any) => {
-            const isOffboarded = !!rec.properties?.offboarded_at;
-            const isFullService = rec.service_type === 'full_service';
-            
-            return (
-              <Card 
-                key={rec.id} 
-                className={`overflow-hidden transition-all duration-200 hover:shadow-md ${
-                  isOffboarded 
-                    ? 'opacity-75 border-dashed border-muted-foreground/30 bg-muted/20' 
-                    : ''
-                }`}
-              >
-                {/* Archived Banner */}
-                {isOffboarded && (
-                  <div className="bg-muted/50 border-b border-dashed px-4 py-2 flex items-center gap-2">
-                    <Archive className="w-4 h-4 text-muted-foreground" />
-                    <span className="text-xs text-muted-foreground font-medium">
-                      Archived {rec.properties?.offboarded_at && format(new Date(rec.properties.offboarded_at), "MMM dd, yyyy")}
+      ) : (
+        <>
+          {/* Progress indicator for the selected month */}
+          {selectedMonth !== "all" && (
+            <div className="mb-4 p-3 bg-muted/50 rounded-lg flex items-center justify-between">
+              <p className="text-sm text-muted-foreground">
+                <span className="font-medium text-foreground">{selectedMonthLabel}</span>
+                {" • "}
+                <span className="text-green-600 font-medium">
+                  {filteredReconciliations?.length || 0} reconciled
+                </span>
+                {propertiesMissingReconciliation.length > 0 && (
+                  <>
+                    {" • "}
+                    <span className="text-amber-600 font-medium">
+                      {propertiesMissingReconciliation.length} pending
                     </span>
-                  </div>
+                  </>
                 )}
-                
+              </p>
+            </div>
+          )}
+          
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {/* Existing reconciliation cards */}
+            {filteredReconciliations?.map((rec: any) => {
+              const isOffboarded = !!rec.properties?.offboarded_at;
+              const isFullService = rec.service_type === 'full_service';
+              
+              return (
+                <Card 
+                  key={rec.id} 
+                  className={`overflow-hidden transition-all duration-200 hover:shadow-md ${
+                    isOffboarded 
+                      ? 'opacity-75 border-dashed border-muted-foreground/30 bg-muted/20' 
+                      : ''
+                  }`}
+                >
+                  {/* Archived Banner */}
+                  {isOffboarded && (
+                    <div className="bg-muted/50 border-b border-dashed px-4 py-2 flex items-center gap-2">
+                      <Archive className="w-4 h-4 text-muted-foreground" />
+                      <span className="text-xs text-muted-foreground font-medium">
+                        Archived {rec.properties?.offboarded_at && format(new Date(rec.properties.offboarded_at), "MMM dd, yyyy")}
+                      </span>
+                    </div>
+                  )}
+                  
+                  {/* Header Section */}
+                  <div className="p-4 border-b bg-muted/30">
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <Home className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                        <h3 className="font-semibold truncate">{rec.properties?.name}</h3>
+                      </div>
+                      <div className="flex gap-1.5 flex-shrink-0 flex-wrap justify-end">
+                        {/* Month Badge - prominent display */}
+                        <Badge variant="outline" className="bg-background font-medium">
+                          {format(new Date(rec.reconciliation_month + "T00:00:00"), "MMM yyyy").toUpperCase()}
+                        </Badge>
+                        {getServiceTypeBadge(rec.service_type)}
+                        {getStatusBadge(rec.status, rec.payout_status, rec.service_type)}
+                      </div>
+                    </div>
+                    <div className="text-sm text-muted-foreground space-y-0.5">
+                      <p className="truncate">{rec.properties?.address}</p>
+                      <p className="flex items-center gap-1">
+                        <span className="font-medium">Owner:</span> {rec.property_owners?.name}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Financial Metrics Grid */}
+                  <div className="p-4">
+                    <div className="grid grid-cols-3 gap-3 mb-4">
+                      {/* Revenue */}
+                      <div className="bg-green-50 dark:bg-green-950/30 rounded-lg p-3 text-center">
+                        <div className="flex items-center justify-center gap-1 mb-1">
+                          <TrendingUp className="w-3 h-3 text-green-600" />
+                          <p className="text-xs text-muted-foreground font-medium">Revenue</p>
+                        </div>
+                        <p className="font-bold text-green-600 text-sm">
+                          {formatCurrency(rec.total_revenue || 0)}
+                        </p>
+                      </div>
+                      
+                      {/* Visit Fees */}
+                      <div className="bg-red-50 dark:bg-red-950/30 rounded-lg p-3 text-center">
+                        <div className="flex items-center justify-center gap-1 mb-1">
+                          <TrendingDown className="w-3 h-3 text-red-600" />
+                          <p className="text-xs text-muted-foreground font-medium">Visits</p>
+                        </div>
+                        <p className="font-bold text-red-600 text-sm">
+                          {formatCurrency(rec.calculated_visit_fees || 0)}
+                        </p>
+                      </div>
+                      
+                      {/* Expenses */}
+                      <div className="bg-red-50 dark:bg-red-950/30 rounded-lg p-3 text-center">
+                        <div className="flex items-center justify-center gap-1 mb-1">
+                          <TrendingDown className="w-3 h-3 text-red-600" />
+                          <p className="text-xs text-muted-foreground font-medium">Expenses</p>
+                        </div>
+                        <p className="font-bold text-red-600 text-sm">
+                          {formatCurrency(rec.calculated_total_expenses || 0)}
+                        </p>
+                      </div>
+                      
+                      {/* Mgmt Fee */}
+                      <div className="bg-amber-50 dark:bg-amber-950/30 rounded-lg p-3 text-center">
+                        <div className="flex items-center justify-center gap-1 mb-1">
+                          <DollarSign className="w-3 h-3 text-amber-600" />
+                          <p className="text-xs text-muted-foreground font-medium">Mgmt Fee</p>
+                        </div>
+                        <p className="font-bold text-amber-600 text-sm">
+                          {formatCurrency(rec.management_fee || 0)}
+                        </p>
+                      </div>
+                      
+                      {/* Order Min */}
+                      <div className="bg-amber-50 dark:bg-amber-950/30 rounded-lg p-3 text-center">
+                        <div className="flex items-center justify-center gap-1 mb-1">
+                          <DollarSign className="w-3 h-3 text-amber-600" />
+                          <p className="text-xs text-muted-foreground font-medium">Order Min</p>
+                        </div>
+                        <p className="font-bold text-amber-600 text-sm">
+                          {formatCurrency(rec.order_minimum_fee || 0)}
+                        </p>
+                      </div>
+                      
+                      {/* Settlement Amount */}
+                      <div className={`rounded-lg p-3 text-center ${
+                        isFullService 
+                          ? 'bg-green-100 dark:bg-green-950/50 ring-1 ring-green-200 dark:ring-green-800' 
+                          : 'bg-primary/10 ring-1 ring-primary/20'
+                      }`}>
+                        <p className="text-xs text-muted-foreground font-medium mb-1">
+                          {isFullService ? 'Payout' : 'Due'}
+                        </p>
+                        {rec.calculator_error ? (
+                          <div className="flex items-center justify-center gap-1">
+                            <AlertTriangle className="w-3 h-3 text-destructive" />
+                            <p className="text-xs text-destructive">Error</p>
+                          </div>
+                        ) : (
+                          <p className={`font-bold text-sm ${isFullService ? 'text-green-600' : 'text-primary'}`}>
+                            {formatCurrency(isFullService 
+                              ? (rec.calculated_payout_to_owner || 0) 
+                              : (rec.calculated_due_from_owner || 0)
+                            )}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    
+                    <p className="text-xs text-muted-foreground text-center mb-4 italic">
+                      Only approved items included in calculations
+                    </p>
+
+                    {/* Actions */}
+                    <ReconciliationCardActions
+                      reconciliation={rec}
+                      isOffboarded={isOffboarded}
+                      onReview={() => setSelectedReconciliation(rec.id)}
+                      onOffboard={() => handleOffboardClick(rec)}
+                      onSendPerformanceEmail={() => handlePerformanceEmailClick(rec)}
+                      onSendOwnerStatement={() => handleStatementEmailClick(rec)}
+                      sendingPerformance={sendingPerformance === rec.id}
+                      sendingStatement={sendingStatement === rec.id}
+                    />
+                  </div>
+                </Card>
+              );
+            })}
+            
+            {/* Placeholder cards for properties missing reconciliations */}
+            {selectedMonth !== "all" && propertiesMissingReconciliation.map((prop: any) => (
+              <Card 
+                key={`missing-${prop.id}`}
+                className="overflow-hidden border-dashed border-amber-300 dark:border-amber-700 bg-amber-50/30 dark:bg-amber-950/10"
+              >
                 {/* Header Section */}
-                <div className="p-4 border-b bg-muted/30">
+                <div className="p-4 border-b border-dashed border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-950/20">
                   <div className="flex items-start justify-between gap-2 mb-2">
                     <div className="flex items-center gap-2 min-w-0 flex-1">
-                      <Home className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                      <h3 className="font-semibold truncate">{rec.properties?.name}</h3>
+                      <Home className="w-4 h-4 text-amber-600 flex-shrink-0" />
+                      <h3 className="font-semibold truncate text-amber-800 dark:text-amber-200">{prop.name}</h3>
                     </div>
-                    <div className="flex gap-1.5 flex-shrink-0 flex-wrap justify-end">
-                      {/* Month Badge - prominent display */}
-                      <Badge variant="outline" className="bg-background font-medium">
-                        {format(new Date(rec.reconciliation_month + "T00:00:00"), "MMM yyyy").toUpperCase()}
+                    <div className="flex gap-1.5 flex-shrink-0">
+                      <Badge variant="outline" className="bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-900 dark:text-amber-300 dark:border-amber-700">
+                        NOT STARTED
                       </Badge>
-                      {getServiceTypeBadge(rec.service_type)}
-                      {getStatusBadge(rec.status, rec.payout_status, rec.service_type)}
                     </div>
                   </div>
                   <div className="text-sm text-muted-foreground space-y-0.5">
-                    <p className="truncate">{rec.properties?.address}</p>
+                    <p className="truncate">{prop.address}</p>
                     <p className="flex items-center gap-1">
-                      <span className="font-medium">Owner:</span> {rec.property_owners?.name}
+                      <span className="font-medium">Owner:</span> {prop.property_owners?.name || "No owner assigned"}
                     </p>
                   </div>
                 </div>
 
-                {/* Financial Metrics Grid */}
-                <div className="p-4">
-                  <div className="grid grid-cols-3 gap-3 mb-4">
-                    {/* Revenue */}
-                    <div className="bg-green-50 dark:bg-green-950/30 rounded-lg p-3 text-center">
-                      <div className="flex items-center justify-center gap-1 mb-1">
-                        <TrendingUp className="w-3 h-3 text-green-600" />
-                        <p className="text-xs text-muted-foreground font-medium">Revenue</p>
-                      </div>
-                      <p className="font-bold text-green-600 text-sm">
-                        {formatCurrency(rec.total_revenue || 0)}
-                      </p>
-                    </div>
-                    
-                    {/* Visit Fees */}
-                    <div className="bg-red-50 dark:bg-red-950/30 rounded-lg p-3 text-center">
-                      <div className="flex items-center justify-center gap-1 mb-1">
-                        <TrendingDown className="w-3 h-3 text-red-600" />
-                        <p className="text-xs text-muted-foreground font-medium">Visits</p>
-                      </div>
-                      <p className="font-bold text-red-600 text-sm">
-                        {formatCurrency(rec.calculated_visit_fees || 0)}
-                      </p>
-                    </div>
-                    
-                    {/* Expenses */}
-                    <div className="bg-red-50 dark:bg-red-950/30 rounded-lg p-3 text-center">
-                      <div className="flex items-center justify-center gap-1 mb-1">
-                        <TrendingDown className="w-3 h-3 text-red-600" />
-                        <p className="text-xs text-muted-foreground font-medium">Expenses</p>
-                      </div>
-                      <p className="font-bold text-red-600 text-sm">
-                        {formatCurrency(rec.calculated_total_expenses || 0)}
-                      </p>
-                    </div>
-                    
-                    {/* Mgmt Fee */}
-                    <div className="bg-amber-50 dark:bg-amber-950/30 rounded-lg p-3 text-center">
-                      <div className="flex items-center justify-center gap-1 mb-1">
-                        <DollarSign className="w-3 h-3 text-amber-600" />
-                        <p className="text-xs text-muted-foreground font-medium">Mgmt Fee</p>
-                      </div>
-                      <p className="font-bold text-amber-600 text-sm">
-                        {formatCurrency(rec.management_fee || 0)}
-                      </p>
-                    </div>
-                    
-                    {/* Order Min */}
-                    <div className="bg-amber-50 dark:bg-amber-950/30 rounded-lg p-3 text-center">
-                      <div className="flex items-center justify-center gap-1 mb-1">
-                        <DollarSign className="w-3 h-3 text-amber-600" />
-                        <p className="text-xs text-muted-foreground font-medium">Order Min</p>
-                      </div>
-                      <p className="font-bold text-amber-600 text-sm">
-                        {formatCurrency(rec.order_minimum_fee || 0)}
-                      </p>
-                    </div>
-                    
-                    {/* Settlement Amount */}
-                    <div className={`rounded-lg p-3 text-center ${
-                      isFullService 
-                        ? 'bg-green-100 dark:bg-green-950/50 ring-1 ring-green-200 dark:ring-green-800' 
-                        : 'bg-primary/10 ring-1 ring-primary/20'
-                    }`}>
-                      <p className="text-xs text-muted-foreground font-medium mb-1">
-                        {isFullService ? 'Payout' : 'Due'}
-                      </p>
-                      {rec.calculator_error ? (
-                        <div className="flex items-center justify-center gap-1">
-                          <AlertTriangle className="w-3 h-3 text-destructive" />
-                          <p className="text-xs text-destructive">Error</p>
-                        </div>
-                      ) : (
-                        <p className={`font-bold text-sm ${isFullService ? 'text-green-600' : 'text-primary'}`}>
-                          {formatCurrency(isFullService 
-                            ? (rec.calculated_payout_to_owner || 0) 
-                            : (rec.calculated_due_from_owner || 0)
-                          )}
-                        </p>
-                      )}
-                    </div>
+                {/* Empty State */}
+                <div className="p-6 flex flex-col items-center justify-center text-center">
+                  <div className="w-12 h-12 rounded-full bg-amber-100 dark:bg-amber-900/50 flex items-center justify-center mb-3">
+                    <Calendar className="w-6 h-6 text-amber-600" />
                   </div>
-                  
-                  <p className="text-xs text-muted-foreground text-center mb-4 italic">
-                    Only approved items included in calculations
+                  <p className="text-sm text-muted-foreground mb-4">
+                    No reconciliation for <span className="font-medium">{selectedMonthLabel}</span>
                   </p>
-
-                  {/* Actions */}
-                  <ReconciliationCardActions
-                    reconciliation={rec}
-                    isOffboarded={isOffboarded}
-                    onReview={() => setSelectedReconciliation(rec.id)}
-                    onOffboard={() => handleOffboardClick(rec)}
-                    onSendPerformanceEmail={() => handlePerformanceEmailClick(rec)}
-                    onSendOwnerStatement={() => handleStatementEmailClick(rec)}
-                    sendingPerformance={sendingPerformance === rec.id}
-                    sendingStatement={sendingStatement === rec.id}
-                  />
+                  <Button 
+                    variant="outline" 
+                    className="border-amber-300 hover:bg-amber-100 dark:border-amber-700 dark:hover:bg-amber-900"
+                    onClick={() => setShowCreateDialog(true)}
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Create Reconciliation
+                  </Button>
                 </div>
               </Card>
-            );
-          })}
-        </div>
-      ) : (
-        <Card className="p-12 text-center">
-          <p className="text-muted-foreground mb-4">No reconciliations yet</p>
-          <Button onClick={() => setShowCreateDialog(true)}>
-            <Calendar className="w-4 h-4 mr-2" />
-            Create Your First Reconciliation
-          </Button>
-        </Card>
+            ))}
+          </div>
+          
+          {/* Empty state when no reconciliations AND no missing properties */}
+          {(!filteredReconciliations || filteredReconciliations.length === 0) && propertiesMissingReconciliation.length === 0 && (
+            <Card className="p-12 text-center">
+              <p className="text-muted-foreground mb-4">No reconciliations yet</p>
+              <Button onClick={() => setShowCreateDialog(true)}>
+                <Calendar className="w-4 h-4 mr-2" />
+                Create Your First Reconciliation
+              </Button>
+            </Card>
+          )}
+        </>
       )}
 
       <CreateReconciliationDialog
