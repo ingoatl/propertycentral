@@ -83,6 +83,18 @@ export const GmailIntegrationCard = () => {
         return;
       }
 
+      // Open popup IMMEDIATELY on click to avoid browser blocking
+      const popup = window.open('about:blank', 'gmail-auth', 'width=600,height=700,scrollbars=yes');
+      
+      if (!popup) {
+        toast.error('Popup was blocked. Please allow popups for this site.');
+        setReconnecting(false);
+        return;
+      }
+
+      // Show loading message in popup
+      popup.document.write('<html><body style="font-family: system-ui; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0;"><p>Loading Google Sign-In...</p></body></html>');
+
       // Call edge function to get OAuth URL
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/gmail-oauth-init`,
@@ -98,13 +110,14 @@ export const GmailIntegrationCard = () => {
       const result = await response.json();
 
       if (!response.ok) {
+        popup.close();
         toast.error(result.error || 'Failed to initialize Gmail connection');
         setReconnecting(false);
         return;
       }
 
-      // Open in popup
-      const popup = window.open(result.authUrl, 'gmail-auth', 'width=600,height=700,scrollbars=yes');
+      // Redirect popup to OAuth URL
+      popup.location.href = result.authUrl;
       
       // Listen for popup close
       const checkPopup = setInterval(() => {
