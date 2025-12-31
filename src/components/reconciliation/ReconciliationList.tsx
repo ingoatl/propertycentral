@@ -61,29 +61,6 @@ export const ReconciliationList = () => {
     }
   }, [monthOptions]);
 
-  // Real-time subscription for line item changes
-  useEffect(() => {
-    const channel = supabase
-      .channel('reconciliation-line-items-list-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'reconciliation_line_items'
-        },
-        () => {
-          // Refetch reconciliations when any line item changes
-          refetch();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, []);
-
   const { data: reconciliations, isLoading, refetch } = useQuery({
     queryKey: ["reconciliations"],
     queryFn: async () => {
@@ -146,6 +123,32 @@ export const ReconciliationList = () => {
       return reconciliationsWithCalculatedTotals;
     },
   });
+
+  // Real-time subscription for line items, visits, and expenses
+  useEffect(() => {
+    const channel = supabase
+      .channel('reconciliation-realtime-updates')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'reconciliation_line_items' },
+        () => refetch()
+      )
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'visits' },
+        () => refetch()
+      )
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'expenses' },
+        () => refetch()
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [refetch]);
 
   // Fetch Client-Managed properties that have ACTIVE LISTINGS (ownerrez or mid-term bookings)
   const { data: activeProperties } = useQuery({
@@ -862,9 +865,12 @@ export const ReconciliationList = () => {
                               </div>
 
                               {rec.pending_items_count > 0 && (
-                                <p className="text-xs text-amber-600 text-center font-medium">
-                                  {rec.pending_items_count} items pending approval
-                                </p>
+                                <div className="flex items-center justify-center gap-2 p-2 bg-amber-100 dark:bg-amber-900/30 rounded-lg border border-amber-300 dark:border-amber-700">
+                                  <Clock className="w-4 h-4 text-amber-600" />
+                                  <span className="text-sm text-amber-700 dark:text-amber-400 font-medium">
+                                    {rec.pending_items_count} item{rec.pending_items_count !== 1 ? 's' : ''} pending approval
+                                  </span>
+                                </div>
                               )}
 
                               <Button 
