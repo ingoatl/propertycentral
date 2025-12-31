@@ -127,40 +127,30 @@ export function EmailInsightsCard({ propertyId, showHeader = true }: EmailInsigh
     }
   };
 
-  const connectGmail = () => {
+  const connectGmail = async () => {
     try {
-      const GOOGLE_CLIENT_ID = '875247515146-89f318c262h205d5r7ducao9f1ih4aas.apps.googleusercontent.com';
-      const REDIRECT_URI = 'https://ijsxcaaqphaciaenlegl.supabase.co/functions/v1/gmail-oauth';
+      // Fetch the OAuth URL from the edge function (uses secrets for client ID)
+      const { data, error } = await supabase.functions.invoke('gmail-auth-url');
       
-      supabase.auth.getUser().then(({ data: { user } }) => {
-        if (!user) {
-          toast.error('Not authenticated');
-          return;
+      if (error || !data?.authUrl) {
+        console.error('Error getting auth URL:', error);
+        toast.error('Failed to start Gmail connection');
+        return;
+      }
+
+      console.log('OAuth URL:', data.authUrl);
+      
+      const authWindow = window.open(data.authUrl, 'gmail-auth', 'width=600,height=700');
+      
+      const pollTimer = setInterval(() => {
+        if (authWindow?.closed) {
+          clearInterval(pollTimer);
+          setTimeout(() => {
+            checkGmailConnection();
+            loadInsights();
+          }, 1000);
         }
-
-        const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
-          `client_id=${encodeURIComponent(GOOGLE_CLIENT_ID)}` +
-          `&redirect_uri=${encodeURIComponent(REDIRECT_URI)}` +
-          `&response_type=code` +
-          `&scope=${encodeURIComponent('https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/userinfo.email openid')}` +
-          `&access_type=offline` +
-          `&prompt=consent` +
-          `&state=${encodeURIComponent(user.id)}`;
-
-        console.log('OAuth URL:', authUrl);
-        
-        const authWindow = window.open(authUrl, 'gmail-auth', 'width=600,height=700');
-        
-        const pollTimer = setInterval(() => {
-          if (authWindow?.closed) {
-            clearInterval(pollTimer);
-            setTimeout(() => {
-              checkGmailConnection();
-              loadInsights();
-            }, 1000);
-          }
-        }, 500);
-      });
+      }, 500);
     } catch (error: any) {
       console.error('Error connecting Gmail:', error);
       toast.error('Failed to connect Gmail');
