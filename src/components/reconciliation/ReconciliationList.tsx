@@ -801,6 +801,14 @@ export const ReconciliationList = () => {
                               <p className="flex items-center gap-1">
                                 <span className="font-medium">Owner:</span> {rec.property_owners?.name}
                               </p>
+                              {rec.property_owners?.payment_method && (
+                                <p className="flex items-center gap-1 text-xs">
+                                  <span className="font-medium">Payment:</span> 
+                                  <span className={rec.property_owners?.stripe_customer_id ? "text-green-600" : "text-amber-600"}>
+                                    {rec.property_owners?.stripe_customer_id ? "✓ Stripe Connected" : rec.property_owners.payment_method}
+                                  </span>
+                                </p>
+                              )}
                             </div>
                           </div>
 
