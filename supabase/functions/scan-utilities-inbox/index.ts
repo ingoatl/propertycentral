@@ -219,19 +219,30 @@ function matchLabelToProperty(labelName: string): { id: string; name: string } |
   return null;
 }
 
-async function refreshToken(refreshToken: string): Promise<string> {
+async function refreshToken(refreshTokenValue: string): Promise<string> {
   const response = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
       client_id: Deno.env.get("GOOGLE_CLIENT_ID")!,
       client_secret: Deno.env.get("GOOGLE_CLIENT_SECRET")!,
-      refresh_token: refreshToken,
+      refresh_token: refreshTokenValue,
       grant_type: "refresh_token",
     }),
   });
   const data = await response.json();
-  if (data.error) throw new Error(data.error_description || data.error);
+  
+  if (data.error) {
+    // Provide clearer error messages for common OAuth issues
+    if (data.error === 'invalid_grant') {
+      throw new Error('Gmail authorization expired or revoked. Please reconnect Gmail in Settings → Integrations. If the OAuth app is in Testing mode, tokens expire after 7 days.');
+    }
+    if (data.error === 'unauthorized_client') {
+      throw new Error('Gmail OAuth client is not authorized. Please check the Google Cloud Console settings.');
+    }
+    throw new Error(`Token refresh failed: ${data.error_description || data.error}`);
+  }
+  
   return data.access_token;
 }
 

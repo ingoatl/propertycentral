@@ -32,12 +32,12 @@ serve(async (req) => {
 
     console.log(`Finalizing reconciliation ${reconciliation_id}`);
 
-    // Get the reconciliation
+    // Get the reconciliation with platform listings to check if property is live
     const { data: rec, error: recError } = await supabaseClient
       .from("monthly_reconciliations")
       .select(`
         *,
-        properties(id, name, management_fee_percentage, order_minimum_fee),
+        properties(id, name, management_fee_percentage, order_minimum_fee, first_listing_live_at),
         property_owners(service_type)
       `)
       .eq("id", reconciliation_id)
@@ -284,13 +284,17 @@ serve(async (req) => {
     const managementFeePercentage = rec.properties?.management_fee_percentage || 15;
     const hasMidTerm = (midTermBookings?.length || 0) > 0;
     
+    // Only charge minimum fee if property is actually live on a platform
+    const isPropertyLive = rec.properties?.first_listing_live_at != null;
+    
     let orderMinimumFee = 0;
-    if (!hasMidTerm) {
+    if (!hasMidTerm && isPropertyLive) {
       const nightlyRate = totalNights > 0 ? accommodationRevenueTotal / totalNights : 0;
       if (nightlyRate < 200) orderMinimumFee = 250;
       else if (nightlyRate <= 400) orderMinimumFee = 400;
       else orderMinimumFee = 750;
     }
+    // Properties without first_listing_live_at = no minimum fee (not yet listed)
 
     const managementFeeBase = accommodationRevenueTotal + midTermRevenue;
     const calculatedFee = managementFeeBase * (managementFeePercentage / 100);
