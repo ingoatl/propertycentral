@@ -443,7 +443,7 @@ export const ReconciliationList = () => {
     }
   };
 
-  // Create preview reconciliation for current month
+  // Create preview reconciliation for current month and auto-open modal
   const handleCreatePreview = async (propertyId: string) => {
     try {
       setCreatingPreviewFor(propertyId);
@@ -457,8 +457,11 @@ export const ReconciliationList = () => {
       });
 
       if (response.data?.success) {
-        toast.success("Preview reconciliation created! You can now start approving expenses.");
         await refetch();
+        // Auto-open the review modal for the newly created reconciliation
+        if (response.data.reconciliation?.id) {
+          setSelectedReconciliation(response.data.reconciliation.id);
+        }
       } else {
         throw new Error(response.data?.error || "Failed to create preview");
       }
@@ -678,25 +681,15 @@ export const ReconciliationList = () => {
                       return (
                         <Card 
                           key={rec.id} 
-                          className={`overflow-hidden transition-all duration-200 hover:shadow-md ${
+                          className={`overflow-hidden transition-all duration-200 hover:shadow-md cursor-pointer ${
                             isOffboarded 
                               ? 'opacity-75 border-dashed border-muted-foreground/30 bg-muted/20' 
-                              : hasDiscrepancy
-                                ? 'border-red-300 dark:border-red-700 bg-red-50/30 dark:bg-red-950/10'
-                                : isPreview
-                                  ? 'border-indigo-300 dark:border-indigo-700 bg-indigo-50/30 dark:bg-indigo-950/10'
-                                  : 'border-amber-300 dark:border-amber-700 bg-amber-50/30 dark:bg-amber-950/10'
+                              : isPreview
+                                ? 'border-indigo-300 dark:border-indigo-700 bg-indigo-50/30 dark:bg-indigo-950/10'
+                                : 'border-amber-300 dark:border-amber-700 bg-amber-50/30 dark:bg-amber-950/10'
                           }`}
+                          onClick={() => setSelectedReconciliation(rec.id)}
                         >
-                          {/* Payment Discrepancy Banner */}
-                          {hasDiscrepancy && (
-                            <div className="bg-red-50 dark:bg-red-950/50 border-b border-red-200 dark:border-red-800 px-4 py-2 flex items-center gap-2">
-                              <AlertTriangle className="w-4 h-4 text-red-600" />
-                              <span className="text-xs text-red-700 dark:text-red-300 font-medium">
-                                Payment Discrepancy: Expected {formatCurrency(expectedRent)}, Received {formatCurrency(receivedRent)}
-                              </span>
-                            </div>
-                          )}
                           
                           {/* Archived Banner */}
                           {isOffboarded && (
@@ -709,14 +702,14 @@ export const ReconciliationList = () => {
                           )}
                           
                           {/* Header Section */}
-                          <div className={`p-4 border-b ${hasDiscrepancy ? 'bg-red-50/50 dark:bg-red-950/20' : isPreview ? 'bg-indigo-50/50 dark:bg-indigo-950/20' : 'bg-amber-50/50 dark:bg-amber-950/20'}`}>
+                          <div className={`p-4 border-b ${isPreview ? 'bg-indigo-50/50 dark:bg-indigo-950/20' : 'bg-amber-50/50 dark:bg-amber-950/20'}`}>
                             <div className="flex items-start justify-between gap-2 mb-2">
                               <div className="flex items-center gap-2 min-w-0 flex-1">
                                 <Home className="w-4 h-4 text-muted-foreground flex-shrink-0" />
                                 <h3 className="font-semibold truncate">{rec.properties?.name}</h3>
                               </div>
                               <div className="flex gap-1.5 flex-shrink-0 flex-wrap justify-end">
-                                <Badge variant="outline" className={`font-medium ${hasDiscrepancy ? 'bg-red-100 text-red-700 border-red-300 dark:bg-red-900 dark:text-red-300' : isPreview ? 'bg-indigo-100 text-indigo-700 border-indigo-300 dark:bg-indigo-900 dark:text-indigo-300' : 'bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-900 dark:text-amber-300'}`}>
+                                <Badge variant="outline" className={`font-medium ${isPreview ? 'bg-indigo-100 text-indigo-700 border-indigo-300 dark:bg-indigo-900 dark:text-indigo-300' : 'bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-900 dark:text-amber-300'}`}>
                                   {format(new Date(rec.reconciliation_month + "T00:00:00"), "MMM yyyy").toUpperCase()}
                                   {isPreview ? " - PREVIEW" : " - DRAFT"}
                                 </Badge>
@@ -735,15 +728,15 @@ export const ReconciliationList = () => {
                           <div className="p-4">
                             <div className="space-y-4">
                               <div className="grid grid-cols-2 gap-3">
-                                <div className={`rounded-lg p-3 text-center ${hasDiscrepancy ? 'bg-red-50 dark:bg-red-950/30' : 'bg-green-50 dark:bg-green-950/30'}`}>
+                                <div className="rounded-lg p-3 text-center bg-green-50 dark:bg-green-950/30">
                                   <p className="text-xs text-muted-foreground font-medium mb-1">
                                     {expectedRent > 0 ? 'Rent Received' : 'Revenue'} {isPreview && "(MTD)"}
                                   </p>
-                                  <p className={`font-bold text-sm ${hasDiscrepancy ? 'text-red-600' : 'text-green-600'}`}>
+                                  <p className="font-bold text-sm text-green-600">
                                     {isPreview ? formatCurrency(currentRevenue) : formatCurrency(rec.total_revenue || 0)}
                                   </p>
                                   {isPreview && expectedRent > 0 && (
-                                    <p className={`text-xs mt-0.5 ${hasDiscrepancy ? 'text-red-600' : 'text-muted-foreground'}`}>
+                                    <p className="text-xs mt-0.5 text-muted-foreground">
                                       of {formatCurrency(expectedRent)} expected
                                     </p>
                                   )}
@@ -784,7 +777,10 @@ export const ReconciliationList = () => {
 
                               <Button 
                                 className="w-full"
-                                onClick={() => setSelectedReconciliation(rec.id)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedReconciliation(rec.id);
+                                }}
                               >
                                 <Eye className="w-4 h-4 mr-2" />
                                 Review & Approve Expenses
@@ -804,7 +800,8 @@ export const ReconciliationList = () => {
                       return (
                         <Card 
                           key={`missing-${prop.id}`}
-                          className="overflow-hidden border-indigo-300 dark:border-indigo-700 bg-indigo-50/20 dark:bg-indigo-950/10"
+                          className="overflow-hidden border-indigo-300 dark:border-indigo-700 bg-indigo-50/20 dark:bg-indigo-950/10 cursor-pointer hover:shadow-md transition-all duration-200"
+                          onClick={() => !creatingPreviewFor && handleCreatePreview(prop.id)}
                         >
                           <div className="p-4 border-b border-indigo-200 dark:border-indigo-800 bg-indigo-50/50 dark:bg-indigo-950/20">
                             <div className="flex items-start justify-between gap-2 mb-2">
@@ -853,7 +850,10 @@ export const ReconciliationList = () => {
                               </p>
                               <Button 
                                 className="bg-indigo-600 hover:bg-indigo-700"
-                                onClick={() => handleCreatePreview(prop.id)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleCreatePreview(prop.id);
+                                }}
                                 disabled={creatingPreviewFor === prop.id}
                               >
                                 {creatingPreviewFor === prop.id ? (
