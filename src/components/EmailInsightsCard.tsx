@@ -160,20 +160,29 @@ export function EmailInsightsCard({ propertyId, showHeader = true }: EmailInsigh
   const scanEmails = async () => {
     try {
       setScanning(true);
-      toast.loading('Scanning emails...');
+      toast.loading('Starting email scan...');
 
       const { data, error } = await supabase.functions.invoke('scan-gmail');
 
       if (error) throw error;
 
       toast.dismiss();
-      toast.success(`Scanned ${data.emailsProcessed} emails, generated ${data.insightsGenerated} insights`);
       
-      await loadInsights();
+      // Handle background processing response
+      if (data?.scanLogId) {
+        toast.success(`Scan started! Processing ${data.totalEmails || 0} emails in background. Refresh in a minute to see results.`);
+      } else if (data?.emailsProcessed !== undefined) {
+        toast.success(`Scanned ${data.emailsProcessed} emails, generated ${data.insightsGenerated || 0} insights`);
+      } else {
+        toast.success('Email scan initiated');
+      }
+      
+      // Reload insights after a short delay to catch any quick results
+      setTimeout(() => loadInsights(), 3000);
     } catch (error: any) {
       console.error('Error scanning emails:', error);
       toast.dismiss();
-      toast.error('Failed to scan emails');
+      toast.error('Failed to scan emails. Check if Gmail API is enabled in Google Cloud Console.');
     } finally {
       setScanning(false);
     }
