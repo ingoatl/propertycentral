@@ -41,63 +41,79 @@ serve(async (req) => {
       const hoursUntilExpiry = (expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60);
       const daysUntilExpiry = hoursUntilExpiry / 24;
 
-      console.log(`Token for user ${token.user_id} expires in ${daysUntilExpiry.toFixed(1)} days`);
+      console.log(`Token for user ${token.user_id} expires in ${daysUntilExpiry.toFixed(1)} days (${hoursUntilExpiry.toFixed(1)} hours)`);
 
-      // Check if token is expired or expiring soon (within 3 days)
-      if (hoursUntilExpiry <= 72) {
-        const isExpired = hoursUntilExpiry <= 0;
-        const alertType = isExpired ? 'EXPIRED' : 'EXPIRING_SOON';
-        
-        // Try to refresh the token if not expired
-        if (!isExpired) {
-          try {
-            const GOOGLE_CLIENT_ID = Deno.env.get('GOOGLE_CLIENT_ID');
-            const GOOGLE_CLIENT_SECRET = Deno.env.get('GOOGLE_CLIENT_SECRET');
+      // Proactively refresh tokens that expire within 7 days
+      // This ensures we always have a fresh token before it expires
+      const shouldRefresh = hoursUntilExpiry <= 168; // 7 days = 168 hours
+      const isExpired = hoursUntilExpiry <= 0;
 
-            const refreshResponse = await fetch('https://oauth2.googleapis.com/token', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-              body: new URLSearchParams({
-                client_id: GOOGLE_CLIENT_ID!,
-                client_secret: GOOGLE_CLIENT_SECRET!,
-                refresh_token: token.refresh_token,
-                grant_type: 'refresh_token',
-              }),
-            });
+      if (!shouldRefresh) {
+        // Token is still valid for more than 7 days
+        results.push({ 
+          userId: token.user_id, 
+          status: 'valid', 
+          daysRemaining: daysUntilExpiry.toFixed(1) 
+        });
+        continue;
+      }
 
-            if (refreshResponse.ok) {
-              const newTokens = await refreshResponse.json();
-              const newExpiresAt = new Date(Date.now() + newTokens.expires_in * 1000);
-              
-              await supabase
-                .from('gmail_oauth_tokens')
-                .update({
-                  access_token: newTokens.access_token,
-                  expires_at: newExpiresAt.toISOString(),
-                  updated_at: new Date().toISOString(),
-                })
-                .eq('user_id', token.user_id);
+      console.log(`Token needs refresh: expires in ${hoursUntilExpiry.toFixed(1)} hours`);
+      
+      // Attempt to refresh the token
+      try {
+        const GOOGLE_CLIENT_ID = Deno.env.get('GOOGLE_CLIENT_ID');
+        const GOOGLE_CLIENT_SECRET = Deno.env.get('GOOGLE_CLIENT_SECRET');
 
-              console.log(`Token refreshed successfully for user ${token.user_id}`);
-              results.push({ userId: token.user_id, status: 'refreshed' });
-              continue;
-            } else {
-              const errorText = await refreshResponse.text();
-              console.error('Token refresh failed:', errorText);
-            }
-          } catch (refreshError) {
-            console.error('Error refreshing token:', refreshError);
-          }
+        const refreshResponse = await fetch('https://oauth2.googleapis.com/token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({
+            client_id: GOOGLE_CLIENT_ID!,
+            client_secret: GOOGLE_CLIENT_SECRET!,
+            refresh_token: token.refresh_token,
+            grant_type: 'refresh_token',
+          }),
+        });
+
+        if (refreshResponse.ok) {
+          const newTokens = await refreshResponse.json();
+          const newExpiresAt = new Date(Date.now() + newTokens.expires_in * 1000);
+          
+          await supabase
+            .from('gmail_oauth_tokens')
+            .update({
+              access_token: newTokens.access_token,
+              expires_at: newExpiresAt.toISOString(),
+              updated_at: new Date().toISOString(),
+            })
+            .eq('user_id', token.user_id);
+
+          console.log(`Token refreshed successfully for user ${token.user_id}, new expiry: ${newExpiresAt.toISOString()}`);
+          results.push({ 
+            userId: token.user_id, 
+            status: 'refreshed', 
+            newExpiresAt: newExpiresAt.toISOString() 
+          });
+          continue;
+        } else {
+          const errorText = await refreshResponse.text();
+          console.error('Token refresh failed:', errorText);
         }
+      } catch (refreshError) {
+        console.error('Error refreshing token:', refreshError);
+      }
 
-        // Send alert email
+      // If we get here, refresh failed - send alert if token is expiring soon (within 24h) or expired
+      if (hoursUntilExpiry <= 24) {
+        const alertType = isExpired ? 'EXPIRED' : 'EXPIRING_SOON';
         const subject = isExpired 
           ? '🚨 Gmail Token Expired - Action Required'
-          : '⚠️ Gmail Token Expiring Soon';
+          : '⚠️ Gmail Token Expiring Soon - Refresh Failed';
         
         const message = isExpired
-          ? `Your Gmail connection has expired. Please reconnect Gmail in the app to continue scanning emails.`
-          : `Your Gmail token will expire in ${Math.ceil(hoursUntilExpiry)} hours. The system will attempt to auto-refresh, but if this fails, you may need to reconnect Gmail.`;
+          ? `Your Gmail connection has expired and automatic refresh failed. Please reconnect Gmail in the app to continue scanning emails.`
+          : `Your Gmail token will expire in ${Math.ceil(hoursUntilExpiry)} hours and automatic refresh failed. Please reconnect Gmail in the app.`;
 
         try {
           await resend.emails.send({
@@ -128,7 +144,12 @@ serve(async (req) => {
           results.push({ userId: token.user_id, status: alertType, emailSent: false, error: String(emailError) });
         }
       } else {
-        results.push({ userId: token.user_id, status: 'valid', daysRemaining: daysUntilExpiry.toFixed(1) });
+        // Refresh failed but token still has time - will try again on next run
+        results.push({ 
+          userId: token.user_id, 
+          status: 'refresh_failed_will_retry', 
+          hoursRemaining: hoursUntilExpiry.toFixed(1) 
+        });
       }
     }
 
