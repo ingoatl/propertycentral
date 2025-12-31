@@ -9,8 +9,8 @@ const corsHeaders = {
 
 interface HolidayEmailRequest {
   holidayTemplateId: string;
-  testEmail?: string; // If provided, send only to this email
-  ownerIds?: string[]; // If provided, send only to these owners
+  testEmail?: string;
+  ownerIds?: string[];
 }
 
 serve(async (req) => {
@@ -20,7 +20,6 @@ serve(async (req) => {
 
   try {
     const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
-    
     if (!RESEND_API_KEY) throw new Error('RESEND_API_KEY not configured');
 
     const resend = new Resend(RESEND_API_KEY);
@@ -31,7 +30,10 @@ serve(async (req) => {
 
     const { holidayTemplateId, testEmail, ownerIds } = await req.json() as HolidayEmailRequest;
 
-    console.log('Holiday email request:', { holidayTemplateId, testEmail, ownerIds: ownerIds?.length });
+    console.log('=== HOLIDAY EMAIL REQUEST ===');
+    console.log('Template ID:', holidayTemplateId);
+    console.log('Test email:', testEmail || 'None');
+    console.log('Owner IDs count:', ownerIds?.length || 'All');
 
     // Fetch the holiday template
     const { data: template, error: templateError } = await supabase
@@ -46,22 +48,13 @@ serve(async (req) => {
 
     console.log('Using template:', template.holiday_name);
 
-    // If test email WITH ownerIds, use real owner data but send to test email
+    // Handle test email with real owner data
     if (testEmail && ownerIds && ownerIds.length > 0) {
-      // Fetch the real owner and property data
       const { data: properties, error: propertiesError } = await supabase
         .from('properties')
         .select(`
-          id,
-          name,
-          address,
-          image_path,
-          owner_id,
-          property_owners!inner(
-            id,
-            name,
-            email
-          )
+          id, name, address, image_path, owner_id,
+          property_owners!inner(id, name, email)
         `)
         .in('owner_id', ownerIds)
         .limit(1);
@@ -79,56 +72,32 @@ serve(async (req) => {
         supabase,
         resend,
         template,
-        owner: {
-          id: owner.id,
-          name: owner.name,
-          email: testEmail, // Send to test email, not the owner
-        },
-        property: {
-          id: property.id,
-          name: property.name || property.address,
-          image_path: property.image_path,
-        },
+        owner: { id: owner.id, name: owner.name, email: testEmail },
+        property: { id: property.id, name: property.name || property.address, image_path: property.image_path },
         isTest: true,
         supabaseUrl,
       });
 
       return new Response(
-        JSON.stringify({ 
-          success: true, 
-          message: `Personalized test email for ${owner.name} sent to ${testEmail}`,
-          result 
-        }),
+        JSON.stringify({ success: true, message: `Personalized test email sent to ${testEmail}`, result }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // If test email only (no ownerIds), create a mock recipient
+    // Handle test email with mock data
     if (testEmail && (!ownerIds || ownerIds.length === 0)) {
       const result = await sendHolidayEmail({
         supabase,
         resend,
         template,
-        owner: {
-          id: 'test',
-          name: 'Test Owner',
-          email: testEmail,
-        },
-        property: {
-          id: 'test',
-          name: 'Sample Property',
-          image_path: null,
-        },
+        owner: { id: 'test', name: 'Test Owner', email: testEmail },
+        property: { id: 'test', name: 'Sample Property', image_path: null },
         isTest: true,
         supabaseUrl,
       });
 
       return new Response(
-        JSON.stringify({ 
-          success: true, 
-          message: `Test email sent to ${testEmail}`,
-          result 
-        }),
+        JSON.stringify({ success: true, message: `Test email sent to ${testEmail}`, result }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -137,18 +106,8 @@ serve(async (req) => {
     let ownersQuery = supabase
       .from('properties')
       .select(`
-        id,
-        name,
-        address,
-        image_path,
-        owner_id,
-        property_owners!inner(
-          id,
-          name,
-          email,
-          second_owner_name,
-          second_owner_email
-        )
+        id, name, address, image_path, owner_id,
+        property_owners!inner(id, name, email, second_owner_name, second_owner_email)
       `)
       .is('offboarded_at', null)
       .not('owner_id', 'is', null);
@@ -165,7 +124,7 @@ serve(async (req) => {
 
     console.log(`Found ${properties?.length || 0} properties to send emails for`);
 
-    // Fetch pre-generated images from queue for all recipients
+    // Fetch pre-generated images from queue
     const { data: queueItems } = await supabase
       .from('holiday_email_queue')
       .select('recipient_email, pre_generated_image_url')
@@ -173,7 +132,6 @@ serve(async (req) => {
       .eq('status', 'pending')
       .not('pre_generated_image_url', 'is', null);
 
-    // Create a map of email -> pre-generated image URL
     const preGeneratedImageMap = new Map<string, string>();
     queueItems?.forEach((item: { recipient_email: string; pre_generated_image_url: string }) => {
       if (item.pre_generated_image_url) {
@@ -188,8 +146,7 @@ serve(async (req) => {
 
     for (const property of properties || []) {
       const owner = property.property_owners as any;
-      
-      // Skip if we've already sent to this email
+
       if (processedEmails.has(owner.email)) {
         console.log(`Skipping duplicate: ${owner.email}`);
         continue;
@@ -201,16 +158,8 @@ serve(async (req) => {
           supabase,
           resend,
           template,
-          owner: {
-            id: owner.id,
-            name: owner.name,
-            email: owner.email,
-          },
-          property: {
-            id: property.id,
-            name: property.name || property.address,
-            image_path: property.image_path,
-          },
+          owner: { id: owner.id, name: owner.name, email: owner.email },
+          property: { id: property.id, name: property.name || property.address, image_path: property.image_path },
           isTest: false,
           supabaseUrl,
           preGeneratedImageUrl: preGeneratedImageMap.get(owner.email),
@@ -218,44 +167,34 @@ serve(async (req) => {
 
         results.push({ email: owner.email, success: true, ...result });
 
-        // Also send to second owner if exists
+        // Send to second owner if exists
         if (owner.second_owner_email && !processedEmails.has(owner.second_owner_email)) {
           processedEmails.add(owner.second_owner_email);
-          
-          // Use second owner's name if available, otherwise use primary owner's name
           const secondOwnerName = owner.second_owner_name || owner.name;
-          
+
           const secondResult = await sendHolidayEmail({
             supabase,
             resend,
             template,
-            owner: {
-              id: owner.id,
-              name: secondOwnerName,
-              email: owner.second_owner_email,
-            },
-            property: {
-              id: property.id,
-              name: property.name || property.address,
-              image_path: property.image_path,
-            },
+            owner: { id: owner.id, name: secondOwnerName, email: owner.second_owner_email },
+            property: { id: property.id, name: property.name || property.address, image_path: property.image_path },
             isTest: false,
             supabaseUrl,
             preGeneratedImageUrl: preGeneratedImageMap.get(owner.second_owner_email),
           });
-          
+
           results.push({ email: owner.second_owner_email, success: true, ...secondResult });
         }
 
-        // Rate limiting: wait 100ms between emails to stay under Resend limits
-        await new Promise(resolve => setTimeout(resolve, 100));
+        // Rate limiting
+        await new Promise(resolve => setTimeout(resolve, 150));
 
       } catch (error) {
         console.error(`Failed to send to ${owner.email}:`, error);
-        results.push({ 
-          email: owner.email, 
-          success: false, 
-          error: error instanceof Error ? error.message : 'Unknown error' 
+        results.push({
+          email: owner.email,
+          success: false,
+          error: error instanceof Error ? error.message : 'Unknown error'
         });
       }
     }
@@ -264,12 +203,12 @@ serve(async (req) => {
     const failCount = results.filter(r => !r.success).length;
 
     return new Response(
-      JSON.stringify({ 
-        success: true, 
+      JSON.stringify({
+        success: true,
         message: `Sent ${successCount} emails, ${failCount} failed`,
         totalSent: successCount,
         totalFailed: failCount,
-        results 
+        results
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
@@ -277,14 +216,46 @@ serve(async (req) => {
   } catch (error) {
     console.error('Error in send-holiday-email:', error);
     return new Response(
-      JSON.stringify({ 
-        error: error instanceof Error ? error.message : 'Unknown error',
-        success: false 
-      }),
+      JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error', success: false }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });
+
+/**
+ * Downloads an image and returns it as base64 for inline embedding
+ */
+async function downloadImageAsBase64(imageUrl: string): Promise<{ base64: string; contentType: string } | null> {
+  try {
+    console.log('Downloading image for inline embedding:', imageUrl);
+    
+    const response = await fetch(imageUrl, {
+      headers: { 'Accept': 'image/*' }
+    });
+
+    if (!response.ok) {
+      console.error('Failed to download image:', response.status, response.statusText);
+      return null;
+    }
+
+    const contentType = response.headers.get('content-type') || 'image/png';
+    const arrayBuffer = await response.arrayBuffer();
+    const uint8Array = new Uint8Array(arrayBuffer);
+    
+    // Convert to base64
+    let binary = '';
+    for (let i = 0; i < uint8Array.length; i++) {
+      binary += String.fromCharCode(uint8Array[i]);
+    }
+    const base64 = btoa(binary);
+
+    console.log('Image downloaded successfully, size:', Math.round(uint8Array.length / 1024), 'KB');
+    return { base64, contentType };
+  } catch (error) {
+    console.error('Error downloading image:', error);
+    return null;
+  }
+}
 
 async function sendHolidayEmail({
   supabase,
@@ -306,18 +277,17 @@ async function sendHolidayEmail({
   preGeneratedImageUrl?: string | null;
 }) {
   const ownerFirstName = owner.name.split(' ')[0];
-
-  // Use pre-generated image if available, otherwise generate on-the-fly
   let generatedImageUrl: string | null = null;
+  let imageAttachment: { content: string; filename: string; contentId: string } | null = null;
 
+  // Step 1: Get image URL (pre-generated or generate on-the-fly)
   if (preGeneratedImageUrl) {
-    console.log(`Using pre-generated image for ${ownerFirstName} - ${property.name}`);
+    console.log(`Using pre-generated image for ${ownerFirstName}`);
     generatedImageUrl = preGeneratedImageUrl;
   } else {
     console.log(`Generating image on-the-fly for ${ownerFirstName} - ${property.name}`);
 
     try {
-      // Call generate-holiday-image function with proper template
       const imageResponse = await fetch(`${supabaseUrl}/functions/v1/generate-holiday-image`, {
         method: 'POST',
         headers: {
@@ -344,20 +314,31 @@ async function sendHolidayEmail({
     }
   }
 
-  // Personalize the message and remove any greeting/closing lines since we add them in HTML
+  // Step 2: Download image and convert to base64 for inline embedding (CID)
+  // This is the industry best practice - images are embedded directly in the email
+  // ensuring they always display regardless of email client settings
+  if (generatedImageUrl) {
+    const imageData = await downloadImageAsBase64(generatedImageUrl);
+    if (imageData) {
+      imageAttachment = {
+        content: imageData.base64,
+        filename: 'holiday-greeting.png',
+        contentId: 'holiday-image-cid',
+      };
+      console.log('Image prepared for inline embedding via CID');
+    }
+  }
+
+  // Step 3: Personalize message
   let personalizedMessage = template.message_template
     .replace(/{owner_name}/g, owner.name)
     .replace(/{owner_first_name}/g, ownerFirstName)
     .replace(/{property_name}/g, property.name);
-  
-  // Remove greeting line if present (e.g., "Dear John," or "Dear John Smith,")
+
+  // Clean up greeting/closing lines
   personalizedMessage = personalizedMessage
     .replace(/^Dear [^,\n]+,?\s*\n*/i, '')
-    .trim();
-  
-  // Remove closing/sign-off lines since we have a signature section
-  // This handles variations like "With warmest wishes,", "Warmly,", "With love,", etc.
-  personalizedMessage = personalizedMessage
+    .trim()
     .replace(/\n*(With warmest wishes|With warm regards|Warmest regards|Warm regards|Warmly|With love|With gratitude|Cheers|Best wishes|Best regards|Sincerely|Regards),?\s*\n+.*(Anja|Ingo|PeachHaus).*$/gis, '')
     .trim();
 
@@ -366,27 +347,39 @@ async function sendHolidayEmail({
     .replace(/{owner_first_name}/g, ownerFirstName)
     .replace(/{property_name}/g, property.name);
 
-  // Build HTML email
+  // Step 4: Build HTML using CID reference for inline image
   const htmlContent = buildHolidayEmailHtml({
     subject: personalizedSubject,
     message: personalizedMessage,
     ownerFirstName,
     holidayEmoji: template.emoji,
-    imageUrl: generatedImageUrl,
+    hasInlineImage: !!imageAttachment,
+    externalImageUrl: !imageAttachment ? generatedImageUrl : null,
   });
 
-  // Send email via Resend - CC anja@peachhausgroup.com on all emails
-  const emailResult = await resend.emails.send({
+  // Step 5: Send email with inline attachment
+  const emailPayload: any = {
     from: 'PeachHaus Group <info@peachhausgroup.com>',
     to: [owner.email],
     cc: ['anja@peachhausgroup.com'],
     subject: personalizedSubject,
     html: htmlContent,
-  });
+  };
 
+  // Add inline image attachment if available
+  if (imageAttachment) {
+    emailPayload.attachments = [{
+      content: imageAttachment.content,
+      filename: imageAttachment.filename,
+      content_id: imageAttachment.contentId,
+    }];
+    console.log('Sending email with inline CID image attachment');
+  }
+
+  const emailResult = await resend.emails.send(emailPayload);
   console.log(`Email sent to ${owner.email}:`, emailResult);
 
-  // Log the send (skip for test)
+  // Step 6: Log the send
   if (!isTest) {
     await supabase.from('holiday_email_logs').insert({
       owner_id: owner.id,
@@ -398,7 +391,7 @@ async function sendHolidayEmail({
     });
   }
 
-  return { emailId: emailResult.id, imageUrl: generatedImageUrl };
+  return { emailId: emailResult.id, imageUrl: generatedImageUrl, imageEmbedded: !!imageAttachment };
 }
 
 function buildHolidayEmailHtml({
@@ -406,21 +399,63 @@ function buildHolidayEmailHtml({
   message,
   ownerFirstName,
   holidayEmoji,
-  imageUrl,
+  hasInlineImage,
+  externalImageUrl,
 }: {
   subject: string;
   message: string;
   ownerFirstName: string;
   holidayEmoji: string;
-  imageUrl: string | null;
+  hasInlineImage: boolean;
+  externalImageUrl: string | null;
 }) {
-  // Get current year for footer
   const currentYear = new Date().getFullYear();
-  
-  // Hosted image URLs - using exact filenames from storage bucket
+
+  // Hosted image URLs
   const hostsPhotoUrl = "https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/Gemini_Generated_Image_1rel501rel501rel.png";
   const signatureUrl = "https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/Screenshot_41.jpg";
-  
+
+  // Use CID reference for inline image (most reliable), fall back to external URL
+  let imageHtml = '';
+  if (hasInlineImage) {
+    // CID (Content-ID) reference - image is embedded in the email itself
+    // This is the most reliable method as images are part of the email data
+    imageHtml = `
+    <tr>
+      <td style="padding: 0 32px;">
+        <table cellpadding="0" cellspacing="0" width="100%" style="background-color: #f5f3ef;">
+          <tr>
+            <td style="border-radius: 8px; overflow: hidden; box-shadow: 0 8px 32px rgba(0,0,0,0.08);">
+              <img src="cid:holiday-image-cid" 
+                   alt="Season's Greetings from PeachHaus"
+                   width="556"
+                   style="width: 100%; max-width: 556px; height: auto; display: block; border-radius: 8px; background-color: #f5f3ef;">
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+    `;
+  } else if (externalImageUrl) {
+    // Fallback to external URL (less reliable, may be blocked by email clients)
+    imageHtml = `
+    <tr>
+      <td style="padding: 0 32px;">
+        <table cellpadding="0" cellspacing="0" width="100%" style="background-color: #f5f3ef;">
+          <tr>
+            <td style="border-radius: 8px; overflow: hidden; box-shadow: 0 8px 32px rgba(0,0,0,0.08);">
+              <img src="${externalImageUrl}" 
+                   alt="Season's Greetings from PeachHaus"
+                   width="556"
+                   style="width: 100%; max-width: 556px; height: auto; display: block; border-radius: 8px; background-color: #f5f3ef;">
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+    `;
+  }
+
   return `
 <!DOCTYPE html>
 <html>
@@ -459,24 +494,8 @@ function buildHolidayEmailHtml({
             </td>
           </tr>
           
-          <!-- Holiday Image - Optimized for instant display -->
-          ${imageUrl ? `
-          <tr>
-            <td style="padding: 0 32px;">
-              <table cellpadding="0" cellspacing="0" width="100%" style="background-color: #f5f3ef;">
-                <tr>
-                  <td style="border-radius: 8px; overflow: hidden; box-shadow: 0 8px 32px rgba(0,0,0,0.08);">
-                    <img src="${imageUrl}" 
-                         alt="Season's Greetings from PeachHaus"
-                         width="556"
-                         height="371"
-                         style="width: 100%; max-width: 556px; height: auto; display: block; border-radius: 8px; background-color: #f5f3ef;">
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-          ` : ''}
+          <!-- Holiday Image -->
+          ${imageHtml}
           
           <!-- Message Content -->
           <tr>
@@ -502,7 +521,7 @@ function buildHolidayEmailHtml({
             <td style="padding: 0 48px;">
               <table cellpadding="0" cellspacing="0" width="100%">
                 <tr>
-                  <td style="height: 1px; background: linear-gradient(90deg, transparent 0%, #d4b896 20%, #d4b896 80%, transparent 100%);"></td>
+                  <td style="border-top: 1px solid #e8e4de;"></td>
                 </tr>
               </table>
             </td>
@@ -510,24 +529,24 @@ function buildHolidayEmailHtml({
           
           <!-- Signature Section -->
           <tr>
-            <td style="padding: 36px 48px 44px 48px;">
+            <td style="padding: 36px 48px 24px 48px;">
               <table cellpadding="0" cellspacing="0" width="100%">
                 <tr>
-                  <!-- Hosts Photo -->
-                  <td style="width: 100px; vertical-align: top; padding-right: 24px;">
+                  <td valign="middle" style="width: 100px;">
                     <img src="${hostsPhotoUrl}" 
                          alt="Anja & Ingo" 
-                         style="width: 90px; height: 90px; border-radius: 50%; object-fit: cover; border: 3px solid #f5f3ef; box-shadow: 0 4px 12px rgba(0,0,0,0.06);">
+                         width="90" 
+                         style="width: 90px; height: auto; border-radius: 50%; border: 2px solid #e8e4de;"
+                         onerror="this.style.display='none'">
                   </td>
-                  <!-- Signature Area -->
-                  <td style="vertical-align: middle;">
-                    <p style="margin: 0 0 8px 0; font-family: 'Cormorant Garamond', Georgia, serif; font-size: 13px; color: #8a8a8a; letter-spacing: 2px; text-transform: uppercase; font-weight: 500;">
-                      Warmest Regards
+                  <td valign="middle" style="padding-left: 20px;">
+                    <p style="margin: 0 0 6px 0; font-family: 'Cormorant Garamond', Georgia, 'Times New Roman', serif; font-size: 18px; font-weight: 600; color: #1a1a1a;">
+                      Warmly,
                     </p>
-                    <img src="${signatureUrl}" 
-                         alt="Anja & Ingo" 
-                         style="height: 52px; width: auto; margin: 4px 0 8px 0; display: block;">
-                    <p style="margin: 0; font-family: Georgia, serif; font-size: 11px; color: #b8956a; letter-spacing: 2px; text-transform: uppercase;">
+                    <p style="margin: 0 0 4px 0; font-family: Georgia, 'Times New Roman', serif; font-size: 15px; color: #4a4a4a;">
+                      Anja & Ingo
+                    </p>
+                    <p style="margin: 0; font-family: Georgia, 'Times New Roman', serif; font-size: 13px; color: #8a8a8a; font-style: italic;">
                       PeachHaus Group
                     </p>
                   </td>
@@ -538,26 +557,14 @@ function buildHolidayEmailHtml({
           
           <!-- Footer -->
           <tr>
-            <td style="padding: 0;">
-              <table cellpadding="0" cellspacing="0" width="100%" style="background-color: #faf9f7; border-top: 1px solid #eee9e2;">
+            <td style="padding: 24px 48px 32px 48px; background-color: #faf9f7; border-top: 1px solid #e8e4de;">
+              <table cellpadding="0" cellspacing="0" width="100%">
                 <tr>
-                  <td style="padding: 28px 48px 24px 48px; text-align: center;">
-                    <!-- Decorative Element -->
-                    <table cellpadding="0" cellspacing="0" style="margin: 0 auto 18px auto;">
-                      <tr>
-                        <td style="width: 40px; height: 1px; background-color: #d4b896;"></td>
-                        <td style="padding: 0 14px; font-size: 16px; color: #d4b896; line-height: 1;">${holidayEmoji || '✨'}</td>
-                        <td style="width: 40px; height: 1px; background-color: #d4b896;"></td>
-                      </tr>
-                    </table>
-                    
-                    <p style="margin: 0 0 6px 0; font-family: Georgia, serif; font-size: 11px; color: #9a9a9a; letter-spacing: 1.5px; text-transform: uppercase;">
-                      Premium Property Management
+                  <td style="text-align: center;">
+                    <p style="margin: 0 0 8px 0; font-family: Georgia, 'Times New Roman', serif; font-size: 12px; color: #8a8a8a;">
+                      PeachHaus Group · Atlanta, Georgia
                     </p>
-                    <p style="margin: 0 0 16px 0; font-family: Georgia, serif; font-size: 12px; color: #b8b8b8;">
-                      info@peachhausgroup.com
-                    </p>
-                    <p style="margin: 0; font-family: Georgia, serif; font-size: 10px; color: #d0d0d0;">
+                    <p style="margin: 0; font-family: Georgia, 'Times New Roman', serif; font-size: 11px; color: #aaa;">
                       © ${currentYear} PeachHaus Group. All rights reserved.
                     </p>
                   </td>
@@ -566,13 +573,7 @@ function buildHolidayEmailHtml({
             </td>
           </tr>
           
-          <!-- Bottom Gold Accent -->
-          <tr>
-            <td style="height: 4px; background: linear-gradient(90deg, #b8956a 0%, #d4b896 50%, #b8956a 100%);"></td>
-          </tr>
-          
         </table>
-        <!-- End Main Card -->
         
       </td>
     </tr>
@@ -580,5 +581,5 @@ function buildHolidayEmailHtml({
   
 </body>
 </html>
-  `;
+`;
 }
