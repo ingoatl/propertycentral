@@ -341,3 +341,9 @@ verify_jwt = false
 
 [functions.auto-finalize-previews]
 verify_jwt = false
+
+[functions.check-gmail-token-expiry]
+verify_jwt = false
+
+[functions.gmail-auth-url]
+verify_jwt = true
