@@ -103,19 +103,20 @@ export async function generateAuditReport(reconciliationId: string): Promise<voi
     const userIds = [...new Set([
       ...(lineItems || []).map((item: any) => item.approved_by).filter(Boolean),
       ...(auditLog || []).map((log: any) => log.user_id).filter(Boolean),
-      rec.approved_by
+      rec.approved_by,
+      rec.reviewed_by
     ].filter(Boolean))];
 
     let userMap: Record<string, string> = {};
     if (userIds.length > 0) {
       const { data: profiles } = await supabase
         .from("profiles")
-        .select("id, full_name, email")
+        .select("id, first_name, email")
         .in("id", userIds);
 
       if (profiles) {
         userMap = profiles.reduce((acc: Record<string, string>, p: any) => {
-          acc[p.id] = p.full_name || p.email || p.id;
+          acc[p.id] = p.first_name || p.email || p.id;
           return acc;
         }, {});
       }
@@ -151,6 +152,8 @@ export async function generateAuditReport(reconciliationId: string): Promise<voi
         : ["Due from Owner", formatCurrency(rec.due_from_owner || 0)],
       [""],
       ["APPROVAL INFORMATION"],
+      ["Reviewed By", userMap[rec.reviewed_by] || rec.reviewed_by || "Not Yet Reviewed"],
+      ["Reviewed At", rec.reviewed_at ? format(new Date(rec.reviewed_at), "MMMM dd, yyyy 'at' h:mm a") : "Not Yet Reviewed"],
       ["Approved By", userMap[rec.approved_by] || rec.approved_by || "Pending"],
       ["Approved At", rec.approved_at ? format(new Date(rec.approved_at), "MMMM dd, yyyy 'at' h:mm a") : "Pending"],
       [""],
