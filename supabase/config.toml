@@ -341,9 +341,3 @@ verify_jwt = false
 
 [functions.auto-finalize-previews]
 verify_jwt = false
-
-[functions.check-gmail-token-health]
-verify_jwt = false
-
-[functions.gmail-oauth-init]
-verify_jwt = true

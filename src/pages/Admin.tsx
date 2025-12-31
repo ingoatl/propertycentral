@@ -24,7 +24,6 @@ import GoogleReviewsTab from "@/components/bookings/GoogleReviewsTab";
 import { CalendarAdminPanel } from "@/components/admin/CalendarAdminPanel";
 import { PhoneAssignmentsManager } from "@/components/admin/PhoneAssignmentsManager";
 import { LeadEmailTemplatesManager } from "@/components/admin/LeadEmailTemplatesManager";
-import { GmailIntegrationCard } from "@/components/admin/GmailIntegrationCard";
 
 const createUserSchema = z.object({
   email: z.string().email("Invalid email address").max(255),
@@ -448,10 +447,6 @@ const Admin = () => {
             <FileText className="w-4 h-4 mr-2" />
             Lead Emails
           </TabsTrigger>
-          <TabsTrigger value="integrations">
-            <Mail className="w-4 h-4 mr-2" />
-            Integrations
-          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="users" className="space-y-8 mt-8">
@@ -813,12 +808,6 @@ const Admin = () => {
 
         <TabsContent value="lead-email-templates" className="mt-8">
           <LeadEmailTemplatesManager />
-        </TabsContent>
-
-        <TabsContent value="integrations" className="mt-8">
-          <div className="grid gap-6 md:grid-cols-2">
-            <GmailIntegrationCard />
-          </div>
         </TabsContent>
       </Tabs>
     </div>
