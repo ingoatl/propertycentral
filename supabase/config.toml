@@ -329,3 +329,12 @@ verify_jwt = true
 
 [functions.ghl-inbound-webhook]
 verify_jwt = false
+
+[functions.create-owner-payment-setup]
+verify_jwt = false
+
+[functions.send-billing-transition-email]
+verify_jwt = true
+
+[functions.get-owner-for-payment]
+verify_jwt = false
