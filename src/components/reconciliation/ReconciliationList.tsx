@@ -54,10 +54,10 @@ export const ReconciliationList = () => {
     return isSameMonth(monthDate, new Date());
   };
 
-  // Default to last month (index 1)
+  // Default to current month (index 0)
   useEffect(() => {
-    if (monthOptions.length > 1 && selectedMonth === "all") {
-      setSelectedMonth(monthOptions[1].value);
+    if (monthOptions.length > 0 && selectedMonth === "all") {
+      setSelectedMonth(monthOptions[0].value);
     }
   }, [monthOptions]);
 
@@ -147,9 +147,9 @@ export const ReconciliationList = () => {
     },
   });
 
-  // Fetch all active (managed) properties for showing "missing reconciliation" placeholders
+  // Fetch all Client-Managed properties (the 11 managed properties)
   const { data: activeProperties } = useQuery({
-    queryKey: ["active-properties-for-reconciliation"],
+    queryKey: ["managed-properties-for-reconciliation"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("properties")
@@ -159,14 +159,91 @@ export const ReconciliationList = () => {
           address,
           owner_id,
           billing_status,
+          property_type,
           property_owners(name, email, service_type)
         `)
-        .eq("billing_status", "active")
+        .eq("property_type", "Client-Managed")
         .is("offboarded_at", null);
 
       if (error) throw error;
       return data || [];
     },
+  });
+
+  // Fetch current month revenue from OwnerRez bookings and mid-term bookings
+  const { data: currentMonthRevenue } = useQuery({
+    queryKey: ["current-month-revenue", selectedMonth],
+    queryFn: async () => {
+      if (!isCurrentMonth(selectedMonth)) return {};
+      
+      const monthDate = new Date(selectedMonth + "T00:00:00");
+      const startDate = format(startOfMonth(monthDate), "yyyy-MM-dd");
+      const endDate = format(endOfMonth(monthDate), "yyyy-MM-dd");
+      const today = format(new Date(), "yyyy-MM-dd");
+      
+      // Get OwnerRez bookings for current month (check_out within month and before today)
+      const { data: ownerrezData, error: ownerrezError } = await supabase
+        .from("ownerrez_bookings")
+        .select("property_id, total_amount, accommodation_revenue, check_in, check_out")
+        .gte("check_out", startDate)
+        .lte("check_in", today)
+        .eq("booking_status", "active");
+      
+      if (ownerrezError) console.error("Error fetching OwnerRez revenue:", ownerrezError);
+      
+      // Get mid-term bookings active during current month
+      const { data: midtermData, error: midtermError } = await supabase
+        .from("mid_term_bookings")
+        .select("property_id, monthly_rent, start_date, end_date")
+        .lte("start_date", endDate)
+        .gte("end_date", startDate)
+        .eq("status", "active");
+      
+      if (midtermError) console.error("Error fetching mid-term revenue:", midtermError);
+      
+      // Calculate revenue per property
+      const revenueByProperty: Record<string, { ownerrez: number; midterm: number; total: number }> = {};
+      
+      // Add OwnerRez revenue (for properties that have property_id set)
+      (ownerrezData || []).forEach((booking: any) => {
+        if (booking.property_id) {
+          if (!revenueByProperty[booking.property_id]) {
+            revenueByProperty[booking.property_id] = { ownerrez: 0, midterm: 0, total: 0 };
+          }
+          const amount = booking.accommodation_revenue || booking.total_amount || 0;
+          revenueByProperty[booking.property_id].ownerrez += amount;
+          revenueByProperty[booking.property_id].total += amount;
+        }
+      });
+      
+      // Add mid-term revenue (prorated for current month)
+      (midtermData || []).forEach((booking: any) => {
+        if (booking.property_id) {
+          if (!revenueByProperty[booking.property_id]) {
+            revenueByProperty[booking.property_id] = { ownerrez: 0, midterm: 0, total: 0 };
+          }
+          // Prorate monthly rent based on days in month
+          const bookingStart = new Date(booking.start_date);
+          const bookingEnd = new Date(booking.end_date);
+          const monthStart = startOfMonth(monthDate);
+          const monthEnd = endOfMonth(monthDate);
+          const todayDate = new Date();
+          
+          const effectiveStart = bookingStart > monthStart ? bookingStart : monthStart;
+          const effectiveEnd = bookingEnd < monthEnd ? bookingEnd : (todayDate < monthEnd ? todayDate : monthEnd);
+          
+          const daysInMonth = Math.ceil((monthEnd.getTime() - monthStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+          const activeDays = Math.max(0, Math.ceil((effectiveEnd.getTime() - effectiveStart.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+          
+          const proratedRent = (booking.monthly_rent / daysInMonth) * activeDays;
+          revenueByProperty[booking.property_id].midterm += proratedRent;
+          revenueByProperty[booking.property_id].total += proratedRent;
+        }
+      });
+      
+      return revenueByProperty;
+    },
+    enabled: isCurrentMonth(selectedMonth),
   });
 
   // Fetch pending expenses count for current month preview
@@ -545,6 +622,8 @@ export const ReconciliationList = () => {
                       const isOffboarded = !!rec.properties?.offboarded_at;
                       const isFullService = rec.service_type === 'full_service';
                       const isPreview = isCurrentMonth(rec.reconciliation_month) || rec.status === 'preview';
+                      const propertyRevenue = currentMonthRevenue?.[rec.property_id];
+                      const currentRevenue = propertyRevenue?.total || 0;
                       
                       return (
                         <Card 
@@ -594,11 +673,18 @@ export const ReconciliationList = () => {
                           <div className="p-4">
                             <div className="space-y-4">
                               <div className="grid grid-cols-2 gap-3">
-                                <div className="bg-gray-50 dark:bg-gray-950/30 rounded-lg p-3 text-center">
-                                  <p className="text-xs text-muted-foreground font-medium mb-1">Revenue</p>
-                                  <p className={`font-bold text-sm ${isPreview ? 'text-muted-foreground' : 'text-green-600'}`}>
-                                    {isPreview ? "TBD" : formatCurrency(rec.total_revenue || 0)}
+                                <div className="bg-green-50 dark:bg-green-950/30 rounded-lg p-3 text-center">
+                                  <p className="text-xs text-muted-foreground font-medium mb-1">
+                                    Revenue {isPreview && "(MTD)"}
                                   </p>
+                                  <p className={`font-bold text-sm text-green-600`}>
+                                    {isPreview ? formatCurrency(currentRevenue) : formatCurrency(rec.total_revenue || 0)}
+                                  </p>
+                                  {isPreview && currentRevenue > 0 && (
+                                    <p className="text-xs text-muted-foreground mt-0.5">
+                                      as of today
+                                    </p>
+                                  )}
                                 </div>
                                 <div className="bg-amber-50 dark:bg-amber-950/30 rounded-lg p-3 text-center">
                                   <p className="text-xs text-muted-foreground font-medium mb-1">Pending Items</p>
@@ -645,6 +731,8 @@ export const ReconciliationList = () => {
                     {/* Placeholder cards for properties missing preview (current month only) */}
                     {missingPropertiesForSection.map((prop: any) => {
                       const expenseCount = pendingExpensesCount?.[prop.id] || 0;
+                      const propertyRevenue = currentMonthRevenue?.[prop.id];
+                      const currentRevenue = propertyRevenue?.total || 0;
                       
                       return (
                         <Card 
@@ -671,36 +759,49 @@ export const ReconciliationList = () => {
                             </div>
                           </div>
 
-                          <div className="p-6 flex flex-col items-center justify-center text-center">
-                            <div className="w-12 h-12 rounded-full flex items-center justify-center mb-3 bg-indigo-100 dark:bg-indigo-900/50">
-                              <Eye className="w-6 h-6 text-indigo-600" />
-                            </div>
-                            
-                            {expenseCount > 0 && (
-                              <p className="text-sm text-indigo-600 font-medium mb-2">
-                                {expenseCount} expense{expenseCount !== 1 ? 's' : ''} pending approval
-                              </p>
+                          <div className="p-4">
+                            {/* Show current revenue if available */}
+                            {currentRevenue > 0 && (
+                              <div className="bg-green-50 dark:bg-green-950/30 rounded-lg p-3 text-center mb-4">
+                                <p className="text-xs text-muted-foreground font-medium mb-1">Revenue (MTD)</p>
+                                <p className="font-bold text-green-600 text-sm">
+                                  {formatCurrency(currentRevenue)}
+                                </p>
+                                <p className="text-xs text-muted-foreground mt-0.5">as of today</p>
+                              </div>
                             )}
-                            <p className="text-sm text-muted-foreground mb-4">
-                              Start approving expenses for <span className="font-medium">{selectedMonthLabel}</span>
-                            </p>
-                            <Button 
-                              className="bg-indigo-600 hover:bg-indigo-700"
-                              onClick={() => handleCreatePreview(prop.id)}
-                              disabled={creatingPreviewFor === prop.id}
-                            >
-                              {creatingPreviewFor === prop.id ? (
-                                <>
-                                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                  Creating...
-                                </>
-                              ) : (
-                                <>
-                                  <Plus className="w-4 h-4 mr-2" />
-                                  Start Preview
-                                </>
+                            
+                            <div className="flex flex-col items-center justify-center text-center">
+                              <div className="w-12 h-12 rounded-full flex items-center justify-center mb-3 bg-indigo-100 dark:bg-indigo-900/50">
+                                <Eye className="w-6 h-6 text-indigo-600" />
+                              </div>
+                              
+                              {expenseCount > 0 && (
+                                <p className="text-sm text-indigo-600 font-medium mb-2">
+                                  {expenseCount} expense{expenseCount !== 1 ? 's' : ''} pending approval
+                                </p>
                               )}
-                            </Button>
+                              <p className="text-sm text-muted-foreground mb-4">
+                                Start approving expenses for <span className="font-medium">{selectedMonthLabel}</span>
+                              </p>
+                              <Button 
+                                className="bg-indigo-600 hover:bg-indigo-700"
+                                onClick={() => handleCreatePreview(prop.id)}
+                                disabled={creatingPreviewFor === prop.id}
+                              >
+                                {creatingPreviewFor === prop.id ? (
+                                  <>
+                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                    Creating...
+                                  </>
+                                ) : (
+                                  <>
+                                    <Plus className="w-4 h-4 mr-2" />
+                                    Start Preview
+                                  </>
+                                )}
+                              </Button>
+                            </div>
                           </div>
                         </Card>
                       );
