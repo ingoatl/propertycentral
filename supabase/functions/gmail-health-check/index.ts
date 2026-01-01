@@ -19,8 +19,8 @@ interface HealthCheckResult {
 }
 
 async function refreshAccessToken(refreshToken: string): Promise<string> {
-  const GOOGLE_CLIENT_ID = Deno.env.get('GOOGLE_CLIENT_ID');
-  const GOOGLE_CLIENT_SECRET = Deno.env.get('GOOGLE_CLIENT_SECRET');
+  const GOOGLE_CLIENT_ID = Deno.env.get('GOOGLE_CLIENT_ID')?.trim();
+  const GOOGLE_CLIENT_SECRET = Deno.env.get('GOOGLE_CLIENT_SECRET')?.trim();
 
   const response = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
