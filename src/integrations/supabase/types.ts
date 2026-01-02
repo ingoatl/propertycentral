@@ -4198,6 +4198,97 @@ export type Database = {
         }
         Relationships: []
       }
+      pending_task_confirmations: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          assigned_to_user_id: string | null
+          created_at: string | null
+          created_task_id: string | null
+          expires_at: string | null
+          id: string
+          owner_id: string | null
+          phase_suggestion: number | null
+          priority: string | null
+          property_id: string | null
+          rejection_reason: string | null
+          source_id: string | null
+          source_quote: string | null
+          source_type: string
+          status: string | null
+          task_category: string | null
+          task_description: string | null
+          task_title: string
+          updated_at: string | null
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          assigned_to_user_id?: string | null
+          created_at?: string | null
+          created_task_id?: string | null
+          expires_at?: string | null
+          id?: string
+          owner_id?: string | null
+          phase_suggestion?: number | null
+          priority?: string | null
+          property_id?: string | null
+          rejection_reason?: string | null
+          source_id?: string | null
+          source_quote?: string | null
+          source_type: string
+          status?: string | null
+          task_category?: string | null
+          task_description?: string | null
+          task_title: string
+          updated_at?: string | null
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          assigned_to_user_id?: string | null
+          created_at?: string | null
+          created_task_id?: string | null
+          expires_at?: string | null
+          id?: string
+          owner_id?: string | null
+          phase_suggestion?: number | null
+          priority?: string | null
+          property_id?: string | null
+          rejection_reason?: string | null
+          source_id?: string | null
+          source_quote?: string | null
+          source_type?: string
+          status?: string | null
+          task_category?: string | null
+          task_description?: string | null
+          task_title?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pending_task_confirmations_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "property_owners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pending_task_confirmations_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "comprehensive_property_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pending_task_confirmations_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       permit_reminders: {
         Row: {
           created_at: string
@@ -6444,6 +6535,48 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      watchdog_logs: {
+        Row: {
+          check_type: string
+          created_at: string | null
+          details: Json | null
+          emails_scanned: number | null
+          id: string
+          issues_found: string[] | null
+          owner_emails_detected: number | null
+          run_at: string | null
+          status: string
+          tasks_confirmed: number | null
+          tasks_extracted: number | null
+        }
+        Insert: {
+          check_type: string
+          created_at?: string | null
+          details?: Json | null
+          emails_scanned?: number | null
+          id?: string
+          issues_found?: string[] | null
+          owner_emails_detected?: number | null
+          run_at?: string | null
+          status: string
+          tasks_confirmed?: number | null
+          tasks_extracted?: number | null
+        }
+        Update: {
+          check_type?: string
+          created_at?: string | null
+          details?: Json | null
+          emails_scanned?: number | null
+          id?: string
+          issues_found?: string[] | null
+          owner_emails_detected?: number | null
+          run_at?: string | null
+          status?: string
+          tasks_confirmed?: number | null
+          tasks_extracted?: number | null
+        }
+        Relationships: []
       }
       work_order_timeline: {
         Row: {
