@@ -1,6 +1,7 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { ExternalLink, Calculator, Search, Bot, CheckCircle } from "lucide-react";
+import { ExternalLink, Calculator, Search, Bot, CheckCircle, Copy } from "lucide-react";
+import { toast } from "sonner";
 
 interface ZillowPricingInstructionsModalProps {
   open: boolean;
@@ -25,8 +26,15 @@ export const ZillowPricingInstructionsModal = ({
   const zillowUrl = `https://www.zillow.com/homes/${formattedAddress}_rb/`;
 
   const copyPromptForAI = () => {
-    const prompt = `Go to Zillow and find the Rent Zestimate for this property: ${address}. Tell me the monthly rent estimate.`;
+    const prompt = `Go to Zillow.com and find the Rent Zestimate for this property: ${address}
+
+The Rent Zestimate is Zillow's estimated monthly rent value. Once you find it, tell me:
+1. The Rent Zestimate amount
+2. The calculated listing price (Rent Zestimate × 2.2)
+
+For example, if the Rent Zestimate is $3,000/month, the listing price would be $3,000 × 2.2 = $6,600/month.`;
     navigator.clipboard.writeText(prompt);
+    toast.success("AI prompt copied! Paste it into ChatGPT, Claude, or any AI assistant.");
   };
 
   return (
@@ -93,29 +101,31 @@ export const ZillowPricingInstructionsModal = ({
                 onClick={copyPromptForAI}
                 className="gap-2"
               >
-                <Bot className="h-4 w-4" />
+                <Copy className="h-4 w-4" />
                 Copy AI Prompt
               </Button>
-              <p className="text-xs text-muted-foreground italic">
-                Prompt: "Go to Zillow and find the Rent Zestimate for {address?.substring(0, 30)}..."
+              <p className="text-xs text-muted-foreground italic mt-2">
+                Paste this prompt into ChatGPT, Claude, or any AI. It will find the Rent Zestimate and calculate the listing price for you.
               </p>
             </div>
           </div>
 
-          {/* Step 2 */}
+          {/* Step 2 - THE FORMULA */}
           <div className="flex gap-3 pt-2 border-t">
-            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold">
+            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-green-600 flex items-center justify-center text-white font-semibold">
               2
             </div>
             <div className="space-y-2">
-              <h4 className="font-medium">Calculate the Listing Price</h4>
-              <div className="p-3 bg-accent/50 rounded-lg border">
-                <p className="text-sm font-mono">
-                  <strong>Rent Zestimate × 2.2 = Listing Price</strong>
+              <h4 className="font-medium text-green-700 dark:text-green-400">Calculate the Listing Price</h4>
+              <div className="p-4 bg-green-100 dark:bg-green-900/30 rounded-lg border-2 border-green-500">
+                <p className="text-lg font-bold text-green-700 dark:text-green-300 text-center">
+                  Rent Zestimate × 2.2 = Listing Price
                 </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Example: $3,000/mo × 2.2 = $6,600/mo listing price
-                </p>
+                <div className="mt-3 space-y-1 text-sm text-green-600 dark:text-green-400">
+                  <p><strong>Example 1:</strong> $2,500/mo × 2.2 = <strong>$5,500/mo</strong></p>
+                  <p><strong>Example 2:</strong> $3,000/mo × 2.2 = <strong>$6,600/mo</strong></p>
+                  <p><strong>Example 3:</strong> $4,000/mo × 2.2 = <strong>$8,800/mo</strong></p>
+                </div>
               </div>
             </div>
           </div>
