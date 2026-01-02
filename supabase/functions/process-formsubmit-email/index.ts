@@ -12,40 +12,55 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 // Task title mappings from form fields
 const FIELD_TO_TASK_MAPPING: Record<string, string> = {
-  // Owner Info
+  // Owner Info - multiple variations
   'owner_full_name': 'Owner Name',
   'owner_name': 'Owner Name',
+  'ownername': 'Owner Name',
   'full_name': 'Owner Name',
   'name': 'Owner Name',
   'owner_email': 'Owner Email',
+  'owneremail': 'Owner Email',
   'email': 'Owner Email',
   'owner_phone': 'Owner Phone',
+  'ownerphone': 'Owner Phone',
   'phone': 'Owner Phone',
   'phone_number': 'Owner Phone',
   
   // Property Details
   'property_address': 'Property Address',
+  'propertyaddress': 'Property Address',
   'address': 'Property Address',
   'bedrooms': 'Bedrooms',
   'beds': 'Bedrooms',
   'bathrooms': 'Bathrooms',
   'baths': 'Bathrooms',
   'square_footage': 'Square Footage',
+  'squarefootage': 'Square Footage',
   'sqft': 'Square Footage',
   'property_type': 'Property Type',
+  'propertytype': 'Property Type',
   
   // Access & Codes
   'wifi_network': 'WiFi Network Name (SSID)',
   'wifi_ssid': 'WiFi Network Name (SSID)',
   'wifi_name': 'WiFi Network Name (SSID)',
+  'wifinetwork': 'WiFi Network Name (SSID)',
   'wifi_password': 'WiFi Password',
+  'wifipassword': 'WiFi Password',
   'smart_lock_brand': 'Smart Lock Brand',
+  'smartlockbrand': 'Smart Lock Brand',
   'lock_brand': 'Smart Lock Brand',
   'smart_lock_code': 'Smart Lock Code',
+  'smartlockcode': 'Smart Lock Code',
   'lock_code': 'Smart Lock Code',
   'lockbox_code': 'Lockbox Code for Emergencies',
+  'lockboxcode': 'Lockbox Code for Emergencies',
   'gate_code': 'Gate code',
+  'gatecode': 'Gate code',
   'garage_code': 'Garage code',
+  'garagecode': 'Garage code',
+  'alarm_system_code': 'Alarm Code',
+  'alarmsystemcode': 'Alarm Code',
   
   // Utilities
   'electric_provider': 'Electric Provider',
@@ -58,6 +73,9 @@ const FIELD_TO_TASK_MAPPING: Record<string, string> = {
   'internet': 'Internet Provider',
   'trash_day': 'Trash Pickup Day',
   'trash_pickup_day': 'Trash Pickup Day',
+  'trashpickupday': 'Trash Pickup Day',
+  'trash_bin_location': 'Trash Bin Location',
+  'trashbinlocation': 'Trash Bin Location',
   
   // Operations
   'cleaner_name': 'Primary Cleaner',
@@ -78,6 +96,7 @@ const FIELD_TO_TASK_MAPPING: Record<string, string> = {
   
   // Property Features
   'unique_selling_points': 'Unique Selling Points',
+  'uniquesellingpoints': 'Unique Selling Points',
   'selling_points': 'Unique Selling Points',
   'house_quirks': 'House Quirks',
   'quirks': 'House Quirks',
@@ -87,16 +106,24 @@ const FIELD_TO_TASK_MAPPING: Record<string, string> = {
   // Maintenance/Vendors
   'hvac_service': 'HVAC Service',
   'hvac': 'HVAC Service',
+  'hvactype': 'HVAC Type',
+  'hvac_type': 'HVAC Type',
   'pest_control': 'Pest Control Provider',
   'pest_control_provider': 'Pest Control Provider',
   'lawncare': 'Lawncare Provider',
   'lawncare_provider': 'Lawncare Provider',
   'emergency_contact': 'Emergency Contact',
+  'emergencycontact': 'Emergency Contact',
+  'emergency_contact_phone': 'Emergency Contact Phone',
+  'emergencycontactphone': 'Emergency Contact Phone',
   
   // Insurance & Legal
   'insurance_provider': 'Insurance Provider',
   'insurance': 'Insurance Provider',
+  'insurancestatus': 'Insurance Status',
+  'insurance_status': 'Insurance Status',
   'str_permit_status': 'STR Permit Status',
+  'strpermitstatus': 'STR Permit Status',
   'permit_status': 'STR Permit Status',
   
   // Pricing
@@ -106,6 +133,7 @@ const FIELD_TO_TASK_MAPPING: Record<string, string> = {
   'min_stay': 'Minimum Stay',
   'pet_policy': 'Pet Policy',
   'pets_allowed': 'Pet Policy',
+  'petsallowed': 'Pet Policy',
   'house_rules': 'House Rules',
   
   // Photography
@@ -119,10 +147,32 @@ const FIELD_TO_TASK_MAPPING: Record<string, string> = {
   'linens': 'Linens Status',
   'furniture_status': 'Furniture Status',
   'furniture': 'Furniture Status',
+  'furnishingstatus': 'Furnishing Status',
+  'furnishing_status': 'Furnishing Status',
   
   // Parking
   'parking_instructions': 'Parking Instructions',
   'parking': 'Parking Instructions',
+  'parkingtype': 'Parking Type',
+  'parking_type': 'Parking Type',
+  'parkingspaces': 'Parking Spaces',
+  'parking_spaces': 'Parking Spaces',
+  
+  // Safety
+  'smoke_detector_status': 'Smoke Detector Status',
+  'smokedetectorstatus': 'Smoke Detector Status',
+  'fire_extinguisher_location': 'Fire Extinguisher Location',
+  'fireextinguisherlocation': 'Fire Extinguisher Location',
+  'water_shutoff_location': 'Water Shutoff Location',
+  'watershutofflocation': 'Water Shutoff Location',
+  'breaker_panel_location': 'Breaker Panel Location',
+  'breakerpanellocation': 'Breaker Panel Location',
+  
+  // Pool/Hot Tub
+  'pool_hottub_present': 'Pool/Hot Tub',
+  'poolhottubpresent': 'Pool/Hot Tub',
+  'pool_service_provider': 'Pool Service Provider',
+  'poolserviceprovider': 'Pool Service Provider',
 };
 
 // Parse formsubmit email body to extract field-value pairs
