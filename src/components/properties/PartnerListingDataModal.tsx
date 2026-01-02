@@ -149,7 +149,25 @@ export function PartnerListingDataModal({
   ].filter(item => item.value);
 
   const pricingItems = [
-    { label: "Monthly Rent (MidTermNation)", value: property.monthly_price ? `$${property.monthly_price.toLocaleString()}` : null, highlight: true },
+    { 
+      label: "Listing Price (Zillow × 2.3)", 
+      value: (property as any).calculated_listing_price 
+        ? `$${(property as any).calculated_listing_price.toLocaleString()}/mo` 
+        : null, 
+      highlight: true,
+      badge: "Use this price"
+    },
+    { 
+      label: "Zillow Rent Zestimate", 
+      value: (property as any).zillow_rent_zestimate 
+        ? `$${(property as any).zillow_rent_zestimate.toLocaleString()}/mo` 
+        : null
+    },
+    { 
+      label: "MidTermNation Price", 
+      value: property.monthly_price ? `$${property.monthly_price.toLocaleString()}/mo` : null,
+      note: "Original sync price"
+    },
     { label: "Security Deposit", value: property.security_deposit ? `$${property.security_deposit.toLocaleString()}` : null },
     { label: "Cleaning Fee", value: property.cleaning_fee ? `$${property.cleaning_fee.toLocaleString()}` : null },
   ].filter(item => item.value);

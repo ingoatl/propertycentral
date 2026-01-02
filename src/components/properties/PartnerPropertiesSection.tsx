@@ -51,6 +51,9 @@ interface PartnerProperty {
   gallery_images: string[] | null;
   amenities: any;
   monthly_price: number | null;
+  zillow_rent_zestimate: number | null;
+  calculated_listing_price: number | null;
+  zillow_last_fetched: string | null;
   security_deposit: number | null;
   cleaning_fee: number | null;
   contact_name: string | null;
@@ -448,17 +451,31 @@ export const PartnerPropertiesSection = () => {
                   </div>
 
                   {/* Pricing row */}
-                  <div className="flex items-center justify-between pt-1.5 border-t border-border/30 mt-1.5">
-                    {property.monthly_price ? (
-                      <span className="font-semibold text-sm text-green-600">
-                        ${property.monthly_price.toLocaleString()}/mo
-                      </span>
+                  <div className="flex flex-col gap-1 pt-1.5 border-t border-border/30 mt-1.5">
+                    {property.calculated_listing_price ? (
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold text-sm text-green-600">
+                          ${property.calculated_listing_price.toLocaleString()}/mo
+                        </span>
+                        <span className="text-[9px] text-muted-foreground bg-green-100 px-1.5 py-0.5 rounded">
+                          Zillow × 2.3
+                        </span>
+                      </div>
+                    ) : property.monthly_price ? (
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold text-sm text-amber-600">
+                          ${property.monthly_price.toLocaleString()}/mo
+                        </span>
+                        <span className="text-[9px] text-muted-foreground bg-amber-100 px-1.5 py-0.5 rounded">
+                          MidTermNation
+                        </span>
+                      </div>
                     ) : (
                       <span className="text-xs text-muted-foreground">No price</span>
                     )}
-                    {property.security_deposit && (
+                    {property.zillow_rent_zestimate && (
                       <span className="text-[10px] text-muted-foreground">
-                        Deposit: ${property.security_deposit.toLocaleString()}
+                        Zestimate: ${property.zillow_rent_zestimate.toLocaleString()}/mo
                       </span>
                     )}
                   </div>
