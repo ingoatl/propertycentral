@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Dialog,
@@ -20,9 +20,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Loader2, Send, Eye, Building2, Truck } from "lucide-react";
+import { Loader2, Send, Eye, Building2, Truck, CheckCircle, TestTube } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
 
 interface ServiceSignupDialogProps {
   open: boolean;
@@ -37,6 +38,8 @@ interface PropertyData {
   trash_bin_location?: string;
   gate_code?: string;
   access_instructions?: string;
+  hasService?: boolean;
+  activeServices?: string[];
 }
 
 interface VendorData {
@@ -47,6 +50,12 @@ interface VendorData {
   specialty: string[];
 }
 
+interface PropertyVendorAssignment {
+  property_id: string;
+  vendor_id: string;
+  specialty: string;
+}
+
 const ServiceSignupDialog = ({ open, onOpenChange }: ServiceSignupDialogProps) => {
   const [selectedPropertyId, setSelectedPropertyId] = useState<string>("");
   const [selectedVendorId, setSelectedVendorId] = useState<string>("");
@@ -55,6 +64,7 @@ const ServiceSignupDialog = ({ open, onOpenChange }: ServiceSignupDialogProps) =
   const [showPreview, setShowPreview] = useState(false);
   const [currentUserEmail, setCurrentUserEmail] = useState<string>("");
   const [currentUserName, setCurrentUserName] = useState<string>("");
+  const queryClient = useQueryClient();
 
   // Fetch current user
   useEffect(() => {
@@ -77,11 +87,24 @@ const ServiceSignupDialog = ({ open, onOpenChange }: ServiceSignupDialogProps) =
     }
   }, [open]);
 
+  // Fetch existing property-vendor assignments
+  const { data: existingAssignments = [] } = useQuery({
+    queryKey: ["property-vendor-assignments"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("property_vendor_assignments")
+        .select("property_id, vendor_id, specialty");
+
+      if (error) throw error;
+      return data as PropertyVendorAssignment[];
+    },
+    enabled: open,
+  });
+
   // Fetch properties with trash info
   const { data: properties = [] } = useQuery({
     queryKey: ["properties-for-service-signup"],
     queryFn: async () => {
-      // First get all active properties
       const { data: props, error: propsError } = await supabase
         .from("properties")
         .select("id, name, address")
@@ -90,17 +113,14 @@ const ServiceSignupDialog = ({ open, onOpenChange }: ServiceSignupDialogProps) =
 
       if (propsError) throw propsError;
 
-      // Get onboarding data for trash info
       const { data: onboardingData } = await supabase
         .from("owner_onboarding_submissions")
         .select("property_id, trash_pickup_day, trash_bin_location, gate_code");
 
-      // Get maintenance book data for additional access info
       const { data: maintenanceData } = await supabase
         .from("property_maintenance_book")
         .select("property_id, gate_code, access_instructions, lockbox_code");
 
-      // Merge data
       return props?.map((prop) => {
         const onboarding = onboardingData?.find((o) => o.property_id === prop.id);
         const maintenance = maintenanceData?.find((m) => m.property_id === prop.id);
@@ -133,9 +153,24 @@ const ServiceSignupDialog = ({ open, onOpenChange }: ServiceSignupDialogProps) =
     enabled: open,
   });
 
+  // Enrich properties with service status
+  const propertiesWithServiceStatus = useMemo(() => {
+    return properties.map((prop) => {
+      const propertyAssignments = existingAssignments.filter(
+        (a) => a.property_id === prop.id
+      );
+      const activeServices = propertyAssignments.map((a) => a.specialty);
+      return {
+        ...prop,
+        hasService: propertyAssignments.length > 0,
+        activeServices,
+      };
+    });
+  }, [properties, existingAssignments]);
+
   const selectedProperty = useMemo(
-    () => properties.find((p) => p.id === selectedPropertyId),
-    [properties, selectedPropertyId]
+    () => propertiesWithServiceStatus.find((p) => p.id === selectedPropertyId),
+    [propertiesWithServiceStatus, selectedPropertyId]
   );
 
   const selectedVendor = useMemo(
@@ -147,6 +182,14 @@ const ServiceSignupDialog = ({ open, onOpenChange }: ServiceSignupDialogProps) =
     () => selectedVendor?.specialty?.includes("valet_trash") || selectedVendor?.specialty?.includes("trash_services"),
     [selectedVendor]
   );
+
+  // Check if selected property already has service with selected vendor
+  const hasExistingService = useMemo(() => {
+    if (!selectedPropertyId || !selectedVendorId) return false;
+    return existingAssignments.some(
+      (a) => a.property_id === selectedPropertyId && a.vendor_id === selectedVendorId
+    );
+  }, [existingAssignments, selectedPropertyId, selectedVendorId]);
 
   // Generate email when property and vendor are selected
   useEffect(() => {
@@ -219,31 +262,58 @@ Best regards,`;
   };
 
   const sendEmailMutation = useMutation({
-    mutationFn: async () => {
-      if (!selectedVendor?.email) {
+    mutationFn: async ({ isTest = false }: { isTest?: boolean } = {}) => {
+      if (!selectedVendor?.email && !isTest) {
         throw new Error("Vendor email is required");
       }
 
+      const { data: { user } } = await supabase.auth.getUser();
+
       const { data, error } = await supabase.functions.invoke("send-vendor-service-email", {
         body: {
-          to: selectedVendor.email,
-          toName: selectedVendor.company_name || selectedVendor.name,
-          subject: emailSubject,
+          to: isTest ? user?.email : selectedVendor!.email,
+          toName: isTest ? "Test Recipient" : (selectedVendor!.company_name || selectedVendor!.name),
+          subject: isTest ? `[TEST] ${emailSubject}` : emailSubject,
           body: emailBody,
           propertyId: selectedPropertyId,
           vendorId: selectedVendorId,
           senderEmail: currentUserEmail,
           senderName: currentUserName,
+          isTest,
         },
       });
 
       if (error) throw error;
-      return data;
+
+      // If not a test, create the property_vendor_assignment record
+      if (!isTest && !hasExistingService) {
+        const specialty = selectedVendor!.specialty[0] || "general";
+        const { error: assignmentError } = await supabase
+          .from("property_vendor_assignments")
+          .insert({
+            property_id: selectedPropertyId,
+            vendor_id: selectedVendorId,
+            specialty,
+            notes: `Service signup email sent on ${new Date().toLocaleDateString()}`,
+          });
+
+        if (assignmentError) {
+          console.error("Failed to create assignment:", assignmentError);
+        }
+      }
+
+      return { data, isTest };
     },
-    onSuccess: () => {
-      toast.success("Service signup email sent successfully!");
-      onOpenChange(false);
-      resetForm();
+    onSuccess: ({ isTest }) => {
+      if (isTest) {
+        toast.success("Test email sent to your inbox!");
+      } else {
+        toast.success("Service signup email sent successfully!");
+        queryClient.invalidateQueries({ queryKey: ["property-vendor-assignments"] });
+        queryClient.invalidateQueries({ queryKey: ["active-vendor-services"] });
+        onOpenChange(false);
+        resetForm();
+      }
     },
     onError: (error: any) => {
       toast.error(`Failed to send email: ${error.message}`);
@@ -266,7 +336,11 @@ Best regards,`;
   };
 
   const getSpecialtyLabel = (specialty: string) => {
-    return specialty.split("_").map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(" ");
+    const labels: Record<string, string> = {
+      valet_trash: "Valet Trash",
+      trash_services: "Trash Services",
+    };
+    return labels[specialty] || specialty.split("_").map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(" ");
   };
 
   return (
@@ -293,11 +367,17 @@ Best regards,`;
                     <SelectValue placeholder="Choose a property..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {properties.map((property) => (
+                    {propertiesWithServiceStatus.map((property) => (
                       <SelectItem key={property.id} value={property.id}>
-                        <div className="flex items-center gap-2">
-                          <Building2 className="h-4 w-4 text-muted-foreground" />
-                          <span>{property.name}</span>
+                        <div className="flex items-center gap-2 w-full">
+                          <Building2 className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                          <span className="flex-1 truncate">{property.name}</span>
+                          {property.hasService && (
+                            <Badge variant="secondary" className="text-xs gap-1 flex-shrink-0">
+                              <CheckCircle className="h-3 w-3 text-green-600" />
+                              {property.activeServices?.length} service{property.activeServices?.length !== 1 ? "s" : ""}
+                            </Badge>
+                          )}
                         </div>
                       </SelectItem>
                     ))}
@@ -326,6 +406,29 @@ Best regards,`;
                 </Select>
               </div>
             </div>
+
+            {/* Existing Service Warning */}
+            {hasExistingService && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 flex items-center gap-2 text-sm text-amber-800">
+                <CheckCircle className="h-4 w-4 flex-shrink-0" />
+                <span>This property already has an active service with this vendor.</span>
+              </div>
+            )}
+
+            {/* Active Services for Selected Property */}
+            {selectedProperty?.hasService && (
+              <div className="rounded-lg border bg-muted/30 p-3">
+                <h4 className="font-medium text-sm mb-2">Active Services for {selectedProperty.name}</h4>
+                <div className="flex flex-wrap gap-2">
+                  {selectedProperty.activeServices?.map((service) => (
+                    <Badge key={service} variant="secondary" className="gap-1">
+                      <CheckCircle className="h-3 w-3 text-green-600" />
+                      {getSpecialtyLabel(service)}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Property Info Summary */}
             {selectedProperty && (
@@ -438,7 +541,20 @@ Best regards,`;
             Cancel
           </Button>
           <Button
-            onClick={() => sendEmailMutation.mutate()}
+            variant="outline"
+            onClick={() => sendEmailMutation.mutate({ isTest: true })}
+            disabled={!selectedPropertyId || !selectedVendorId || !emailBody || sendEmailMutation.isPending}
+            className="gap-2"
+          >
+            {sendEmailMutation.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <TestTube className="h-4 w-4" />
+            )}
+            Send Test Email
+          </Button>
+          <Button
+            onClick={() => sendEmailMutation.mutate({ isTest: false })}
             disabled={!selectedPropertyId || !selectedVendorId || !emailBody || sendEmailMutation.isPending}
             className="gap-2"
           >
