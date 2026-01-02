@@ -5,7 +5,8 @@ import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
 import { 
   Bed, Bath, Square, Users, Car, Building, DollarSign, 
-  Mail, Phone, User, PawPrint, ExternalLink, MapPin, Download, Image as ImageIcon, Calendar, Pencil, Check, X
+  Mail, Phone, User, PawPrint, ExternalLink, MapPin, Download, Image as ImageIcon, Calendar, Pencil, Check, X,
+  AlertCircle, Info, RefreshCw
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -33,6 +34,9 @@ interface PartnerProperty {
   gallery_images: string[] | null;
   amenities: any;
   monthly_price: number | null;
+  zillow_rent_zestimate: number | null;
+  calculated_listing_price: number | null;
+  zillow_last_fetched: string | null;
   security_deposit: number | null;
   cleaning_fee: number | null;
   contact_name: string | null;
@@ -66,6 +70,9 @@ export function PartnerPropertyDetailsModal({
   const [editingAddress, setEditingAddress] = useState(false);
   const [editedAddress, setEditedAddress] = useState("");
   const [savingAddress, setSavingAddress] = useState(false);
+  const [editingZestimate, setEditingZestimate] = useState(false);
+  const [zestimateValue, setZestimateValue] = useState("");
+  const [savingZestimate, setSavingZestimate] = useState(false);
   
   if (!property) return null;
 
@@ -183,6 +190,64 @@ export function PartnerPropertyDetailsModal({
     setEditedAddress("");
   };
 
+  const handleEditZestimate = () => {
+    setZestimateValue(property.zillow_rent_zestimate?.toString() || "");
+    setEditingZestimate(true);
+  };
+
+  const handleSaveZestimate = async () => {
+    const value = parseFloat(zestimateValue);
+    if (isNaN(value) || value <= 0) {
+      toast.error("Please enter a valid rent amount");
+      return;
+    }
+
+    setSavingZestimate(true);
+    try {
+      const calculatedPrice = Math.round(value * 2.3);
+      const { error } = await supabase
+        .from("partner_properties")
+        .update({ 
+          zillow_rent_zestimate: value,
+          calculated_listing_price: calculatedPrice,
+          zillow_last_fetched: new Date().toISOString()
+        })
+        .eq("id", property.id);
+
+      if (error) throw error;
+
+      toast.success(`Rent Zestimate saved! Listing price: $${calculatedPrice.toLocaleString()}`);
+      setEditingZestimate(false);
+      onPropertyUpdated?.();
+    } catch (error: any) {
+      console.error("Error saving Zestimate:", error);
+      toast.error(error.message || "Failed to save Zestimate");
+    } finally {
+      setSavingZestimate(false);
+    }
+  };
+
+  const handleCancelZestimate = () => {
+    setEditingZestimate(false);
+    setZestimateValue("");
+  };
+
+  const openZillowPage = () => {
+    if (!property.address) {
+      toast.error("Address is required to look up Zillow");
+      return;
+    }
+    const formattedAddress = property.address
+      .trim()
+      .toLowerCase()
+      .replace(/,/g, "")
+      .replace(/\./g, "")
+      .replace(/\s+/g, "-")
+      .replace(/-+/g, "-")
+      .replace(/[^a-z0-9-]/g, "");
+    window.open(`https://www.zillow.com/homes/${formattedAddress}_rb/`, '_blank');
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh] p-0">
@@ -291,6 +356,31 @@ export function PartnerPropertyDetailsModal({
 
             <Separator />
 
+            {/* Team Instructions Box */}
+            <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+              <div className="flex items-start gap-3">
+                <Info className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <h4 className="font-semibold text-blue-800 dark:text-blue-300 mb-2">Team Instructions</h4>
+                  <ol className="text-sm text-blue-700 dark:text-blue-400 space-y-2 list-decimal list-inside">
+                    <li><strong>Verify Pricing:</strong> Click "Open Zillow" below to find the Rent Zestimate for this property</li>
+                    <li><strong>Calculate Listing Price:</strong> Our listing price = Zillow Rent Zestimate × 2.3</li>
+                    <li><strong>Enter Zestimate:</strong> Click the edit button next to "Zillow Rent Zestimate" to enter the value from Zillow</li>
+                    <li><strong>Don't use owner's suggested rent:</strong> Always use Zillow Zestimate × 2.3 formula for accurate pricing</li>
+                  </ol>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="mt-3 bg-blue-100 dark:bg-blue-900/50 border-blue-300 dark:border-blue-700 hover:bg-blue-200 dark:hover:bg-blue-800"
+                    onClick={openZillowPage}
+                  >
+                    <ExternalLink className="w-4 h-4 mr-2" />
+                    Open Zillow to Verify Price
+                  </Button>
+                </div>
+              </div>
+            </div>
+
             {/* Owner Information - Prominent Section */}
             <div className="bg-primary/5 rounded-lg p-4 border border-primary/20">
               <h3 className="text-sm font-semibold text-primary uppercase tracking-wide mb-3 flex items-center gap-2">
@@ -397,21 +487,112 @@ export function PartnerPropertyDetailsModal({
 
             <Separator />
 
-            {/* Pricing with Zillow Note */}
+            {/* Pricing with Zillow Integration */}
             <div>
               <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
                 Pricing
               </h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="p-4 border rounded-lg">
-                  <div className="flex items-center gap-2 mb-1">
-                    <DollarSign className="w-4 h-4 text-green-600" />
-                    <p className="text-sm text-muted-foreground">Monthly Rent (MidTermNation)</p>
+              
+              {/* Main listing price - uses calculated_listing_price if available */}
+              <div className="p-4 border-2 border-green-500 rounded-lg mb-4 bg-green-50 dark:bg-green-950/20">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <DollarSign className="w-5 h-5 text-green-600" />
+                    <p className="font-semibold text-green-800 dark:text-green-300">MidTermNation Listing Price</p>
                   </div>
-                  <p className="text-2xl font-bold text-green-600">{formatCurrency(property.monthly_price)}</p>
-                  <p className="text-xs text-amber-600 mt-1">
-                    ⚠️ Calculate listing price: Zillow Zestimate × 2.3
+                  {property.zillow_last_fetched && (
+                    <span className="text-xs text-muted-foreground">
+                      Updated: {formatDate(property.zillow_last_fetched)}
+                    </span>
+                  )}
+                </div>
+                <p className="text-3xl font-bold text-green-600">
+                  {property.calculated_listing_price 
+                    ? formatCurrency(property.calculated_listing_price)
+                    : <span className="text-amber-600">⚠️ Needs Zillow Verification</span>
+                  }
+                </p>
+                {property.zillow_rent_zestimate && (
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Based on Zillow Rent Zestimate: {formatCurrency(property.zillow_rent_zestimate)} × 2.3
                   </p>
+                )}
+              </div>
+
+              {/* Zillow Rent Zestimate Input */}
+              <div className="p-4 border border-amber-300 dark:border-amber-700 rounded-lg mb-4 bg-amber-50 dark:bg-amber-950/20">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 text-amber-600" />
+                    <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">Zillow Rent Zestimate</p>
+                  </div>
+                  {!editingZestimate && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={handleEditZestimate}
+                      className="h-7 px-2"
+                    >
+                      <Pencil className="w-3 h-3 mr-1" />
+                      {property.zillow_rent_zestimate ? "Update" : "Enter Value"}
+                    </Button>
+                  )}
+                </div>
+                
+                {editingZestimate ? (
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg font-semibold">$</span>
+                    <Input
+                      type="number"
+                      value={zestimateValue}
+                      onChange={(e) => setZestimateValue(e.target.value)}
+                      className="flex-1 h-10"
+                      placeholder="Enter Zillow Rent Zestimate..."
+                      autoFocus
+                    />
+                    <Button
+                      size="sm"
+                      onClick={handleSaveZestimate}
+                      disabled={savingZestimate}
+                      className="h-10"
+                    >
+                      <Check className="w-4 h-4 mr-1" />
+                      Save
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={handleCancelZestimate}
+                      disabled={savingZestimate}
+                      className="h-10"
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                ) : (
+                  <div>
+                    <p className="text-xl font-semibold">
+                      {property.zillow_rent_zestimate 
+                        ? formatCurrency(property.zillow_rent_zestimate)
+                        : <span className="text-muted-foreground">Not entered yet</span>
+                      }
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Go to Zillow → Search this address → Find "Rent Zestimate" → Enter value above
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Owner's Suggested Price (for reference) */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="p-4 border rounded-lg bg-muted/30">
+                  <div className="flex items-center gap-2 mb-1">
+                    <DollarSign className="w-4 h-4 text-muted-foreground" />
+                    <p className="text-sm text-muted-foreground">Owner's Suggested Rent</p>
+                  </div>
+                  <p className="text-xl font-semibold text-muted-foreground">{formatCurrency(property.monthly_price)}</p>
+                  <p className="text-xs text-amber-600 mt-1">⚠️ Do not use - for reference only</p>
                 </div>
                 <div className="p-4 border rounded-lg">
                   <div className="flex items-center gap-2 mb-1">
