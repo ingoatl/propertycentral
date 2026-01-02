@@ -22,7 +22,46 @@ serve(async (req) => {
     let overallStatus: "healthy" | "warning" | "error" = "healthy";
     const details: Record<string, any> = {};
 
-    // ========== CHECK 1: Email Scanning Health ==========
+    // ========== CHECK 1: Gmail OAuth Token Health ==========
+    console.log("Checking Gmail OAuth token health...");
+    
+    const { data: gmailTokens, error: tokenError } = await supabase
+      .from("gmail_oauth_tokens")
+      .select("id, user_id, expires_at, updated_at")
+      .order("updated_at", { ascending: false })
+      .limit(5);
+
+    if (tokenError) {
+      console.error("Error checking Gmail tokens:", tokenError);
+      issues.push("Failed to check Gmail token status");
+      overallStatus = "error";
+    } else if (!gmailTokens || gmailTokens.length === 0) {
+      issues.push("No Gmail OAuth tokens configured");
+      overallStatus = "warning";
+    } else {
+      const now = new Date();
+      const validTokens = gmailTokens.filter(t => new Date(t.expires_at) > now);
+      const expiredTokens = gmailTokens.filter(t => new Date(t.expires_at) <= now);
+      
+      details.gmailTokens = {
+        total: gmailTokens.length,
+        valid: validTokens.length,
+        expired: expiredTokens.length,
+        latestUpdate: gmailTokens[0]?.updated_at,
+      };
+      
+      if (validTokens.length === 0) {
+        issues.push("All Gmail tokens are expired - email scanning may fail");
+        overallStatus = "error";
+      } else if (expiredTokens.length > 0) {
+        issues.push(`${expiredTokens.length} Gmail token(s) expired`);
+        if (overallStatus !== "error") overallStatus = "warning";
+      }
+      
+      console.log(`Gmail tokens: ${validTokens.length} valid, ${expiredTokens.length} expired`);
+    }
+
+    // ========== CHECK 2: Email Scanning Health ==========
     console.log("Checking email scan health...");
     
     const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
@@ -39,7 +78,7 @@ serve(async (req) => {
       overallStatus = "error";
     } else if (!recentScans || recentScans.length === 0) {
       issues.push("No email scans in past 24 hours");
-      overallStatus = "warning";
+      overallStatus = overallStatus === "error" ? "error" : "warning";
     } else {
       const successfulScans = recentScans.filter(s => s.scan_status === "completed");
       const failedScans = recentScans.filter(s => s.scan_status !== "completed");
@@ -54,13 +93,13 @@ serve(async (req) => {
       
       if (failedScans.length > successfulScans.length) {
         issues.push(`More failed scans (${failedScans.length}) than successful (${successfulScans.length})`);
-        overallStatus = "warning";
+        overallStatus = overallStatus === "error" ? "error" : "warning";
       }
       
       console.log(`Email scans: ${successfulScans.length} successful, ${failedScans.length} failed`);
     }
 
-    // ========== CHECK 2: Owner Email Detection ==========
+    // ========== CHECK 3: Owner Email Detection ==========
     console.log("Checking owner email detection...");
     
     // Get all property owner emails
@@ -88,7 +127,7 @@ serve(async (req) => {
     
     console.log(`Owner emails: ${ownerEmailsDetected.length} detected from ${ownerEmails.size} known owners`);
 
-    // ========== CHECK 3: Pending Task Confirmations ==========
+    // ========== CHECK 4: Pending Task Confirmations ==========
     console.log("Checking pending task confirmations...");
     
     const { data: pendingConfirmations } = await supabase
@@ -112,7 +151,7 @@ serve(async (req) => {
     
     console.log(`Task confirmations: ${pendingConfirmations?.length || 0} pending, ${expiredConfirmations.length} expired`);
 
-    // ========== CHECK 4: Owner Conversation Analysis ==========
+    // ========== CHECK 5: Owner Conversation Analysis ==========
     console.log("Checking owner conversation analysis...");
     
     const { data: recentConversations } = await supabase
@@ -122,7 +161,7 @@ serve(async (req) => {
     
     const pendingAnalysis = (recentConversations || []).filter(c => c.status === "pending");
     const analyzedConversations = (recentConversations || []).filter(c => c.status === "analyzed");
-    const failedAnalysis = (recentConversations || []).filter(c => c.status === "failed");
+    const failedAnalysis = (recentConversations || []).filter(c => c.status === "failed" || c.status === "error");
     
     details.ownerConversations = {
       total: recentConversations?.length || 0,
@@ -143,7 +182,23 @@ serve(async (req) => {
     
     console.log(`Owner conversations: ${analyzedConversations.length} analyzed, ${pendingAnalysis.length} pending, ${failedAnalysis.length} failed`);
 
-    // ========== CHECK 5: Lead Communication Processing ==========
+    // ========== CHECK 6: FormSubmit Email Detection ==========
+    console.log("Checking FormSubmit email detection...");
+    
+    const { data: formSubmitInsights } = await supabase
+      .from("email_insights")
+      .select("id, sender_email, subject, created_at")
+      .gte("created_at", twentyFourHoursAgo)
+      .ilike("sender_email", "%formsubmit%");
+    
+    details.formSubmitEmails = {
+      count: formSubmitInsights?.length || 0,
+      subjects: (formSubmitInsights || []).map(i => i.subject).slice(0, 5),
+    };
+    
+    console.log(`FormSubmit emails detected: ${formSubmitInsights?.length || 0}`);
+
+    // ========== CHECK 7: Lead Communication Processing ==========
     console.log("Checking lead communication processing...");
     
     const { data: recentLeadComms } = await supabase
@@ -165,11 +220,10 @@ serve(async (req) => {
     
     console.log(`Lead communications: ${recentLeadComms?.length || 0} total, ${inboundComms.length} inbound`);
 
-    // ========== CHECK 6: Auto-approve Expired Confirmations ==========
+    // ========== Auto-approve Expired Confirmations ==========
     if (expiredConfirmations.length > 0) {
       console.log(`Auto-approving ${expiredConfirmations.length} expired confirmations...`);
       
-      // For now, just mark as auto_approved - could create tasks here too
       const { error: updateError } = await supabase
         .from("pending_task_confirmations")
         .update({
@@ -197,7 +251,7 @@ serve(async (req) => {
         emails_scanned: details.emailScans?.totalEmailsProcessed || 0,
         owner_emails_detected: details.ownerEmails?.ownerEmailsDetected || 0,
         tasks_extracted: details.taskConfirmations?.pending || 0,
-        tasks_confirmed: 0, // Would need to track this separately
+        tasks_confirmed: 0,
         issues_found: issues.length > 0 ? issues : null,
       });
     

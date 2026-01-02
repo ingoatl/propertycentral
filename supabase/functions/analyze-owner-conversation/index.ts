@@ -578,8 +578,12 @@ Extract ALL available information. Use null only if truly not found. Be thorough
       return null;
     };
     
-    if (existingProject && analysisResult.actionItems && analysisResult.actionItems.length > 0) {
-      console.log(`Found ${analysisResult.actionItems.length} action items to process`);
+    // ========== INSERT INTO PENDING_TASK_CONFIRMATIONS FOR APPROVAL ==========
+    // Instead of creating onboarding_tasks directly, queue them for human review
+    const INGO_USER_ID = '8f7c8f43-536f-4587-99dc-5086c144a045';
+    
+    if (analysisResult.actionItems && analysisResult.actionItems.length > 0) {
+      console.log(`Found ${analysisResult.actionItems.length} action items - queuing for approval`);
       
       // Map action item type to phase number
       const typeToPhase: Record<string, number> = {
@@ -590,51 +594,61 @@ Extract ALL available information. Use null only if truly not found. Be thorough
         'maintenance': 5,       // Maintenance
       };
       
+      // Get owner_id from property
+      let ownerId: string | null = null;
+      if (propertyContext?.id) {
+        const { data: propData } = await supabase
+          .from("properties")
+          .select("owner_id")
+          .eq("id", propertyContext.id)
+          .single();
+        ownerId = propData?.owner_id || null;
+      }
+      
       for (const actionItem of analysisResult.actionItems) {
-        // Check if task with similar title already exists using fuzzy matching
-        const similarTask = findSimilarTask(actionItem.title);
-        if (similarTask) {
-          // Add info to existing task notes instead of creating duplicate
-          const newNote = `\n\n[From owner email]: ${actionItem.description}\nSource: "${actionItem.source}"`;
-          const updatedNotes = similarTask.notes 
-            ? `${similarTask.notes}${newNote}`
-            : newNote.trim();
-          
-          await supabase
-            .from("onboarding_tasks")
-            .update({ notes: updatedNotes })
-            .eq("id", similarTask.id);
-          
-          console.log(`Similar task exists, updated notes: "${similarTask.title}" ← "${actionItem.title}"`);
-          actionItemsSkipped.push(`${actionItem.title} → merged into "${similarTask.title}"`);
+        // Check if similar confirmation already exists
+        const { data: existingConf } = await supabase
+          .from("pending_task_confirmations")
+          .select("id")
+          .eq("property_id", propertyContext?.id)
+          .ilike("task_title", actionItem.title)
+          .eq("status", "pending")
+          .maybeSingle();
+        
+        if (existingConf) {
+          console.log(`Task confirmation already exists for: ${actionItem.title}`);
+          actionItemsSkipped.push(`${actionItem.title} (already pending)`);
           continue;
         }
         
         const phaseNumber = typeToPhase[actionItem.type] || 1;
         
-        // Insert task WITHOUT priority field (doesn't exist in schema)
+        // Insert into pending_task_confirmations for human review
         const { error: insertError } = await supabase
-          .from("onboarding_tasks")
+          .from("pending_task_confirmations")
           .insert({
-            project_id: existingProject.id,
-            phase_number: phaseNumber,
-            phase_title: getPhaseTitle(phaseNumber),
-            title: actionItem.title,
-            notes: `${actionItem.description}\n\nSource: "${actionItem.source}"`,
+            source_type: 'conversation',
+            source_id: conversationId,
+            property_id: propertyContext?.id || null,
+            owner_id: ownerId,
+            task_title: actionItem.title,
+            task_description: actionItem.description,
+            task_category: actionItem.type === 'maintenance' ? 'Maintenance' : 
+                           actionItem.type === 'owner_preference' ? 'Owner Preferences' :
+                           actionItem.type === 'verification' ? 'Verification' : 'Setup',
+            phase_suggestion: phaseNumber,
+            priority: actionItem.priority || 'medium',
+            source_quote: actionItem.source,
             status: 'pending',
-            created_at: new Date().toISOString()
+            assigned_to_user_id: INGO_USER_ID,
+            expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days
           });
         
         if (!insertError) {
           actionItemsCreated.push(actionItem.title);
-          // Add to tasksByTitle to prevent duplicates within same analysis
-          tasksByTitle.set(actionItem.title.toLowerCase(), { 
-            title: actionItem.title, 
-            project_id: existingProject.id 
-          });
-          console.log(`✓ Created task: ${actionItem.title} (Phase ${phaseNumber})`);
+          console.log(`✓ Queued for approval: ${actionItem.title} (Phase ${phaseNumber})`);
         } else {
-          console.error(`✗ Failed to create task: ${actionItem.title}`, insertError);
+          console.error(`✗ Failed to queue task: ${actionItem.title}`, insertError);
         }
       }
     }
