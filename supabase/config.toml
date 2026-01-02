@@ -368,3 +368,6 @@ verify_jwt = false
 
 [functions.extract-tasks-from-email]
 verify_jwt = false
+
+[functions.send-vendor-service-email]
+verify_jwt = true
