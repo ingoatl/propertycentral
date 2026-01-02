@@ -147,12 +147,19 @@ serve(async (req) => {
 
   try {
     let forceRescan = false;
+    let scanFormsubmitOnly = false;
+    let searchQuery = '';
+    let daysBack = 35;
+    
     if (req.method === 'POST') {
       try {
         const body = await req.text();
         if (body) {
           const parsed = JSON.parse(body);
           forceRescan = parsed.forceRescan || false;
+          scanFormsubmitOnly = parsed.scanFormsubmitOnly || false;
+          searchQuery = parsed.searchQuery || '';
+          daysBack = parsed.daysBack || 35;
         }
       } catch {
         // Empty body or invalid JSON, use defaults
@@ -194,15 +201,23 @@ serve(async (req) => {
         .eq('user_id', tokenData.user_id);
     }
 
-    // Fetch emails from last 35 days
-    const thirtyFiveDaysAgo = new Date();
-    thirtyFiveDaysAgo.setDate(thirtyFiveDaysAgo.getDate() - 35);
-    const afterDate = Math.floor(thirtyFiveDaysAgo.getTime() / 1000);
+    // Calculate date filter
+    const daysAgo = new Date();
+    daysAgo.setDate(daysAgo.getDate() - daysBack);
+    const afterDate = Math.floor(daysAgo.getTime() / 1000);
 
-    console.log(`Fetching emails after ${thirtyFiveDaysAgo.toISOString()}`);
+    // Build search query
+    let query = `after:${afterDate}`;
+    if (scanFormsubmitOnly) {
+      query = `from:formsubmit.co after:${afterDate}`;
+    } else if (searchQuery) {
+      query = `${searchQuery} after:${afterDate}`;
+    }
+
+    console.log(`Fetching emails with query: ${query}`);
 
     const messagesResponse = await fetch(
-      `https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=500&q=after:${afterDate}`,
+      `https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=500&q=${encodeURIComponent(query)}`,
       {
         headers: { Authorization: `Bearer ${accessToken}` },
       }
