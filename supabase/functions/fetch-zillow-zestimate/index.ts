@@ -86,26 +86,68 @@ Deno.serve(async (req) => {
     // Method 1: Use AI Vision to extract Rent Zestimate from screenshot
     if (screenshot) {
       try {
-        console.log("Using AI Vision to extract Rent Zestimate from screenshot...");
+        console.log("Using Lovable AI Vision to extract Rent Zestimate from screenshot...");
         
-        // Call Gemini Vision API via Lovable AI proxy
-        const aiResponse = await fetch("https://ijsxcaaqphaciaenlegl.supabase.co/functions/v1/ai-extract-rent-zestimate", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
-          },
-          body: JSON.stringify({
-            screenshotUrl: screenshot,
-            address: address,
-          }),
-        });
+        // Use Lovable AI Gateway directly (no need for separate function)
+        const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+        
+        if (LOVABLE_API_KEY) {
+          const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${LOVABLE_API_KEY}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              model: "google/gemini-2.5-flash",
+              messages: [
+                {
+                  role: "system",
+                  content: `Extract the Rent Zestimate from this Zillow page screenshot. 
+The Rent Zestimate is Zillow's estimated monthly rent (NOT the sale price).
+It's typically shown as "Rent Zestimate: $X,XXX/mo" or similar.
+Only return a JSON object: {"rentZestimate": 3500} or {"rentZestimate": null, "reason": "not found"}`
+                },
+                {
+                  role: "user",
+                  content: [
+                    { type: "text", text: `Find the Rent Zestimate for: ${address}` },
+                    { type: "image_url", image_url: { url: screenshot } }
+                  ]
+                }
+              ]
+            }),
+          });
 
-        if (aiResponse.ok) {
-          const aiData = await aiResponse.json();
-          if (aiData.rentZestimate && aiData.rentZestimate > 500 && aiData.rentZestimate < 50000) {
-            rentZestimate = aiData.rentZestimate;
-            console.log(`AI Vision extracted Rent Zestimate: $${rentZestimate}`);
+          if (aiResponse.ok) {
+            const aiData = await aiResponse.json();
+            const content = aiData.choices?.[0]?.message?.content || "";
+            console.log("AI Vision response:", content);
+            
+            // Parse response
+            try {
+              let cleanContent = content.trim();
+              if (cleanContent.includes("```")) {
+                cleanContent = cleanContent.replace(/```json\n?/g, "").replace(/```\n?/g, "");
+              }
+              const parsed = JSON.parse(cleanContent.trim());
+              if (parsed.rentZestimate && parsed.rentZestimate > 500 && parsed.rentZestimate < 50000) {
+                rentZestimate = parsed.rentZestimate;
+                console.log(`AI Vision extracted Rent Zestimate: $${rentZestimate}`);
+              }
+            } catch (parseErr) {
+              // Try regex fallback
+              const match = content.match(/(\d{1,2},?\d{3})/);
+              if (match) {
+                const value = parseInt(match[1].replace(/,/g, ""), 10);
+                if (value >= 1000 && value <= 20000) {
+                  rentZestimate = value;
+                  console.log(`Regex extracted Rent Zestimate: $${rentZestimate}`);
+                }
+              }
+            }
+          } else {
+            console.error("AI Vision request failed:", aiResponse.status);
           }
         }
       } catch (aiError) {
