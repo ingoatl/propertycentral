@@ -352,7 +352,7 @@ verify_jwt = true
 verify_jwt = false
 
 [functions.process-formsubmit-email]
-verify_jwt = true
+verify_jwt = false
 
 [functions.gmail-health-check]
 verify_jwt = true
