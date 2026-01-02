@@ -919,6 +919,57 @@ ANALYZE CAREFULLY - Extract ALL order details including order number and deliver
       }
     }
 
+    // ========== AUTOMATIC TASK EXTRACTION ==========
+    // Extract actionable tasks from email and create pending confirmations
+    // Run in background using EdgeRuntime.waitUntil
+    if (property && insight && analysis.isRelevant) {
+      const extractTasksInBackground = async () => {
+        try {
+          console.log('Starting background task extraction for email insight:', insight.id);
+          
+          const taskResponse = await fetch(
+            `${supabaseUrl}/functions/v1/extract-tasks-from-email`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${supabaseServiceKey}`,
+              },
+              body: JSON.stringify({
+                emailInsightId: insight.id,
+                propertyId: property.id,
+                ownerId: owner?.id || null,
+                subject,
+                summary: analysis.summary,
+                body,
+                suggestedActions: analysis.suggestedActions,
+                senderEmail
+              })
+            }
+          );
+          
+          if (taskResponse.ok) {
+            const taskResult = await taskResponse.json();
+            console.log('Task extraction completed:', taskResult);
+          } else {
+            console.error('Task extraction failed:', await taskResponse.text());
+          }
+        } catch (taskError) {
+          console.error('Error in background task extraction:', taskError);
+        }
+      };
+      
+      // Use EdgeRuntime.waitUntil for background processing
+      // @ts-ignore - EdgeRuntime is available in Deno edge functions
+      if (typeof EdgeRuntime !== 'undefined' && EdgeRuntime.waitUntil) {
+        // @ts-ignore
+        EdgeRuntime.waitUntil(extractTasksInBackground());
+      } else {
+        // Fallback: fire and forget
+        extractTasksInBackground();
+      }
+    }
+
     return new Response(
       JSON.stringify({ 
         shouldSave: true, 

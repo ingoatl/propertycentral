@@ -411,7 +411,7 @@ export const WorkflowDialog = ({ open, onOpenChange, project: initialProject, pr
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-6xl max-h-[90vh] max-md:max-w-full max-md:h-screen max-md:p-4" onPointerDownOutside={(e) => e.preventDefault()}>
+      <DialogContent className="max-w-6xl max-h-[90vh] max-md:max-w-full max-md:h-screen max-md:p-4">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 max-md:text-base md:text-xl">
             <span className="max-md:hidden">{propertyName} - {isPartnerProperty ? "Listing Tasks" : "Onboarding Workflow"}</span>

@@ -362,3 +362,6 @@ verify_jwt = false
 
 [functions.analyze-communications-for-tasks]
 verify_jwt = true
+
+[functions.extract-tasks-from-email]
+verify_jwt = false
