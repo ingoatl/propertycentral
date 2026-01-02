@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { refreshGoogleToken, validateOAuthSetup } from "../_shared/google-oauth.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -9,6 +10,7 @@ const corsHeaders = {
 interface HealthCheckResult {
   healthy: boolean;
   checks: {
+    credentialsValid: boolean;
     tokenExists: boolean;
     tokenNotExpired: boolean;
     gmailApiEnabled: boolean;
@@ -16,30 +18,6 @@ interface HealthCheckResult {
   };
   errors: string[];
   recommendations: string[];
-}
-
-async function refreshAccessToken(refreshToken: string): Promise<string> {
-  const GOOGLE_CLIENT_ID = Deno.env.get('GOOGLE_CLIENT_ID')?.trim();
-  const GOOGLE_CLIENT_SECRET = Deno.env.get('GOOGLE_CLIENT_SECRET')?.trim();
-
-  const response = await fetch('https://oauth2.googleapis.com/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      client_id: GOOGLE_CLIENT_ID!,
-      client_secret: GOOGLE_CLIENT_SECRET!,
-      refresh_token: refreshToken,
-      grant_type: 'refresh_token',
-    }),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Token refresh failed: ${errorText}`);
-  }
-
-  const tokens = await response.json();
-  return tokens.access_token;
 }
 
 serve(async (req) => {
@@ -50,6 +28,7 @@ serve(async (req) => {
   const result: HealthCheckResult = {
     healthy: true,
     checks: {
+      credentialsValid: false,
       tokenExists: false,
       tokenNotExpired: false,
       gmailApiEnabled: false,
@@ -66,6 +45,21 @@ serve(async (req) => {
     );
 
     console.log('Starting Gmail health check...');
+
+    // Check 0: Validate OAuth credentials are properly configured
+    const credentialsCheck = validateOAuthSetup();
+    if (!credentialsCheck.valid) {
+      result.checks.credentialsValid = false;
+      result.healthy = false;
+      result.errors.push(`OAuth credentials issue: ${credentialsCheck.issues.join(', ')}`);
+      result.recommendations.push('Check GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in Supabase secrets');
+      
+      return new Response(JSON.stringify(result), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    result.checks.credentialsValid = true;
+    console.log('Credentials valid');
 
     // Check 1: Token exists
     const { data: tokenData, error: tokenError } = await supabase
@@ -95,14 +89,15 @@ serve(async (req) => {
     if (expiresAt <= now) {
       console.log('Token expired, attempting refresh...');
       try {
-        accessToken = await refreshAccessToken(tokenData.refresh_token);
+        const refreshResult = await refreshGoogleToken(tokenData.refresh_token);
+        accessToken = refreshResult.accessToken;
         
         // Update the token
         await supabase
           .from('gmail_oauth_tokens')
           .update({
             access_token: accessToken,
-            expires_at: new Date(Date.now() + 3600 * 1000).toISOString(),
+            expires_at: new Date(Date.now() + refreshResult.expiresIn * 1000).toISOString(),
             updated_at: new Date().toISOString(),
           })
           .eq('user_id', tokenData.user_id);
@@ -112,8 +107,8 @@ serve(async (req) => {
       } catch (refreshError) {
         result.checks.tokenNotExpired = false;
         result.healthy = false;
-        result.errors.push(`Token refresh failed: ${refreshError instanceof Error ? refreshError.message : 'Unknown error'}`);
-        result.recommendations.push('Reconnect Gmail account - the refresh token may have been revoked');
+        result.errors.push(refreshError instanceof Error ? refreshError.message : 'Token refresh failed');
+        result.recommendations.push('Reconnect Gmail account - the authorization may have expired or been revoked');
       }
     } else {
       result.checks.tokenNotExpired = true;

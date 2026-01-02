@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { getGoogleCredentials } from "../_shared/google-oauth.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -49,8 +50,8 @@ serve(async (req) => {
       );
     }
     
-    const GOOGLE_CLIENT_ID = Deno.env.get('GOOGLE_CLIENT_ID')?.trim();
-    const GOOGLE_CLIENT_SECRET = Deno.env.get('GOOGLE_CLIENT_SECRET')?.trim();
+    // Use shared utility to get credentials
+    const { clientId, clientSecret } = getGoogleCredentials();
     const REDIRECT_URI = `${Deno.env.get('SUPABASE_URL')}/functions/v1/gmail-oauth`;
 
     console.log('Exchanging code for tokens...');
@@ -63,8 +64,8 @@ serve(async (req) => {
       },
       body: new URLSearchParams({
         code,
-        client_id: GOOGLE_CLIENT_ID!,
-        client_secret: GOOGLE_CLIENT_SECRET!,
+        client_id: clientId,
+        client_secret: clientSecret,
         redirect_uri: REDIRECT_URI,
         grant_type: 'authorization_code',
       }),

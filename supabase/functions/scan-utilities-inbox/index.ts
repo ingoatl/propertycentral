@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { refreshGoogleToken } from "../_shared/google-oauth.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -219,33 +220,6 @@ function matchLabelToProperty(labelName: string): { id: string; name: string } |
   return null;
 }
 
-async function refreshToken(refreshTokenValue: string): Promise<string> {
-  const response = await fetch("https://oauth2.googleapis.com/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      client_id: Deno.env.get("GOOGLE_CLIENT_ID")!,
-      client_secret: Deno.env.get("GOOGLE_CLIENT_SECRET")!,
-      refresh_token: refreshTokenValue,
-      grant_type: "refresh_token",
-    }),
-  });
-  const data = await response.json();
-  
-  if (data.error) {
-    // Provide clearer error messages for common OAuth issues
-    if (data.error === 'invalid_grant') {
-      throw new Error('Gmail authorization expired or revoked. Please reconnect Gmail in Settings → Integrations. If the OAuth app is in Testing mode, tokens expire after 7 days.');
-    }
-    if (data.error === 'unauthorized_client') {
-      throw new Error('Gmail OAuth client is not authorized. Please check the Google Cloud Console settings.');
-    }
-    throw new Error(`Token refresh failed: ${data.error_description || data.error}`);
-  }
-  
-  return data.access_token;
-}
-
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -275,7 +249,18 @@ serve(async (req) => {
       );
     }
 
-    const accessToken = await refreshToken(tokenData.refresh_token);
+    // Use shared OAuth utility for token refresh
+    const { accessToken } = await refreshGoogleToken(tokenData.refresh_token);
+    
+    // Update the token in the database
+    await supabase
+      .from("gmail_oauth_tokens")
+      .update({
+        access_token: accessToken,
+        expires_at: new Date(Date.now() + 3600 * 1000).toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("user_id", tokenData.user_id);
 
     // Fetch ALL Gmail labels
     console.log("Fetching all Gmail labels...");
@@ -425,84 +410,72 @@ serve(async (req) => {
           const { amount, source: amountSource } = extractAmount(textContent, subject);
           if (!amount) {
             skippedNoAmount++;
-            // Log amount extraction failures for debugging
-            if (skippedNoAmount <= 5) {
-              console.log(`  ⚠ No amount found in: ${subject.substring(0, 60)}... (provider: ${provider.name})`);
-              // Log a snippet of the email to help debug
-              const snippet = textContent.substring(0, 300).replace(/\s+/g, " ");
-              console.log(`    Snippet: ${snippet}...`);
-            }
+            console.log(`  ⚠ No amount in: ${subject.substring(0, 50)}... (provider: ${provider.name})`);
             continue;
           }
 
-          const accountNum = extractAccountNumber(fullText);
+          // Extract account number
+          const accountNumber = extractAccountNumber(textContent);
           
-          // Parse bill date from email date
-          let billDate = new Date().toISOString().split("T")[0];
-          try {
-            const d = new Date(date);
-            if (!isNaN(d.getTime())) billDate = d.toISOString().split("T")[0];
-          } catch {}
+          // Parse date
+          const billDate = new Date(date);
+          
+          // Insert into database
+          const { error: insertError } = await supabase
+            .from("utility_readings")
+            .insert({
+              property_id: utilLabel.propertyId,
+              utility_type: provider.type,
+              provider_name: provider.name,
+              amount_due: amount,
+              bill_date: billDate.toISOString().split("T")[0],
+              account_number: accountNumber,
+              gmail_message_id: msg.id,
+              source: "gmail_scan",
+              extraction_source: amountSource,
+            });
 
-          // Insert reading
-          const { error: insertErr } = await supabase.from("utility_readings").insert({
-            property_id: utilLabel.propertyId,
-            utility_type: provider.type,
-            provider: provider.name,
-            account_number: accountNum,
-            bill_date: billDate,
-            amount_due: amount,
-            gmail_message_id: msg.id,
-            match_method: "label",
-            raw_email_data: { subject, from, date, label: utilLabel.name },
-          });
-
-          if (!insertErr) {
+          if (insertError) {
+            console.log(`  ✗ Insert error: ${insertError.message}`);
+          } else {
             newReadings++;
+            existingIds.add(msg.id);
             propertyStats[utilLabel.propertyId].count++;
             propertyStats[utilLabel.propertyId].types.add(provider.type);
-            existingIds.add(msg.id);
-            console.log(`  + ${provider.type}: ${provider.name} $${amount}`);
-          } else {
-            console.log(`  Error inserting: ${insertErr.message}`);
+            console.log(`  ✓ Added: ${provider.name} $${amount} (${amountSource})`);
           }
-          
-        } catch (e) {
-          console.error("  Error processing message:", e);
+        } catch (msgError) {
+          console.error(`  Error processing message:`, msgError);
         }
       }
     }
 
-    // Summary
-    console.log("\n========== SUMMARY ==========");
-    for (const [id, stats] of Object.entries(propertyStats)) {
-      console.log(`${stats.name}: ${stats.count} readings (${[...stats.types].join(", ")})`);
-    }
-    console.log(`\nTotal: ${newReadings} new readings`);
-    console.log(`Skipped: ${skippedDupe} duplicates, ${skippedNoProvider} no provider, ${skippedNoAmount} no amount`);
+    // Build summary
+    const summary = {
+      newReadings,
+      skippedDuplicate: skippedDupe,
+      skippedNoProvider,
+      skippedNoAmount,
+      propertiesProcessed: Object.keys(propertyStats).length,
+      propertyBreakdown: Object.entries(propertyStats).map(([id, stats]) => ({
+        propertyId: id,
+        propertyName: stats.name,
+        newReadings: stats.count,
+        utilityTypes: Array.from(stats.types),
+      })),
+    };
+
+    console.log("\n=== SCAN COMPLETE ===");
+    console.log(JSON.stringify(summary, null, 2));
 
     return new Response(
-      JSON.stringify({ 
-        success: true, 
-        newReadings, 
-        skippedDuplicates: skippedDupe,
-        skippedNoProvider,
-        skippedNoAmount,
-        properties: Object.entries(propertyStats).map(([id, stats]) => ({
-          id,
-          name: stats.name,
-          count: stats.count,
-          types: [...stats.types],
-        })),
-        labelsProcessed: utilityLabels.length,
-      }),
+      JSON.stringify({ success: true, ...summary }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
-    
-  } catch (error: any) {
-    console.error("Error:", error);
+  } catch (error) {
+    console.error("Error in scan-utilities-inbox:", error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }

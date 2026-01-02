@@ -1,33 +1,11 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { refreshGoogleToken } from "../_shared/google-oauth.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
-
-async function refreshAccessToken(refreshToken: string) {
-  const GOOGLE_CLIENT_ID = Deno.env.get('GOOGLE_CLIENT_ID')?.trim();
-  const GOOGLE_CLIENT_SECRET = Deno.env.get('GOOGLE_CLIENT_SECRET')?.trim();
-
-  const response = await fetch('https://oauth2.googleapis.com/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      client_id: GOOGLE_CLIENT_ID!,
-      client_secret: GOOGLE_CLIENT_SECRET!,
-      refresh_token: refreshToken,
-      grant_type: 'refresh_token',
-    }),
-  });
-
-  if (!response.ok) {
-    throw new Error('Failed to refresh access token');
-  }
-
-  const tokens = await response.json();
-  return tokens.access_token;
-}
 
 // Background task to process emails
 async function processEmailsInBackground(
@@ -203,13 +181,14 @@ serve(async (req) => {
     // Refresh token if expired
     if (new Date(tokenData.expires_at) <= new Date()) {
       console.log('Access token expired, refreshing...');
-      accessToken = await refreshAccessToken(tokenData.refresh_token);
+      const refreshResult = await refreshGoogleToken(tokenData.refresh_token);
+      accessToken = refreshResult.accessToken;
       
       await supabase
         .from('gmail_oauth_tokens')
         .update({
           access_token: accessToken,
-          expires_at: new Date(Date.now() + 3600 * 1000).toISOString(),
+          expires_at: new Date(Date.now() + refreshResult.expiresIn * 1000).toISOString(),
           updated_at: new Date().toISOString(),
         })
         .eq('user_id', tokenData.user_id);
