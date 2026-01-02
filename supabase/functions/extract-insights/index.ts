@@ -821,12 +821,112 @@ ANALYZE CAREFULLY - Extract ALL order details including order number and deliver
 
     console.log('Saved email insight:', insight.id);
 
+    // ========== OWNER EMAIL AUTO-ANALYSIS ==========
+    // If this email is from a property owner and contains instructions/tasks,
+    // automatically create an owner_conversation and analyze it for action items
+    let ownerConversationCreated = false;
+    let ownerConversationId = null;
+    
+    if (owner && property) {
+      // Check if this email appears to contain owner instructions (not just an expense/receipt)
+      const emailTextLower = `${subject} ${body}`.toLowerCase();
+      const instructionIndicators = [
+        'please', 'make sure', 'ensure', 'need to', 'should', 'must', 'dont forget',
+        "don't forget", 'remember to', 'check', 'verify', 'set up', 'configure',
+        'code is', 'password is', 'wifi', 'key is', 'lock', 'trash', 'garbage',
+        'access', 'instructions', 'important', 'note that', 'fyi', 'heads up'
+      ];
+      
+      const hasInstructions = instructionIndicators.some(ind => emailTextLower.includes(ind));
+      const isJustReceipt = analysis.category === 'expense' && !hasInstructions;
+      
+      // Create owner conversation if this appears to have owner instructions
+      if (hasInstructions && !isJustReceipt) {
+        console.log('Owner email with instructions detected, creating owner_conversation...');
+        
+        // Check for existing conversation with same gmail_message_id
+        const { data: existingConv } = await supabase
+          .from('owner_conversations')
+          .select('id')
+          .eq('property_id', property.id)
+          .eq('transcript', body.substring(0, 100)) // Check first 100 chars to avoid exact duplicates
+          .maybeSingle();
+        
+        if (!existingConv) {
+          // Get onboarding project for this property
+          const { data: project } = await supabase
+            .from('onboarding_projects')
+            .select('id')
+            .eq('property_id', property.id)
+            .maybeSingle();
+          
+          // Create owner conversation record
+          const { data: newConversation, error: convError } = await supabase
+            .from('owner_conversations')
+            .insert({
+              property_id: property.id,
+              project_id: project?.id || null,
+              source: 'email',
+              transcript: `From: ${senderEmail}\nSubject: ${subject}\n\n${body}`,
+              status: 'pending',
+              created_at: new Date().toISOString()
+            })
+            .select()
+            .single();
+          
+          if (!convError && newConversation) {
+            ownerConversationCreated = true;
+            ownerConversationId = newConversation.id;
+            console.log('Created owner_conversation:', newConversation.id);
+            
+            // Invoke analyze-owner-conversation to extract action items
+            try {
+              const analyzeResponse = await fetch(
+                `${supabaseUrl}/functions/v1/analyze-owner-conversation`,
+                {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${supabaseServiceKey}`,
+                  },
+                  body: JSON.stringify({
+                    conversationId: newConversation.id,
+                    transcript: `From: ${senderEmail}\nSubject: ${subject}\n\n${body}`,
+                    propertyContext: {
+                      id: property.id,
+                      name: property.name,
+                      address: property.address
+                    }
+                  })
+                }
+              );
+              
+              if (analyzeResponse.ok) {
+                const analyzeResult = await analyzeResponse.json();
+                console.log('Owner conversation analyzed:', analyzeResult);
+              } else {
+                console.error('Failed to analyze owner conversation:', await analyzeResponse.text());
+              }
+            } catch (analyzeError) {
+              console.error('Error invoking analyze-owner-conversation:', analyzeError);
+            }
+          } else {
+            console.error('Failed to create owner_conversation:', convError);
+          }
+        } else {
+          console.log('Owner conversation already exists for this email content');
+        }
+      }
+    }
+
     return new Response(
       JSON.stringify({ 
         shouldSave: true, 
         insight,
         expenseCreated,
         expenseId,
+        ownerConversationCreated,
+        ownerConversationId,
         analysis
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
