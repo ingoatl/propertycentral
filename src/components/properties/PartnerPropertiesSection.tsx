@@ -450,33 +450,31 @@ export const PartnerPropertiesSection = () => {
                     )}
                   </div>
 
-                  {/* Pricing row */}
+                  {/* Pricing row - only show Zillow-based pricing */}
                   <div className="flex flex-col gap-1 pt-1.5 border-t border-border/30 mt-1.5">
-                    {property.calculated_listing_price ? (
-                      <div className="flex items-center justify-between">
-                        <span className="font-semibold text-sm text-green-600">
-                          ${property.calculated_listing_price.toLocaleString()}/mo
+                    {property.calculated_listing_price && property.zillow_rent_zestimate ? (
+                      <>
+                        <div className="flex items-center justify-between">
+                          <span className="font-semibold text-sm text-green-600">
+                            ${property.calculated_listing_price.toLocaleString()}/mo
+                          </span>
+                          <span className="text-[9px] text-muted-foreground bg-green-100 dark:bg-green-900/30 px-1.5 py-0.5 rounded">
+                            Zillow × 2.3
+                          </span>
+                        </div>
+                        <span className="text-[10px] text-muted-foreground">
+                          Zestimate: ${property.zillow_rent_zestimate.toLocaleString()}/mo
                         </span>
-                        <span className="text-[9px] text-muted-foreground bg-green-100 px-1.5 py-0.5 rounded">
-                          Zillow × 2.3
-                        </span>
-                      </div>
-                    ) : property.monthly_price ? (
-                      <div className="flex items-center justify-between">
-                        <span className="font-semibold text-sm text-amber-600">
-                          ${property.monthly_price.toLocaleString()}/mo
-                        </span>
-                        <span className="text-[9px] text-muted-foreground bg-amber-100 px-1.5 py-0.5 rounded">
-                          MidTermNation
-                        </span>
-                      </div>
+                      </>
                     ) : (
-                      <span className="text-xs text-muted-foreground">No price</span>
-                    )}
-                    {property.zillow_rent_zestimate && (
-                      <span className="text-[10px] text-muted-foreground">
-                        Zestimate: ${property.zillow_rent_zestimate.toLocaleString()}/mo
-                      </span>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-muted-foreground italic">
+                          Pricing pending
+                        </span>
+                        <span className="text-[9px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                          Needs Zestimate
+                        </span>
+                      </div>
                     )}
                   </div>
                 </CardHeader>
