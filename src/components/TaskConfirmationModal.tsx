@@ -215,6 +215,8 @@ function TaskCard({
 }
 
 export function TaskConfirmationModal() {
+  const [isOpen, setIsOpen] = useState(true);
+  
   const {
     pendingConfirmations,
     isLoading,
@@ -231,8 +233,6 @@ export function TaskConfirmationModal() {
   if (!isEligibleUser || pendingConfirmations.length === 0) {
     return null;
   }
-
-  const [isOpen, setIsOpen] = useState(true);
 
   const handleApprove = (id: string, title?: string, description?: string) => {
     approveTask({ confirmationId: id, editedTitle: title, editedDescription: description });
