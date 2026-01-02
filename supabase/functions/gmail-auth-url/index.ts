@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { getGoogleCredentials } from "../_shared/google-oauth.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -35,19 +36,22 @@ serve(async (req) => {
       );
     }
 
-    const GOOGLE_CLIENT_ID = Deno.env.get('GOOGLE_CLIENT_ID')?.trim();
-    const REDIRECT_URI = `${Deno.env.get('SUPABASE_URL')}/functions/v1/gmail-oauth`;
-
-    if (!GOOGLE_CLIENT_ID) {
-      console.error('GOOGLE_CLIENT_ID not configured');
+    // Use shared utility to get credentials
+    let credentials;
+    try {
+      credentials = getGoogleCredentials();
+    } catch (error) {
+      console.error('Credentials error:', error);
       return new Response(
         JSON.stringify({ error: 'Google OAuth not configured' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
+    const REDIRECT_URI = `${Deno.env.get('SUPABASE_URL')}/functions/v1/gmail-oauth`;
+
     const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
-      `client_id=${encodeURIComponent(GOOGLE_CLIENT_ID)}` +
+      `client_id=${encodeURIComponent(credentials.clientId)}` +
       `&redirect_uri=${encodeURIComponent(REDIRECT_URI)}` +
       `&response_type=code` +
       `&scope=${encodeURIComponent('https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/userinfo.email openid')}` +
