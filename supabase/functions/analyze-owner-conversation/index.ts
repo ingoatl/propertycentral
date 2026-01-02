@@ -56,6 +56,18 @@ const directTaskMappings: Record<string, string[]> = {
   'pet': ['Pet policy', 'Pets Allowed', 'Pet Rules'],
 };
 
+// Helper to get phase title
+const getPhaseTitle = (phaseNumber: number): string => {
+  const phaseTitles: Record<number, string> = {
+    1: 'Property Setup',
+    2: 'Verification & Testing',
+    3: 'Owner Preferences',
+    4: 'Follow-up Items',
+    5: 'Maintenance',
+  };
+  return phaseTitles[phaseNumber] || 'General';
+};
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -185,8 +197,8 @@ serve(async (req) => {
       }
     }
 
-    // Enhanced system prompt with explicit field extraction
-    const systemPrompt = `You are an expert property management assistant. Your job is to analyze owner conversations, property documents, and structured data to extract property information.
+    // Enhanced system prompt with explicit field extraction AND action items
+    const systemPrompt = `You are an expert property management assistant. Your job is to analyze owner conversations, property documents, and structured data to extract property information AND identify action items/setup tasks.
 
 CRITICAL: Extract specific field values that map to these EXACT onboarding task fields:
 
@@ -241,6 +253,15 @@ PROPERTY SPECS:
 - water_shutoff_location: Where main water shutoff is
 - gas_shutoff_location: Where gas shutoff is
 
+ACTION ITEMS & SETUP TASKS:
+CRITICAL: Identify ALL action items, setup tasks, and things that need to be done or verified. Look for:
+- Physical setup tasks (e.g., "make sure the lock is self-locking", "verify WiFi works", "check thermostat settings")
+- Configuration tasks (e.g., "set up smart lock", "configure security system", "program garage door")
+- Verification tasks (e.g., "confirm utilities are transferred", "test all appliances")
+- Owner requests or preferences (e.g., "owner prefers guests use back entrance", "no shoes inside")
+- Follow-up items (e.g., "need to get HOA approval", "waiting for permit")
+- Maintenance items (e.g., "HVAC filter needs replacing", "check water heater")
+
 Property Context: ${propertyContext ? `${propertyContext.name} at ${propertyContext.address}` : 'Unknown property'}
 
 Return a JSON object with this structure:
@@ -283,6 +304,15 @@ Return a JSON object with this structure:
     "water_shutoff_location": "value or null",
     "gas_shutoff_location": "value or null"
   },
+  "actionItems": [
+    {
+      "type": "setup_task|verification|owner_preference|follow_up|maintenance",
+      "title": "Brief descriptive title (e.g., 'Ensure lock is self-locking')",
+      "description": "Detailed description of what needs to be done",
+      "priority": "high|medium|low",
+      "source": "Direct quote from the conversation/document"
+    }
+  ],
   "credentials": [
     {
       "serviceName": "Service name",
@@ -310,7 +340,7 @@ Return a JSON object with this structure:
   ]
 }
 
-Extract ALL available information. Use null only if truly not found.`;
+Extract ALL available information. Use null only if truly not found. Be thorough with action items - any task, instruction, or preference mentioned should be captured.`;
 
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -496,6 +526,53 @@ Extract ALL available information. Use null only if truly not found.`;
           } else {
             console.log(`No task found for field "${fieldKey}" (looking for: ${mapping.titles.join(', ')})`);
           }
+        }
+      }
+    }
+
+    // Create onboarding tasks from extracted action items
+    const actionItemsCreated: string[] = [];
+    if (existingProject && analysisResult.actionItems && analysisResult.actionItems.length > 0) {
+      console.log(`Found ${analysisResult.actionItems.length} action items to process`);
+      
+      // Map action item type to phase number
+      const typeToPhase: Record<string, number> = {
+        'setup_task': 1,        // Property Setup
+        'verification': 2,      // Verification
+        'owner_preference': 3,  // Owner Preferences
+        'follow_up': 4,         // Follow-up
+        'maintenance': 5,       // Maintenance
+      };
+      
+      for (const actionItem of analysisResult.actionItems) {
+        // Check if task with similar title already exists
+        const existingTask = tasksByTitle.get(actionItem.title.toLowerCase());
+        if (existingTask) {
+          console.log(`Task already exists: ${actionItem.title}`);
+          continue;
+        }
+        
+        const phaseNumber = typeToPhase[actionItem.type] || 1;
+        const priority = actionItem.priority === 'high' ? 1 : actionItem.priority === 'medium' ? 2 : 3;
+        
+        const { error: insertError } = await supabase
+          .from("onboarding_tasks")
+          .insert({
+            project_id: existingProject.id,
+            phase_number: phaseNumber,
+            phase_title: getPhaseTitle(phaseNumber),
+            title: actionItem.title,
+            notes: `${actionItem.description}\n\nSource: "${actionItem.source}"`,
+            status: 'pending',
+            priority: priority,
+            created_at: new Date().toISOString()
+          });
+        
+        if (!insertError) {
+          actionItemsCreated.push(actionItem.title);
+          console.log(`✓ Created task: ${actionItem.title} (Phase ${phaseNumber})`);
+        } else {
+          console.error(`✗ Failed to create task: ${actionItem.title}`, insertError);
         }
       }
     }
