@@ -52,19 +52,47 @@ export const WorkflowDialog = ({ open, onOpenChange, project: initialProject, pr
     loadPhaseAssignments();
   }, []);
 
+  // Fetch fresh project data when dialog opens
   useEffect(() => {
-    if (open && initialProject?.id) {
-      loadTasks();
-      // Also refresh progress when dialog opens
-      refreshProjectProgress();
-    }
-  }, [open, initialProject?.id]);
+    const loadProject = async () => {
+      if (!open || !propertyId) return;
+      
+      try {
+        const { data, error } = await supabase
+          .from("onboarding_projects")
+          .select("*")
+          .eq("property_id", propertyId)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        
+        if (error) throw error;
+        
+        if (data) {
+          setProjectData(data as OnboardingProject);
+          setLocalProgress(data.progress ?? 0);
+          setLocalStatus((data.status as "completed" | "in-progress" | "pending") ?? "pending");
+        } else {
+          setProjectData(null);
+        }
+      } catch (error) {
+        console.error("Error loading project:", error);
+        setProjectData(initialProject);
+      }
+    };
+    
+    loadProject();
+  }, [open, propertyId]);
 
-  // Sync local state with prop changes
   useEffect(() => {
-    setLocalProgress(initialProject?.progress ?? 0);
-    setLocalStatus(initialProject?.status ?? "pending");
-  }, [initialProject?.progress, initialProject?.status]);
+    if (open && projectData?.id) {
+      loadTasks();
+      refreshProjectProgress();
+    } else if (open && !projectData) {
+      setLoading(false);
+      setTasks([]);
+    }
+  }, [open, projectData?.id]);
 
   useEffect(() => {
     // Filter tasks based on search query, "my tasks" filter, and admin status
@@ -180,7 +208,7 @@ export const WorkflowDialog = ({ open, onOpenChange, project: initialProject, pr
   };
 
   const loadTasks = async () => {
-    if (!initialProject?.id) {
+    if (!projectData?.id) {
       setLoading(false);
       return;
     }
@@ -190,7 +218,7 @@ export const WorkflowDialog = ({ open, onOpenChange, project: initialProject, pr
       const { data, error } = await supabase
         .from("onboarding_tasks")
         .select("*")
-        .eq("project_id", initialProject.id)
+        .eq("project_id", projectData.id)
         .order("phase_number")
         .order("created_at");
 
@@ -207,7 +235,7 @@ export const WorkflowDialog = ({ open, onOpenChange, project: initialProject, pr
           // This phase has no tasks - create them
           for (const task of phase.tasks) {
             missingPhaseTasks.push({
-              project_id: initialProject.id,
+              project_id: projectData.id,
               phase_number: phase.id,
               phase_title: phase.title,
               title: task.title,
@@ -232,7 +260,7 @@ export const WorkflowDialog = ({ open, onOpenChange, project: initialProject, pr
           const { data: updatedData } = await supabase
             .from("onboarding_tasks")
             .select("*")
-            .eq("project_id", initialProject.id)
+            .eq("project_id", projectData.id)
             .order("phase_number")
             .order("created_at");
             
@@ -300,9 +328,13 @@ export const WorkflowDialog = ({ open, onOpenChange, project: initialProject, pr
 
       if (tasksError) throw tasksError;
 
+      // Set the new project data so the UI refreshes
+      setProjectData(newProject as OnboardingProject);
+      setLocalProgress(0);
+      setLocalStatus("pending");
+      
       toast.success("Onboarding started successfully!");
       onUpdate();
-      onOpenChange(false);
     } catch (error: any) {
       console.error('Error starting onboarding:', error);
       toast.error("Failed to start onboarding");
@@ -314,18 +346,18 @@ export const WorkflowDialog = ({ open, onOpenChange, project: initialProject, pr
   const handleTaskUpdate = async () => {
     // Reload tasks to show updated status without closing modal
     await loadTasks();
-    if (initialProject?.id) {
+    if (projectData?.id) {
       await updateProjectProgress();
     }
   };
 
   const refreshProjectProgress = async () => {
-    if (!initialProject?.id) return;
+    if (!projectData?.id) return;
     
     const { data: freshTasks } = await supabase
       .from("onboarding_tasks")
       .select("status, field_value")
-      .eq("project_id", initialProject.id);
+      .eq("project_id", projectData.id);
 
     if (!freshTasks) return;
 
@@ -342,13 +374,13 @@ export const WorkflowDialog = ({ open, onOpenChange, project: initialProject, pr
   };
 
   const updateProjectProgress = async () => {
-    if (!initialProject?.id) return;
+    if (!projectData?.id) return;
 
     // Fetch fresh task data to calculate accurate progress
     const { data: freshTasks } = await supabase
       .from("onboarding_tasks")
       .select("status, field_value")
-      .eq("project_id", initialProject.id);
+      .eq("project_id", projectData.id);
 
     if (!freshTasks) return;
 
@@ -366,7 +398,7 @@ export const WorkflowDialog = ({ open, onOpenChange, project: initialProject, pr
         status: progress === 100 ? "completed" : progress > 0 ? "in-progress" : "pending",
         updated_at: new Date().toISOString(),
       })
-      .eq("id", initialProject.id);
+      .eq("id", projectData.id);
 
     if (error) {
       console.error("Failed to update project progress:", error);
@@ -396,18 +428,18 @@ export const WorkflowDialog = ({ open, onOpenChange, project: initialProject, pr
                 Visit Price: ${visitPrice}
               </div>
             )}
-            {initialProject && (
+            {projectData && (
               <div className="flex items-center gap-2">
                 <span className="font-medium">Status:</span>
                 <span className="capitalize">{localStatus}</span>
                 <span className="ml-4 font-medium">Progress:</span>
-                <span>{localProgress}%</span>
+                <span>{Math.round(localProgress)}%</span>
               </div>
             )}
           </div>
         </DialogHeader>
 
-        {!initialProject ? (
+        {!projectData ? (
           <div className="flex flex-col items-center justify-center py-12 space-y-4">
             <Building2 className="h-16 w-16 text-muted-foreground opacity-50" />
             <div className="text-center space-y-2">
@@ -460,7 +492,7 @@ export const WorkflowDialog = ({ open, onOpenChange, project: initialProject, pr
                 <div className="space-y-4 max-md:space-y-3">
                   {/* Workflow Phases */}
                   <WorkflowPhases
-                    projectId={initialProject.id}
+                    projectId={projectData.id}
                     tasks={filteredTasks}
                     onTaskUpdate={handleTaskUpdate}
                     searchQuery={searchQuery}
@@ -484,7 +516,7 @@ export const WorkflowDialog = ({ open, onOpenChange, project: initialProject, pr
                   )}
 
                   {/* Inspection Card - only for regular properties */}
-                  {!isPartnerProperty && <InspectionCard projectId={initialProject.id} />}
+                  {!isPartnerProperty && <InspectionCard projectId={projectData.id} />}
                 </div>
               )}
             </ScrollArea>
