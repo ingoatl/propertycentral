@@ -11,7 +11,7 @@ import { Vendor, VENDOR_SPECIALTIES } from "@/types/maintenance";
 import AddVendorDialog from "@/components/maintenance/AddVendorDialog";
 import VendorDetailModal from "@/components/maintenance/VendorDetailModal";
 import ServiceSignupDialog from "@/components/maintenance/ServiceSignupDialog";
-
+import ActiveServicesOverview from "@/components/maintenance/ActiveServicesOverview";
 const Vendors = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedSpecialty, setSelectedSpecialty] = useState<string | null>(null);
@@ -153,6 +153,9 @@ const Vendors = () => {
             </CardContent>
           </Card>
         </div>
+
+        {/* Active Services Overview */}
+        <ActiveServicesOverview />
 
         {/* Filters */}
         <div className="flex flex-col sm:flex-row gap-4">

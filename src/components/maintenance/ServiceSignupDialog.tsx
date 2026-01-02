@@ -144,7 +144,7 @@ const ServiceSignupDialog = ({ open, onOpenChange }: ServiceSignupDialogProps) =
   );
 
   const isTrashService = useMemo(
-    () => selectedVendor?.specialty?.includes("trash_services"),
+    () => selectedVendor?.specialty?.includes("valet_trash") || selectedVendor?.specialty?.includes("trash_services"),
     [selectedVendor]
   );
 
