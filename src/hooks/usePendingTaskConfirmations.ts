@@ -101,7 +101,7 @@ export function usePendingTaskConfirmations() {
     };
   }, [isEligibleUser, refetch]);
 
-  // Approve task mutation
+  // Approve task mutation - creates tasks in owner_conversation_actions (Initial Setup Tasks)
   const approveMutation = useMutation({
     mutationFn: async ({
       confirmationId,
@@ -116,38 +116,48 @@ export function usePendingTaskConfirmations() {
       const confirmation = pendingConfirmations.find((c) => c.id === confirmationId);
       if (!confirmation) throw new Error("Confirmation not found");
 
-      // Get onboarding project for this property
-      const { data: project } = await supabase
-        .from("onboarding_projects")
+      // Get or create owner_conversation for this property
+      let conversationId: string;
+      
+      const { data: existingConversation } = await supabase
+        .from("owner_conversations")
         .select("id")
         .eq("property_id", confirmation.property_id)
+        .limit(1)
         .maybeSingle();
 
-      if (!project) {
-        throw new Error("No onboarding project found for this property");
+      if (existingConversation) {
+        conversationId = existingConversation.id;
+      } else {
+        // Create a new conversation for this property
+        const { data: newConversation, error: convError } = await supabase
+          .from("owner_conversations")
+          .insert({
+            property_id: confirmation.property_id,
+            title: "Setup Tasks",
+            ai_summary: "Tasks extracted from pending confirmations",
+            conversation_date: new Date().toISOString().split('T')[0],
+          })
+          .select()
+          .single();
+        
+        if (convError) throw convError;
+        conversationId = newConversation.id;
       }
 
-      // Create the onboarding task
-      const phaseNumber = confirmation.phase_suggestion || 1;
-      const phaseTitles: Record<number, string> = {
-        1: "Property Setup",
-        2: "Verification & Testing",
-        3: "Owner Preferences",
-        4: "Follow-up Items",
-        5: "Maintenance",
-      };
-
+      // Create the task in owner_conversation_actions (Initial Setup Tasks)
       const { data: newTask, error: taskError } = await supabase
-        .from("onboarding_tasks")
+        .from("owner_conversation_actions")
         .insert({
-          project_id: project.id,
-          phase_number: phaseNumber,
-          phase_title: phaseTitles[phaseNumber] || "General",
+          conversation_id: conversationId,
+          action_type: "task",
           title: editedTitle || confirmation.task_title,
-          notes: (editedDescription || confirmation.task_description) +
+          description: (editedDescription || confirmation.task_description || "") +
             (confirmation.source_quote ? `\n\nSource: "${confirmation.source_quote}"` : ""),
-          status: "pending",
-          created_at: new Date().toISOString(),
+          category: confirmation.task_category || "General",
+          priority: confirmation.priority || "medium",
+          status: "created",
+          assigned_to: "peachhaus",
         })
         .select()
         .single();
@@ -171,9 +181,9 @@ export function usePendingTaskConfirmations() {
       return newTask;
     },
     onSuccess: (newTask) => {
-      toast.success(`Task "${newTask.title}" created!`);
+      toast.success(`Task "${newTask.title}" added to Initial Setup Tasks!`);
       queryClient.invalidateQueries({ queryKey: ["pending-task-confirmations"] });
-      queryClient.invalidateQueries({ queryKey: ["onboarding-tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["owner-conversation-actions"] });
     },
     onError: (error) => {
       console.error("Error approving task:", error);

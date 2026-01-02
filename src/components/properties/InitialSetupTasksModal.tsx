@@ -170,8 +170,8 @@ export function InitialSetupTasksModal({
 
   // Separate tasks by assignee and status
   const completedTasks = tasks.filter(t => t.status === "completed");
-  const peachHausTasks = tasks.filter(t => t.status !== "completed" && t.assigned_to !== "owner");
-  const ownerTasks = tasks.filter(t => t.status !== "completed" && t.assigned_to === "owner");
+  const peachHausTasks = tasks.filter(t => t.status !== "completed" && t.status !== "dismissed" && t.assigned_to !== "owner");
+  const ownerTasks = tasks.filter(t => t.status !== "completed" && t.status !== "dismissed" && t.assigned_to === "owner");
 
   const getPriorityColor = (priority: string | null) => {
     switch (priority) {
