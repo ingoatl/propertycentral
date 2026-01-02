@@ -238,6 +238,7 @@ export const VENDOR_SPECIALTIES = [
   'flooring',
   'painting',
   'windows_doors',
+  'trash_services',
 ];
 
 export const URGENCY_CONFIG: Record<WorkOrderUrgency, { label: string; color: string; bgColor: string }> = {

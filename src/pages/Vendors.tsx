@@ -6,15 +6,17 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Plus, Search, Phone, Mail, Star, Clock, Wrench, Shield, AlertTriangle, Loader2, ScanSearch } from "lucide-react";
+import { Plus, Search, Phone, Mail, Star, Clock, Wrench, Shield, AlertTriangle, Loader2, ScanSearch, FileSignature } from "lucide-react";
 import { Vendor, VENDOR_SPECIALTIES } from "@/types/maintenance";
 import AddVendorDialog from "@/components/maintenance/AddVendorDialog";
 import VendorDetailModal from "@/components/maintenance/VendorDetailModal";
+import ServiceSignupDialog from "@/components/maintenance/ServiceSignupDialog";
 
 const Vendors = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedSpecialty, setSelectedSpecialty] = useState<string | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
+  const [showServiceSignupDialog, setShowServiceSignupDialog] = useState(false);
   const [selectedVendor, setSelectedVendor] = useState<Vendor | null>(null);
   const [isExtracting, setIsExtracting] = useState(false);
   const queryClient = useQueryClient();
@@ -102,6 +104,14 @@ const Vendors = () => {
                 <ScanSearch className="h-4 w-4" />
               )}
               {isExtracting ? 'Scanning...' : 'Extract from Emails'}
+            </Button>
+            <Button 
+              variant="outline"
+              onClick={() => setShowServiceSignupDialog(true)} 
+              className="gap-2"
+            >
+              <FileSignature className="h-4 w-4" />
+              Sign Up for Service
             </Button>
             <Button onClick={() => setShowAddDialog(true)} className="gap-2">
               <Plus className="h-4 w-4" />
@@ -314,6 +324,11 @@ const Vendors = () => {
           }}
         />
       )}
+
+      <ServiceSignupDialog
+        open={showServiceSignupDialog}
+        onOpenChange={setShowServiceSignupDialog}
+      />
     </>
   );
 };
