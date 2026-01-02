@@ -10,6 +10,7 @@ import { toast } from "sonner";
 interface HealthCheckResult {
   healthy: boolean;
   checks: {
+    credentialsValid: boolean;
     tokenExists: boolean;
     tokenNotExpired: boolean;
     gmailApiEnabled: boolean;
@@ -48,6 +49,7 @@ export function GmailHealthWatchdog() {
       setHealth({
         healthy: false,
         checks: {
+          credentialsValid: false,
           tokenExists: false,
           tokenNotExpired: false,
           gmailApiEnabled: false,
@@ -114,6 +116,12 @@ export function GmailHealthWatchdog() {
           <>
             {/* Status Checks */}
             <div className="grid grid-cols-2 gap-2 text-sm">
+              <div className="flex items-center gap-2">
+                {getCheckIcon(health.checks.credentialsValid)}
+                <span className={health.checks.credentialsValid ? 'text-foreground' : 'text-muted-foreground'}>
+                  Credentials valid
+                </span>
+              </div>
               <div className="flex items-center gap-2">
                 {getCheckIcon(health.checks.tokenExists)}
                 <span className={health.checks.tokenExists ? 'text-foreground' : 'text-muted-foreground'}>
