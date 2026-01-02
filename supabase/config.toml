@@ -359,3 +359,6 @@ verify_jwt = true
 
 [functions.fetch-zillow-zestimate]
 verify_jwt = false
+
+[functions.analyze-communications-for-tasks]
+verify_jwt = true
