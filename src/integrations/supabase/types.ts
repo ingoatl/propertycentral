@@ -5338,6 +5338,7 @@ export type Database = {
           created_at: string | null
           id: string
           is_primary: boolean | null
+          monthly_cost: number | null
           notes: string | null
           property_id: string
           specialty: string
@@ -5350,6 +5351,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           is_primary?: boolean | null
+          monthly_cost?: number | null
           notes?: string | null
           property_id: string
           specialty: string
@@ -5362,6 +5364,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           is_primary?: boolean | null
+          monthly_cost?: number | null
           notes?: string | null
           property_id?: string
           specialty?: string
