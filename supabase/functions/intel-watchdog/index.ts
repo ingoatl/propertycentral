@@ -55,7 +55,7 @@ serve(async (req) => {
         overallStatus = "error";
       } else if (expiredTokens.length > 0) {
         issues.push(`${expiredTokens.length} Gmail token(s) expired`);
-        if (overallStatus !== "error") overallStatus = "warning";
+        overallStatus = "warning";
       }
       
       console.log(`Gmail tokens: ${validTokens.length} valid, ${expiredTokens.length} expired`);
