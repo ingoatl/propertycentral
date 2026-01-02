@@ -220,8 +220,20 @@ serve(async (req) => {
     
     console.log("Processing formsubmit email:", { emailInsightId, propertyId, gmailMessageId });
     
-    // Get Gmail access token
-    const accessToken = await refreshGoogleToken(supabase as any);
+    // Fetch refresh token from database first
+    const { data: tokenData, error: tokenError } = await supabase
+      .from('gmail_oauth_tokens')
+      .select('refresh_token')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+    
+    if (tokenError || !tokenData?.refresh_token) {
+      throw new Error("No Gmail OAuth token found. Please reconnect Gmail.");
+    }
+    
+    // Get Gmail access token using the refresh token
+    const { accessToken } = await refreshGoogleToken(tokenData.refresh_token);
     if (!accessToken) {
       throw new Error("Failed to get Gmail access token");
     }

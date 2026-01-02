@@ -47,10 +47,10 @@ Deno.serve(async (req) => {
       throw managedError;
     }
 
-    // Fetch partner properties
+    // Fetch partner properties with Zillow pricing
     const { data: partnerProperties, error: partnerError } = await supabase
       .from("partner_properties")
-      .select("*")
+      .select("*, zillow_rent_zestimate, calculated_listing_price, zillow_last_fetched")
       .eq("status", "active");
 
     if (partnerError) {
@@ -100,7 +100,7 @@ Deno.serve(async (req) => {
       };
     });
 
-    // Transform partner properties
+    // Transform partner properties - use calculated_listing_price (2.3x Zillow) if available
     const transformedPartner = (partnerProperties || []).map((p: any) => ({
       id: p.id,
       name: p.property_title || p.address,
@@ -111,7 +111,10 @@ Deno.serve(async (req) => {
       bedrooms: p.bedrooms,
       bathrooms: p.bathrooms,
       sqft: p.square_footage,
-      monthly_rent: p.monthly_price,
+      monthly_rent: p.calculated_listing_price || p.monthly_price,
+      zillow_rent_zestimate: p.zillow_rent_zestimate || null,
+      midtermnation_price: p.monthly_price,
+      price_source: p.calculated_listing_price ? "zillow_calculated" : "midtermnation",
       nightly_rate: null,
       image_url: p.featured_image_url,
       property_type: "partner",

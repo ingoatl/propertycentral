@@ -439,6 +439,40 @@ serve(async (req) => {
         console.log(`Successfully synced property: ${property.property_title}`);
         
         if (upsertedProperty?.id) {
+          // Step 0: Fetch Zillow Rent Zestimate and calculate listing price
+          const fullAddress = [property.address, property.city, property.state, property.zip_code]
+            .filter(Boolean)
+            .join(', ');
+          
+          if (fullAddress) {
+            try {
+              console.log(`Fetching Zillow Zestimate for: ${fullAddress}`);
+              const zillowResponse = await fetch(
+                `${Deno.env.get('SUPABASE_URL')}/functions/v1/fetch-zillow-zestimate`,
+                {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+                  },
+                  body: JSON.stringify({
+                    address: fullAddress,
+                    partnerPropertyId: upsertedProperty.id,
+                  }),
+                }
+              );
+              
+              const zillowData = await zillowResponse.json();
+              if (zillowData.success) {
+                console.log(`✓ Zillow Zestimate: $${zillowData.rentZestimate}, Calculated Price: $${zillowData.calculatedListingPrice}`);
+              } else {
+                console.log(`⚠️ Could not fetch Zillow Zestimate: ${zillowData.error}`);
+              }
+            } catch (zillowError) {
+              console.error('Failed to fetch Zillow Zestimate:', zillowError);
+            }
+          }
+          
           // Step 1: Create or find onboarding project
           const projectId = await createOnboardingProjectIfNeeded(supabase, upsertedProperty.id, property);
           

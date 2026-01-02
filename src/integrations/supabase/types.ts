@@ -4031,6 +4031,7 @@ export type Database = {
           appliances_included: string[] | null
           bathrooms: number | null
           bedrooms: number | null
+          calculated_listing_price: number | null
           category: string
           city: string | null
           cleaning_fee: number | null
@@ -4067,6 +4068,8 @@ export type Database = {
           utilities_included: string[] | null
           virtual_tour_url: string | null
           year_built: number | null
+          zillow_last_fetched: string | null
+          zillow_rent_zestimate: number | null
           zip_code: string | null
         }
         Insert: {
@@ -4075,6 +4078,7 @@ export type Database = {
           appliances_included?: string[] | null
           bathrooms?: number | null
           bedrooms?: number | null
+          calculated_listing_price?: number | null
           category?: string
           city?: string | null
           cleaning_fee?: number | null
@@ -4111,6 +4115,8 @@ export type Database = {
           utilities_included?: string[] | null
           virtual_tour_url?: string | null
           year_built?: number | null
+          zillow_last_fetched?: string | null
+          zillow_rent_zestimate?: number | null
           zip_code?: string | null
         }
         Update: {
@@ -4119,6 +4125,7 @@ export type Database = {
           appliances_included?: string[] | null
           bathrooms?: number | null
           bedrooms?: number | null
+          calculated_listing_price?: number | null
           category?: string
           city?: string | null
           cleaning_fee?: number | null
@@ -4155,6 +4162,8 @@ export type Database = {
           utilities_included?: string[] | null
           virtual_tour_url?: string | null
           year_built?: number | null
+          zillow_last_fetched?: string | null
+          zillow_rent_zestimate?: number | null
           zip_code?: string | null
         }
         Relationships: []

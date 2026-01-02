@@ -356,3 +356,6 @@ verify_jwt = false
 
 [functions.gmail-health-check]
 verify_jwt = true
+
+[functions.fetch-zillow-zestimate]
+verify_jwt = false
