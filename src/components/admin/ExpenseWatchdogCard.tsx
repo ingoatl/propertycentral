@@ -220,30 +220,27 @@ export const ExpenseWatchdogCard = () => {
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
       <Card className={flaggedCount > 0 ? "border-amber-500" : ""}>
         <CardHeader className="pb-2">
-          <CollapsibleTrigger className="flex items-center justify-between w-full">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <AlertTriangle className={`w-5 h-5 ${flaggedCount > 0 ? "text-amber-500" : "text-green-500"}`} />
-              Expense Watchdog
-              {flaggedCount > 0 && (
-                <Badge variant="destructive" className="ml-2">
-                  {flaggedCount} issues
-                </Badge>
-              )}
-            </CardTitle>
-            <div className="flex items-center gap-2">
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={(e) => {
-                  e.stopPropagation();
-                  refetch();
-                }}
-              >
-                <RefreshCw className="w-4 h-4" />
-              </Button>
+          <div className="flex items-center justify-between w-full">
+            <CollapsibleTrigger className="flex items-center gap-2 hover:opacity-80 cursor-pointer">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <AlertTriangle className={`w-5 h-5 ${flaggedCount > 0 ? "text-amber-500" : "text-green-500"}`} />
+                Expense Watchdog
+                {flaggedCount > 0 && (
+                  <Badge variant="destructive" className="ml-2">
+                    {flaggedCount} issues
+                  </Badge>
+                )}
+              </CardTitle>
               {isOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-            </div>
-          </CollapsibleTrigger>
+            </CollapsibleTrigger>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => refetch()}
+            >
+              <RefreshCw className="w-4 h-4" />
+            </Button>
+          </div>
         </CardHeader>
         <CollapsibleContent>
           <CardContent>
