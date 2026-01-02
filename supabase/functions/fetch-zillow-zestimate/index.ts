@@ -5,6 +5,8 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+const MULTIPLIER = 2.2;
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -29,7 +31,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Format address for Zillow URL - more careful formatting
+    // Format address for Zillow URL
     const formattedAddress = address
       .trim()
       .toLowerCase()
@@ -41,9 +43,9 @@ Deno.serve(async (req) => {
     
     const zillowUrl = `https://www.zillow.com/homes/${formattedAddress}_rb/`;
     
-    console.log("Fetching Zillow page:", zillowUrl);
+    console.log("Fetching Zillow page screenshot:", zillowUrl);
 
-    // Scrape Zillow using Firecrawl
+    // Use Firecrawl to get a screenshot of the Zillow page
     const scrapeResponse = await fetch("https://api.firecrawl.dev/v1/scrape", {
       method: "POST",
       headers: {
@@ -52,9 +54,10 @@ Deno.serve(async (req) => {
       },
       body: JSON.stringify({
         url: zillowUrl,
-        formats: ["markdown", "html"],
-        onlyMainContent: false, // Get full page to find rent estimate
-        waitFor: 5000, // Longer wait for dynamic content
+        formats: ["screenshot", "markdown"],
+        onlyMainContent: false,
+        waitFor: 5000,
+        screenshot: true,
       }),
     });
 
@@ -72,79 +75,73 @@ Deno.serve(async (req) => {
       );
     }
 
+    const screenshot = scrapeData.data?.screenshot || scrapeData.screenshot;
     const markdown = scrapeData.data?.markdown || scrapeData.markdown || "";
-    const html = scrapeData.data?.html || scrapeData.html || "";
-    console.log("Scraped markdown length:", markdown.length);
-    console.log("Scraped HTML length:", html.length);
-    console.log("Markdown preview:", markdown.substring(0, 2000));
-
-    // Extract Rent Zestimate from the content
-    // Zillow shows rent estimate in various formats on the page
-    let rentZestimate: number | null = null;
     
-    // Try markdown patterns first
-    const markdownPatterns = [
-      /Rent\s*Zestimate[®™]?\s*[:\s]*\$?([\d,]+)/i,
-      /Zestimate.*?rent[:\s]*\$?([\d,]+)/i,
-      /rent[:\s]*\$?([\d,]+)\s*\/\s*mo/i,
-      /\$?([\d,]+)\s*\/mo.*?(?:rent|estimated)/i,
-      /Estimated\s*monthly\s*rent[:\s]*\$?([\d,]+)/i,
-      /Monthly\s*rent\s*estimate[:\s]*\$?([\d,]+)/i,
-    ];
+    console.log("Got screenshot:", !!screenshot);
+    console.log("Screenshot URL length:", screenshot?.length || 0);
 
-    for (const pattern of markdownPatterns) {
-      const match = markdown.match(pattern);
-      if (match) {
-        const value = parseInt(match[1].replace(/,/g, ""), 10);
-        if (value > 500 && value < 50000) {
-          rentZestimate = value;
-          console.log(`Found Rent Zestimate in markdown: $${rentZestimate}`);
-          break;
+    let rentZestimate: number | null = null;
+
+    // Method 1: Use AI Vision to extract Rent Zestimate from screenshot
+    if (screenshot) {
+      try {
+        console.log("Using AI Vision to extract Rent Zestimate from screenshot...");
+        
+        // Call Gemini Vision API via Lovable AI proxy
+        const aiResponse = await fetch("https://ijsxcaaqphaciaenlegl.supabase.co/functions/v1/ai-extract-rent-zestimate", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+          },
+          body: JSON.stringify({
+            screenshotUrl: screenshot,
+            address: address,
+          }),
+        });
+
+        if (aiResponse.ok) {
+          const aiData = await aiResponse.json();
+          if (aiData.rentZestimate && aiData.rentZestimate > 500 && aiData.rentZestimate < 50000) {
+            rentZestimate = aiData.rentZestimate;
+            console.log(`AI Vision extracted Rent Zestimate: $${rentZestimate}`);
+          }
         }
+      } catch (aiError) {
+        console.error("AI Vision extraction failed:", aiError);
       }
     }
 
-    // Try HTML patterns if markdown didn't find it
-    if (!rentZestimate && html) {
-      const htmlPatterns = [
-        /data-testid="[^"]*rent[^"]*"[^>]*>\$?([\d,]+)/i,
-        /rent[^<]*<[^>]*>\$?([\d,]+)/i,
-        /Zestimate[^<]*<[^>]*>[^<]*<[^>]*>\$?([\d,]+)/i,
-        /\$?([\d,]+)\s*(?:<[^>]*>)*\s*\/\s*mo/i,
+    // Method 2: Fallback to regex parsing of markdown
+    if (!rentZestimate && markdown) {
+      console.log("Falling back to regex extraction from markdown...");
+      const patterns = [
+        /Rent\s*Zestimate[®™]?\s*[:\s]*\$?([\d,]+)/i,
+        /Zestimate.*?rent[:\s]*\$?([\d,]+)/i,
+        /rent[:\s]*\$?([\d,]+)\s*\/\s*mo/i,
+        /\$?([\d,]+)\s*\/mo.*?(?:rent|estimated)/i,
+        /Estimated\s*monthly\s*rent[:\s]*\$?([\d,]+)/i,
       ];
-      
-      for (const pattern of htmlPatterns) {
-        const match = html.match(pattern);
+
+      for (const pattern of patterns) {
+        const match = markdown.match(pattern);
         if (match) {
           const value = parseInt(match[1].replace(/,/g, ""), 10);
           if (value > 500 && value < 50000) {
             rentZestimate = value;
-            console.log(`Found Rent Zestimate in HTML: $${rentZestimate}`);
+            console.log(`Regex extracted Rent Zestimate: $${rentZestimate}`);
             break;
           }
         }
       }
     }
-    
-    // Last resort - look for any dollar amounts in reasonable rent range
-    if (!rentZestimate) {
-      const dollarPattern = /\$([\d,]+)\s*(?:\/\s*month|\/mo|per\s*month)/gi;
-      let match;
-      while ((match = dollarPattern.exec(markdown + html)) !== null) {
-        const value = parseInt(match[1].replace(/,/g, ""), 10);
-        if (value >= 1000 && value <= 20000) {
-          rentZestimate = value;
-          console.log(`Found potential rent value: $${rentZestimate}`);
-          break;
-        }
-      }
-    }
 
-    // Calculate listing price (2.3x Rent Zestimate)
-    const calculatedListingPrice = rentZestimate ? Math.round(rentZestimate * 2.3) : null;
+    // Calculate listing price (2.2x Rent Zestimate)
+    const calculatedListingPrice = rentZestimate ? Math.round(rentZestimate * MULTIPLIER) : null;
 
-    console.log("Rent Zestimate:", rentZestimate);
-    console.log("Calculated Listing Price (2.3x):", calculatedListingPrice);
+    console.log("Final Rent Zestimate:", rentZestimate);
+    console.log(`Calculated Listing Price (${MULTIPLIER}x):`, calculatedListingPrice);
 
     // Update partner property if ID provided
     if (partnerPropertyId && (rentZestimate || calculatedListingPrice)) {
@@ -174,7 +171,8 @@ Deno.serve(async (req) => {
         zillowUrl,
         rentZestimate,
         calculatedListingPrice,
-        multiplier: 2.3,
+        multiplier: MULTIPLIER,
+        screenshotAvailable: !!screenshot,
         fetchedAt: new Date().toISOString(),
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
