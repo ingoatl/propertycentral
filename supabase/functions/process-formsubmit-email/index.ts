@@ -127,43 +127,100 @@ const FIELD_TO_TASK_MAPPING: Record<string, string> = {
 
 // Parse formsubmit email body to extract field-value pairs
 function parseFormSubmitEmail(body: string, rawHtml: string | null): Record<string, string> {
-  const content = body || rawHtml || '';
   const fields: Record<string, string> = {};
   
   console.log("Parsing formsubmit email content...");
-  console.log("Content length:", content.length);
+  console.log("Body length:", body?.length || 0);
+  console.log("HTML length:", rawHtml?.length || 0);
   
-  // Pattern 1: Field Name: Value format
-  const colonPattern = /([A-Za-z][A-Za-z0-9_\s]{2,40}):\s*([^\n]+)/g;
-  let match;
-  while ((match = colonPattern.exec(content)) !== null) {
-    const fieldName = match[1].trim().toLowerCase().replace(/\s+/g, '_');
-    const value = match[2].trim();
-    if (value && value.length > 0 && value !== 'N/A' && value !== 'n/a') {
-      fields[fieldName] = value;
+  // Prefer HTML for formsubmit emails as they use tables
+  const content = rawHtml || body || '';
+  
+  // Skip fields that are email metadata, not form data
+  const skipFields = new Set([
+    'from', 'to', 'date', 'subject', 'forwarded_message', 'message',
+    'someone_just_submitted_your_form_on_https', 's_what_they_had_to_say',
+    'font', 'family', 'style', 'width', 'height', 'border', 'padding',
+    'align', 'color', 'margin', 'display', 'radius', 'collapse', 'bottom',
+    'decoration', 'html_lang', 'meta_charset', 'meta_name', 'content',
+    'equiv', 'table_style', 'th_style', 'td_style', 'ref', 'image', 'https'
+  ]);
+  
+  // Pattern 1: HTML table with Name/Value headers (FormSubmit's format)
+  // Look for tables with form data
+  const tablePattern = /<table[^>]*>([\s\S]*?)<\/table>/gi;
+  let tableMatch;
+  while ((tableMatch = tablePattern.exec(content)) !== null) {
+    const tableContent = tableMatch[1];
+    
+    // Extract rows from table
+    const rowPattern = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
+    let rowMatch;
+    while ((rowMatch = rowPattern.exec(tableContent)) !== null) {
+      const rowContent = rowMatch[1];
+      
+      // Extract cells - handle both th and td
+      const cellPattern = /<t[hd][^>]*>([\s\S]*?)<\/t[hd]>/gi;
+      const cells: string[] = [];
+      let cellMatch;
+      while ((cellMatch = cellPattern.exec(rowContent)) !== null) {
+        // Strip HTML tags from cell content
+        const cellText = cellMatch[1].replace(/<[^>]*>/g, '').trim();
+        if (cellText) {
+          cells.push(cellText);
+        }
+      }
+      
+      // If we have exactly 2 cells, treat as key-value pair
+      if (cells.length === 2) {
+        const fieldName = cells[0].toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+        const value = cells[1];
+        
+        // Skip metadata and empty values
+        if (fieldName && value && !skipFields.has(fieldName) && value !== 'N/A' && value.length > 0) {
+          fields[fieldName] = value;
+          console.log(`Table field: ${fieldName} = ${value.substring(0, 50)}`);
+        }
+      }
     }
   }
   
-  // Pattern 2: HTML table rows (common in formsubmit)
-  const tableRowPattern = /<tr[^>]*>\s*<td[^>]*>([^<]+)<\/td>\s*<td[^>]*>([^<]+)<\/td>\s*<\/tr>/gi;
-  while ((match = tableRowPattern.exec(content)) !== null) {
-    const fieldName = match[1].trim().toLowerCase().replace(/\s+/g, '_');
-    const value = match[2].trim();
-    if (value && value.length > 0 && value !== 'N/A' && value !== 'n/a') {
-      fields[fieldName] = value;
+  // Pattern 2: Plain text "Field Name: Value" format (skip email headers)
+  if (Object.keys(fields).length === 0 && body) {
+    // Skip the forwarded message header section
+    let cleanBody = body;
+    const forwardedIndex = cleanBody.indexOf('---------- Forwarded message');
+    if (forwardedIndex > -1) {
+      // Find the actual form content after the header
+      const formStartPatterns = [
+        /Someone just submitted your form/i,
+        /Here's what they had to say/i,
+        /New.*?submission/i
+      ];
+      for (const pattern of formStartPatterns) {
+        const match = cleanBody.match(pattern);
+        if (match && match.index) {
+          cleanBody = cleanBody.substring(match.index);
+          break;
+        }
+      }
+    }
+    
+    // Now extract field: value pairs
+    const colonPattern = /^([A-Za-z][A-Za-z0-9_\s]{2,40}):\s*(.+)$/gm;
+    let match;
+    while ((match = colonPattern.exec(cleanBody)) !== null) {
+      const fieldName = match[1].trim().toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+      const value = match[2].trim();
+      
+      if (fieldName && value && !skipFields.has(fieldName) && value !== 'N/A') {
+        fields[fieldName] = value;
+        console.log(`Text field: ${fieldName} = ${value.substring(0, 50)}`);
+      }
     }
   }
   
-  // Pattern 3: Key = Value format
-  const equalPattern = /([A-Za-z][A-Za-z0-9_\s]{2,40})\s*=\s*([^\n]+)/g;
-  while ((match = equalPattern.exec(content)) !== null) {
-    const fieldName = match[1].trim().toLowerCase().replace(/\s+/g, '_');
-    const value = match[2].trim();
-    if (value && value.length > 0 && value !== 'N/A') {
-      fields[fieldName] = value;
-    }
-  }
-  
+  console.log("Total extracted fields:", Object.keys(fields).length);
   console.log("Extracted fields:", JSON.stringify(fields, null, 2));
   return fields;
 }

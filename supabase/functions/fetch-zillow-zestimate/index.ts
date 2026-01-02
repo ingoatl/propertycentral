@@ -29,13 +29,15 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Format address for Zillow URL
+    // Format address for Zillow URL - more careful formatting
     const formattedAddress = address
       .trim()
       .toLowerCase()
-      .replace(/[,#]/g, "")
+      .replace(/,/g, "")
+      .replace(/\./g, "")
       .replace(/\s+/g, "-")
-      .replace(/[^\w-]/g, "");
+      .replace(/-+/g, "-")
+      .replace(/[^a-z0-9-]/g, "");
     
     const zillowUrl = `https://www.zillow.com/homes/${formattedAddress}_rb/`;
     
@@ -50,9 +52,9 @@ Deno.serve(async (req) => {
       },
       body: JSON.stringify({
         url: zillowUrl,
-        formats: ["markdown"],
-        onlyMainContent: true,
-        waitFor: 3000,
+        formats: ["markdown", "html"],
+        onlyMainContent: false, // Get full page to find rent estimate
+        waitFor: 5000, // Longer wait for dynamic content
       }),
     });
 
@@ -71,30 +73,68 @@ Deno.serve(async (req) => {
     }
 
     const markdown = scrapeData.data?.markdown || scrapeData.markdown || "";
-    console.log("Scraped content length:", markdown.length);
-    console.log("Content preview:", markdown.substring(0, 1000));
+    const html = scrapeData.data?.html || scrapeData.html || "";
+    console.log("Scraped markdown length:", markdown.length);
+    console.log("Scraped HTML length:", html.length);
+    console.log("Markdown preview:", markdown.substring(0, 2000));
 
-    // Extract Rent Zestimate from the markdown content
-    // Zillow shows rent estimate in various formats
-    const rentPatterns = [
-      /Rent\s*Zestimate[®™]?\s*:?\s*\$?([\d,]+)/i,
-      /rent\s*estimate[®™]?\s*:?\s*\$?([\d,]+)/i,
-      /estimated\s*rent[®™]?\s*:?\s*\$?([\d,]+)/i,
-      /\$?([\d,]+)\s*\/\s*mo(?:nth)?.*?(?:rent|zestimate)/i,
-      /rent[^\n]*?\$?([\d,]+)\s*(?:\/\s*mo|per\s*month)/i,
-      /zestimate[^\n]*?\$?([\d,]+)\s*(?:\/\s*mo|per\s*month)/i,
-      /monthly\s*rent[^\n]*?\$?([\d,]+)/i,
-    ];
-
+    // Extract Rent Zestimate from the content
+    // Zillow shows rent estimate in various formats on the page
     let rentZestimate: number | null = null;
     
-    for (const pattern of rentPatterns) {
+    // Try markdown patterns first
+    const markdownPatterns = [
+      /Rent\s*Zestimate[®™]?\s*[:\s]*\$?([\d,]+)/i,
+      /Zestimate.*?rent[:\s]*\$?([\d,]+)/i,
+      /rent[:\s]*\$?([\d,]+)\s*\/\s*mo/i,
+      /\$?([\d,]+)\s*\/mo.*?(?:rent|estimated)/i,
+      /Estimated\s*monthly\s*rent[:\s]*\$?([\d,]+)/i,
+      /Monthly\s*rent\s*estimate[:\s]*\$?([\d,]+)/i,
+    ];
+
+    for (const pattern of markdownPatterns) {
       const match = markdown.match(pattern);
       if (match) {
         const value = parseInt(match[1].replace(/,/g, ""), 10);
-        if (value > 500 && value < 50000) { // Reasonable rent range
+        if (value > 500 && value < 50000) {
           rentZestimate = value;
-          console.log(`Found Rent Zestimate: $${rentZestimate} using pattern: ${pattern}`);
+          console.log(`Found Rent Zestimate in markdown: $${rentZestimate}`);
+          break;
+        }
+      }
+    }
+
+    // Try HTML patterns if markdown didn't find it
+    if (!rentZestimate && html) {
+      const htmlPatterns = [
+        /data-testid="[^"]*rent[^"]*"[^>]*>\$?([\d,]+)/i,
+        /rent[^<]*<[^>]*>\$?([\d,]+)/i,
+        /Zestimate[^<]*<[^>]*>[^<]*<[^>]*>\$?([\d,]+)/i,
+        /\$?([\d,]+)\s*(?:<[^>]*>)*\s*\/\s*mo/i,
+      ];
+      
+      for (const pattern of htmlPatterns) {
+        const match = html.match(pattern);
+        if (match) {
+          const value = parseInt(match[1].replace(/,/g, ""), 10);
+          if (value > 500 && value < 50000) {
+            rentZestimate = value;
+            console.log(`Found Rent Zestimate in HTML: $${rentZestimate}`);
+            break;
+          }
+        }
+      }
+    }
+    
+    // Last resort - look for any dollar amounts in reasonable rent range
+    if (!rentZestimate) {
+      const dollarPattern = /\$([\d,]+)\s*(?:\/\s*month|\/mo|per\s*month)/gi;
+      let match;
+      while ((match = dollarPattern.exec(markdown + html)) !== null) {
+        const value = parseInt(match[1].replace(/,/g, ""), 10);
+        if (value >= 1000 && value <= 20000) {
+          rentZestimate = value;
+          console.log(`Found potential rent value: $${rentZestimate}`);
           break;
         }
       }
