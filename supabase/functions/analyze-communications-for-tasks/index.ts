@@ -116,9 +116,9 @@ serve(async (req) => {
         .insert({
           property_id: propertyId,
           title: `${property.name || "Property"} - Setup Tasks`,
-          status: "active",
-          conversation_date: new Date().toISOString(),
+          conversation_date: new Date().toISOString().split('T')[0],
           ai_summary: "Auto-generated from communications analysis",
+          status: "pending",
         })
         .select("id")
         .single();
