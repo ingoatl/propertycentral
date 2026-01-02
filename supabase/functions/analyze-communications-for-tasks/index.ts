@@ -32,9 +32,14 @@ interface ExtractedTask {
   priority: "urgent" | "high" | "medium" | "low";
   category: string;
   assigned_to: "peachhaus" | "owner";
-  source_type: "email" | "phone" | "document";
-  source_id: string;
+  source_type: "email" | "phone" | "sms" | "document";
+  source_quote?: string;
+  confidence: number; // 0-100 confidence score
+  phase_suggestion?: number;
 }
+
+// Auto-approve threshold - tasks with confidence >= this are auto-approved
+const AUTO_APPROVE_THRESHOLD = 80;
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -54,22 +59,39 @@ serve(async (req) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    console.log(`Analyzing communications for property: ${propertyId}`);
+    console.log(`Analyzing ALL communications for property: ${propertyId}`);
 
-    // Fetch all relevant data sources
-    const [emailsResult, callsResult, existingConvResult] = await Promise.all([
+    // Get property and owner info
+    const { data: property } = await supabase
+      .from("properties")
+      .select("id, name, address, owner_id")
+      .eq("id", propertyId)
+      .single();
+
+    if (!property) {
+      throw new Error("Property not found");
+    }
+
+    // Fetch ALL relevant data sources in parallel
+    const [emailsResult, callsResult, smsResult, existingConvResult] = await Promise.all([
       supabase
         .from("email_insights")
         .select("*")
         .eq("property_id", propertyId)
         .order("email_date", { ascending: false })
-        .limit(50),
+        .limit(100), // Increased limit
       supabase
         .from("user_phone_calls")
         .select("*")
         .eq("property_id", propertyId)
         .order("started_at", { ascending: false })
-        .limit(20),
+        .limit(50),
+      supabase
+        .from("lead_communications")
+        .select("*")
+        .eq("communication_type", "sms")
+        .order("created_at", { ascending: false })
+        .limit(50),
       supabase
         .from("owner_conversations")
         .select("id")
@@ -79,11 +101,12 @@ serve(async (req) => {
 
     const emails = (emailsResult.data || []) as EmailInsight[];
     const calls = (callsResult.data || []) as PhoneCall[];
+    const smsList = smsResult.data || [];
     const existingConversation = existingConvResult.data?.[0];
 
-    console.log(`Found ${emails.length} emails, ${calls.length} calls`);
+    console.log(`Found: ${emails.length} emails, ${calls.length} calls, ${smsList.length} SMS`);
 
-    // Create or get conversation record
+    // Create or get conversation record for auto-approved tasks
     let conversationId: string;
     if (existingConversation) {
       conversationId = existingConversation.id;
@@ -92,9 +115,10 @@ serve(async (req) => {
         .from("owner_conversations")
         .insert({
           property_id: propertyId,
-          title: `${propertyName || "Property"} - Owner Intel`,
+          title: `${property.name || "Property"} - Setup Tasks`,
           status: "active",
           conversation_date: new Date().toISOString(),
+          ai_summary: "Auto-generated from communications analysis",
         })
         .select("id")
         .single();
@@ -104,8 +128,9 @@ serve(async (req) => {
       console.log(`Created new conversation: ${conversationId}`);
     }
 
-    // Build context for AI analysis
+    // Build comprehensive context for AI analysis
     const emailContext = emails.map((e) => ({
+      id: e.id,
       date: e.email_date,
       from: e.sender_email,
       subject: e.subject,
@@ -118,57 +143,93 @@ serve(async (req) => {
     const callContext = calls
       .filter((c) => c.transcription)
       .map((c) => ({
+        id: c.id,
         date: c.started_at,
         from: c.from_number,
         to: c.to_number,
-        transcript: c.transcription?.substring(0, 2000), // Limit length
+        transcript: c.transcription?.substring(0, 3000),
       }));
 
-    // Prepare prompt for AI
-    const analysisPrompt = `You are analyzing communications (emails and phone calls) for a property onboarding. 
-Extract actionable setup tasks that need to be completed. Focus on:
-- Action items mentioned in emails
-- Follow-up tasks from phone conversations
-- Pending deliverables from either party
-- Things the owner needs to provide (documents, info, access)
-- Things the property manager (PeachHaus) needs to complete
+    const smsContext = smsList
+      .filter((s: any) => s.body)
+      .map((s: any) => ({
+        id: s.id,
+        date: s.created_at,
+        direction: s.direction,
+        body: s.body?.substring(0, 500),
+      }));
 
-Property: ${propertyName || "Unknown"}
+    // Comprehensive AI analysis prompt
+    const analysisPrompt = `You are an expert property management AI analyzing ALL communications for a property setup/onboarding.
 
-EMAILS:
+PROPERTY: ${property.name || "Unknown"} at ${property.address || "Unknown address"}
+
+COMMUNICATIONS DATA:
+
+=== EMAILS (${emails.length} total) ===
 ${JSON.stringify(emailContext, null, 2)}
 
-PHONE CALLS:
+=== PHONE CALLS (${calls.length} total) ===
 ${JSON.stringify(callContext, null, 2)}
 
-Based on this communication history, extract a list of actionable setup tasks. For each task provide:
-- title: Clear, actionable task title (max 60 chars)
-- description: Brief description of what needs to be done
-- priority: "urgent", "high", "medium", or "low"
-- category: One of: "documents", "access", "utilities", "photos", "listing", "cleaning", "maintenance", "legal", "financial", "other"
-- assigned_to: "owner" if the owner needs to do it, "peachhaus" if PeachHaus team needs to do it
+=== SMS MESSAGES (${smsList.length} total) ===
+${JSON.stringify(smsContext, null, 2)}
 
-IMPORTANT RULES:
-1. Only extract ACTIONABLE tasks that are still pending or unclear
-2. Skip tasks that appear to be already completed based on the conversation flow
-3. Prioritize tasks mentioned in recent emails
-4. Be specific - don't create vague tasks
-5. Limit to 15 most important tasks
+TASK EXTRACTION RULES:
 
-Return a JSON array of tasks. Example:
-[
-  {
-    "title": "Upload insurance policy document",
-    "description": "Owner needs to provide copy of homeowner's insurance policy listing PeachHaus as additional insured",
-    "priority": "high",
-    "category": "documents",
-    "assigned_to": "owner"
-  }
-]
+1. **HIGH CONFIDENCE (80-100%)** - Auto-approve these:
+   - Explicit action items directly stated: "Please set up WiFi code as 12345"
+   - Clear instructions from owner: "The lockbox code is 4567"
+   - Specific requests: "I need you to coordinate with the photographer"
+   - Confirmed appointments or deadlines
 
-Return ONLY the JSON array, no other text.`;
+2. **MEDIUM CONFIDENCE (50-79%)** - Need confirmation:
+   - Implied tasks: "The lawn needs attention"
+   - Follow-up items from discussions
+   - Tasks mentioned but not explicitly assigned
+   - Vague references to needed work
 
-    // Call OpenAI for analysis
+3. **LOW CONFIDENCE (0-49%)** - Need verification:
+   - Assumptions based on property type
+   - General best practices not explicitly mentioned
+   - Tasks that might already be done
+
+TASK CATEGORIES & PHASES:
+- Phase 1 (Legal): contracts, insurance, permits
+- Phase 2 (Access): keys, lockbox, gate codes, smart locks
+- Phase 3 (Technology): WiFi, smart home, cameras
+- Phase 4 (Utilities): electric, water, gas, internet, trash
+- Phase 5 (Operations): cleaning, maintenance vendors
+- Phase 6 (Guest Experience): house rules, amenities
+- Phase 7 (Property Details): furnishings, inventory
+- Phase 8 (Marketing): photos, listing, pricing
+
+EXTRACT TASKS AS JSON:
+{
+  "tasks": [
+    {
+      "title": "Clear actionable task title (max 60 chars)",
+      "description": "Specific description with details from communications",
+      "priority": "urgent" | "high" | "medium" | "low",
+      "category": "documents" | "access" | "wifi" | "utilities" | "cleaning" | "photos" | "listing" | "legal" | "hoa" | "smart_home" | "maintenance" | "other",
+      "assigned_to": "peachhaus" | "owner",
+      "confidence": 0-100,
+      "source_quote": "Exact quote from communication if available",
+      "phase_suggestion": 1-8
+    }
+  ],
+  "analysis_summary": "Brief summary of key findings"
+}
+
+IMPORTANT:
+- Be thorough - extract ALL actionable items
+- Include specific values/codes/names from communications
+- Higher confidence = more explicit the task was stated
+- Prioritize tasks mentioned in recent communications
+- Maximum 25 tasks, ordered by priority then confidence`;
+
+    // Call OpenAI for comprehensive analysis
+    console.log("Calling OpenAI for comprehensive analysis...");
     const openaiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -180,12 +241,13 @@ Return ONLY the JSON array, no other text.`;
         messages: [
           {
             role: "system",
-            content: "You are an expert at extracting actionable tasks from business communications. Always respond with valid JSON only.",
+            content: "You are an expert property management task extractor. Analyze communications thoroughly and extract actionable setup tasks with confidence scores. Always respond with valid JSON only.",
           },
           { role: "user", content: analysisPrompt },
         ],
-        temperature: 0.3,
-        max_tokens: 2000,
+        temperature: 0.2,
+        max_tokens: 4000,
+        response_format: { type: "json_object" },
       }),
     });
 
@@ -195,75 +257,135 @@ Return ONLY the JSON array, no other text.`;
     }
 
     const openaiData = await openaiResponse.json();
-    const aiResponseText = openaiData.choices[0]?.message?.content || "[]";
+    const aiResponseText = openaiData.choices[0]?.message?.content || "{}";
 
-    console.log("AI Response:", aiResponseText);
+    console.log("AI Analysis complete");
 
     // Parse the AI response
-    let extractedTasks: ExtractedTask[] = [];
+    let analysisResult: { tasks: ExtractedTask[]; analysis_summary?: string };
     try {
-      // Clean the response - remove markdown code blocks if present
-      let cleanedResponse = aiResponseText.trim();
-      if (cleanedResponse.startsWith("```json")) {
-        cleanedResponse = cleanedResponse.slice(7);
-      }
-      if (cleanedResponse.startsWith("```")) {
-        cleanedResponse = cleanedResponse.slice(3);
-      }
-      if (cleanedResponse.endsWith("```")) {
-        cleanedResponse = cleanedResponse.slice(0, -3);
-      }
-      extractedTasks = JSON.parse(cleanedResponse.trim());
+      analysisResult = JSON.parse(aiResponseText);
     } catch (parseError) {
       console.error("Failed to parse AI response:", parseError);
       throw new Error("Failed to parse AI response as JSON");
     }
 
+    const extractedTasks = analysisResult.tasks || [];
     console.log(`Extracted ${extractedTasks.length} tasks`);
 
-    // Check for existing tasks to avoid duplicates
-    const { data: existingTasks } = await supabase
-      .from("owner_conversation_actions")
-      .select("title")
-      .eq("conversation_id", conversationId)
-      .eq("action_type", "task");
+    // Get existing tasks and pending confirmations to avoid duplicates
+    const [existingTasksResult, pendingConfirmationsResult] = await Promise.all([
+      supabase
+        .from("owner_conversation_actions")
+        .select("title")
+        .eq("conversation_id", conversationId),
+      supabase
+        .from("pending_task_confirmations")
+        .select("task_title")
+        .eq("property_id", propertyId)
+        .in("status", ["pending", "approved"]),
+    ]);
 
-    const existingTitles = new Set((existingTasks || []).map((t) => t.title.toLowerCase()));
+    const existingTitles = new Set([
+      ...(existingTasksResult.data || []).map((t) => t.title.toLowerCase()),
+      ...(pendingConfirmationsResult.data || []).map((t) => t.task_title.toLowerCase()),
+    ]);
 
-    // Insert new tasks
-    const newTasks = extractedTasks
-      .filter((task) => !existingTitles.has(task.title.toLowerCase()))
-      .map((task) => ({
+    // Separate tasks by confidence
+    const highConfidenceTasks: ExtractedTask[] = [];
+    const lowConfidenceTasks: ExtractedTask[] = [];
+
+    for (const task of extractedTasks) {
+      // Skip duplicates
+      if (existingTitles.has(task.title.toLowerCase())) {
+        console.log(`Skipping duplicate: ${task.title}`);
+        continue;
+      }
+
+      if (task.confidence >= AUTO_APPROVE_THRESHOLD) {
+        highConfidenceTasks.push(task);
+      } else {
+        lowConfidenceTasks.push(task);
+      }
+    }
+
+    console.log(`High confidence (auto-approve): ${highConfidenceTasks.length}`);
+    console.log(`Low confidence (need confirmation): ${lowConfidenceTasks.length}`);
+
+    // AUTO-APPROVE high confidence tasks - insert directly to owner_conversation_actions
+    const autoApprovedTasks = [];
+    if (highConfidenceTasks.length > 0) {
+      const tasksToInsert = highConfidenceTasks.map((task) => ({
         conversation_id: conversationId,
         action_type: "task",
         title: task.title,
-        description: task.description,
+        description: `${task.description}${task.source_quote ? `\n\nSource: "${task.source_quote}"` : ""}`,
         priority: task.priority,
         category: task.category,
         assigned_to: task.assigned_to,
-        status: "pending",
+        status: "created",
       }));
 
-    if (newTasks.length > 0) {
-      const { error: insertError } = await supabase
+      const { data: inserted, error: insertError } = await supabase
         .from("owner_conversation_actions")
-        .insert(newTasks);
+        .insert(tasksToInsert)
+        .select();
 
       if (insertError) {
-        console.error("Error inserting tasks:", insertError);
-        throw insertError;
+        console.error("Error auto-approving tasks:", insertError);
+      } else {
+        autoApprovedTasks.push(...(inserted || []));
+        console.log(`Auto-approved ${inserted?.length || 0} high-confidence tasks`);
       }
+    }
 
-      console.log(`Inserted ${newTasks.length} new tasks`);
+    // Create pending confirmations for low confidence tasks
+    const pendingConfirmations = [];
+    if (lowConfidenceTasks.length > 0) {
+      const confirmationsToInsert = lowConfidenceTasks.map((task) => ({
+        property_id: propertyId,
+        owner_id: property.owner_id,
+        source_type: task.source_type || "email",
+        task_title: task.title,
+        task_description: task.description,
+        task_category: task.category,
+        priority: task.priority,
+        source_quote: task.source_quote,
+        phase_suggestion: task.phase_suggestion,
+        status: "pending",
+        expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      }));
+
+      const { data: inserted, error: insertError } = await supabase
+        .from("pending_task_confirmations")
+        .insert(confirmationsToInsert)
+        .select();
+
+      if (insertError) {
+        console.error("Error creating pending confirmations:", insertError);
+      } else {
+        pendingConfirmations.push(...(inserted || []));
+        console.log(`Created ${inserted?.length || 0} pending confirmations`);
+      }
     }
 
     return new Response(
       JSON.stringify({
         success: true,
+        propertyId,
+        propertyName: property.name,
         conversationId,
-        tasksExtracted: extractedTasks.length,
-        tasksInserted: newTasks.length,
-        tasks: newTasks,
+        summary: analysisResult.analysis_summary,
+        stats: {
+          emailsAnalyzed: emails.length,
+          callsAnalyzed: calls.length,
+          smsAnalyzed: smsList.length,
+          totalTasksExtracted: extractedTasks.length,
+          autoApproved: autoApprovedTasks.length,
+          pendingConfirmation: pendingConfirmations.length,
+        },
+        autoApprovedTasks,
+        pendingConfirmations,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

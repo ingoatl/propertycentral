@@ -34,15 +34,13 @@ export interface PendingTaskConfirmation {
   };
 }
 
-const INGO_USER_ID = "8f7c8f43-536f-4587-99dc-5086c144a045";
-
 export function usePendingTaskConfirmations() {
   const { user } = useAuth() as any;
   const queryClient = useQueryClient();
   const [realtimeEnabled, setRealtimeEnabled] = useState(false);
 
-  // Only show modal for Ingo during testing phase
-  const isEligibleUser = user?.id === INGO_USER_ID;
+  // Show modal for all authenticated users
+  const isEligibleUser = !!user?.id;
 
   // Fetch pending confirmations
   const { data: pendingConfirmations = [], isLoading, refetch } = useQuery({
