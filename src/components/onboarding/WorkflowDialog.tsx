@@ -31,13 +31,21 @@ export const WorkflowDialog = ({ open, onOpenChange, project: initialProject, pr
   const [searchQuery, setSearchQuery] = useState("");
   const [filteredTasks, setFilteredTasks] = useState<OnboardingTask[]>([]);
   const [creatingProject, setCreatingProject] = useState(false);
-  const [showMyTasksOnly, setShowMyTasksOnly] = useState(true);
+  const { isAdmin } = useAdminCheck();
+  const [showMyTasksOnly, setShowMyTasksOnly] = useState(!isAdmin); // Admins see all by default
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [userRoleIds, setUserRoleIds] = useState<string[]>([]);
   const [phaseToRoleMap, setPhaseToRoleMap] = useState<Map<number, string>>(new Map());
   const [localProgress, setLocalProgress] = useState(initialProject?.progress ?? 0);
   const [localStatus, setLocalStatus] = useState(initialProject?.status ?? "pending");
-  const { isAdmin } = useAdminCheck();
+  const [projectData, setProjectData] = useState<OnboardingProject | null>(initialProject);
+
+  // Update showMyTasksOnly when isAdmin changes
+  useEffect(() => {
+    if (isAdmin) {
+      setShowMyTasksOnly(false);
+    }
+  }, [isAdmin]);
 
   useEffect(() => {
     loadCurrentUser();
