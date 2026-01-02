@@ -530,8 +530,54 @@ Extract ALL available information. Use null only if truly not found. Be thorough
       }
     }
 
-    // Create onboarding tasks from extracted action items
+    // Create onboarding tasks from extracted action items with fuzzy duplicate detection
     const actionItemsCreated: string[] = [];
+    const actionItemsSkipped: string[] = [];
+    
+    // Helper for fuzzy matching - check if two titles are semantically similar
+    const isSimilarTask = (newTitle: string, existingTitle: string): boolean => {
+      const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9\s]/g, '').split(/\s+/);
+      const newWords = normalize(newTitle);
+      const existingWords = normalize(existingTitle);
+      
+      // Extract key action words
+      const keyActionWords = ['lock', 'self-lock', 'selflocking', 'trash', 'garbage', 'key', 'garage', 
+        'wifi', 'password', 'code', 'alarm', 'security', 'clean', 'thermostat', 'hvac', 'water', 
+        'electric', 'gas', 'internet', 'hoa', 'pet', 'parking', 'access', 'door', 'gate'];
+      
+      // Find matching key words in both titles
+      const newKeyWords = newWords.filter(w => keyActionWords.some(k => w.includes(k) || k.includes(w)));
+      const existingKeyWords = existingWords.filter(w => keyActionWords.some(k => w.includes(k) || k.includes(w)));
+      
+      // If both have similar key words, they're likely duplicates
+      if (newKeyWords.length > 0 && existingKeyWords.length > 0) {
+        const overlap = newKeyWords.filter(nw => 
+          existingKeyWords.some(ew => nw.includes(ew) || ew.includes(nw))
+        );
+        if (overlap.length > 0) return true;
+      }
+      
+      // Check for significant word overlap (>50% of words match)
+      const matchingWords = newWords.filter(w => existingWords.includes(w));
+      const overlapRatio = matchingWords.length / Math.min(newWords.length, existingWords.length);
+      return overlapRatio > 0.5;
+    };
+    
+    // Find similar existing task
+    const findSimilarTask = (title: string): any | null => {
+      // Exact match first
+      const exactMatch = tasksByTitle.get(title.toLowerCase());
+      if (exactMatch) return exactMatch;
+      
+      // Fuzzy match
+      for (const [existingTitle, task] of tasksByTitle) {
+        if (isSimilarTask(title, existingTitle)) {
+          return task;
+        }
+      }
+      return null;
+    };
+    
     if (existingProject && analysisResult.actionItems && analysisResult.actionItems.length > 0) {
       console.log(`Found ${analysisResult.actionItems.length} action items to process`);
       
@@ -545,16 +591,28 @@ Extract ALL available information. Use null only if truly not found. Be thorough
       };
       
       for (const actionItem of analysisResult.actionItems) {
-        // Check if task with similar title already exists
-        const existingTask = tasksByTitle.get(actionItem.title.toLowerCase());
-        if (existingTask) {
-          console.log(`Task already exists: ${actionItem.title}`);
+        // Check if task with similar title already exists using fuzzy matching
+        const similarTask = findSimilarTask(actionItem.title);
+        if (similarTask) {
+          // Add info to existing task notes instead of creating duplicate
+          const newNote = `\n\n[From owner email]: ${actionItem.description}\nSource: "${actionItem.source}"`;
+          const updatedNotes = similarTask.notes 
+            ? `${similarTask.notes}${newNote}`
+            : newNote.trim();
+          
+          await supabase
+            .from("onboarding_tasks")
+            .update({ notes: updatedNotes })
+            .eq("id", similarTask.id);
+          
+          console.log(`Similar task exists, updated notes: "${similarTask.title}" ← "${actionItem.title}"`);
+          actionItemsSkipped.push(`${actionItem.title} → merged into "${similarTask.title}"`);
           continue;
         }
         
         const phaseNumber = typeToPhase[actionItem.type] || 1;
-        const priority = actionItem.priority === 'high' ? 1 : actionItem.priority === 'medium' ? 2 : 3;
         
+        // Insert task WITHOUT priority field (doesn't exist in schema)
         const { error: insertError } = await supabase
           .from("onboarding_tasks")
           .insert({
@@ -564,18 +622,24 @@ Extract ALL available information. Use null only if truly not found. Be thorough
             title: actionItem.title,
             notes: `${actionItem.description}\n\nSource: "${actionItem.source}"`,
             status: 'pending',
-            priority: priority,
             created_at: new Date().toISOString()
           });
         
         if (!insertError) {
           actionItemsCreated.push(actionItem.title);
+          // Add to tasksByTitle to prevent duplicates within same analysis
+          tasksByTitle.set(actionItem.title.toLowerCase(), { 
+            title: actionItem.title, 
+            project_id: existingProject.id 
+          });
           console.log(`✓ Created task: ${actionItem.title} (Phase ${phaseNumber})`);
         } else {
           console.error(`✗ Failed to create task: ${actionItem.title}`, insertError);
         }
       }
     }
+    
+    console.log(`Action items: ${actionItemsCreated.length} created, ${actionItemsSkipped.length} merged/skipped`);
 
     // Store credentials as property info
     for (const cred of analysisResult.credentials || []) {
