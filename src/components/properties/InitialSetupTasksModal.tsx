@@ -15,7 +15,8 @@ import {
   Loader2,
   AlertCircle,
   Clock,
-  ArrowRight
+  ArrowRight,
+  Sparkles
 } from "lucide-react";
 
 interface Task {
@@ -50,6 +51,7 @@ export function InitialSetupTasksModal({
   const [sendingEmail, setSendingEmail] = useState(false);
   const [completingTask, setCompletingTask] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("peachhaus");
+  const [analyzing, setAnalyzing] = useState(false);
 
   useEffect(() => {
     if (open && propertyId) {
@@ -136,6 +138,23 @@ export function InitialSetupTasksModal({
     } catch (error) {
       console.error("Error reassigning task:", error);
       toast.error("Failed to reassign task");
+    }
+  };
+
+  const handleAnalyzeCommunications = async () => {
+    try {
+      setAnalyzing(true);
+      const { error } = await supabase.functions.invoke("analyze-communications-for-tasks", {
+        body: { propertyId, propertyName },
+      });
+      if (error) throw error;
+      toast.success("Communications analyzed - tasks extracted!");
+      await loadTasks();
+    } catch (error) {
+      console.error("Error analyzing:", error);
+      toast.error("Failed to analyze communications");
+    } finally {
+      setAnalyzing(false);
     }
   };
 
@@ -279,20 +298,28 @@ export function InitialSetupTasksModal({
                 {peachHausTasks.length + ownerTasks.length} pending • {completedTasks.length} completed
               </span>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleSendOwnerEmail}
-              disabled={sendingEmail || ownerTasks.length === 0}
-              className="gap-2"
-            >
-              {sendingEmail ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <Mail className="w-4 h-4" />
-              )}
-              Send Owner Status Email
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleAnalyzeCommunications}
+                disabled={analyzing}
+                className="gap-2"
+              >
+                {analyzing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                Analyze Emails
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleSendOwnerEmail}
+                disabled={sendingEmail || ownerTasks.length === 0}
+                className="gap-2"
+              >
+                {sendingEmail ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
+                Send Status Email
+              </Button>
+            </div>
           </div>
         </DialogHeader>
 
