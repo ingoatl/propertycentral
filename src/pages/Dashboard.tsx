@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { PropertySummary, Visit, Expense, OwnerRezBooking } from "@/types";
 import { toast } from "sonner";
@@ -17,6 +17,19 @@ const Dashboard = () => {
   const [syncing, setSyncing] = useState(false);
   const { isAdmin, loading: adminLoading } = useAdminCheck();
 
+  // Debounce timer ref to prevent rapid re-fetches
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Debounced load function to prevent rapid re-fetches from realtime events
+  const debouncedLoadData = useCallback(() => {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+    debounceTimerRef.current = setTimeout(() => {
+      loadData();
+    }, 500);
+  }, []);
+
   useEffect(() => {
     loadData();
 
@@ -33,7 +46,7 @@ const Dashboard = () => {
         (payload) => {
           // Reload data when reconciliations are approved or updated
           if (payload.eventType === 'UPDATE' || payload.eventType === 'INSERT') {
-            loadData();
+            debouncedLoadData();
           }
         }
       )
@@ -48,9 +61,9 @@ const Dashboard = () => {
           schema: 'public',
           table: 'visits'
         },
-        (payload) => {
+        () => {
           // Reload when visits are marked as billed
-          loadData();
+          debouncedLoadData();
         }
       )
       .subscribe();
@@ -64,20 +77,23 @@ const Dashboard = () => {
           schema: 'public',
           table: 'expenses'
         },
-        (payload) => {
+        () => {
           // Reload when expenses are added, updated, or deleted
-          loadData();
+          debouncedLoadData();
         }
       )
       .subscribe();
 
-    // Cleanup subscriptions on unmount
+    // Cleanup subscriptions and debounce timer on unmount
     return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
       supabase.removeChannel(reconciliationsChannel);
       supabase.removeChannel(visitsChannel);
       supabase.removeChannel(expensesChannel);
     };
-  }, []);
+  }, [debouncedLoadData]);
 
   const loadData = async () => {
     try {

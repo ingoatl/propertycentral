@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, memo, useCallback } from "react";
 import { 
   Dialog, 
   DialogContent, 
@@ -63,7 +63,7 @@ interface TaskCardProps {
   isRejecting: boolean;
 }
 
-function TaskCard({ 
+const TaskCard = memo(function TaskCard({ 
   confirmation, 
   onApprove, 
   onReject, 
@@ -81,13 +81,21 @@ function TaskCard({
     || sourceTypeConfig.manual;
   const SourceIcon = sourceConfig.icon;
 
-  const handleApprove = () => {
+  const handleApprove = useCallback(() => {
     if (isEditing) {
       onApprove(confirmation.id, editedTitle, editedDescription);
     } else {
       onApprove(confirmation.id);
     }
-  };
+  }, [isEditing, onApprove, confirmation.id, editedTitle, editedDescription]);
+
+  const handleReject = useCallback(() => {
+    onReject(confirmation.id);
+  }, [onReject, confirmation.id]);
+
+  const toggleEditing = useCallback(() => {
+    setIsEditing(prev => !prev);
+  }, []);
 
   return (
     <Card className="border-l-4 border-l-primary">
@@ -182,7 +190,7 @@ function TaskCard({
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => setIsEditing(!isEditing)}
+            onClick={toggleEditing}
             className="text-xs"
           >
             <Pencil className="h-3 w-3 mr-1" />
@@ -192,7 +200,7 @@ function TaskCard({
             <Button
               variant="outline"
               size="sm"
-              onClick={() => onReject(confirmation.id)}
+              onClick={handleReject}
               disabled={isRejecting}
               className="text-destructive hover:text-destructive"
             >
@@ -212,7 +220,7 @@ function TaskCard({
       </CardContent>
     </Card>
   );
-}
+});
 
 export function TaskConfirmationModal() {
   const [isOpen, setIsOpen] = useState(true);
@@ -234,13 +242,17 @@ export function TaskConfirmationModal() {
     return null;
   }
 
-  const handleApprove = (id: string, title?: string, description?: string) => {
+  const handleApprove = useCallback((id: string, title?: string, description?: string) => {
     approveTask({ confirmationId: id, editedTitle: title, editedDescription: description });
-  };
+  }, [approveTask]);
 
-  const handleReject = (id: string, reason?: string) => {
+  const handleReject = useCallback((id: string, reason?: string) => {
     rejectTask({ confirmationId: id, reason });
-  };
+  }, [rejectTask]);
+
+  const handleApproveAll = useCallback(() => {
+    approveAllTasks();
+  }, [approveAllTasks]);
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -282,7 +294,7 @@ export function TaskConfirmationModal() {
             Review Later
           </Button>
           <Button
-            onClick={() => approveAllTasks()}
+            onClick={handleApproveAll}
             disabled={isApprovingAll}
           >
             <CheckCircle2 className="h-4 w-4 mr-2" />
