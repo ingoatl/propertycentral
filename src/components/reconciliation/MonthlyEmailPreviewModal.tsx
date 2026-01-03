@@ -25,6 +25,8 @@ interface ApprovedLineItem {
   verified: boolean;
   excluded: boolean;
   notes?: string;
+  hours?: number;
+  actualPrice?: number;
 }
 
 interface DuplicateWarning {
@@ -136,12 +138,12 @@ export const MonthlyEmailPreviewModal = ({
             .filter((item: any) => item.item_type === 'visit')
             .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
           
-          // Fetch visit notes from the visits table for better display
+          // Fetch visit notes and hours from the visits table for better display
           if (visits.length > 0) {
             const visitIds = visits.map((v: any) => v.item_id);
             const { data: visitDetails } = await supabase
               .from("visits")
-              .select("id, notes, visited_by")
+              .select("id, notes, visited_by, hours, price")
               .in("id", visitIds);
             
             if (visitDetails) {
@@ -149,6 +151,12 @@ export const MonthlyEmailPreviewModal = ({
                 const detail = visitDetails.find((d: any) => d.id === v.item_id);
                 if (detail?.notes) {
                   v.notes = detail.notes;
+                }
+                if (detail?.hours) {
+                  v.hours = detail.hours;
+                }
+                if (detail?.price) {
+                  v.actualPrice = detail.price;
                 }
               });
             }
@@ -335,20 +343,33 @@ export const MonthlyEmailPreviewModal = ({
                   Visits ({approvedVisits.length})
                 </div>
                 <div className="space-y-2">
-                  {approvedVisits.map((visit) => (
-                    <div key={visit.id} className="p-2 bg-muted/30 rounded border-l-2 border-orange-400">
-                      <div className="flex justify-between text-sm">
-                        <span className="font-medium">{visit.description}</span>
-                        <span className="font-medium text-orange-600">${Math.abs(visit.amount).toFixed(2)}</span>
+                  {approvedVisits.map((visit) => {
+                    const visitHours = Number(visit.hours || 0);
+                    const actualPrice = Math.abs(visit.amount);
+                    const hourlyRate = 50;
+                    const hourlyCharge = visitHours * hourlyRate;
+                    const baseVisitFee = actualPrice - hourlyCharge;
+                    
+                    return (
+                      <div key={visit.id} className="p-2 bg-muted/30 rounded border-l-2 border-orange-400">
+                        <div className="flex justify-between text-sm">
+                          <span className="font-medium">{visit.description}</span>
+                          <span className="font-medium text-orange-600">${actualPrice.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                          <span>{format(new Date(visit.date + 'T00:00:00'), 'MMM dd, yyyy')}</span>
+                        </div>
+                        {visitHours > 0 && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            ↳ Base: ${baseVisitFee.toFixed(0)} + {visitHours} hr{visitHours > 1 ? 's' : ''} @ ${hourlyRate}/hr = ${hourlyCharge.toFixed(0)}
+                          </p>
+                        )}
+                        {visit.notes && (
+                          <p className="text-xs text-muted-foreground mt-1 italic">📝 {visit.notes}</p>
+                        )}
                       </div>
-                      <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                        <span>{format(new Date(visit.date + 'T00:00:00'), 'MMM dd, yyyy')}</span>
-                      </div>
-                      {visit.notes && (
-                        <p className="text-xs text-muted-foreground mt-1 italic">📝 {visit.notes}</p>
-                      )}
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}
