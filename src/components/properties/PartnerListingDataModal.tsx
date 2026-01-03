@@ -1,4 +1,9 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { 
+  ResponsiveModal, 
+  ResponsiveModalContent, 
+  ResponsiveModalHeader, 
+  ResponsiveModalTitle 
+} from "@/components/ui/responsive-modal";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -195,67 +200,70 @@ export function PartnerListingDataModal({
   const renderDataItem = (item: { label: string; value: string | null | undefined; highlight?: boolean }, idx: number) => (
     <div 
       key={idx}
-      className={`flex items-center justify-between p-3 rounded-lg hover:bg-muted cursor-pointer transition-colors group ${item.highlight ? 'bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800' : 'bg-muted/50'}`}
+      className={`flex items-center justify-between p-3 max-md:p-4 rounded-lg hover:bg-muted cursor-pointer transition-colors group ${item.highlight ? 'bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800' : 'bg-muted/50'}`}
       onClick={() => item.value && copyToClipboard(item.value, item.label)}
     >
       <div className="flex-1 min-w-0">
-        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+        <p className="text-xs max-md:text-sm font-medium text-muted-foreground uppercase tracking-wide">
           {item.label}
         </p>
-        <p className="text-sm font-medium truncate pr-4">
+        <p className="text-sm max-md:text-base font-medium truncate pr-4">
           {item.value}
         </p>
         {item.highlight && (
-          <p className="text-xs text-amber-600 dark:text-amber-400 mt-0.5 flex items-center gap-1">
-            <AlertTriangle className="w-3 h-3" />
+          <p className="text-xs max-md:text-sm text-amber-600 dark:text-amber-400 mt-0.5 flex items-center gap-1">
+            <AlertTriangle className="w-3 h-3 max-md:w-4 max-md:h-4" />
             Calculate listing price: Zillow Zestimate × 2.3
           </p>
         )}
       </div>
       <div className="flex-shrink-0">
         {copiedField === item.label ? (
-          <Check className="w-4 h-4 text-green-600" />
+          <Check className="w-4 h-4 max-md:w-6 max-md:h-6 text-green-600" />
         ) : (
-          <Copy className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+          <Copy className="w-4 h-4 max-md:w-6 max-md:h-6 text-muted-foreground opacity-100 max-md:opacity-100 group-hover:opacity-100 transition-opacity" />
         )}
       </div>
     </div>
   );
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] p-0">
-        <DialogHeader className="p-6 pb-4">
-          <div className="flex items-start justify-between">
-            <div>
-              <DialogTitle className="text-xl font-semibold">
+    <ResponsiveModal open={open} onOpenChange={onOpenChange}>
+      <ResponsiveModalContent className="max-w-2xl p-0">
+        <ResponsiveModalHeader className="p-4 md:p-6 pb-2 md:pb-4">
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex-1 min-w-0">
+              <ResponsiveModalTitle className="text-lg md:text-xl font-semibold">
                 Listing Data
-              </DialogTitle>
-              <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
-                <MapPin className="w-4 h-4" />
-                {property.property_title || property.address || [property.city, property.state].filter(Boolean).join(", ") || "No address"}
+              </ResponsiveModalTitle>
+              <div className="flex items-center gap-2 text-sm max-md:text-base text-muted-foreground mt-1">
+                <MapPin className="w-4 h-4 flex-shrink-0" />
+                <span className="truncate">
+                  {property.property_title || property.address || [property.city, property.state].filter(Boolean).join(", ") || "No address"}
+                </span>
               </div>
             </div>
-            <Badge className="bg-orange-500 text-white">Partner</Badge>
+            <Badge className="bg-orange-500 text-white flex-shrink-0">Partner</Badge>
           </div>
-        </DialogHeader>
+        </ResponsiveModalHeader>
         
-        <ScrollArea className="max-h-[calc(90vh-120px)]">
-          <div className="p-6 pt-0 space-y-4">
-            <div className="flex items-center justify-between gap-2">
-              <p className="text-sm text-muted-foreground">
-                Click any field to copy its value to clipboard.
+        <ScrollArea className="flex-1 max-h-[calc(90vh-120px)] max-md:max-h-[calc(95vh-140px)]">
+          <div className="p-4 md:p-6 pt-0 space-y-4">
+            <div className="flex flex-col max-md:gap-3 md:flex-row md:items-center md:justify-between gap-2">
+              <p className="text-sm max-md:text-base text-muted-foreground">
+                Click any field to copy its value.
               </p>
               <Button
                 variant="outline"
                 size="sm"
+                className="max-md:w-full max-md:h-12 max-md:text-base"
                 onClick={() => {
                   const allText = allItems.map(item => `${item.label}: ${item.value}`).join("\n");
                   navigator.clipboard.writeText(allText);
                   toast.success("All listing data copied!");
                 }}
               >
-                <Copy className="w-3 h-3 mr-1.5" />
+                <Copy className="w-3 h-3 max-md:w-5 max-md:h-5 mr-1.5" />
                 Copy All
               </Button>
             </div>
@@ -263,8 +271,8 @@ export function PartnerListingDataModal({
             {/* Owner Information Section */}
             {ownerInfoItems.length > 0 && (
               <div className="space-y-2">
-                <h4 className="text-xs font-semibold text-primary uppercase tracking-wide flex items-center gap-2">
-                  <User className="w-3 h-3" />
+                <h4 className="text-xs max-md:text-sm font-semibold text-primary uppercase tracking-wide flex items-center gap-2">
+                  <User className="w-3 h-3 max-md:w-4 max-md:h-4" />
                   Owner Information
                 </h4>
                 <div className="grid gap-2">
@@ -275,7 +283,7 @@ export function PartnerListingDataModal({
 
             {/* Property Details Section */}
             <div className="space-y-2">
-              <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+              <h4 className="text-xs max-md:text-sm font-semibold text-muted-foreground uppercase tracking-wide">
                 Property Details
               </h4>
               <div className="grid gap-2">
@@ -286,7 +294,7 @@ export function PartnerListingDataModal({
             {/* Pricing Section */}
             {pricingItems.length > 0 && (
               <div className="space-y-2">
-                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                <h4 className="text-xs max-md:text-sm font-semibold text-muted-foreground uppercase tracking-wide">
                   Pricing
                 </h4>
                 <div className="grid gap-2">
@@ -298,7 +306,7 @@ export function PartnerListingDataModal({
             {/* Policy Section */}
             {policyItems.length > 0 && (
               <div className="space-y-2">
-                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                <h4 className="text-xs max-md:text-sm font-semibold text-muted-foreground uppercase tracking-wide">
                   Policies
                 </h4>
                 <div className="grid gap-2">
@@ -310,7 +318,7 @@ export function PartnerListingDataModal({
             {/* Description & Features Section */}
             {descriptionItems.length > 0 && (
               <div className="space-y-2">
-                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                <h4 className="text-xs max-md:text-sm font-semibold text-muted-foreground uppercase tracking-wide">
                   Description & Features
                 </h4>
                 <div className="grid gap-2">
@@ -322,7 +330,7 @@ export function PartnerListingDataModal({
             {/* Links Section */}
             {linkItems.length > 0 && (
               <div className="space-y-2">
-                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                <h4 className="text-xs max-md:text-sm font-semibold text-muted-foreground uppercase tracking-wide">
                   External Links
                 </h4>
                 <div className="grid gap-2">
@@ -333,19 +341,20 @@ export function PartnerListingDataModal({
 
             {/* Images Section with Download All */}
             <div className="pt-4 border-t space-y-3">
-              <div className="flex items-center justify-between">
-                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-2">
-                  <ImageIcon className="w-3 h-3" />
+              <div className="flex flex-col max-md:gap-3 md:flex-row md:items-center md:justify-between">
+                <h4 className="text-xs max-md:text-sm font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-2">
+                  <ImageIcon className="w-3 h-3 max-md:w-4 max-md:h-4" />
                   Property Images ({allImages.length})
                 </h4>
                 {allImages.length > 0 && (
                   <Button 
                     variant="default" 
-                    size="sm" 
+                    size="sm"
+                    className="max-md:w-full max-md:h-12 max-md:text-base"
                     onClick={downloadAllImages}
                     disabled={downloading}
                   >
-                    <Download className="w-3 h-3 mr-1.5" />
+                    <Download className="w-3 h-3 max-md:w-5 max-md:h-5 mr-1.5" />
                     {downloading ? "Downloading..." : `Download All (${allImages.length})`}
                   </Button>
                 )}
@@ -353,19 +362,19 @@ export function PartnerListingDataModal({
 
               {property.featured_image_url && (
                 <div>
-                  <p className="text-xs text-muted-foreground mb-2">Featured Image</p>
+                  <p className="text-xs max-md:text-sm text-muted-foreground mb-2">Featured Image</p>
                   <img 
                     src={property.featured_image_url} 
                     alt={property.property_title || "Property"} 
-                    className="w-full h-48 object-cover rounded-lg"
+                    className="w-full h-48 max-md:h-56 object-cover rounded-lg"
                   />
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="mt-2 text-xs"
+                    className="mt-2 text-xs max-md:text-sm max-md:h-10 max-md:w-full"
                     onClick={() => copyToClipboard(property.featured_image_url!, "Featured Image URL")}
                   >
-                    <Copy className="w-3 h-3 mr-1.5" />
+                    <Copy className="w-3 h-3 max-md:w-4 max-md:h-4 mr-1.5" />
                     Copy Image URL
                   </Button>
                 </div>
@@ -373,22 +382,22 @@ export function PartnerListingDataModal({
 
               {property.gallery_images && property.gallery_images.length > 0 && (
                 <div>
-                  <p className="text-xs text-muted-foreground mb-2">Gallery Images ({property.gallery_images.length})</p>
-                  <div className="grid grid-cols-3 gap-2">
+                  <p className="text-xs max-md:text-sm text-muted-foreground mb-2">Gallery Images ({property.gallery_images.length})</p>
+                  <div className="grid grid-cols-3 max-md:grid-cols-2 gap-2">
                     {property.gallery_images.map((img, idx) => (
                       <div key={idx} className="relative group">
                         <img 
                           src={img} 
                           alt={`Gallery ${idx + 1}`} 
-                          className="w-full h-24 object-cover rounded-md"
+                          className="w-full h-24 max-md:h-32 object-cover rounded-md"
                         />
                         <Button
                           variant="secondary"
                           size="sm"
-                          className="absolute inset-0 w-full h-full opacity-0 group-hover:opacity-100 transition-opacity bg-black/50 text-white text-xs"
+                          className="absolute inset-0 w-full h-full opacity-0 group-hover:opacity-100 max-md:opacity-100 transition-opacity bg-black/50 text-white text-xs max-md:text-sm"
                           onClick={() => copyToClipboard(img, `Gallery Image ${idx + 1}`)}
                         >
-                          <Copy className="w-3 h-3 mr-1" />
+                          <Copy className="w-3 h-3 max-md:w-4 max-md:h-4 mr-1" />
                           Copy URL
                         </Button>
                       </div>
@@ -398,14 +407,14 @@ export function PartnerListingDataModal({
               )}
 
               {allImages.length === 0 && (
-                <div className="flex items-center justify-center h-24 bg-muted/50 rounded-lg">
-                  <p className="text-sm text-muted-foreground">No images available</p>
+                <div className="flex items-center justify-center h-24 max-md:h-32 bg-muted/50 rounded-lg">
+                  <p className="text-sm max-md:text-base text-muted-foreground">No images available</p>
                 </div>
               )}
             </div>
           </div>
         </ScrollArea>
-      </DialogContent>
-    </Dialog>
+      </ResponsiveModalContent>
+    </ResponsiveModal>
   );
 }

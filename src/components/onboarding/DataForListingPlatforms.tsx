@@ -1,5 +1,10 @@
 import { useState, useEffect } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { 
+  ResponsiveModal, 
+  ResponsiveModalContent, 
+  ResponsiveModalHeader, 
+  ResponsiveModalTitle 
+} from "@/components/ui/responsive-modal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Copy, Check, Loader2, Search } from "lucide-react";
@@ -218,7 +223,7 @@ export const DataForListingPlatforms = ({
     return (
       <div className={`flex items-start justify-between py-3 max-md:py-4 border-b border-border/50 last:border-0 gap-4 max-md:gap-3 ${isMatch ? 'bg-primary/5 px-2 rounded-md' : ''}`}>
         <div className="flex-1 min-w-0">
-          <p className="text-sm max-md:text-lg font-medium text-foreground mb-1">{label}</p>
+          <p className="text-sm max-md:text-base font-medium text-foreground mb-1">{label}</p>
           {note && <p className="text-xs max-md:text-sm text-muted-foreground mt-0.5">{note}</p>}
           {value ? (
             isUrl(value) ? (
@@ -242,13 +247,13 @@ export const DataForListingPlatforms = ({
           <Button
             variant="ghost"
             size="icon"
-            className="h-7 w-7 max-md:h-12 max-md:w-12 flex-shrink-0 mt-0.5 flex"
+            className="h-8 w-8 max-md:h-12 max-md:w-12 flex-shrink-0 mt-0.5 flex"
             onClick={() => copyToClipboard(value, label)}
           >
             {copiedField === label ? (
-              <Check className="h-3.5 w-3.5 max-md:h-6 max-md:w-6 text-green-600" />
+              <Check className="h-4 w-4 max-md:h-6 max-md:w-6 text-green-600" />
             ) : (
-              <Copy className="h-3.5 w-3.5 max-md:h-6 max-md:w-6" />
+              <Copy className="h-4 w-4 max-md:h-6 max-md:w-6" />
             )}
           </Button>
         )}
@@ -266,20 +271,22 @@ export const DataForListingPlatforms = ({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] max-md:max-h-screen flex flex-col">
-        <DialogHeader className="flex-shrink-0">
-          <DialogTitle className="text-xl max-md:text-2xl">Listing Data - {propertyName}</DialogTitle>
-        </DialogHeader>
+    <ResponsiveModal open={open} onOpenChange={onOpenChange}>
+      <ResponsiveModalContent className="max-w-4xl p-0">
+        <ResponsiveModalHeader className="p-4 md:p-6 pb-2 flex-shrink-0">
+          <ResponsiveModalTitle className="text-lg md:text-xl">
+            Listing Data - {propertyName}
+          </ResponsiveModalTitle>
+        </ResponsiveModalHeader>
 
-        <div className="relative flex-shrink-0 mb-4">
+        <div className="relative flex-shrink-0 px-4 md:px-6 mb-4">
           <Input
             placeholder="Search listing data..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-10 max-md:h-12 max-md:text-base max-md:pl-12"
           />
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none max-md:h-5 max-md:w-5 max-md:left-4" />
+          <Search className="absolute left-7 md:left-9 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none max-md:h-5 max-md:w-5" />
         </div>
 
         {loading ? (
@@ -287,14 +294,14 @@ export const DataForListingPlatforms = ({
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
           </div>
         ) : listingData ? (
-          <ScrollArea className="h-[70vh] max-md:h-[calc(100vh-120px)] pr-4 max-md:pr-2">
-            <div className="space-y-6 max-md:space-y-5">
+          <ScrollArea className="flex-1 max-h-[calc(90vh-180px)] max-md:max-h-[calc(95vh-160px)]">
+            <div className="space-y-4 max-md:space-y-3 px-4 md:px-6 pb-6">
               {/* Listing URLs - Priority Section */}
               <Card className="border-primary/20">
-                <CardHeader className="pb-3 max-md:pb-4">
-                  <CardTitle className="text-base max-md:text-xl">Listing URLs</CardTitle>
+                <CardHeader className="pb-2 max-md:pb-3 px-4 max-md:px-4">
+                  <CardTitle className="text-sm max-md:text-lg">Listing URLs</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-0">
+                <CardContent className="space-y-0 px-4 max-md:px-4">
                   <DataRow label="Airbnb URL" value={listingData.airbnbUrl} />
                   <DataRow label="VRBO URL" value={listingData.vrboUrl} />
                   <DataRow label="Direct Booking Website" value={listingData.directBookingWebsite} />
@@ -304,10 +311,10 @@ export const DataForListingPlatforms = ({
 
               {/* Property Specifications */}
               <Card>
-                <CardHeader className="pb-3 max-md:pb-4">
-                  <CardTitle className="text-base max-md:text-xl">Property Specifications</CardTitle>
+                <CardHeader className="pb-2 max-md:pb-3 px-4 max-md:px-4">
+                  <CardTitle className="text-sm max-md:text-lg">Property Specifications</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-0">
+                <CardContent className="space-y-0 px-4 max-md:px-4">
                   <DataRow label="Property Address" value={listingData.propertyAddress} />
                   <DataRow label="Brand Name" value={listingData.brandName} />
                   <DataRow label="STR/MTR" value={listingData.rentalType} />
@@ -323,23 +330,24 @@ export const DataForListingPlatforms = ({
                 </CardContent>
               </Card>
 
-              {/* Schools & Pet Policies */}
+              {/* Schools */}
               <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base">Schools</CardTitle>
+                <CardHeader className="pb-2 max-md:pb-3 px-4 max-md:px-4">
+                  <CardTitle className="text-sm max-md:text-lg">Schools</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-0">
+                <CardContent className="space-y-0 px-4 max-md:px-4">
                   <DataRow label="Elementary School" value={listingData.elementarySchool} />
                   <DataRow label="Middle School" value={listingData.middleSchool} />
                   <DataRow label="High School" value={listingData.highSchool} />
                 </CardContent>
               </Card>
 
+              {/* Pet Policies */}
               <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base">Pet Policies</CardTitle>
+                <CardHeader className="pb-2 max-md:pb-3 px-4 max-md:px-4">
+                  <CardTitle className="text-sm max-md:text-lg">Pet Policies</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-0">
+                <CardContent className="space-y-0 px-4 max-md:px-4">
                   <DataRow label="Pets Allowed" value={listingData.petsAllowed} />
                   <DataRow label="Pet Rules" value={listingData.petRules} />
                   <DataRow label="Maximum Pets" value={listingData.maxPets} />
@@ -349,10 +357,10 @@ export const DataForListingPlatforms = ({
 
               {/* Financial Terms */}
               <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base">Financial Terms</CardTitle>
+                <CardHeader className="pb-2 max-md:pb-3 px-4 max-md:px-4">
+                  <CardTitle className="text-sm max-md:text-lg">Financial Terms</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-0">
+                <CardContent className="space-y-0 px-4 max-md:px-4">
                   <DataRow label="Monthly Rent" value={listingData.monthlyRent} />
                   <DataRow label="Nightly Rate" value={listingData.nightlyRate} />
                   <DataRow label="Security Deposit" value={listingData.securityDeposit} />
@@ -367,10 +375,10 @@ export const DataForListingPlatforms = ({
 
               {/* Lease Terms */}
               <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base">Lease Terms</CardTitle>
+                <CardHeader className="pb-2 max-md:pb-3 px-4 max-md:px-4">
+                  <CardTitle className="text-sm max-md:text-lg">Lease Terms</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-0">
+                <CardContent className="space-y-0 px-4 max-md:px-4">
                   <DataRow label="Lease Term" value={listingData.leaseTerm} />
                   <DataRow label="Notice to Vacate" value={listingData.noticeToVacate} />
                 </CardContent>
@@ -378,20 +386,20 @@ export const DataForListingPlatforms = ({
 
               {/* Contact Information */}
               <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base">Contact Information</CardTitle>
+                <CardHeader className="pb-2 max-md:pb-3 px-4 max-md:px-4">
+                  <CardTitle className="text-sm max-md:text-lg">Contact Information</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-0">
+                <CardContent className="space-y-0 px-4 max-md:px-4">
                   <DataRow label="Contact Email" value={listingData.contactEmail} />
                 </CardContent>
               </Card>
 
               {/* Assets */}
               <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base">Assets</CardTitle>
+                <CardHeader className="pb-2 max-md:pb-3 px-4 max-md:px-4">
+                  <CardTitle className="text-sm max-md:text-lg">Assets</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-0">
+                <CardContent className="space-y-0 px-4 max-md:px-4">
                   <DataRow label="Property Photos" value={listingData.propertyPhotos} />
                   <DataRow label="Listing Descriptions" value={listingData.listingDescriptions} />
                 </CardContent>
@@ -403,7 +411,7 @@ export const DataForListingPlatforms = ({
             No listing data available
           </div>
         )}
-      </DialogContent>
-    </Dialog>
+      </ResponsiveModalContent>
+    </ResponsiveModal>
   );
 };

@@ -1,4 +1,9 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { 
+  ResponsiveModal, 
+  ResponsiveModalContent, 
+  ResponsiveModalHeader, 
+  ResponsiveModalTitle 
+} from "@/components/ui/responsive-modal";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
@@ -253,52 +258,56 @@ export function PartnerPropertyDetailsModal({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] p-0">
-        <DialogHeader className="p-6 pb-4">
-          <div className="flex items-start justify-between">
-            <div className="flex-1">
-              <DialogTitle className="text-xl font-semibold">
+    <ResponsiveModal open={open} onOpenChange={onOpenChange}>
+      <ResponsiveModalContent className="max-w-4xl p-0">
+        <ResponsiveModalHeader className="p-4 md:p-6 pb-2 md:pb-4">
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex-1 min-w-0">
+              <ResponsiveModalTitle className="text-lg md:text-xl font-semibold">
                 {property.property_title || "Partner Property Details"}
-              </DialogTitle>
+              </ResponsiveModalTitle>
               {editingAddress ? (
-                <div className="flex items-center gap-2 mt-2">
-                  <MapPin className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                  <Input
-                    value={editedAddress}
-                    onChange={(e) => setEditedAddress(e.target.value)}
-                    className="flex-1 h-8 text-sm"
-                    placeholder="Enter address..."
-                    autoFocus
-                  />
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={handleSaveAddress}
-                    disabled={savingAddress}
-                    className="h-8 px-2"
-                  >
-                    <Check className="w-4 h-4 text-green-600" />
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={handleCancelEdit}
-                    disabled={savingAddress}
-                    className="h-8 px-2"
-                  >
-                    <X className="w-4 h-4 text-destructive" />
-                  </Button>
+                <div className="flex items-center gap-2 mt-2 flex-wrap max-md:flex-col max-md:items-stretch">
+                  <div className="flex items-center gap-2 flex-1 min-w-0">
+                    <MapPin className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                    <Input
+                      value={editedAddress}
+                      onChange={(e) => setEditedAddress(e.target.value)}
+                      className="flex-1 h-8 max-md:h-10 text-sm max-md:text-base"
+                      placeholder="Enter address..."
+                      autoFocus
+                    />
+                  </div>
+                  <div className="flex gap-2 max-md:justify-end">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={handleSaveAddress}
+                      disabled={savingAddress}
+                      className="h-8 px-2 max-md:h-10 max-md:px-4"
+                    >
+                      <Check className="w-4 h-4 text-green-600" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={handleCancelEdit}
+                      disabled={savingAddress}
+                      className="h-8 px-2 max-md:h-10 max-md:px-4"
+                    >
+                      <X className="w-4 h-4 text-destructive" />
+                    </Button>
+                  </div>
                 </div>
               ) : (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1 group">
-                  <MapPin className="w-4 h-4" />
-                  <span>{property.address || [property.city, property.state, property.zip_code].filter(Boolean).join(", ") || "No address"}</span>
+                <div className="flex items-center gap-2 text-sm max-md:text-base text-muted-foreground mt-1 group">
+                  <MapPin className="w-4 h-4 flex-shrink-0" />
+                  <span className="truncate">{property.address || [property.city, property.state, property.zip_code].filter(Boolean).join(", ") || "No address"}</span>
                   <Button
                     size="sm"
                     variant="ghost"
                     onClick={handleEditAddress}
-                    className="h-6 px-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="h-6 px-2 opacity-100 max-md:opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
                   >
                     <Pencil className="w-3 h-3" />
                   </Button>
@@ -307,21 +316,22 @@ export function PartnerPropertyDetailsModal({
             </div>
             <Badge className="bg-orange-500 text-white flex-shrink-0">Partner Property</Badge>
           </div>
-        </DialogHeader>
+        </ResponsiveModalHeader>
         
-        <ScrollArea className="max-h-[calc(90vh-120px)]">
-          <div className="p-6 pt-0 space-y-6">
+        <ScrollArea className="flex-1 max-h-[calc(90vh-120px)] max-md:max-h-[calc(95vh-140px)]">
+          <div className="p-4 md:p-6 pt-0 space-y-6 max-md:space-y-4">
             {/* Featured Image & Gallery with Download Button */}
             <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-2">
+              <div className="flex flex-col max-md:gap-2 md:flex-row md:items-center md:justify-between">
+                <h3 className="text-sm max-md:text-base font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-2">
                   <ImageIcon className="w-4 h-4" />
                   Property Images ({allImages.length})
                 </h3>
                 {allImages.length > 0 && (
                   <Button 
                     variant="outline" 
-                    size="sm" 
+                    size="sm"
+                    className="max-md:w-full max-md:h-10"
                     onClick={downloadAllImages}
                     disabled={downloading}
                   >
@@ -335,22 +345,22 @@ export function PartnerPropertyDetailsModal({
                 <img 
                   src={property.featured_image_url} 
                   alt={property.property_title || "Property"} 
-                  className="w-full h-64 object-cover rounded-lg"
+                  className="w-full h-48 max-md:h-56 object-cover rounded-lg"
                 />
               ) : (
-                <div className="w-full h-64 bg-muted rounded-lg flex items-center justify-center">
+                <div className="w-full h-48 max-md:h-40 bg-muted rounded-lg flex items-center justify-center">
                   <ImageIcon className="w-16 h-16 text-muted-foreground/30" />
                 </div>
               )}
               
               {property.gallery_images && property.gallery_images.length > 0 && (
-                <div className="grid grid-cols-4 gap-2">
+                <div className="grid grid-cols-4 max-md:grid-cols-2 gap-2">
                   {property.gallery_images.map((img, idx) => (
                     <img 
                       key={idx}
                       src={img} 
                       alt={`Gallery ${idx + 1}`} 
-                      className="w-full h-20 object-cover rounded-md cursor-pointer hover:opacity-80 transition-opacity"
+                      className="w-full h-20 max-md:h-24 object-cover rounded-md cursor-pointer hover:opacity-80 transition-opacity"
                       onClick={() => window.open(img, '_blank')}
                     />
                   ))}
@@ -361,33 +371,33 @@ export function PartnerPropertyDetailsModal({
             <Separator />
 
             {/* Team Instructions Box */}
-            <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+            <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-3 md:p-4">
               <div className="flex items-start gap-3">
                 <Info className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
-                <div className="flex-1">
-                  <div className="flex items-center justify-between mb-2">
-                    <h4 className="font-semibold text-blue-800 dark:text-blue-300">Team Instructions</h4>
+                <div className="flex-1 min-w-0">
+                  <div className="flex flex-col max-md:gap-2 md:flex-row md:items-center md:justify-between mb-2">
+                    <h4 className="font-semibold text-blue-800 dark:text-blue-300 text-sm md:text-base">Team Instructions</h4>
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={() => setShowInstructionsModal(true)}
-                      className="h-7 px-2 text-blue-600"
+                      className="h-7 px-2 text-blue-600 max-md:w-full max-md:h-9"
                     >
                       <HelpCircle className="w-4 h-4 mr-1" />
                       Full Guide
                     </Button>
                   </div>
-                  <ol className="text-sm text-blue-700 dark:text-blue-400 space-y-2 list-decimal list-inside">
-                    <li><strong>Find Rent Zestimate:</strong> Go to Zillow or <strong>ask AI</strong> to find the Rent Zestimate</li>
+                  <ol className="text-sm max-md:text-base text-blue-700 dark:text-blue-400 space-y-2 list-decimal list-inside">
+                    <li><strong>Find Rent Zestimate:</strong> Go to Zillow or <strong>ask AI</strong></li>
                     <li><strong>Calculate:</strong> Listing Price = Rent Zestimate × <strong>{PRICING_MULTIPLIER}</strong></li>
-                    <li><strong>Enter Value:</strong> Click "Enter Value" in the Zillow Rent Zestimate box below</li>
-                    <li><strong>Never use owner's suggested rent</strong> - always use the formula above</li>
+                    <li><strong>Enter Value:</strong> Click "Enter Value" below</li>
+                    <li><strong>Never use owner's suggested rent</strong></li>
                   </ol>
-                  <div className="flex gap-2 mt-3">
+                  <div className="flex flex-col max-md:gap-2 md:flex-row gap-2 mt-3">
                     <Button 
                       variant="outline" 
                       size="sm" 
-                      className="bg-blue-100 dark:bg-blue-900/50 border-blue-300 dark:border-blue-700 hover:bg-blue-200 dark:hover:bg-blue-800"
+                      className="bg-blue-100 dark:bg-blue-900/50 border-blue-300 dark:border-blue-700 hover:bg-blue-200 dark:hover:bg-blue-800 max-md:w-full max-md:h-10"
                       onClick={openZillowPage}
                     >
                       <ExternalLink className="w-4 h-4 mr-2" />
@@ -396,7 +406,7 @@ export function PartnerPropertyDetailsModal({
                     <Button 
                       variant="outline" 
                       size="sm" 
-                      className="bg-blue-100 dark:bg-blue-900/50 border-blue-300 dark:border-blue-700 hover:bg-blue-200 dark:hover:bg-blue-800"
+                      className="bg-blue-100 dark:bg-blue-900/50 border-blue-300 dark:border-blue-700 hover:bg-blue-200 dark:hover:bg-blue-800 max-md:w-full max-md:h-10"
                       onClick={() => setShowInstructionsModal(true)}
                     >
                       <HelpCircle className="w-4 h-4 mr-2" />
@@ -408,37 +418,37 @@ export function PartnerPropertyDetailsModal({
             </div>
 
             {/* Owner Information - Prominent Section */}
-            <div className="bg-primary/5 rounded-lg p-4 border border-primary/20">
-              <h3 className="text-sm font-semibold text-primary uppercase tracking-wide mb-3 flex items-center gap-2">
+            <div className="bg-primary/5 rounded-lg p-3 md:p-4 border border-primary/20">
+              <h3 className="text-sm max-md:text-base font-semibold text-primary uppercase tracking-wide mb-3 flex items-center gap-2">
                 <User className="w-4 h-4" />
                 Owner Information
               </h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-background rounded-lg">
                     <User className="w-5 h-5 text-primary" />
                   </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Owner Name</p>
-                    <p className="font-semibold">{property.contact_name || "Not provided"}</p>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs max-md:text-sm text-muted-foreground">Owner Name</p>
+                    <p className="font-semibold text-sm max-md:text-base truncate">{property.contact_name || "Not provided"}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-background rounded-lg">
                     <Mail className="w-5 h-5 text-primary" />
                   </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Email</p>
-                    <p className="font-semibold text-sm">{property.contact_email || "Not provided"}</p>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs max-md:text-sm text-muted-foreground">Email</p>
+                    <p className="font-semibold text-sm max-md:text-base truncate">{property.contact_email || "Not provided"}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-background rounded-lg">
                     <Phone className="w-5 h-5 text-primary" />
                   </div>
-                  <div>
-                    <p className="text-xs text-muted-foreground">Phone</p>
-                    <p className="font-semibold">{property.contact_phone || "Not provided"}</p>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs max-md:text-sm text-muted-foreground">Phone</p>
+                    <p className="font-semibold text-sm max-md:text-base">{property.contact_phone || "Not provided"}</p>
                   </div>
                 </div>
               </div>
@@ -446,66 +456,66 @@ export function PartnerPropertyDetailsModal({
 
             {/* Property Specifications */}
             <div>
-              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+              <h3 className="text-sm max-md:text-base font-semibold text-muted-foreground uppercase tracking-wide mb-3">
                 Property Specifications
               </h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4">
                 <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg">
-                  <Bed className="w-5 h-5 text-primary" />
-                  <div>
-                    <p className="text-xs text-muted-foreground">Bedrooms</p>
-                    <p className="font-medium">{property.bedrooms || "N/A"}</p>
+                  <Bed className="w-5 h-5 text-primary flex-shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-xs max-md:text-sm text-muted-foreground">Bedrooms</p>
+                    <p className="font-medium text-sm max-md:text-base">{property.bedrooms || "N/A"}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg">
-                  <Bath className="w-5 h-5 text-primary" />
-                  <div>
-                    <p className="text-xs text-muted-foreground">Bathrooms</p>
-                    <p className="font-medium">{property.bathrooms || "N/A"}</p>
+                  <Bath className="w-5 h-5 text-primary flex-shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-xs max-md:text-sm text-muted-foreground">Bathrooms</p>
+                    <p className="font-medium text-sm max-md:text-base">{property.bathrooms || "N/A"}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg">
-                  <Square className="w-5 h-5 text-primary" />
-                  <div>
-                    <p className="text-xs text-muted-foreground">Sq Ft</p>
-                    <p className="font-medium">{property.square_footage?.toLocaleString() || "N/A"}</p>
+                  <Square className="w-5 h-5 text-primary flex-shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-xs max-md:text-sm text-muted-foreground">Sq Ft</p>
+                    <p className="font-medium text-sm max-md:text-base">{property.square_footage?.toLocaleString() || "N/A"}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg">
-                  <Users className="w-5 h-5 text-primary" />
-                  <div>
-                    <p className="text-xs text-muted-foreground">Max Guests</p>
-                    <p className="font-medium">{property.max_guests || "N/A"}</p>
+                  <Users className="w-5 h-5 text-primary flex-shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-xs max-md:text-sm text-muted-foreground">Max Guests</p>
+                    <p className="font-medium text-sm max-md:text-base">{property.max_guests || "N/A"}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg">
-                  <Building className="w-5 h-5 text-primary" />
-                  <div>
-                    <p className="text-xs text-muted-foreground">Type</p>
-                    <p className="font-medium">{property.property_type || "N/A"}</p>
+                  <Building className="w-5 h-5 text-primary flex-shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-xs max-md:text-sm text-muted-foreground">Type</p>
+                    <p className="font-medium text-sm max-md:text-base truncate">{property.property_type || "N/A"}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg">
-                  <Building className="w-5 h-5 text-primary" />
-                  <div>
-                    <p className="text-xs text-muted-foreground">Stories</p>
-                    <p className="font-medium">{property.stories || "N/A"}</p>
+                  <Building className="w-5 h-5 text-primary flex-shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-xs max-md:text-sm text-muted-foreground">Stories</p>
+                    <p className="font-medium text-sm max-md:text-base">{property.stories || "N/A"}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg">
-                  <Car className="w-5 h-5 text-primary" />
-                  <div>
-                    <p className="text-xs text-muted-foreground">Parking</p>
-                    <p className="font-medium">
+                  <Car className="w-5 h-5 text-primary flex-shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-xs max-md:text-sm text-muted-foreground">Parking</p>
+                    <p className="font-medium text-sm max-md:text-base truncate">
                       {property.parking_spaces ? `${property.parking_spaces} ${property.parking_type || 'spaces'}` : "N/A"}
                     </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg">
-                  <Calendar className="w-5 h-5 text-primary" />
-                  <div>
-                    <p className="text-xs text-muted-foreground">Year Built</p>
-                    <p className="font-medium">{property.year_built || "N/A"}</p>
+                  <Calendar className="w-5 h-5 text-primary flex-shrink-0" />
+                  <div className="min-w-0">
+                    <p className="text-xs max-md:text-sm text-muted-foreground">Year Built</p>
+                    <p className="font-medium text-sm max-md:text-base">{property.year_built || "N/A"}</p>
                   </div>
                 </div>
               </div>
@@ -515,49 +525,49 @@ export function PartnerPropertyDetailsModal({
 
             {/* Pricing with Zillow Integration */}
             <div>
-              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+              <h3 className="text-sm max-md:text-base font-semibold text-muted-foreground uppercase tracking-wide mb-3">
                 Pricing
               </h3>
               
               {/* Main listing price - uses calculated_listing_price if available */}
-              <div className="p-4 border-2 border-green-500 rounded-lg mb-4 bg-green-50 dark:bg-green-950/20">
-                <div className="flex items-center justify-between mb-2">
+              <div className="p-3 md:p-4 border-2 border-green-500 rounded-lg mb-4 bg-green-50 dark:bg-green-950/20">
+                <div className="flex flex-col max-md:gap-1 md:flex-row md:items-center md:justify-between mb-2">
                   <div className="flex items-center gap-2">
                     <DollarSign className="w-5 h-5 text-green-600" />
-                    <p className="font-semibold text-green-800 dark:text-green-300">MidTermNation Listing Price</p>
+                    <p className="font-semibold text-green-800 dark:text-green-300 text-sm max-md:text-base">MidTermNation Listing Price</p>
                   </div>
                   {property.zillow_last_fetched && (
-                    <span className="text-xs text-muted-foreground">
+                    <span className="text-xs max-md:text-sm text-muted-foreground">
                       Updated: {formatDate(property.zillow_last_fetched)}
                     </span>
                   )}
                 </div>
-                <p className="text-3xl font-bold text-green-600">
+                <p className="text-2xl md:text-3xl font-bold text-green-600">
                   {property.calculated_listing_price 
                     ? formatCurrency(property.calculated_listing_price)
-                    : <span className="text-amber-600">⚠️ Needs Zillow Verification</span>
+                    : <span className="text-amber-600 text-lg md:text-xl">⚠️ Needs Zillow Verification</span>
                   }
                 </p>
                 {property.zillow_rent_zestimate && (
-                  <p className="text-sm text-muted-foreground mt-1">
+                  <p className="text-sm max-md:text-base text-muted-foreground mt-1">
                     Based on Zillow Rent Zestimate: {formatCurrency(property.zillow_rent_zestimate)} × {PRICING_MULTIPLIER}
                   </p>
                 )}
               </div>
 
               {/* Zillow Rent Zestimate Input */}
-              <div className="p-4 border border-amber-300 dark:border-amber-700 rounded-lg mb-4 bg-amber-50 dark:bg-amber-950/20">
-                <div className="flex items-center justify-between mb-2">
+              <div className="p-3 md:p-4 border border-amber-300 dark:border-amber-700 rounded-lg mb-4 bg-amber-50 dark:bg-amber-950/20">
+                <div className="flex flex-col max-md:gap-2 md:flex-row md:items-center md:justify-between mb-2">
                   <div className="flex items-center gap-2">
                     <AlertCircle className="w-4 h-4 text-amber-600" />
-                    <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">Zillow Rent Zestimate</p>
+                    <p className="text-sm max-md:text-base font-semibold text-amber-800 dark:text-amber-300">Zillow Rent Zestimate</p>
                   </div>
                   {!editingZestimate && (
                     <Button
                       size="sm"
                       variant="ghost"
                       onClick={handleEditZestimate}
-                      className="h-7 px-2"
+                      className="h-7 px-2 max-md:w-full max-md:h-10"
                     >
                       <Pencil className="w-3 h-3 mr-1" />
                       {property.zillow_rent_zestimate ? "Update" : "Enter Value"}
@@ -566,44 +576,49 @@ export function PartnerPropertyDetailsModal({
                 </div>
                 
                 {editingZestimate ? (
-                  <div className="flex items-center gap-2">
-                    <span className="text-lg font-semibold">$</span>
-                    <Input
-                      type="number"
-                      value={zestimateValue}
-                      onChange={(e) => setZestimateValue(e.target.value)}
-                      className="flex-1 h-10"
-                      placeholder="Enter Zillow Rent Zestimate..."
-                      autoFocus
-                    />
-                    <Button
-                      size="sm"
-                      onClick={handleSaveZestimate}
-                      disabled={savingZestimate}
-                      className="h-10"
-                    >
-                      <Check className="w-4 h-4 mr-1" />
-                      Save
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={handleCancelZestimate}
-                      disabled={savingZestimate}
-                      className="h-10"
-                    >
-                      <X className="w-4 h-4" />
-                    </Button>
+                  <div className="flex flex-col max-md:gap-2 md:flex-row md:items-center gap-2">
+                    <span className="text-lg font-semibold max-md:hidden">$</span>
+                    <div className="flex items-center gap-2 flex-1">
+                      <span className="text-lg font-semibold md:hidden">$</span>
+                      <Input
+                        type="number"
+                        value={zestimateValue}
+                        onChange={(e) => setZestimateValue(e.target.value)}
+                        className="flex-1 h-10 max-md:h-12 max-md:text-base"
+                        placeholder="Enter Zillow Rent Zestimate..."
+                        autoFocus
+                      />
+                    </div>
+                    <div className="flex gap-2 max-md:w-full">
+                      <Button
+                        size="sm"
+                        onClick={handleSaveZestimate}
+                        disabled={savingZestimate}
+                        className="h-10 max-md:flex-1 max-md:h-12"
+                      >
+                        <Check className="w-4 h-4 mr-1" />
+                        Save
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={handleCancelZestimate}
+                        disabled={savingZestimate}
+                        className="h-10 max-md:h-12"
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
                   </div>
                 ) : (
                   <div>
-                    <p className="text-xl font-semibold">
+                    <p className="text-xl max-md:text-2xl font-semibold">
                       {property.zillow_rent_zestimate 
                         ? formatCurrency(property.zillow_rent_zestimate)
                         : <span className="text-muted-foreground">Not entered yet</span>
                       }
                     </p>
-                    <p className="text-xs text-muted-foreground mt-1">
+                    <p className="text-xs max-md:text-sm text-muted-foreground mt-1">
                       Go to Zillow → Search this address → Find "Rent Zestimate" → Enter value above
                     </p>
                   </div>
@@ -611,28 +626,28 @@ export function PartnerPropertyDetailsModal({
               </div>
 
               {/* Owner's Suggested Price (for reference) */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="p-4 border rounded-lg bg-muted/30">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
+                <div className="p-3 md:p-4 border rounded-lg bg-muted/30">
                   <div className="flex items-center gap-2 mb-1">
                     <DollarSign className="w-4 h-4 text-muted-foreground" />
-                    <p className="text-sm text-muted-foreground">Owner's Suggested Rent</p>
+                    <p className="text-sm max-md:text-base text-muted-foreground">Owner's Suggested Rent</p>
                   </div>
-                  <p className="text-xl font-semibold text-muted-foreground">{formatCurrency(property.monthly_price)}</p>
-                  <p className="text-xs text-amber-600 mt-1">⚠️ Do not use - for reference only</p>
+                  <p className="text-lg md:text-xl font-semibold text-muted-foreground">{formatCurrency(property.monthly_price)}</p>
+                  <p className="text-xs max-md:text-sm text-amber-600 mt-1">⚠️ Do not use - for reference only</p>
                 </div>
-                <div className="p-4 border rounded-lg">
+                <div className="p-3 md:p-4 border rounded-lg">
                   <div className="flex items-center gap-2 mb-1">
                     <DollarSign className="w-4 h-4 text-muted-foreground" />
-                    <p className="text-sm text-muted-foreground">Security Deposit</p>
+                    <p className="text-sm max-md:text-base text-muted-foreground">Security Deposit</p>
                   </div>
-                  <p className="text-xl font-semibold">{formatCurrency(property.security_deposit)}</p>
+                  <p className="text-lg md:text-xl font-semibold">{formatCurrency(property.security_deposit)}</p>
                 </div>
-                <div className="p-4 border rounded-lg">
+                <div className="p-3 md:p-4 border rounded-lg">
                   <div className="flex items-center gap-2 mb-1">
                     <DollarSign className="w-4 h-4 text-muted-foreground" />
-                    <p className="text-sm text-muted-foreground">Cleaning Fee</p>
+                    <p className="text-sm max-md:text-base text-muted-foreground">Cleaning Fee</p>
                   </div>
-                  <p className="text-xl font-semibold">{formatCurrency(property.cleaning_fee)}</p>
+                  <p className="text-lg md:text-xl font-semibold">{formatCurrency(property.cleaning_fee)}</p>
                 </div>
               </div>
             </div>
@@ -643,10 +658,10 @@ export function PartnerPropertyDetailsModal({
             {property.property_description && (
               <>
                 <div>
-                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+                  <h3 className="text-sm max-md:text-base font-semibold text-muted-foreground uppercase tracking-wide mb-3">
                     Description
                   </h3>
-                  <p className="text-sm text-muted-foreground leading-relaxed">
+                  <p className="text-sm max-md:text-base text-muted-foreground leading-relaxed">
                     {property.property_description}
                   </p>
                 </div>
@@ -658,12 +673,12 @@ export function PartnerPropertyDetailsModal({
             {amenitiesList.length > 0 && (
               <>
                 <div>
-                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+                  <h3 className="text-sm max-md:text-base font-semibold text-muted-foreground uppercase tracking-wide mb-3">
                     Amenities
                   </h3>
                   <div className="flex flex-wrap gap-2">
                     {amenitiesList.map((amenity: string, idx: number) => (
-                      <Badge key={idx} variant="secondary" className="text-xs">
+                      <Badge key={idx} variant="secondary" className="text-xs max-md:text-sm max-md:py-1.5 max-md:px-3">
                         {amenity}
                       </Badge>
                     ))}
@@ -677,12 +692,12 @@ export function PartnerPropertyDetailsModal({
             {property.appliances_included && property.appliances_included.length > 0 && (
               <>
                 <div>
-                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+                  <h3 className="text-sm max-md:text-base font-semibold text-muted-foreground uppercase tracking-wide mb-3">
                     Appliances Included
                   </h3>
                   <div className="flex flex-wrap gap-2">
                     {property.appliances_included.map((item: string, idx: number) => (
-                      <Badge key={idx} variant="outline" className="text-xs">
+                      <Badge key={idx} variant="outline" className="text-xs max-md:text-sm max-md:py-1.5 max-md:px-3">
                         {item}
                       </Badge>
                     ))}
@@ -693,15 +708,15 @@ export function PartnerPropertyDetailsModal({
             )}
 
             {/* Services & Utilities */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
               {property.services_included && property.services_included.length > 0 && (
                 <div>
-                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+                  <h3 className="text-sm max-md:text-base font-semibold text-muted-foreground uppercase tracking-wide mb-3">
                     Services Included
                   </h3>
                   <div className="flex flex-wrap gap-2">
                     {property.services_included.map((service: string, idx: number) => (
-                      <Badge key={idx} variant="secondary" className="text-xs bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
+                      <Badge key={idx} variant="secondary" className="text-xs max-md:text-sm max-md:py-1.5 max-md:px-3 bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
                         {service}
                       </Badge>
                     ))}
@@ -710,12 +725,12 @@ export function PartnerPropertyDetailsModal({
               )}
               {property.utilities_included && property.utilities_included.length > 0 && (
                 <div>
-                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+                  <h3 className="text-sm max-md:text-base font-semibold text-muted-foreground uppercase tracking-wide mb-3">
                     Utilities Included
                   </h3>
                   <div className="flex flex-wrap gap-2">
                     {property.utilities_included.map((utility: string, idx: number) => (
-                      <Badge key={idx} variant="secondary" className="text-xs bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">
+                      <Badge key={idx} variant="secondary" className="text-xs max-md:text-sm max-md:py-1.5 max-md:px-3 bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">
                         {utility}
                       </Badge>
                     ))}
@@ -730,14 +745,14 @@ export function PartnerPropertyDetailsModal({
             {(property.pet_policy || property.pet_policy_details) && (
               <>
                 <div>
-                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3 flex items-center gap-2">
+                  <h3 className="text-sm max-md:text-base font-semibold text-muted-foreground uppercase tracking-wide mb-3 flex items-center gap-2">
                     <PawPrint className="w-4 h-4" />
                     Pet Policy
                   </h3>
                   <div className="p-3 bg-muted/50 rounded-lg">
-                    <p className="font-medium">{property.pet_policy || "Not specified"}</p>
+                    <p className="font-medium text-sm max-md:text-base">{property.pet_policy || "Not specified"}</p>
                     {property.pet_policy_details && (
-                      <p className="text-sm text-muted-foreground mt-1">{property.pet_policy_details}</p>
+                      <p className="text-sm max-md:text-base text-muted-foreground mt-1">{property.pet_policy_details}</p>
                     )}
                   </div>
                 </div>
@@ -747,12 +762,12 @@ export function PartnerPropertyDetailsModal({
 
             {/* External Links */}
             <div>
-              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+              <h3 className="text-sm max-md:text-base font-semibold text-muted-foreground uppercase tracking-wide mb-3">
                 External Links
               </h3>
-              <div className="flex flex-wrap gap-3">
+              <div className="flex flex-col max-md:gap-2 md:flex-row md:flex-wrap gap-3">
                 {property.existing_listing_url && (
-                  <Button variant="outline" size="sm" asChild>
+                  <Button variant="outline" size="sm" className="max-md:w-full max-md:h-10 max-md:text-base" asChild>
                     <a href={property.existing_listing_url} target="_blank" rel="noopener noreferrer">
                       <ExternalLink className="w-4 h-4 mr-2" />
                       View Existing Listing
@@ -760,7 +775,7 @@ export function PartnerPropertyDetailsModal({
                   </Button>
                 )}
                 {property.virtual_tour_url && (
-                  <Button variant="outline" size="sm" asChild>
+                  <Button variant="outline" size="sm" className="max-md:w-full max-md:h-10 max-md:text-base" asChild>
                     <a href={property.virtual_tour_url} target="_blank" rel="noopener noreferrer">
                       <ExternalLink className="w-4 h-4 mr-2" />
                       Virtual Tour
@@ -768,20 +783,20 @@ export function PartnerPropertyDetailsModal({
                   </Button>
                 )}
                 {!property.existing_listing_url && !property.virtual_tour_url && (
-                  <p className="text-sm text-muted-foreground">No external links available</p>
+                  <p className="text-sm max-md:text-base text-muted-foreground">No external links available</p>
                 )}
               </div>
             </div>
 
             {/* Sync Info */}
             <div className="pt-4 border-t">
-              <p className="text-xs text-muted-foreground">
-                Last synced: {formatDate(property.synced_at)} • Status: <Badge variant="secondary" className="text-xs ml-1">{property.status || "active"}</Badge>
+              <p className="text-xs max-md:text-sm text-muted-foreground">
+                Last synced: {formatDate(property.synced_at)} • Status: <Badge variant="secondary" className="text-xs max-md:text-sm ml-1">{property.status || "active"}</Badge>
               </p>
             </div>
           </div>
         </ScrollArea>
-      </DialogContent>
+      </ResponsiveModalContent>
 
       {/* Zillow Pricing Instructions Modal */}
       <ZillowPricingInstructionsModal
@@ -789,6 +804,6 @@ export function PartnerPropertyDetailsModal({
         onOpenChange={setShowInstructionsModal}
         address={property.address || undefined}
       />
-    </Dialog>
+    </ResponsiveModal>
   );
 }
