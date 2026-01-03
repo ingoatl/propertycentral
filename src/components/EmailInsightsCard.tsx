@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -127,7 +127,19 @@ export function EmailInsightsCard({ propertyId, showHeader = true }: EmailInsigh
     }
   };
 
-  const connectGmail = async () => {
+  const pollTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Cleanup poll timer on unmount
+  useEffect(() => {
+    return () => {
+      if (pollTimerRef.current) {
+        clearInterval(pollTimerRef.current);
+        pollTimerRef.current = null;
+      }
+    };
+  }, []);
+
+  const connectGmail = useCallback(async () => {
     try {
       // Fetch the OAuth URL from the edge function (uses secrets for client ID)
       const { data, error } = await supabase.functions.invoke('gmail-auth-url');
@@ -142,9 +154,17 @@ export function EmailInsightsCard({ propertyId, showHeader = true }: EmailInsigh
       
       const authWindow = window.open(data.authUrl, 'gmail-auth', 'width=600,height=700');
       
-      const pollTimer = setInterval(() => {
+      // Clear any existing poll timer
+      if (pollTimerRef.current) {
+        clearInterval(pollTimerRef.current);
+      }
+      
+      pollTimerRef.current = setInterval(() => {
         if (authWindow?.closed) {
-          clearInterval(pollTimer);
+          if (pollTimerRef.current) {
+            clearInterval(pollTimerRef.current);
+            pollTimerRef.current = null;
+          }
           setTimeout(() => {
             checkGmailConnection();
             loadInsights();
@@ -155,7 +175,7 @@ export function EmailInsightsCard({ propertyId, showHeader = true }: EmailInsigh
       console.error('Error connecting Gmail:', error);
       toast.error('Failed to connect Gmail');
     }
-  };
+  }, []);
 
   const scanEmails = async () => {
     try {

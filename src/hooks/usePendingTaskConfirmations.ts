@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -69,6 +69,23 @@ export function usePendingTaskConfirmations() {
     refetchInterval: 30000, // Refetch every 30 seconds as backup
   });
 
+  // Use ref to store refetch to avoid dependency issues
+  const refetchRef = useRef(refetch);
+  refetchRef.current = refetch;
+
+  // Debounce timer ref
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Debounced refetch to prevent rapid re-fetches
+  const debouncedRefetch = useCallback(() => {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+    debounceTimerRef.current = setTimeout(() => {
+      refetchRef.current();
+    }, 300);
+  }, []);
+
   // Set up realtime subscription
   useEffect(() => {
     if (!isEligibleUser) return;
@@ -84,7 +101,7 @@ export function usePendingTaskConfirmations() {
         },
         (payload) => {
           console.log("Realtime update:", payload);
-          refetch();
+          debouncedRefetch();
         }
       )
       .subscribe((status) => {
@@ -95,9 +112,12 @@ export function usePendingTaskConfirmations() {
       });
 
     return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
       supabase.removeChannel(channel);
     };
-  }, [isEligibleUser, refetch]);
+  }, [isEligibleUser, debouncedRefetch]);
 
   // Approve task mutation - creates tasks in owner_conversation_actions (Initial Setup Tasks)
   const approveMutation = useMutation({

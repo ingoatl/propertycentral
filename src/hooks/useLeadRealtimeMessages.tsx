@@ -1,10 +1,23 @@
-import { useEffect } from "react";
+import { useEffect, useRef, useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 export function useLeadRealtimeMessages() {
   const queryClient = useQueryClient();
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Debounced query invalidation to prevent rapid re-fetches
+  const debouncedInvalidate = useCallback(() => {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+    debounceTimerRef.current = setTimeout(() => {
+      queryClient.invalidateQueries({ queryKey: ["lead-communications"] });
+      queryClient.invalidateQueries({ queryKey: ["all-communications"] });
+      queryClient.invalidateQueries({ queryKey: ["leads"] });
+    }, 300);
+  }, [queryClient]);
 
   useEffect(() => {
     // Subscribe to lead_communications realtime updates
@@ -47,23 +60,23 @@ export function useLeadRealtimeMessages() {
               action: {
                 label: "View",
                 onClick: () => {
-                  // Could navigate to lead or open modal
                   queryClient.invalidateQueries({ queryKey: ["leads"] });
                 },
               },
             });
           }
 
-          // Invalidate relevant queries
-          queryClient.invalidateQueries({ queryKey: ["lead-communications"] });
-          queryClient.invalidateQueries({ queryKey: ["all-communications"] });
-          queryClient.invalidateQueries({ queryKey: ["leads"] });
+          // Debounced invalidation to prevent rapid re-fetches
+          debouncedInvalidate();
         }
       )
       .subscribe();
 
     return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
       supabase.removeChannel(channel);
     };
-  }, [queryClient]);
+  }, [queryClient, debouncedInvalidate]);
 }
