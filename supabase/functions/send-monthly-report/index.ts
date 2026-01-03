@@ -968,19 +968,35 @@ State: ${state}
                       const personName = visit.visited_by || 'Staff';
                       // Use ONLY the actual stored price - don't fabricate charges
                       const actualVisitPrice = Number(visit.price || 0);
+                      const visitHours = Number(visit.hours || 0);
                       
                       // Format date correctly to avoid timezone issues
                       const visitDate = new Date(visit.date + 'T12:00:00');
                       const dateStr = visitDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
                       
-                      // Simple display - just show the actual price without fabricated breakdown
+                      // Build the visit description with hours breakdown if applicable
+                      let visitDescription = `Property Visit - ${dateStr} (${personName})`;
+                      
                       let result = `
                     <tr>
-                      <td style="padding: 12px 0; color: #2c3e50; font-size: 15px; border-bottom: 1px solid #f5f5f5;">
-                        Property Visit - ${dateStr} (${personName})
+                      <td style="padding: 12px 0; color: #2c3e50; font-size: 15px; border-bottom: ${visit.notes || visitHours > 0 ? 'none' : '1px solid #f5f5f5'};">
+                        ${visitDescription}
                       </td>
-                      <td style="padding: 12px 0; color: #4a4a4a; font-size: 15px; text-align: right; font-weight: 600; border-bottom: 1px solid #f5f5f5;">$${actualVisitPrice.toFixed(2)}</td>
+                      <td style="padding: 12px 0; color: #4a4a4a; font-size: 15px; text-align: right; font-weight: 600; border-bottom: ${visit.notes || visitHours > 0 ? 'none' : '1px solid #f5f5f5'};">$${actualVisitPrice.toFixed(2)}</td>
                     </tr>`;
+                      
+                      // Add hours breakdown if hours were logged
+                      if (visitHours > 0) {
+                        const hourlyRate = 50;
+                        const hourlyCharge = visitHours * hourlyRate;
+                        const baseVisitFee = actualVisitPrice - hourlyCharge;
+                        result += `
+                    <tr>
+                      <td colspan="2" style="padding: 2px 0 ${visit.notes ? '4px' : '10px'} 20px; color: #6b7280; font-size: 12px; border-bottom: ${visit.notes ? 'none' : '1px solid #f5f5f5'};">
+                        ↳ Base: $${baseVisitFee.toFixed(0)} + ${visitHours} hr${visitHours > 1 ? 's' : ''} @ $${hourlyRate}/hr = $${hourlyCharge.toFixed(0)}
+                      </td>
+                    </tr>`;
+                      }
                       
                       // Add notes if present
                       if (visit.notes && visit.notes.trim()) {
