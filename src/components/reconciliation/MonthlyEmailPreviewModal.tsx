@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Mail, Send, TestTube, Eye, DollarSign, RotateCcw, CheckCircle2, AlertTriangle } from "lucide-react";
+import { Mail, Send, TestTube, Eye, DollarSign, RotateCcw, CheckCircle2, AlertTriangle, FileDown } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -43,6 +43,7 @@ export const MonthlyEmailPreviewModal = ({
 }: MonthlyEmailPreviewModalProps) => {
   const [isSendingTest, setIsSendingTest] = useState(false);
   const [isSendingOwner, setIsSendingOwner] = useState(false);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [ownerName, setOwnerName] = useState("Property Owner");
   const [visitTotal, setVisitTotal] = useState(0);
   const [expenseTotal, setExpenseTotal] = useState(0);
@@ -52,6 +53,35 @@ export const MonthlyEmailPreviewModal = ({
   const [approvedVisits, setApprovedVisits] = useState<ApprovedLineItem[]>([]);
   const [approvedExpenses, setApprovedExpenses] = useState<ApprovedLineItem[]>([]);
   const [duplicateWarnings, setDuplicateWarnings] = useState<DuplicateWarning[]>([]);
+
+  const handleDownloadPdf = async () => {
+    setIsGeneratingPdf(true);
+    const toastId = toast.loading("Generating PDF statement...");
+    try {
+      const { data, error } = await supabase.functions.invoke("generate-statement-pdf", {
+        body: { reconciliation_id: reconciliation.id },
+      });
+
+      if (error) throw error;
+      
+      // Create a Blob from the HTML and open print dialog
+      const htmlContent = data.html;
+      const printWindow = window.open('', '_blank');
+      if (printWindow) {
+        printWindow.document.write(htmlContent);
+        printWindow.document.close();
+        printWindow.onload = () => {
+          printWindow.print();
+        };
+      }
+      
+      toast.success("PDF ready for download", { id: toastId });
+    } catch (error: any) {
+      toast.error(error.message || "Failed to generate PDF", { id: toastId });
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  };
 
   useEffect(() => {
     const fetchOwnerAndLineItems = async () => {
@@ -302,31 +332,46 @@ export const MonthlyEmailPreviewModal = ({
             </Card>
           )}
 
-          {/* Live Calculation Summary - Match Review Modal */}
-          <Card className="p-4 bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20">
-            <h3 className="font-semibold mb-3 flex items-center gap-2">
-              <DollarSign className="w-5 h-5 text-primary" />
-              Statement Summary (From Approved Items)
-            </h3>
-            <div className="grid grid-cols-3 gap-4 text-sm">
-              <div className="text-center p-3 bg-background rounded-lg border">
-                <div className="text-xs text-muted-foreground mb-1">Management Fee</div>
-                <div className="font-bold text-lg">${managementFee.toFixed(2)}</div>
+          {/* Net Owner Result - THE MOST IMPORTANT NUMBER */}
+          <div className={`p-6 rounded-xl border ${
+            (Number(reconciliation.total_revenue || 0) - dueFromOwner) >= 0 
+              ? 'bg-gradient-to-br from-emerald-50 to-emerald-100 border-emerald-200' 
+              : 'bg-gradient-to-br from-red-50 to-red-100 border-red-200'
+          }`}>
+            <div className="flex justify-between items-center">
+              <div>
+                <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1">
+                  {(Number(reconciliation.total_revenue || 0) - dueFromOwner) >= 0 
+                    ? 'Net Owner Earnings' 
+                    : 'Balance Due from Owner'}
+                </div>
+                <div className="text-sm text-muted-foreground">
+                  For period {monthLabel}
+                </div>
               </div>
-              <div className="text-center p-3 bg-background rounded-lg border">
-                <div className="text-xs text-muted-foreground mb-1">Visit Fees ({approvedVisits.length})</div>
-                <div className="font-bold text-lg text-orange-600">${visitTotal.toFixed(2)}</div>
-              </div>
-              <div className="text-center p-3 bg-background rounded-lg border">
-                <div className="text-xs text-muted-foreground mb-1">Expenses ({approvedExpenses.length})</div>
-                <div className="font-bold text-lg text-orange-600">${expenseTotal.toFixed(2)}</div>
+              <div className={`text-4xl font-bold font-mono ${
+                (Number(reconciliation.total_revenue || 0) - dueFromOwner) >= 0 
+                  ? 'text-emerald-600' 
+                  : 'text-red-600'
+              }`}>
+                ${Math.abs(Number(reconciliation.total_revenue || 0) - dueFromOwner).toFixed(2)}
               </div>
             </div>
-            <div className="mt-4 pt-3 border-t flex justify-between items-center">
-              <span className="font-medium">Total Due from Owner:</span>
-              <span className="text-2xl font-bold text-primary">${dueFromOwner.toFixed(2)}</span>
+            <div className="grid grid-cols-2 gap-4 mt-4 pt-4 border-t border-current/10">
+              <div className="text-center">
+                <div className="text-xs text-muted-foreground">Gross Revenue</div>
+                <div className="text-lg font-semibold font-mono text-emerald-600">
+                  ${Number(reconciliation.total_revenue || 0).toFixed(2)}
+                </div>
+              </div>
+              <div className="text-center">
+                <div className="text-xs text-muted-foreground">Total Expenses</div>
+                <div className="text-lg font-semibold font-mono text-red-600">
+                  ${dueFromOwner.toFixed(2)}
+                </div>
+              </div>
             </div>
-          </Card>
+          </div>
 
           {/* Detailed Line Items Preview */}
           <Card className="p-4">
@@ -419,10 +464,10 @@ export const MonthlyEmailPreviewModal = ({
               </div>
             </Card>
 
-            {/* Email Preview - PeachHaus Design */}
-          <div className="border rounded-lg overflow-hidden shadow-sm bg-white dark:bg-gray-900">
+          {/* Email Preview - Fortune 500 Professional Design */}
+          <div className="border rounded-xl overflow-hidden shadow-lg bg-white dark:bg-gray-900">
             {/* Logo Header */}
-            <div className="bg-white dark:bg-gray-900 border-b-4 border-[#FF8C42] p-8 text-center">
+            <div className="bg-white dark:bg-gray-900 border-b-[3px] border-[#FF7F00] p-8 text-center">
               <img 
                 src="/peachhaus-logo.png" 
                 alt="PeachHaus Property Management" 
@@ -430,153 +475,178 @@ export const MonthlyEmailPreviewModal = ({
               />
             </div>
 
-            {/* Orange Header with Title */}
-            <div className="bg-[#FF7F00] p-8 text-center text-white">
-              <h1 className="text-3xl font-bold tracking-wide mb-3">
-                🏡 PeachHaus Monthly Summary
+            {/* Title Header */}
+            <div className="bg-[#FF7F00] px-10 py-6 text-white">
+              <h1 className="text-2xl font-bold tracking-wide text-center">
+                OWNER STATEMENT
               </h1>
-              <p className="text-lg opacity-95">
-                Property: {reconciliation.properties?.name} | Period: {monthLabel}
+              <p className="text-center text-sm opacity-90 mt-2">
+                {reconciliation.properties?.name} • {monthLabel}
               </p>
             </div>
 
-            {/* Professional Summary */}
-            <div className="p-8 bg-white dark:bg-gray-900">
-              <p className="text-sm leading-relaxed text-gray-700 dark:text-gray-300 mb-4">
-                Dear {ownerName},
-              </p>
-              <p className="text-sm leading-relaxed text-gray-700 dark:text-gray-300 mb-4">
-                Please find enclosed your official monthly financial statement for the period ending {monthLabel}. 
-                This statement provides a comprehensive breakdown of all revenue collected and expenses incurred on your behalf 
-                during the reporting period. All amounts reflected herein have been verified and reconciled with our accounting records.
-              </p>
+            {/* Statement ID Bar */}
+            <div className="bg-gray-50 dark:bg-gray-800 px-10 py-3 border-b flex justify-between text-xs text-muted-foreground font-mono">
+              <span>Statement ID: PH-{new Date(reconciliation.reconciliation_month).getFullYear()}{String(new Date(reconciliation.reconciliation_month).getMonth() + 1).padStart(2, '0')}-{reconciliation.id?.slice(0, 8).toUpperCase()}</span>
+              <span>Issue Date: {format(new Date(), 'MMMM d, yyyy')}</span>
             </div>
 
-            {/* Property Info Card */}
-            <div className="mx-8 mb-8 bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 rounded-2xl p-6 border border-gray-200 dark:border-gray-700 shadow-sm">
-              <div className="flex items-start gap-5">
-                <div className="w-12 h-12 bg-gradient-to-br from-pink-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg flex-shrink-0">
-                  <span className="text-2xl">🏠</span>
+            {/* Main Content */}
+            <div className="p-10 bg-white dark:bg-gray-900">
+              
+              {/* Property & Owner Info */}
+              <div className="grid grid-cols-2 gap-6 mb-8">
+                <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-5 border-l-4 border-[#FF7F00]">
+                  <div className="text-[10px] text-muted-foreground uppercase tracking-wide mb-2">Property</div>
+                  <div className="font-semibold text-gray-900 dark:text-white">{reconciliation.properties?.name}</div>
+                  <div className="text-sm text-muted-foreground mt-1">{reconciliation.properties?.address}</div>
                 </div>
-                <div className="flex-1">
-                  <h3 className="text-xl font-semibold text-gray-800 dark:text-gray-200 mb-2">
-                    {reconciliation.properties?.name}
-                  </h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
-                    📍 {reconciliation.properties?.address}
-                  </p>
+                <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-5">
+                  <div className="text-[10px] text-muted-foreground uppercase tracking-wide mb-2">Statement Period</div>
+                  <div className="font-semibold text-gray-900 dark:text-white">{monthLabel}</div>
+                  <div className="text-sm text-muted-foreground mt-1">Prepared for: {ownerName}</div>
                 </div>
               </div>
-            </div>
 
-            {/* Performance Summary */}
-            <div className="p-8 bg-white dark:bg-gray-900">
-              <h2 className="text-xl font-bold text-[#FF7F00] mb-6 uppercase tracking-wide">
-                📊 Performance Summary
-              </h2>
-              
-              {/* Income Section */}
-              <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl p-6 mb-6 shadow-sm">
-                <h3 className="text-lg font-bold text-gray-800 dark:text-gray-200 mb-4">
-                  Income & Activity
-                </h3>
-                <div className="space-y-3">
+              {/* NET RESULT BOX - Most Important Number */}
+              <div className={`rounded-xl p-6 mb-8 border ${
+                (Number(reconciliation.total_revenue || 0) - dueFromOwner) >= 0 
+                  ? 'bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-900/20 dark:to-emerald-800/20 border-emerald-200 dark:border-emerald-700' 
+                  : 'bg-gradient-to-br from-red-50 to-red-100 dark:from-red-900/20 dark:to-red-800/20 border-red-200 dark:border-red-700'
+              }`}>
+                <div className="flex justify-between items-center">
+                  <div>
+                    <div className="text-xs text-muted-foreground uppercase tracking-wide">
+                      {(Number(reconciliation.total_revenue || 0) - dueFromOwner) >= 0 ? 'Net Owner Earnings' : 'Balance Due from Owner'}
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-1">For period {monthLabel}</div>
+                  </div>
+                  <div className={`text-4xl font-bold font-mono ${
+                    (Number(reconciliation.total_revenue || 0) - dueFromOwner) >= 0 ? 'text-emerald-600' : 'text-red-600'
+                  }`}>
+                    ${Math.abs(Number(reconciliation.total_revenue || 0) - dueFromOwner).toFixed(2)}
+                  </div>
+                </div>
+              </div>
+
+              {/* REVENUE Section */}
+              <div className="mb-6">
+                <div className="text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide px-4 py-3 bg-gray-100 dark:bg-gray-800 rounded-t-lg border-b-2 border-emerald-500">
+                  Revenue
+                </div>
+                <div className="border border-t-0 rounded-b-lg overflow-hidden">
                   {shortTermRevenue > 0 && (
-                    <div className="flex justify-between pb-3 border-b dark:border-gray-700">
+                    <div className="flex justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-800">
                       <span className="text-sm text-gray-700 dark:text-gray-300">Short-term Booking Revenue</span>
-                      <span className="text-sm font-semibold text-green-600 dark:text-green-400">
-                        ${shortTermRevenue.toFixed(2)}
-                      </span>
+                      <span className="text-sm font-medium font-mono text-emerald-600">${shortTermRevenue.toFixed(2)}</span>
                     </div>
                   )}
                   {midTermRevenue > 0 && (
-                    <div className="flex justify-between pb-3 border-b dark:border-gray-700">
+                    <div className="flex justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-800">
                       <span className="text-sm text-gray-700 dark:text-gray-300">Mid-term Rental Revenue</span>
-                      <span className="text-sm font-semibold text-green-600 dark:text-green-400">
-                        ${midTermRevenue.toFixed(2)}
-                      </span>
+                      <span className="text-sm font-medium font-mono text-emerald-600">${midTermRevenue.toFixed(2)}</span>
                     </div>
                   )}
-                  <div className="flex justify-between pt-4 -mx-6 px-6 py-4 rounded-lg" style={{ backgroundColor: '#E9F8EF' }}>
-                    <span className="text-sm font-bold" style={{ color: '#166534' }}>Subtotal: Gross Revenue</span>
-                    <span className="text-sm font-bold" style={{ color: '#166534' }}>
-                      ${Number(reconciliation.total_revenue || 0).toFixed(2)}
-                    </span>
+                  <div className="flex justify-between px-4 py-4 bg-emerald-50 dark:bg-emerald-900/20">
+                    <span className="text-sm font-semibold text-emerald-800 dark:text-emerald-300">TOTAL GROSS REVENUE</span>
+                    <span className="text-base font-bold font-mono text-emerald-700 dark:text-emerald-400">${Number(reconciliation.total_revenue || 0).toFixed(2)}</span>
                   </div>
                 </div>
               </div>
 
-              {/* Services Rendered Section */}
-              <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl p-6 mb-6 shadow-sm">
-                <h3 className="text-lg font-bold text-gray-800 dark:text-gray-200 mb-4">
-                  🧰 PeachHaus Services Rendered
-                </h3>
-                <div className="space-y-3">
-                  <div className="flex justify-between pb-3 border-b dark:border-gray-700">
+              {/* EXPENSES Section */}
+              <div className="mb-6">
+                <div className="text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide px-4 py-3 bg-gray-100 dark:bg-gray-800 rounded-t-lg border-b-2 border-red-500">
+                  Expenses & Fees
+                </div>
+                <div className="border border-t-0 rounded-b-lg overflow-hidden">
+                  <div className="flex justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-800">
                     <span className="text-sm text-gray-700 dark:text-gray-300">
-                      Management Fee ({reconciliation.properties?.management_fee_percentage || 15}%)
+                      Management Fee ({reconciliation.properties?.management_fee_percentage || 15}% of revenue)
                     </span>
-                    <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-                      ${managementFee.toFixed(2)}
-                    </span>
+                    <span className="text-sm font-medium font-mono text-gray-700 dark:text-gray-300">${managementFee.toFixed(2)}</span>
                   </div>
                   
                   {/* Visit Line Items */}
-                  {approvedVisits.map((visit) => (
-                    <div key={visit.id} className="flex justify-between pb-2 text-sm border-b dark:border-gray-700">
-                      <span className="text-gray-600 dark:text-gray-400">
-                        {visit.description} ({format(new Date(visit.date + 'T00:00:00'), 'MMM dd')})
-                      </span>
-                      <span className="font-medium text-gray-700 dark:text-gray-300">
-                        ${Math.abs(visit.amount).toFixed(2)}
-                      </span>
-                    </div>
-                  ))}
+                  {approvedVisits.map((visit) => {
+                    const visitHours = Number(visit.hours || 0);
+                    const actualPrice = Math.abs(visit.amount);
+                    const hourlyRate = 50;
+                    const hourlyCharge = visitHours * hourlyRate;
+                    const baseVisitFee = actualPrice - hourlyCharge;
+                    
+                    return (
+                      <div key={visit.id} className="px-4 py-3 border-b border-gray-100 dark:border-gray-800">
+                        <div className="flex justify-between">
+                          <span className="text-sm text-gray-700 dark:text-gray-300">
+                            {visit.description} ({format(new Date(visit.date + 'T00:00:00'), 'MMM d')})
+                          </span>
+                          <span className="text-sm font-medium font-mono text-gray-700 dark:text-gray-300">${actualPrice.toFixed(2)}</span>
+                        </div>
+                        {visitHours > 0 && (
+                          <div className="text-xs text-muted-foreground mt-1 pl-4">
+                            ↳ Base: ${baseVisitFee.toFixed(0)} + {visitHours} hr{visitHours > 1 ? 's' : ''} @ ${hourlyRate}/hr
+                          </div>
+                        )}
+                        {visit.notes && (
+                          <div className="text-xs text-muted-foreground mt-1 pl-4 italic">📝 {visit.notes}</div>
+                        )}
+                      </div>
+                    );
+                  })}
                   
                   {/* Expense Line Items */}
                   {approvedExpenses.map((expense) => (
-                    <div key={expense.id} className="flex justify-between pb-2 text-sm border-b dark:border-gray-700">
-                      <span className="text-gray-600 dark:text-gray-400 flex-1 truncate mr-2">
-                        {expense.description}
-                      </span>
-                      <span className="font-medium text-gray-700 dark:text-gray-300">
-                        ${Math.abs(expense.amount).toFixed(2)}
-                      </span>
+                    <div key={expense.id} className="flex justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-800">
+                      <div className="flex-1">
+                        <span className="text-sm text-gray-700 dark:text-gray-300 block truncate">{expense.description}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {format(new Date(expense.date + 'T00:00:00'), 'MMM d, yyyy')}
+                          {expense.category && ` • ${expense.category}`}
+                        </span>
+                      </div>
+                      <span className="text-sm font-medium font-mono text-gray-700 dark:text-gray-300 ml-4">${Math.abs(expense.amount).toFixed(2)}</span>
                     </div>
                   ))}
                   
-                  <div className="flex justify-between pt-4 -mx-6 px-6 py-4 rounded-lg" style={{ backgroundColor: '#FFF3EC' }}>
-                    <span className="text-sm font-bold" style={{ color: '#E86800' }}>Total Due from Owner</span>
-                    <span className="text-sm font-bold" style={{ color: '#E86800' }}>
-                      ${dueFromOwner.toFixed(2)}
-                    </span>
+                  <div className="flex justify-between px-4 py-4 bg-red-50 dark:bg-red-900/20">
+                    <span className="text-sm font-semibold text-red-800 dark:text-red-300">TOTAL EXPENSES</span>
+                    <span className="text-base font-bold font-mono text-red-700 dark:text-red-400">${dueFromOwner.toFixed(2)}</span>
                   </div>
                 </div>
               </div>
 
-              {/* Thank You Message */}
-              <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-5 mt-6 text-center">
-                <p className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-2">
-                  Thank you for partnering with PeachHaus.
-                </p>
-                <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
-                  All charges reflect completed services that maintain your property's quality and performance readiness.
-                </p>
+              {/* NET RESULT FINAL BOX */}
+              <div className="bg-gray-900 dark:bg-gray-950 rounded-xl p-6">
+                <div className="flex justify-between items-center">
+                  <div className="text-white">
+                    <div className="text-xs uppercase tracking-wide opacity-70">
+                      {(Number(reconciliation.total_revenue || 0) - dueFromOwner) >= 0 ? 'Net Owner Earnings' : 'Balance Due from Owner'}
+                    </div>
+                    <div className="text-xs opacity-50 mt-1">For period {monthLabel}</div>
+                  </div>
+                  <div className={`text-3xl font-bold font-mono ${
+                    (Number(reconciliation.total_revenue || 0) - dueFromOwner) >= 0 ? 'text-emerald-400' : 'text-red-400'
+                  }`}>
+                    ${Math.abs(Number(reconciliation.total_revenue || 0) - dueFromOwner).toFixed(2)}
+                  </div>
+                </div>
               </div>
+
             </div>
 
             {/* Footer */}
-            <div className="bg-[#2c3e50] text-white p-8 text-center border-t-4 border-[#FF8C42]">
-              <p className="font-semibold text-base tracking-wide mb-3">
+            <div className="bg-[#1f2937] text-white p-8 text-center border-t-[3px] border-[#FF7F00]">
+              <p className="font-semibold text-base tracking-wide mb-2">
                 PeachHaus Property Management
               </p>
-              <p className="text-sm text-gray-300 mb-4">
-                Questions or concerns? Contact us at{' '}
-                <a href="mailto:info@peachhausgroup.com" className="text-[#FF8C42] font-semibold">
+              <p className="text-sm text-gray-400">
+                Questions? Contact us at{' '}
+                <a href="mailto:info@peachhausgroup.com" className="text-[#FF7F00] font-medium">
                   info@peachhausgroup.com
                 </a>
               </p>
-              <p className="text-xs text-gray-400 leading-relaxed">
+              <p className="text-xs text-gray-500 mt-4">
                 This is an official financial statement. Please retain for your records.
               </p>
             </div>
@@ -584,9 +654,19 @@ export const MonthlyEmailPreviewModal = ({
           </div>
 
           <div className="flex justify-between pt-4 border-t gap-2">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
-              Close
-            </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => onOpenChange(false)}>
+                Close
+              </Button>
+              <Button
+                variant="outline"
+                onClick={handleDownloadPdf}
+                disabled={isGeneratingPdf}
+              >
+                <FileDown className="w-4 h-4 mr-2" />
+                {isGeneratingPdf ? "Generating..." : "Download PDF"}
+              </Button>
+            </div>
             <div className="flex gap-2">
               <Button
                 variant="secondary"

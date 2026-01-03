@@ -1,5 +1,8 @@
 project_id = "ijsxcaaqphaciaenlegl"
 
+[functions.generate-statement-pdf]
+verify_jwt = false
+
 [functions.ai-property-chat]
 verify_jwt = true
 

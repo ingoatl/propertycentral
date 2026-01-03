@@ -920,89 +920,115 @@ State: ${state}
                 </div>
               </div>
 
-              <!-- Performance Summary -->
-              <div style="background-color: #ffffff; padding: 40px; margin: 0;">
-                <h2 style="color: #FF7F00; margin: 0 0 30px 0; font-size: 22px; font-weight: 700; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', 'Helvetica', 'Arial', sans-serif;">
-                  📊 Performance Summary
-                </h2>
+              <!-- Statement ID Banner -->
+              <div style="background: #f8f9fa; padding: 12px 40px; border-bottom: 1px solid #e5e7eb;">
+                <table style="width: 100%;">
+                  <tr>
+                    <td style="font-size: 11px; color: #6b7280; font-family: 'Courier New', monospace;">
+                      Statement ID: PH-${new Date(previousMonthName).getFullYear()}${String(new Date(previousMonthName).getMonth() + 1).padStart(2, '0')}-${reconciliation_id.slice(0, 8).toUpperCase()}
+                    </td>
+                    <td style="text-align: right; font-size: 11px; color: #6b7280;">
+                      Issue Date: ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+                    </td>
+                  </tr>
+                </table>
+              </div>
+
+              <!-- Financial Summary Section -->
+              <div style="background-color: #ffffff; padding: 40px;">
                 
-                <!-- Income & Activity Section -->
-                <div style="background-color: #ffffff; border: 1px solid #EAEAEA; border-radius: 12px; padding: 25px; margin-bottom: 25px;">
-                  <h3 style="color: #2c3e50; margin: 0 0 20px 0; font-size: 18px; font-weight: 700; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', 'Helvetica', 'Arial', sans-serif;">
-                    Income & Activity
-                  </h3>
-                  <table style="width: 100%; border-collapse: collapse; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', 'Helvetica', 'Arial', sans-serif;">
-                    ${bookingRevenue > 0 ? `
+                <!-- NET OWNER RESULT - THE MOST IMPORTANT NUMBER -->
+                <div style="background: linear-gradient(135deg, ${netIncome >= 0 ? '#ecfdf5' : '#fef2f2'} 0%, ${netIncome >= 0 ? '#d1fae5' : '#fee2e2'} 100%); border-radius: 12px; padding: 28px; margin-bottom: 32px; border: 1px solid ${netIncome >= 0 ? '#a7f3d0' : '#fecaca'};">
+                  <table style="width: 100%;">
                     <tr>
-                      <td style="padding: 12px 0; color: #2c3e50; font-size: 15px; border-bottom: 1px solid #f5f5f5;">Short-term Booking Revenue</td>
-                      <td style="padding: 12px 0; color: #22c55e; font-size: 15px; text-align: right; font-weight: 600; border-bottom: 1px solid #f5f5f5;">$${bookingRevenue.toFixed(2)}</td>
-                    </tr>` : ''}
-                    ${midTermRevenue > 0 ? `
-                    <tr>
-                      <td style="padding: 12px 0; color: #2c3e50; font-size: 15px; border-bottom: 1px solid #f5f5f5;">Mid-term Rental Revenue</td>
-                      <td style="padding: 12px 0; color: #22c55e; font-size: 15px; text-align: right; font-weight: 600; border-bottom: 1px solid #f5f5f5;">$${midTermRevenue.toFixed(2)}</td>
-                    </tr>` : ''}
-                    <tr style="background-color: #E9F8EF;">
-                      <td style="padding: 16px 12px; color: #166534; font-size: 16px; font-weight: 700;">Subtotal: Gross Revenue</td>
-                      <td style="padding: 16px 12px; color: #166534; font-size: 16px; text-align: right; font-weight: 800;">$${totalRevenue.toFixed(2)}</td>
+                      <td style="vertical-align: middle;">
+                        <div style="font-size: 11px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">
+                          ${netIncome >= 0 ? 'Net Owner Earnings' : 'Balance Due from Owner'}
+                        </div>
+                        <div style="font-size: 10px; color: #9ca3af;">
+                          For period ${previousMonthName}
+                        </div>
+                      </td>
+                      <td style="text-align: right; vertical-align: middle;">
+                        <div style="font-size: 36px; font-weight: 700; color: ${netIncome >= 0 ? '#059669' : '#dc2626'}; font-family: 'Courier New', Consolas, monospace;">
+                          ${netIncome >= 0 ? '' : '-'}$${Math.abs(netIncome).toFixed(2)}
+                        </div>
+                      </td>
                     </tr>
                   </table>
                 </div>
 
-                <!-- PeachHaus Services Rendered Section -->
-                <div style="background-color: #ffffff; border: 1px solid #EAEAEA; border-radius: 12px; padding: 25px; margin-bottom: 25px;">
-                  <h3 style="color: #2c3e50; margin: 0 0 20px 0; font-size: 18px; font-weight: 700; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', 'Helvetica', 'Arial', sans-serif;">
-                    🧰 PeachHaus Services Rendered
-                  </h3>
-                  <table style="width: 100%; border-collapse: collapse; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', 'Helvetica', 'Arial', sans-serif;">
+                <!-- REVENUE SECTION -->
+                <div style="margin-bottom: 28px;">
+                  <div style="font-size: 12px; font-weight: 600; color: #1f2937; padding: 14px 16px; background: #f3f4f6; border-radius: 8px 8px 0 0; border-bottom: 2px solid #059669; text-transform: uppercase; letter-spacing: 0.5px;">
+                    Revenue
+                  </div>
+                  <table style="width: 100%; border-collapse: collapse; border: 1px solid #e5e7eb; border-top: none;">
+                    ${bookingRevenue > 0 ? `
                     <tr>
-                      <td style="padding: 12px 0; color: #2c3e50; font-size: 15px; border-bottom: 1px solid #f5f5f5;">Management & Oversight (${property.management_fee_percentage || 15}%)</td>
-                      <td style="padding: 12px 0; color: #4a4a4a; font-size: 15px; text-align: right; font-weight: 600; border-bottom: 1px solid #f5f5f5;">$${managementFees.toFixed(2)}</td>
+                      <td style="padding: 14px 16px; border-bottom: 1px solid #f3f4f6; font-size: 14px; color: #374151;">Short-term Booking Revenue</td>
+                      <td style="padding: 14px 16px; border-bottom: 1px solid #f3f4f6; text-align: right; font-family: 'Courier New', monospace; font-size: 14px; color: #059669; font-weight: 500;">$${bookingRevenue.toFixed(2)}</td>
+                    </tr>` : ''}
+                    ${midTermRevenue > 0 ? `
+                    <tr>
+                      <td style="padding: 14px 16px; border-bottom: 1px solid #f3f4f6; font-size: 14px; color: #374151;">Mid-term Rental Revenue</td>
+                      <td style="padding: 14px 16px; border-bottom: 1px solid #f3f4f6; text-align: right; font-family: 'Courier New', monospace; font-size: 14px; color: #059669; font-weight: 500;">$${midTermRevenue.toFixed(2)}</td>
+                    </tr>` : ''}
+                    <tr style="background: #ecfdf5;">
+                      <td style="padding: 16px; font-size: 14px; font-weight: 600; color: #065f46;">TOTAL GROSS REVENUE</td>
+                      <td style="padding: 16px; text-align: right; font-family: 'Courier New', monospace; font-size: 16px; color: #065f46; font-weight: 700;">$${totalRevenue.toFixed(2)}</td>
+                    </tr>
+                  </table>
+                </div>
+
+                <!-- EXPENSES SECTION -->
+                <div style="margin-bottom: 28px;">
+                  <div style="font-size: 12px; font-weight: 600; color: #1f2937; padding: 14px 16px; background: #f3f4f6; border-radius: 8px 8px 0 0; border-bottom: 2px solid #dc2626; text-transform: uppercase; letter-spacing: 0.5px;">
+                    Expenses & Fees
+                  </div>
+                  <table style="width: 100%; border-collapse: collapse; border: 1px solid #e5e7eb; border-top: none; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
+                    <tr>
+                      <td style="padding: 14px 16px; border-bottom: 1px solid #f3f4f6; font-size: 14px; color: #374151;">
+                        Management Fee (${property.management_fee_percentage || 15}% of revenue)
+                      </td>
+                      <td style="padding: 14px 16px; border-bottom: 1px solid #f3f4f6; text-align: right; font-family: 'Courier New', monospace; font-size: 14px; color: #374151;">$${managementFees.toFixed(2)}</td>
                     </tr>
                     ${orderMinimumFee > 0 ? `
                     <tr>
-                      <td style="padding: 12px 0; color: #2c3e50; font-size: 15px; border-bottom: 1px solid #f5f5f5;">Operational Minimum Fee</td>
-                      <td style="padding: 12px 0; color: #4a4a4a; font-size: 15px; text-align: right; font-weight: 600; border-bottom: 1px solid #f5f5f5;">$${orderMinimumFee.toFixed(2)}</td>
+                      <td style="padding: 14px 16px; border-bottom: 1px solid #f3f4f6; font-size: 14px; color: #374151;">Operational Minimum Fee</td>
+                      <td style="padding: 14px 16px; border-bottom: 1px solid #f3f4f6; text-align: right; font-family: 'Courier New', monospace; font-size: 14px; color: #374151;">$${orderMinimumFee.toFixed(2)}</td>
                     </tr>` : ''}
                     ${visits && visits.length > 0 ? visits.map((visit: any) => {
                       const personName = visit.visited_by || 'Staff';
-                      // Use ONLY the actual stored price - don't fabricate charges
                       const actualVisitPrice = Number(visit.price || 0);
                       const visitHours = Number(visit.hours || 0);
-                      
-                      // Format date correctly to avoid timezone issues
                       const visitDate = new Date(visit.date + 'T12:00:00');
                       const dateStr = visitDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
                       
-                      // Build the visit description with hours breakdown if applicable
-                      let visitDescription = `Property Visit - ${dateStr} (${personName})`;
-                      
                       let result = `
                     <tr>
-                      <td style="padding: 12px 0; color: #2c3e50; font-size: 15px; border-bottom: ${visit.notes || visitHours > 0 ? 'none' : '1px solid #f5f5f5'};">
-                        ${visitDescription}
+                      <td style="padding: 12px 16px; border-bottom: ${visit.notes || visitHours > 0 ? 'none' : '1px solid #f3f4f6'}; vertical-align: top;">
+                        <div style="font-size: 14px; color: #374151;">Property Visit - ${dateStr} (${personName})</div>
                       </td>
-                      <td style="padding: 12px 0; color: #4a4a4a; font-size: 15px; text-align: right; font-weight: 600; border-bottom: ${visit.notes || visitHours > 0 ? 'none' : '1px solid #f5f5f5'};">$${actualVisitPrice.toFixed(2)}</td>
+                      <td style="padding: 12px 16px; border-bottom: ${visit.notes || visitHours > 0 ? 'none' : '1px solid #f3f4f6'}; text-align: right; font-family: 'Courier New', monospace; font-size: 14px; color: #374151; vertical-align: top;">$${actualVisitPrice.toFixed(2)}</td>
                     </tr>`;
                       
-                      // Add hours breakdown if hours were logged
                       if (visitHours > 0) {
                         const hourlyRate = 50;
                         const hourlyCharge = visitHours * hourlyRate;
                         const baseVisitFee = actualVisitPrice - hourlyCharge;
                         result += `
                     <tr>
-                      <td colspan="2" style="padding: 2px 0 ${visit.notes ? '4px' : '10px'} 20px; color: #6b7280; font-size: 12px; border-bottom: ${visit.notes ? 'none' : '1px solid #f5f5f5'};">
+                      <td colspan="2" style="padding: 2px 16px ${visit.notes ? '4px' : '12px'} 32px; color: #6b7280; font-size: 12px; border-bottom: ${visit.notes ? 'none' : '1px solid #f3f4f6'};">
                         ↳ Base: $${baseVisitFee.toFixed(0)} + ${visitHours} hr${visitHours > 1 ? 's' : ''} @ $${hourlyRate}/hr = $${hourlyCharge.toFixed(0)}
                       </td>
                     </tr>`;
                       }
                       
-                      // Add notes if present
                       if (visit.notes && visit.notes.trim()) {
                         result += `
                     <tr>
-                      <td colspan="2" style="padding: 4px 0 10px 20px; color: #6b7280; font-size: 12px; font-style: italic; border-bottom: 1px solid #f5f5f5;">
+                      <td colspan="2" style="padding: 2px 16px 12px 32px; color: #6b7280; font-size: 12px; font-style: italic; border-bottom: 1px solid #f3f4f6;">
                         📝 ${visit.notes}
                       </td>
                     </tr>`;
@@ -1014,136 +1040,98 @@ State: ${state}
                       const description = expense.purpose || 'Maintenance & Supplies';
                       const dateStr = new Date(expense.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
                       
-                      // Check if there are line items (individual products from Amazon orders, etc.)
                       if (expense.line_items?.items && Array.isArray(expense.line_items.items) && expense.line_items.items.length > 1) {
-                        // For multi-item orders, show header and each item
                         const actualTotal = Number(expense.amount);
-                        let lineItemsSum = 0;
-                        
-                        // Calculate sum of line item prices
-                        expense.line_items.items.forEach((item: any) => {
-                          lineItemsSum += item.price ? Number(item.price) : 0;
-                        });
-                        
-                        // If line items don't match the actual total, we need to adjust
-                        const priceDifference = Math.abs(actualTotal - lineItemsSum);
-                        const shouldAdjust = priceDifference > 0.01; // More than 1 cent difference
-                        
-                        let result = '';
-                        
-                        // Show header row with order info
-                        let headerText = `${dateStr}: ${expense.vendor || 'Online Order'}`;
-                        if (expense.order_number) headerText += ` [Order #${expense.order_number}]`;
-                        
-                        result += `
+                        let result = `
                         <tr>
-                          <td style="padding: 10px 0 2px 0; color: #2c3e50; font-size: 14px; font-weight: 600; border-bottom: none;">
-                            ${headerText}
+                          <td style="padding: 12px 16px 4px 16px; color: #374151; font-size: 14px; font-weight: 500; border-bottom: none;">
+                            ${dateStr}: ${expense.vendor || 'Order'}${expense.order_number ? ` [#${expense.order_number}]` : ''}
                           </td>
-                          <td style="padding: 10px 0 2px 0; color: #4a4a4a; font-size: 14px; text-align: right; font-weight: 600; border-bottom: none;"></td>
+                          <td style="padding: 12px 16px 4px 16px; border-bottom: none;"></td>
                         </tr>`;
                         
-                        // Show each line item
                         expense.line_items.items.forEach((item: any, index: number) => {
                           const itemPrice = item.price ? Number(item.price) : 0;
-                          const itemName = item.name || 'Item';
                           const isLast = index === expense.line_items.items.length - 1;
-                          
                           result += `
                           <tr>
-                            <td style="padding: 4px 0 4px 20px; color: #6b7280; font-size: 13px; border-bottom: none;">
-                              ${isLast ? '└─' : '├─'} ${itemName}
+                            <td style="padding: 4px 16px 4px 32px; color: #6b7280; font-size: 13px; border-bottom: none;">
+                              ${isLast ? '└─' : '├─'} ${item.name || 'Item'}
                             </td>
-                            <td style="padding: 4px 0; color: #6b7280; font-size: 13px; text-align: right; border-bottom: none;">$${itemPrice.toFixed(2)}</td>
+                            <td style="padding: 4px 16px; color: #6b7280; font-size: 13px; text-align: right; font-family: 'Courier New', monospace; border-bottom: none;">$${itemPrice.toFixed(2)}</td>
                           </tr>`;
                         });
                         
-                        // Show total row with receipt link if available
                         result += `
                         <tr>
-                          <td style="padding: 4px 0 10px 20px; color: #2c3e50; font-size: 13px; font-weight: 600; border-bottom: 1px solid #f5f5f5;">
-                            Order Total:${expense.receipt_url ? ` <a href="${expense.receipt_url}" style="color: #FF7F00; text-decoration: underline; font-weight: normal; font-size: 12px; margin-left: 8px;">📎 View Receipt</a>` : ''}
+                          <td style="padding: 4px 16px 12px 32px; color: #374151; font-size: 13px; font-weight: 500; border-bottom: 1px solid #f3f4f6;">
+                            Order Total:${expense.receipt_url ? ` <a href="${expense.receipt_url}" style="color: #FF7F00; text-decoration: underline; font-weight: normal; font-size: 11px; margin-left: 8px;">📎 Receipt</a>` : ''}
                           </td>
-                          <td style="padding: 4px 0 10px 0; color: #2c3e50; font-size: 14px; text-align: right; font-weight: 700; border-bottom: 1px solid #f5f5f5;">$${actualTotal.toFixed(2)}</td>
+                          <td style="padding: 4px 16px 12px 16px; color: #374151; font-size: 14px; text-align: right; font-family: 'Courier New', monospace; font-weight: 600; border-bottom: 1px solid #f3f4f6;">$${actualTotal.toFixed(2)}</td>
                         </tr>`;
                         
                         return result;
                       } else {
-                        // For regular expenses or single-item orders, show as single row
                         let detailText = `${dateStr}: ${description}`;
                         if (expense.vendor) detailText += ` - ${expense.vendor}`;
                         if (expense.category) detailText += ` (${expense.category})`;
-                        if (expense.order_number) detailText += ` [Order #${expense.order_number}]`;
-                        
-                        // Add receipt link
-                        let receiptLink = '';
-                        if (expense.receipt_url) {
-                          receiptLink = `<a href="${expense.receipt_url}" style="color: #FF7F00; text-decoration: underline; font-size: 12px; margin-left: 8px;">📎 View Receipt</a>`;
-                        }
-                        
-                        let extraDetail = '';
-                        if (expense.items_detail) {
-                          extraDetail = `
-                            <div style="margin-top: 6px; padding-left: 12px; font-size: 12px; color: #6b7280;">
-                              ${expense.items_detail}
-                            </div>`;
-                        }
                         
                         return `
                         <tr>
-                          <td style="padding: 10px 0; color: #2c3e50; font-size: 14px; border-bottom: 1px solid #f5f5f5;">
-                            <div>${detailText}${receiptLink}</div>
-                            ${extraDetail}
+                          <td style="padding: 12px 16px; color: #374151; font-size: 14px; border-bottom: 1px solid #f3f4f6;">
+                            <div>${detailText}</div>
+                            ${expense.receipt_url ? `<a href="${expense.receipt_url}" style="color: #FF7F00; text-decoration: underline; font-size: 11px;">📎 View Receipt</a>` : ''}
                           </td>
-                          <td style="padding: 10px 0; color: #4a4a4a; font-size: 14px; text-align: right; font-weight: 600; border-bottom: 1px solid #f5f5f5; vertical-align: top;">$${Number(expense.amount).toFixed(2)}</td>
+                          <td style="padding: 12px 16px; color: #374151; font-size: 14px; text-align: right; font-family: 'Courier New', monospace; font-weight: 500; border-bottom: 1px solid #f3f4f6; vertical-align: top;">$${Number(expense.amount).toFixed(2)}</td>
                         </tr>`;
                       }
                     }).join('') : ''}
                     ${cleaningFeesTotal > 0 ? `
                     <tr>
-                      <td colspan="2" style="padding: 16px 0 8px 0; color: #2c3e50; font-size: 14px; font-weight: 600; border-bottom: none;">
-                        🔄 Pass-Through Fees (collected from guests, paid to service providers)
+                      <td style="padding: 12px 16px; color: #374151; font-size: 14px; border-bottom: 1px solid #f3f4f6;">
+                        <div>Cleaning Fees (pass-through)</div>
+                        <div style="font-size: 11px; color: #9ca3af;">Collected from guests, paid to service providers</div>
                       </td>
-                    </tr>
-                    <tr>
-                      <td style="padding: 8px 0 8px 20px; color: #2c3e50; font-size: 14px; border-bottom: 1px solid #f5f5f5;">
-                        Cleaning Fees
-                      </td>
-                      <td style="padding: 8px 0; color: #4a4a4a; font-size: 14px; text-align: right; font-weight: 600; border-bottom: 1px solid #f5f5f5;">$${cleaningFeesTotal.toFixed(2)}</td>
+                      <td style="padding: 12px 16px; text-align: right; font-family: 'Courier New', monospace; font-size: 14px; color: #374151; border-bottom: 1px solid #f3f4f6;">$${cleaningFeesTotal.toFixed(2)}</td>
                     </tr>` : ''}
                     ${petFeesTotal > 0 ? `
                     <tr>
-                      <td style="padding: 8px 0 8px 20px; color: #2c3e50; font-size: 14px; border-bottom: 1px solid #f5f5f5;">
-                        Pet Fees
+                      <td style="padding: 12px 16px; color: #374151; font-size: 14px; border-bottom: 1px solid #f3f4f6;">
+                        <div>Pet Fees (pass-through)</div>
+                        <div style="font-size: 11px; color: #9ca3af;">Collected from guests, paid to service providers</div>
                       </td>
-                      <td style="padding: 8px 0; color: #4a4a4a; font-size: 14px; text-align: right; font-weight: 600; border-bottom: 1px solid #f5f5f5;">$${petFeesTotal.toFixed(2)}</td>
+                      <td style="padding: 12px 16px; text-align: right; font-family: 'Courier New', monospace; font-size: 14px; color: #374151; border-bottom: 1px solid #f3f4f6;">$${petFeesTotal.toFixed(2)}</td>
                     </tr>` : ''}
-                    <tr style="background-color: #FFF3EC;">
-                      <td style="padding: 16px 12px; color: #E86800; font-size: 16px; font-weight: 700;">Total: Amount Due from Owner</td>
-                      <td style="padding: 16px 12px; color: #E86800; font-size: 16px; text-align: right; font-weight: 800;">$${totalExpensesWithVisits.toFixed(2)}</td>
+                    <tr style="background: #fef2f2;">
+                      <td style="padding: 16px; font-size: 14px; font-weight: 600; color: #991b1b;">TOTAL EXPENSES</td>
+                      <td style="padding: 16px; text-align: right; font-family: 'Courier New', monospace; font-size: 16px; color: #991b1b; font-weight: 700;">$${totalExpensesWithVisits.toFixed(2)}</td>
                     </tr>
+                  </table>
+                </div>
+
+                <!-- NET RESULT FINAL BOX -->
+                <div style="background: #1f2937; border-radius: 12px; padding: 24px; margin-bottom: 24px;">
+                  <table style="width: 100%;">
                     <tr>
-                      <td colspan="2" style="padding: 16px 0; color: #6b7280; font-size: 13px; line-height: 1.6; font-style: italic;">
-                        Reflects PeachHaus management and service charges for this period.<br>
-                        All services are part of PeachHaus' proactive management to protect property value and guest experience.
+                      <td style="color: white; vertical-align: middle;">
+                        <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.7; margin-bottom: 4px;">
+                          ${netIncome >= 0 ? 'Net Owner Earnings' : 'Balance Due from Owner'}
+                        </div>
+                        <div style="font-size: 10px; opacity: 0.5;">For period ${previousMonthName}</div>
+                      </td>
+                      <td style="text-align: right; vertical-align: middle;">
+                        <div style="font-size: 32px; font-weight: 700; color: ${netIncome >= 0 ? '#34d399' : '#f87171'}; font-family: 'Courier New', Consolas, monospace;">
+                          ${netIncome >= 0 ? '' : '-'}$${Math.abs(netIncome).toFixed(2)}
+                        </div>
                       </td>
                     </tr>
                   </table>
                 </div>
 
-                <!-- Thank You Message -->
-                <div style="background-color: #fafafa; border-radius: 8px; padding: 20px; margin-top: 30px; text-align: center;">
-                  <p style="color: #2c3e50; margin: 0 0 8px 0; font-size: 15px; font-weight: 600; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', 'Helvetica', 'Arial', sans-serif;">
-                    Thank you for partnering with PeachHaus.
-                  </p>
-                  <p style="color: #6b7280; margin: 0; font-size: 14px; line-height: 1.6; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', 'Helvetica', 'Arial', sans-serif;">
-                    All charges reflect completed services that maintain your property's quality and performance readiness.
-                  </p>
-                </div>
               </div>
 
-              <!-- End of Performance Summary -->
-            </div>`;
+              <!-- End of Financial Summary -->
+            </div>`
 
     // AI Insights removed from owner statement - only for performance email
 
