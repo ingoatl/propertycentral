@@ -1298,13 +1298,13 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
           {/* EXPANDABLE CONTENT - Animated */}
           <CollapsibleContent>
             <div 
-              className="flex"
+              className="flex max-md:flex-col-reverse"
               onClick={(e) => e.stopPropagation()}
             >
           {/* LEFT: Main Content (VA-focused) */}
-          <div className="flex-1 p-4 space-y-4">
+          <div className="flex-1 p-4 space-y-4 max-md:p-3 max-md:pb-6">
             {/* Due Date & Assignment Info */}
-            <div className="flex gap-3 flex-wrap items-center">
+            <div className="flex gap-3 flex-wrap items-center max-md:gap-2">
               {task.due_date && (
                 <TaskDueDateDisplay
                   dueDate={task.due_date}
@@ -1330,16 +1330,16 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
 
             {/* Field Input with Copy Button */}
             <div className="space-y-2">
-              <div className="flex items-center justify-between gap-2 mb-2">
-                <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-2 max-md:flex-col max-md:items-start">
+                <div className="flex flex-wrap items-center gap-2">
                   {task.field_value && (
                     <>
-                      <span className="text-sm font-medium">Value entered:</span>
+                      <span className="text-sm font-medium max-md:hidden">Value entered:</span>
                       <Button
                         variant="ghost"
                         size="sm"
                         onClick={handleCopy}
-                        className="h-7 px-2 text-xs"
+                        className="h-7 px-2 text-xs max-md:h-9 max-md:px-3"
                         title="Copy value"
                       >
                         {copied ? <><Check className="w-3 h-3 mr-1" /> Copied</> : <><Copy className="w-3 h-3 mr-1" /> Copy</>}
@@ -1349,7 +1349,7 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
                           variant="outline"
                           size="sm"
                           onClick={() => setIsEditing(true)}
-                          className="h-7 px-2 text-xs gap-1"
+                          className="h-7 px-2 text-xs gap-1 max-md:h-9 max-md:px-3"
                         >
                           <Edit2 className="w-3 h-3" />
                           Edit Value
@@ -1364,14 +1364,14 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
                         size="sm"
                         onClick={handleManualSave}
                         disabled={saveStatus === 'saving'}
-                        className="h-7"
+                        className="h-7 max-md:h-9"
                       >
                         {saveStatus === 'saving' ? 'Saving...' : 'Save'}
                       </Button>
                     )}
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 max-md:w-full">
                   {taskStatus !== 'completed' && (
                     <Button
                       variant="default"
@@ -1395,7 +1395,7 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
                         toast.error("Failed to update task");
                       }
                     }}
-                    className="h-8"
+                    className="h-8 max-md:h-10 max-md:w-full max-md:text-base"
                   >
                     <CheckCircle2 className="w-4 h-4 mr-1" />
                     Mark Complete

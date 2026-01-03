@@ -411,7 +411,7 @@ export const WorkflowDialog = ({ open, onOpenChange, project: initialProject, pr
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-6xl max-h-[90vh] max-md:max-w-full max-md:h-screen max-md:p-4">
+      <DialogContent className="max-w-6xl max-h-[90vh] max-md:max-w-full max-md:h-[100dvh] max-md:max-h-[100dvh] max-md:p-3 max-md:rounded-none">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 max-md:text-base md:text-xl">
             <span className="max-md:hidden">{propertyName} - {isPartnerProperty ? "Listing Tasks" : "Onboarding Workflow"}</span>
@@ -485,7 +485,7 @@ export const WorkflowDialog = ({ open, onOpenChange, project: initialProject, pr
               </Button>
             </div>
 
-            <ScrollArea className="h-[calc(90vh-280px)] pr-4 max-md:h-[calc(100vh-320px)] max-md:pr-2">
+            <ScrollArea className="h-[calc(90vh-280px)] pr-4 max-md:h-[calc(100dvh-180px)] max-md:pr-1">
               {loading ? (
                 <div className="py-12 text-center text-muted-foreground max-md:text-base">Loading workflow...</div>
               ) : (
