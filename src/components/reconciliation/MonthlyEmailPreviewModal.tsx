@@ -464,191 +464,181 @@ export const MonthlyEmailPreviewModal = ({
               </div>
             </Card>
 
-          {/* Email Preview - Fortune 500 Professional Design */}
-          <div className="border rounded-xl overflow-hidden shadow-lg bg-white dark:bg-gray-900">
-            {/* Logo Header */}
-            <div className="bg-white dark:bg-gray-900 border-b-[3px] border-[#FF7F00] p-8 text-center">
-              <img 
-                src="/peachhaus-logo.png" 
-                alt="PeachHaus Property Management" 
-                className="max-w-[280px] h-auto mx-auto"
-              />
+          {/* Email Preview - Fortune 500 Corporate Style */}
+          <div className="border rounded-lg overflow-hidden shadow-sm bg-white">
+            
+            {/* Header - Corporate Minimal */}
+            <div className="px-8 py-5 border-b-2 border-black flex justify-between items-end">
+              <div>
+                <div className="text-xl font-bold text-black tracking-tight">PeachHaus</div>
+                <div className="text-[10px] text-gray-500 uppercase tracking-widest mt-0.5">Property Management</div>
+              </div>
+              <div className="text-right">
+                <div className="text-base font-semibold text-black">OWNER STATEMENT</div>
+                <div className="text-[10px] text-gray-500 font-mono mt-1">
+                  PH-{new Date(reconciliation.reconciliation_month).getFullYear()}{String(new Date(reconciliation.reconciliation_month).getMonth() + 1).padStart(2, '0')}-{reconciliation.id?.slice(0, 8).toUpperCase()}
+                </div>
+              </div>
             </div>
 
-            {/* Title Header */}
-            <div className="bg-[#FF7F00] px-10 py-6 text-white">
-              <h1 className="text-2xl font-bold tracking-wide text-center">
-                OWNER STATEMENT
-              </h1>
-              <p className="text-center text-sm opacity-90 mt-2">
-                {reconciliation.properties?.name} • {monthLabel}
-              </p>
-            </div>
-
-            {/* Statement ID Bar */}
-            <div className="bg-gray-50 dark:bg-gray-800 px-10 py-3 border-b flex justify-between text-xs text-muted-foreground font-mono">
-              <span>Statement ID: PH-{new Date(reconciliation.reconciliation_month).getFullYear()}{String(new Date(reconciliation.reconciliation_month).getMonth() + 1).padStart(2, '0')}-{reconciliation.id?.slice(0, 8).toUpperCase()}</span>
-              <span>Issue Date: {format(new Date(), 'MMMM d, yyyy')}</span>
+            {/* Property & Period Info */}
+            <div className="px-8 py-4 bg-gray-50 border-b border-gray-200 flex justify-between">
+              <div>
+                <div className="text-[10px] text-gray-500 uppercase tracking-wide mb-1">Property</div>
+                <div className="text-sm font-semibold text-black">{reconciliation.properties?.name}</div>
+                <div className="text-xs text-gray-500 mt-0.5">{reconciliation.properties?.address}</div>
+              </div>
+              <div className="text-right">
+                <div className="text-[10px] text-gray-500 uppercase tracking-wide mb-1">Statement Period</div>
+                <div className="text-sm font-semibold text-black">{monthLabel}</div>
+                <div className="text-xs text-gray-500 mt-0.5">Issue Date: {format(new Date(), 'MMMM d, yyyy')}</div>
+              </div>
             </div>
 
             {/* Main Content */}
-            <div className="p-10 bg-white dark:bg-gray-900">
+            <div className="p-8">
               
-              {/* Property & Owner Info */}
-              <div className="grid grid-cols-2 gap-6 mb-8">
-                <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-5 border-l-4 border-[#FF7F00]">
-                  <div className="text-[10px] text-muted-foreground uppercase tracking-wide mb-2">Property</div>
-                  <div className="font-semibold text-gray-900 dark:text-white">{reconciliation.properties?.name}</div>
-                  <div className="text-sm text-muted-foreground mt-1">{reconciliation.properties?.address}</div>
-                </div>
-                <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-5">
-                  <div className="text-[10px] text-muted-foreground uppercase tracking-wide mb-2">Statement Period</div>
-                  <div className="font-semibold text-gray-900 dark:text-white">{monthLabel}</div>
-                  <div className="text-sm text-muted-foreground mt-1">Prepared for: {ownerName}</div>
-                </div>
-              </div>
+              {/* Greeting */}
+              <p className="text-sm text-black mb-4">
+                Dear {ownerName},
+              </p>
+              <p className="text-xs text-gray-600 mb-6">
+                Please find below your financial statement for the period ending {monthLabel}.
+              </p>
 
-              {/* NET RESULT BOX - Most Important Number */}
-              <div className={`rounded-xl p-6 mb-8 border ${
-                (Number(reconciliation.total_revenue || 0) - dueFromOwner) >= 0 
-                  ? 'bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-900/20 dark:to-emerald-800/20 border-emerald-200 dark:border-emerald-700' 
-                  : 'bg-gradient-to-br from-red-50 to-red-100 dark:from-red-900/20 dark:to-red-800/20 border-red-200 dark:border-red-700'
-              }`}>
-                <div className="flex justify-between items-center">
+              {/* NET RESULT - Primary Focus */}
+              <div className="border-2 border-black mb-6">
+                <div className="bg-black px-5 py-4 flex justify-between items-center">
                   <div>
-                    <div className="text-xs text-muted-foreground uppercase tracking-wide">
-                      {(Number(reconciliation.total_revenue || 0) - dueFromOwner) >= 0 ? 'Net Owner Earnings' : 'Balance Due from Owner'}
+                    <div className="text-[10px] text-white uppercase tracking-wide opacity-80">
+                      {(Number(reconciliation.total_revenue || 0) - dueFromOwner) >= 0 ? 'NET OWNER EARNINGS' : 'BALANCE DUE FROM OWNER'}
                     </div>
-                    <div className="text-xs text-muted-foreground mt-1">For period {monthLabel}</div>
+                    <div className="text-[10px] text-white opacity-50 mt-0.5">For period {monthLabel}</div>
                   </div>
-                  <div className={`text-4xl font-bold font-mono ${
-                    (Number(reconciliation.total_revenue || 0) - dueFromOwner) >= 0 ? 'text-emerald-600' : 'text-red-600'
-                  }`}>
+                  <div className="text-2xl font-bold text-white font-mono">
                     ${Math.abs(Number(reconciliation.total_revenue || 0) - dueFromOwner).toFixed(2)}
+                  </div>
+                </div>
+                <div className="bg-gray-50 px-5 py-3 flex justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-gray-500">Gross Revenue</span>
+                    <span className="text-sm font-semibold text-black font-mono">${Number(reconciliation.total_revenue || 0).toFixed(2)}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-gray-500">Total Expenses</span>
+                    <span className="text-sm font-semibold text-black font-mono">(${dueFromOwner.toFixed(2)})</span>
                   </div>
                 </div>
               </div>
 
               {/* REVENUE Section */}
-              <div className="mb-6">
-                <div className="text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide px-4 py-3 bg-gray-100 dark:bg-gray-800 rounded-t-lg border-b-2 border-emerald-500">
+              <div className="mb-4">
+                <div className="text-[10px] font-semibold text-black uppercase tracking-wide py-2 border-b border-black">
                   Revenue
                 </div>
-                <div className="border border-t-0 rounded-b-lg overflow-hidden">
-                  {shortTermRevenue > 0 && (
-                    <div className="flex justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-800">
-                      <span className="text-sm text-gray-700 dark:text-gray-300">Short-term Booking Revenue</span>
-                      <span className="text-sm font-medium font-mono text-emerald-600">${shortTermRevenue.toFixed(2)}</span>
-                    </div>
-                  )}
-                  {midTermRevenue > 0 && (
-                    <div className="flex justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-800">
-                      <span className="text-sm text-gray-700 dark:text-gray-300">Mid-term Rental Revenue</span>
-                      <span className="text-sm font-medium font-mono text-emerald-600">${midTermRevenue.toFixed(2)}</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between px-4 py-4 bg-emerald-50 dark:bg-emerald-900/20">
-                    <span className="text-sm font-semibold text-emerald-800 dark:text-emerald-300">TOTAL GROSS REVENUE</span>
-                    <span className="text-base font-bold font-mono text-emerald-700 dark:text-emerald-400">${Number(reconciliation.total_revenue || 0).toFixed(2)}</span>
-                  </div>
-                </div>
+                <table className="w-full">
+                  <tbody>
+                    {shortTermRevenue > 0 && (
+                      <tr className="border-b border-gray-200">
+                        <td className="py-2 text-xs text-black">Short-term Booking Revenue</td>
+                        <td className="py-2 text-xs text-black text-right font-mono">${shortTermRevenue.toFixed(2)}</td>
+                      </tr>
+                    )}
+                    {midTermRevenue > 0 && (
+                      <tr className="border-b border-gray-200">
+                        <td className="py-2 text-xs text-black">Mid-term Rental Revenue</td>
+                        <td className="py-2 text-xs text-black text-right font-mono">${midTermRevenue.toFixed(2)}</td>
+                      </tr>
+                    )}
+                    <tr className="bg-gray-50">
+                      <td className="py-2.5 text-xs font-semibold text-black">TOTAL GROSS REVENUE</td>
+                      <td className="py-2.5 text-sm font-bold text-black text-right font-mono">${Number(reconciliation.total_revenue || 0).toFixed(2)}</td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
 
               {/* EXPENSES Section */}
-              <div className="mb-6">
-                <div className="text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide px-4 py-3 bg-gray-100 dark:bg-gray-800 rounded-t-lg border-b-2 border-red-500">
+              <div className="mb-4">
+                <div className="text-[10px] font-semibold text-black uppercase tracking-wide py-2 border-b border-black">
                   Expenses & Fees
                 </div>
-                <div className="border border-t-0 rounded-b-lg overflow-hidden">
-                  <div className="flex justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-800">
-                    <span className="text-sm text-gray-700 dark:text-gray-300">
-                      Management Fee ({reconciliation.properties?.management_fee_percentage || 15}% of revenue)
-                    </span>
-                    <span className="text-sm font-medium font-mono text-gray-700 dark:text-gray-300">${managementFee.toFixed(2)}</span>
-                  </div>
-                  
-                  {/* Visit Line Items */}
-                  {approvedVisits.map((visit) => {
-                    const visitHours = Number(visit.hours || 0);
-                    const actualPrice = Math.abs(visit.amount);
-                    const hourlyRate = 50;
-                    const hourlyCharge = visitHours * hourlyRate;
-                    const baseVisitFee = actualPrice - hourlyCharge;
+                <table className="w-full">
+                  <tbody>
+                    <tr className="border-b border-gray-200">
+                      <td className="py-2 text-xs text-black">Management Fee ({reconciliation.properties?.management_fee_percentage || 15}%)</td>
+                      <td className="py-2 text-xs text-black text-right font-mono">${managementFee.toFixed(2)}</td>
+                    </tr>
                     
-                    return (
-                      <div key={visit.id} className="px-4 py-3 border-b border-gray-100 dark:border-gray-800">
-                        <div className="flex justify-between">
-                          <span className="text-sm text-gray-700 dark:text-gray-300">
-                            {visit.description} ({format(new Date(visit.date + 'T00:00:00'), 'MMM d')})
-                          </span>
-                          <span className="text-sm font-medium font-mono text-gray-700 dark:text-gray-300">${actualPrice.toFixed(2)}</span>
-                        </div>
-                        {visitHours > 0 && (
-                          <div className="text-xs text-muted-foreground mt-1 pl-4">
-                            ↳ Base: ${baseVisitFee.toFixed(0)} + {visitHours} hr{visitHours > 1 ? 's' : ''} @ ${hourlyRate}/hr
+                    {/* Visit Line Items */}
+                    {approvedVisits.map((visit) => {
+                      const visitHours = Number(visit.hours || 0);
+                      const actualPrice = Math.abs(visit.amount);
+                      const hourlyRate = 50;
+                      const hourlyCharge = visitHours * hourlyRate;
+                      const baseVisitFee = actualPrice - hourlyCharge;
+                      
+                      return (
+                        <tr key={visit.id} className="border-b border-gray-200">
+                          <td className="py-2 text-xs text-black">
+                            <div>{visit.description}</div>
+                            <div className="text-[10px] text-gray-500">
+                              {format(new Date(visit.date + 'T00:00:00'), 'MMM d')}
+                              {visitHours > 0 && ` • Base $${baseVisitFee.toFixed(0)} + ${visitHours}h`}
+                            </div>
+                            {visit.notes && <div className="text-[10px] text-gray-400 italic mt-0.5">{visit.notes}</div>}
+                          </td>
+                          <td className="py-2 text-xs text-black text-right font-mono align-top">${actualPrice.toFixed(2)}</td>
+                        </tr>
+                      );
+                    })}
+                    
+                    {/* Expense Line Items */}
+                    {approvedExpenses.map((expense) => (
+                      <tr key={expense.id} className="border-b border-gray-200">
+                        <td className="py-2 text-xs text-black">
+                          <div className="truncate max-w-[300px]">{expense.description}</div>
+                          <div className="text-[10px] text-gray-500">
+                            {format(new Date(expense.date + 'T00:00:00'), 'MMM d')}
+                            {expense.category && ` • ${expense.category}`}
                           </div>
-                        )}
-                        {visit.notes && (
-                          <div className="text-xs text-muted-foreground mt-1 pl-4 italic">📝 {visit.notes}</div>
-                        )}
-                      </div>
-                    );
-                  })}
-                  
-                  {/* Expense Line Items */}
-                  {approvedExpenses.map((expense) => (
-                    <div key={expense.id} className="flex justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-800">
-                      <div className="flex-1">
-                        <span className="text-sm text-gray-700 dark:text-gray-300 block truncate">{expense.description}</span>
-                        <span className="text-xs text-muted-foreground">
-                          {format(new Date(expense.date + 'T00:00:00'), 'MMM d, yyyy')}
-                          {expense.category && ` • ${expense.category}`}
-                        </span>
-                      </div>
-                      <span className="text-sm font-medium font-mono text-gray-700 dark:text-gray-300 ml-4">${Math.abs(expense.amount).toFixed(2)}</span>
-                    </div>
-                  ))}
-                  
-                  <div className="flex justify-between px-4 py-4 bg-red-50 dark:bg-red-900/20">
-                    <span className="text-sm font-semibold text-red-800 dark:text-red-300">TOTAL EXPENSES</span>
-                    <span className="text-base font-bold font-mono text-red-700 dark:text-red-400">${dueFromOwner.toFixed(2)}</span>
-                  </div>
-                </div>
+                        </td>
+                        <td className="py-2 text-xs text-black text-right font-mono align-top">${Math.abs(expense.amount).toFixed(2)}</td>
+                      </tr>
+                    ))}
+                    
+                    <tr className="bg-gray-50">
+                      <td className="py-2.5 text-xs font-semibold text-black">TOTAL EXPENSES</td>
+                      <td className="py-2.5 text-sm font-bold text-black text-right font-mono">(${dueFromOwner.toFixed(2)})</td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
 
-              {/* NET RESULT FINAL BOX */}
-              <div className="bg-gray-900 dark:bg-gray-950 rounded-xl p-6">
-                <div className="flex justify-between items-center">
-                  <div className="text-white">
-                    <div className="text-xs uppercase tracking-wide opacity-70">
-                      {(Number(reconciliation.total_revenue || 0) - dueFromOwner) >= 0 ? 'Net Owner Earnings' : 'Balance Due from Owner'}
-                    </div>
-                    <div className="text-xs opacity-50 mt-1">For period {monthLabel}</div>
-                  </div>
-                  <div className={`text-3xl font-bold font-mono ${
-                    (Number(reconciliation.total_revenue || 0) - dueFromOwner) >= 0 ? 'text-emerald-400' : 'text-red-400'
-                  }`}>
+              {/* NET RESULT - Final */}
+              <div className="border-2 border-black">
+                <div className="bg-black px-5 py-3 flex justify-between items-center">
+                  <span className="text-xs font-semibold text-white uppercase tracking-wide">
+                    {(Number(reconciliation.total_revenue || 0) - dueFromOwner) >= 0 ? 'NET OWNER EARNINGS' : 'BALANCE DUE FROM OWNER'}
+                  </span>
+                  <span className="text-lg font-bold text-white font-mono">
                     ${Math.abs(Number(reconciliation.total_revenue || 0) - dueFromOwner).toFixed(2)}
-                  </div>
+                  </span>
                 </div>
               </div>
 
             </div>
 
             {/* Footer */}
-            <div className="bg-[#1f2937] text-white p-8 text-center border-t-[3px] border-[#FF7F00]">
-              <p className="font-semibold text-base tracking-wide mb-2">
-                PeachHaus Property Management
+            <div className="px-8 py-5 border-t border-gray-200 bg-gray-50">
+              <p className="text-xs text-gray-500 mb-2">
+                Questions about this statement? Reply to this email or contact{' '}
+                <a href="mailto:info@peachhausgroup.com" className="text-black underline">info@peachhausgroup.com</a>
               </p>
-              <p className="text-sm text-gray-400">
-                Questions? Contact us at{' '}
-                <a href="mailto:info@peachhausgroup.com" className="text-[#FF7F00] font-medium">
-                  info@peachhausgroup.com
-                </a>
-              </p>
-              <p className="text-xs text-gray-500 mt-4">
-                This is an official financial statement. Please retain for your records.
-              </p>
+              <div className="text-[10px] text-gray-400 border-t border-gray-200 pt-3 mt-3">
+                <div>PeachHaus Property Management</div>
+                <div>This is an official financial statement. Please retain for your records.</div>
+              </div>
             </div>
           </div>
           </div>

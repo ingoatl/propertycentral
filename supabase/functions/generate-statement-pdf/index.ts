@@ -223,46 +223,41 @@ function generatePdfHtml(data: StatementData): string {
     return new Date(dateStr + "T00:00:00").toLocaleDateString("en-US", {
       month: "short",
       day: "numeric",
-      year: "numeric",
     });
   };
 
-  // Generate visit rows
+  // Generate visit rows - compact format
   const visitRows = data.visits.map((visit) => {
     const hourlyRate = 50;
     const hourlyCharge = (visit.hours || 0) * hourlyRate;
     const baseVisitFee = visit.amount - hourlyCharge;
     
-    let detailLine = "";
+    let detail = visit.date ? formatDate(visit.date) : "";
     if (visit.hours && visit.hours > 0) {
-      detailLine = `<div style="font-size: 10px; color: #6b7280; margin-top: 2px; padding-left: 12px;">↳ Base: ${formatCurrency(baseVisitFee)} + ${visit.hours} hr${visit.hours > 1 ? "s" : ""} @ $${hourlyRate}/hr = ${formatCurrency(hourlyCharge)}</div>`;
-    }
-    if (visit.notes) {
-      detailLine += `<div style="font-size: 10px; color: #6b7280; margin-top: 2px; padding-left: 12px; font-style: italic;">📝 ${visit.notes}</div>`;
+      detail += ` • Base ${formatCurrency(baseVisitFee)} + ${visit.hours}h`;
     }
 
     return `
       <tr>
-        <td style="padding: 10px 16px; border-bottom: 1px solid #f3f4f6; vertical-align: top;">
-          <div style="font-size: 12px; color: #374151;">${visit.description}</div>
-          <div style="font-size: 10px; color: #9ca3af; margin-top: 2px;">${visit.date ? formatDate(visit.date) : ""}</div>
-          ${detailLine}
+        <td style="padding: 6px 0; font-size: 11px; color: #111111; border-bottom: 1px solid #e5e5e5;">
+          ${visit.description}
+          <span style="color: #666666; font-size: 10px; margin-left: 8px;">${detail}</span>
         </td>
-        <td style="padding: 10px 16px; border-bottom: 1px solid #f3f4f6; text-align: right; font-family: 'Courier New', monospace; font-size: 12px; color: #374151; vertical-align: top;">
+        <td style="padding: 6px 0; font-size: 11px; color: #111111; text-align: right; font-family: 'SF Mono', 'Menlo', 'Courier New', monospace; border-bottom: 1px solid #e5e5e5;">
           ${formatCurrency(visit.amount)}
         </td>
       </tr>
     `;
   }).join("");
 
-  // Generate expense rows
+  // Generate expense rows - compact format
   const expenseRows = data.expenses.map((expense) => `
     <tr>
-      <td style="padding: 10px 16px; border-bottom: 1px solid #f3f4f6;">
-        <div style="font-size: 12px; color: #374151;">${expense.description}</div>
-        <div style="font-size: 10px; color: #9ca3af; margin-top: 2px;">${expense.date ? formatDate(expense.date) : ""}${expense.category ? ` • ${expense.category}` : ""}</div>
+      <td style="padding: 6px 0; font-size: 11px; color: #111111; border-bottom: 1px solid #e5e5e5;">
+        ${expense.description}
+        <span style="color: #666666; font-size: 10px; margin-left: 8px;">${expense.date ? formatDate(expense.date) : ""}</span>
       </td>
-      <td style="padding: 10px 16px; border-bottom: 1px solid #f3f4f6; text-align: right; font-family: 'Courier New', monospace; font-size: 12px; color: #374151;">
+      <td style="padding: 6px 0; font-size: 11px; color: #111111; text-align: right; font-family: 'SF Mono', 'Menlo', 'Courier New', monospace; border-bottom: 1px solid #e5e5e5;">
         ${formatCurrency(expense.amount)}
       </td>
     </tr>
@@ -270,9 +265,8 @@ function generatePdfHtml(data: StatementData): string {
 
   const isPositiveNet = data.netOwnerEarnings >= 0;
   const netLabel = data.serviceType === "cohosting" 
-    ? (isPositiveNet ? "Net Owner Earnings" : "Balance Due from Owner")
-    : "Net Owner Payout";
-  const netColor = isPositiveNet ? "#059669" : "#dc2626";
+    ? (isPositiveNet ? "NET OWNER EARNINGS" : "BALANCE DUE FROM OWNER")
+    : "NET OWNER PAYOUT";
 
   return `
 <!DOCTYPE html>
@@ -281,167 +275,203 @@ function generatePdfHtml(data: StatementData): string {
   <meta charset="utf-8">
   <title>Owner Statement - ${data.periodMonth} ${data.periodYear}</title>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    @page {
+      size: letter;
+      margin: 0.5in;
+    }
     
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+    * { 
+      box-sizing: border-box; 
+      margin: 0; 
+      padding: 0; 
+    }
     
     body {
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', Arial, sans-serif;
       background: #ffffff;
-      color: #1f2937;
-      line-height: 1.5;
-      font-size: 12px;
+      color: #111111;
+      line-height: 1.4;
+      font-size: 11px;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
     }
     
     .page {
-      max-width: 800px;
+      max-width: 7.5in;
       margin: 0 auto;
-      padding: 40px;
+      padding: 0;
       background: white;
     }
     
     @media print {
-      .page { padding: 20px; }
+      body { background: white; }
+      .page { 
+        padding: 0;
+        max-width: 100%;
+      }
     }
   </style>
 </head>
 <body>
   <div class="page">
     
-    <!-- Header -->
-    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 40px; padding-bottom: 24px; border-bottom: 3px solid #FF7F00;">
-      <div>
-        <div style="font-size: 28px; font-weight: 700; color: #FF7F00; letter-spacing: -0.5px;">PeachHaus</div>
-        <div style="font-size: 11px; color: #6b7280; margin-top: 4px; letter-spacing: 0.5px;">PROPERTY MANAGEMENT</div>
-      </div>
-      <div style="text-align: right;">
-        <div style="font-size: 20px; font-weight: 600; color: #1f2937; margin-bottom: 8px;">OWNER STATEMENT</div>
-        <div style="font-size: 11px; color: #6b7280;">
-          <div>Statement ID: <span style="font-family: 'Courier New', monospace; font-weight: 500;">${data.statementId}</span></div>
-          <div style="margin-top: 2px;">Issue Date: ${data.statementDate}</div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Property & Owner Info -->
-    <div style="display: flex; justify-content: space-between; margin-bottom: 32px; gap: 24px;">
-      <div style="flex: 1; background: #f9fafb; border-radius: 8px; padding: 20px; border-left: 4px solid #FF7F00;">
-        <div style="font-size: 10px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">Property</div>
-        <div style="font-size: 14px; font-weight: 600; color: #1f2937; margin-bottom: 4px;">${data.propertyName}</div>
-        <div style="font-size: 11px; color: #6b7280;">${data.propertyAddress}</div>
-      </div>
-      <div style="flex: 1; background: #f9fafb; border-radius: 8px; padding: 20px;">
-        <div style="font-size: 10px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">Statement Period</div>
-        <div style="font-size: 14px; font-weight: 600; color: #1f2937; margin-bottom: 4px;">${data.periodMonth} ${data.periodYear}</div>
-        <div style="font-size: 11px; color: #6b7280;">Prepared for: ${data.ownerName}</div>
-      </div>
-    </div>
-
-    <!-- Financial Summary Box -->
-    <div style="background: linear-gradient(135deg, ${isPositiveNet ? "#ecfdf5" : "#fef2f2"} 0%, ${isPositiveNet ? "#d1fae5" : "#fee2e2"} 100%); border-radius: 12px; padding: 24px; margin-bottom: 32px; border: 1px solid ${isPositiveNet ? "#a7f3d0" : "#fecaca"};">
-      <div style="display: flex; justify-content: space-between; align-items: center;">
-        <div>
-          <div style="font-size: 11px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">${netLabel}</div>
-          <div style="font-size: 32px; font-weight: 700; color: ${netColor}; font-family: 'Courier New', monospace;">
-            ${formatCurrency(Math.abs(data.netOwnerEarnings))}
+    <!-- Header - Corporate Minimal -->
+    <table style="width: 100%; border-bottom: 2px solid #111111; padding-bottom: 12px; margin-bottom: 16px;">
+      <tr>
+        <td style="vertical-align: bottom;">
+          <div style="font-size: 18px; font-weight: 700; color: #111111; letter-spacing: -0.3px;">PeachHaus</div>
+          <div style="font-size: 9px; color: #666666; margin-top: 2px; letter-spacing: 1px; text-transform: uppercase;">Property Management</div>
+        </td>
+        <td style="text-align: right; vertical-align: bottom;">
+          <div style="font-size: 14px; font-weight: 600; color: #111111; margin-bottom: 4px;">OWNER STATEMENT</div>
+          <div style="font-size: 9px; color: #666666; font-family: 'SF Mono', 'Menlo', 'Courier New', monospace;">
+            ${data.statementId}
           </div>
-        </div>
-        <div style="text-align: right;">
-          <div style="font-size: 11px; color: #6b7280;">Gross Revenue</div>
-          <div style="font-size: 18px; font-weight: 600; color: #059669; font-family: 'Courier New', monospace;">${formatCurrency(data.grossRevenue)}</div>
-          <div style="font-size: 11px; color: #6b7280; margin-top: 8px;">Total Expenses</div>
-          <div style="font-size: 18px; font-weight: 600; color: #dc2626; font-family: 'Courier New', monospace;">${formatCurrency(data.totalExpenses)}</div>
-        </div>
-      </div>
-    </div>
+        </td>
+      </tr>
+    </table>
+
+    <!-- Property & Period Info - Compact -->
+    <table style="width: 100%; margin-bottom: 16px; border: 1px solid #e5e5e5;">
+      <tr>
+        <td style="padding: 10px 12px; background: #f9f9f9; width: 50%; vertical-align: top; border-right: 1px solid #e5e5e5;">
+          <div style="font-size: 9px; color: #666666; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Property</div>
+          <div style="font-size: 12px; font-weight: 600; color: #111111;">${data.propertyName}</div>
+          <div style="font-size: 10px; color: #666666; margin-top: 2px;">${data.propertyAddress}</div>
+        </td>
+        <td style="padding: 10px 12px; background: #f9f9f9; width: 50%; vertical-align: top;">
+          <div style="font-size: 9px; color: #666666; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Statement Period</div>
+          <div style="font-size: 12px; font-weight: 600; color: #111111;">${data.periodMonth} ${data.periodYear}</div>
+          <div style="font-size: 10px; color: #666666; margin-top: 2px;">Prepared for: ${data.ownerName}</div>
+        </td>
+      </tr>
+    </table>
+
+    <!-- Financial Summary - The Key Numbers -->
+    <table style="width: 100%; margin-bottom: 16px; border: 1px solid #111111;">
+      <tr>
+        <td style="padding: 12px 16px; background: #111111; color: #ffffff;">
+          <table style="width: 100%;">
+            <tr>
+              <td style="vertical-align: middle;">
+                <div style="font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.8; margin-bottom: 2px;">${netLabel}</div>
+                <div style="font-size: 10px; opacity: 0.6;">For period ${data.periodMonth} ${data.periodYear}</div>
+              </td>
+              <td style="text-align: right; vertical-align: middle;">
+                <div style="font-size: 24px; font-weight: 700; font-family: 'SF Mono', 'Menlo', 'Courier New', monospace; color: #ffffff;">
+                  ${isPositiveNet ? "" : "-"}${formatCurrency(Math.abs(data.netOwnerEarnings))}
+                </div>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding: 10px 16px; background: #f9f9f9; border-top: 1px solid #e5e5e5;">
+          <table style="width: 100%;">
+            <tr>
+              <td style="font-size: 10px; color: #666666;">Gross Revenue</td>
+              <td style="font-size: 12px; font-weight: 600; color: #111111; text-align: right; font-family: 'SF Mono', 'Menlo', 'Courier New', monospace;">${formatCurrency(data.grossRevenue)}</td>
+              <td style="width: 40px;"></td>
+              <td style="font-size: 10px; color: #666666;">Total Expenses</td>
+              <td style="font-size: 12px; font-weight: 600; color: #111111; text-align: right; font-family: 'SF Mono', 'Menlo', 'Courier New', monospace;">(${formatCurrency(data.totalExpenses)})</td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
 
     <!-- Revenue Section -->
-    <div style="margin-bottom: 24px;">
-      <div style="font-size: 13px; font-weight: 600; color: #1f2937; padding: 12px 16px; background: #f3f4f6; border-radius: 8px 8px 0 0; border-bottom: 2px solid #059669;">
-        REVENUE
+    <div style="margin-bottom: 12px;">
+      <div style="font-size: 10px; font-weight: 600; color: #111111; padding: 6px 0; border-bottom: 1px solid #111111; text-transform: uppercase; letter-spacing: 0.5px;">
+        Revenue
       </div>
-      <table style="width: 100%; border-collapse: collapse; background: white; border: 1px solid #e5e7eb; border-top: none;">
+      <table style="width: 100%;">
         ${data.shortTermRevenue > 0 ? `
         <tr>
-          <td style="padding: 12px 16px; border-bottom: 1px solid #f3f4f6; font-size: 12px; color: #374151;">Short-term Booking Revenue</td>
-          <td style="padding: 12px 16px; border-bottom: 1px solid #f3f4f6; text-align: right; font-family: 'Courier New', monospace; font-size: 12px; color: #059669; font-weight: 500;">${formatCurrency(data.shortTermRevenue)}</td>
+          <td style="padding: 6px 0; font-size: 11px; color: #111111; border-bottom: 1px solid #e5e5e5;">Short-term Booking Revenue</td>
+          <td style="padding: 6px 0; font-size: 11px; color: #111111; text-align: right; font-family: 'SF Mono', 'Menlo', 'Courier New', monospace; border-bottom: 1px solid #e5e5e5;">${formatCurrency(data.shortTermRevenue)}</td>
         </tr>` : ""}
         ${data.midTermRevenue > 0 ? `
         <tr>
-          <td style="padding: 12px 16px; border-bottom: 1px solid #f3f4f6; font-size: 12px; color: #374151;">Mid-term Rental Revenue</td>
-          <td style="padding: 12px 16px; border-bottom: 1px solid #f3f4f6; text-align: right; font-family: 'Courier New', monospace; font-size: 12px; color: #059669; font-weight: 500;">${formatCurrency(data.midTermRevenue)}</td>
+          <td style="padding: 6px 0; font-size: 11px; color: #111111; border-bottom: 1px solid #e5e5e5;">Mid-term Rental Revenue</td>
+          <td style="padding: 6px 0; font-size: 11px; color: #111111; text-align: right; font-family: 'SF Mono', 'Menlo', 'Courier New', monospace; border-bottom: 1px solid #e5e5e5;">${formatCurrency(data.midTermRevenue)}</td>
         </tr>` : ""}
-        <tr style="background: #ecfdf5;">
-          <td style="padding: 14px 16px; font-size: 12px; font-weight: 600; color: #065f46;">TOTAL GROSS REVENUE</td>
-          <td style="padding: 14px 16px; text-align: right; font-family: 'Courier New', monospace; font-size: 14px; color: #065f46; font-weight: 700;">${formatCurrency(data.grossRevenue)}</td>
+        <tr style="background: #f9f9f9;">
+          <td style="padding: 8px 0; font-size: 11px; font-weight: 600; color: #111111;">TOTAL GROSS REVENUE</td>
+          <td style="padding: 8px 0; font-size: 12px; color: #111111; text-align: right; font-family: 'SF Mono', 'Menlo', 'Courier New', monospace; font-weight: 700;">${formatCurrency(data.grossRevenue)}</td>
         </tr>
       </table>
     </div>
 
     <!-- Expenses Section -->
-    <div style="margin-bottom: 24px;">
-      <div style="font-size: 13px; font-weight: 600; color: #1f2937; padding: 12px 16px; background: #f3f4f6; border-radius: 8px 8px 0 0; border-bottom: 2px solid #dc2626;">
-        EXPENSES & FEES
+    <div style="margin-bottom: 12px;">
+      <div style="font-size: 10px; font-weight: 600; color: #111111; padding: 6px 0; border-bottom: 1px solid #111111; text-transform: uppercase; letter-spacing: 0.5px;">
+        Expenses & Fees
       </div>
-      <table style="width: 100%; border-collapse: collapse; background: white; border: 1px solid #e5e7eb; border-top: none;">
+      <table style="width: 100%;">
         <tr>
-          <td style="padding: 12px 16px; border-bottom: 1px solid #f3f4f6; font-size: 12px; color: #374151;">Management Fee (${data.managementFeePercentage}% of revenue)</td>
-          <td style="padding: 12px 16px; border-bottom: 1px solid #f3f4f6; text-align: right; font-family: 'Courier New', monospace; font-size: 12px; color: #374151;">${formatCurrency(data.managementFee)}</td>
+          <td style="padding: 6px 0; font-size: 11px; color: #111111; border-bottom: 1px solid #e5e5e5;">Management Fee (${data.managementFeePercentage}%)</td>
+          <td style="padding: 6px 0; font-size: 11px; color: #111111; text-align: right; font-family: 'SF Mono', 'Menlo', 'Courier New', monospace; border-bottom: 1px solid #e5e5e5;">${formatCurrency(data.managementFee)}</td>
         </tr>
         ${data.orderMinimumFee > 0 ? `
         <tr>
-          <td style="padding: 12px 16px; border-bottom: 1px solid #f3f4f6; font-size: 12px; color: #374151;">Operational Minimum Fee</td>
-          <td style="padding: 12px 16px; border-bottom: 1px solid #f3f4f6; text-align: right; font-family: 'Courier New', monospace; font-size: 12px; color: #374151;">${formatCurrency(data.orderMinimumFee)}</td>
+          <td style="padding: 6px 0; font-size: 11px; color: #111111; border-bottom: 1px solid #e5e5e5;">Operational Minimum Fee</td>
+          <td style="padding: 6px 0; font-size: 11px; color: #111111; text-align: right; font-family: 'SF Mono', 'Menlo', 'Courier New', monospace; border-bottom: 1px solid #e5e5e5;">${formatCurrency(data.orderMinimumFee)}</td>
         </tr>` : ""}
         ${visitRows}
         ${expenseRows}
         ${data.cleaningFees > 0 ? `
         <tr>
-          <td style="padding: 12px 16px; border-bottom: 1px solid #f3f4f6; font-size: 12px; color: #374151;">
-            <div>Cleaning Fees (pass-through)</div>
-            <div style="font-size: 10px; color: #9ca3af;">Collected from guests, paid to service providers</div>
+          <td style="padding: 6px 0; font-size: 11px; color: #111111; border-bottom: 1px solid #e5e5e5;">
+            Cleaning Fees <span style="color: #666666; font-size: 10px;">(pass-through)</span>
           </td>
-          <td style="padding: 12px 16px; border-bottom: 1px solid #f3f4f6; text-align: right; font-family: 'Courier New', monospace; font-size: 12px; color: #374151;">${formatCurrency(data.cleaningFees)}</td>
+          <td style="padding: 6px 0; font-size: 11px; color: #111111; text-align: right; font-family: 'SF Mono', 'Menlo', 'Courier New', monospace; border-bottom: 1px solid #e5e5e5;">${formatCurrency(data.cleaningFees)}</td>
         </tr>` : ""}
         ${data.petFees > 0 ? `
         <tr>
-          <td style="padding: 12px 16px; border-bottom: 1px solid #f3f4f6; font-size: 12px; color: #374151;">
-            <div>Pet Fees (pass-through)</div>
-            <div style="font-size: 10px; color: #9ca3af;">Collected from guests, paid to service providers</div>
+          <td style="padding: 6px 0; font-size: 11px; color: #111111; border-bottom: 1px solid #e5e5e5;">
+            Pet Fees <span style="color: #666666; font-size: 10px;">(pass-through)</span>
           </td>
-          <td style="padding: 12px 16px; border-bottom: 1px solid #f3f4f6; text-align: right; font-family: 'Courier New', monospace; font-size: 12px; color: #374151;">${formatCurrency(data.petFees)}</td>
+          <td style="padding: 6px 0; font-size: 11px; color: #111111; text-align: right; font-family: 'SF Mono', 'Menlo', 'Courier New', monospace; border-bottom: 1px solid #e5e5e5;">${formatCurrency(data.petFees)}</td>
         </tr>` : ""}
-        <tr style="background: #fef2f2;">
-          <td style="padding: 14px 16px; font-size: 12px; font-weight: 600; color: #991b1b;">TOTAL EXPENSES</td>
-          <td style="padding: 14px 16px; text-align: right; font-family: 'Courier New', monospace; font-size: 14px; color: #991b1b; font-weight: 700;">${formatCurrency(data.totalExpenses)}</td>
+        <tr style="background: #f9f9f9;">
+          <td style="padding: 8px 0; font-size: 11px; font-weight: 600; color: #111111;">TOTAL EXPENSES</td>
+          <td style="padding: 8px 0; font-size: 12px; color: #111111; text-align: right; font-family: 'SF Mono', 'Menlo', 'Courier New', monospace; font-weight: 700;">(${formatCurrency(data.totalExpenses)})</td>
         </tr>
       </table>
     </div>
 
-    <!-- Net Result -->
-    <div style="background: #1f2937; border-radius: 12px; padding: 24px; margin-bottom: 40px;">
-      <div style="display: flex; justify-content: space-between; align-items: center;">
-        <div style="color: white;">
-          <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.7; margin-bottom: 4px;">${netLabel}</div>
-          <div style="font-size: 10px; opacity: 0.5;">For period ${data.periodMonth} ${data.periodYear}</div>
-        </div>
-        <div style="font-size: 36px; font-weight: 700; color: ${isPositiveNet ? "#34d399" : "#f87171"}; font-family: 'Courier New', monospace;">
-          ${isPositiveNet ? "" : "-"}${formatCurrency(Math.abs(data.netOwnerEarnings))}
-        </div>
-      </div>
-    </div>
+    <!-- Net Result - Final -->
+    <table style="width: 100%; margin-bottom: 20px; border: 2px solid #111111;">
+      <tr>
+        <td style="padding: 12px 16px; background: #111111;">
+          <table style="width: 100%;">
+            <tr>
+              <td style="font-size: 11px; font-weight: 600; color: #ffffff; text-transform: uppercase; letter-spacing: 0.5px;">${netLabel}</td>
+              <td style="font-size: 18px; font-weight: 700; color: #ffffff; text-align: right; font-family: 'SF Mono', 'Menlo', 'Courier New', monospace;">
+                ${isPositiveNet ? "" : "-"}${formatCurrency(Math.abs(data.netOwnerEarnings))}
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
 
     <!-- Footer -->
-    <div style="border-top: 1px solid #e5e7eb; padding-top: 24px; text-align: center;">
-      <div style="font-size: 11px; color: #6b7280; margin-bottom: 8px;">
-        This is an official financial statement from PeachHaus Property Management.
-      </div>
-      <div style="font-size: 11px; color: #9ca3af;">
-        Questions? Contact us at <span style="color: #FF7F00;">info@peachhausgroup.com</span>
-      </div>
-      <div style="font-size: 10px; color: #d1d5db; margin-top: 16px;">
-        Statement ID: ${data.statementId} • Generated: ${data.statementDate}
-      </div>
+    <div style="border-top: 1px solid #e5e5e5; padding-top: 12px;">
+      <table style="width: 100%;">
+        <tr>
+          <td style="font-size: 9px; color: #666666;">
+            This is an official financial statement from PeachHaus Property Management.<br>
+            Please retain for your records.
+          </td>
+          <td style="text-align: right; font-size: 9px; color: #666666;">
+            Questions? Contact info@peachhausgroup.com<br>
+            <span style="font-family: 'SF Mono', 'Menlo', 'Courier New', monospace;">${data.statementId}</span> • ${data.statementDate}
+          </td>
+        </tr>
+      </table>
     </div>
 
   </div>
