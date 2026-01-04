@@ -179,9 +179,27 @@ export function OwnerReceiptsTab({ expenses, propertyId, token }: OwnerReceiptsT
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       
-      // Open in new tab for download
-      window.open(data.signedUrl, "_blank");
-      toast.success("Receipt opened in new tab");
+      // Fetch the file as blob to force proper download
+      const response = await fetch(data.signedUrl);
+      if (!response.ok) throw new Error("Failed to fetch file");
+      
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      
+      // Determine filename from path
+      const filename = receiptPath.split('/').pop() || `receipt-${expense.id}`;
+      
+      // Create download link
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      // Cleanup
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
+      toast.success("Receipt downloaded");
     } catch (err) {
       console.error("Download error:", err);
       toast.error("Failed to download receipt");

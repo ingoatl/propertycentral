@@ -316,6 +316,10 @@ serve(async (req: Request): Promise<Response> => {
     // MTR revenue: Use statement data for months with statements (most accurate after reconciliation)
     // For future months without statements, calculate from bookings
     
+    // Track detailed breakdown for UI display
+    const mtrBreakdown: { month: string; tenant: string; amount: number; source: string; days?: number }[] = [];
+    const strBreakdown: { guest: string; checkIn: string; checkOut: string; amount: number; source: string }[] = [];
+    
     // First, get MTR from statements (already adjusted during reconciliation)
     let mtrFromStatements = 0;
     const monthsWithStatements = new Set<string>();
@@ -333,15 +337,38 @@ serve(async (req: Request): Promise<Response> => {
         if (originalTotal > 0 && s.revenue_override < originalTotal) {
           // Reduce MTR proportionally to the override
           const ratio = s.revenue_override / originalTotal;
-          mtrFromStatements += (s.mid_term_revenue || 0) * ratio;
-          console.log(`Month ${monthKey}: MTR adjusted from $${s.mid_term_revenue} to $${((s.mid_term_revenue || 0) * ratio).toFixed(2)} (override ratio: ${ratio.toFixed(2)})`);
+          const adjustedMtr = (s.mid_term_revenue || 0) * ratio;
+          mtrFromStatements += adjustedMtr;
+          mtrBreakdown.push({
+            month: monthKey,
+            tenant: 'Statement (adjusted)',
+            amount: adjustedMtr,
+            source: 'statement',
+          });
+          console.log(`Month ${monthKey}: MTR adjusted from $${s.mid_term_revenue} to $${adjustedMtr.toFixed(2)} (override ratio: ${ratio.toFixed(2)})`);
         } else {
           // Override is >= original, use full MTR
           mtrFromStatements += s.mid_term_revenue || 0;
+          if (s.mid_term_revenue && s.mid_term_revenue > 0) {
+            mtrBreakdown.push({
+              month: monthKey,
+              tenant: 'Statement',
+              amount: s.mid_term_revenue,
+              source: 'statement',
+            });
+          }
         }
       } else {
         // No override, use statement's mid_term_revenue
         mtrFromStatements += s.mid_term_revenue || 0;
+        if (s.mid_term_revenue && s.mid_term_revenue > 0) {
+          mtrBreakdown.push({
+            month: monthKey,
+            tenant: 'Statement',
+            amount: s.mid_term_revenue,
+            source: 'statement',
+          });
+        }
       }
     }
     
@@ -370,11 +397,29 @@ serve(async (req: Request): Promise<Response> => {
           const proratedRent = (b.monthly_rent / daysInMonth) * daysOccupied;
           
           mtrFromFutureBookings += proratedRent;
+          mtrBreakdown.push({
+            month: monthKey,
+            tenant: b.tenant_name || 'MTR Guest',
+            amount: proratedRent,
+            source: 'booking',
+            days: daysOccupied,
+          });
         }
         
         currentDate.setMonth(currentDate.getMonth() + 1);
         currentDate.setDate(1);
       }
+    }
+    
+    // Build STR breakdown
+    for (const b of validSTRBookings) {
+      strBreakdown.push({
+        guest: b.guest_name || 'Guest',
+        checkIn: b.check_in,
+        checkOut: b.check_out,
+        amount: b.total_amount || 0,
+        source: b.ownerrez_listing_name || 'OwnerRez',
+      });
     }
     
     const mtrRevenue = mtrFromStatements + mtrFromFutureBookings;
@@ -556,6 +601,16 @@ serve(async (req: Request): Promise<Response> => {
       performance,
       monthlyRevenue: monthlyRevenueArray,
       ownerHighlights,
+      revenueBreakdown: {
+        mtr: mtrBreakdown,
+        str: strBreakdown,
+        summary: {
+          mtrFromStatements,
+          mtrFromFutureBookings,
+          strFromReconciliation: totalSTRFromRecon,
+          strFromBookings: calculatedSTRRevenue,
+        }
+      },
     };
 
     return new Response(
