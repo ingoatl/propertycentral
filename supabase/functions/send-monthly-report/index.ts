@@ -106,10 +106,10 @@ const handler = async (req: Request): Promise<Response> => {
         throw new Error("Owner email not found");
       }
 
-      // Generate magic link token for portal access (30-day expiry for statement emails)
+      // Generate magic link token for portal access (never expires)
       if (ownerId) {
         const token = crypto.randomUUID() + "-" + crypto.randomUUID();
-        const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(); // 30 days
+        const expiresAt = new Date(Date.now() + 100 * 365 * 24 * 60 * 60 * 1000).toISOString(); // Never expires (100 years)
         
         const { error: sessionError } = await supabase
           .from("owner_portal_sessions")
