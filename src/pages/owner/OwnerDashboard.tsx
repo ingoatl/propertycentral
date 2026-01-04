@@ -421,10 +421,26 @@ export default function OwnerDashboard() {
         return;
       }
 
-      // Handle signed URL (preferred)
+      // Handle signed URL - fetch as blob to avoid browser blocking
       if (data.signedUrl) {
-        window.open(data.signedUrl, "_blank");
-        toast.success("Statement opened");
+        try {
+          const response = await fetch(data.signedUrl);
+          if (!response.ok) throw new Error("Failed to fetch PDF");
+          
+          const blob = await response.blob();
+          const blobUrl = URL.createObjectURL(blob);
+          
+          // Open in new tab (blob URL is not blocked)
+          window.open(blobUrl, "_blank");
+          
+          // Cleanup after a delay
+          setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+          toast.success("Statement opened");
+        } catch (fetchError) {
+          console.error("Fetch error, trying direct open:", fetchError);
+          // Fallback: try direct open (may be blocked by some browsers)
+          window.open(data.signedUrl, "_blank");
+        }
         return;
       }
 
