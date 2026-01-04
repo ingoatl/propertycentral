@@ -1074,6 +1074,8 @@ export default function OwnerDashboard() {
         statement={viewingStatement}
         fetchPdf={fetchStatementPdf}
         propertyName={property?.name}
+        ownerName={session?.ownerName}
+        propertyAddress={property?.address}
       />
     </div>
   );
