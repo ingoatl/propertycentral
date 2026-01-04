@@ -261,9 +261,15 @@ export default function OwnerDashboard() {
 
   useEffect(() => {
     const token = searchParams.get("token");
+    const ownerIdParam = searchParams.get("owner");
+    
     if (token) {
       setSessionToken(token);
       loadAllDataWithToken(token);
+    } else if (ownerIdParam) {
+      // Admin access - load data directly by owner ID (no token required)
+      console.log("Admin access mode - loading owner:", ownerIdParam);
+      loadAllData(ownerIdParam, null);
     } else {
       const storedSession = localStorage.getItem("owner_session");
       if (storedSession) {
@@ -365,7 +371,7 @@ export default function OwnerDashboard() {
     }
   };
 
-  const loadAllData = async (ownerId: string, propertyId?: string) => {
+  const loadAllData = async (ownerId: string, propertyId?: string | null) => {
     try {
       console.log("Loading all data for owner:", ownerId, "property:", propertyId);
       
@@ -388,6 +394,20 @@ export default function OwnerDashboard() {
       }
 
       console.log("Owner portal data loaded:", data);
+
+      // Set session from data (for admin access mode)
+      if (data.owner) {
+        const ownerSession: OwnerSession = {
+          ownerId: data.owner.id,
+          ownerName: data.owner.name,
+          email: data.owner.email,
+          propertyId: data.property?.id,
+          propertyName: data.property?.name,
+          secondOwnerName: data.owner.secondOwnerName,
+          secondOwnerEmail: data.owner.secondOwnerEmail,
+        };
+        setSession(ownerSession);
+      }
 
       setProperty(data.property);
       setStatements(data.statements || []);
