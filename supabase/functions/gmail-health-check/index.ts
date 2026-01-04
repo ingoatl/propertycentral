@@ -85,15 +85,23 @@ serve(async (req) => {
     let accessToken = tokenData.access_token;
     const expiresAt = new Date(tokenData.expires_at);
     const now = new Date();
+    
+    // Add buffer of 5 minutes for token expiration
+    const expirationBuffer = 5 * 60 * 1000;
+    const isExpiringSoon = expiresAt.getTime() - now.getTime() < expirationBuffer;
 
-    if (expiresAt <= now) {
-      console.log('Token expired, attempting refresh...');
+    if (isExpiringSoon) {
+      console.log(`Token expired or expiring soon (expires: ${expiresAt.toISOString()}), attempting refresh...`);
       try {
+        if (!tokenData.refresh_token) {
+          throw new Error('No refresh token available - please reconnect Gmail');
+        }
+        
         const refreshResult = await refreshGoogleToken(tokenData.refresh_token);
         accessToken = refreshResult.accessToken;
         
-        // Update the token
-        await supabase
+        // Update the token in database
+        const { error: updateError } = await supabase
           .from('gmail_oauth_tokens')
           .update({
             access_token: accessToken,
@@ -102,17 +110,35 @@ serve(async (req) => {
           })
           .eq('user_id', tokenData.user_id);
 
+        if (updateError) {
+          console.error('Failed to update token in database:', updateError);
+        }
+
         result.checks.tokenNotExpired = true;
         console.log('Token refreshed successfully');
       } catch (refreshError) {
         result.checks.tokenNotExpired = false;
         result.healthy = false;
-        result.errors.push(refreshError instanceof Error ? refreshError.message : 'Token refresh failed');
-        result.recommendations.push('Reconnect Gmail account - the authorization may have expired or been revoked');
+        const errorMessage = refreshError instanceof Error ? refreshError.message : 'Token refresh failed';
+        result.errors.push(errorMessage);
+        
+        // Provide actionable recommendations based on error type
+        if (errorMessage.includes('invalid_grant') || errorMessage.includes('expired')) {
+          result.recommendations.push('The Gmail authorization has expired. Go to Settings → Integrations → Gmail and click "Reconnect Gmail"');
+        } else if (errorMessage.includes('invalid_client')) {
+          result.recommendations.push('Gmail OAuth credentials need to be verified in Supabase secrets');
+        } else {
+          result.recommendations.push('Try reconnecting Gmail in Settings → Integrations');
+        }
+        
+        // Stop further checks if token is invalid
+        return new Response(JSON.stringify(result), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
       }
     } else {
       result.checks.tokenNotExpired = true;
-      console.log('Token is still valid');
+      console.log(`Token is valid until ${expiresAt.toISOString()}`);
     }
 
     // Check 3: Gmail API is enabled (try to fetch profile)

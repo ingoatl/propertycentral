@@ -104,23 +104,61 @@ export const OwnerMarketInsightsEnhanced = memo(function OwnerMarketInsightsEnha
     declining: "text-amber-600 bg-amber-100 dark:bg-amber-900/30",
   };
 
-  // Loading state with progress bar
+  // Loading state with smooth animated progress bar
   if (isLoading) {
     return (
       <div className="space-y-6">
-        <Card className="border-none shadow-lg overflow-hidden">
-          <CardContent className="py-16">
-            <div className="max-w-md mx-auto text-center space-y-6">
-              <div className="w-16 h-16 mx-auto rounded-full bg-gradient-to-br from-primary/20 to-primary/40 flex items-center justify-center animate-pulse">
-                <Sparkles className="h-8 w-8 text-primary" />
+        <Card className="border-none shadow-lg overflow-hidden bg-gradient-to-br from-background via-background to-primary/5">
+          <CardContent className="py-20">
+            <div className="max-w-lg mx-auto text-center space-y-8">
+              {/* Animated icon container */}
+              <div className="relative w-20 h-20 mx-auto">
+                {/* Outer ring */}
+                <div className="absolute inset-0 rounded-full border-4 border-primary/20" />
+                {/* Spinning ring */}
+                <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-primary animate-spin" style={{ animationDuration: '1.5s' }} />
+                {/* Inner glow */}
+                <div className="absolute inset-2 rounded-full bg-gradient-to-br from-primary/10 to-primary/30 flex items-center justify-center">
+                  <Sparkles className="h-8 w-8 text-primary animate-pulse" />
+                </div>
               </div>
+              
+              {/* Text content */}
               <div className="space-y-2">
-                <h3 className="text-xl font-semibold">Generating Market Insights</h3>
-                <p className="text-muted-foreground">{loadingStep}</p>
+                <h3 className="text-xl font-semibold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text">
+                  Generating Market Insights
+                </h3>
+                <p className="text-muted-foreground h-6 transition-all duration-500">{loadingStep}</p>
               </div>
-              <div className="space-y-2">
-                <Progress value={loadingProgress} className="h-2" />
-                <p className="text-sm text-muted-foreground">{loadingProgress}% complete</p>
+              
+              {/* Smooth progress bar */}
+              <div className="space-y-3 px-4">
+                <div className="relative h-2 bg-muted/50 rounded-full overflow-hidden">
+                  {/* Background shimmer */}
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-primary/10 to-transparent animate-shimmer" />
+                  {/* Actual progress */}
+                  <div 
+                    className="absolute inset-y-0 left-0 bg-gradient-to-r from-primary via-primary to-primary/80 rounded-full transition-all duration-700 ease-out"
+                    style={{ width: `${loadingProgress}%` }}
+                  >
+                    {/* Glow effect on leading edge */}
+                    <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-r from-transparent to-white/30 rounded-full" />
+                  </div>
+                </div>
+                <p className="text-sm text-muted-foreground font-medium tabular-nums">
+                  {loadingProgress}% complete
+                </p>
+              </div>
+              
+              {/* Subtle loading dots */}
+              <div className="flex justify-center gap-1.5">
+                {[0, 1, 2].map((i) => (
+                  <div
+                    key={i}
+                    className="w-2 h-2 rounded-full bg-primary/40 animate-bounce"
+                    style={{ animationDelay: `${i * 150}ms`, animationDuration: '1s' }}
+                  />
+                ))}
               </div>
             </div>
           </CardContent>
