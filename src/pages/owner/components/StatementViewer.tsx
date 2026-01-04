@@ -182,13 +182,20 @@ export function StatementViewer({
               </div>
             </div>
           ) : blobUrl ? (
-            // PDF viewer using embed - works with blob URLs and avoids ad blocker issues
-            <embed
-              src={blobUrl}
+            // PDF viewer using object tag with iframe fallback - better browser support than embed
+            <object
+              data={blobUrl}
               type="application/pdf"
               className="w-full h-full min-h-[600px]"
               title="Statement PDF"
-            />
+            >
+              {/* Fallback to iframe if object doesn't work */}
+              <iframe
+                src={blobUrl}
+                className="w-full h-full min-h-[600px] border-0"
+                title="Statement PDF"
+              />
+            </object>
           ) : (
             <div className="absolute inset-0 flex items-center justify-center">
               <p className="text-muted-foreground">No statement to display</p>
