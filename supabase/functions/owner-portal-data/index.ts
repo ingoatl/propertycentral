@@ -52,10 +52,10 @@ serve(async (req: Request): Promise<Response> => {
       );
     }
 
-    // Fetch owner details including second owner
+    // Fetch owner details including second owner and service type
     const { data: owner, error: ownerError } = await supabase
       .from("property_owners")
-      .select("id, name, email, phone, second_owner_name, second_owner_email")
+      .select("id, name, email, phone, second_owner_name, second_owner_email, service_type")
       .eq("id", validatedOwnerId)
       .single();
 
@@ -181,13 +181,25 @@ serve(async (req: Request): Promise<Response> => {
         .maybeSingle(),
     ]);
 
-    const statements = statementsResult.data || [];
+    const rawStatements = statementsResult.data || [];
     const expenses = expensesResult.data || [];
     const credentials = credentialsResult.data || [];
     const strBookings = strBookingsResult.data || [];
     const mtrBookings = mtrBookingsResult.data || [];
     const emailInsights = emailInsightsResult.data || [];
     const propertyDetails = propertyDetailsResult.data;
+    
+    // Process statements to calculate correct net owner earnings based on service type
+    // For co-hosting: owner keeps revenue, net_to_owner = what they owe us, so actual_net = revenue - net_to_owner
+    // For full-service: we collect revenue, net_to_owner = what we pay them, so actual_net = net_to_owner
+    const isCohosting = owner.service_type === 'cohosting';
+    const statements = rawStatements.map(s => ({
+      ...s,
+      // Calculate actual net owner earnings based on service type
+      actual_net_earnings: isCohosting 
+        ? (s.total_revenue || 0) - (s.net_to_owner || 0)  // Co-hosting: revenue minus fees owed
+        : (s.net_to_owner || 0)  // Full-service: net_to_owner is already correct
+    }));
     
     // Merge reviews from both queries (by property_id and by property name), deduplicate by id
     const reviewsById = reviewsResult.data || [];

@@ -464,7 +464,7 @@ async function generatePdf(data: StatementData): Promise<Uint8Array> {
     if (data.midTermProrationDetails.length > 0) {
       for (const detail of data.midTermProrationDetails) {
         // Tenant name and date range
-        const tenantLine = `└ ${detail.tenantName} (${detail.dateRange})`;
+        const tenantLine = `> ${detail.tenantName} (${detail.dateRange})`;
         page.drawText(tenantLine.substring(0, 65), { x: margin + 10, y, size: 8, font: helvetica, color: gray });
         y -= 10;
         
