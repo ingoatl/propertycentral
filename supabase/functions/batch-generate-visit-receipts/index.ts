@@ -93,18 +93,26 @@ serve(async (req) => {
 });
 
 function generateVisitReceiptHtml(visit: any): string {
-  const propertyName = visit.properties?.name || "Property";
-  const propertyAddress = visit.properties?.address || "";
-  const visitDate = new Date(visit.date).toLocaleDateString("en-US", {
-    weekday: "long",
+  const propertyAddress = visit.properties?.address || "Property";
+  const visitDate = new Date(visit.date);
+  const formattedDate = visitDate.toLocaleDateString("en-US", {
     year: "numeric",
     month: "long",
     day: "numeric",
   });
-  const visitTime = visit.time || "";
+  
+  // Generate receipt number
+  const receiptNumber = `VIS-${visitDate.getFullYear()}${String(visitDate.getMonth() + 1).padStart(2, '0')}-${visit.id.slice(0, 6).toUpperCase()}`;
+  const generatedDate = new Date().toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+
   const amount = new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
+    minimumFractionDigits: 2,
   }).format(visit.price || 0);
 
   return `<!DOCTYPE html>
@@ -112,119 +120,287 @@ function generateVisitReceiptHtml(visit: any): string {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Visit Receipt - ${propertyAddress}</title>
+  <title>Service Receipt - ${receiptNumber}</title>
   <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+    
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { 
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: #f8f9fa;
-      padding: 20px;
-      min-height: 100vh;
+    
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #FAFAFA;
+      color: #1A1A1A;
+      font-size: 14px;
+      line-height: 1.5;
+      padding: 32px 16px;
+      -webkit-font-smoothing: antialiased;
     }
+    
     .receipt {
-      max-width: 600px;
+      max-width: 520px;
       margin: 0 auto;
-      background: white;
-      border-radius: 12px;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.08);
-      overflow: hidden;
+      background: #FFFFFF;
+      border: 1px solid #E5E5E5;
     }
+    
+    /* Header */
     .header {
-      background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
-      color: white;
-      padding: 30px;
-      text-align: center;
+      padding: 40px 40px 32px;
+      border-bottom: 1px solid #E5E5E5;
     }
-    .header h1 { font-size: 24px; font-weight: 700; margin-bottom: 5px; }
-    .header p { opacity: 0.9; font-size: 14px; }
-    .content { padding: 30px; }
-    .section { margin-bottom: 25px; }
-    .section-title { 
-      font-size: 11px; 
-      text-transform: uppercase; 
-      letter-spacing: 1px; 
-      color: #6b7280; 
-      margin-bottom: 8px; 
+    
+    .brand {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 24px;
     }
-    .section-value { font-size: 16px; color: #111827; font-weight: 500; }
-    .amount-section {
-      background: #f9fafb;
-      border-radius: 8px;
-      padding: 20px;
-      text-align: center;
-      margin: 25px 0;
+    
+    .logo {
+      font-size: 18px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      color: #1A1A1A;
     }
-    .amount { font-size: 36px; font-weight: 700; color: #111827; }
-    .notes {
-      background: #fffbeb;
-      border-left: 4px solid #f59e0b;
-      padding: 15px;
-      border-radius: 0 8px 8px 0;
-      margin-top: 20px;
+    
+    .logo-accent {
+      color: #E07A42;
     }
-    .notes-title { font-weight: 600; color: #92400e; margin-bottom: 8px; }
-    .notes-content { color: #78350f; font-size: 14px; line-height: 1.6; }
-    .footer {
-      border-top: 1px solid #e5e7eb;
-      padding: 20px 30px;
-      text-align: center;
-      font-size: 12px;
-      color: #9ca3af;
-    }
-    .badge {
-      display: inline-block;
-      background: #dcfce7;
-      color: #166534;
-      padding: 4px 12px;
-      border-radius: 20px;
-      font-size: 12px;
+    
+    .receipt-type {
+      font-size: 11px;
       font-weight: 500;
-      margin-top: 10px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #666666;
+      background: #F5F5F5;
+      padding: 6px 12px;
+    }
+    
+    .receipt-meta {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4px 24px;
+      font-size: 12px;
+      color: #666666;
+    }
+    
+    .receipt-meta dt {
+      font-weight: 400;
+    }
+    
+    .receipt-meta dd {
+      font-weight: 500;
+      color: #1A1A1A;
+      font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+      font-size: 11px;
+    }
+    
+    /* Amount Section */
+    .amount-section {
+      padding: 32px 40px;
+      background: #FAFAFA;
+      border-bottom: 1px solid #E5E5E5;
+      text-align: center;
+    }
+    
+    .amount-label {
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #666666;
+      margin-bottom: 8px;
+    }
+    
+    .amount-value {
+      font-size: 42px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      color: #1A1A1A;
+      font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+      font-feature-settings: 'tnum' 1;
+    }
+    
+    .amount-status {
+      display: inline-block;
+      margin-top: 12px;
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: #166534;
+      background: #DCFCE7;
+      padding: 4px 10px;
+    }
+    
+    /* Details Section */
+    .details {
+      padding: 32px 40px;
+    }
+    
+    .section-title {
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #666666;
+      margin-bottom: 16px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #E5E5E5;
+    }
+    
+    .detail-grid {
+      display: grid;
+      gap: 16px;
+    }
+    
+    .detail-row {
+      display: grid;
+      grid-template-columns: 140px 1fr;
+      gap: 16px;
+    }
+    
+    .detail-label {
+      font-size: 13px;
+      color: #666666;
+    }
+    
+    .detail-value {
+      font-size: 13px;
+      font-weight: 500;
+      color: #1A1A1A;
+      text-align: right;
+    }
+    
+    .property-section {
+      margin-bottom: 24px;
+    }
+    
+    .property-address {
+      font-size: 15px;
+      font-weight: 500;
+      color: #1A1A1A;
+      line-height: 1.4;
+    }
+    
+    /* Notes */
+    .notes-section {
+      margin-top: 24px;
+      padding-top: 24px;
+      border-top: 1px solid #E5E5E5;
+    }
+    
+    .notes-content {
+      font-size: 13px;
+      color: #4A4A4A;
+      line-height: 1.6;
+      background: #FAFAFA;
+      padding: 16px;
+      border-left: 2px solid #E07A42;
+    }
+    
+    /* Footer */
+    .footer {
+      padding: 24px 40px;
+      border-top: 1px solid #E5E5E5;
+      background: #FAFAFA;
+    }
+    
+    .company-info {
+      font-size: 11px;
+      color: #666666;
+      text-align: center;
+      line-height: 1.6;
+    }
+    
+    .company-name {
+      font-weight: 600;
+      color: #1A1A1A;
+      margin-bottom: 4px;
+    }
+    
+    .legal-text {
+      margin-top: 16px;
+      font-size: 10px;
+      color: #999999;
+      text-align: center;
     }
   </style>
 </head>
 <body>
   <div class="receipt">
     <div class="header">
-      <h1>PeachHaus Group LLC</h1>
-      <p>Property Visit Receipt</p>
+      <div class="brand">
+        <div class="logo">Peach<span class="logo-accent">Haus</span></div>
+        <div class="receipt-type">Service Receipt</div>
+      </div>
+      <dl class="receipt-meta">
+        <dt>Receipt No.</dt>
+        <dd>${receiptNumber}</dd>
+        <dt>Issue Date</dt>
+        <dd>${generatedDate}</dd>
+      </dl>
     </div>
-    <div class="content">
-      <div class="section">
+    
+    <div class="amount-section">
+      <div class="amount-label">Service Fee</div>
+      <div class="amount-value">${amount}</div>
+      <div class="amount-status">Paid</div>
+    </div>
+    
+    <div class="details">
+      <div class="property-section">
         <div class="section-title">Property</div>
-        <div class="section-value">${propertyAddress || propertyName}</div>
+        <div class="property-address">${propertyAddress}</div>
       </div>
-      <div class="section">
-        <div class="section-title">Visit Date</div>
-        <div class="section-value">${visitDate}${visitTime ? ` at ${visitTime}` : ""}</div>
+      
+      <div class="section-title">Service Details</div>
+      <div class="detail-grid">
+        <div class="detail-row">
+          <span class="detail-label">Service Date</span>
+          <span class="detail-value">${formattedDate}</span>
+        </div>
+        ${visit.time ? `
+        <div class="detail-row">
+          <span class="detail-label">Time</span>
+          <span class="detail-value">${visit.time}</span>
+        </div>
+        ` : ''}
+        <div class="detail-row">
+          <span class="detail-label">Service Type</span>
+          <span class="detail-value">Property Visit</span>
+        </div>
+        ${visit.visited_by ? `
+        <div class="detail-row">
+          <span class="detail-label">Team Member</span>
+          <span class="detail-value">${visit.visited_by}</span>
+        </div>
+        ` : ''}
+        ${visit.hours ? `
+        <div class="detail-row">
+          <span class="detail-label">Duration</span>
+          <span class="detail-value">${visit.hours} hour${visit.hours !== 1 ? 's' : ''}</span>
+        </div>
+        ` : ''}
       </div>
-      ${visit.visited_by ? `
-      <div class="section">
-        <div class="section-title">Visited By</div>
-        <div class="section-value">${visit.visited_by}</div>
-      </div>
-      ` : ""}
-      ${visit.hours ? `
-      <div class="section">
-        <div class="section-title">Duration</div>
-        <div class="section-value">${visit.hours} hour${visit.hours !== 1 ? "s" : ""}</div>
-      </div>
-      ` : ""}
-      <div class="amount-section">
-        <div class="section-title">Visit Fee</div>
-        <div class="amount">${amount}</div>
-        <div class="badge">✓ Paid</div>
-      </div>
+      
       ${visit.notes ? `
-      <div class="notes">
-        <div class="notes-title">Service Notes</div>
+      <div class="notes-section">
+        <div class="section-title">Service Notes</div>
         <div class="notes-content">${visit.notes}</div>
       </div>
-      ` : ""}
+      ` : ''}
     </div>
+    
     <div class="footer">
-      Receipt ID: ${visit.id}<br>
-      Generated by PeachHaus Property Management System
+      <div class="company-info">
+        <div class="company-name">PeachHaus Group LLC</div>
+        info@peachhausgroup.com
+      </div>
+      <div class="legal-text">
+        This receipt confirms payment for property management services rendered.
+      </div>
     </div>
   </div>
 </body>

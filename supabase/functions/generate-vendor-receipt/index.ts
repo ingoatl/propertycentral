@@ -79,7 +79,7 @@ Deno.serve(async (req) => {
           .single();
 
         // Generate HTML receipt
-        const html = generateExpenseReceiptHtml(expense, property);
+        const html = generateProfessionalExpenseReceipt(expense, property);
 
         // Create file path
         const fileName = `vendor-receipt-${expense.id}.html`;
@@ -144,7 +144,7 @@ Deno.serve(async (req) => {
   }
 });
 
-function generateExpenseReceiptHtml(
+function generateProfessionalExpenseReceipt(
   expense: ExpenseData, 
   property: { name: string; address: string } | null
 ): string {
@@ -154,157 +154,270 @@ function generateExpenseReceiptHtml(
     month: "long",
     day: "numeric",
   });
+  
+  const generatedDate = new Date().toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+  
+  // Generate receipt number
+  const receiptNumber = `EXP-${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, '0')}-${expense.id.slice(0, 6).toUpperCase()}`;
 
   const amount = new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
+    minimumFractionDigits: 2,
   }).format(expense.amount);
 
   const description = expense.items_detail || expense.purpose || expense.category || "Service";
   const vendor = expense.vendor || "PeachHaus Property Management";
+  const category = expense.category ? expense.category.charAt(0).toUpperCase() + expense.category.slice(1) : "General";
 
   return `<!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Expense Receipt - ${expense.id}</title>
+  <title>Expense Receipt - ${receiptNumber}</title>
   <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+    
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { 
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: #f5f5f5;
-      padding: 20px;
-      color: #333;
+    
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #FAFAFA;
+      color: #1A1A1A;
+      font-size: 14px;
+      line-height: 1.5;
+      padding: 32px 16px;
+      -webkit-font-smoothing: antialiased;
     }
+    
     .receipt {
-      max-width: 500px;
+      max-width: 520px;
       margin: 0 auto;
-      background: white;
-      border-radius: 12px;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.08);
-      overflow: hidden;
+      background: #FFFFFF;
+      border: 1px solid #E5E5E5;
     }
+    
+    /* Header */
     .header {
-      background: linear-gradient(135deg, #FF6B35 0%, #FF8C42 100%);
-      color: white;
-      padding: 30px;
-      text-align: center;
+      padding: 40px 40px 32px;
+      border-bottom: 1px solid #E5E5E5;
     }
-    .logo {
-      font-size: 28px;
-      font-weight: 700;
-      margin-bottom: 5px;
-      letter-spacing: -0.5px;
-    }
-    .logo span { opacity: 0.9; font-weight: 400; }
-    .tagline {
-      font-size: 12px;
-      opacity: 0.85;
-      text-transform: uppercase;
-      letter-spacing: 1.5px;
-    }
-    .badge {
-      display: inline-block;
-      background: rgba(255,255,255,0.2);
-      padding: 8px 16px;
-      border-radius: 20px;
-      font-size: 14px;
-      margin-top: 15px;
-    }
-    .content { padding: 30px; }
-    .amount-box {
-      text-align: center;
-      padding: 25px;
-      background: #f8f9fa;
-      border-radius: 10px;
-      margin-bottom: 25px;
-    }
-    .amount-label {
-      font-size: 12px;
-      color: #666;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      margin-bottom: 5px;
-    }
-    .amount {
-      font-size: 42px;
-      font-weight: 700;
-      color: #FF6B35;
-    }
-    .details { margin-bottom: 25px; }
-    .detail-row {
+    
+    .brand {
       display: flex;
+      align-items: center;
       justify-content: space-between;
-      padding: 12px 0;
-      border-bottom: 1px solid #eee;
+      margin-bottom: 24px;
     }
-    .detail-row:last-child { border-bottom: none; }
-    .detail-label { 
-      color: #666;
-      font-size: 14px;
+    
+    .logo {
+      font-size: 18px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      color: #1A1A1A;
     }
-    .detail-value { 
+    
+    .logo-accent {
+      color: #E07A42;
+    }
+    
+    .receipt-type {
+      font-size: 11px;
       font-weight: 500;
-      text-align: right;
-      max-width: 60%;
-    }
-    .property-box {
-      background: #FFF5F0;
-      border-radius: 10px;
-      padding: 20px;
-      margin-bottom: 20px;
-    }
-    .property-title {
-      font-size: 12px;
-      color: #FF6B35;
+      letter-spacing: 0.08em;
       text-transform: uppercase;
-      letter-spacing: 1px;
+      color: #666666;
+      background: #F5F5F5;
+      padding: 6px 12px;
+    }
+    
+    .receipt-meta {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4px 24px;
+      font-size: 12px;
+      color: #666666;
+    }
+    
+    .receipt-meta dt {
+      font-weight: 400;
+    }
+    
+    .receipt-meta dd {
+      font-weight: 500;
+      color: #1A1A1A;
+      font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+      font-size: 11px;
+    }
+    
+    /* Amount Section */
+    .amount-section {
+      padding: 32px 40px;
+      background: #FAFAFA;
+      border-bottom: 1px solid #E5E5E5;
+      text-align: center;
+    }
+    
+    .amount-label {
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #666666;
       margin-bottom: 8px;
     }
-    .property-address {
-      font-size: 16px;
-      font-weight: 500;
+    
+    .amount-value {
+      font-size: 42px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      color: #1A1A1A;
+      font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+      font-feature-settings: 'tnum' 1;
     }
-    .footer {
-      text-align: center;
-      padding: 20px 30px 30px;
-      border-top: 1px solid #eee;
-    }
-    .receipt-id {
+    
+    .amount-status {
+      display: inline-block;
+      margin-top: 12px;
       font-size: 11px;
-      color: #999;
-      font-family: monospace;
+      font-weight: 500;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: #166534;
+      background: #DCFCE7;
+      padding: 4px 10px;
     }
+    
+    /* Details Section */
+    .details {
+      padding: 32px 40px;
+    }
+    
+    .section-title {
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #666666;
+      margin-bottom: 16px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #E5E5E5;
+    }
+    
+    .detail-grid {
+      display: grid;
+      gap: 16px;
+    }
+    
+    .detail-row {
+      display: grid;
+      grid-template-columns: 140px 1fr;
+      gap: 16px;
+    }
+    
+    .detail-label {
+      font-size: 13px;
+      color: #666666;
+    }
+    
+    .detail-value {
+      font-size: 13px;
+      font-weight: 500;
+      color: #1A1A1A;
+      text-align: right;
+    }
+    
+    .property-section {
+      margin-bottom: 24px;
+    }
+    
+    .property-address {
+      font-size: 15px;
+      font-weight: 500;
+      color: #1A1A1A;
+      line-height: 1.4;
+    }
+    
+    /* Description */
+    .description-section {
+      margin-top: 24px;
+      padding-top: 24px;
+      border-top: 1px solid #E5E5E5;
+    }
+    
+    .description-content {
+      font-size: 13px;
+      color: #4A4A4A;
+      line-height: 1.6;
+      background: #FAFAFA;
+      padding: 16px;
+      border-left: 2px solid #E07A42;
+    }
+    
+    /* Footer */
+    .footer {
+      padding: 24px 40px;
+      border-top: 1px solid #E5E5E5;
+      background: #FAFAFA;
+    }
+    
     .company-info {
-      margin-top: 15px;
-      font-size: 12px;
-      color: #666;
+      font-size: 11px;
+      color: #666666;
+      text-align: center;
+      line-height: 1.6;
+    }
+    
+    .company-name {
+      font-weight: 600;
+      color: #1A1A1A;
+      margin-bottom: 4px;
+    }
+    
+    .legal-text {
+      margin-top: 16px;
+      font-size: 10px;
+      color: #999999;
+      text-align: center;
     }
   </style>
 </head>
 <body>
   <div class="receipt">
     <div class="header">
-      <div class="logo">Peach<span>Haus</span></div>
-      <div class="tagline">Property Management</div>
-      <div class="badge">Expense Receipt</div>
+      <div class="brand">
+        <div class="logo">Peach<span class="logo-accent">Haus</span></div>
+        <div class="receipt-type">Expense Receipt</div>
+      </div>
+      <dl class="receipt-meta">
+        <dt>Receipt No.</dt>
+        <dd>${receiptNumber}</dd>
+        <dt>Issue Date</dt>
+        <dd>${generatedDate}</dd>
+      </dl>
     </div>
     
-    <div class="content">
-      <div class="amount-box">
-        <div class="amount-label">Amount</div>
-        <div class="amount">${amount}</div>
-      </div>
-      
-      <div class="property-box">
-        <div class="property-title">Property</div>
+    <div class="amount-section">
+      <div class="amount-label">Amount</div>
+      <div class="amount-value">${amount}</div>
+      <div class="amount-status">Paid</div>
+    </div>
+    
+    <div class="details">
+      <div class="property-section">
+        <div class="section-title">Property</div>
         <div class="property-address">${property?.address || "Property"}</div>
       </div>
       
-      <div class="details">
+      <div class="section-title">Transaction Details</div>
+      <div class="detail-grid">
         <div class="detail-row">
-          <span class="detail-label">Date</span>
+          <span class="detail-label">Transaction Date</span>
           <span class="detail-value">${formattedDate}</span>
         </div>
         <div class="detail-row">
@@ -313,20 +426,25 @@ function generateExpenseReceiptHtml(
         </div>
         <div class="detail-row">
           <span class="detail-label">Category</span>
-          <span class="detail-value">${expense.category || "General"}</span>
-        </div>
-        <div class="detail-row">
-          <span class="detail-label">Description</span>
-          <span class="detail-value">${description}</span>
+          <span class="detail-value">${category}</span>
         </div>
       </div>
+      
+      ${description && description !== category ? `
+      <div class="description-section">
+        <div class="section-title">Description</div>
+        <div class="description-content">${description}</div>
+      </div>
+      ` : ''}
     </div>
     
     <div class="footer">
-      <div class="receipt-id">Receipt ID: ${expense.id}</div>
       <div class="company-info">
-        PeachHaus Property Management<br>
+        <div class="company-name">PeachHaus Group LLC</div>
         info@peachhausgroup.com
+      </div>
+      <div class="legal-text">
+        This receipt confirms payment for property management services rendered.
       </div>
     </div>
   </div>
