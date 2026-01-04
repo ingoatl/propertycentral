@@ -145,6 +145,7 @@ export default function OwnerDashboard() {
   const [credentials, setCredentials] = useState<Credential[]>([]);
   const [bookings, setBookings] = useState<{ str: any[]; mtr: any[] } | null>(null);
   const [reviews, setReviews] = useState<Review[]>([]);
+  const [monthlyRevenueData, setMonthlyRevenueData] = useState<any[]>([]);
   const [performanceMetrics, setPerformanceMetrics] = useState<PerformanceMetrics>({
     totalRevenue: 0,
     strRevenue: 0,
@@ -242,6 +243,7 @@ export default function OwnerDashboard() {
       setCredentials(data.credentials || []);
       setBookings(data.bookings || null);
       setReviews(data.reviews || []);
+      setMonthlyRevenueData(data.monthlyRevenue || []);
       setPerformanceMetrics(data.performance || {
         totalRevenue: 0,
         strRevenue: 0,
@@ -299,6 +301,7 @@ export default function OwnerDashboard() {
       setCredentials(data.credentials || []);
       setBookings(data.bookings || null);
       setReviews(data.reviews || []);
+      setMonthlyRevenueData(data.monthlyRevenue || []);
       setPerformanceMetrics(data.performance || {
         totalRevenue: 0,
         strRevenue: 0,
@@ -387,8 +390,29 @@ export default function OwnerDashboard() {
         return;
       }
 
-      window.open(data.signedUrl, "_blank");
-      toast.success("Statement opened");
+      // Handle signed URL (preferred)
+      if (data.signedUrl) {
+        window.open(data.signedUrl, "_blank");
+        toast.success("Statement opened");
+        return;
+      }
+
+      // Handle base64 data fallback
+      if (data.pdfBase64) {
+        const byteCharacters = atob(data.pdfBase64);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], { type: "application/pdf" });
+        const url = URL.createObjectURL(blob);
+        window.open(url, "_blank");
+        toast.success("Statement downloaded");
+        return;
+      }
+
+      toast.error("No statement data received");
     } catch (err) {
       console.error("Download error:", err);
       toast.error("Failed to download statement");
@@ -583,7 +607,11 @@ export default function OwnerDashboard() {
               />
 
               {/* Performance Charts */}
-              <OwnerPerformanceCharts statements={statements} propertyName={property?.name} />
+              <OwnerPerformanceCharts 
+                statements={statements} 
+                monthlyRevenueData={monthlyRevenueData}
+                propertyName={property?.name} 
+              />
 
               {/* Revenue Forecast */}
               {bookings && (

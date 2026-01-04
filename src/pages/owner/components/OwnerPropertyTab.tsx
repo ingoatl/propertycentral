@@ -159,7 +159,7 @@ export function OwnerPropertyTab({ property, owner }: OwnerPropertyTabProps) {
         </CardContent>
       </Card>
 
-      {/* PeachHaus Contact Card */}
+      {/* PeachHaus Contact Card with Signature */}
       <Card className="border-none shadow-lg">
         <CardHeader className="bg-gradient-to-r from-emerald-500/5 to-emerald-500/10 border-b">
           <CardTitle className="flex items-center gap-2">
@@ -168,24 +168,35 @@ export function OwnerPropertyTab({ property, owner }: OwnerPropertyTabProps) {
           </CardTitle>
         </CardHeader>
         <CardContent className="p-6">
-          <div className="flex items-start gap-4">
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-lg">
-              <span className="text-2xl font-bold text-primary-foreground">PH</span>
+          <div className="flex flex-col md:flex-row items-center gap-6">
+            {/* Hosts Photo */}
+            <div className="flex-shrink-0">
+              <img 
+                src="https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/ingo-headshot.png" 
+                alt="Anja & Ingo Schaer" 
+                className="w-24 h-24 rounded-full object-cover border-4 border-primary/20 shadow-lg"
+              />
             </div>
-            <div className="flex-1">
-              <h3 className="font-semibold text-lg">PeachHaus Group</h3>
-              <p className="text-muted-foreground text-sm mb-3">Your dedicated property management partner</p>
+            
+            <div className="flex-1 text-center md:text-left">
+              {/* Signature Image */}
+              <img 
+                src="https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/ingo-signature.png" 
+                alt="Anja & Ingo Signature" 
+                className="h-12 mx-auto md:mx-0 mb-2"
+              />
+              <p className="text-muted-foreground text-sm mb-3">Your dedicated property management partners</p>
               
               <div className="space-y-2">
-                <div className="flex items-center gap-2 text-sm">
+                <div className="flex items-center justify-center md:justify-start gap-2 text-sm">
                   <Mail className="h-4 w-4 text-muted-foreground" />
                   <a href="mailto:info@peachhausgroup.com" className="text-primary hover:underline">
                     info@peachhausgroup.com
                   </a>
                 </div>
-                <div className="flex items-center gap-2 text-sm">
+                <div className="flex items-center justify-center md:justify-start gap-2 text-sm">
                   <Phone className="h-4 w-4 text-muted-foreground" />
-                  <span>(770) 800-0000</span>
+                  <span>(404) 800-5932</span>
                 </div>
               </div>
             </div>

@@ -46,6 +46,7 @@ interface StatementData {
   propertyName: string;
   propertyAddress: string;
   ownerName: string;
+  secondOwnerName?: string;
   ownerAccountId: string;
   periodMonth: string;
   periodYear: string;
@@ -90,7 +91,7 @@ const handler = async (req: Request): Promise<Response> => {
       .select(`
         *,
         properties(*),
-        property_owners(id, name, email, service_type)
+        property_owners(id, name, email, service_type, second_owner_name)
       `)
       .eq("id", reconciliation_id)
       .single();
@@ -257,6 +258,7 @@ const handler = async (req: Request): Promise<Response> => {
       propertyName: reconciliation.properties?.name || "Property",
       propertyAddress: reconciliation.properties?.address || "",
       ownerName: reconciliation.property_owners?.name || "Property Owner",
+      secondOwnerName: reconciliation.property_owners?.second_owner_name || undefined,
       ownerAccountId,
       periodMonth,
       periodYear,
@@ -385,7 +387,11 @@ async function generatePdf(data: StatementData): Promise<Uint8Array> {
   page.drawText("PREPARED FOR", { x: width / 2 + 10, y, size: 8, font: helveticaBold, color: gray });
   y -= 12;
   page.drawText(data.propertyName, { x: margin, y, size: 10, font: helveticaBold, color: black });
-  page.drawText(data.ownerName, { x: width / 2 + 10, y, size: 10, font: helveticaBold, color: black });
+  // Show both owner names if second owner exists
+  const ownerDisplayName = data.secondOwnerName 
+    ? `${data.ownerName} & ${data.secondOwnerName}` 
+    : data.ownerName;
+  page.drawText(ownerDisplayName, { x: width / 2 + 10, y, size: 10, font: helveticaBold, color: black });
   y -= 11;
   page.drawText(data.propertyAddress, { x: margin, y, size: 8, font: helvetica, color: gray });
   page.drawText(`Account: ${data.ownerAccountId}`, { x: width / 2 + 10, y, size: 8, font: helvetica, color: gray });
@@ -537,11 +543,11 @@ async function generatePdf(data: StatementData): Promise<Uint8Array> {
     y -= 13;
   }
   
-  // Total expenses
+  // Total expenses - all black, no colors
   page.drawLine({ start: { x: margin, y }, end: { x: width - margin, y }, thickness: 0.5, color: lightGray });
   y -= 11;
   page.drawText("TOTAL EXPENSES", { x: margin, y, size: 9, font: helveticaBold, color: black });
-  page.drawText(`(${formatCurrency(data.totalExpenses)})`, { x: width - margin - 75, y, size: 9, font: helveticaBold, color: rgb(0.7, 0.2, 0.2) });
+  page.drawText(`(${formatCurrency(data.totalExpenses)})`, { x: width - margin - 75, y, size: 9, font: helveticaBold, color: black });
   y -= 18;
   
   // === NET RESULT LINE ===

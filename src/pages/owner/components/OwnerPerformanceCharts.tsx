@@ -31,18 +31,49 @@ interface Statement {
   status: string;
 }
 
+interface MonthlyRevenueData {
+  month: string;
+  str: number;
+  mtr: number;
+  total: number;
+}
+
 interface OwnerPerformanceChartsProps {
   statements: Statement[];
+  monthlyRevenueData?: MonthlyRevenueData[];
   propertyName?: string;
 }
 
 type TimeFilter = "6m" | "12m" | "all";
 
-export function OwnerPerformanceCharts({ statements, propertyName }: OwnerPerformanceChartsProps) {
+export function OwnerPerformanceCharts({ statements, monthlyRevenueData, propertyName }: OwnerPerformanceChartsProps) {
   const [timeFilter, setTimeFilter] = useState<TimeFilter>("all");
 
-  // Prepare chart data - filter based on selected time range
+  // Prepare chart data - use enriched monthlyRevenueData if available, fall back to statements
   const revenueData = useMemo(() => {
+    // Prefer enriched monthly revenue data (includes booking-calculated revenue for months without reconciliations)
+    if (monthlyRevenueData && monthlyRevenueData.length > 0) {
+      const sortedData = [...monthlyRevenueData].sort((a, b) => 
+        new Date(a.month).getTime() - new Date(b.month).getTime()
+      );
+
+      let filteredData = sortedData;
+      if (timeFilter === "6m") {
+        filteredData = sortedData.slice(-6);
+      } else if (timeFilter === "12m") {
+        filteredData = sortedData.slice(-12);
+      }
+
+      return filteredData.map(d => ({
+        month: format(new Date(d.month), "MMM yy"),
+        fullMonth: format(new Date(d.month), "MMMM yyyy"),
+        revenue: d.total || 0,
+        expenses: 0, // Not available in enriched data
+        net: d.total || 0, // Use total as net approximation when no reconciliation
+      }));
+    }
+
+    // Fall back to statements data
     const sortedStatements = [...statements].sort((a, b) => 
       new Date(a.reconciliation_month).getTime() - new Date(b.reconciliation_month).getTime()
     );
@@ -62,7 +93,7 @@ export function OwnerPerformanceCharts({ statements, propertyName }: OwnerPerfor
       expenses: Math.abs(s.total_expenses || 0),
       net: s.net_to_owner || 0,
     }));
-  }, [statements, timeFilter]);
+  }, [statements, monthlyRevenueData, timeFilter]);
 
   // Calculate metrics from ALL data (not filtered)
   const metrics = useMemo(() => {
