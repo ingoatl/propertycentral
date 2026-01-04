@@ -23,6 +23,7 @@ import { format } from "date-fns";
 
 interface StatementRecord {
   id: string;
+  reconciliation_id: string;
   statement_number: string;
   statement_date: string;
   statement_month: string;
@@ -65,6 +66,7 @@ export function StatementArchiveTab() {
         .from("owner_statement_archive")
         .select(`
           id,
+          reconciliation_id,
           statement_number,
           statement_date,
           statement_month,
@@ -143,9 +145,9 @@ export function StatementArchiveTab() {
         a.click();
         URL.revokeObjectURL(url);
       } else {
-        // Generate PDF on demand
+        // Generate PDF on demand using reconciliation_id
         const { data, error } = await supabase.functions.invoke("generate-statement-pdf", {
-          body: { statementId: statement.id },
+          body: { reconciliation_id: statement.reconciliation_id },
         });
 
         if (error) throw error;
