@@ -21,9 +21,10 @@ interface Expense {
 interface OwnerReceiptViewerProps {
   expense: Expense;
   onClose: () => void;
+  token?: string;
 }
 
-export function OwnerReceiptViewer({ expense, onClose }: OwnerReceiptViewerProps) {
+export function OwnerReceiptViewer({ expense, onClose, token }: OwnerReceiptViewerProps) {
   const [loading, setLoading] = useState(true);
   const [signedUrl, setSignedUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -43,11 +44,13 @@ export function OwnerReceiptViewer({ expense, onClose }: OwnerReceiptViewerProps
       }
 
       try {
-        const { data, error: urlError } = await supabase.storage
-          .from("expense-documents")
-          .createSignedUrl(receiptPath, 600); // 10 minutes
+        // Use edge function to bypass RLS
+        const { data, error: urlError } = await supabase.functions.invoke("owner-receipt-url", {
+          body: { expenseId: expense.id, token, filePath: receiptPath },
+        });
 
         if (urlError) throw urlError;
+        if (data?.error) throw new Error(data.error);
 
         setSignedUrl(data.signedUrl);
       } catch (err) {
@@ -59,7 +62,7 @@ export function OwnerReceiptViewer({ expense, onClose }: OwnerReceiptViewerProps
     };
 
     fetchSignedUrl();
-  }, [receiptPath]);
+  }, [receiptPath, expense.id, token]);
 
   const handleDownload = () => {
     if (signedUrl) {

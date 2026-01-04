@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   Receipt,
   Search,
@@ -14,6 +15,8 @@ import {
   Calendar,
   DollarSign,
   X,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react";
 import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
@@ -35,9 +38,18 @@ interface Expense {
 interface OwnerReceiptsTabProps {
   expenses: Expense[];
   propertyId: string;
+  token?: string;
 }
 
-export function OwnerReceiptsTab({ expenses, propertyId }: OwnerReceiptsTabProps) {
+interface MonthGroup {
+  monthKey: string;
+  monthLabel: string;
+  expenses: Expense[];
+  total: number;
+  receiptsCount: number;
+}
+
+export function OwnerReceiptsTab({ expenses, propertyId, token }: OwnerReceiptsTabProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [vendorFilter, setVendorFilter] = useState<string>("all");
@@ -45,6 +57,7 @@ export function OwnerReceiptsTab({ expenses, propertyId }: OwnerReceiptsTabProps
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [viewingReceipt, setViewingReceipt] = useState<Expense | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [expandedMonths, setExpandedMonths] = useState<Set<string>>(new Set());
 
   // Get unique categories and vendors for filters
   const categories = useMemo(() => {
@@ -97,6 +110,47 @@ export function OwnerReceiptsTab({ expenses, propertyId }: OwnerReceiptsTabProps
     return result;
   }, [expenses, searchQuery, categoryFilter, vendorFilter, sortBy, sortOrder]);
 
+  // Group expenses by month
+  const monthGroups = useMemo(() => {
+    const groups = new Map<string, MonthGroup>();
+    
+    filteredExpenses.forEach(expense => {
+      const date = new Date(expense.date);
+      const monthKey = format(date, "yyyy-MM");
+      const monthLabel = format(date, "MMMM yyyy");
+      
+      if (!groups.has(monthKey)) {
+        groups.set(monthKey, {
+          monthKey,
+          monthLabel,
+          expenses: [],
+          total: 0,
+          receiptsCount: 0,
+        });
+      }
+      
+      const group = groups.get(monthKey)!;
+      group.expenses.push(expense);
+      group.total += expense.amount;
+      if (expense.email_screenshot_path || expense.file_path || expense.original_receipt_path) {
+        group.receiptsCount++;
+      }
+    });
+
+    // Sort by month descending
+    return Array.from(groups.values()).sort((a, b) => 
+      b.monthKey.localeCompare(a.monthKey)
+    );
+  }, [filteredExpenses]);
+
+  // Auto-expand first 3 months
+  useMemo(() => {
+    if (expandedMonths.size === 0 && monthGroups.length > 0) {
+      const initialExpanded = new Set(monthGroups.slice(0, 3).map(g => g.monthKey));
+      setExpandedMonths(initialExpanded);
+    }
+  }, [monthGroups.length]);
+
   // Calculate totals
   const totalAmount = filteredExpenses.reduce((sum, e) => sum + e.amount, 0);
   const receiptsWithFiles = filteredExpenses.filter(e => e.email_screenshot_path || e.file_path || e.original_receipt_path).length;
@@ -109,7 +163,6 @@ export function OwnerReceiptsTab({ expenses, propertyId }: OwnerReceiptsTabProps
   };
 
   const handleDownloadReceipt = async (expense: Expense) => {
-    // Priority: email_screenshot_path > file_path > original_receipt_path
     const receiptPath = expense.email_screenshot_path || expense.file_path || expense.original_receipt_path;
     if (!receiptPath) {
       toast.error("No receipt file available");
@@ -118,11 +171,13 @@ export function OwnerReceiptsTab({ expenses, propertyId }: OwnerReceiptsTabProps
 
     setDownloadingId(expense.id);
     try {
-      const { data, error } = await supabase.storage
-        .from("expense-documents")
-        .createSignedUrl(receiptPath, 300);
+      // Use edge function to bypass RLS
+      const { data, error } = await supabase.functions.invoke("owner-receipt-url", {
+        body: { expenseId: expense.id, token, filePath: receiptPath },
+      });
 
       if (error) throw error;
+      if (data?.error) throw new Error(data.error);
       
       // Open in new tab for download
       window.open(data.signedUrl, "_blank");
@@ -139,6 +194,18 @@ export function OwnerReceiptsTab({ expenses, propertyId }: OwnerReceiptsTabProps
     setSearchQuery("");
     setCategoryFilter("all");
     setVendorFilter("all");
+  };
+
+  const toggleMonth = (monthKey: string) => {
+    setExpandedMonths(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(monthKey)) {
+        newSet.delete(monthKey);
+      } else {
+        newSet.add(monthKey);
+      }
+      return newSet;
+    });
   };
 
   const hasActiveFilters = searchQuery || categoryFilter !== "all" || vendorFilter !== "all";
@@ -248,16 +315,16 @@ export function OwnerReceiptsTab({ expenses, propertyId }: OwnerReceiptsTabProps
         </CardContent>
       </Card>
 
-      {/* Receipts List */}
+      {/* Receipts List Grouped by Month */}
       <Card className="border-none shadow-lg overflow-hidden">
         <CardHeader className="bg-gradient-to-r from-muted/50 to-background border-b">
           <CardTitle className="flex items-center gap-2 text-lg">
             <Receipt className="h-5 w-5" />
-            Expense Receipts
+            Expense Receipts by Month
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0">
-          {filteredExpenses.length === 0 ? (
+          {monthGroups.length === 0 ? (
             <div className="p-12 text-center">
               <Receipt className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
               <p className="text-muted-foreground">No expenses found</p>
@@ -269,71 +336,111 @@ export function OwnerReceiptsTab({ expenses, propertyId }: OwnerReceiptsTabProps
             </div>
           ) : (
             <div className="divide-y">
-              {filteredExpenses.map((expense) => {
-                const hasReceipt = expense.email_screenshot_path || expense.file_path || expense.original_receipt_path;
-                return (
-                  <div
-                    key={expense.id}
-                    className="flex items-center justify-between p-4 hover:bg-muted/30 transition-colors"
-                  >
-                    <div className="flex items-center gap-4 flex-1 min-w-0">
-                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                        hasReceipt ? 'bg-emerald-100 text-emerald-600' : 'bg-muted text-muted-foreground'
-                      }`}>
-                        {hasReceipt ? <FileText className="h-5 w-5" /> : <Receipt className="h-5 w-5" />}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="font-medium truncate">
-                          {expense.purpose || expense.category || "Expense"}
-                        </p>
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <Calendar className="h-3.5 w-3.5" />
-                          <span>{format(new Date(expense.date), "MMM d, yyyy")}</span>
-                          {expense.vendor && (
-                            <>
-                              <span>•</span>
-                              <span className="truncate">{expense.vendor}</span>
-                            </>
-                          )}
+              {monthGroups.map((group) => (
+                <Collapsible 
+                  key={group.monthKey} 
+                  open={expandedMonths.has(group.monthKey)}
+                  onOpenChange={() => toggleMonth(group.monthKey)}
+                >
+                  <CollapsibleTrigger className="w-full">
+                    <div className="flex items-center justify-between p-4 hover:bg-muted/30 transition-colors cursor-pointer">
+                      <div className="flex items-center gap-3">
+                        {expandedMonths.has(group.monthKey) ? (
+                          <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                        ) : (
+                          <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                        )}
+                        <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                          <Calendar className="h-5 w-5 text-primary" />
+                        </div>
+                        <div className="text-left">
+                          <p className="font-semibold">{group.monthLabel}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {group.expenses.length} expense{group.expenses.length !== 1 ? 's' : ''} • {group.receiptsCount} receipt{group.receiptsCount !== 1 ? 's' : ''}
+                          </p>
                         </div>
                       </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      {expense.category && (
-                        <Badge variant="secondary" className="hidden md:flex">
-                          {expense.category}
-                        </Badge>
-                      )}
-                      <p className="font-mono font-semibold text-lg">
-                        {formatCurrency(expense.amount)}
-                      </p>
-                      <div className="flex gap-1">
-                        {hasReceipt && (
-                          <>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => setViewingReceipt(expense)}
-                              className="h-8 w-8"
-                            >
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleDownloadReceipt(expense)}
-                              disabled={downloadingId === expense.id}
-                              className="h-8 w-8"
-                            >
-                              <Download className="h-4 w-4" />
-                            </Button>
-                          </>
-                        )}
+                      <div className="text-right">
+                        <p className="font-mono font-semibold text-lg">{formatCurrency(group.total)}</p>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <div className="divide-y border-t bg-muted/10">
+                      {group.expenses.map((expense) => {
+                        const hasReceipt = expense.email_screenshot_path || expense.file_path || expense.original_receipt_path;
+                        return (
+                          <div
+                            key={expense.id}
+                            className="flex items-center justify-between p-4 pl-16 hover:bg-muted/30 transition-colors"
+                          >
+                            <div className="flex items-center gap-4 flex-1 min-w-0">
+                              <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                                hasReceipt ? 'bg-emerald-100 text-emerald-600' : 'bg-muted text-muted-foreground'
+                              }`}>
+                                {hasReceipt ? <FileText className="h-4 w-4" /> : <Receipt className="h-4 w-4" />}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <p className="font-medium truncate text-sm">
+                                  {expense.purpose || expense.category || "Expense"}
+                                </p>
+                                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                  <span>{format(new Date(expense.date), "MMM d")}</span>
+                                  {expense.vendor && (
+                                    <>
+                                      <span>•</span>
+                                      <span className="truncate">{expense.vendor}</span>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              {expense.category && (
+                                <Badge variant="secondary" className="hidden md:flex text-xs">
+                                  {expense.category}
+                                </Badge>
+                              )}
+                              <p className="font-mono font-semibold">
+                                {formatCurrency(expense.amount)}
+                              </p>
+                              <div className="flex gap-1">
+                                {hasReceipt && (
+                                  <>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setViewingReceipt(expense);
+                                      }}
+                                      className="h-8 w-8"
+                                    >
+                                      <Eye className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleDownloadReceipt(expense);
+                                      }}
+                                      disabled={downloadingId === expense.id}
+                                      className="h-8 w-8"
+                                    >
+                                      <Download className="h-4 w-4" />
+                                    </Button>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
+              ))}
             </div>
           )}
         </CardContent>
@@ -344,6 +451,7 @@ export function OwnerReceiptsTab({ expenses, propertyId }: OwnerReceiptsTabProps
         <OwnerReceiptViewer
           expense={viewingReceipt}
           onClose={() => setViewingReceipt(null)}
+          token={token}
         />
       )}
     </div>

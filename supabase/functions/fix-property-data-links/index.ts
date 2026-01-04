@@ -32,11 +32,12 @@ serve(async (req) => {
 
     let bookingsLinked = 0;
     let reviewsLinked = 0;
+    let reviewsLinkedViaBooking = 0;
 
     // Link orphaned ownerrez_bookings to properties
     const { data: orphanedBookings } = await supabase
       .from("ownerrez_bookings")
-      .select("id, ownerrez_listing_name, property_id")
+      .select("id, ownerrez_listing_name, property_id, booking_id")
       .is("property_id", null);
 
     console.log(`Found ${orphanedBookings?.length || 0} orphaned bookings`);
@@ -66,6 +67,22 @@ serve(async (req) => {
       }
     }
 
+    // Now get all bookings with property_ids for review linking
+    const { data: allBookingsWithProperty } = await supabase
+      .from("ownerrez_bookings")
+      .select("booking_id, property_id")
+      .not("property_id", "is", null);
+
+    // Create a map of booking_id to property_id
+    const bookingToPropertyMap = new Map<string, string>();
+    (allBookingsWithProperty || []).forEach(b => {
+      if (b.booking_id && b.property_id) {
+        bookingToPropertyMap.set(b.booking_id, b.property_id);
+      }
+    });
+
+    console.log(`Built booking-to-property map with ${bookingToPropertyMap.size} entries`);
+
     // Link orphaned ownerrez_reviews to properties via bookings
     const { data: orphanedReviews } = await supabase
       .from("ownerrez_reviews")
@@ -76,7 +93,23 @@ serve(async (req) => {
 
     for (const review of orphanedReviews || []) {
       if (review.booking_id) {
-        // Try to find the booking and get its property_id
+        // First check our local map
+        const mappedPropertyId = bookingToPropertyMap.get(review.booking_id);
+        
+        if (mappedPropertyId) {
+          const { error } = await supabase
+            .from("ownerrez_reviews")
+            .update({ property_id: mappedPropertyId })
+            .eq("id", review.id);
+
+          if (!error) {
+            reviewsLinkedViaBooking++;
+            reviewsLinked++;
+          }
+          continue;
+        }
+
+        // Fallback: Try to find the booking and get its property_id from DB
         const { data: booking } = await supabase
           .from("ownerrez_bookings")
           .select("property_id")
@@ -97,13 +130,14 @@ serve(async (req) => {
       }
     }
 
-    console.log(`Linking complete: ${bookingsLinked} bookings, ${reviewsLinked} reviews linked`);
+    console.log(`Linking complete: ${bookingsLinked} bookings, ${reviewsLinked} reviews linked (${reviewsLinkedViaBooking} via booking map)`);
 
     return new Response(
       JSON.stringify({
         success: true,
         bookingsLinked,
         reviewsLinked,
+        reviewsLinkedViaBooking,
         totalProperties: properties?.length || 0,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
