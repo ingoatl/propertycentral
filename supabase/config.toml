@@ -395,3 +395,6 @@ verify_jwt = true
 
 [functions.fix-property-data-links]
 verify_jwt = false
+
+[functions.owner-portal-data]
+verify_jwt = false
