@@ -734,6 +734,7 @@ export default function OwnerDashboard() {
                   loadingProgress={100}
                   loadingStep=""
                   isSuperhost={performanceMetrics.averageRating !== null && performanceMetrics.averageRating >= 4.8 && performanceMetrics.reviewCount >= 10}
+                  rentalType={property?.rental_type as "hybrid" | "mid_term" | "long_term" | null}
                 />
               </div>
             ) : (

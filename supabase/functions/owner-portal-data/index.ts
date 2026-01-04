@@ -101,10 +101,11 @@ serve(async (req: Request): Promise<Response> => {
       strBookingsResult,
       mtrBookingsResult,
       reviewsResult,
+      reviewsByListingResult,
       emailInsightsResult,
       propertyDetailsResult,
     ] = await Promise.all([
-      // Monthly reconciliations (statements) - fetch all historical data
+      // Monthly reconciliations (statements) - fetch all historical data (24 months)
       supabase
         .from("monthly_reconciliations")
         .select("id, reconciliation_month, total_revenue, total_expenses, net_to_owner, status, short_term_revenue, mid_term_revenue")
@@ -129,27 +130,35 @@ serve(async (req: Request): Promise<Response> => {
         .eq("property_id", property.id)
         .order("service_name"),
       
-      // STR bookings (OwnerRez) - exclude canceled and zero-amount
+      // STR bookings (OwnerRez) - exclude canceled and zero-amount - extended to 24 months
       supabase
         .from("ownerrez_bookings")
         .select("id, booking_id, guest_name, check_in, check_out, total_amount, management_fee, booking_status, ownerrez_listing_name")
         .eq("property_id", property.id)
         .order("check_in", { ascending: false })
-        .limit(100),
+        .limit(200), // Extended for historical data
       
-      // MTR bookings
+      // MTR bookings - extended for historical data
       supabase
         .from("mid_term_bookings")
         .select("id, tenant_name, tenant_email, start_date, end_date, monthly_rent, security_deposit, status, notes")
         .eq("property_id", property.id)
         .order("start_date", { ascending: false })
-        .limit(50),
+        .limit(100), // Extended for historical data
       
       // Reviews - use correct column names
       supabase
         .from("ownerrez_reviews")
-        .select("id, guest_name, star_rating, review_text, review_date, review_source")
+        .select("id, guest_name, star_rating, review_text, review_date, review_source, property_name")
         .eq("property_id", property.id)
+        .order("review_date", { ascending: false })
+        .limit(50),
+      
+      // Fallback: Reviews by property name (in case they're linked by listing name)
+      supabase
+        .from("ownerrez_reviews")
+        .select("id, guest_name, star_rating, review_text, review_date, review_source, property_name")
+        .ilike("property_name", `%${property.name}%`)
         .order("review_date", { ascending: false })
         .limit(50),
       
@@ -175,9 +184,21 @@ serve(async (req: Request): Promise<Response> => {
     const credentials = credentialsResult.data || [];
     const strBookings = strBookingsResult.data || [];
     const mtrBookings = mtrBookingsResult.data || [];
-    const reviews = reviewsResult.data || [];
     const emailInsights = emailInsightsResult.data || [];
     const propertyDetails = propertyDetailsResult.data;
+    
+    // Merge reviews from both queries (by property_id and by property name), deduplicate by id
+    const reviewsById = reviewsResult.data || [];
+    const reviewsByListing = reviewsByListingResult.data || [];
+    const reviewIdSet = new Set(reviewsById.map(r => r.id));
+    const mergedReviews = [...reviewsById];
+    for (const r of reviewsByListing) {
+      if (!reviewIdSet.has(r.id)) {
+        mergedReviews.push(r);
+        reviewIdSet.add(r.id);
+      }
+    }
+    const reviews = mergedReviews;
 
     console.log("Data fetched:", {
       statements: statements.length,
@@ -186,6 +207,7 @@ serve(async (req: Request): Promise<Response> => {
       strBookings: strBookings.length,
       mtrBookings: mtrBookings.length,
       reviews: reviews.length,
+      reviewsByListing: reviewsByListing.length,
       emailInsights: emailInsights.length,
     });
 
