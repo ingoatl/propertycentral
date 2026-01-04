@@ -12,7 +12,7 @@ const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 // Company information
 const COMPANY = {
-  name: "PeachHaus Property Management",
+  name: "PeachHaus Group LLC",
   address: "1860 Sandy Plains Rd Ste 204 #4023, Marietta, GA 30066",
   phone: "(404) 800-5932",
   email: "info@peachhausgroup.com",
@@ -490,19 +490,37 @@ async function generatePdf(data: StatementData): Promise<Uint8Array> {
     y -= 13;
   }
   
-  // Expenses - with better text handling
+  // Expenses - show full details with line items
   for (const expense of data.expenses) {
-    if (y < 140) break;
+    if (y < 100) break;
     
     const expDate = expense.date ? ` - ${formatDate(expense.date)}` : '';
     let expDesc = expense.description || expense.category || 'Expense';
-    // Truncate at 60 chars
-    if (expDesc.length > 60) {
-      expDesc = expDesc.substring(0, 57) + '...';
+    
+    // Check if description contains multiple items (from Amazon line_items)
+    // Show first 120 chars of description without truncation if possible
+    if (expDesc.length > 120) {
+      // Wrap text for very long descriptions
+      const lines = wrapText(expDesc, 85);
+      for (let i = 0; i < Math.min(lines.length, 3); i++) {
+        if (y < 100) break;
+        const lineText = i === 0 ? `${lines[i]}${expDate}` : `  ${lines[i]}`;
+        page.drawText(lineText, { x: margin, y, size: 8, font: helvetica, color: i === 0 ? black : gray });
+        if (i === 0) {
+          page.drawText(formatCurrency(expense.amount), { x: width - margin - 65, y, size: 9, font: helvetica, color: black });
+        }
+        y -= 11;
+      }
+      if (lines.length > 3) {
+        page.drawText(`  ...and ${lines.length - 3} more items`, { x: margin, y, size: 7, font: helvetica, color: gray });
+        y -= 10;
+      }
+    } else {
+      // Short description - display normally
+      page.drawText(`${expDesc}${expDate}`, { x: margin, y, size: 9, font: helvetica, color: black });
+      page.drawText(formatCurrency(expense.amount), { x: width - margin - 65, y, size: 9, font: helvetica, color: black });
+      y -= 13;
     }
-    page.drawText(`${expDesc}${expDate}`, { x: margin, y, size: 9, font: helvetica, color: black });
-    page.drawText(formatCurrency(expense.amount), { x: width - margin - 65, y, size: 9, font: helvetica, color: black });
-    y -= 13;
   }
   
   // Cleaning fees

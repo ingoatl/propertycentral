@@ -991,6 +991,7 @@ export type Database = {
       email_insights: {
         Row: {
           action_required: boolean | null
+          attachments: Json | null
           category: string
           created_at: string
           due_date: string | null
@@ -1013,6 +1014,7 @@ export type Database = {
         }
         Insert: {
           action_required?: boolean | null
+          attachments?: Json | null
           category: string
           created_at?: string
           due_date?: string | null
@@ -1035,6 +1037,7 @@ export type Database = {
         }
         Update: {
           action_required?: boolean | null
+          attachments?: Json | null
           category?: string
           created_at?: string
           due_date?: string | null
@@ -1192,6 +1195,7 @@ export type Database = {
       expenses: {
         Row: {
           amount: number
+          attachment_metadata: Json | null
           billed: boolean | null
           category: string | null
           created_at: string
@@ -1207,6 +1211,7 @@ export type Database = {
           line_items: Json | null
           order_date: string | null
           order_number: string | null
+          original_receipt_path: string | null
           parent_expense_id: string | null
           property_id: string
           purpose: string | null
@@ -1219,6 +1224,7 @@ export type Database = {
         }
         Insert: {
           amount: number
+          attachment_metadata?: Json | null
           billed?: boolean | null
           category?: string | null
           created_at?: string
@@ -1234,6 +1240,7 @@ export type Database = {
           line_items?: Json | null
           order_date?: string | null
           order_number?: string | null
+          original_receipt_path?: string | null
           parent_expense_id?: string | null
           property_id: string
           purpose?: string | null
@@ -1246,6 +1253,7 @@ export type Database = {
         }
         Update: {
           amount?: number
+          attachment_metadata?: Json | null
           billed?: boolean | null
           category?: string | null
           created_at?: string
@@ -1261,6 +1269,7 @@ export type Database = {
           line_items?: Json | null
           order_date?: string | null
           order_number?: string | null
+          original_receipt_path?: string | null
           parent_expense_id?: string | null
           property_id?: string
           purpose?: string | null

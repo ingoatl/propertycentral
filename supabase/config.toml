@@ -374,3 +374,6 @@ verify_jwt = false
 
 [functions.send-vendor-service-email]
 verify_jwt = true
+
+[functions.extract-email-attachments]
+verify_jwt = true
