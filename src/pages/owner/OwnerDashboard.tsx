@@ -167,6 +167,7 @@ export default function OwnerDashboard() {
   const [insightsProgress, setInsightsProgress] = useState(0);
   const [insightsStep, setInsightsStep] = useState("Initializing...");
   const [sessionToken, setSessionToken] = useState<string | null>(null);
+  const [revenueBreakdown, setRevenueBreakdown] = useState<any>(null);
 
   useEffect(() => {
     const token = searchParams.get("token");
@@ -257,6 +258,7 @@ export default function OwnerDashboard() {
         averageRating: null,
         reviewCount: 0,
       });
+      setRevenueBreakdown(data.revenueBreakdown || null);
 
       navigate("/owner", { replace: true });
       toast.success("Welcome to your owner portal!");
@@ -315,6 +317,7 @@ export default function OwnerDashboard() {
         averageRating: null,
         reviewCount: 0,
       });
+      setRevenueBreakdown(data.revenueBreakdown || null);
 
       // Load AI market insights separately
       if (data.property?.id) {
@@ -630,6 +633,7 @@ export default function OwnerDashboard() {
               <OwnerPerformanceOverview 
                 metrics={performanceMetrics}
                 propertyName={property?.name}
+                revenueBreakdown={revenueBreakdown}
               />
 
               {/* Performance Charts */}
