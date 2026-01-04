@@ -169,6 +169,14 @@ export function OwnerReceiptsTab({ expenses, propertyId, token }: OwnerReceiptsT
       return;
     }
 
+    // Check if it's an HTML file - open in viewer instead of downloading
+    const isHtml = receiptPath.toLowerCase().endsWith('.html') || receiptPath.toLowerCase().endsWith('.htm');
+    if (isHtml) {
+      setViewingReceipt(expense);
+      toast.info("Opening HTML receipt in viewer");
+      return;
+    }
+
     setDownloadingId(expense.id);
     try {
       // Use edge function to bypass RLS
@@ -179,27 +187,41 @@ export function OwnerReceiptsTab({ expenses, propertyId, token }: OwnerReceiptsT
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       
-      // Fetch the file as blob to force proper download
+      // Fetch the file as blob to avoid browser blocking
       const response = await fetch(data.signedUrl);
       if (!response.ok) throw new Error("Failed to fetch file");
       
       const blob = await response.blob();
+      
+      // Check content type - if HTML, open in viewer instead
+      if (blob.type.includes('html') || blob.type.includes('text')) {
+        setViewingReceipt(expense);
+        toast.info("Opening receipt in viewer");
+        return;
+      }
+      
       const blobUrl = URL.createObjectURL(blob);
       
-      // Determine filename from path
-      const filename = receiptPath.split('/').pop() || `receipt-${expense.id}`;
+      // For PDFs and images, open in new tab for better viewing
+      const isPdf = blob.type === 'application/pdf' || receiptPath.toLowerCase().endsWith('.pdf');
+      const isImage = blob.type.startsWith('image/');
       
-      // Create download link
-      const link = document.createElement('a');
-      link.href = blobUrl;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      
-      // Cleanup
-      setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
-      toast.success("Receipt downloaded");
+      if (isPdf || isImage) {
+        window.open(blobUrl, "_blank");
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+        toast.success("Receipt opened in new tab");
+      } else {
+        // For other files, download
+        const filename = receiptPath.split('/').pop() || `receipt-${expense.id}`;
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
+        toast.success("Receipt downloaded");
+      }
     } catch (err) {
       console.error("Download error:", err);
       toast.error("Failed to download receipt");
