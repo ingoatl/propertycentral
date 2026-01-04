@@ -55,6 +55,7 @@ interface Statement {
   total_revenue: number;
   total_expenses: number;
   net_to_owner: number;
+  actual_net_earnings?: number; // Calculated correctly based on service type
   status: string;
   short_term_revenue?: number;
   mid_term_revenue?: number;
@@ -672,7 +673,7 @@ export default function OwnerDashboard() {
                           <span>Revenue: {formatCurrency(latestStatement.total_revenue || 0)}</span>
                           <span>•</span>
                           <span className="text-emerald-600 font-medium">
-                            Net: {formatCurrency(latestStatement.net_to_owner || 0)}
+                            Net: {formatCurrency(latestStatement.actual_net_earnings ?? latestStatement.net_to_owner ?? 0)}
                           </span>
                         </div>
                       </div>
@@ -817,7 +818,7 @@ export default function OwnerDashboard() {
                             <div className="flex gap-3 text-sm text-muted-foreground">
                               <span>Revenue: {formatCurrency(statement.total_revenue || 0)}</span>
                               <span>•</span>
-                              <span className="text-emerald-600">Net: {formatCurrency(statement.net_to_owner || 0)}</span>
+                              <span className="text-emerald-600">Net: {formatCurrency(statement.actual_net_earnings ?? statement.net_to_owner ?? 0)}</span>
                             </div>
                           </div>
                         </div>

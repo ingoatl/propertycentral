@@ -28,6 +28,7 @@ interface Statement {
   total_revenue: number;
   total_expenses: number;
   net_to_owner: number;
+  actual_net_earnings?: number; // Calculated correctly based on service type
   status: string;
 }
 
@@ -91,7 +92,7 @@ export function OwnerPerformanceCharts({ statements, monthlyRevenueData, propert
       fullMonth: format(new Date(s.reconciliation_month), "MMMM yyyy"),
       revenue: s.total_revenue || 0,
       expenses: Math.abs(s.total_expenses || 0),
-      net: s.net_to_owner || 0,
+      net: s.actual_net_earnings ?? s.net_to_owner ?? 0,
     }));
   }, [statements, monthlyRevenueData, timeFilter]);
 
@@ -100,7 +101,7 @@ export function OwnerPerformanceCharts({ statements, monthlyRevenueData, propert
     if (statements.length === 0) return null;
 
     const totalRevenue = statements.reduce((sum, s) => sum + (s.total_revenue || 0), 0);
-    const totalNet = statements.reduce((sum, s) => sum + (s.net_to_owner || 0), 0);
+    const totalNet = statements.reduce((sum, s) => sum + (s.actual_net_earnings ?? s.net_to_owner ?? 0), 0);
     const totalExpenses = statements.reduce((sum, s) => sum + Math.abs(s.total_expenses || 0), 0);
 
     const avgMonthlyRevenue = totalRevenue / statements.length;
@@ -130,7 +131,7 @@ export function OwnerPerformanceCharts({ statements, monthlyRevenueData, propert
       growthRate,
       expenseRatio,
       thisMonthRevenue: thisMonth?.total_revenue || 0,
-      thisMonthNet: thisMonth?.net_to_owner || 0,
+      thisMonthNet: thisMonth?.actual_net_earnings ?? thisMonth?.net_to_owner ?? 0,
       lastMonthRevenue: lastMonth?.total_revenue || 0,
       monthsOfData: statements.length,
     };
