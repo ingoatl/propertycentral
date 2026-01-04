@@ -29,6 +29,7 @@ interface Expense {
   category: string | null;
   file_path: string | null;
   original_receipt_path: string | null;
+  email_screenshot_path?: string | null;
 }
 
 interface OwnerReceiptsTabProps {
@@ -98,7 +99,7 @@ export function OwnerReceiptsTab({ expenses, propertyId }: OwnerReceiptsTabProps
 
   // Calculate totals
   const totalAmount = filteredExpenses.reduce((sum, e) => sum + e.amount, 0);
-  const receiptsWithFiles = filteredExpenses.filter(e => e.file_path || e.original_receipt_path).length;
+  const receiptsWithFiles = filteredExpenses.filter(e => e.email_screenshot_path || e.file_path || e.original_receipt_path).length;
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-US", {
@@ -108,7 +109,8 @@ export function OwnerReceiptsTab({ expenses, propertyId }: OwnerReceiptsTabProps
   };
 
   const handleDownloadReceipt = async (expense: Expense) => {
-    const receiptPath = expense.original_receipt_path || expense.file_path;
+    // Priority: email_screenshot_path > file_path > original_receipt_path
+    const receiptPath = expense.email_screenshot_path || expense.file_path || expense.original_receipt_path;
     if (!receiptPath) {
       toast.error("No receipt file available");
       return;
@@ -268,7 +270,7 @@ export function OwnerReceiptsTab({ expenses, propertyId }: OwnerReceiptsTabProps
           ) : (
             <div className="divide-y">
               {filteredExpenses.map((expense) => {
-                const hasReceipt = expense.file_path || expense.original_receipt_path;
+                const hasReceipt = expense.email_screenshot_path || expense.file_path || expense.original_receipt_path;
                 return (
                   <div
                     key={expense.id}
