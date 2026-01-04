@@ -15,6 +15,7 @@ interface Expense {
   category: string | null;
   file_path: string | null;
   original_receipt_path: string | null;
+  email_screenshot_path?: string | null;
 }
 
 interface OwnerReceiptViewerProps {
@@ -28,7 +29,8 @@ export function OwnerReceiptViewer({ expense, onClose }: OwnerReceiptViewerProps
   const [error, setError] = useState<string | null>(null);
   const [zoom, setZoom] = useState(100);
 
-  const receiptPath = expense.original_receipt_path || expense.file_path;
+  // Priority: email_screenshot_path (real email) > file_path (uploaded) > original_receipt_path (auto-generated)
+  const receiptPath = expense.email_screenshot_path || expense.file_path || expense.original_receipt_path;
   const isPdf = receiptPath?.toLowerCase().endsWith('.pdf');
   const isHtml = receiptPath?.toLowerCase().endsWith('.html');
 

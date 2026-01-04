@@ -11,8 +11,6 @@ import {
   TrendingUp,
   FileText,
   Download,
-  Calendar,
-  DollarSign,
   Home,
   LogOut,
   RefreshCw,
@@ -25,12 +23,18 @@ import {
   EyeOff,
   BarChart3,
   Users,
+  Sparkles,
+  Star,
+  MapPin,
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { OwnerReceiptsTab } from "./components/OwnerReceiptsTab";
 import { OwnerBookingsTab } from "./components/OwnerBookingsTab";
 import { OwnerPerformanceCharts } from "./components/OwnerPerformanceCharts";
+import { OwnerPerformanceOverview } from "./components/OwnerPerformanceOverview";
+import { OwnerReviewsCard } from "./components/OwnerReviewsCard";
+import { OwnerMarketInsights } from "./components/OwnerMarketInsights";
 
 interface OwnerSession {
   ownerId: string;
@@ -58,6 +62,7 @@ interface Expense {
   category: string | null;
   file_path: string | null;
   original_receipt_path: string | null;
+  email_screenshot_path: string | null;
 }
 
 interface PropertyData {
@@ -65,6 +70,7 @@ interface PropertyData {
   name: string;
   address: string;
   rental_type: string | null;
+  image_path: string | null;
 }
 
 interface Credential {
@@ -74,6 +80,43 @@ interface Credential {
   password: string | null;
   url: string | null;
   notes: string | null;
+}
+
+interface MarketInsightsData {
+  property: any;
+  performance: {
+    totalRevenue: number;
+    strRevenue: number;
+    mtrRevenue: number;
+    totalBookings: number;
+    strBookings: number;
+    mtrBookings: number;
+    occupancyRate: number;
+    averageRating: number | null;
+    reviewCount: number;
+  };
+  reviews: Array<{
+    id: string;
+    guestName: string | null;
+    rating: number;
+    text: string;
+    date: string;
+    source: string;
+  }>;
+  monthlyRevenue: any[];
+  aiInsights: {
+    comparableProperties: any[];
+    marketMetrics: {
+      areaOccupancy: number;
+      avgNightlyRate: number;
+      yoyGrowth: number;
+      marketTrend: "rising" | "stable" | "declining";
+    };
+    futureOpportunities: any[];
+    demandDrivers: any[];
+    strengthsForArea: string[];
+  };
+  generatedAt: string;
 }
 
 export default function OwnerDashboard() {
@@ -88,18 +131,18 @@ export default function OwnerDashboard() {
   const [activeTab, setActiveTab] = useState("overview");
   const [downloadingPdf, setDownloadingPdf] = useState<string | null>(null);
   const [visiblePasswords, setVisiblePasswords] = useState<Set<string>>(new Set());
+  const [marketInsights, setMarketInsights] = useState<MarketInsightsData | null>(null);
+  const [loadingInsights, setLoadingInsights] = useState(false);
 
   useEffect(() => {
     const token = searchParams.get("token");
     if (token) {
       validateToken(token);
     } else {
-      // Check for existing session in localStorage
       const storedSession = localStorage.getItem("owner_session");
       if (storedSession) {
         try {
           const parsed = JSON.parse(storedSession);
-          // Check if session is still valid (30 days)
           const expiresAt = new Date(parsed.expiresAt);
           if (expiresAt > new Date()) {
             setSession(parsed);
@@ -137,20 +180,17 @@ export default function OwnerDashboard() {
         return;
       }
 
-      // Mark token as used
       await supabase
         .from("owner_portal_sessions")
         .update({ used_at: new Date().toISOString() })
         .eq("id", data.id);
 
-      // Create session
       const ownerSession: OwnerSession = {
         ownerId: data.owner_id,
         ownerName: data.property_owners?.name || "Owner",
         email: data.email,
       };
 
-      // Store session with 30-day expiry
       const sessionData = {
         ...ownerSession,
         expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
@@ -158,7 +198,6 @@ export default function OwnerDashboard() {
       localStorage.setItem("owner_session", JSON.stringify(sessionData));
       setSession(ownerSession);
 
-      // Remove token from URL
       navigate("/owner", { replace: true });
       
       loadOwnerData(data.owner_id);
@@ -172,10 +211,9 @@ export default function OwnerDashboard() {
 
   const loadOwnerData = async (ownerId: string) => {
     try {
-      // Load property
       const { data: propertyData } = await supabase
         .from("properties")
-        .select("id, name, address, rental_type")
+        .select("id, name, address, rental_type, image_path")
         .eq("owner_id", ownerId)
         .is("offboarded_at", null)
         .single();
@@ -183,7 +221,6 @@ export default function OwnerDashboard() {
       if (propertyData) {
         setProperty(propertyData);
 
-        // Load statements
         const { data: statementsData } = await supabase
           .from("monthly_reconciliations")
           .select("id, reconciliation_month, total_revenue, total_expenses, net_to_owner, status")
@@ -194,17 +231,15 @@ export default function OwnerDashboard() {
 
         setStatements((statementsData || []) as Statement[]);
 
-        // Load ALL expenses with receipt paths
         const { data: expensesData } = await supabase
           .from("expenses")
-          .select("id, date, amount, purpose, vendor, category, file_path, original_receipt_path")
+          .select("id, date, amount, purpose, vendor, category, file_path, original_receipt_path, email_screenshot_path")
           .eq("property_id", propertyData.id)
           .order("date", { ascending: false })
           .limit(200);
 
         setExpenses(expensesData || []);
 
-        // Load property credentials
         const { data: credentialsData } = await supabase
           .from("property_credentials")
           .select("id, service_name, username, password, url, notes")
@@ -212,6 +247,9 @@ export default function OwnerDashboard() {
           .order("service_name");
 
         setCredentials((credentialsData || []) as Credential[]);
+
+        // Load market insights
+        loadMarketInsights(propertyData.id);
       }
     } catch (err) {
       console.error("Error loading owner data:", err);
@@ -221,8 +259,27 @@ export default function OwnerDashboard() {
     }
   };
 
+  const loadMarketInsights = async (propertyId: string) => {
+    setLoadingInsights(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("generate-market-insights", {
+        body: { propertyId },
+      });
+
+      if (error) {
+        console.error("Error loading market insights:", error);
+        return;
+      }
+
+      setMarketInsights(data);
+    } catch (err) {
+      console.error("Error loading market insights:", err);
+    } finally {
+      setLoadingInsights(false);
+    }
+  };
+
   const downloadStatement = async (statement: Statement) => {
-    // Generate PDF path from reconciliation data
     const pdfPath = `${statement.id}.pdf`;
     
     setDownloadingPdf(statement.id);
@@ -232,7 +289,6 @@ export default function OwnerDashboard() {
         .createSignedUrl(pdfPath, 300);
 
       if (error) {
-        // PDF might not exist yet - try to generate it
         toast.error("Statement PDF not available. Please contact support.");
         return;
       }
@@ -313,82 +369,86 @@ export default function OwnerDashboard() {
     );
   }
 
-  const totalRevenue = statements.reduce((sum, s) => sum + (s.total_revenue || 0), 0);
-  const totalNet = statements.reduce((sum, s) => sum + (s.net_to_owner || 0), 0);
   const latestStatement = statements[0];
+  const performanceMetrics = marketInsights?.performance || {
+    totalRevenue: statements.reduce((sum, s) => sum + (s.total_revenue || 0), 0),
+    strRevenue: 0,
+    mtrRevenue: 0,
+    totalBookings: 0,
+    strBookings: 0,
+    mtrBookings: 0,
+    occupancyRate: 0,
+    averageRating: null,
+    reviewCount: 0,
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-muted/20 to-background">
-      {/* Header */}
-      <header className="bg-background/80 backdrop-blur-md border-b sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-lg">
-              <Building2 className="h-6 w-6 text-primary-foreground" />
+      {/* Hero Header with Property Image */}
+      <header className="relative">
+        {property?.image_path && (
+          <div className="absolute inset-0 h-64 md:h-80">
+            <img
+              src={property.image_path}
+              alt={property.name}
+              className="w-full h-full object-cover"
+            />
+            <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-background" />
+          </div>
+        )}
+        
+        <div className={`relative ${property?.image_path ? 'pt-8 pb-32 md:pb-40' : 'py-6'} bg-gradient-to-br from-primary/10 to-primary/5`}>
+          <div className="max-w-7xl mx-auto px-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 rounded-2xl bg-white/90 dark:bg-background/90 backdrop-blur flex items-center justify-center shadow-lg">
+                  <Building2 className="h-7 w-7 text-primary" />
+                </div>
+                <div className={property?.image_path ? 'text-white' : ''}>
+                  <h1 className="font-bold text-2xl md:text-3xl">{property?.name || "Your Property"}</h1>
+                  <div className="flex items-center gap-2 text-sm opacity-90">
+                    <MapPin className="h-4 w-4" />
+                    {property?.address}
+                  </div>
+                </div>
+              </div>
+              <Button 
+                variant={property?.image_path ? "secondary" : "ghost"} 
+                size="sm" 
+                onClick={handleLogout} 
+                className="gap-2"
+              >
+                <LogOut className="h-4 w-4" />
+                <span className="hidden sm:inline">Logout</span>
+              </Button>
             </div>
-            <div>
-              <h1 className="font-bold text-lg">{property?.name || "Your Property"}</h1>
-              <p className="text-sm text-muted-foreground">Welcome back, {session.ownerName}</p>
+            
+            <div className={`mt-4 ${property?.image_path ? 'text-white/90' : 'text-muted-foreground'}`}>
+              <p className="text-lg">Welcome back, {session.ownerName}</p>
+              {marketInsights?.performance?.averageRating && (
+                <div className="flex items-center gap-2 mt-2">
+                  <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
+                  <span className="font-semibold">{marketInsights.performance.averageRating.toFixed(1)}</span>
+                  <span className="text-sm">({marketInsights.performance.reviewCount} reviews)</span>
+                </div>
+              )}
             </div>
           </div>
-          <Button variant="ghost" size="sm" onClick={handleLogout} className="gap-2">
-            <LogOut className="h-4 w-4" />
-            <span className="hidden sm:inline">Logout</span>
-          </Button>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 py-8">
-        {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-          <Card className="bg-gradient-to-br from-emerald-50 to-emerald-100/50 border-none shadow-lg dark:from-emerald-950/30 dark:to-emerald-900/20">
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-4">
-                <div className="w-14 h-14 rounded-2xl bg-emerald-500/20 flex items-center justify-center">
-                  <DollarSign className="h-7 w-7 text-emerald-600" />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground font-medium">YTD Revenue</p>
-                  <p className="text-3xl font-bold tracking-tight">{formatCurrency(totalRevenue)}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="bg-gradient-to-br from-blue-50 to-blue-100/50 border-none shadow-lg dark:from-blue-950/30 dark:to-blue-900/20">
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-4">
-                <div className="w-14 h-14 rounded-2xl bg-blue-500/20 flex items-center justify-center">
-                  <TrendingUp className="h-7 w-7 text-blue-600" />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground font-medium">YTD Net Earnings</p>
-                  <p className="text-3xl font-bold tracking-tight">{formatCurrency(totalNet)}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="bg-gradient-to-br from-purple-50 to-purple-100/50 border-none shadow-lg dark:from-purple-950/30 dark:to-purple-900/20">
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-4">
-                <div className="w-14 h-14 rounded-2xl bg-purple-500/20 flex items-center justify-center">
-                  <Calendar className="h-7 w-7 text-purple-600" />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground font-medium">Statements</p>
-                  <p className="text-3xl font-bold tracking-tight">{statements.length}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
+      <main className="max-w-7xl mx-auto px-4 py-8 -mt-16 md:-mt-20 relative z-10">
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="mb-6 bg-muted/50 p-1 h-auto flex-wrap">
+          <TabsList className="mb-6 bg-background/95 backdrop-blur shadow-lg border p-1 h-auto flex-wrap">
             <TabsTrigger value="overview" className="gap-2">
               <BarChart3 className="h-4 w-4" />
               <span className="hidden sm:inline">Overview</span>
+            </TabsTrigger>
+            <TabsTrigger value="insights" className="gap-2">
+              <Sparkles className="h-4 w-4" />
+              <span className="hidden sm:inline">Market Insights</span>
             </TabsTrigger>
             <TabsTrigger value="bookings" className="gap-2">
               <Users className="h-4 w-4" />
@@ -409,9 +469,25 @@ export default function OwnerDashboard() {
           </TabsList>
 
           <TabsContent value="overview">
-            <div className="space-y-6">
+            <div className="space-y-8">
+              {/* Performance Overview */}
+              <OwnerPerformanceOverview 
+                metrics={performanceMetrics}
+                propertyName={property?.name}
+              />
+
               {/* Performance Charts */}
               <OwnerPerformanceCharts statements={statements} propertyName={property?.name} />
+
+              {/* Reviews Section */}
+              {marketInsights?.reviews && marketInsights.reviews.length > 0 && (
+                <OwnerReviewsCard
+                  reviews={marketInsights.reviews}
+                  averageRating={marketInsights.performance.averageRating}
+                  reviewCount={marketInsights.performance.reviewCount}
+                  propertyName={property?.name}
+                />
+              )}
 
               {/* Latest Statement Quick View */}
               {latestStatement && (
@@ -453,6 +529,74 @@ export default function OwnerDashboard() {
                 </Card>
               )}
             </div>
+          </TabsContent>
+
+          <TabsContent value="insights">
+            {loadingInsights ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="flex flex-col items-center gap-4">
+                  <RefreshCw className="h-8 w-8 animate-spin text-primary" />
+                  <p className="text-muted-foreground">Generating AI market insights...</p>
+                </div>
+              </div>
+            ) : marketInsights?.aiInsights ? (
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-xl font-semibold">Market Research & Insights</h2>
+                    <p className="text-sm text-muted-foreground">
+                      AI-powered analysis • Last updated: {marketInsights.generatedAt ? format(new Date(marketInsights.generatedAt), "MMM d, yyyy h:mm a") : "Just now"}
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => property && loadMarketInsights(property.id)}
+                    disabled={loadingInsights}
+                    className="gap-2"
+                  >
+                    <RefreshCw className={`h-4 w-4 ${loadingInsights ? 'animate-spin' : ''}`} />
+                    Refresh
+                  </Button>
+                </div>
+
+                <OwnerMarketInsights
+                  propertyName={property?.name || "Your Property"}
+                  propertyBeds={marketInsights.property?.bedrooms || 5}
+                  propertyBaths={marketInsights.property?.bathrooms || 3}
+                  currentNightlyRate={property?.rental_type === 'hybrid' ? 280 : undefined}
+                  currentOccupancy={marketInsights.performance.occupancyRate}
+                  avgMonthlyRevenue={marketInsights.monthlyRevenue.length > 0 
+                    ? marketInsights.monthlyRevenue.reduce((sum, m) => sum + m.revenue, 0) / marketInsights.monthlyRevenue.length
+                    : 0}
+                  comparables={marketInsights.aiInsights.comparableProperties || []}
+                  marketMetrics={marketInsights.aiInsights.marketMetrics || {
+                    areaOccupancy: 75,
+                    avgNightlyRate: 280,
+                    yoyGrowth: 5,
+                    marketTrend: "stable"
+                  }}
+                  opportunities={marketInsights.aiInsights.futureOpportunities || []}
+                  demandDrivers={marketInsights.aiInsights.demandDrivers || []}
+                  strengthsForArea={marketInsights.aiInsights.strengthsForArea || []}
+                  generatedAt={marketInsights.generatedAt}
+                />
+              </div>
+            ) : (
+              <Card className="border-none shadow-lg">
+                <CardContent className="py-12 text-center">
+                  <Sparkles className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
+                  <p className="text-muted-foreground">Market insights not available</p>
+                  <Button
+                    variant="outline"
+                    className="mt-4"
+                    onClick={() => property && loadMarketInsights(property.id)}
+                  >
+                    Generate Insights
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
 
           <TabsContent value="bookings">
