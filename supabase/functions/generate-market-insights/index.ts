@@ -143,6 +143,11 @@ serve(async (req) => {
     const currentDate = new Date();
     const currentYear = currentDate.getFullYear();
     const currentMonth = currentDate.getMonth() + 1;
+    
+    // Determine rental type for prompt customization
+    const rentalType = property.rental_type || "hybrid";
+    const isMTROnly = rentalType === "mid_term";
+    const isHybrid = rentalType === "hybrid";
 
     // Build context for AI
     const propertyContext = {
@@ -163,8 +168,92 @@ serve(async (req) => {
       reviewCount: reviews?.length || 0,
     };
 
-    // Generate AI insights
-    const aiPrompt = `You are a real estate market analyst for PeachHaus Property Management. Generate market insights for this property.
+    // Generate AI insights - different prompts based on rental type
+    let aiPrompt: string;
+    
+    if (isMTROnly) {
+      // MTR-ONLY PROPERTY PROMPT - Focus on corporate housing, insurance, healthcare
+      aiPrompt = `You are a real estate market analyst for PeachHaus Property Management specializing in CORPORATE HOUSING and MID-TERM RENTALS.
+
+IMPORTANT: Today's date is ${currentDate.toISOString().split('T')[0]}. This is a MID-TERM ONLY property - focus on 30+ day stays.
+
+Property: ${propertyContext.name}
+Address: ${propertyContext.address}
+City: ${city}, ${state}
+Bedrooms: ${propertyContext.bedrooms}, Bathrooms: ${propertyContext.bathrooms}
+Rental Type: Mid-Term Only (30+ day stays)
+Current Performance:
+- MTR Revenue: $${finalMTRRevenue.toLocaleString()}
+- Total Bookings: ${totalBookings}
+- Occupancy Rate: ${occupancyRate}%
+
+Generate a JSON response focused on MID-TERM RENTAL opportunities:
+
+{
+  "comparableProperties": [
+    {
+      "name": "Corporate housing / extended stay property",
+      "area": "Specific area in ${city}",
+      "distance": "< X miles",
+      "bedrooms": number,
+      "bathrooms": number,
+      "nightlyRate": 0,
+      "occupancy": number (percentage),
+      "avgMonthly": number (monthly rate),
+      "platform": "Corporate Housing" or "Furnished Finder"
+    }
+  ],
+  "marketMetrics": {
+    "areaOccupancy": number,
+    "avgNightlyRate": 0,
+    "avgMonthlyRate": number,
+    "yoyGrowth": number,
+    "marketTrend": "rising" | "stable" | "declining"
+  },
+  "futureOpportunities": [
+    {
+      "title": "Corporate/MTR opportunity",
+      "timeframe": "When",
+      "description": "Focus on corporate relocations, insurance placements, healthcare travelers",
+      "potentialImpact": "Revenue impact"
+    }
+  ],
+  "demandDrivers": [
+    {
+      "event": "Corporate housing demand driver (e.g., 'Q1 Corporate Relocation Season', 'Healthcare Traveler Contract Renewals', 'Insurance Displacement Peak')",
+      "date": "YYYY-MM-DD format",
+      "impact": "Expected demand increase for extended stays",
+      "category": "Corporate" | "Insurance" | "Healthcare" | "Relocation" | "Seasonal"
+    }
+  ],
+  "strengthsForArea": [
+    "Focus on corporate housing advantages, hospital proximity, business districts"
+  ],
+  "mtrDemandSources": [
+    {
+      "source": "Corporate Relocations",
+      "description": "Fortune 500 companies with offices in ${city}",
+      "typicalStay": "30-90 days",
+      "demandLevel": "High"
+    }
+  ]
+}
+
+CRITICAL for MTR properties:
+- Focus on CORPORATE HOUSING demand, not tourist events
+- demandDrivers should include: Corporate relocation seasons (Q1, Q3), Insurance claim peaks (storm seasons), Healthcare traveler contract cycles (quarterly), University/hospital rotations
+- Include Fortune 500 companies in ${city}: Home Depot, Delta, Coca-Cola, UPS, etc.
+- Include major hospital systems for travel nurse demand
+- Focus on monthly rates, not nightly rates
+- strengthsForArea should emphasize: proximity to business districts, hospitals, corporate headquarters
+
+Generate 4-5 corporate housing comparables.
+Generate 3-4 MTR-focused opportunities.
+Generate 6-8 corporate/MTR demand drivers.
+Generate 4-5 location strengths for corporate housing.`;
+    } else {
+      // HYBRID or STR PROPERTY PROMPT - Balance events and corporate
+      aiPrompt = `You are a real estate market analyst for PeachHaus Property Management. Generate market insights for this HYBRID property that does both short-term and mid-term rentals.
 
 IMPORTANT: Today's date is ${currentDate.toISOString().split('T')[0]}. All events MUST be in the future from this date.
 
@@ -172,7 +261,7 @@ Property: ${propertyContext.name}
 Address: ${propertyContext.address}
 City: ${city}, ${state}
 Bedrooms: ${propertyContext.bedrooms}, Bathrooms: ${propertyContext.bathrooms}
-Rental Type: ${propertyContext.rentalType || "Hybrid (STR + MTR)"}
+Rental Type: ${isHybrid ? "Hybrid (STR + MTR)" : "Short-Term Rental"}
 Current Performance:
 - STR Revenue: $${finalSTRRevenue.toLocaleString()}
 - MTR Revenue: $${finalMTRRevenue.toLocaleString()}
@@ -236,6 +325,7 @@ Generate 3-4 future opportunities relevant to ${city}/${state}.
 Generate 6-8 demand drivers with specific future dates.
 Generate 4-5 location strengths.
 Be specific and realistic based on ${city} metro market conditions.`;
+    }
 
     const openaiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",

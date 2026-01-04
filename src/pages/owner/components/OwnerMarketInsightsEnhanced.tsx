@@ -23,6 +23,7 @@ import {
   Zap
 } from "lucide-react";
 import { UpcomingEventsTimeline } from "./UpcomingEventsTimeline";
+import { CorporateHousingDemandCard } from "./CorporateHousingDemandCard";
 
 interface ComparableProperty {
   name: string;
@@ -75,6 +76,7 @@ interface OwnerMarketInsightsEnhancedProps {
   loadingProgress: number;
   loadingStep: string;
   isSuperhost?: boolean;
+  rentalType?: "hybrid" | "mid_term" | "long_term" | null;
 }
 
 // Memoize the entire component to prevent unnecessary re-renders
@@ -97,7 +99,11 @@ export const OwnerMarketInsightsEnhanced = memo(function OwnerMarketInsightsEnha
   loadingProgress,
   loadingStep,
   isSuperhost = false,
+  rentalType = "hybrid",
 }: OwnerMarketInsightsEnhancedProps) {
+  const isMTROnly = rentalType === "mid_term";
+  const isHybrid = rentalType === "hybrid" || !rentalType;
+  
   const trendColors = {
     rising: "text-emerald-600 bg-emerald-100 dark:bg-emerald-900/30",
     stable: "text-blue-600 bg-blue-100 dark:bg-blue-900/30",
@@ -338,13 +344,20 @@ export const OwnerMarketInsightsEnhanced = memo(function OwnerMarketInsightsEnha
         </CardContent>
       </Card>
 
-      {/* Upcoming Events Timeline */}
-      {demandDrivers.length > 0 && (
-        <UpcomingEventsTimeline
-          events={demandDrivers}
-          propertyAddress={propertyAddress}
+      {/* Demand Timeline - Different for MTR vs Hybrid/STR */}
+      {isMTROnly ? (
+        <CorporateHousingDemandCard
           propertyCity={propertyCity}
+          propertyAddress={propertyAddress}
         />
+      ) : (
+        demandDrivers.length > 0 && (
+          <UpcomingEventsTimeline
+            events={demandDrivers}
+            propertyAddress={propertyAddress}
+            propertyCity={propertyCity}
+          />
+        )
       )}
 
       {/* Comparable Properties */}

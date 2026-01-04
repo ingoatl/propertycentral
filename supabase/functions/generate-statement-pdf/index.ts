@@ -421,45 +421,50 @@ async function generatePdf(data: StatementData): Promise<Uint8Array> {
   page.drawText(netAmountText, { x: width - margin - 95, y: y - 24, size: 18, font: helveticaBold, color: rgb(1, 1, 1) });
   y -= boxHeight + 16;
   
-  // === REVENUE SECTION ===
-  page.drawText("REVENUE", { x: margin, y, size: 10, font: helveticaBold, color: black });
+  // === REVENUE BREAKDOWN SECTION ===
+  page.drawText("REVENUE BREAKDOWN", { x: margin, y, size: 10, font: helveticaBold, color: black });
   y -= 4;
-  page.drawLine({ start: { x: margin, y }, end: { x: width - margin, y }, thickness: 0.5, color: lightGray });
+  page.drawLine({ start: { x: margin, y }, end: { x: width - margin, y }, thickness: 1, color: black });
   y -= 14;
   
-  // Mid-term revenue with proration
-  if (data.midTermRevenue > 0) {
-    if (data.midTermProrationDetails.length > 0) {
-      for (const detail of data.midTermProrationDetails) {
-        page.drawText("Mid-term Rental Income", { x: margin, y, size: 9, font: helvetica, color: black });
-        page.drawText(formatCurrency(detail.proratedAmount), { x: width - margin - 65, y, size: 9, font: helvetica, color: black });
-        y -= 11;
-        const tenantInfo = `Tenant: ${detail.tenantName} (${detail.dateRange})`;
-        page.drawText(tenantInfo.substring(0, 70), { x: margin + 8, y, size: 7, font: helvetica, color: gray });
-        y -= 9;
-        if (!detail.isFullMonth) {
-          page.drawText(`Proration: ${formatCurrency(detail.monthlyRent)}/mo × ${detail.occupiedDays}/${detail.daysInMonth} days`, { x: margin + 8, y, size: 7, font: helvetica, color: gray });
-          y -= 11;
-        }
-      }
-    } else {
-      page.drawText("Mid-term Rental Income", { x: margin, y, size: 9, font: helvetica, color: black });
-      page.drawText(formatCurrency(data.midTermRevenue), { x: width - margin - 65, y, size: 9, font: helvetica, color: black });
-      y -= 13;
-    }
-  }
-  
-  // Short-term revenue
+  // Short-term revenue FIRST (if any)
   if (data.shortTermRevenue > 0) {
-    page.drawText("Short-term Booking Income", { x: margin, y, size: 9, font: helvetica, color: black });
-    page.drawText(formatCurrency(data.shortTermRevenue), { x: width - margin - 65, y, size: 9, font: helvetica, color: black });
+    page.drawText("Short-term Booking Income", { x: margin, y, size: 9, font: helveticaBold, color: black });
+    page.drawText(formatCurrency(data.shortTermRevenue), { x: width - margin - 65, y, size: 9, font: helveticaBold, color: black });
     y -= 13;
   }
   
-  // Gross revenue total
+  // Mid-term revenue with clear proration breakdown
+  if (data.midTermRevenue > 0) {
+    page.drawText("Mid-term Rental Income", { x: margin, y, size: 9, font: helveticaBold, color: black });
+    page.drawText(formatCurrency(data.midTermRevenue), { x: width - margin - 65, y, size: 9, font: helveticaBold, color: black });
+    y -= 12;
+    
+    // Show proration details indented
+    if (data.midTermProrationDetails.length > 0) {
+      for (const detail of data.midTermProrationDetails) {
+        // Tenant name and date range
+        const tenantLine = `└ ${detail.tenantName} (${detail.dateRange})`;
+        page.drawText(tenantLine.substring(0, 65), { x: margin + 10, y, size: 8, font: helvetica, color: gray });
+        y -= 10;
+        
+        // Proration calculation (only if not full month)
+        if (!detail.isFullMonth) {
+          const prorationLine = `   ${formatCurrency(detail.monthlyRent)}/mo prorated: ${detail.occupiedDays} of ${detail.daysInMonth} days`;
+          page.drawText(prorationLine, { x: margin + 10, y, size: 7, font: helvetica, color: gray });
+          y -= 10;
+        }
+      }
+    }
+    y -= 3;
+  }
+  
+  // Visual separator before total
   page.drawLine({ start: { x: margin, y }, end: { x: width - margin, y }, thickness: 0.5, color: lightGray });
   y -= 11;
-  page.drawText("GROSS REVENUE", { x: margin, y, size: 9, font: helveticaBold, color: black });
+  
+  // Gross revenue total with emphasis
+  page.drawText("TOTAL GROSS REVENUE", { x: margin, y, size: 9, font: helveticaBold, color: black });
   page.drawText(formatCurrency(data.grossRevenue), { x: width - margin - 65, y, size: 9, font: helveticaBold, color: black });
   y -= 20;
   
