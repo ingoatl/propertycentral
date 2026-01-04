@@ -73,18 +73,19 @@ export const MonthlyEmailPreviewModal = ({
 
       if (error) throw error;
       
-      // Create a Blob from the HTML and open print dialog
-      const htmlContent = data.html;
-      const printWindow = window.open('', '_blank');
-      if (printWindow) {
-        printWindow.document.write(htmlContent);
-        printWindow.document.close();
-        printWindow.onload = () => {
-          printWindow.print();
-        };
-      }
+      // Convert base64 to binary and download as actual PDF
+      const pdfBytes = Uint8Array.from(atob(data.pdfBase64), c => c.charCodeAt(0));
+      const blob = new Blob([pdfBytes], { type: "application/pdf" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = data.fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
       
-      toast.success("PDF ready for download", { id: toastId });
+      toast.success("PDF downloaded successfully", { id: toastId });
     } catch (error: any) {
       toast.error(error.message || "Failed to generate PDF", { id: toastId });
     } finally {

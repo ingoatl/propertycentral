@@ -2021,6 +2021,63 @@ export type Database = {
           },
         ]
       }
+      insurance_certificates: {
+        Row: {
+          coverage_amount: number | null
+          created_at: string | null
+          document_path: string | null
+          effective_date: string
+          expiration_date: string
+          id: string
+          insurance_type: string
+          policy_number: string | null
+          property_id: string | null
+          provider: string
+          updated_at: string | null
+        }
+        Insert: {
+          coverage_amount?: number | null
+          created_at?: string | null
+          document_path?: string | null
+          effective_date: string
+          expiration_date: string
+          id?: string
+          insurance_type: string
+          policy_number?: string | null
+          property_id?: string | null
+          provider: string
+          updated_at?: string | null
+        }
+        Update: {
+          coverage_amount?: number | null
+          created_at?: string | null
+          document_path?: string | null
+          effective_date?: string
+          expiration_date?: string
+          id?: string
+          insurance_type?: string
+          policy_number?: string | null
+          property_id?: string | null
+          provider?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "insurance_certificates_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "comprehensive_property_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "insurance_certificates_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       job_applications: {
         Row: {
           availability: string[] | null
@@ -2643,6 +2700,67 @@ export type Database = {
             columns: ["property_id"]
             isOneToOne: false
             referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lease_documents: {
+        Row: {
+          document_path: string
+          document_type: string
+          end_date: string | null
+          id: string
+          notes: string | null
+          property_id: string | null
+          start_date: string | null
+          tenant_name: string
+          uploaded_at: string | null
+          uploaded_by: string | null
+        }
+        Insert: {
+          document_path: string
+          document_type: string
+          end_date?: string | null
+          id?: string
+          notes?: string | null
+          property_id?: string | null
+          start_date?: string | null
+          tenant_name: string
+          uploaded_at?: string | null
+          uploaded_by?: string | null
+        }
+        Update: {
+          document_path?: string
+          document_type?: string
+          end_date?: string | null
+          id?: string
+          notes?: string | null
+          property_id?: string | null
+          start_date?: string | null
+          tenant_name?: string
+          uploaded_at?: string | null
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lease_documents_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "comprehensive_property_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lease_documents_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lease_documents_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -3769,6 +3887,77 @@ export type Database = {
             columns: ["property_id"]
             isOneToOne: false
             referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      owner_distributions: {
+        Row: {
+          amount: number
+          created_at: string | null
+          distribution_date: string
+          id: string
+          owner_id: string | null
+          payment_method: string | null
+          property_id: string | null
+          reconciliation_id: string | null
+          reference_number: string | null
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          amount: number
+          created_at?: string | null
+          distribution_date: string
+          id?: string
+          owner_id?: string | null
+          payment_method?: string | null
+          property_id?: string | null
+          reconciliation_id?: string | null
+          reference_number?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string | null
+          distribution_date?: string
+          id?: string
+          owner_id?: string | null
+          payment_method?: string | null
+          property_id?: string | null
+          reconciliation_id?: string | null
+          reference_number?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "owner_distributions_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "property_owners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "owner_distributions_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "comprehensive_property_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "owner_distributions_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "owner_distributions_reconciliation_id_fkey"
+            columns: ["reconciliation_id"]
+            isOneToOne: false
+            referencedRelation: "monthly_reconciliations"
             referencedColumns: ["id"]
           },
         ]
@@ -6337,6 +6526,59 @@ export type Database = {
             columns: ["property_id"]
             isOneToOne: false
             referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      trust_account_reconciliations: {
+        Row: {
+          bank_statement_date: string
+          created_at: string | null
+          difference: number | null
+          document_path: string | null
+          id: string
+          is_reconciled: boolean | null
+          ledger_balance: number
+          notes: string | null
+          reconciled_by: string | null
+          reconciliation_date: string
+          statement_balance: number
+          updated_at: string | null
+        }
+        Insert: {
+          bank_statement_date: string
+          created_at?: string | null
+          difference?: number | null
+          document_path?: string | null
+          id?: string
+          is_reconciled?: boolean | null
+          ledger_balance: number
+          notes?: string | null
+          reconciled_by?: string | null
+          reconciliation_date: string
+          statement_balance: number
+          updated_at?: string | null
+        }
+        Update: {
+          bank_statement_date?: string
+          created_at?: string | null
+          difference?: number | null
+          document_path?: string | null
+          id?: string
+          is_reconciled?: boolean | null
+          ledger_balance?: number
+          notes?: string | null
+          reconciled_by?: string | null
+          reconciliation_date?: string
+          statement_balance?: number
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trust_account_reconciliations_reconciled_by_fkey"
+            columns: ["reconciled_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
