@@ -398,3 +398,9 @@ verify_jwt = false
 
 [functions.owner-portal-data]
 verify_jwt = false
+
+[functions.owner-receipt-url]
+verify_jwt = false
+
+[functions.owner-statement-pdf]
+verify_jwt = false

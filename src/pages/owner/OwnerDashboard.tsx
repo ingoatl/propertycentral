@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Progress } from "@/components/ui/progress";
 import {
   Building2,
   Receipt,
@@ -33,7 +34,7 @@ import { OwnerBookingsTab } from "./components/OwnerBookingsTab";
 import { OwnerPerformanceCharts } from "./components/OwnerPerformanceCharts";
 import { OwnerPerformanceOverview } from "./components/OwnerPerformanceOverview";
 import { OwnerReviewsCard } from "./components/OwnerReviewsCard";
-import { OwnerMarketInsights } from "./components/OwnerMarketInsights";
+import { OwnerMarketInsightsEnhanced } from "./components/OwnerMarketInsightsEnhanced";
 
 interface OwnerSession {
   ownerId: string;
@@ -150,10 +151,14 @@ export default function OwnerDashboard() {
   const [visiblePasswords, setVisiblePasswords] = useState<Set<string>>(new Set());
   const [marketInsights, setMarketInsights] = useState<MarketInsightsData | null>(null);
   const [loadingInsights, setLoadingInsights] = useState(false);
+  const [insightsProgress, setInsightsProgress] = useState(0);
+  const [insightsStep, setInsightsStep] = useState("Initializing...");
+  const [sessionToken, setSessionToken] = useState<string | null>(null);
 
   useEffect(() => {
     const token = searchParams.get("token");
     if (token) {
+      setSessionToken(token);
       loadAllDataWithToken(token);
     } else {
       const storedSession = localStorage.getItem("owner_session");
@@ -163,6 +168,7 @@ export default function OwnerDashboard() {
           const expiresAt = new Date(parsed.expiresAt);
           if (expiresAt > new Date()) {
             setSession(parsed);
+            setSessionToken(parsed.token || null);
             loadAllData(parsed.ownerId, parsed.propertyId);
           } else {
             localStorage.removeItem("owner_session");
@@ -305,6 +311,21 @@ export default function OwnerDashboard() {
 
   const loadMarketInsights = async (propertyId: string) => {
     setLoadingInsights(true);
+    setInsightsProgress(0);
+    setInsightsStep("Analyzing market data...");
+    
+    // Simulate progress steps
+    const progressInterval = setInterval(() => {
+      setInsightsProgress(prev => {
+        if (prev >= 90) return prev;
+        const step = prev < 30 ? 30 : prev < 60 ? 60 : 80;
+        if (prev < 30) setInsightsStep("Generating comparables...");
+        else if (prev < 60) setInsightsStep("Analyzing demand drivers...");
+        else setInsightsStep("Creating insights...");
+        return step;
+      });
+    }, 800);
+
     try {
       const { data, error } = await supabase.functions.invoke("generate-market-insights", {
         body: { propertyId },
@@ -315,29 +336,33 @@ export default function OwnerDashboard() {
         return;
       }
 
+      setInsightsProgress(100);
+      setInsightsStep("Complete!");
       setMarketInsights(data);
     } catch (err) {
       console.error("Error loading market insights:", err);
     } finally {
+      clearInterval(progressInterval);
       setLoadingInsights(false);
     }
   };
 
   const downloadStatement = async (statement: Statement) => {
-    const pdfPath = `${statement.id}.pdf`;
-    
     setDownloadingPdf(statement.id);
     try {
-      const { data, error } = await supabase.storage
-        .from("statement-pdfs")
-        .createSignedUrl(pdfPath, 300);
+      // Use edge function to bypass RLS
+      const { data, error } = await supabase.functions.invoke("owner-statement-pdf", {
+        body: { reconciliationId: statement.id, token: sessionToken },
+      });
 
-      if (error) {
-        toast.error("Statement PDF not available. Please contact support.");
+      if (error) throw error;
+      if (data?.error) {
+        toast.error(data.error);
         return;
       }
 
       window.open(data.signedUrl, "_blank");
+      toast.success("Statement opened");
     } catch (err) {
       console.error("Download error:", err);
       toast.error("Failed to download statement");
@@ -585,12 +610,22 @@ export default function OwnerDashboard() {
 
           <TabsContent value="insights">
             {loadingInsights ? (
-              <div className="flex items-center justify-center py-12">
-                <div className="flex flex-col items-center gap-4">
-                  <RefreshCw className="h-8 w-8 animate-spin text-primary" />
-                  <p className="text-muted-foreground">Generating AI market insights...</p>
-                </div>
-              </div>
+              <OwnerMarketInsightsEnhanced
+                propertyName={property?.name || "Your Property"}
+                propertyBeds={5}
+                propertyBaths={3}
+                currentOccupancy={0}
+                avgMonthlyRevenue={0}
+                comparables={[]}
+                marketMetrics={{ areaOccupancy: 0, avgNightlyRate: 0, yoyGrowth: 0, marketTrend: "stable" }}
+                opportunities={[]}
+                demandDrivers={[]}
+                strengthsForArea={[]}
+                generatedAt=""
+                isLoading={true}
+                loadingProgress={insightsProgress}
+                loadingStep={insightsStep}
+              />
             ) : marketInsights?.aiInsights ? (
               <div className="space-y-6">
                 <div className="flex items-center justify-between">
@@ -612,7 +647,7 @@ export default function OwnerDashboard() {
                   </Button>
                 </div>
 
-                <OwnerMarketInsights
+                <OwnerMarketInsightsEnhanced
                   propertyName={property?.name || "Your Property"}
                   propertyBeds={marketInsights.property?.bedrooms || 5}
                   propertyBaths={marketInsights.property?.bathrooms || 3}
@@ -632,6 +667,9 @@ export default function OwnerDashboard() {
                   demandDrivers={marketInsights.aiInsights.demandDrivers || []}
                   strengthsForArea={marketInsights.aiInsights.strengthsForArea || []}
                   generatedAt={marketInsights.generatedAt}
+                  isLoading={false}
+                  loadingProgress={100}
+                  loadingStep=""
                 />
               </div>
             ) : (
