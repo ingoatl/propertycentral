@@ -162,6 +162,18 @@ export function OwnerReceiptsTab({ expenses, propertyId, token }: OwnerReceiptsT
     }).format(amount);
   };
 
+  // Handle viewing/downloading receipt - always use inline viewer for best compatibility
+  const handleViewReceipt = (expense: Expense) => {
+    const receiptPath = expense.email_screenshot_path || expense.file_path || expense.original_receipt_path;
+    if (!receiptPath) {
+      toast.error("No receipt file available");
+      return;
+    }
+    // Always use the inline viewer - it handles all file types and avoids ad blocker issues
+    setViewingReceipt(expense);
+  };
+
+  // Download receipt programmatically (avoids browser blocking)
   const handleDownloadReceipt = async (expense: Expense) => {
     const receiptPath = expense.email_screenshot_path || expense.file_path || expense.original_receipt_path;
     if (!receiptPath) {
@@ -169,19 +181,11 @@ export function OwnerReceiptsTab({ expenses, propertyId, token }: OwnerReceiptsT
       return;
     }
 
-    // Check if it's an HTML file - always open in viewer for HTML
-    const isHtml = receiptPath.toLowerCase().endsWith('.html') || receiptPath.toLowerCase().endsWith('.htm');
-    if (isHtml) {
-      setViewingReceipt(expense);
-      toast.info("Opening HTML receipt in viewer");
-      return;
-    }
-
     setDownloadingId(expense.id);
     try {
       console.log("Downloading receipt:", receiptPath);
       
-      // Use edge function to bypass RLS
+      // Use edge function to get signed URL
       const { data, error } = await supabase.functions.invoke("owner-receipt-url", {
         body: { expenseId: expense.id, token, filePath: receiptPath },
       });
@@ -189,45 +193,27 @@ export function OwnerReceiptsTab({ expenses, propertyId, token }: OwnerReceiptsT
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       
-      console.log("Got signed URL, fetching as blob...");
-      
-      // Fetch the file as blob to avoid browser blocking
+      // Fetch as blob and create programmatic download - never blocked
       const response = await fetch(data.signedUrl);
       if (!response.ok) throw new Error("Failed to fetch file");
       
       const blob = await response.blob();
-      console.log("Blob received, type:", blob.type, "size:", blob.size);
-      
-      // Check content type - if HTML, open in viewer instead
-      if (blob.type.includes('html') || blob.type.includes('text/html')) {
-        console.log("Content is HTML, opening in viewer");
-        setViewingReceipt(expense);
-        toast.info("Opening receipt in viewer");
-        return;
-      }
-      
       const blobUrl = URL.createObjectURL(blob);
       
-      // For PDFs and images, open in new tab for better viewing
-      const isPdf = blob.type === 'application/pdf' || receiptPath.toLowerCase().endsWith('.pdf');
-      const isImage = blob.type.startsWith('image/');
+      // Determine filename
+      const filename = receiptPath.split('/').pop() || `receipt-${expense.id}`;
       
-      if (isPdf || isImage) {
-        window.open(blobUrl, "_blank");
-        setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
-        toast.success("Receipt opened in new tab");
-      } else {
-        // For other files, download
-        const filename = receiptPath.split('/').pop() || `receipt-${expense.id}`;
-        const link = document.createElement('a');
-        link.href = blobUrl;
-        link.download = filename;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
-        toast.success("Receipt downloaded");
-      }
+      // Create download link
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      // Cleanup
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+      toast.success("Receipt downloaded");
     } catch (err) {
       console.error("Download error:", err);
       toast.error("Failed to download receipt");
@@ -458,9 +444,10 @@ export function OwnerReceiptsTab({ expenses, propertyId, token }: OwnerReceiptsT
                                       size="icon"
                                       onClick={(e) => {
                                         e.stopPropagation();
-                                        setViewingReceipt(expense);
+                                        handleViewReceipt(expense);
                                       }}
                                       className="h-8 w-8"
+                                      title="View Receipt"
                                     >
                                       <Eye className="h-4 w-4" />
                                     </Button>
