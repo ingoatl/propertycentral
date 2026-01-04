@@ -129,9 +129,11 @@ const handler = async (req: Request): Promise<Response> => {
       }
 
       // Use reconciliation data instead of live queries
+      // Check for revenue_override - if set, use it as the mid-term revenue
+      const hasRevenueOverride = reconciliation.revenue_override !== null && reconciliation.revenue_override !== undefined && reconciliation.revenue_override > 0;
       totalRevenue = Number(reconciliation.total_revenue || 0);
       bookingRevenue = Number(reconciliation.short_term_revenue || 0);
-      midTermRevenue = Number(reconciliation.mid_term_revenue || 0);
+      midTermRevenue = hasRevenueOverride ? Number(reconciliation.revenue_override) : Number(reconciliation.mid_term_revenue || 0);
       managementFees = Number(reconciliation.management_fee || 0);
       
       // Fetch mid-term booking details for proration explanation
@@ -148,7 +150,21 @@ const handler = async (req: Request): Promise<Response> => {
         .gte("end_date", recMonthStart.toISOString().split('T')[0])
         .lte("start_date", recMonthEnd.toISOString().split('T')[0]);
       
-      if (mtBookings && mtBookings.length > 0) {
+      // Check if there's a revenue override - if so, use it instead of calculated proration
+      if (hasRevenueOverride && mtBookings && mtBookings.length > 0) {
+        // Use override amount - show as manual adjustment
+        const booking = mtBookings[0];
+        midTermProrationDetails.push({
+          tenantName: booking.tenant_name,
+          dateRange: `${recMonth.toLocaleDateString('en-US', { month: 'short' })} (Adjusted)`,
+          monthlyRent: Number(reconciliation.revenue_override),
+          occupiedDays: daysInMonth,
+          daysInMonth: daysInMonth,
+          proratedAmount: Number(reconciliation.revenue_override),
+          isFullMonth: true
+        });
+        console.log("Using revenue override for mid-term proration:", reconciliation.revenue_override);
+      } else if (mtBookings && mtBookings.length > 0) {
         mtBookings.forEach((booking: any) => {
           const bookingStart = new Date(booking.start_date + "T00:00:00");
           const bookingEnd = new Date(booking.end_date + "T00:00:00");
