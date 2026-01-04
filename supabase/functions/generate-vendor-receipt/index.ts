@@ -27,12 +27,27 @@ Deno.serve(async (req) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { expenseId, batchMode } = await req.json();
+    const { expenseId, batchMode, regenerateHtml } = await req.json();
 
     // If batch mode, get all vendor expenses without receipts
     let expensesToProcess: ExpenseData[] = [];
 
-    if (batchMode) {
+    if (regenerateHtml) {
+      // Find expenses with HTML receipts and convert them to PDF
+      console.log("Regenerate mode: finding expenses with HTML receipts to convert to PDF");
+      const { data: expenses, error } = await supabase
+        .from("expenses")
+        .select("id, date, amount, vendor, purpose, category, items_detail, property_id")
+        .like("original_receipt_path", "%.html")
+        .limit(200);
+
+      if (error) {
+        console.error("Error fetching HTML expenses:", error);
+        throw error;
+      }
+      expensesToProcess = expenses || [];
+      console.log(`Found ${expensesToProcess.length} HTML receipts to convert to PDF`);
+    } else if (batchMode) {
       console.log("Batch mode: finding expenses without receipts (excluding email-sourced expenses)");
       const { data: expenses, error } = await supabase
         .from("expenses")
