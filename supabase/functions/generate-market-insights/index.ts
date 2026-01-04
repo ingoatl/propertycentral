@@ -57,12 +57,12 @@ serve(async (req) => {
       .eq("property_id", propertyId)
       .order("check_in", { ascending: false });
 
-    // Fetch mid-term bookings
+    // Fetch mid-term bookings (correct column names: start_date, end_date, monthly_rent)
     const { data: mtBookings } = await supabase
       .from("mid_term_bookings")
       .select("*")
       .eq("property_id", propertyId)
-      .order("check_in", { ascending: false });
+      .order("start_date", { ascending: false });
 
     // Fetch reviews
     const { data: reviews } = await supabase
@@ -72,33 +72,63 @@ serve(async (req) => {
       .order("review_date", { ascending: false })
       .limit(10);
 
-    // Fetch reconciliation data for financial metrics
+    // Fetch reconciliation data for financial metrics (primary source of truth)
     const { data: reconciliations } = await supabase
       .from("monthly_reconciliations")
       .select("*")
       .eq("property_id", propertyId)
+      .in("status", ["statement_sent", "approved"])
       .order("reconciliation_month", { ascending: false })
       .limit(12);
 
-    // Calculate real metrics
+    // Calculate real metrics from booking data
     const totalSTRRevenue = bookings?.reduce((sum, b) => sum + (b.total_amount || 0), 0) || 0;
-    const totalMTRRevenue = mtBookings?.reduce((sum, b) => sum + (b.total_rent || 0), 0) || 0;
+    
+    // Calculate MTR revenue from mid_term_bookings (monthly_rent * months stayed)
+    const totalMTRRevenue = mtBookings?.reduce((sum, b) => {
+      const startDate = new Date(b.start_date);
+      const endDate = new Date(b.end_date || b.start_date);
+      const days = Math.max(1, Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)));
+      const months = days / 30;
+      return sum + ((b.monthly_rent || 0) * months);
+    }, 0) || 0;
+
     const totalBookings = (bookings?.length || 0) + (mtBookings?.length || 0);
     const averageRating = reviews?.length 
       ? reviews.reduce((sum, r) => sum + (r.star_rating || 0), 0) / reviews.length 
       : null;
 
+    // Use reconciliation data as primary revenue source if available
+    const reconRevenue = reconciliations?.reduce((sum, r) => sum + (r.total_revenue || 0), 0) || 0;
+    const reconSTRRevenue = reconciliations?.reduce((sum, r) => sum + (r.short_term_revenue || 0), 0) || 0;
+    const reconMTRRevenue = reconciliations?.reduce((sum, r) => sum + (r.mid_term_revenue || 0), 0) || 0;
+
+    // Use reconciliation data if available, fallback to calculated
+    const finalSTRRevenue = reconSTRRevenue > 0 ? reconSTRRevenue : totalSTRRevenue;
+    const finalMTRRevenue = reconMTRRevenue > 0 ? reconMTRRevenue : totalMTRRevenue;
+    const finalTotalRevenue = reconRevenue > 0 ? reconRevenue : (totalSTRRevenue + totalMTRRevenue);
+
     // Calculate occupancy from bookings
     const now = new Date();
     const yearStart = new Date(now.getFullYear(), 0, 1);
-    const daysInYear = Math.floor((now.getTime() - yearStart.getTime()) / (1000 * 60 * 60 * 24));
+    const daysInYear = Math.max(1, Math.floor((now.getTime() - yearStart.getTime()) / (1000 * 60 * 60 * 24)));
     
     let bookedDays = 0;
-    [...(bookings || []), ...(mtBookings || [])].forEach(b => {
+    // STR bookings use check_in/check_out
+    (bookings || []).forEach(b => {
       const checkIn = new Date(b.check_in);
       const checkOut = new Date(b.check_out || b.check_in);
       if (checkIn >= yearStart && checkIn <= now) {
         const nights = Math.floor((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24));
+        bookedDays += Math.min(nights, daysInYear);
+      }
+    });
+    // MTR bookings use start_date/end_date
+    (mtBookings || []).forEach(b => {
+      const startDate = new Date(b.start_date);
+      const endDate = new Date(b.end_date || b.start_date);
+      if (startDate >= yearStart && startDate <= now) {
+        const nights = Math.floor((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
         bookedDays += Math.min(nights, daysInYear);
       }
     });
@@ -120,8 +150,8 @@ serve(async (req) => {
       sqft: compData?.sqft,
       rentalType: property.rental_type,
       nightlyRate: property.nightly_rate,
-      totalSTRRevenue,
-      totalMTRRevenue,
+      totalSTRRevenue: finalSTRRevenue,
+      totalMTRRevenue: finalMTRRevenue,
       totalBookings,
       occupancyRate,
       averageRating,
@@ -136,8 +166,8 @@ Address: ${propertyContext.address}
 Bedrooms: ${propertyContext.bedrooms}, Bathrooms: ${propertyContext.bathrooms}
 Rental Type: ${propertyContext.rentalType || "Hybrid (STR + MTR)"}
 Current Performance:
-- STR Revenue: $${totalSTRRevenue.toLocaleString()}
-- MTR Revenue: $${totalMTRRevenue.toLocaleString()}
+- STR Revenue: $${finalSTRRevenue.toLocaleString()}
+- MTR Revenue: $${finalMTRRevenue.toLocaleString()}
 - Total Bookings: ${totalBookings}
 - Occupancy Rate: ${occupancyRate}%
 - Average Rating: ${averageRating ? averageRating.toFixed(2) : "No reviews yet"}
@@ -245,9 +275,9 @@ Be specific and realistic based on Atlanta metro market conditions.`;
         rentalType: property.rental_type,
       },
       performance: {
-        totalRevenue: totalSTRRevenue + totalMTRRevenue,
-        strRevenue: totalSTRRevenue,
-        mtrRevenue: totalMTRRevenue,
+        totalRevenue: finalTotalRevenue,
+        strRevenue: finalSTRRevenue,
+        mtrRevenue: finalMTRRevenue,
         totalBookings,
         strBookings: bookings?.length || 0,
         mtrBookings: mtBookings?.length || 0,

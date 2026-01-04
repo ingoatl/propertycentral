@@ -170,7 +170,6 @@ export default function OwnerDashboard() {
           property_owners(id, name, email)
         `)
         .eq("token", token)
-        .is("used_at", null)
         .gt("expires_at", new Date().toISOString())
         .single();
 
@@ -180,15 +179,20 @@ export default function OwnerDashboard() {
         return;
       }
 
-      await supabase
-        .from("owner_portal_sessions")
-        .update({ used_at: new Date().toISOString() })
-        .eq("id", data.id);
+      // Only mark as used if not an admin preview (admin previews can be reused)
+      if (!data.is_admin_preview && !data.used_at) {
+        await supabase
+          .from("owner_portal_sessions")
+          .update({ used_at: new Date().toISOString() })
+          .eq("id", data.id);
+      }
 
       const ownerSession: OwnerSession = {
         ownerId: data.owner_id,
         ownerName: data.property_owners?.name || "Owner",
         email: data.email,
+        propertyId: data.property_id || undefined,
+        propertyName: data.property_name || undefined,
       };
 
       const sessionData = {
@@ -200,11 +204,36 @@ export default function OwnerDashboard() {
 
       navigate("/owner", { replace: true });
       
-      loadOwnerData(data.owner_id);
+      // If property_id is in the session, use it directly
+      if (data.property_id) {
+        loadOwnerDataWithProperty(data.owner_id, data.property_id);
+      } else {
+        loadOwnerData(data.owner_id);
+      }
       toast.success("Welcome to your owner portal!");
     } catch (err) {
       console.error("Token validation error:", err);
       toast.error("Failed to validate access link");
+      setLoading(false);
+    }
+  };
+
+  const loadOwnerDataWithProperty = async (ownerId: string, propertyId: string) => {
+    try {
+      const { data: propertyData } = await supabase
+        .from("properties")
+        .select("id, name, address, rental_type, image_path")
+        .eq("id", propertyId)
+        .single();
+
+      if (propertyData) {
+        setProperty(propertyData);
+        await loadPropertyDetails(propertyData);
+      }
+    } catch (err) {
+      console.error("Error loading owner data with property:", err);
+      toast.error("Failed to load your data");
+    } finally {
       setLoading(false);
     }
   };
@@ -220,36 +249,7 @@ export default function OwnerDashboard() {
 
       if (propertyData) {
         setProperty(propertyData);
-
-        const { data: statementsData } = await supabase
-          .from("monthly_reconciliations")
-          .select("id, reconciliation_month, total_revenue, total_expenses, net_to_owner, status")
-          .eq("property_id", propertyData.id)
-          .in("status", ["statement_sent", "approved"])
-          .order("reconciliation_month", { ascending: false })
-          .limit(24);
-
-        setStatements((statementsData || []) as Statement[]);
-
-        const { data: expensesData } = await supabase
-          .from("expenses")
-          .select("id, date, amount, purpose, vendor, category, file_path, original_receipt_path, email_screenshot_path")
-          .eq("property_id", propertyData.id)
-          .order("date", { ascending: false })
-          .limit(200);
-
-        setExpenses(expensesData || []);
-
-        const { data: credentialsData } = await supabase
-          .from("property_credentials")
-          .select("id, service_name, username, password, url, notes")
-          .eq("property_id", propertyData.id)
-          .order("service_name");
-
-        setCredentials((credentialsData || []) as Credential[]);
-
-        // Load market insights
-        loadMarketInsights(propertyData.id);
+        await loadPropertyDetails(propertyData);
       }
     } catch (err) {
       console.error("Error loading owner data:", err);
@@ -257,6 +257,38 @@ export default function OwnerDashboard() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const loadPropertyDetails = async (propertyData: PropertyData) => {
+    const { data: statementsData } = await supabase
+      .from("monthly_reconciliations")
+      .select("id, reconciliation_month, total_revenue, total_expenses, net_to_owner, status")
+      .eq("property_id", propertyData.id)
+      .in("status", ["statement_sent", "approved"])
+      .order("reconciliation_month", { ascending: false })
+      .limit(24);
+
+    setStatements((statementsData || []) as Statement[]);
+
+    const { data: expensesData } = await supabase
+      .from("expenses")
+      .select("id, date, amount, purpose, vendor, category, file_path, original_receipt_path, email_screenshot_path")
+      .eq("property_id", propertyData.id)
+      .order("date", { ascending: false })
+      .limit(200);
+
+    setExpenses(expensesData || []);
+
+    const { data: credentialsData } = await supabase
+      .from("property_credentials")
+      .select("id, service_name, username, password, url, notes")
+      .eq("property_id", propertyData.id)
+      .order("service_name");
+
+    setCredentials((credentialsData || []) as Credential[]);
+
+    // Load market insights
+    loadMarketInsights(propertyData.id);
   };
 
   const loadMarketInsights = async (propertyId: string) => {

@@ -389,3 +389,9 @@ verify_jwt = true
 
 [functions.generate-vendor-receipt]
 verify_jwt = true
+
+[functions.generate-market-insights]
+verify_jwt = true
+
+[functions.fix-property-data-links]
+verify_jwt = false

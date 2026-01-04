@@ -235,19 +235,28 @@ export function OwnerPortalAdmin() {
     }
 
     try {
-      // Create a test session in localStorage to simulate owner login
-      const sessionData = {
-        ownerId: owner.id,
-        ownerName: owner.name,
-        email: owner.email,
-        propertyId: owner.property_id,
-        propertyName: owner.property_name,
-        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24 hours
-      };
-      localStorage.setItem("owner_session", JSON.stringify(sessionData));
+      // Create a real session token in the database (works across domains/tabs)
+      const token = crypto.randomUUID();
+      const { error } = await supabase
+        .from("owner_portal_sessions")
+        .insert({
+          owner_id: owner.id,
+          email: owner.email,
+          token: token,
+          expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+          is_admin_preview: true,
+          property_id: owner.property_id,
+          property_name: owner.property_name,
+        });
+
+      if (error) {
+        console.error("Error creating session:", error);
+        toast.error("Failed to create portal session");
+        return;
+      }
       
-      // Open the owner portal in a new tab
-      window.open("/owner", "_blank");
+      // Open the owner portal with the token in URL
+      window.open(`/owner?token=${token}`, "_blank");
       toast.success(`Opening portal as ${owner.name}`);
     } catch (error) {
       console.error("Error opening portal:", error);
