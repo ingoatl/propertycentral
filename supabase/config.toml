@@ -386,3 +386,6 @@ verify_jwt = true
 
 [functions.batch-generate-visit-receipts]
 verify_jwt = true
+
+[functions.generate-vendor-receipt]
+verify_jwt = true

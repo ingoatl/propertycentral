@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { CheckCircle, XCircle, Clock, Shield, UserPlus, Key, Users, MessageCircleQuestion, UserCog, Bug, Mail, Database, Briefcase, Sparkles, Star, Calendar, Phone, FileText, FileArchive } from "lucide-react";
+import { CheckCircle, XCircle, Clock, Shield, UserPlus, Key, Users, MessageCircleQuestion, UserCog, Bug, Mail, Database, Briefcase, Sparkles, Star, Calendar, Phone, FileText, FileArchive, Home } from "lucide-react";
 import { RescheduleLogsTab } from "@/components/admin/RescheduleLogsTab";
 import { z } from "zod";
 import { TeamMatrixTab } from "@/components/admin/TeamMatrixTab";
@@ -25,6 +25,7 @@ import { CalendarAdminPanel } from "@/components/admin/CalendarAdminPanel";
 import { PhoneAssignmentsManager } from "@/components/admin/PhoneAssignmentsManager";
 import { LeadEmailTemplatesManager } from "@/components/admin/LeadEmailTemplatesManager";
 import { GRECAuditDashboard } from "@/components/admin/GRECAuditDashboard";
+import { OwnerPortalAdmin } from "@/components/admin/OwnerPortalAdmin";
 
 const createUserSchema = z.object({
   email: z.string().email("Invalid email address").max(255),
@@ -448,6 +449,10 @@ const Admin = () => {
             <FileText className="w-4 h-4 mr-2" />
             Lead Emails
           </TabsTrigger>
+          <TabsTrigger value="owner-portal">
+            <Home className="w-4 h-4 mr-2" />
+            Owner Portal
+          </TabsTrigger>
           <TabsTrigger value="grec-audit">
             <FileArchive className="w-4 h-4 mr-2" />
             GREC Audit
@@ -813,6 +818,10 @@ const Admin = () => {
 
         <TabsContent value="lead-email-templates" className="mt-8">
           <LeadEmailTemplatesManager />
+        </TabsContent>
+
+        <TabsContent value="owner-portal" className="mt-8">
+          <OwnerPortalAdmin />
         </TabsContent>
 
         <TabsContent value="grec-audit" className="mt-8">
