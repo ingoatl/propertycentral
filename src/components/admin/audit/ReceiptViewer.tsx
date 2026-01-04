@@ -147,14 +147,25 @@ export function ReceiptViewer({
         throw new Error("Could not generate download URL");
       }
       
+      // Fetch the file as a blob to bypass browser blocking
+      const response = await fetch(data.signedUrl);
+      if (!response.ok) {
+        throw new Error("Failed to fetch file");
+      }
+      
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      
       // Create a temporary link to trigger download
       const link = document.createElement('a');
-      link.href = data.signedUrl;
+      link.href = blobUrl;
       link.download = path.split('/').pop() || 'receipt';
-      link.target = '_blank';
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+      
+      // Clean up blob URL
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
       
       toast.success("Download started");
     } catch (err) {
@@ -316,7 +327,19 @@ export function ReceiptViewer({
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => signedUrl && window.open(signedUrl, "_blank")}
+                onClick={async () => {
+                  if (signedUrl) {
+                    try {
+                      const response = await fetch(signedUrl);
+                      const blob = await response.blob();
+                      const blobUrl = URL.createObjectURL(blob);
+                      window.open(blobUrl, "_blank");
+                    } catch {
+                      // Fallback to direct URL if fetch fails
+                      window.open(signedUrl, "_blank");
+                    }
+                  }
+                }}
                 disabled={!signedUrl}
               >
                 <ExternalLink className="h-4 w-4 mr-1" />

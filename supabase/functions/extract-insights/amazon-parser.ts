@@ -14,13 +14,31 @@ export interface ParsedAmazonOrder {
 
 export function parseAmazonEmail(subject: string, body: string, rawHtml: string | null): ParsedAmazonOrder | null {
   const content = rawHtml || body;
+  const subjectLower = subject.toLowerCase();
+  const contentLower = content.toLowerCase();
   
   // Check if this is an Amazon email
-  const isAmazon = subject.toLowerCase().includes('amazon') || 
-                   content.toLowerCase().includes('amazon.com') ||
-                   content.toLowerCase().includes('your order');
+  const isAmazon = subjectLower.includes('amazon') || 
+                   contentLower.includes('amazon.com') ||
+                   contentLower.includes('your order');
   
   if (!isAmazon) return null;
+
+  // Skip shipping confirmations and delivery notifications (they don't have prices)
+  const isShippingConfirmation = 
+    subjectLower.includes('shipped') ||
+    subjectLower.includes('shipping') ||
+    subjectLower.includes('on the way') ||
+    subjectLower.includes('out for delivery') ||
+    subjectLower.includes('delivered') ||
+    subjectLower.includes('arriving') ||
+    subjectLower.includes('track your package') ||
+    (contentLower.includes('your package') && !contentLower.includes('order total'));
+  
+  if (isShippingConfirmation) {
+    console.log('Skipping shipping confirmation email:', subject);
+    return null;
+  }
 
   const result: ParsedAmazonOrder = {
     orderNumber: null,

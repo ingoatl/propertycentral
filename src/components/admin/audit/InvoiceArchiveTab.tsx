@@ -69,6 +69,7 @@ export function InvoiceArchiveTab() {
   const [activeTab, setActiveTab] = useState<"expenses" | "visits">("expenses");
   const [properties, setProperties] = useState<{ id: string; name: string; address: string; property_type: string }[]>([]);
   const [generatingReceipts, setGeneratingReceipts] = useState(false);
+  const [generatingExpenseReceipts, setGeneratingExpenseReceipts] = useState(false);
   const [generatingVisitReceipt, setGeneratingVisitReceipt] = useState<string | null>(null);
 
   useEffect(() => {
@@ -241,6 +242,43 @@ export function InvoiceArchiveTab() {
     }
   };
 
+  const generateAllExpenseReceipts = async () => {
+    setGeneratingExpenseReceipts(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error("Not authenticated");
+        return;
+      }
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-vendor-receipt`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ batchMode: true }),
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to generate receipts");
+      }
+
+      toast.success(`Generated ${result.generated} expense receipts`);
+      loadData(); // Refresh
+    } catch (error: unknown) {
+      console.error("Error generating receipts:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to generate receipts");
+    } finally {
+      setGeneratingExpenseReceipts(false);
+    }
+  };
+
   // Get properties filtered by current view for dropdown
   const filteredProperties = properties.filter((p) => {
     if (propertyView === "managed") {
@@ -378,10 +416,27 @@ export function InvoiceArchiveTab() {
                 </SelectContent>
               </Select>
             </div>
-            <Button variant="outline" onClick={loadData}>
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Refresh
-            </Button>
+            <div className="flex gap-2">
+              {expenseStats.withoutReceipts > 0 && (
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={generateAllExpenseReceipts}
+                  disabled={generatingExpenseReceipts}
+                >
+                  {generatingExpenseReceipts ? (
+                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Sparkles className="h-4 w-4 mr-2" />
+                  )}
+                  Generate Missing ({expenseStats.withoutReceipts})
+                </Button>
+              )}
+              <Button variant="outline" onClick={loadData}>
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Refresh
+              </Button>
+            </div>
           </div>
 
           {filteredExpenses.length === 0 ? (
