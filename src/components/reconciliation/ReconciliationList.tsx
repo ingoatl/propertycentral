@@ -857,9 +857,9 @@ export const ReconciliationList = () => {
                           {/* Header Section */}
                           <div className={`p-4 border-b ${isPreview ? 'bg-indigo-50/50 dark:bg-indigo-950/20' : 'bg-amber-50/50 dark:bg-amber-950/20'}`}>
                             <div className="flex items-start justify-between gap-2 mb-2">
-                              <div className="flex items-center gap-2 min-w-0 flex-1">
-                                <Home className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                                <h3 className="font-semibold truncate">{rec.properties?.name}</h3>
+                              <div className="flex items-start gap-2 min-w-0 flex-1">
+                                <Home className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+                                <h3 className="font-semibold text-sm leading-tight">{rec.properties?.name}</h3>
                               </div>
                               <div className="flex gap-1.5 flex-shrink-0 flex-wrap justify-end">
                                 <Badge variant="outline" className={`font-medium ${isPreview ? 'bg-indigo-100 text-indigo-700 border-indigo-300 dark:bg-indigo-900 dark:text-indigo-300' : 'bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-900 dark:text-amber-300'}`}>
@@ -984,9 +984,9 @@ export const ReconciliationList = () => {
                         >
                           <div className="p-4 border-b border-indigo-200 dark:border-indigo-800 bg-indigo-50/50 dark:bg-indigo-950/20">
                             <div className="flex items-start justify-between gap-2 mb-2">
-                              <div className="flex items-center gap-2 min-w-0 flex-1">
-                                <Home className="w-4 h-4 flex-shrink-0 text-indigo-600" />
-                                <h3 className="font-semibold truncate text-indigo-800 dark:text-indigo-200">
+                              <div className="flex items-start gap-2 min-w-0 flex-1">
+                                <Home className="w-4 h-4 flex-shrink-0 text-indigo-600 mt-0.5" />
+                                <h3 className="font-semibold text-sm leading-tight text-indigo-800 dark:text-indigo-200">
                                   {prop.name}
                                 </h3>
                               </div>
@@ -1144,9 +1144,9 @@ export const ReconciliationList = () => {
                             {/* Header Section */}
                             <div className="p-4 border-b bg-muted/30">
                               <div className="flex items-start justify-between gap-2 mb-2">
-                                <div className="flex items-center gap-2 min-w-0 flex-1">
-                                  <Home className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                                  <h3 className="font-semibold truncate">{rec.properties?.name}</h3>
+                                <div className="flex items-start gap-2 min-w-0 flex-1">
+                                  <Home className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+                                  <h3 className="font-semibold text-sm leading-tight">{rec.properties?.name}</h3>
                                 </div>
                                 <div className="flex gap-1.5 flex-shrink-0 flex-wrap justify-end">
                                   <Badge variant="outline" className="font-medium bg-background">
@@ -1290,9 +1290,9 @@ export const ReconciliationList = () => {
                         >
                           <div className="p-4 border-b border-dashed border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-950/20">
                             <div className="flex items-start justify-between gap-2 mb-2">
-                              <div className="flex items-center gap-2 min-w-0 flex-1">
-                                <Home className="w-4 h-4 flex-shrink-0 text-amber-600" />
-                                <h3 className="font-semibold truncate text-amber-800 dark:text-amber-200">
+                              <div className="flex items-start gap-2 min-w-0 flex-1">
+                                <Home className="w-4 h-4 flex-shrink-0 text-amber-600 mt-0.5" />
+                                <h3 className="font-semibold text-sm leading-tight text-amber-800 dark:text-amber-200">
                                   {prop.name}
                                 </h3>
                               </div>
