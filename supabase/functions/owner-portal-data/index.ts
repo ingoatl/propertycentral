@@ -141,7 +141,7 @@ serve(async (req: Request): Promise<Response> => {
       // Monthly reconciliations (statements) - fetch all historical data (24 months)
       supabase
         .from("monthly_reconciliations")
-        .select("id, reconciliation_month, total_revenue, total_expenses, net_to_owner, status, short_term_revenue, mid_term_revenue")
+        .select("id, reconciliation_month, total_revenue, total_expenses, net_to_owner, status, short_term_revenue, mid_term_revenue, revenue_override")
         .eq("property_id", property.id)
         .in("status", ["sent", "statement_sent", "completed", "approved", "preview", "pending"])
         .order("reconciliation_month", { ascending: false })
@@ -313,19 +313,72 @@ serve(async (req: Request): Promise<Response> => {
     const calculatedSTRRevenue = validSTRBookings.reduce((sum, b) => sum + (b.total_amount || 0), 0);
     const strRevenue = totalSTRFromRecon > 0 ? totalSTRFromRecon : calculatedSTRRevenue;
 
-    // MTR revenue: ALWAYS calculate from mid_term_bookings table (source of truth)
-    // This ensures accuracy regardless of reconciliation data
-    const calculatedMTRRevenue = mtrBookings.reduce((sum, b) => {
-      if (!b.start_date || !b.end_date || !b.monthly_rent) return sum;
+    // MTR revenue: Use statement data for months with statements (most accurate after reconciliation)
+    // For future months without statements, calculate from bookings
+    
+    // First, get MTR from statements (already adjusted during reconciliation)
+    let mtrFromStatements = 0;
+    const monthsWithStatements = new Set<string>();
+    
+    for (const s of statements) {
+      const monthKey = s.reconciliation_month?.substring(0, 7) || '';
+      if (!monthKey) continue;
+      monthsWithStatements.add(monthKey);
+      
+      // If revenue_override is set and less than total, use it proportionally
+      // revenue_override = 0 means no revenue that month (manual adjustment)
+      if (s.revenue_override !== null && s.revenue_override !== undefined) {
+        // revenue_override replaces total_revenue, so calculate MTR proportion
+        const originalTotal = (s.short_term_revenue || 0) + (s.mid_term_revenue || 0);
+        if (originalTotal > 0 && s.revenue_override < originalTotal) {
+          // Reduce MTR proportionally to the override
+          const ratio = s.revenue_override / originalTotal;
+          mtrFromStatements += (s.mid_term_revenue || 0) * ratio;
+          console.log(`Month ${monthKey}: MTR adjusted from $${s.mid_term_revenue} to $${((s.mid_term_revenue || 0) * ratio).toFixed(2)} (override ratio: ${ratio.toFixed(2)})`);
+        } else {
+          // Override is >= original, use full MTR
+          mtrFromStatements += s.mid_term_revenue || 0;
+        }
+      } else {
+        // No override, use statement's mid_term_revenue
+        mtrFromStatements += s.mid_term_revenue || 0;
+      }
+    }
+    
+    // For months without statements (future bookings), calculate from bookings
+    let mtrFromFutureBookings = 0;
+    const nowDate = new Date();
+    for (const b of mtrBookings) {
+      if (!b.start_date || !b.end_date || !b.monthly_rent) continue;
       const startDate = new Date(b.start_date);
       const endDate = new Date(b.end_date);
-      const days = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-      const months = days / 30;
-      return sum + (b.monthly_rent * months);
-    }, 0);
-    const mtrRevenue = calculatedMTRRevenue;
+      
+      // Prorate across months
+      let currentDate = new Date(startDate);
+      while (currentDate <= endDate) {
+        const monthKey = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`;
+        
+        // Only add if this month has no statement (future months)
+        if (!monthsWithStatements.has(monthKey)) {
+          const monthStart = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+          const monthEnd = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+          const daysInMonth = monthEnd.getDate();
+          
+          const effectiveStart = startDate > monthStart ? startDate : monthStart;
+          const effectiveEnd = endDate < monthEnd ? endDate : monthEnd;
+          const daysOccupied = Math.max(1, Math.ceil((effectiveEnd.getTime() - effectiveStart.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+          const proratedRent = (b.monthly_rent / daysInMonth) * daysOccupied;
+          
+          mtrFromFutureBookings += proratedRent;
+        }
+        
+        currentDate.setMonth(currentDate.getMonth() + 1);
+        currentDate.setDate(1);
+      }
+    }
     
-    console.log(`MTR revenue calculated from mid_term_bookings: $${mtrRevenue.toFixed(2)} (${mtrBookings.length} bookings)`);
+    const mtrRevenue = mtrFromStatements + mtrFromFutureBookings;
+    console.log(`MTR revenue: from statements=$${mtrFromStatements.toFixed(2)}, from future bookings=$${mtrFromFutureBookings.toFixed(2)}, total=$${mtrRevenue.toFixed(2)}`);
     
     // Total revenue is STR + MTR
     const totalRevenue = strRevenue + mtrRevenue;
