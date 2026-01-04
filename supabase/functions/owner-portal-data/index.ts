@@ -470,37 +470,51 @@ serve(async (req: Request): Promise<Response> => {
     const totalRevenue = strRevenue + mtrRevenue;
 
     // Calculate occupancy rate using only valid bookings
+    // Calculate for CURRENT year (any booking that overlaps with this year)
     const now = new Date();
     const yearStart = new Date(now.getFullYear(), 0, 1);
+    const yearEnd = new Date(now.getFullYear(), 11, 31, 23, 59, 59);
     const daysThisYear = Math.ceil((now.getTime() - yearStart.getTime()) / (1000 * 60 * 60 * 24));
     
     let bookedDays = 0;
+    const occupancyDetails = { strDays: 0, mtrDays: 0, strBookingsThisYear: 0, mtrBookingsThisYear: 0 };
     
-    // Count STR booked days (only valid bookings)
+    // Count STR booked days (bookings that overlap with current year)
     validSTRBookings.forEach(b => {
       if (!b.check_in || !b.check_out) return;
       const checkIn = new Date(b.check_in);
       const checkOut = new Date(b.check_out);
-      if (checkIn.getFullYear() === now.getFullYear()) {
-        const days = Math.ceil((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24));
+      
+      // Check if booking overlaps with current year
+      if (checkOut >= yearStart && checkIn <= now) {
+        const effectiveStart = checkIn < yearStart ? yearStart : checkIn;
+        const effectiveEnd = checkOut > now ? now : checkOut;
+        const days = Math.max(0, Math.ceil((effectiveEnd.getTime() - effectiveStart.getTime()) / (1000 * 60 * 60 * 24)));
         bookedDays += days;
+        occupancyDetails.strDays += days;
+        if (days > 0) occupancyDetails.strBookingsThisYear++;
       }
     });
     
-    // Count MTR booked days
+    // Count MTR booked days (bookings that overlap with current year)
     mtrBookings.forEach(b => {
       if (!b.start_date || !b.end_date) return;
       const start = new Date(b.start_date);
       const end = new Date(b.end_date);
-      if (start.getFullYear() === now.getFullYear() || end.getFullYear() === now.getFullYear()) {
+      
+      // Check if booking overlaps with current year
+      if (end >= yearStart && start <= now) {
         const effectiveStart = start < yearStart ? yearStart : start;
         const effectiveEnd = end > now ? now : end;
-        const days = Math.ceil((effectiveEnd.getTime() - effectiveStart.getTime()) / (1000 * 60 * 60 * 24));
-        bookedDays += Math.max(0, days);
+        const days = Math.max(0, Math.ceil((effectiveEnd.getTime() - effectiveStart.getTime()) / (1000 * 60 * 60 * 24)));
+        bookedDays += days;
+        occupancyDetails.mtrDays += days;
+        if (days > 0) occupancyDetails.mtrBookingsThisYear++;
       }
     });
 
     const occupancyRate = daysThisYear > 0 ? Math.min(100, Math.round((bookedDays / daysThisYear) * 100)) : 0;
+    console.log(`Occupancy calc: ${bookedDays}/${daysThisYear} days = ${occupancyRate}%`, occupancyDetails);
 
   // Calculate average rating using star_rating column
   const ratingsWithValue = reviews.filter(r => r.star_rating && r.star_rating > 0);
