@@ -179,18 +179,18 @@ export const ReconciliationCardActions = ({
                 variant="outline"
                 size="sm"
                 className="flex-1"
-                onClick={handleSendDashboardInvite}
-                disabled={sendingDashboardInvite || sendingStatement}
-                title="Send owner their dashboard access link"
+                onClick={() => {
+                  const owner = reconciliation.properties?.property_owners;
+                  if (owner?.id) {
+                    window.open(`/owner-dashboard?owner=${owner.id}`, '_blank');
+                  } else {
+                    toast.error("No owner found for this property");
+                  }
+                }}
+                title="View owner dashboard"
               >
-                {sendingDashboardInvite ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <>
-                    <ExternalLink className="w-4 h-4 mr-1" />
-                    <span className="hidden sm:inline">Dashboard</span>
-                  </>
-                )}
+                <ExternalLink className="w-4 h-4 mr-1" />
+                <span className="hidden sm:inline">Dashboard</span>
               </Button>
               <Button
                 variant="outline"
@@ -206,7 +206,7 @@ export const ReconciliationCardActions = ({
                   <>
                     <Send className="w-4 h-4 mr-1" />
                     <span className="hidden sm:inline">
-                      {reconciliation.status === "statement_sent" ? "Resend" : "Statement"}
+                      {reconciliation.status === "statement_sent" ? "Resend Statement" : "Statement"}
                     </span>
                   </>
                 )}

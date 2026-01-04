@@ -106,24 +106,9 @@ serve(async (req) => {
           Dear ${ownerName.split(' ')[0]},
         </p>
         
-        <p style="font-size: 15px; line-height: 1.75; color: #4a5568; margin: 20px 0 24px 0;">
+        <p style="font-size: 15px; line-height: 1.75; color: #4a5568; margin: 20px 0 32px 0;">
           We're upgrading to a more secure and convenient billing system powered by <strong>Stripe</strong>—the industry leader in payment security. Please set up your preferred payment method to ensure seamless processing of your monthly statements.
         </p>
-        
-        <!-- Deadline Warning Box -->
-        <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 16px 20px; margin-bottom: 32px;">
-          <table cellpadding="0" cellspacing="0" border="0" width="100%">
-            <tr>
-              <td style="vertical-align: top; width: 32px;">
-                <span style="font-size: 20px;">⏰</span>
-              </td>
-              <td>
-                <p style="margin: 0; font-size: 14px; font-weight: 600; color: #991b1b;">Action Required by ${deadline}</p>
-                <p style="margin: 6px 0 0 0; font-size: 13px; color: #7f1d1d; line-height: 1.5;">Please complete your payment setup before the deadline to ensure uninterrupted service for your property.</p>
-              </td>
-            </tr>
-          </table>
-        </div>
 
         <!-- CTA Button Box -->
         <div style="background: #1a3b4c; border-radius: 12px; padding: 32px; text-align: center; margin-bottom: 32px;">
