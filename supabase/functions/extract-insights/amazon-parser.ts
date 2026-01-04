@@ -13,7 +13,7 @@ export interface ParsedAmazonOrder {
 }
 
 export function parseAmazonEmail(subject: string, body: string, rawHtml: string | null): ParsedAmazonOrder | null {
-  const content = rawHtml || body;
+  const content = rawHtml || body || '';
   const subjectLower = subject.toLowerCase();
   const contentLower = content.toLowerCase();
   
@@ -24,19 +24,86 @@ export function parseAmazonEmail(subject: string, body: string, rawHtml: string 
   
   if (!isAmazon) return null;
 
-  // Skip shipping confirmations and delivery notifications (they don't have prices)
-  const isShippingConfirmation = 
-    subjectLower.includes('shipped') ||
-    subjectLower.includes('shipping') ||
-    subjectLower.includes('on the way') ||
-    subjectLower.includes('out for delivery') ||
-    subjectLower.includes('delivered') ||
-    subjectLower.includes('arriving') ||
-    subjectLower.includes('track your package') ||
-    (contentLower.includes('your package') && !contentLower.includes('order total'));
+  // STRICT: Skip ALL shipping, delivery, return, and notification emails
+  const skipPatterns = [
+    'shipped',
+    'shipping',
+    'on the way',
+    'out for delivery',
+    'delivered',
+    'arriving',
+    'track your package',
+    'tracking',
+    'return',
+    'refund',
+    'cancelled',
+    'payment declined',
+    'payment update',
+    'prime day',
+    'deal',
+    'subscribe',
+    'review',
+    'rate your',
+    'leave a review',
+    'feedback',
+    'survey',
+    'reminder',
+    'your package',
+    'package has',
+    'dispatched',
+    'preparing to ship',
+    'shipping soon',
+    'shipping update',
+    'delivery update',
+    'expected delivery',
+    'carrier',
+    'out of stock',
+    'back in stock',
+    'wishlist',
+    'save for later'
+  ];
   
-  if (isShippingConfirmation) {
-    console.log('Skipping shipping confirmation email:', subject);
+  // Check subject for skip patterns
+  for (const pattern of skipPatterns) {
+    if (subjectLower.includes(pattern)) {
+      console.log(`Amazon parser: Skipping email with pattern "${pattern}" in subject: ${subject}`);
+      return null;
+    }
+  }
+  
+  // Also check the beginning of the body for shipping notifications
+  const bodyStart = contentLower.substring(0, 500);
+  for (const pattern of ['shipped', 'on the way', 'out for delivery', 'arriving', 'dispatched', 'preparing to ship']) {
+    if (bodyStart.includes(pattern)) {
+      console.log(`Amazon parser: Skipping shipping notification: ${subject}`);
+      return null;
+    }
+  }
+  
+  // POSITIVE DETECTION: Must be an actual order confirmation with a price
+  const isOrderConfirmation = 
+    subjectLower.includes('your order') ||
+    subjectLower.includes('order confirmation') ||
+    subjectLower.includes('order #') ||
+    subjectLower.includes('your amazon.com order') ||
+    subjectLower.includes('order of') ||
+    contentLower.includes('order total') ||
+    contentLower.includes('grand total') ||
+    contentLower.includes('thank you for your order') ||
+    contentLower.includes('order confirmed');
+  
+  // Must have at least one valid price to be an order confirmation
+  const pricePattern = /\$[\d,]+\.\d{2}/g;
+  const prices = content.match(pricePattern);
+  const hasValidPrice = prices && prices.length > 0;
+  
+  if (!isOrderConfirmation) {
+    console.log(`Amazon parser: Not an order confirmation: ${subject}`);
+    return null;
+  }
+  
+  if (!hasValidPrice) {
+    console.log(`Amazon parser: No valid price found in: ${subject}`);
     return null;
   }
 

@@ -32,12 +32,20 @@ Deno.serve(async (req) => {
     let expensesToProcess: ExpenseData[] = [];
 
     if (batchMode) {
-      console.log("Batch mode: finding expenses without receipts");
+      console.log("Batch mode: finding expenses without receipts (excluding email-sourced expenses)");
+      // ONLY generate receipts for truly manual expenses:
+      // - No existing file_path (uploaded receipt)
+      // - No original_receipt_path (already generated)
+      // - No email_screenshot_path (real email receipt)
+      // - No email_insight_id (came from email extraction - should have email receipt)
+      // - Only for PeachHaus services or manual vendor entries
       const { data: expenses, error } = await supabase
         .from("expenses")
-        .select("id, date, amount, vendor, purpose, category, items_detail, property_id")
+        .select("id, date, amount, vendor, purpose, category, items_detail, property_id, email_insight_id, email_screenshot_path")
         .is("file_path", null)
         .is("original_receipt_path", null)
+        .is("email_screenshot_path", null)
+        .is("email_insight_id", null)
         .or("vendor.is.null,vendor.eq.PeachHaus,category.in.(cleaning,repairs,maintenance,visit)")
         .limit(100);
 
@@ -46,7 +54,7 @@ Deno.serve(async (req) => {
         throw error;
       }
       expensesToProcess = expenses || [];
-      console.log(`Found ${expensesToProcess.length} expenses to process`);
+      console.log(`Found ${expensesToProcess.length} truly manual expenses to process (excluded email-sourced)`);
     } else if (expenseId) {
       const { data: expense, error } = await supabase
         .from("expenses")
