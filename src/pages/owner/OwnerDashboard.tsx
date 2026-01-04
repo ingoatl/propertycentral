@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useMemo, memo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Building2,
   Receipt,
@@ -26,6 +27,8 @@ import {
   Sparkles,
   Star,
   MapPin,
+  AlertCircle,
+  CheckCircle2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -168,6 +171,91 @@ export default function OwnerDashboard() {
   const [insightsStep, setInsightsStep] = useState("Initializing...");
   const [sessionToken, setSessionToken] = useState<string | null>(null);
   const [revenueBreakdown, setRevenueBreakdown] = useState<any>(null);
+  
+  // Session stability & refresh state
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
+  const [dataStale, setDataStale] = useState(false);
+  const refreshIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const visibilityRef = useRef(true);
+
+  // Stale-while-revalidate: Keep showing data but indicate refresh is happening
+  const refreshData = useCallback(async (showToast = false) => {
+    if (!session?.ownerId) return;
+    
+    setIsRefreshing(true);
+    console.log("Refreshing dashboard data...");
+    
+    try {
+      const { data, error } = await supabase.functions.invoke("owner-portal-data", {
+        body: { ownerId: session.ownerId, propertyId: session.propertyId },
+      });
+
+      if (error || data?.error) {
+        console.error("Refresh error:", error || data?.error);
+        // Don't clear data on error - stale-while-revalidate pattern
+        setDataStale(true);
+        return;
+      }
+
+      // Update all state with fresh data
+      setProperty(data.property);
+      setStatements(data.statements || []);
+      setExpenses(data.expenses || []);
+      setCredentials(data.credentials || []);
+      setBookings(data.bookings || null);
+      setReviews(data.reviews || []);
+      setMonthlyRevenueData(data.monthlyRevenue || []);
+      setPerformanceMetrics(data.performance || performanceMetrics);
+      setRevenueBreakdown(data.revenueBreakdown || null);
+      setLastRefresh(new Date());
+      setDataStale(false);
+      
+      if (showToast) {
+        toast.success("Dashboard refreshed");
+      }
+    } catch (err) {
+      console.error("Refresh failed:", err);
+      setDataStale(true);
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [session?.ownerId, session?.propertyId, performanceMetrics]);
+
+  // Handle visibility changes - refresh when tab becomes visible
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && !visibilityRef.current) {
+        console.log("Tab became visible, checking if refresh needed...");
+        const timeSinceRefresh = Date.now() - lastRefresh.getTime();
+        // If more than 5 minutes since last refresh, refresh data
+        if (timeSinceRefresh > 5 * 60 * 1000) {
+          refreshData();
+        }
+      }
+      visibilityRef.current = document.visibilityState === 'visible';
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [lastRefresh, refreshData]);
+
+  // Auto-refresh every 10 minutes while active
+  useEffect(() => {
+    if (session) {
+      refreshIntervalRef.current = setInterval(() => {
+        if (document.visibilityState === 'visible') {
+          refreshData();
+        }
+      }, 10 * 60 * 1000); // 10 minutes
+    }
+    
+    return () => {
+      if (refreshIntervalRef.current) {
+        clearInterval(refreshIntervalRef.current);
+      }
+    };
+  }, [session, refreshData]);
 
   useEffect(() => {
     const token = searchParams.get("token");
@@ -584,15 +672,27 @@ export default function OwnerDashboard() {
                   </div>
                 </div>
               </div>
-              <Button 
-                variant={propertyImageUrl ? "secondary" : "ghost"} 
-                size="sm" 
-                onClick={handleLogout} 
-                className="gap-2"
-              >
-                <LogOut className="h-4 w-4" />
-                <span className="hidden sm:inline">Logout</span>
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button 
+                  variant={propertyImageUrl ? "secondary" : "outline"} 
+                  size="sm" 
+                  onClick={() => refreshData(true)}
+                  disabled={isRefreshing}
+                  className="gap-2"
+                >
+                  <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                  <span className="hidden sm:inline">{isRefreshing ? 'Refreshing...' : 'Refresh'}</span>
+                </Button>
+                <Button 
+                  variant={propertyImageUrl ? "secondary" : "ghost"} 
+                  size="sm" 
+                  onClick={handleLogout} 
+                  className="gap-2"
+                >
+                  <LogOut className="h-4 w-4" />
+                  <span className="hidden sm:inline">Logout</span>
+                </Button>
+              </div>
             </div>
             
             <div className={`mt-4 ${propertyImageUrl ? 'text-white/90' : 'text-muted-foreground'}`}>
@@ -614,6 +714,32 @@ export default function OwnerDashboard() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 py-8 -mt-16 md:-mt-20 relative z-10">
+        {/* Data Status Alert */}
+        {(isRefreshing || dataStale) && (
+          <Alert className={`mb-4 ${dataStale ? 'border-amber-500 bg-amber-50 dark:bg-amber-950/20' : 'border-blue-500 bg-blue-50 dark:bg-blue-950/20'}`}>
+            <div className="flex items-center gap-2">
+              {isRefreshing ? (
+                <>
+                  <RefreshCw className="h-4 w-4 animate-spin text-blue-600" />
+                  <AlertDescription className="text-blue-700 dark:text-blue-300">
+                    Refreshing your dashboard data...
+                  </AlertDescription>
+                </>
+              ) : dataStale ? (
+                <>
+                  <AlertCircle className="h-4 w-4 text-amber-600" />
+                  <AlertDescription className="text-amber-700 dark:text-amber-300 flex items-center gap-2">
+                    Data may be outdated. 
+                    <Button variant="link" size="sm" className="h-auto p-0 text-amber-700" onClick={() => refreshData(true)}>
+                      Click to refresh
+                    </Button>
+                  </AlertDescription>
+                </>
+              ) : null}
+            </div>
+          </Alert>
+        )}
+        
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="mb-6 bg-background/95 backdrop-blur shadow-lg border p-1 h-auto flex-wrap">

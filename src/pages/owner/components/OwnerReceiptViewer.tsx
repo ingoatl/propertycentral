@@ -45,32 +45,47 @@ export function OwnerReceiptViewer({ expense, onClose, token }: OwnerReceiptView
       }
 
       try {
+        console.log("Fetching receipt for path:", receiptPath);
+        
         // Use edge function to get signed URL
         const { data, error: urlError } = await supabase.functions.invoke("owner-receipt-url", {
-          body: { expenseId: expense.id, token, filePath: receiptPath, returnContent: isHtml },
+          body: { expenseId: expense.id, token, filePath: receiptPath },
         });
 
         if (urlError) throw urlError;
         if (data?.error) throw new Error(data.error);
 
+        console.log("Received signed URL, fetching content...");
         setSignedUrl(data.signedUrl);
 
-        // For HTML files, fetch the content to render with srcdoc
-        if (isHtml && data.signedUrl) {
-          try {
-            const response = await fetch(data.signedUrl);
-            if (response.ok) {
-              const html = await response.text();
-              // Sanitize and prepare HTML for rendering
-              const sanitizedHtml = html
-                .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '') // Remove scripts
-                .replace(/onclick|onerror|onload|onmouseover/gi, 'data-removed'); // Remove event handlers
-              setHtmlContent(sanitizedHtml);
-            }
-          } catch (fetchErr) {
-            console.warn("Could not fetch HTML content, falling back to iframe src:", fetchErr);
-            // Will fall back to iframe with src
+        // Always fetch as blob first to determine actual content type
+        try {
+          const response = await fetch(data.signedUrl);
+          if (!response.ok) throw new Error("Failed to fetch content");
+          
+          const blob = await response.blob();
+          console.log("Fetched blob type:", blob.type, "size:", blob.size);
+          
+          // Check if it's actually HTML (by content type or extension)
+          const isHtmlContent = blob.type.includes('html') || blob.type.includes('text') || isHtml;
+          
+          if (isHtmlContent) {
+            const text = await blob.text();
+            // Sanitize and prepare HTML for rendering
+            const sanitizedHtml = text
+              .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '') // Remove scripts
+              .replace(/onclick|onerror|onload|onmouseover/gi, 'data-removed'); // Remove event handlers
+            setHtmlContent(sanitizedHtml);
+            console.log("HTML content loaded and sanitized");
+          } else {
+            // For non-HTML, create a blob URL for display
+            const blobUrl = URL.createObjectURL(blob);
+            setSignedUrl(blobUrl);
+            console.log("Created blob URL for non-HTML content");
           }
+        } catch (fetchErr) {
+          console.warn("Could not fetch content directly:", fetchErr);
+          // Keep the signed URL as fallback
         }
       } catch (err) {
         console.error("Error fetching receipt:", err);
