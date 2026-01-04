@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table,
   TableBody,
@@ -39,6 +40,8 @@ interface ExpenseRecord {
   items_detail: string | null;
   property_id: string;
   property_name?: string;
+  property_address?: string;
+  property_type?: string;
   created_at: string;
 }
 
@@ -47,30 +50,52 @@ export function InvoiceArchiveTab() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [propertyFilter, setPropertyFilter] = useState("all");
-  const [properties, setProperties] = useState<{ id: string; name: string }[]>([]);
+  const [propertyView, setPropertyView] = useState<"managed" | "owned">("managed");
+  const [properties, setProperties] = useState<{ id: string; name: string; address: string; property_type: string }[]>([]);
 
   useEffect(() => {
     loadData();
-  }, [propertyFilter]);
+  }, [propertyFilter, propertyView]);
 
   const loadData = async () => {
     setLoading(true);
     try {
-      // Load properties for filter
+      // Load properties for filter - include address and type
       const { data: propData } = await supabase
         .from("properties")
-        .select("id, name")
+        .select("id, name, address, property_type")
         .is("offboarded_at", null)
-        .order("name");
+        .order("address");
 
       setProperties(propData || []);
 
-      // Load expenses with receipts
+      // Filter properties by type for the dropdown
+      const filteredPropertyIds = (propData || [])
+        .filter((p) => {
+          if (propertyView === "managed") {
+            return p.property_type === "Client-Managed";
+          } else {
+            return p.property_type === "Company-Owned";
+          }
+        })
+        .map((p) => p.id);
+
+      // Load expenses with receipts - exclude visits (no receipt required)
       let query = supabase
         .from("expenses")
         .select("*")
         .order("date", { ascending: false })
         .limit(500);
+
+      // Filter by property type
+      if (filteredPropertyIds.length > 0) {
+        query = query.in("property_id", filteredPropertyIds);
+      } else {
+        // No properties match, return empty
+        setExpenses([]);
+        setLoading(false);
+        return;
+      }
 
       if (propertyFilter !== "all") {
         query = query.eq("property_id", propertyFilter);
@@ -79,11 +104,16 @@ export function InvoiceArchiveTab() {
       const { data: expenseData, error } = await query;
       if (error) throw error;
 
-      // Enrich with property names
-      const enrichedExpenses = (expenseData || []).map((exp) => ({
-        ...exp,
-        property_name: propData?.find((p) => p.id === exp.property_id)?.name || "Unknown",
-      }));
+      // Enrich with property info - use address instead of name
+      const enrichedExpenses = (expenseData || []).map((exp) => {
+        const prop = propData?.find((p) => p.id === exp.property_id);
+        return {
+          ...exp,
+          property_name: prop?.name || "Unknown",
+          property_address: prop?.address || "Unknown",
+          property_type: prop?.property_type || "Unknown",
+        };
+      });
 
       setExpenses(enrichedExpenses);
     } catch (error) {
@@ -93,6 +123,15 @@ export function InvoiceArchiveTab() {
       setLoading(false);
     }
   };
+
+  // Get properties filtered by current view for dropdown
+  const filteredProperties = properties.filter((p) => {
+    if (propertyView === "managed") {
+      return p.property_type === "Client-Managed";
+    } else {
+      return p.property_type === "Company-Owned";
+    }
+  });
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-US", {
@@ -107,7 +146,7 @@ export function InvoiceArchiveTab() {
     exp.vendor?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     exp.purpose?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     exp.order_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    exp.property_name?.toLowerCase().includes(searchTerm.toLowerCase())
+    exp.property_address?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const stats = {
@@ -127,6 +166,17 @@ export function InvoiceArchiveTab() {
 
   return (
     <div className="space-y-6">
+      {/* Managed/Owned Toggle */}
+      <Tabs value={propertyView} onValueChange={(v) => {
+        setPropertyView(v as "managed" | "owned");
+        setPropertyFilter("all"); // Reset property filter when switching view
+      }}>
+        <TabsList>
+          <TabsTrigger value="managed">Managed Properties</TabsTrigger>
+          <TabsTrigger value="owned">Owned Properties</TabsTrigger>
+        </TabsList>
+      </Tabs>
+
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card className="p-4">
           <div className="text-sm text-muted-foreground">Total Invoices</div>
@@ -149,20 +199,20 @@ export function InvoiceArchiveTab() {
       <div className="flex flex-col sm:flex-row gap-4 justify-between">
         <div className="flex gap-2 flex-1">
           <Input
-            placeholder="Search vendor, purpose, order #..."
+            placeholder="Search vendor, purpose, order #, address..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="max-w-sm"
           />
           <Select value={propertyFilter} onValueChange={setPropertyFilter}>
-            <SelectTrigger className="w-[200px]">
+            <SelectTrigger className="w-[250px]">
               <SelectValue placeholder="All Properties" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Properties</SelectItem>
-              {properties.map((prop) => (
+              {filteredProperties.map((prop) => (
                 <SelectItem key={prop.id} value={prop.id}>
-                  {prop.name}
+                  {prop.address}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -202,8 +252,8 @@ export function InvoiceArchiveTab() {
                   <TableCell className="font-medium">
                     {format(new Date(exp.date), "MMM d, yyyy")}
                   </TableCell>
-                  <TableCell className="max-w-[150px] truncate">
-                    {exp.property_name}
+                  <TableCell className="max-w-[200px] truncate" title={exp.property_address}>
+                    {exp.property_address}
                   </TableCell>
                   <TableCell>{exp.vendor || "-"}</TableCell>
                   <TableCell className="max-w-[250px]" title={exp.purpose || exp.items_detail || ""}>

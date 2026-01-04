@@ -7274,6 +7274,7 @@ export type Database = {
           notes: string | null
           price: number
           property_id: string
+          receipt_path: string | null
           reconciliation_id: string | null
           time: string
           user_id: string | null
@@ -7288,6 +7289,7 @@ export type Database = {
           notes?: string | null
           price: number
           property_id: string
+          receipt_path?: string | null
           reconciliation_id?: string | null
           time: string
           user_id?: string | null
@@ -7302,6 +7304,7 @@ export type Database = {
           notes?: string | null
           price?: number
           property_id?: string
+          receipt_path?: string | null
           reconciliation_id?: string | null
           time?: string
           user_id?: string | null

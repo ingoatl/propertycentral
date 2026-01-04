@@ -360,15 +360,48 @@ export function ReceiptViewer({
             ) : signedUrl ? (
               <div className="flex items-center justify-center min-h-full">
                 {isPdfFile(currentPath) ? (
-                  <iframe
-                    src={signedUrl}
-                    className="w-full h-full min-h-[70vh] border rounded-lg bg-white"
-                    style={{
-                      transform: `scale(${zoom}) rotate(${rotation}deg)`,
-                      transformOrigin: "center center",
-                    }}
-                    title="Receipt PDF"
-                  />
+                  <div className="w-full h-full min-h-[70vh] flex flex-col items-center justify-center gap-6">
+                    {/* PDF: Use object tag with fallback, plus prominent action buttons */}
+                    <object
+                      data={signedUrl}
+                      type="application/pdf"
+                      className="w-full h-[60vh] border rounded-lg bg-white"
+                      style={{
+                        transform: `scale(${zoom}) rotate(${rotation}deg)`,
+                        transformOrigin: "center center",
+                      }}
+                    >
+                      {/* Fallback for browsers that block PDF embedding */}
+                      <div className="flex flex-col items-center justify-center h-full bg-muted/50 rounded-lg p-8 gap-4">
+                        <FileText className="h-16 w-16 text-muted-foreground" />
+                        <p className="text-lg font-medium">PDF Preview Blocked</p>
+                        <p className="text-sm text-muted-foreground text-center max-w-md">
+                          Your browser is blocking the PDF preview. Use the buttons below to view or download the receipt.
+                        </p>
+                        <div className="flex gap-3 mt-2">
+                          <Button onClick={() => window.open(signedUrl, "_blank")}>
+                            <ExternalLink className="h-4 w-4 mr-2" />
+                            Open PDF in New Tab
+                          </Button>
+                          <Button variant="outline" onClick={downloadReceipt}>
+                            <Download className="h-4 w-4 mr-2" />
+                            Download PDF
+                          </Button>
+                        </div>
+                      </div>
+                    </object>
+                    {/* Always show action buttons for PDF */}
+                    <div className="flex gap-3">
+                      <Button variant="default" size="lg" onClick={() => window.open(signedUrl, "_blank")}>
+                        <ExternalLink className="h-4 w-4 mr-2" />
+                        Open PDF in New Tab
+                      </Button>
+                      <Button variant="outline" size="lg" onClick={downloadReceipt}>
+                        <Download className="h-4 w-4 mr-2" />
+                        Download PDF
+                      </Button>
+                    </div>
+                  </div>
                 ) : (
                   <img
                     src={signedUrl}
