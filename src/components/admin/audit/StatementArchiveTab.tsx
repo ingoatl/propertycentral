@@ -130,6 +130,18 @@ export function StatementArchiveTab() {
   const downloadPdf = async (statement: StatementRecord) => {
     setDownloading(statement.id);
     try {
+      // Generate proper filename: "December 2025 Statement - Owner Name - Property Name.pdf"
+      const monthDate = new Date(statement.statement_month);
+      const monthName = format(monthDate, "MMMM yyyy");
+      const filenameParts = [monthName, "Statement"];
+      if (statement.owner_name && statement.owner_name !== "Unknown") {
+        filenameParts.push(statement.owner_name);
+      }
+      if (statement.property_name && statement.property_name !== "Unknown") {
+        filenameParts.push(statement.property_name);
+      }
+      const properFilename = filenameParts.join(" - ").replace(/[^a-zA-Z0-9\s\-]/g, "").replace(/\s+/g, " ").trim() + ".pdf";
+
       if (statement.statement_pdf_path) {
         // Download from storage
         const { data, error } = await supabase.storage
@@ -141,7 +153,7 @@ export function StatementArchiveTab() {
         const url = URL.createObjectURL(data);
         const a = document.createElement("a");
         a.href = url;
-        a.download = `${statement.statement_number}.pdf`;
+        a.download = properFilename;
         a.click();
         URL.revokeObjectURL(url);
       } else {
@@ -158,7 +170,7 @@ export function StatementArchiveTab() {
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
-        a.download = `${statement.statement_number}.pdf`;
+        a.download = properFilename;
         a.click();
         URL.revokeObjectURL(url);
       }

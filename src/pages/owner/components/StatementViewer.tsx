@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Download, RefreshCw, X, FileText, Calendar } from "lucide-react";
+import { Download, RefreshCw, X, FileText, ExternalLink, ZoomIn, ZoomOut, RotateCw } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 
@@ -20,6 +20,8 @@ interface StatementViewerProps {
   statement: Statement | null;
   fetchPdf: (statementId: string) => Promise<{ signedUrl?: string; pdfBase64?: string }>;
   propertyName?: string;
+  ownerName?: string;
+  propertyAddress?: string;
 }
 
 export function StatementViewer({
@@ -28,27 +30,39 @@ export function StatementViewer({
   statement,
   fetchPdf,
   propertyName,
+  ownerName,
+  propertyAddress,
 }: StatementViewerProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [blobUrl, setBlobUrl] = useState<string | null>(null);
+  const [signedUrl, setSignedUrl] = useState<string | null>(null);
+  const [zoom, setZoom] = useState(1);
+  const [rotation, setRotation] = useState(0);
 
-  // Cleanup blob URL on unmount or when dialog closes
-  useEffect(() => {
-    return () => {
-      if (blobUrl) {
-        URL.revokeObjectURL(blobUrl);
-      }
-    };
-  }, [blobUrl]);
+  // Generate proper filename for download
+  const getDownloadFilename = useCallback(() => {
+    if (!statement) return "statement.pdf";
+    
+    const monthDate = new Date(statement.reconciliation_month + "-01");
+    const monthName = format(monthDate, "MMMM yyyy");
+    
+    const parts = [monthName, "Statement"];
+    if (ownerName) parts.push(ownerName);
+    if (propertyAddress) parts.push(propertyAddress);
+    
+    // Clean up the filename - remove special characters
+    const filename = parts.join(" - ").replace(/[^a-zA-Z0-9\s\-]/g, "").replace(/\s+/g, " ").trim();
+    return `${filename}.pdf`;
+  }, [statement, ownerName, propertyAddress]);
 
   // Load PDF when dialog opens
   useEffect(() => {
     if (!open || !statement) {
-      // Reset state when closed
-      setBlobUrl(null);
+      setSignedUrl(null);
       setError(null);
       setLoading(true);
+      setZoom(1);
+      setRotation(0);
       return;
     }
 
@@ -61,17 +75,10 @@ export function StatementViewer({
         const data = await fetchPdf(statement.id);
 
         if (data.signedUrl) {
-          // Fetch as blob to avoid ad blocker issues
-          const response = await fetch(data.signedUrl);
-          if (!response.ok) {
-            throw new Error(`Failed to fetch PDF: ${response.status}`);
-          }
-          const blob = await response.blob();
-          const url = URL.createObjectURL(blob);
-          setBlobUrl(url);
-          console.log("StatementViewer: PDF loaded from signed URL");
+          setSignedUrl(data.signedUrl);
+          console.log("StatementViewer: PDF signed URL received");
         } else if (data.pdfBase64) {
-          // Convert base64 to blob
+          // Convert base64 to blob and create object URL
           const byteCharacters = atob(data.pdfBase64);
           const byteNumbers = new Array(byteCharacters.length);
           for (let i = 0; i < byteCharacters.length; i++) {
@@ -80,7 +87,7 @@ export function StatementViewer({
           const byteArray = new Uint8Array(byteNumbers);
           const blob = new Blob([byteArray], { type: "application/pdf" });
           const url = URL.createObjectURL(blob);
-          setBlobUrl(url);
+          setSignedUrl(url);
           console.log("StatementViewer: PDF loaded from base64");
         } else {
           throw new Error("No PDF data received");
@@ -96,18 +103,35 @@ export function StatementViewer({
     loadPdf();
   }, [open, statement, fetchPdf]);
 
-  // Download the PDF programmatically
-  const handleDownload = useCallback(() => {
-    if (!blobUrl || !statement) return;
+  // Download the PDF with proper naming
+  const handleDownload = useCallback(async () => {
+    if (!signedUrl || !statement) return;
 
-    const link = document.createElement("a");
-    link.href = blobUrl;
-    link.download = `statement-${statement.reconciliation_month}.pdf`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    toast.success("Statement downloaded");
-  }, [blobUrl, statement]);
+    try {
+      const response = await fetch(signedUrl);
+      if (!response.ok) throw new Error("Failed to fetch PDF");
+      
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.download = getDownloadFilename();
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
+      toast.success("Statement downloaded");
+    } catch (err) {
+      console.error("Download error:", err);
+      toast.error("Failed to download statement");
+    }
+  }, [signedUrl, statement, getDownloadFilename]);
+
+  const handleZoomIn = () => setZoom((z) => Math.min(z + 0.25, 2));
+  const handleZoomOut = () => setZoom((z) => Math.max(z - 0.25, 0.5));
+  const handleRotate = () => setRotation((r) => (r + 90) % 360);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-US", {
@@ -122,8 +146,8 @@ export function StatementViewer({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl max-h-[90vh] flex flex-col p-0">
-        <DialogHeader className="flex-shrink-0 p-4 pb-3 border-b">
+      <DialogContent className="max-w-5xl h-[90vh] flex flex-col p-0">
+        <DialogHeader className="flex-shrink-0 p-4 border-b">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
@@ -149,55 +173,89 @@ export function StatementViewer({
                   </div>
                 </div>
               )}
-              <Button
-                variant="default"
-                size="sm"
-                onClick={handleDownload}
-                disabled={!blobUrl}
-              >
-                <Download className="h-4 w-4 mr-2" />
-                Download
-              </Button>
             </div>
+          </div>
+
+          {/* Toolbar */}
+          <div className="flex items-center gap-2 mt-3">
+            <Button variant="outline" size="sm" onClick={handleZoomOut} disabled={!signedUrl}>
+              <ZoomOut className="h-4 w-4" />
+            </Button>
+            <span className="text-sm min-w-[60px] text-center">
+              {Math.round(zoom * 100)}%
+            </span>
+            <Button variant="outline" size="sm" onClick={handleZoomIn} disabled={!signedUrl}>
+              <ZoomIn className="h-4 w-4" />
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleRotate} disabled={!signedUrl}>
+              <RotateCw className="h-4 w-4" />
+            </Button>
+            <div className="flex-1" />
+            <Button variant="outline" size="sm" onClick={handleDownload} disabled={!signedUrl}>
+              <Download className="h-4 w-4 mr-1" />
+              Download
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => signedUrl && window.open(signedUrl, "_blank")}
+              disabled={!signedUrl}
+            >
+              <ExternalLink className="h-4 w-4 mr-1" />
+              Open in New Tab
+            </Button>
           </div>
         </DialogHeader>
 
-        <div className="flex-1 overflow-hidden bg-muted/30 min-h-[600px] relative">
+        {/* Content area */}
+        <div className="flex-1 overflow-auto bg-muted/30 p-4">
           {loading ? (
-            <div className="absolute inset-0 flex items-center justify-center">
+            <div className="flex items-center justify-center h-full">
               <div className="flex flex-col items-center gap-3">
                 <RefreshCw className="h-8 w-8 animate-spin text-primary" />
                 <p className="text-sm text-muted-foreground">Loading statement...</p>
               </div>
             </div>
           ) : error ? (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="text-center p-8">
-                <X className="h-12 w-12 mx-auto text-destructive/50 mb-4" />
-                <p className="text-destructive font-medium mb-2">Failed to load statement</p>
-                <p className="text-sm text-muted-foreground mb-4">{error}</p>
-                <Button variant="outline" onClick={() => onOpenChange(false)}>
-                  Close
+            <div className="flex flex-col items-center justify-center h-full text-destructive gap-4">
+              <X className="h-12 w-12" />
+              <div className="text-center">
+                <p className="font-medium">Failed to load statement</p>
+                <p className="text-sm text-muted-foreground mt-1">{error}</p>
+              </div>
+              <Button variant="outline" onClick={() => onOpenChange(false)}>
+                Close
+              </Button>
+            </div>
+          ) : signedUrl ? (
+            <div className="flex flex-col items-center justify-center min-h-full gap-6">
+              {/* PDF: Use Google Docs Viewer - same as GREC audit (most reliable) */}
+              <iframe
+                src={`https://docs.google.com/gview?url=${encodeURIComponent(signedUrl)}&embedded=true`}
+                className="w-full h-[60vh] border rounded-lg bg-white"
+                title="Statement PDF"
+                style={{
+                  transform: `scale(${zoom}) rotate(${rotation}deg)`,
+                  transformOrigin: "center center",
+                }}
+              />
+              {/* Action buttons */}
+              <div className="flex gap-3 flex-wrap justify-center">
+                <Button variant="default" size="lg" onClick={() => window.open(signedUrl, "_blank")}>
+                  <ExternalLink className="h-4 w-4 mr-2" />
+                  Open PDF in New Tab
+                </Button>
+                <Button variant="outline" size="lg" onClick={handleDownload}>
+                  <Download className="h-4 w-4 mr-2" />
+                  Download PDF
                 </Button>
               </div>
+              <p className="text-xs text-muted-foreground text-center max-w-md">
+                If the preview doesn't load, use the buttons above to view or download the PDF directly.
+              </p>
             </div>
-          ) : blobUrl ? (
-            // PDF viewer using object tag with iframe fallback - better browser support than embed
-            <object
-              data={blobUrl}
-              type="application/pdf"
-              className="w-full h-full min-h-[600px]"
-              title="Statement PDF"
-            >
-              {/* Fallback to iframe if object doesn't work */}
-              <iframe
-                src={blobUrl}
-                className="w-full h-full min-h-[600px] border-0"
-                title="Statement PDF"
-              />
-            </object>
           ) : (
-            <div className="absolute inset-0 flex items-center justify-center">
+            <div className="flex items-center justify-center h-full">
               <p className="text-muted-foreground">No statement to display</p>
             </div>
           )}
