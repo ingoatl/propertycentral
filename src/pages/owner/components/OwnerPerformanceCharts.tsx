@@ -1,5 +1,6 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import {
   AreaChart,
   Area,
@@ -10,9 +11,6 @@ import {
   ResponsiveContainer,
   BarChart,
   Bar,
-  Cell,
-  PieChart,
-  Pie,
 } from "recharts";
 import {
   TrendingUp,
@@ -22,7 +20,7 @@ import {
   Percent,
   Activity,
 } from "lucide-react";
-import { format, subMonths, startOfMonth } from "date-fns";
+import { format } from "date-fns";
 
 interface Statement {
   id: string;
@@ -38,23 +36,35 @@ interface OwnerPerformanceChartsProps {
   propertyName?: string;
 }
 
+type TimeFilter = "6m" | "12m" | "all";
+
 export function OwnerPerformanceCharts({ statements, propertyName }: OwnerPerformanceChartsProps) {
-  // Prepare chart data - last 12 months
+  const [timeFilter, setTimeFilter] = useState<TimeFilter>("all");
+
+  // Prepare chart data - filter based on selected time range
   const revenueData = useMemo(() => {
     const sortedStatements = [...statements].sort((a, b) => 
       new Date(a.reconciliation_month).getTime() - new Date(b.reconciliation_month).getTime()
     );
 
-    return sortedStatements.slice(-12).map(s => ({
-      month: format(new Date(s.reconciliation_month), "MMM"),
+    let filteredStatements = sortedStatements;
+    if (timeFilter === "6m") {
+      filteredStatements = sortedStatements.slice(-6);
+    } else if (timeFilter === "12m") {
+      filteredStatements = sortedStatements.slice(-12);
+    }
+    // "all" shows everything
+
+    return filteredStatements.map(s => ({
+      month: format(new Date(s.reconciliation_month), "MMM yy"),
       fullMonth: format(new Date(s.reconciliation_month), "MMMM yyyy"),
       revenue: s.total_revenue || 0,
       expenses: Math.abs(s.total_expenses || 0),
       net: s.net_to_owner || 0,
     }));
-  }, [statements]);
+  }, [statements, timeFilter]);
 
-  // Calculate metrics
+  // Calculate metrics from ALL data (not filtered)
   const metrics = useMemo(() => {
     if (statements.length === 0) return null;
 
@@ -91,6 +101,7 @@ export function OwnerPerformanceCharts({ statements, propertyName }: OwnerPerfor
       thisMonthRevenue: thisMonth?.total_revenue || 0,
       thisMonthNet: thisMonth?.net_to_owner || 0,
       lastMonthRevenue: lastMonth?.total_revenue || 0,
+      monthsOfData: statements.length,
     };
   }, [statements]);
 
@@ -138,8 +149,9 @@ export function OwnerPerformanceCharts({ statements, propertyName }: OwnerPerfor
           <CardContent className="pt-6">
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-sm text-muted-foreground font-medium">Avg Monthly Revenue</p>
-                <p className="text-2xl font-bold mt-1">{formatCurrency(metrics.avgMonthlyRevenue)}</p>
+                <p className="text-sm text-muted-foreground font-medium">Total Revenue</p>
+                <p className="text-2xl font-bold mt-1">{formatCurrency(metrics.totalRevenue)}</p>
+                <p className="text-xs text-muted-foreground mt-1">{metrics.monthsOfData} months</p>
               </div>
               <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center">
                 <DollarSign className="h-5 w-5 text-emerald-600" />
@@ -152,8 +164,9 @@ export function OwnerPerformanceCharts({ statements, propertyName }: OwnerPerfor
           <CardContent className="pt-6">
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-sm text-muted-foreground font-medium">Avg Monthly Net</p>
-                <p className="text-2xl font-bold mt-1">{formatCurrency(metrics.avgMonthlyNet)}</p>
+                <p className="text-sm text-muted-foreground font-medium">Total Net Earnings</p>
+                <p className="text-2xl font-bold mt-1">{formatCurrency(metrics.totalNet)}</p>
+                <p className="text-xs text-muted-foreground mt-1">After expenses</p>
               </div>
               <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center">
                 <TrendingUp className="h-5 w-5 text-blue-600" />
@@ -200,10 +213,35 @@ export function OwnerPerformanceCharts({ statements, propertyName }: OwnerPerfor
       {/* Revenue Trend Chart */}
       <Card className="border-none shadow-lg">
         <CardHeader className="pb-2">
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <TrendingUp className="h-5 w-5" />
-            Revenue Trend
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <TrendingUp className="h-5 w-5" />
+              Revenue Trend
+            </CardTitle>
+            <div className="flex gap-1">
+              <Button 
+                variant={timeFilter === "6m" ? "secondary" : "ghost"} 
+                size="sm"
+                onClick={() => setTimeFilter("6m")}
+              >
+                6M
+              </Button>
+              <Button 
+                variant={timeFilter === "12m" ? "secondary" : "ghost"} 
+                size="sm"
+                onClick={() => setTimeFilter("12m")}
+              >
+                12M
+              </Button>
+              <Button 
+                variant={timeFilter === "all" ? "secondary" : "ghost"} 
+                size="sm"
+                onClick={() => setTimeFilter("all")}
+              >
+                All
+              </Button>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="h-[300px]">

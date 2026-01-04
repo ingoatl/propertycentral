@@ -74,12 +74,13 @@ serve(async (req: Request): Promise<Response> => {
 
     const pdfPath = `${reconciliationId}.pdf`;
 
-    // Try to get existing PDF
+    // Try to get existing PDF first
+    console.log("Checking for existing PDF at:", pdfPath);
     const { data: signedUrlData, error: signedUrlError } = await supabase.storage
       .from("statement-pdfs")
       .createSignedUrl(pdfPath, 600); // 10 minutes
 
-    if (!signedUrlError && signedUrlData) {
+    if (!signedUrlError && signedUrlData?.signedUrl) {
       console.log("Existing PDF found, returning signed URL");
       return new Response(
         JSON.stringify({ 
@@ -91,7 +92,7 @@ serve(async (req: Request): Promise<Response> => {
     }
 
     // PDF doesn't exist - try to generate it
-    console.log("PDF not found, attempting to generate...");
+    console.log("PDF not found, generating new PDF...");
 
     try {
       const generateResponse = await fetch(`${supabaseUrl}/functions/v1/generate-statement-pdf`, {
@@ -103,55 +104,104 @@ serve(async (req: Request): Promise<Response> => {
         body: JSON.stringify({ reconciliationId }),
       });
 
-      if (generateResponse.ok) {
-        const generateData = await generateResponse.json();
-        
-        if (generateData.pdfBase64) {
-          // Upload the generated PDF
-          const pdfBytes = Uint8Array.from(atob(generateData.pdfBase64), c => c.charCodeAt(0));
-          
-          const { error: uploadError } = await supabase.storage
-            .from("statement-pdfs")
-            .upload(pdfPath, pdfBytes, {
-              contentType: "application/pdf",
-              upsert: true,
-            });
+      console.log("Generate PDF response status:", generateResponse.status);
 
-          if (uploadError) {
-            console.error("Failed to upload generated PDF:", uploadError);
-          } else {
-            console.log("PDF generated and uploaded successfully");
-            
-            // Now get signed URL for the newly uploaded PDF
-            const { data: newSignedUrl, error: newSignedError } = await supabase.storage
-              .from("statement-pdfs")
-              .createSignedUrl(pdfPath, 600);
-
-            if (!newSignedError && newSignedUrl) {
-              return new Response(
-                JSON.stringify({ 
-                  signedUrl: newSignedUrl.signedUrl,
-                  month: reconciliation.reconciliation_month,
-                  generated: true
-                }),
-                { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-              );
-            }
-          }
-        }
+      if (!generateResponse.ok) {
+        const errorText = await generateResponse.text();
+        console.error("PDF generation failed:", errorText);
+        return new Response(
+          JSON.stringify({ 
+            error: "Failed to generate statement PDF",
+            details: errorText,
+            month: reconciliation.reconciliation_month
+          }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
       }
+
+      const generateData = await generateResponse.json();
+      console.log("PDF generation response received:", { 
+        hasPdfBase64: !!generateData.pdfBase64,
+        fileName: generateData.fileName 
+      });
+      
+      if (!generateData.pdfBase64) {
+        console.error("No PDF data in response");
+        return new Response(
+          JSON.stringify({ 
+            error: "PDF generation returned no data",
+            month: reconciliation.reconciliation_month
+          }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Decode and upload the generated PDF
+      const pdfBytes = Uint8Array.from(atob(generateData.pdfBase64), c => c.charCodeAt(0));
+      console.log("PDF decoded, size:", pdfBytes.length, "bytes");
+      
+      const { error: uploadError } = await supabase.storage
+        .from("statement-pdfs")
+        .upload(pdfPath, pdfBytes, {
+          contentType: "application/pdf",
+          upsert: true,
+        });
+
+      if (uploadError) {
+        console.error("Failed to upload generated PDF:", uploadError);
+        // Return the PDF directly even if upload failed
+        return new Response(
+          JSON.stringify({ 
+            pdfBase64: generateData.pdfBase64,
+            fileName: generateData.fileName,
+            month: reconciliation.reconciliation_month,
+            generated: true,
+            uploadFailed: true
+          }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      console.log("PDF generated and uploaded successfully");
+      
+      // Get signed URL for the newly uploaded PDF
+      const { data: newSignedUrl, error: newSignedError } = await supabase.storage
+        .from("statement-pdfs")
+        .createSignedUrl(pdfPath, 600);
+
+      if (newSignedError || !newSignedUrl?.signedUrl) {
+        console.error("Failed to get signed URL for new PDF:", newSignedError);
+        return new Response(
+          JSON.stringify({ 
+            pdfBase64: generateData.pdfBase64,
+            fileName: generateData.fileName,
+            month: reconciliation.reconciliation_month,
+            generated: true
+          }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      return new Response(
+        JSON.stringify({ 
+          signedUrl: newSignedUrl.signedUrl,
+          month: reconciliation.reconciliation_month,
+          generated: true
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+
     } catch (genError) {
       console.error("Error generating PDF:", genError);
+      return new Response(
+        JSON.stringify({ 
+          error: "Failed to generate statement PDF",
+          details: genError instanceof Error ? genError.message : "Unknown error",
+          month: reconciliation.reconciliation_month
+        }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
-
-    // If we couldn't generate or get the PDF
-    return new Response(
-      JSON.stringify({ 
-        error: "Statement PDF not available. Please contact support.",
-        month: reconciliation.reconciliation_month
-      }),
-      { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
 
   } catch (error: unknown) {
     console.error("Owner statement PDF error:", error);

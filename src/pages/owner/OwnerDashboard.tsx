@@ -36,6 +36,7 @@ import { OwnerPerformanceOverview } from "./components/OwnerPerformanceOverview"
 import { OwnerReviewsCard } from "./components/OwnerReviewsCard";
 import { OwnerMarketInsightsEnhanced } from "./components/OwnerMarketInsightsEnhanced";
 import { OwnerPropertyTab } from "./components/OwnerPropertyTab";
+import { OwnerRevenueForecast } from "./components/OwnerRevenueForecast";
 
 interface OwnerSession {
   ownerId: string;
@@ -325,27 +326,38 @@ export default function OwnerDashboard() {
   const loadMarketInsights = async (propertyId: string) => {
     setLoadingInsights(true);
     setInsightsProgress(0);
-    setInsightsStep("Analyzing market data...");
+    setInsightsStep("Connecting to market data sources...");
     
-    // Simulate progress steps
+    // Real progress steps with meaningful descriptions
+    const progressSteps = [
+      { progress: 10, step: "Analyzing your property's performance..." },
+      { progress: 25, step: "Scanning comparable rentals in your area..." },
+      { progress: 40, step: "Gathering occupancy and rate data..." },
+      { progress: 55, step: "Identifying demand drivers and events..." },
+      { progress: 70, step: "Generating AI-powered insights..." },
+      { progress: 85, step: "Preparing personalized recommendations..." },
+      { progress: 95, step: "Finalizing your market report..." },
+    ];
+    
+    let stepIndex = 0;
     const progressInterval = setInterval(() => {
-      setInsightsProgress(prev => {
-        if (prev >= 90) return prev;
-        const step = prev < 30 ? 30 : prev < 60 ? 60 : 80;
-        if (prev < 30) setInsightsStep("Generating comparables...");
-        else if (prev < 60) setInsightsStep("Analyzing demand drivers...");
-        else setInsightsStep("Creating insights...");
-        return step;
-      });
-    }, 800);
+      if (stepIndex < progressSteps.length) {
+        setInsightsProgress(progressSteps[stepIndex].progress);
+        setInsightsStep(progressSteps[stepIndex].step);
+        stepIndex++;
+      }
+    }, 1200);
 
     try {
       const { data, error } = await supabase.functions.invoke("generate-market-insights", {
         body: { propertyId },
       });
 
+      clearInterval(progressInterval);
+
       if (error) {
         console.error("Error loading market insights:", error);
+        setInsightsStep("Failed to generate insights");
         return;
       }
 
@@ -354,6 +366,7 @@ export default function OwnerDashboard() {
       setMarketInsights(data);
     } catch (err) {
       console.error("Error loading market insights:", err);
+      setInsightsStep("Failed to generate insights");
     } finally {
       clearInterval(progressInterval);
       setLoadingInsights(false);
@@ -572,6 +585,11 @@ export default function OwnerDashboard() {
               {/* Performance Charts */}
               <OwnerPerformanceCharts statements={statements} propertyName={property?.name} />
 
+              {/* Revenue Forecast */}
+              {bookings && (
+                <OwnerRevenueForecast bookings={bookings} propertyName={property?.name} />
+              )}
+
               {/* Reviews Section */}
               {reviews.length > 0 && (
                 <OwnerReviewsCard
@@ -746,9 +764,6 @@ export default function OwnerDashboard() {
                           </div>
                         </div>
                         <div className="flex items-center gap-3">
-                          <Badge variant="secondary" className="capitalize">
-                            {statement.status.replace(/_/g, " ")}
-                          </Badge>
                           <Button
                             variant="outline"
                             size="icon"

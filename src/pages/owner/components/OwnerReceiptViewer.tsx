@@ -27,6 +27,7 @@ interface OwnerReceiptViewerProps {
 export function OwnerReceiptViewer({ expense, onClose, token }: OwnerReceiptViewerProps) {
   const [loading, setLoading] = useState(true);
   const [signedUrl, setSignedUrl] = useState<string | null>(null);
+  const [htmlContent, setHtmlContent] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [zoom, setZoom] = useState(100);
 
@@ -36,7 +37,7 @@ export function OwnerReceiptViewer({ expense, onClose, token }: OwnerReceiptView
   const isHtml = receiptPath?.toLowerCase().endsWith('.html');
 
   useEffect(() => {
-    const fetchSignedUrl = async () => {
+    const fetchReceipt = async () => {
       if (!receiptPath) {
         setError("No receipt file available");
         setLoading(false);
@@ -44,15 +45,33 @@ export function OwnerReceiptViewer({ expense, onClose, token }: OwnerReceiptView
       }
 
       try {
-        // Use edge function to bypass RLS
+        // Use edge function to get signed URL
         const { data, error: urlError } = await supabase.functions.invoke("owner-receipt-url", {
-          body: { expenseId: expense.id, token, filePath: receiptPath },
+          body: { expenseId: expense.id, token, filePath: receiptPath, returnContent: isHtml },
         });
 
         if (urlError) throw urlError;
         if (data?.error) throw new Error(data.error);
 
         setSignedUrl(data.signedUrl);
+
+        // For HTML files, fetch the content to render with srcdoc
+        if (isHtml && data.signedUrl) {
+          try {
+            const response = await fetch(data.signedUrl);
+            if (response.ok) {
+              const html = await response.text();
+              // Sanitize and prepare HTML for rendering
+              const sanitizedHtml = html
+                .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '') // Remove scripts
+                .replace(/onclick|onerror|onload|onmouseover/gi, 'data-removed'); // Remove event handlers
+              setHtmlContent(sanitizedHtml);
+            }
+          } catch (fetchErr) {
+            console.warn("Could not fetch HTML content, falling back to iframe src:", fetchErr);
+            // Will fall back to iframe with src
+          }
+        }
       } catch (err) {
         console.error("Error fetching receipt:", err);
         setError("Failed to load receipt");
@@ -61,10 +80,24 @@ export function OwnerReceiptViewer({ expense, onClose, token }: OwnerReceiptView
       }
     };
 
-    fetchSignedUrl();
-  }, [receiptPath, expense.id, token]);
+    fetchReceipt();
+  }, [receiptPath, expense.id, token, isHtml]);
 
   const handleDownload = () => {
+    if (signedUrl) {
+      // For downloads, always open in new tab
+      const link = document.createElement('a');
+      link.href = signedUrl;
+      link.target = '_blank';
+      link.download = `receipt-${expense.id}${isPdf ? '.pdf' : isHtml ? '.html' : '.png'}`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      toast.success("Download started");
+    }
+  };
+
+  const handleOpenExternal = () => {
     if (signedUrl) {
       window.open(signedUrl, "_blank");
       toast.success("Receipt opened in new tab");
@@ -114,7 +147,7 @@ export function OwnerReceiptViewer({ expense, onClose, token }: OwnerReceiptView
                   </Button>
                 </>
               )}
-              <Button variant="outline" size="sm" onClick={handleDownload} disabled={!signedUrl}>
+              <Button variant="outline" size="sm" onClick={handleOpenExternal} disabled={!signedUrl}>
                 <ExternalLink className="h-4 w-4 mr-2" />
                 Open
               </Button>
@@ -136,7 +169,7 @@ export function OwnerReceiptViewer({ expense, onClose, token }: OwnerReceiptView
               <div className="text-center">
                 <X className="h-12 w-12 mx-auto text-destructive/50 mb-4" />
                 <p className="text-destructive">{error}</p>
-                <Button variant="outline" onClick={handleDownload} className="mt-4">
+                <Button variant="outline" onClick={handleOpenExternal} className="mt-4">
                   Try Opening Directly
                 </Button>
               </div>
@@ -149,13 +182,23 @@ export function OwnerReceiptViewer({ expense, onClose, token }: OwnerReceiptView
                 className="w-full h-full min-h-[500px] rounded-lg"
                 title="Receipt PDF"
               />
+            ) : isHtml && htmlContent ? (
+              // HTML Viewer using srcdoc for proper rendering
+              <iframe
+                srcDoc={htmlContent}
+                className="w-full h-full min-h-[500px] bg-white rounded-lg"
+                title="Receipt HTML"
+                sandbox="allow-same-origin"
+                style={{ border: 'none' }}
+              />
             ) : isHtml ? (
-              // HTML Viewer
+              // Fallback: HTML Viewer using src with sandbox
               <iframe
                 src={signedUrl}
                 className="w-full h-full min-h-[500px] bg-white rounded-lg"
                 title="Receipt HTML"
                 sandbox="allow-same-origin"
+                style={{ border: 'none' }}
               />
             ) : (
               // Image Viewer

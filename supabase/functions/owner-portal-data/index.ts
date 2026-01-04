@@ -104,14 +104,14 @@ serve(async (req: Request): Promise<Response> => {
       emailInsightsResult,
       propertyDetailsResult,
     ] = await Promise.all([
-      // Monthly reconciliations (statements)
+      // Monthly reconciliations (statements) - fetch all historical data
       supabase
         .from("monthly_reconciliations")
         .select("id, reconciliation_month, total_revenue, total_expenses, net_to_owner, status, short_term_revenue, mid_term_revenue")
         .eq("property_id", property.id)
         .in("status", ["statement_sent", "approved", "preview", "pending"])
         .order("reconciliation_month", { ascending: false })
-        .limit(24),
+        .limit(60), // 5 years of data
       
       // Expenses - ONLY show approved expenses (billed or with reconciliation)
       supabase
@@ -188,6 +188,17 @@ serve(async (req: Request): Promise<Response> => {
       reviews: reviews.length,
       emailInsights: emailInsights.length,
     });
+
+    // Log MTR bookings for debugging
+    if (mtrBookings.length > 0) {
+      console.log("MTR Bookings found:", mtrBookings.map(b => ({
+        id: b.id,
+        tenant: b.tenant_name,
+        dates: `${b.start_date} to ${b.end_date}`,
+        rent: b.monthly_rent,
+        status: b.status,
+      })));
+    }
 
     // Filter valid bookings for revenue calculations (exclude canceled and owner blocks)
     const validSTRBookings = strBookings.filter(b => 
