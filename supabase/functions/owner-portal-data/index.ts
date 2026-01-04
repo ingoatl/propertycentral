@@ -147,12 +147,12 @@ serve(async (req: Request): Promise<Response> => {
         .order("reconciliation_month", { ascending: false })
         .limit(60), // 5 years of data
       
-      // Expenses - ONLY show approved expenses (billed or with reconciliation)
+      // Expenses - Show ALL expenses for the property (owners should see all receipts logged)
+      // This includes billed, reconciled, AND new expenses with receipts not yet processed
       supabase
         .from("expenses")
         .select("id, date, amount, purpose, vendor, category, file_path, original_receipt_path, email_screenshot_path, items_detail")
         .eq("property_id", property.id)
-        .or("billed.eq.true,reconciliation_id.not.is.null")
         .order("date", { ascending: false })
         .limit(200),
       
