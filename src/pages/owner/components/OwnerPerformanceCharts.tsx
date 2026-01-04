@@ -148,6 +148,20 @@ export function OwnerPerformanceCharts({ statements, monthlyRevenueData, propert
       mtr: (s as any).mid_term_revenue || 0,
     }));
 
+    // Calculate date range labels for clarity
+    const oldestStatement = sortedStatements[sortedStatements.length - 1];
+    const newestStatement = sortedStatements[0];
+    
+    const dateRangeLabel = oldestStatement && newestStatement
+      ? `${format(new Date(oldestStatement.reconciliation_month), "MMM yyyy")} – ${format(new Date(newestStatement.reconciliation_month), "MMM yyyy")}`
+      : "N/A";
+
+    const thisMonthShort = thisMonth ? format(new Date(thisMonth.reconciliation_month), "MMM") : "";
+    const lastMonthShort = lastMonth ? format(new Date(lastMonth.reconciliation_month), "MMM") : "";
+    const momComparisonLabel = thisMonth && lastMonth
+      ? `${thisMonthShort} vs ${lastMonthShort} ${format(new Date(thisMonth.reconciliation_month), "yyyy")}`
+      : "N/A";
+
     return {
       totalRevenue,
       totalNet,
@@ -165,6 +179,8 @@ export function OwnerPerformanceCharts({ statements, monthlyRevenueData, propert
       recentStatements,
       thisMonthLabel: thisMonth ? format(new Date(thisMonth.reconciliation_month), "MMMM yyyy") : "N/A",
       lastMonthLabel: lastMonth ? format(new Date(lastMonth.reconciliation_month), "MMMM yyyy") : "N/A",
+      dateRangeLabel,
+      momComparisonLabel,
     };
   }, [statements]);
 
@@ -219,7 +235,7 @@ export function OwnerPerformanceCharts({ statements, monthlyRevenueData, propert
                 <p className="text-sm text-muted-foreground font-medium">Total Revenue</p>
                 <p className="text-2xl font-bold mt-1">{formatCurrency(metrics.totalRevenue)}</p>
                 <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-                  {metrics.monthsOfData} months
+                  {metrics.dateRangeLabel}
                   <ChevronRight className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
                 </p>
               </div>
@@ -241,7 +257,7 @@ export function OwnerPerformanceCharts({ statements, monthlyRevenueData, propert
                 <p className="text-sm text-muted-foreground font-medium">Total Net Earnings</p>
                 <p className="text-2xl font-bold mt-1">{formatCurrency(metrics.totalNet)}</p>
                 <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-                  After expenses
+                  {metrics.dateRangeLabel} (after fees)
                   <ChevronRight className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
                 </p>
               </div>
@@ -272,7 +288,7 @@ export function OwnerPerformanceCharts({ statements, monthlyRevenueData, propert
                   )}
                 </div>
                 <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-                  Revenue change
+                  {metrics.momComparisonLabel}
                   <ChevronRight className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
                 </p>
               </div>
@@ -291,7 +307,7 @@ export function OwnerPerformanceCharts({ statements, monthlyRevenueData, propert
                 <p className="text-sm text-muted-foreground font-medium">Expense Ratio</p>
                 <p className="text-2xl font-bold mt-1">{metrics.expenseRatio.toFixed(1)}%</p>
                 <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
-                  Of revenue
+                  {metrics.dateRangeLabel} avg
                   <ChevronRight className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
                 </p>
               </div>

@@ -18,6 +18,7 @@ interface OwnerEmailInfo {
 
 interface PropertyInfo {
   name?: string;
+  address?: string;
   rentalType?: string;
 }
 
@@ -27,21 +28,25 @@ const sendMagicLinkEmail = async (
   propertyInfo?: PropertyInfo
 ): Promise<boolean> => {
   try {
-    const propertyName = propertyInfo?.name;
+    const propertyName = propertyInfo?.name || "Your Property";
+    const propertyAddress = propertyInfo?.address || "";
     const rentalType = propertyInfo?.rentalType || "hybrid";
-    const isMTR = rentalType === "mid_term";
-
-    const propertyTypeLabel = isMTR ? "Mid-Term Rental" : rentalType === "hybrid" ? "Hybrid Portfolio" : "Short-Term Rental";
     
+    const accessTypeLabel = rentalType === "mid_term" 
+      ? "MID-TERM" 
+      : rentalType === "long_term" 
+        ? "LONG-TERM" 
+        : "SHORT-TERM";
+
     const storageUrl = "https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images";
-    const logoUrl = `${storageUrl}/peachhaus-logo.png`;
+    const logoUrl = `${storageUrl}/peachhaus-logo-full.png`;
     const headshotUrl = `${storageUrl}/ingo-headshot.png`;
     const signatureUrl = `${storageUrl}/ingo-signature.png`;
 
     const { error: emailError } = await resend.emails.send({
       from: "PeachHaus Group LLC <admin@peachhausgroup.com>",
       to: [owner.email],
-      subject: `Your Owner Portal Access${propertyName ? ` — ${propertyName}` : ''}`,
+      subject: `Your Owner Portal Access — ${propertyName}`,
       html: `
         <!DOCTYPE html>
         <html>
@@ -49,161 +54,204 @@ const sendMagicLinkEmail = async (
             <meta charset="utf-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
           </head>
-          <body style="margin: 0; padding: 0; background: #f8f9fa; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; -webkit-font-smoothing: antialiased;">
-            <div style="max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 8px; overflow: hidden; margin-top: 32px; margin-bottom: 32px; box-shadow: 0 4px 24px rgba(0,0,0,0.06);">
+          <body style="margin: 0; padding: 0; background: #f5f9ff; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; -webkit-font-smoothing: antialiased;">
+            <div style="max-width: 650px; margin: 0 auto; background: #ffffff; margin-top: 32px; margin-bottom: 32px;">
               
-              <!-- Premium Header -->
-              <div style="background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%); padding: 40px; text-align: center;">
-                <img src="${logoUrl}" alt="PeachHaus" style="height: 48px; margin-bottom: 24px;" />
-                <h1 style="margin: 0; font-size: 32px; font-weight: 700; color: #ffffff; letter-spacing: -0.5px; line-height: 1.2;">Owner Portal</h1>
-                ${propertyName ? `
-                  <p style="margin: 16px 0 0 0; font-size: 16px; color: rgba(255,255,255,0.85); font-weight: 400;">${propertyName}</p>
-                ` : ''}
-                <div style="margin-top: 20px;">
-                  <span style="display: inline-block; padding: 8px 20px; background: rgba(255,255,255,0.1); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.2); border-radius: 100px; font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.9); text-transform: uppercase; letter-spacing: 1.5px;">${propertyTypeLabel}</span>
-                </div>
+              <!-- Header Section - Matching Statement Layout -->
+              <div style="padding: 32px 40px; border-bottom: 1px solid #e5e7eb;">
+                <table cellpadding="0" cellspacing="0" border="0" width="100%">
+                  <tr>
+                    <td style="vertical-align: middle;">
+                      <img src="${logoUrl}" alt="PeachHaus Property Management" style="height: 56px;" />
+                    </td>
+                    <td style="text-align: right; vertical-align: middle;">
+                      <p style="margin: 0; font-size: 24px; font-weight: 700; color: #1a3b4c; letter-spacing: 1px;">OWNER PORTAL</p>
+                      <p style="margin: 4px 0 0 0; font-size: 13px; color: #64748b; font-weight: 500; letter-spacing: 0.5px;">INVITE</p>
+                    </td>
+                  </tr>
+                </table>
+              </div>
+              
+              <!-- Property Info Row -->
+              <div style="padding: 24px 40px; background: #f8fafc; border-bottom: 1px solid #e5e7eb;">
+                <table cellpadding="0" cellspacing="0" border="0" width="100%">
+                  <tr>
+                    <td style="vertical-align: top;">
+                      <p style="margin: 0; font-size: 10px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 1px;">PROPERTY</p>
+                      <p style="margin: 6px 0 0 0; font-size: 15px; font-weight: 600; color: #1a1a1a;">${propertyName}</p>
+                      ${propertyAddress ? `<p style="margin: 2px 0 0 0; font-size: 13px; color: #64748b;">${propertyAddress}</p>` : ''}
+                    </td>
+                    <td style="text-align: right; vertical-align: top;">
+                      <p style="margin: 0; font-size: 10px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 1px;">ACCESS TYPE</p>
+                      <p style="margin: 6px 0 0 0; font-size: 14px; font-weight: 600; color: #1a3b4c;">${accessTypeLabel}</p>
+                    </td>
+                  </tr>
+                </table>
               </div>
               
               <!-- Main Content -->
-              <div style="padding: 48px 40px;">
-                <p style="font-size: 18px; line-height: 1.5; color: #1a1a1a; margin: 0 0 8px 0; font-weight: 600;">
+              <div style="padding: 40px;">
+                <p style="font-size: 16px; line-height: 1.5; color: #1a1a1a; margin: 0 0 8px 0;">
                   Dear ${owner.name.split(' ')[0]},
                 </p>
                 
-                <p style="font-size: 15px; line-height: 1.75; color: #4a5568; margin: 16px 0 40px 0;">
-                  Your personalized owner dashboard is ready. Access comprehensive performance metrics, financial statements, and AI-powered market insights—all in one secure location.
+                <p style="font-size: 15px; line-height: 1.75; color: #4a5568; margin: 20px 0 32px 0;">
+                  Welcome to your personalized Owner Portal! We're excited to give you instant access to everything happening with your property—all in one secure, easy-to-use dashboard.
                 </p>
                 
-                <!-- CTA Button -->
-                <div style="text-align: center; margin: 40px 0;">
-                  <a href="${portalUrl}" style="display: inline-block; background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: #ffffff; padding: 18px 56px; border-radius: 8px; text-decoration: none; font-size: 16px; font-weight: 700; letter-spacing: 0.3px; box-shadow: 0 4px 16px rgba(245,158,11,0.35); transition: all 0.2s ease;">
-                    Access Your Dashboard →
+                <!-- CTA Box -->
+                <div style="background: #1a3b4c; border-radius: 8px; padding: 32px; text-align: center; margin: 32px 0;">
+                  <p style="margin: 0 0 20px 0; font-size: 14px; font-weight: 600; color: rgba(255,255,255,0.9); text-transform: uppercase; letter-spacing: 1px;">ACCESS YOUR PORTAL</p>
+                  <a href="${portalUrl}" style="display: inline-block; background: #f59e0b; color: #ffffff; padding: 16px 48px; border-radius: 6px; text-decoration: none; font-size: 15px; font-weight: 700; letter-spacing: 0.3px;">
+                    Open Portal →
                   </a>
-                </div>
-                
-                <!-- Bookmark Tip -->
-                <div style="text-align: center; margin: 32px 0; padding: 16px 24px; background: linear-gradient(135deg, #fef3c7 0%, #fef9e7 100%); border-radius: 8px; border: 1px solid #fcd34d;">
-                  <p style="font-size: 13px; color: #92400e; margin: 0; font-weight: 500;">
-                    💡 <strong>Pro tip:</strong> Bookmark this link for instant access anytime
+                  <p style="margin: 20px 0 0 0; font-size: 12px; color: rgba(255,255,255,0.6);">
+                    Bookmark this link for instant access anytime
                   </p>
                 </div>
-              </div>
-              
-              <!-- Features Section -->
-              <div style="padding: 0 40px 48px;">
-                <div style="border-top: 1px solid #e2e8f0; padding-top: 40px;">
-                  <h2 style="font-size: 12px; font-weight: 700; color: #64748b; margin: 0 0 24px 0; text-transform: uppercase; letter-spacing: 1.5px;">What's Included</h2>
+                
+                <!-- What You'll Discover Section -->
+                <div style="margin-top: 40px;">
+                  <p style="margin: 0 0 24px 0; font-size: 12px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 1.5px;">What You'll Discover</p>
                   
-                  <div style="display: block;">
+                  <p style="font-size: 14px; line-height: 1.8; color: #4a5568; margin: 0 0 24px 0;">
+                    Your portal is packed with powerful features designed to keep you informed and in control:
+                  </p>
+                  
+                  <table cellpadding="0" cellspacing="0" border="0" width="100%">
                     <!-- Feature 1 -->
-                    <div style="padding: 16px 0; border-bottom: 1px solid #f1f5f9;">
-                      <table cellpadding="0" cellspacing="0" border="0" width="100%">
-                        <tr>
-                          <td width="40" style="vertical-align: top;">
-                            <div style="width: 32px; height: 32px; background: #f0fdf4; border-radius: 8px; text-align: center; line-height: 32px; font-size: 16px;">📊</div>
-                          </td>
-                          <td style="vertical-align: top; padding-left: 12px;">
-                            <p style="margin: 0; font-size: 14px; font-weight: 600; color: #1a1a1a;">Performance Overview</p>
-                            <p style="margin: 4px 0 0 0; font-size: 13px; color: #64748b; line-height: 1.5;">Revenue trends, occupancy rates, and key performance indicators</p>
-                          </td>
-                        </tr>
-                      </table>
-                    </div>
+                    <tr>
+                      <td style="padding: 12px 0; border-bottom: 1px solid #f1f5f9;">
+                        <table cellpadding="0" cellspacing="0" border="0" width="100%">
+                          <tr>
+                            <td width="28" style="vertical-align: top;">
+                              <span style="color: #10b981; font-size: 16px;">✓</span>
+                            </td>
+                            <td style="vertical-align: top;">
+                              <p style="margin: 0; font-size: 14px; font-weight: 600; color: #1a1a1a;">Live Performance Dashboard</p>
+                              <p style="margin: 4px 0 0 0; font-size: 13px; color: #64748b; line-height: 1.5;">Watch your revenue, occupancy, and growth metrics update in real-time with beautiful charts and insights</p>
+                            </td>
+                          </tr>
+                        </table>
+                      </td>
+                    </tr>
                     
-                    <!-- Feature 2 - AI Insights (Highlighted) -->
-                    <div style="padding: 16px; margin: 8px -16px; background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%); border-radius: 8px; border: 1px solid #fcd34d;">
-                      <table cellpadding="0" cellspacing="0" border="0" width="100%">
-                        <tr>
-                          <td width="40" style="vertical-align: top;">
-                            <div style="width: 32px; height: 32px; background: #fbbf24; border-radius: 8px; text-align: center; line-height: 32px; font-size: 16px;">✨</div>
-                          </td>
-                          <td style="vertical-align: top; padding-left: 12px;">
-                            <p style="margin: 0; font-size: 14px; font-weight: 600; color: #1a1a1a;">
-                              Market Insights 
-                              <span style="display: inline-block; padding: 2px 8px; background: #1a1a1a; color: #fff; font-size: 9px; border-radius: 4px; margin-left: 8px; vertical-align: middle; font-weight: 700; letter-spacing: 0.5px;">AI-POWERED</span>
-                            </p>
-                            <p style="margin: 4px 0 0 0; font-size: 13px; color: #78350f; line-height: 1.5;">
-                              ${isMTR 
-                                ? "Corporate housing demand, insurance placement trends, and positioning recommendations"
-                                : "AI-driven market analysis, local event demand, and revenue optimization strategies"
-                              }
-                            </p>
-                          </td>
-                        </tr>
-                      </table>
-                    </div>
+                    <!-- Feature 2 - AI Insights Highlighted -->
+                    <tr>
+                      <td style="padding: 16px; margin: 8px 0; background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%); border-radius: 8px; border: 1px solid #fcd34d;">
+                        <table cellpadding="0" cellspacing="0" border="0" width="100%">
+                          <tr>
+                            <td width="28" style="vertical-align: top;">
+                              <span style="color: #f59e0b; font-size: 16px;">✨</span>
+                            </td>
+                            <td style="vertical-align: top;">
+                              <p style="margin: 0; font-size: 14px; font-weight: 600; color: #1a1a1a;">
+                                AI-Powered Market Insights
+                                <span style="display: inline-block; padding: 2px 8px; background: #1a1a1a; color: #fff; font-size: 9px; border-radius: 4px; margin-left: 8px; vertical-align: middle; font-weight: 700; letter-spacing: 0.5px;">NEW</span>
+                              </p>
+                              <p style="margin: 4px 0 0 0; font-size: 13px; color: #78350f; line-height: 1.5;">Get personalized recommendations on pricing, demand trends, and opportunities to maximize your returns</p>
+                            </td>
+                          </tr>
+                        </table>
+                      </td>
+                    </tr>
                     
                     <!-- Feature 3 -->
-                    <div style="padding: 16px 0; border-bottom: 1px solid #f1f5f9;">
-                      <table cellpadding="0" cellspacing="0" border="0" width="100%">
-                        <tr>
-                          <td width="40" style="vertical-align: top;">
-                            <div style="width: 32px; height: 32px; background: #eff6ff; border-radius: 8px; text-align: center; line-height: 32px; font-size: 16px;">📅</div>
-                          </td>
-                          <td style="vertical-align: top; padding-left: 12px;">
-                            <p style="margin: 0; font-size: 14px; font-weight: 600; color: #1a1a1a;">Bookings</p>
-                            <p style="margin: 4px 0 0 0; font-size: 13px; color: #64748b; line-height: 1.5;">${isMTR ? "Current and historical tenant placements" : "Guest reservations and booking history"}</p>
-                          </td>
-                        </tr>
-                      </table>
-                    </div>
+                    <tr>
+                      <td style="padding: 12px 0; border-bottom: 1px solid #f1f5f9;">
+                        <table cellpadding="0" cellspacing="0" border="0" width="100%">
+                          <tr>
+                            <td width="28" style="vertical-align: top;">
+                              <span style="color: #10b981; font-size: 16px;">✓</span>
+                            </td>
+                            <td style="vertical-align: top;">
+                              <p style="margin: 0; font-size: 14px; font-weight: 600; color: #1a1a1a;">Complete Booking History</p>
+                              <p style="margin: 4px 0 0 0; font-size: 13px; color: #64748b; line-height: 1.5;">See every reservation with guest details, check-in/out dates, and earnings breakdown</p>
+                            </td>
+                          </tr>
+                        </table>
+                      </td>
+                    </tr>
                     
                     <!-- Feature 4 -->
-                    <div style="padding: 16px 0; border-bottom: 1px solid #f1f5f9;">
-                      <table cellpadding="0" cellspacing="0" border="0" width="100%">
-                        <tr>
-                          <td width="40" style="vertical-align: top;">
-                            <div style="width: 32px; height: 32px; background: #f0fdf4; border-radius: 8px; text-align: center; line-height: 32px; font-size: 16px;">📄</div>
-                          </td>
-                          <td style="vertical-align: top; padding-left: 12px;">
-                            <p style="margin: 0; font-size: 14px; font-weight: 600; color: #1a1a1a;">Monthly Statements</p>
-                            <p style="margin: 4px 0 0 0; font-size: 13px; color: #64748b; line-height: 1.5;">Detailed income statements with revenue breakdown</p>
-                          </td>
-                        </tr>
-                      </table>
-                    </div>
+                    <tr>
+                      <td style="padding: 12px 0; border-bottom: 1px solid #f1f5f9;">
+                        <table cellpadding="0" cellspacing="0" border="0" width="100%">
+                          <tr>
+                            <td width="28" style="vertical-align: top;">
+                              <span style="color: #10b981; font-size: 16px;">✓</span>
+                            </td>
+                            <td style="vertical-align: top;">
+                              <p style="margin: 0; font-size: 14px; font-weight: 600; color: #1a1a1a;">Monthly Statements</p>
+                              <p style="margin: 4px 0 0 0; font-size: 13px; color: #64748b; line-height: 1.5;">Download professional PDF statements showing income, fees, expenses, and net earnings</p>
+                            </td>
+                          </tr>
+                        </table>
+                      </td>
+                    </tr>
                     
                     <!-- Feature 5 -->
-                    <div style="padding: 16px 0; border-bottom: 1px solid #f1f5f9;">
-                      <table cellpadding="0" cellspacing="0" border="0" width="100%">
-                        <tr>
-                          <td width="40" style="vertical-align: top;">
-                            <div style="width: 32px; height: 32px; background: #fef2f2; border-radius: 8px; text-align: center; line-height: 32px; font-size: 16px;">🧾</div>
-                          </td>
-                          <td style="vertical-align: top; padding-left: 12px;">
-                            <p style="margin: 0; font-size: 14px; font-weight: 600; color: #1a1a1a;">Receipts & Expenses</p>
-                            <p style="margin: 4px 0 0 0; font-size: 13px; color: #64748b; line-height: 1.5;">Complete expense records with attached receipts</p>
-                          </td>
-                        </tr>
-                      </table>
-                    </div>
+                    <tr>
+                      <td style="padding: 12px 0; border-bottom: 1px solid #f1f5f9;">
+                        <table cellpadding="0" cellspacing="0" border="0" width="100%">
+                          <tr>
+                            <td width="28" style="vertical-align: top;">
+                              <span style="color: #10b981; font-size: 16px;">✓</span>
+                            </td>
+                            <td style="vertical-align: top;">
+                              <p style="margin: 0; font-size: 14px; font-weight: 600; color: #1a1a1a;">Receipts & Expense Records</p>
+                              <p style="margin: 4px 0 0 0; font-size: 13px; color: #64748b; line-height: 1.5;">Full transparency on every purchase made for your property with photos of receipts</p>
+                            </td>
+                          </tr>
+                        </table>
+                      </td>
+                    </tr>
                     
                     <!-- Feature 6 -->
-                    <div style="padding: 16px 0;">
-                      <table cellpadding="0" cellspacing="0" border="0" width="100%">
-                        <tr>
-                          <td width="40" style="vertical-align: top;">
-                            <div style="width: 32px; height: 32px; background: #f5f3ff; border-radius: 8px; text-align: center; line-height: 32px; font-size: 16px;">🏠</div>
-                          </td>
-                          <td style="vertical-align: top; padding-left: 12px;">
-                            <p style="margin: 0; font-size: 14px; font-weight: 600; color: #1a1a1a;">Property Details</p>
-                            <p style="margin: 4px 0 0 0; font-size: 13px; color: #64748b; line-height: 1.5;">Access codes, WiFi credentials, and documentation</p>
-                          </td>
-                        </tr>
-                      </table>
-                    </div>
-                  </div>
+                    <tr>
+                      <td style="padding: 12px 0;">
+                        <table cellpadding="0" cellspacing="0" border="0" width="100%">
+                          <tr>
+                            <td width="28" style="vertical-align: top;">
+                              <span style="color: #10b981; font-size: 16px;">✓</span>
+                            </td>
+                            <td style="vertical-align: top;">
+                              <p style="margin: 0; font-size: 14px; font-weight: 600; color: #1a1a1a;">Property Details & Access Codes</p>
+                              <p style="margin: 4px 0 0 0; font-size: 13px; color: #64748b; line-height: 1.5;">WiFi passwords, door codes, and important property documentation all in one place</p>
+                            </td>
+                          </tr>
+                        </table>
+                      </td>
+                    </tr>
+                  </table>
+                </div>
+                
+                <!-- View Your Owner Portal Box -->
+                <div style="margin-top: 40px; padding: 24px; background: #f8fafc; border-radius: 8px; border: 1px solid #e5e7eb;">
+                  <table cellpadding="0" cellspacing="0" border="0" width="100%">
+                    <tr>
+                      <td style="vertical-align: middle;">
+                        <p style="margin: 0; font-size: 14px; font-weight: 600; color: #1a1a1a;">View Your Owner Portal</p>
+                        <p style="margin: 4px 0 0 0; font-size: 13px; color: #64748b;">Access your dashboard anytime, anywhere</p>
+                      </td>
+                      <td style="text-align: right; vertical-align: middle;">
+                        <a href="${portalUrl}" style="display: inline-block; background: #f59e0b; color: #ffffff; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-size: 14px; font-weight: 600;">
+                          Open Portal →
+                        </a>
+                      </td>
+                    </tr>
+                  </table>
                 </div>
                 
                 <!-- Security Notice -->
-                <div style="margin-top: 32px; padding: 20px; background: #f8fafc; border-radius: 8px; border-left: 4px solid #1a1a1a;">
+                <div style="margin-top: 32px; padding: 16px 20px; background: #f8fafc; border-radius: 8px; border-left: 4px solid #1a3b4c;">
                   <table cellpadding="0" cellspacing="0" border="0" width="100%">
                     <tr>
                       <td width="24" style="vertical-align: top;">
-                        <span style="font-size: 16px;">🔒</span>
+                        <span style="font-size: 14px;">🔒</span>
                       </td>
-                      <td style="vertical-align: top; padding-left: 12px;">
-                        <p style="font-size: 13px; color: #475569; margin: 0; line-height: 1.6;">
+                      <td style="vertical-align: top; padding-left: 8px;">
+                        <p style="font-size: 12px; color: #475569; margin: 0; line-height: 1.6;">
                           <strong style="color: #1e293b;">Security Note:</strong> This is your private, secure link. Your data is encrypted and refreshed each time you access the portal.
                         </p>
                       </td>
@@ -213,29 +261,29 @@ const sendMagicLinkEmail = async (
               </div>
               
               <!-- Signature Section -->
-              <div style="padding: 40px; background: #f8fafc; border-top: 1px solid #e2e8f0;">
+              <div style="padding: 32px 40px; background: #f8fafc; border-top: 1px solid #e5e7eb;">
                 <table cellpadding="0" cellspacing="0" border="0" style="width: 100%;">
                   <tr>
                     <td style="vertical-align: top; width: 72px;">
-                      <img src="${headshotUrl}" alt="Ingo & Anja Schaer" style="width: 64px; height: 64px; border-radius: 50%; border: 3px solid #fff; box-shadow: 0 4px 12px rgba(0,0,0,0.08);" />
+                      <img src="${headshotUrl}" alt="Ingo & Anja Schaer" style="width: 60px; height: 60px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.08);" />
                     </td>
-                    <td style="vertical-align: top; padding-left: 20px;">
-                      <img src="${signatureUrl}" alt="Signature" style="height: 32px; margin-bottom: 8px; opacity: 0.85;" />
-                      <p style="margin: 0; font-size: 15px; font-weight: 700; color: #1a1a1a;">Ingo & Anja Schaer</p>
-                      <p style="margin: 4px 0 0 0; font-size: 13px; color: #64748b;">Founders, PeachHaus Group</p>
+                    <td style="vertical-align: top; padding-left: 16px;">
+                      <img src="${signatureUrl}" alt="Signature" style="height: 28px; margin-bottom: 6px; opacity: 0.85;" />
+                      <p style="margin: 0; font-size: 14px; font-weight: 600; color: #1a1a1a;">Ingo & Anja Schaer</p>
+                      <p style="margin: 2px 0 0 0; font-size: 12px; color: #64748b;">Founders, PeachHaus Group</p>
                     </td>
                   </tr>
                 </table>
               </div>
               
               <!-- Footer -->
-              <div style="padding: 24px 40px; background: #1a1a1a; text-align: center;">
-                <p style="font-size: 12px; color: rgba(255,255,255,0.7); margin: 0 0 8px 0; font-weight: 500;">
+              <div style="padding: 20px 40px; background: #1a3b4c; text-align: center;">
+                <p style="font-size: 12px; color: rgba(255,255,255,0.8); margin: 0 0 4px 0; font-weight: 500;">
                   PeachHaus Group LLC · Atlanta, Georgia
                 </p>
-                <p style="font-size: 11px; color: rgba(255,255,255,0.5); margin: 0;">
-                  <a href="mailto:info@peachhausgroup.com" style="color: rgba(255,255,255,0.5); text-decoration: none;">info@peachhausgroup.com</a> · 
-                  <a href="https://peachhausgroup.com" style="color: rgba(255,255,255,0.5); text-decoration: none;">peachhausgroup.com</a>
+                <p style="font-size: 11px; color: rgba(255,255,255,0.6); margin: 0;">
+                  <a href="mailto:info@peachhausgroup.com" style="color: rgba(255,255,255,0.6); text-decoration: none;">info@peachhausgroup.com</a> · 
+                  <a href="https://peachhausgroup.com" style="color: rgba(255,255,255,0.6); text-decoration: none;">peachhausgroup.com</a>
                 </p>
               </div>
               
