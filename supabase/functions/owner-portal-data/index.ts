@@ -130,21 +130,23 @@ serve(async (req: Request): Promise<Response> => {
         .eq("property_id", property.id)
         .order("service_name"),
       
-      // STR bookings (OwnerRez) - exclude canceled and zero-amount - extended to 24 months
+      // STR bookings (OwnerRez) - exclude canceled and zero-amount - ALL historical data
       supabase
         .from("ownerrez_bookings")
         .select("id, booking_id, guest_name, check_in, check_out, total_amount, management_fee, booking_status, ownerrez_listing_name")
         .eq("property_id", property.id)
+        .not("booking_status", "eq", "canceled")
+        .not("booking_status", "eq", "Canceled")
         .order("check_in", { ascending: false })
-        .limit(200), // Extended for historical data
+        .limit(500), // Extended for ALL historical data
       
-      // MTR bookings - extended for historical data
+      // MTR bookings - ALL historical data
       supabase
         .from("mid_term_bookings")
         .select("id, tenant_name, tenant_email, start_date, end_date, monthly_rent, security_deposit, status, notes")
         .eq("property_id", property.id)
         .order("start_date", { ascending: false })
-        .limit(100), // Extended for historical data
+        .limit(200), // Extended for ALL historical data
       
       // Reviews - use correct column names
       supabase
@@ -222,11 +224,19 @@ serve(async (req: Request): Promise<Response> => {
       })));
     }
 
-    // Filter valid bookings for revenue calculations (exclude canceled and owner blocks)
+    // Include ALL valid bookings (not just those with amounts for revenue, but all for counting/display)
+    const allSTRBookings = strBookings.filter(b => 
+      b.booking_status !== 'canceled' && 
+      b.booking_status !== 'Canceled' &&
+      b.booking_status !== 'owner_block'
+    );
+    
+    // Filter valid bookings for revenue calculations (exclude canceled, owner blocks, and zero-amount)
     const validSTRBookings = strBookings.filter(b => 
       b.total_amount > 0 && 
       b.booking_status !== 'canceled' && 
-      b.booking_status !== 'Canceled'
+      b.booking_status !== 'Canceled' &&
+      b.booking_status !== 'owner_block'
     );
 
     // Calculate performance metrics from actual data
@@ -376,13 +386,13 @@ serve(async (req: Request): Promise<Response> => {
         date: e.email_date || e.created_at,
       }));
 
-    // Build performance object
+    // Build performance object - use allSTRBookings for counts, validSTRBookings for revenue
     const performance = {
       totalRevenue,
       strRevenue,
       mtrRevenue,
-      totalBookings: validSTRBookings.length + mtrBookings.length,
-      strBookings: validSTRBookings.length,
+      totalBookings: allSTRBookings.length + mtrBookings.length,
+      strBookings: allSTRBookings.length,
       mtrBookings: mtrBookings.length,
       occupancyRate,
       averageRating,
@@ -417,7 +427,7 @@ serve(async (req: Request): Promise<Response> => {
       expenses,
       credentials,
       bookings: {
-        str: strBookings,
+        str: allSTRBookings, // Return all valid bookings for display
         mtr: mtrBookings,
       },
       reviews: formattedReviews,
