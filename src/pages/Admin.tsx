@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { CheckCircle, XCircle, Clock, Shield, UserPlus, Key, Users, MessageCircleQuestion, UserCog, Bug, Mail, Database, Briefcase, Sparkles, Star, Calendar, Phone, FileText } from "lucide-react";
+import { CheckCircle, XCircle, Clock, Shield, UserPlus, Key, Users, MessageCircleQuestion, UserCog, Bug, Mail, Database, Briefcase, Sparkles, Star, Calendar, Phone, FileText, FileArchive } from "lucide-react";
 import { RescheduleLogsTab } from "@/components/admin/RescheduleLogsTab";
 import { z } from "zod";
 import { TeamMatrixTab } from "@/components/admin/TeamMatrixTab";
@@ -24,6 +24,7 @@ import GoogleReviewsTab from "@/components/bookings/GoogleReviewsTab";
 import { CalendarAdminPanel } from "@/components/admin/CalendarAdminPanel";
 import { PhoneAssignmentsManager } from "@/components/admin/PhoneAssignmentsManager";
 import { LeadEmailTemplatesManager } from "@/components/admin/LeadEmailTemplatesManager";
+import { GRECAuditDashboard } from "@/components/admin/GRECAuditDashboard";
 
 const createUserSchema = z.object({
   email: z.string().email("Invalid email address").max(255),
@@ -447,6 +448,10 @@ const Admin = () => {
             <FileText className="w-4 h-4 mr-2" />
             Lead Emails
           </TabsTrigger>
+          <TabsTrigger value="grec-audit">
+            <FileArchive className="w-4 h-4 mr-2" />
+            GREC Audit
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="users" className="space-y-8 mt-8">
@@ -808,6 +813,10 @@ const Admin = () => {
 
         <TabsContent value="lead-email-templates" className="mt-8">
           <LeadEmailTemplatesManager />
+        </TabsContent>
+
+        <TabsContent value="grec-audit" className="mt-8">
+          <GRECAuditDashboard />
         </TabsContent>
       </Tabs>
     </div>

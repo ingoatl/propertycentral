@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.58.0";
+import { PDFDocument, rgb, StandardFonts } from "https://esm.sh/pdf-lib@1.17.1";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -8,9 +9,6 @@ const corsHeaders = {
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
 const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-
-// Company logo URL (publicly accessible)
-const LOGO_URL = `${supabaseUrl}/storage/v1/object/public/property-images/peachhaus-logo.png`;
 
 interface LineItem {
   description: string;
@@ -39,14 +37,10 @@ interface StatementData {
   ownerName: string;
   periodMonth: string;
   periodYear: string;
-  
-  // Revenue
   shortTermRevenue: number;
   midTermRevenue: number;
   midTermProrationDetails: MidTermProration[];
   grossRevenue: number;
-  
-  // Expenses
   managementFee: number;
   managementFeePercentage: number;
   orderMinimumFee: number;
@@ -55,8 +49,6 @@ interface StatementData {
   cleaningFees: number;
   petFees: number;
   totalExpenses: number;
-  
-  // Net Result
   netOwnerEarnings: number;
   serviceType: 'cohosting' | 'full_service';
 }
@@ -74,7 +66,7 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error("reconciliation_id is required");
     }
 
-    console.log(`Generating PDF for reconciliation: ${reconciliation_id}`);
+    console.log(`Generating real PDF for reconciliation: ${reconciliation_id}`);
 
     // Fetch reconciliation data
     const { data: reconciliation, error: recError } = await supabase
@@ -202,7 +194,6 @@ const handler = async (req: Request): Promise<Response> => {
       .filter((item: any) => item.fee_type === "pet_fee")
       .reduce((sum: number, item: any) => sum + Math.abs(item.amount), 0);
 
-    // Check order minimum
     const orderMinLineItem = deduplicatedItems.find((item: any) => item.item_type === "order_minimum");
     const orderMinimumFee = orderMinLineItem ? Math.abs(orderMinLineItem.amount) : 0;
 
@@ -215,7 +206,6 @@ const handler = async (req: Request): Promise<Response> => {
     const periodMonth = monthDate.toLocaleDateString("en-US", { month: "long" });
     const periodYear = monthDate.getFullYear().toString();
 
-    // Generate statement ID
     const statementId = `PH-${periodYear}${String(monthDate.getMonth() + 1).padStart(2, "0")}-${reconciliation.id.slice(0, 8).toUpperCase()}`;
 
     const statementData: StatementData = {
@@ -242,13 +232,19 @@ const handler = async (req: Request): Promise<Response> => {
       serviceType: reconciliation.property_owners?.service_type || "cohosting",
     };
 
-    // Generate PDF HTML
-    const pdfHtml = generatePdfHtml(statementData);
+    // Generate actual PDF using pdf-lib
+    const pdfBytes = await generatePdf(statementData);
+    const pdfBase64 = btoa(String.fromCharCode(...pdfBytes));
+    
+    const fileName = `PeachHaus-Statement-${statementData.propertyName.replace(/[^a-zA-Z0-9]/g, '-')}-${statementData.periodMonth}-${statementData.periodYear}.pdf`;
+
+    console.log(`PDF generated successfully: ${fileName}, size: ${pdfBytes.length} bytes`);
 
     return new Response(
       JSON.stringify({
         success: true,
-        html: pdfHtml,
+        pdfBase64,
+        fileName,
         statementData,
       }),
       {
@@ -268,7 +264,21 @@ const handler = async (req: Request): Promise<Response> => {
   }
 };
 
-function generatePdfHtml(data: StatementData): string {
+async function generatePdf(data: StatementData): Promise<Uint8Array> {
+  const pdfDoc = await PDFDocument.create();
+  const page = pdfDoc.addPage([612, 792]); // Letter size
+  
+  const helvetica = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  const helveticaBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+  
+  const { width, height } = page.getSize();
+  const margin = 50;
+  let y = height - margin;
+  
+  const black = rgb(0, 0, 0);
+  const gray = rgb(0.4, 0.4, 0.4);
+  const lightGray = rgb(0.9, 0.9, 0.9);
+  
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-US", {
       style: "currency",
@@ -284,291 +294,162 @@ function generatePdfHtml(data: StatementData): string {
     });
   };
 
-  // Generate mid-term revenue rows with proration explanation
-  let midTermRevenueRows = '';
-  if (data.midTermRevenue > 0) {
-    if (data.midTermProrationDetails && data.midTermProrationDetails.length > 0) {
-      midTermRevenueRows = data.midTermProrationDetails.map((detail) => {
-        if (detail.isFullMonth) {
-          return `
-          <tr>
-            <td style="padding: 6px 0; font-size: 11px; color: #111111; border-bottom: 1px solid #e5e5e5;">
-              Mid-term Rental Revenue
-              <div style="color: #666666; font-size: 9px; margin-top: 2px;">${detail.tenantName}</div>
-            </td>
-            <td style="padding: 6px 0; font-size: 11px; color: #111111; text-align: right; font-family: 'SF Mono', 'Menlo', 'Courier New', monospace; border-bottom: 1px solid #e5e5e5;">
-              ${formatCurrency(detail.proratedAmount)}
-            </td>
-          </tr>`;
-        } else {
-          return `
-          <tr>
-            <td style="padding: 6px 0; font-size: 11px; color: #111111; border-bottom: 1px solid #e5e5e5;">
-              Mid-term Rental Revenue
-              <div style="color: #666666; font-size: 9px; margin-top: 2px;">${detail.tenantName} (${detail.dateRange})</div>
-              <div style="color: #888888; font-size: 8px; margin-top: 1px; font-family: 'SF Mono', 'Menlo', 'Courier New', monospace;">
-                ${formatCurrency(detail.monthlyRent)}/mo × ${detail.occupiedDays}/${detail.daysInMonth} days = ${formatCurrency(detail.proratedAmount)}
-              </div>
-            </td>
-            <td style="padding: 6px 0; font-size: 11px; color: #111111; text-align: right; font-family: 'SF Mono', 'Menlo', 'Courier New', monospace; border-bottom: 1px solid #e5e5e5; vertical-align: top;">
-              ${formatCurrency(detail.proratedAmount)}
-            </td>
-          </tr>`;
-        }
-      }).join('');
-    } else {
-      midTermRevenueRows = `
-      <tr>
-        <td style="padding: 6px 0; font-size: 11px; color: #111111; border-bottom: 1px solid #e5e5e5;">Mid-term Rental Revenue</td>
-        <td style="padding: 6px 0; font-size: 11px; color: #111111; text-align: right; font-family: 'SF Mono', 'Menlo', 'Courier New', monospace; border-bottom: 1px solid #e5e5e5;">${formatCurrency(data.midTermRevenue)}</td>
-      </tr>`;
-    }
-  }
-
-  // Generate visit rows - compact format
-  const visitRows = data.visits.map((visit) => {
-    const hourlyRate = 50;
-    const hourlyCharge = (visit.hours || 0) * hourlyRate;
-    const baseVisitFee = visit.amount - hourlyCharge;
-    
-    let detail = visit.date ? formatDate(visit.date) : "";
-    if (visit.hours && visit.hours > 0) {
-      detail += ` • Base ${formatCurrency(baseVisitFee)} + ${visit.hours}h`;
-    }
-
-    return `
-      <tr>
-        <td style="padding: 6px 0; font-size: 11px; color: #111111; border-bottom: 1px solid #e5e5e5;">
-          ${visit.description}
-          <span style="color: #666666; font-size: 10px; margin-left: 8px;">${detail}</span>
-        </td>
-        <td style="padding: 6px 0; font-size: 11px; color: #111111; text-align: right; font-family: 'SF Mono', 'Menlo', 'Courier New', monospace; border-bottom: 1px solid #e5e5e5;">
-          ${formatCurrency(visit.amount)}
-        </td>
-      </tr>
-    `;
-  }).join("");
-
-  // Generate expense rows - compact format
-  const expenseRows = data.expenses.map((expense) => `
-    <tr>
-      <td style="padding: 6px 0; font-size: 11px; color: #111111; border-bottom: 1px solid #e5e5e5;">
-        ${expense.description}
-        <span style="color: #666666; font-size: 10px; margin-left: 8px;">${expense.date ? formatDate(expense.date) : ""}</span>
-      </td>
-      <td style="padding: 6px 0; font-size: 11px; color: #111111; text-align: right; font-family: 'SF Mono', 'Menlo', 'Courier New', monospace; border-bottom: 1px solid #e5e5e5;">
-        ${formatCurrency(expense.amount)}
-      </td>
-    </tr>
-  `).join("");
-
+  // === HEADER ===
+  page.drawText("PeachHaus Property Management", { x: margin, y, size: 16, font: helveticaBold, color: black });
+  page.drawText("OWNER STATEMENT", { x: width - margin - 120, y, size: 14, font: helveticaBold, color: black });
+  y -= 18;
+  page.drawText(data.statementId, { x: width - margin - 120, y, size: 9, font: helvetica, color: gray });
+  y -= 25;
+  
+  // Horizontal line
+  page.drawLine({ start: { x: margin, y }, end: { x: width - margin, y }, thickness: 1.5, color: black });
+  y -= 20;
+  
+  // === PROPERTY & PERIOD INFO ===
+  page.drawText("Property:", { x: margin, y, size: 9, font: helvetica, color: gray });
+  page.drawText("Statement Period:", { x: width / 2 + 20, y, size: 9, font: helvetica, color: gray });
+  y -= 14;
+  page.drawText(data.propertyName, { x: margin, y, size: 11, font: helveticaBold, color: black });
+  page.drawText(`${data.periodMonth} ${data.periodYear}`, { x: width / 2 + 20, y, size: 11, font: helveticaBold, color: black });
+  y -= 12;
+  page.drawText(data.propertyAddress, { x: margin, y, size: 9, font: helvetica, color: gray });
+  page.drawText(`Prepared for: ${data.ownerName}`, { x: width / 2 + 20, y, size: 9, font: helvetica, color: gray });
+  y -= 25;
+  
+  // === NET OWNER EARNINGS BOX ===
+  const boxHeight = 45;
+  page.drawRectangle({
+    x: margin,
+    y: y - boxHeight,
+    width: width - 2 * margin,
+    height: boxHeight,
+    color: rgb(0.05, 0.05, 0.05),
+  });
+  
   const isPositiveNet = data.netOwnerEarnings >= 0;
   const netLabel = data.serviceType === "cohosting" 
     ? (isPositiveNet ? "NET OWNER EARNINGS" : "BALANCE DUE FROM OWNER")
     : "NET OWNER PAYOUT";
-
-  return `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <title>Owner Statement - ${data.periodMonth} ${data.periodYear}</title>
-  <style>
-    @page {
-      size: letter;
-      margin: 0.5in;
-    }
-    
-    * { 
-      box-sizing: border-box; 
-      margin: 0; 
-      padding: 0; 
-    }
-    
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', Arial, sans-serif;
-      background: #ffffff;
-      color: #111111;
-      line-height: 1.4;
-      font-size: 11px;
-      -webkit-print-color-adjust: exact;
-      print-color-adjust: exact;
-    }
-    
-    .page {
-      max-width: 7.5in;
-      margin: 0 auto;
-      padding: 0;
-      background: white;
-    }
-    
-    @media print {
-      body { background: white; }
-      .page { 
-        padding: 0;
-        max-width: 100%;
+  
+  page.drawText(netLabel, { x: margin + 15, y: y - 20, size: 9, font: helvetica, color: rgb(1, 1, 1) });
+  page.drawText(`For period ${data.periodMonth} ${data.periodYear}`, { x: margin + 15, y: y - 32, size: 8, font: helvetica, color: rgb(0.7, 0.7, 0.7) });
+  page.drawText(formatCurrency(data.netOwnerEarnings), { x: width - margin - 100, y: y - 28, size: 18, font: helveticaBold, color: rgb(1, 1, 1) });
+  y -= boxHeight + 20;
+  
+  // === REVENUE SECTION ===
+  page.drawText("REVENUE", { x: margin, y, size: 10, font: helveticaBold, color: black });
+  y -= 5;
+  page.drawLine({ start: { x: margin, y }, end: { x: width - margin, y }, thickness: 0.5, color: lightGray });
+  y -= 15;
+  
+  // Mid-term revenue with proration
+  if (data.midTermRevenue > 0) {
+    if (data.midTermProrationDetails.length > 0) {
+      for (const detail of data.midTermProrationDetails) {
+        page.drawText("Mid-term Rental Revenue", { x: margin, y, size: 10, font: helvetica, color: black });
+        page.drawText(formatCurrency(detail.proratedAmount), { x: width - margin - 70, y, size: 10, font: helvetica, color: black });
+        y -= 12;
+        page.drawText(`${detail.tenantName} (${detail.dateRange})`, { x: margin + 10, y, size: 8, font: helvetica, color: gray });
+        y -= 10;
+        if (!detail.isFullMonth) {
+          page.drawText(`${formatCurrency(detail.monthlyRent)}/mo × ${detail.occupiedDays}/${detail.daysInMonth} days = ${formatCurrency(detail.proratedAmount)}`, { x: margin + 10, y, size: 7, font: helvetica, color: gray });
+          y -= 12;
+        }
       }
+    } else {
+      page.drawText("Mid-term Rental Revenue", { x: margin, y, size: 10, font: helvetica, color: black });
+      page.drawText(formatCurrency(data.midTermRevenue), { x: width - margin - 70, y, size: 10, font: helvetica, color: black });
+      y -= 15;
     }
-  </style>
-</head>
-<body>
-  <div class="page">
+  }
+  
+  // Short-term revenue
+  if (data.shortTermRevenue > 0) {
+    page.drawText("Short-term Bookings", { x: margin, y, size: 10, font: helvetica, color: black });
+    page.drawText(formatCurrency(data.shortTermRevenue), { x: width - margin - 70, y, size: 10, font: helvetica, color: black });
+    y -= 15;
+  }
+  
+  // Gross revenue total
+  page.drawLine({ start: { x: margin, y }, end: { x: width - margin, y }, thickness: 0.5, color: lightGray });
+  y -= 12;
+  page.drawText("GROSS REVENUE", { x: margin, y, size: 10, font: helveticaBold, color: black });
+  page.drawText(formatCurrency(data.grossRevenue), { x: width - margin - 70, y, size: 10, font: helveticaBold, color: black });
+  y -= 25;
+  
+  // === EXPENSES SECTION ===
+  page.drawText("EXPENSES", { x: margin, y, size: 10, font: helveticaBold, color: black });
+  y -= 5;
+  page.drawLine({ start: { x: margin, y }, end: { x: width - margin, y }, thickness: 0.5, color: lightGray });
+  y -= 15;
+  
+  // Management fee
+  page.drawText(`Management Fee (${data.managementFeePercentage}%)`, { x: margin, y, size: 10, font: helvetica, color: black });
+  page.drawText(formatCurrency(data.managementFee), { x: width - margin - 70, y, size: 10, font: helvetica, color: black });
+  y -= 15;
+  
+  // Order minimum fee
+  if (data.orderMinimumFee > 0) {
+    page.drawText("Order Minimum Fee", { x: margin, y, size: 10, font: helvetica, color: black });
+    page.drawText(formatCurrency(data.orderMinimumFee), { x: width - margin - 70, y, size: 10, font: helvetica, color: black });
+    y -= 15;
+  }
+  
+  // Visits
+  for (const visit of data.visits) {
+    const visitText = visit.date ? `${visit.description} - ${formatDate(visit.date)}` : visit.description;
+    page.drawText(visitText.substring(0, 50), { x: margin, y, size: 10, font: helvetica, color: black });
+    page.drawText(formatCurrency(visit.amount), { x: width - margin - 70, y, size: 10, font: helvetica, color: black });
+    y -= 15;
     
-    <!-- Header - Corporate Minimal with Logo -->
-    <table style="width: 100%; border-bottom: 2px solid #111111; padding-bottom: 12px; margin-bottom: 16px;">
-      <tr>
-        <td style="vertical-align: middle;">
-          <img src="${LOGO_URL}" alt="PeachHaus" style="height: 36px; width: auto;" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';" />
-          <div style="display: none; font-size: 18px; font-weight: 700; color: #111111; letter-spacing: -0.3px;">PeachHaus</div>
-        </td>
-        <td style="text-align: right; vertical-align: middle;">
-          <div style="font-size: 14px; font-weight: 600; color: #111111; margin-bottom: 4px;">OWNER STATEMENT</div>
-          <div style="font-size: 9px; color: #666666; font-family: 'SF Mono', 'Menlo', 'Courier New', monospace;">
-            ${data.statementId}
-          </div>
-        </td>
-      </tr>
-    </table>
-
-    <!-- Property & Period Info - Compact -->
-    <table style="width: 100%; margin-bottom: 16px; border: 1px solid #e5e5e5;">
-      <tr>
-        <td style="padding: 10px 12px; background: #f9f9f9; width: 50%; vertical-align: top; border-right: 1px solid #e5e5e5;">
-          <div style="font-size: 9px; color: #666666; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Property</div>
-          <div style="font-size: 12px; font-weight: 600; color: #111111;">${data.propertyName}</div>
-          <div style="font-size: 10px; color: #666666; margin-top: 2px;">${data.propertyAddress}</div>
-        </td>
-        <td style="padding: 10px 12px; background: #f9f9f9; width: 50%; vertical-align: top;">
-          <div style="font-size: 9px; color: #666666; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Statement Period</div>
-          <div style="font-size: 12px; font-weight: 600; color: #111111;">${data.periodMonth} ${data.periodYear}</div>
-          <div style="font-size: 10px; color: #666666; margin-top: 2px;">Prepared for: ${data.ownerName}</div>
-        </td>
-      </tr>
-    </table>
-
-    <!-- Financial Summary - The Key Numbers -->
-    <table style="width: 100%; margin-bottom: 16px; border: 1px solid #111111;">
-      <tr>
-        <td style="padding: 12px 16px; background: #111111; color: #ffffff;">
-          <table style="width: 100%;">
-            <tr>
-              <td style="vertical-align: middle;">
-                <div style="font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.8; margin-bottom: 2px;">${netLabel}</div>
-                <div style="font-size: 10px; opacity: 0.6;">For period ${data.periodMonth} ${data.periodYear}</div>
-              </td>
-              <td style="text-align: right; vertical-align: middle;">
-                <div style="font-size: 24px; font-weight: 700; font-family: 'SF Mono', 'Menlo', 'Courier New', monospace; color: #ffffff;">
-                  ${isPositiveNet ? "" : "-"}${formatCurrency(Math.abs(data.netOwnerEarnings))}
-                </div>
-              </td>
-            </tr>
-          </table>
-        </td>
-      </tr>
-      <tr>
-        <td style="padding: 10px 16px; background: #f9f9f9; border-top: 1px solid #e5e5e5;">
-          <table style="width: 100%;">
-            <tr>
-              <td style="font-size: 10px; color: #666666;">Gross Revenue</td>
-              <td style="font-size: 12px; font-weight: 600; color: #111111; text-align: right; font-family: 'SF Mono', 'Menlo', 'Courier New', monospace;">${formatCurrency(data.grossRevenue)}</td>
-              <td style="width: 40px;"></td>
-              <td style="font-size: 10px; color: #666666;">Total Expenses</td>
-              <td style="font-size: 12px; font-weight: 600; color: #111111; text-align: right; font-family: 'SF Mono', 'Menlo', 'Courier New', monospace;">(${formatCurrency(data.totalExpenses)})</td>
-            </tr>
-          </table>
-        </td>
-      </tr>
-    </table>
-
-    <!-- Revenue Section -->
-    <div style="margin-bottom: 12px;">
-      <div style="font-size: 10px; font-weight: 600; color: #111111; padding: 6px 0; border-bottom: 1px solid #111111; text-transform: uppercase; letter-spacing: 0.5px;">
-        Revenue
-      </div>
-      <table style="width: 100%;">
-        ${data.shortTermRevenue > 0 ? `
-        <tr>
-          <td style="padding: 6px 0; font-size: 11px; color: #111111; border-bottom: 1px solid #e5e5e5;">Short-term Booking Revenue</td>
-          <td style="padding: 6px 0; font-size: 11px; color: #111111; text-align: right; font-family: 'SF Mono', 'Menlo', 'Courier New', monospace; border-bottom: 1px solid #e5e5e5;">${formatCurrency(data.shortTermRevenue)}</td>
-        </tr>` : ""}
-        ${midTermRevenueRows}
-        <tr style="background: #f9f9f9;">
-          <td style="padding: 8px 0; font-size: 11px; font-weight: 600; color: #111111;">TOTAL GROSS REVENUE</td>
-          <td style="padding: 8px 0; font-size: 12px; color: #111111; text-align: right; font-family: 'SF Mono', 'Menlo', 'Courier New', monospace; font-weight: 700;">${formatCurrency(data.grossRevenue)}</td>
-        </tr>
-      </table>
-    </div>
-
-    <!-- Expenses Section -->
-    <div style="margin-bottom: 12px;">
-      <div style="font-size: 10px; font-weight: 600; color: #111111; padding: 6px 0; border-bottom: 1px solid #111111; text-transform: uppercase; letter-spacing: 0.5px;">
-        Expenses & Fees
-      </div>
-      <table style="width: 100%;">
-        <tr>
-          <td style="padding: 6px 0; font-size: 11px; color: #111111; border-bottom: 1px solid #e5e5e5;">Management Fee (${data.managementFeePercentage}%)</td>
-          <td style="padding: 6px 0; font-size: 11px; color: #111111; text-align: right; font-family: 'SF Mono', 'Menlo', 'Courier New', monospace; border-bottom: 1px solid #e5e5e5;">${formatCurrency(data.managementFee)}</td>
-        </tr>
-        ${data.orderMinimumFee > 0 ? `
-        <tr>
-          <td style="padding: 6px 0; font-size: 11px; color: #111111; border-bottom: 1px solid #e5e5e5;">Operational Minimum Fee</td>
-          <td style="padding: 6px 0; font-size: 11px; color: #111111; text-align: right; font-family: 'SF Mono', 'Menlo', 'Courier New', monospace; border-bottom: 1px solid #e5e5e5;">${formatCurrency(data.orderMinimumFee)}</td>
-        </tr>` : ""}
-        ${visitRows}
-        ${expenseRows}
-        ${data.cleaningFees > 0 ? `
-        <tr>
-          <td style="padding: 6px 0; font-size: 11px; color: #111111; border-bottom: 1px solid #e5e5e5;">
-            Cleaning Fees <span style="color: #666666; font-size: 10px;">(pass-through)</span>
-          </td>
-          <td style="padding: 6px 0; font-size: 11px; color: #111111; text-align: right; font-family: 'SF Mono', 'Menlo', 'Courier New', monospace; border-bottom: 1px solid #e5e5e5;">${formatCurrency(data.cleaningFees)}</td>
-        </tr>` : ""}
-        ${data.petFees > 0 ? `
-        <tr>
-          <td style="padding: 6px 0; font-size: 11px; color: #111111; border-bottom: 1px solid #e5e5e5;">
-            Pet Fees <span style="color: #666666; font-size: 10px;">(pass-through)</span>
-          </td>
-          <td style="padding: 6px 0; font-size: 11px; color: #111111; text-align: right; font-family: 'SF Mono', 'Menlo', 'Courier New', monospace; border-bottom: 1px solid #e5e5e5;">${formatCurrency(data.petFees)}</td>
-        </tr>` : ""}
-        <tr style="background: #f9f9f9;">
-          <td style="padding: 8px 0; font-size: 11px; font-weight: 600; color: #111111;">TOTAL EXPENSES</td>
-          <td style="padding: 8px 0; font-size: 12px; color: #111111; text-align: right; font-family: 'SF Mono', 'Menlo', 'Courier New', monospace; font-weight: 700;">(${formatCurrency(data.totalExpenses)})</td>
-        </tr>
-      </table>
-    </div>
-
-    <!-- NET RESULT - Final -->
-    <table style="width: 100%; border: 2px solid #111111; margin-bottom: 16px;">
-      <tr>
-        <td style="padding: 12px 16px; background: #111111;">
-          <table style="width: 100%;">
-            <tr>
-              <td style="font-size: 11px; font-weight: 600; color: #ffffff; text-transform: uppercase; letter-spacing: 0.5px;">${netLabel}</td>
-              <td style="font-size: 18px; font-weight: 700; color: #ffffff; text-align: right; font-family: 'SF Mono', 'Menlo', 'Courier New', monospace;">
-                ${isPositiveNet ? "" : "-"}${formatCurrency(Math.abs(data.netOwnerEarnings))}
-              </td>
-            </tr>
-          </table>
-        </td>
-      </tr>
-    </table>
-
-    <!-- Footer -->
-    <div style="border-top: 1px solid #e5e5e5; padding-top: 12px;">
-      <p style="font-size: 9px; color: #666666; margin: 0 0 8px 0; line-height: 1.4;">
-        Questions about this statement? Contact <a href="mailto:info@peachhausgroup.com" style="color: #111111; text-decoration: underline;">info@peachhausgroup.com</a>
-      </p>
-      <div style="font-size: 8px; color: #999999;">
-        <div style="margin-bottom: 2px;">PeachHaus Property Management</div>
-        <div>This is an official financial statement. Please retain for your records.</div>
-        <div style="margin-top: 4px; font-family: 'SF Mono', 'Menlo', 'Courier New', monospace;">${data.statementId} • ${data.statementDate}</div>
-      </div>
-    </div>
-
-  </div>
-</body>
-</html>
-`;
+    // Stop if running low on space
+    if (y < 150) break;
+  }
+  
+  // Expenses
+  for (const expense of data.expenses) {
+    const expText = expense.date ? `${expense.description} - ${formatDate(expense.date)}` : expense.description;
+    page.drawText(expText.substring(0, 50), { x: margin, y, size: 10, font: helvetica, color: black });
+    page.drawText(formatCurrency(expense.amount), { x: width - margin - 70, y, size: 10, font: helvetica, color: black });
+    y -= 15;
+    
+    if (y < 150) break;
+  }
+  
+  // Cleaning fees
+  if (data.cleaningFees > 0) {
+    page.drawText("Cleaning Fees", { x: margin, y, size: 10, font: helvetica, color: black });
+    page.drawText(formatCurrency(data.cleaningFees), { x: width - margin - 70, y, size: 10, font: helvetica, color: black });
+    y -= 15;
+  }
+  
+  // Pet fees
+  if (data.petFees > 0) {
+    page.drawText("Pet Fees", { x: margin, y, size: 10, font: helvetica, color: black });
+    page.drawText(formatCurrency(data.petFees), { x: width - margin - 70, y, size: 10, font: helvetica, color: black });
+    y -= 15;
+  }
+  
+  // Total expenses
+  page.drawLine({ start: { x: margin, y }, end: { x: width - margin, y }, thickness: 0.5, color: lightGray });
+  y -= 12;
+  page.drawText("TOTAL EXPENSES", { x: margin, y, size: 10, font: helveticaBold, color: black });
+  page.drawText(`(${formatCurrency(data.totalExpenses)})`, { x: width - margin - 80, y, size: 10, font: helveticaBold, color: black });
+  y -= 25;
+  
+  // === NET RESULT ===
+  page.drawLine({ start: { x: margin, y }, end: { x: width - margin, y }, thickness: 1, color: black });
+  y -= 15;
+  page.drawText(netLabel, { x: margin, y, size: 12, font: helveticaBold, color: black });
+  page.drawText(formatCurrency(data.netOwnerEarnings), { x: width - margin - 80, y, size: 12, font: helveticaBold, color: black });
+  
+  // === FOOTER ===
+  const footerY = 40;
+  page.drawLine({ start: { x: margin, y: footerY + 15 }, end: { x: width - margin, y: footerY + 15 }, thickness: 0.5, color: lightGray });
+  page.drawText("PeachHaus Property Management | www.peachhausgroup.com", { x: margin, y: footerY, size: 8, font: helvetica, color: gray });
+  page.drawText(`Generated: ${data.statementDate}`, { x: width - margin - 100, y: footerY, size: 8, font: helvetica, color: gray });
+  
+  return pdfDoc.save();
 }
 
 serve(handler);

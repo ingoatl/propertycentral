@@ -1230,8 +1230,9 @@ State: ${state}
 
       console.log(`Sending statement to: ${statementRecipients.join(', ')} from ${fromEmail}...`);
 
-      // Generate PDF HTML for attachment
+      // Generate real PDF for attachment using pdf-lib
       let pdfAttachment: any = null;
+      let pdfStoragePath: string | null = null;
       try {
         const pdfResponse = await fetch(`${supabaseUrl}/functions/v1/generate-statement-pdf`, {
           method: 'POST',
@@ -1244,19 +1245,37 @@ State: ${state}
         
         if (pdfResponse.ok) {
           const pdfData = await pdfResponse.json();
-          if (pdfData.html) {
-            // Encode HTML as base64 for attachment
-            const encoder = new TextEncoder();
-            const htmlBytes = encoder.encode(pdfData.html);
-            const base64Html = btoa(String.fromCharCode(...htmlBytes));
-            
-            const fileName = `PeachHaus-Statement-${property.name.replace(/[^a-zA-Z0-9]/g, '-')}-${previousMonthName.replace(' ', '-')}.html`;
-            
+          if (pdfData.pdfBase64 && pdfData.fileName) {
+            // Use real PDF binary from pdf-lib
             pdfAttachment = {
-              filename: fileName,
-              content: base64Html,
+              filename: pdfData.fileName,
+              content: pdfData.pdfBase64,
             };
-            console.log(`PDF attachment generated: ${fileName}`);
+            console.log(`Real PDF attachment generated: ${pdfData.fileName}`);
+            
+            // Store PDF in Supabase Storage for audit trail
+            if (!isTestEmail) {
+              try {
+                const pdfBytes = Uint8Array.from(atob(pdfData.pdfBase64), c => c.charCodeAt(0));
+                const storagePath = `${property.id}/${new Date().getFullYear()}/${pdfData.fileName}`;
+                
+                const { error: uploadError } = await supabase.storage
+                  .from('statement-pdfs')
+                  .upload(storagePath, pdfBytes, {
+                    contentType: 'application/pdf',
+                    upsert: true
+                  });
+                
+                if (uploadError) {
+                  console.error("Failed to store PDF in storage:", uploadError);
+                } else {
+                  pdfStoragePath = storagePath;
+                  console.log(`PDF stored at: ${storagePath}`);
+                }
+              } catch (storageError) {
+                console.error("Error storing PDF:", storageError);
+              }
+            }
           }
         } else {
           console.error("Failed to generate PDF:", await pdfResponse.text());
@@ -1339,6 +1358,7 @@ State: ${state}
             statement_month: `${statementMonth.getFullYear()}-${String(statementMonth.getMonth() + 1).padStart(2, '0')}-01`,
             recipient_emails: statementRecipients,
             statement_html: emailBody,
+            statement_pdf_path: pdfStoragePath, // Store PDF path for GREC audit
             net_owner_result: netIncome,
             total_revenue: totalRevenue,
             total_expenses: totalExpensesWithVisits,
