@@ -158,6 +158,12 @@ export const navigationConfig: NavElement[] = [
         icon: MessageSquare,
         description: "Communication insights",
       },
+      {
+        path: "/admin?tab=owner-portal",
+        label: "Owner Portal",
+        icon: Building2,
+        description: "Send portal invites",
+      },
     ],
   },
   {

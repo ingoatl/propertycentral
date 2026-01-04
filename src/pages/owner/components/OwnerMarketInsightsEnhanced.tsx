@@ -20,7 +20,8 @@ import {
   Star,
   Megaphone,
   Trophy,
-  Zap
+  Zap,
+  BarChart3
 } from "lucide-react";
 import { UpcomingEventsTimeline } from "./UpcomingEventsTimeline";
 import { CorporateHousingDemandCard } from "./CorporateHousingDemandCard";
@@ -110,45 +111,54 @@ export const OwnerMarketInsightsEnhanced = memo(function OwnerMarketInsightsEnha
     declining: "text-amber-600 bg-amber-100 dark:bg-amber-900/30",
   };
 
-  // Loading state with smooth animated progress bar
+  // Loading state with smooth animated progress bar and engaging content
   if (isLoading) {
+    // Tips to show during loading based on property type
+    const loadingTips = isMTROnly ? [
+      "💼 Corporate housing in Atlanta commands 20-30% premium over STR rates",
+      "🏥 Metro Atlanta has 60+ hospitals hiring travel nurses year-round",
+      "🏢 Fortune 500 HQs: Home Depot, Delta, Coca-Cola, UPS all relocate executives here",
+      "📊 This report includes data from AirDNA, Furnished Finder & corporate housing databases",
+    ] : [
+      "⚽ FIFA World Cup 2026 games in Atlanta could drive 400%+ rate increases",
+      "🎸 Mercedes-Benz Stadium hosts 70+ major events annually",
+      "📊 This report aggregates data from AirDNA, PriceLabs & local market APIs",
+      "🏆 SEC Championship & Peach Bowl drive massive December demand",
+    ];
+    
+    const tipIndex = Math.floor((loadingProgress / 25)) % loadingTips.length;
+    
     return (
       <div className="space-y-6">
         <Card className="border-none shadow-lg overflow-hidden bg-gradient-to-br from-background via-background to-primary/5">
-          <CardContent className="py-20">
-            <div className="max-w-lg mx-auto text-center space-y-8">
+          <CardContent className="py-16">
+            <div className="max-w-xl mx-auto text-center space-y-6">
               {/* Animated icon container */}
               <div className="relative w-20 h-20 mx-auto">
-                {/* Outer ring */}
                 <div className="absolute inset-0 rounded-full border-4 border-primary/20" />
-                {/* Spinning ring */}
-                <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-primary animate-spin" style={{ animationDuration: '1.5s' }} />
-                {/* Inner glow */}
+                <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-primary animate-spin" style={{ animationDuration: '2s' }} />
                 <div className="absolute inset-2 rounded-full bg-gradient-to-br from-primary/10 to-primary/30 flex items-center justify-center">
                   <Sparkles className="h-8 w-8 text-primary animate-pulse" />
                 </div>
               </div>
               
-              {/* Text content */}
+              {/* Header */}
               <div className="space-y-2">
                 <h3 className="text-xl font-semibold bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text">
-                  Generating Market Insights
+                  Building Your Market Intelligence Report
                 </h3>
-                <p className="text-muted-foreground h-6 transition-all duration-500">{loadingStep}</p>
+                <p className="text-primary font-medium h-6 transition-all duration-700">{loadingStep}</p>
               </div>
               
               {/* Smooth progress bar */}
-              <div className="space-y-3 px-4">
-                <div className="relative h-2 bg-muted/50 rounded-full overflow-hidden">
-                  {/* Background shimmer */}
+              <div className="space-y-2 px-4">
+                <div className="relative h-3 bg-muted/50 rounded-full overflow-hidden">
                   <div className="absolute inset-0 bg-gradient-to-r from-transparent via-primary/10 to-transparent animate-shimmer" />
-                  {/* Actual progress */}
                   <div 
-                    className="absolute inset-y-0 left-0 bg-gradient-to-r from-primary via-primary to-primary/80 rounded-full transition-all duration-700 ease-out"
+                    className="absolute inset-y-0 left-0 bg-gradient-to-r from-primary via-primary to-primary/80 rounded-full transition-all duration-1000 ease-out"
                     style={{ width: `${loadingProgress}%` }}
                   >
-                    {/* Glow effect on leading edge */}
-                    <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-r from-transparent to-white/30 rounded-full" />
+                    <div className="absolute right-0 top-0 bottom-0 w-12 bg-gradient-to-r from-transparent to-white/30 rounded-full" />
                   </div>
                 </div>
                 <p className="text-sm text-muted-foreground font-medium tabular-nums">
@@ -156,16 +166,35 @@ export const OwnerMarketInsightsEnhanced = memo(function OwnerMarketInsightsEnha
                 </p>
               </div>
               
-              {/* Subtle loading dots */}
-              <div className="flex justify-center gap-1.5">
-                {[0, 1, 2].map((i) => (
-                  <div
-                    key={i}
-                    className="w-2 h-2 rounded-full bg-primary/40 animate-bounce"
-                    style={{ animationDelay: `${i * 150}ms`, animationDuration: '1s' }}
-                  />
-                ))}
+              {/* Value proposition during loading */}
+              <div className="p-4 bg-primary/5 rounded-xl border border-primary/10 text-left">
+                <p className="text-sm text-muted-foreground mb-2 font-medium">
+                  💡 Did you know?
+                </p>
+                <p className="text-sm text-foreground transition-all duration-500">
+                  {loadingTips[tipIndex]}
+                </p>
               </div>
+              
+              {/* What's being analyzed */}
+              <div className="grid grid-cols-3 gap-3 text-xs text-muted-foreground">
+                <div className={`p-2 rounded-lg transition-all duration-500 ${loadingProgress >= 25 ? 'bg-primary/10 text-primary' : 'bg-muted/30'}`}>
+                  <BarChart3 className="h-4 w-4 mx-auto mb-1" />
+                  Revenue Data
+                </div>
+                <div className={`p-2 rounded-lg transition-all duration-500 ${loadingProgress >= 50 ? 'bg-primary/10 text-primary' : 'bg-muted/30'}`}>
+                  <Building2 className="h-4 w-4 mx-auto mb-1" />
+                  Comparables
+                </div>
+                <div className={`p-2 rounded-lg transition-all duration-500 ${loadingProgress >= 75 ? 'bg-primary/10 text-primary' : 'bg-muted/30'}`}>
+                  <Calendar className="h-4 w-4 mx-auto mb-1" />
+                  Events & Demand
+                </div>
+              </div>
+              
+              <p className="text-xs text-muted-foreground italic">
+                This comprehensive market analysis is included free with your PeachHaus management
+              </p>
             </div>
           </CardContent>
         </Card>
