@@ -35,6 +35,7 @@ import { OwnerPerformanceCharts } from "./components/OwnerPerformanceCharts";
 import { OwnerPerformanceOverview } from "./components/OwnerPerformanceOverview";
 import { OwnerReviewsCard } from "./components/OwnerReviewsCard";
 import { OwnerMarketInsightsEnhanced } from "./components/OwnerMarketInsightsEnhanced";
+import { OwnerPropertyTab } from "./components/OwnerPropertyTab";
 
 interface OwnerSession {
   ownerId: string;
@@ -42,6 +43,8 @@ interface OwnerSession {
   email: string;
   propertyId?: string;
   propertyName?: string;
+  secondOwnerName?: string | null;
+  secondOwnerEmail?: string | null;
 }
 
 interface Statement {
@@ -73,6 +76,11 @@ interface PropertyData {
   address: string;
   rental_type: string | null;
   image_path: string | null;
+  bedrooms?: number;
+  bathrooms?: number;
+  square_feet?: number;
+  max_guests?: number;
+  amenities?: string[];
 }
 
 interface Credential {
@@ -134,6 +142,7 @@ export default function OwnerDashboard() {
   const [statements, setStatements] = useState<Statement[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [credentials, setCredentials] = useState<Credential[]>([]);
+  const [bookings, setBookings] = useState<{ str: any[]; mtr: any[] } | null>(null);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [performanceMetrics, setPerformanceMetrics] = useState<PerformanceMetrics>({
     totalRevenue: 0,
@@ -215,6 +224,8 @@ export default function OwnerDashboard() {
         email: data.owner.email,
         propertyId: data.property?.id,
         propertyName: data.property?.name,
+        secondOwnerName: data.owner.secondOwnerName,
+        secondOwnerEmail: data.owner.secondOwnerEmail,
       };
 
       const sessionData = {
@@ -228,6 +239,7 @@ export default function OwnerDashboard() {
       setStatements(data.statements || []);
       setExpenses(data.expenses || []);
       setCredentials(data.credentials || []);
+      setBookings(data.bookings || null);
       setReviews(data.reviews || []);
       setPerformanceMetrics(data.performance || {
         totalRevenue: 0,
@@ -284,6 +296,7 @@ export default function OwnerDashboard() {
       setStatements(data.statements || []);
       setExpenses(data.expenses || []);
       setCredentials(data.credentials || []);
+      setBookings(data.bookings || null);
       setReviews(data.reviews || []);
       setPerformanceMetrics(data.performance || {
         totalRevenue: 0,
@@ -501,7 +514,10 @@ export default function OwnerDashboard() {
             </div>
             
             <div className={`mt-4 ${propertyImageUrl ? 'text-white/90' : 'text-muted-foreground'}`}>
-              <p className="text-lg">Welcome back, {session.ownerName}</p>
+              <p className="text-lg">
+                Welcome back, {session.ownerName}
+                {session.secondOwnerName && ` & ${session.secondOwnerName}`}
+              </p>
               {performanceMetrics.averageRating && (
                 <div className="flex items-center gap-2 mt-2">
                   <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
@@ -690,7 +706,7 @@ export default function OwnerDashboard() {
           </TabsContent>
 
           <TabsContent value="bookings">
-            {property && <OwnerBookingsTab propertyId={property.id} />}
+            {property && <OwnerBookingsTab propertyId={property.id} bookings={bookings || undefined} />}
           </TabsContent>
 
           <TabsContent value="statements">
@@ -759,157 +775,17 @@ export default function OwnerDashboard() {
           </TabsContent>
 
           <TabsContent value="property">
-            <div className="grid gap-6">
-              {/* Property Address Card */}
-              <Card className="border-none shadow-lg">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Home className="h-5 w-5" />
-                    Property Details
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div className="p-4 bg-muted/30 rounded-xl">
-                      <p className="text-sm text-muted-foreground mb-1">Address</p>
-                      <p className="font-semibold text-lg">{property?.address}</p>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="p-4 bg-muted/30 rounded-xl">
-                        <p className="text-sm text-muted-foreground mb-1">Property Name</p>
-                        <p className="font-semibold">{property?.name}</p>
-                      </div>
-                      {property?.rental_type && (
-                        <div className="p-4 bg-muted/30 rounded-xl">
-                          <p className="text-sm text-muted-foreground mb-1">Rental Type</p>
-                          <Badge variant="secondary" className="mt-1">
-                            {property.rental_type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
-                          </Badge>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Credentials Card */}
-              <Card className="border-none shadow-lg">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Key className="h-5 w-5" />
-                    Access & Credentials
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {credentials.length === 0 ? (
-                    <div className="py-12 text-center">
-                      <Key className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
-                      <p className="text-muted-foreground">
-                        No credentials on file. Contact your property manager to add WiFi, lock codes, and other access information.
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      {credentials.map((cred) => (
-                        <div key={cred.id} className="border rounded-xl p-4 hover:bg-muted/20 transition-colors">
-                          <div className="flex items-center justify-between mb-3">
-                            <div className="flex items-center gap-3">
-                              <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                                cred.service_name.toLowerCase().includes('wifi') 
-                                  ? 'bg-blue-100 text-blue-600' 
-                                  : cred.service_name.toLowerCase().includes('lock') || 
-                                    cred.service_name.toLowerCase().includes('door') ||
-                                    cred.service_name.toLowerCase().includes('gate')
-                                    ? 'bg-amber-100 text-amber-600'
-                                    : 'bg-muted text-muted-foreground'
-                              }`}>
-                                {cred.service_name.toLowerCase().includes('wifi') ? (
-                                  <Wifi className="h-5 w-5" />
-                                ) : cred.service_name.toLowerCase().includes('lock') || 
-                                   cred.service_name.toLowerCase().includes('door') ||
-                                   cred.service_name.toLowerCase().includes('gate') ? (
-                                  <Lock className="h-5 w-5" />
-                                ) : (
-                                  <Key className="h-5 w-5" />
-                                )}
-                              </div>
-                              <span className="font-semibold">{cred.service_name}</span>
-                            </div>
-                            {cred.url && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => window.open(cred.url!, '_blank')}
-                                className="gap-2"
-                              >
-                                <ExternalLink className="h-4 w-4" />
-                                Open
-                              </Button>
-                            )}
-                          </div>
-                          
-                          <div className="grid gap-3">
-                            {cred.username && (
-                              <div className="flex items-center justify-between bg-muted/50 rounded-lg px-4 py-3">
-                                <div>
-                                  <p className="text-xs text-muted-foreground mb-0.5">Username / Network</p>
-                                  <p className="font-mono font-medium">{cred.username}</p>
-                                </div>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8"
-                                  onClick={() => copyToClipboard(cred.username!, 'Username')}
-                                >
-                                  <Copy className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            )}
-                            
-                            {cred.password && (
-                              <div className="flex items-center justify-between bg-muted/50 rounded-lg px-4 py-3">
-                                <div>
-                                  <p className="text-xs text-muted-foreground mb-0.5">Password / Code</p>
-                                  <p className="font-mono font-medium">
-                                    {visiblePasswords.has(cred.id) ? cred.password : '••••••••'}
-                                  </p>
-                                </div>
-                                <div className="flex gap-1">
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-8 w-8"
-                                    onClick={() => togglePasswordVisibility(cred.id)}
-                                  >
-                                    {visiblePasswords.has(cred.id) ? (
-                                      <EyeOff className="h-4 w-4" />
-                                    ) : (
-                                      <Eye className="h-4 w-4" />
-                                    )}
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-8 w-8"
-                                    onClick={() => copyToClipboard(cred.password!, 'Password')}
-                                  >
-                                    <Copy className="h-4 w-4" />
-                                  </Button>
-                                </div>
-                              </div>
-                            )}
-                            
-                            {cred.notes && (
-                              <p className="text-sm text-muted-foreground px-1">{cred.notes}</p>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
+            {property && session && (
+              <OwnerPropertyTab 
+                property={property}
+                owner={{
+                  name: session.ownerName,
+                  email: session.email,
+                  secondOwnerName: session.secondOwnerName,
+                  secondOwnerEmail: session.secondOwnerEmail,
+                }}
+              />
+            )}
           </TabsContent>
         </Tabs>
       </main>
