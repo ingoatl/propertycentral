@@ -9,6 +9,9 @@ const corsHeaders = {
 const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
 const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
+// Company logo URL (publicly accessible)
+const LOGO_URL = `${supabaseUrl}/storage/v1/object/public/property-images/peachhaus-logo.png`;
+
 interface LineItem {
   description: string;
   amount: number;
@@ -16,6 +19,16 @@ interface LineItem {
   category?: string;
   notes?: string;
   hours?: number;
+}
+
+interface MidTermProration {
+  tenantName: string;
+  dateRange: string;
+  monthlyRent: number;
+  occupiedDays: number;
+  daysInMonth: number;
+  proratedAmount: number;
+  isFullMonth: boolean;
 }
 
 interface StatementData {
@@ -30,6 +43,7 @@ interface StatementData {
   // Revenue
   shortTermRevenue: number;
   midTermRevenue: number;
+  midTermProrationDetails: MidTermProration[];
   grossRevenue: number;
   
   // Expenses
@@ -68,13 +82,56 @@ const handler = async (req: Request): Promise<Response> => {
       .select(`
         *,
         properties(*),
-        property_owners(name, email)
+        property_owners(name, email, service_type)
       `)
       .eq("id", reconciliation_id)
       .single();
 
     if (recError || !reconciliation) {
       throw new Error("Reconciliation not found");
+    }
+
+    // Calculate mid-term proration details
+    const recMonth = new Date(reconciliation.reconciliation_month + "T00:00:00");
+    const recMonthStart = new Date(recMonth.getFullYear(), recMonth.getMonth(), 1);
+    const recMonthEnd = new Date(recMonth.getFullYear(), recMonth.getMonth() + 1, 0);
+    const daysInMonth = recMonthEnd.getDate();
+    
+    const { data: mtBookings } = await supabase
+      .from("mid_term_bookings")
+      .select("tenant_name, start_date, end_date, monthly_rent, nightly_rate")
+      .eq("property_id", reconciliation.properties?.id)
+      .eq("status", "active")
+      .gte("end_date", recMonthStart.toISOString().split('T')[0])
+      .lte("start_date", recMonthEnd.toISOString().split('T')[0]);
+    
+    const midTermProrationDetails: MidTermProration[] = [];
+    if (mtBookings && mtBookings.length > 0) {
+      mtBookings.forEach((booking: any) => {
+        const bookingStart = new Date(booking.start_date + "T00:00:00");
+        const bookingEnd = new Date(booking.end_date + "T00:00:00");
+        
+        const effectiveStart = bookingStart > recMonthStart ? bookingStart : recMonthStart;
+        const effectiveEnd = bookingEnd < recMonthEnd ? bookingEnd : recMonthEnd;
+        
+        const occupiedDays = Math.ceil((effectiveEnd.getTime() - effectiveStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+        const monthlyRent = Number(booking.monthly_rent || 0);
+        const proratedAmount = (monthlyRent / daysInMonth) * occupiedDays;
+        
+        const startDay = effectiveStart.getDate();
+        const endDay = effectiveEnd.getDate();
+        const monthName = recMonth.toLocaleDateString('en-US', { month: 'short' });
+        
+        midTermProrationDetails.push({
+          tenantName: booking.tenant_name,
+          dateRange: `${monthName} ${startDay} - ${monthName} ${endDay}`,
+          monthlyRent: monthlyRent,
+          occupiedDays: occupiedDays,
+          daysInMonth: daysInMonth,
+          proratedAmount: proratedAmount,
+          isFullMonth: occupiedDays >= daysInMonth - 1
+        });
+      });
     }
 
     // Fetch line items
@@ -171,6 +228,7 @@ const handler = async (req: Request): Promise<Response> => {
       periodYear,
       shortTermRevenue: Number(reconciliation.short_term_revenue || 0),
       midTermRevenue: Number(reconciliation.mid_term_revenue || 0),
+      midTermProrationDetails,
       grossRevenue,
       managementFee,
       managementFeePercentage: reconciliation.properties?.management_fee_percentage || 15,
@@ -181,7 +239,7 @@ const handler = async (req: Request): Promise<Response> => {
       petFees,
       totalExpenses,
       netOwnerEarnings,
-      serviceType: "cohosting",
+      serviceType: reconciliation.property_owners?.service_type || "cohosting",
     };
 
     // Generate PDF HTML
@@ -225,6 +283,47 @@ function generatePdfHtml(data: StatementData): string {
       day: "numeric",
     });
   };
+
+  // Generate mid-term revenue rows with proration explanation
+  let midTermRevenueRows = '';
+  if (data.midTermRevenue > 0) {
+    if (data.midTermProrationDetails && data.midTermProrationDetails.length > 0) {
+      midTermRevenueRows = data.midTermProrationDetails.map((detail) => {
+        if (detail.isFullMonth) {
+          return `
+          <tr>
+            <td style="padding: 6px 0; font-size: 11px; color: #111111; border-bottom: 1px solid #e5e5e5;">
+              Mid-term Rental Revenue
+              <div style="color: #666666; font-size: 9px; margin-top: 2px;">${detail.tenantName}</div>
+            </td>
+            <td style="padding: 6px 0; font-size: 11px; color: #111111; text-align: right; font-family: 'SF Mono', 'Menlo', 'Courier New', monospace; border-bottom: 1px solid #e5e5e5;">
+              ${formatCurrency(detail.proratedAmount)}
+            </td>
+          </tr>`;
+        } else {
+          return `
+          <tr>
+            <td style="padding: 6px 0; font-size: 11px; color: #111111; border-bottom: 1px solid #e5e5e5;">
+              Mid-term Rental Revenue
+              <div style="color: #666666; font-size: 9px; margin-top: 2px;">${detail.tenantName} (${detail.dateRange})</div>
+              <div style="color: #888888; font-size: 8px; margin-top: 1px; font-family: 'SF Mono', 'Menlo', 'Courier New', monospace;">
+                ${formatCurrency(detail.monthlyRent)}/mo × ${detail.occupiedDays}/${detail.daysInMonth} days = ${formatCurrency(detail.proratedAmount)}
+              </div>
+            </td>
+            <td style="padding: 6px 0; font-size: 11px; color: #111111; text-align: right; font-family: 'SF Mono', 'Menlo', 'Courier New', monospace; border-bottom: 1px solid #e5e5e5; vertical-align: top;">
+              ${formatCurrency(detail.proratedAmount)}
+            </td>
+          </tr>`;
+        }
+      }).join('');
+    } else {
+      midTermRevenueRows = `
+      <tr>
+        <td style="padding: 6px 0; font-size: 11px; color: #111111; border-bottom: 1px solid #e5e5e5;">Mid-term Rental Revenue</td>
+        <td style="padding: 6px 0; font-size: 11px; color: #111111; text-align: right; font-family: 'SF Mono', 'Menlo', 'Courier New', monospace; border-bottom: 1px solid #e5e5e5;">${formatCurrency(data.midTermRevenue)}</td>
+      </tr>`;
+    }
+  }
 
   // Generate visit rows - compact format
   const visitRows = data.visits.map((visit) => {
@@ -315,14 +414,14 @@ function generatePdfHtml(data: StatementData): string {
 <body>
   <div class="page">
     
-    <!-- Header - Corporate Minimal -->
+    <!-- Header - Corporate Minimal with Logo -->
     <table style="width: 100%; border-bottom: 2px solid #111111; padding-bottom: 12px; margin-bottom: 16px;">
       <tr>
-        <td style="vertical-align: bottom;">
-          <div style="font-size: 18px; font-weight: 700; color: #111111; letter-spacing: -0.3px;">PeachHaus</div>
-          <div style="font-size: 9px; color: #666666; margin-top: 2px; letter-spacing: 1px; text-transform: uppercase;">Property Management</div>
+        <td style="vertical-align: middle;">
+          <img src="${LOGO_URL}" alt="PeachHaus" style="height: 36px; width: auto;" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';" />
+          <div style="display: none; font-size: 18px; font-weight: 700; color: #111111; letter-spacing: -0.3px;">PeachHaus</div>
         </td>
-        <td style="text-align: right; vertical-align: bottom;">
+        <td style="text-align: right; vertical-align: middle;">
           <div style="font-size: 14px; font-weight: 600; color: #111111; margin-bottom: 4px;">OWNER STATEMENT</div>
           <div style="font-size: 9px; color: #666666; font-family: 'SF Mono', 'Menlo', 'Courier New', monospace;">
             ${data.statementId}
@@ -392,11 +491,7 @@ function generatePdfHtml(data: StatementData): string {
           <td style="padding: 6px 0; font-size: 11px; color: #111111; border-bottom: 1px solid #e5e5e5;">Short-term Booking Revenue</td>
           <td style="padding: 6px 0; font-size: 11px; color: #111111; text-align: right; font-family: 'SF Mono', 'Menlo', 'Courier New', monospace; border-bottom: 1px solid #e5e5e5;">${formatCurrency(data.shortTermRevenue)}</td>
         </tr>` : ""}
-        ${data.midTermRevenue > 0 ? `
-        <tr>
-          <td style="padding: 6px 0; font-size: 11px; color: #111111; border-bottom: 1px solid #e5e5e5;">Mid-term Rental Revenue</td>
-          <td style="padding: 6px 0; font-size: 11px; color: #111111; text-align: right; font-family: 'SF Mono', 'Menlo', 'Courier New', monospace; border-bottom: 1px solid #e5e5e5;">${formatCurrency(data.midTermRevenue)}</td>
-        </tr>` : ""}
+        ${midTermRevenueRows}
         <tr style="background: #f9f9f9;">
           <td style="padding: 8px 0; font-size: 11px; font-weight: 600; color: #111111;">TOTAL GROSS REVENUE</td>
           <td style="padding: 8px 0; font-size: 12px; color: #111111; text-align: right; font-family: 'SF Mono', 'Menlo', 'Courier New', monospace; font-weight: 700;">${formatCurrency(data.grossRevenue)}</td>
@@ -442,8 +537,8 @@ function generatePdfHtml(data: StatementData): string {
       </table>
     </div>
 
-    <!-- Net Result - Final -->
-    <table style="width: 100%; margin-bottom: 20px; border: 2px solid #111111;">
+    <!-- NET RESULT - Final -->
+    <table style="width: 100%; border: 2px solid #111111; margin-bottom: 16px;">
       <tr>
         <td style="padding: 12px 16px; background: #111111;">
           <table style="width: 100%;">
@@ -460,24 +555,20 @@ function generatePdfHtml(data: StatementData): string {
 
     <!-- Footer -->
     <div style="border-top: 1px solid #e5e5e5; padding-top: 12px;">
-      <table style="width: 100%;">
-        <tr>
-          <td style="font-size: 9px; color: #666666;">
-            This is an official financial statement from PeachHaus Property Management.<br>
-            Please retain for your records.
-          </td>
-          <td style="text-align: right; font-size: 9px; color: #666666;">
-            Questions? Contact info@peachhausgroup.com<br>
-            <span style="font-family: 'SF Mono', 'Menlo', 'Courier New', monospace;">${data.statementId}</span> • ${data.statementDate}
-          </td>
-        </tr>
-      </table>
+      <p style="font-size: 9px; color: #666666; margin: 0 0 8px 0; line-height: 1.4;">
+        Questions about this statement? Contact <a href="mailto:info@peachhausgroup.com" style="color: #111111; text-decoration: underline;">info@peachhausgroup.com</a>
+      </p>
+      <div style="font-size: 8px; color: #999999;">
+        <div style="margin-bottom: 2px;">PeachHaus Property Management</div>
+        <div>This is an official financial statement. Please retain for your records.</div>
+        <div style="margin-top: 4px; font-family: 'SF Mono', 'Menlo', 'Courier New', monospace;">${data.statementId} • ${data.statementDate}</div>
+      </div>
     </div>
 
   </div>
 </body>
 </html>
-  `;
+`;
 }
 
 serve(handler);

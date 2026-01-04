@@ -53,6 +53,15 @@ export const MonthlyEmailPreviewModal = ({
   const [approvedVisits, setApprovedVisits] = useState<ApprovedLineItem[]>([]);
   const [approvedExpenses, setApprovedExpenses] = useState<ApprovedLineItem[]>([]);
   const [duplicateWarnings, setDuplicateWarnings] = useState<DuplicateWarning[]>([]);
+  const [midTermProration, setMidTermProration] = useState<{
+    tenantName: string;
+    dateRange: string;
+    monthlyRent: number;
+    occupiedDays: number;
+    daysInMonth: number;
+    proratedAmount: number;
+    isFullMonth: boolean;
+  }[]>([]);
 
   const handleDownloadPdf = async () => {
     setIsGeneratingPdf(true);

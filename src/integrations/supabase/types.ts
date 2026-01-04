@@ -3883,6 +3883,83 @@ export type Database = {
           },
         ]
       }
+      owner_statement_archive: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_revision: boolean | null
+          line_items_snapshot: Json
+          management_fee: number
+          net_owner_result: number
+          owner_id: string
+          property_id: string
+          recipient_emails: string[]
+          reconciliation_id: string | null
+          revision_number: number | null
+          sent_at: string | null
+          sent_by: string | null
+          statement_date: string
+          statement_html: string
+          statement_month: string
+          statement_number: string
+          statement_pdf_path: string | null
+          total_expenses: number
+          total_revenue: number
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_revision?: boolean | null
+          line_items_snapshot: Json
+          management_fee: number
+          net_owner_result: number
+          owner_id: string
+          property_id: string
+          recipient_emails: string[]
+          reconciliation_id?: string | null
+          revision_number?: number | null
+          sent_at?: string | null
+          sent_by?: string | null
+          statement_date: string
+          statement_html: string
+          statement_month: string
+          statement_number: string
+          statement_pdf_path?: string | null
+          total_expenses: number
+          total_revenue: number
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_revision?: boolean | null
+          line_items_snapshot?: Json
+          management_fee?: number
+          net_owner_result?: number
+          owner_id?: string
+          property_id?: string
+          recipient_emails?: string[]
+          reconciliation_id?: string | null
+          revision_number?: number | null
+          sent_at?: string | null
+          sent_by?: string | null
+          statement_date?: string
+          statement_html?: string
+          statement_month?: string
+          statement_number?: string
+          statement_pdf_path?: string | null
+          total_expenses?: number
+          total_revenue?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "owner_statement_archive_reconciliation_id_fkey"
+            columns: ["reconciliation_id"]
+            isOneToOne: false
+            referencedRelation: "monthly_reconciliations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ownerrez_bookings: {
         Row: {
           accommodation_revenue: number | null
