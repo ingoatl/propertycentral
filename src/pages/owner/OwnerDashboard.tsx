@@ -1008,14 +1008,6 @@ export default function OwnerDashboard() {
                           <Button
                             variant="outline"
                             size="icon"
-                            onClick={() => openStatementViewer(statement)}
-                            title="View Statement"
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="icon"
                             onClick={() => downloadStatement(statement)}
                             disabled={downloadingPdf === statement.id}
                             title="Download Statement"
