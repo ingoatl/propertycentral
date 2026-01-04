@@ -4,7 +4,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table,
   TableBody,
@@ -13,20 +12,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import {
@@ -34,11 +19,8 @@ import {
   Mail,
   ExternalLink,
   RefreshCw,
-  Eye,
   Building2,
-  Calendar,
   TrendingUp,
-  DollarSign,
   Send,
   CheckCircle,
   Clock,
@@ -66,31 +48,6 @@ interface OwnerStats {
   activeThisMonth: number;
 }
 
-interface OwnerDashboardData {
-  owner: OwnerWithProperty;
-  statements: Array<{
-    id: string;
-    reconciliation_month: string;
-    total_revenue: number;
-    net_to_owner: number;
-    status: string;
-  }>;
-  bookings: Array<{
-    id: string;
-    guest_name: string | null;
-    check_in: string | null;
-    check_out: string | null;
-    total_amount: number;
-  }>;
-  recentExpenses: Array<{
-    id: string;
-    date: string;
-    amount: number;
-    purpose: string | null;
-    vendor: string | null;
-  }>;
-}
-
 export function OwnerPortalAdmin() {
   const [owners, setOwners] = useState<OwnerWithProperty[]>([]);
   const [loading, setLoading] = useState(true);
@@ -102,10 +59,6 @@ export function OwnerPortalAdmin() {
     invitedThisMonth: 0,
     activeThisMonth: 0,
   });
-  const [previewOpen, setPreviewOpen] = useState(false);
-  const [previewData, setPreviewData] = useState<OwnerDashboardData | null>(null);
-  const [loadingPreview, setLoadingPreview] = useState(false);
-  const [allOwnerProperties, setAllOwnerProperties] = useState<OwnerWithProperty[]>([]);
 
   useEffect(() => {
     loadOwners();
@@ -264,65 +217,6 @@ export function OwnerPortalAdmin() {
     }
   };
 
-  const loadOwnerPreview = async (owner: OwnerWithProperty) => {
-    if (!owner.property_id) {
-      toast.error("Owner has no active property");
-      return;
-    }
-
-    setLoadingPreview(true);
-    setPreviewOpen(true);
-    
-    // Store the current owner and all owners with properties for switching
-    setAllOwnerProperties(owners.filter(o => o.property_id));
-
-    await loadPreviewDataForOwner(owner);
-  };
-
-  const loadPreviewDataForOwner = async (owner: OwnerWithProperty) => {
-    if (!owner.property_id) return;
-    
-    setLoadingPreview(true);
-    try {
-      // Load statements
-      const { data: statements } = await supabase
-        .from("monthly_reconciliations")
-        .select("id, reconciliation_month, total_revenue, net_to_owner, status")
-        .eq("property_id", owner.property_id)
-        .in("status", ["statement_sent", "approved"])
-        .order("reconciliation_month", { ascending: false })
-        .limit(12);
-
-      // Load bookings
-      const { data: bookings } = await supabase
-        .from("ownerrez_bookings")
-        .select("id, guest_name, check_in, check_out, total_amount")
-        .eq("property_id", owner.property_id)
-        .order("check_in", { ascending: false })
-        .limit(10);
-
-      // Load expenses
-      const { data: expenses } = await supabase
-        .from("expenses")
-        .select("id, date, amount, purpose, vendor")
-        .eq("property_id", owner.property_id)
-        .order("date", { ascending: false })
-        .limit(10);
-
-      setPreviewData({
-        owner,
-        statements: statements || [],
-        bookings: bookings || [],
-        recentExpenses: expenses || [],
-      });
-    } catch (error) {
-      console.error("Error loading preview:", error);
-      toast.error("Failed to load owner dashboard");
-    } finally {
-      setLoadingPreview(false);
-    }
-  };
-
   const filteredOwners = owners.filter(
     (o) =>
       o.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -330,12 +224,6 @@ export function OwnerPortalAdmin() {
       o.property_address?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-    }).format(amount);
-  };
 
   if (loading) {
     return (
@@ -485,15 +373,6 @@ export function OwnerPortalAdmin() {
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-2">
                       <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => loadOwnerPreview(owner)}
-                        disabled={!owner.property_id}
-                      >
-                        <Eye className="h-4 w-4 mr-1" />
-                        Preview
-                      </Button>
-                      <Button
                         variant="outline"
                         size="sm"
                         onClick={() => openPortalAsOwner(owner)}
@@ -525,168 +404,6 @@ export function OwnerPortalAdmin() {
         </CardContent>
       </Card>
 
-      {/* Owner Preview Dialog */}
-      <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <DialogTitle className="flex items-center gap-2">
-                  <Building2 className="h-5 w-5" />
-                  Owner Dashboard Preview
-                </DialogTitle>
-                <DialogDescription>
-                  {previewData?.owner.name} - {previewData?.owner.property_address}
-                </DialogDescription>
-              </div>
-              {/* Property Switcher */}
-              {allOwnerProperties.length > 1 && (
-                <Select 
-                  value={previewData?.owner.id || ""} 
-                  onValueChange={(ownerId) => {
-                    const owner = allOwnerProperties.find(o => o.id === ownerId);
-                    if (owner) loadPreviewDataForOwner(owner);
-                  }}
-                >
-                  <SelectTrigger className="w-[220px]">
-                    <SelectValue placeholder="Switch property" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {allOwnerProperties.map((o) => (
-                      <SelectItem key={o.id} value={o.id}>
-                        <span className="truncate max-w-[180px]">{o.property_address || o.name}</span>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-            </div>
-          </DialogHeader>
-
-          {loadingPreview ? (
-            <div className="flex items-center justify-center py-12">
-              <RefreshCw className="h-8 w-8 animate-spin text-muted-foreground" />
-            </div>
-          ) : previewData ? (
-            <div className="space-y-6">
-              {/* Summary Stats */}
-              <div className="grid grid-cols-3 gap-4">
-                <Card>
-                  <CardContent className="pt-4">
-                    <div className="flex items-center gap-2">
-                      <DollarSign className="h-4 w-4 text-emerald-600" />
-                      <span className="text-sm text-muted-foreground">YTD Revenue</span>
-                    </div>
-                    <p className="text-xl font-bold mt-1">
-                      {formatCurrency(
-                        previewData.statements.reduce((sum, s) => sum + (s.total_revenue || 0), 0)
-                      )}
-                    </p>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardContent className="pt-4">
-                    <div className="flex items-center gap-2">
-                      <TrendingUp className="h-4 w-4 text-blue-600" />
-                      <span className="text-sm text-muted-foreground">YTD Net</span>
-                    </div>
-                    <p className="text-xl font-bold mt-1">
-                      {formatCurrency(
-                        previewData.statements.reduce((sum, s) => sum + (s.net_to_owner || 0), 0)
-                      )}
-                    </p>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardContent className="pt-4">
-                    <div className="flex items-center gap-2">
-                      <Calendar className="h-4 w-4 text-purple-600" />
-                      <span className="text-sm text-muted-foreground">Statements</span>
-                    </div>
-                    <p className="text-xl font-bold mt-1">{previewData.statements.length}</p>
-                  </CardContent>
-                </Card>
-              </div>
-
-              <Tabs defaultValue="statements">
-                <TabsList>
-                  <TabsTrigger value="statements">Statements</TabsTrigger>
-                  <TabsTrigger value="bookings">Bookings</TabsTrigger>
-                  <TabsTrigger value="expenses">Expenses</TabsTrigger>
-                </TabsList>
-
-                <TabsContent value="statements" className="mt-4">
-                  {previewData.statements.length === 0 ? (
-                    <p className="text-muted-foreground text-center py-8">No statements available</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {previewData.statements.map((s) => (
-                        <div key={s.id} className="flex items-center justify-between p-3 border rounded-lg">
-                          <div>
-                            <p className="font-medium">
-                              {format(new Date(s.reconciliation_month), "MMMM yyyy")}
-                            </p>
-                            <p className="text-sm text-muted-foreground">
-                              Revenue: {formatCurrency(s.total_revenue || 0)}
-                            </p>
-                          </div>
-                          <div className="text-right">
-                            <p className="font-bold text-emerald-600">
-                              {formatCurrency(s.net_to_owner || 0)}
-                            </p>
-                            <Badge variant="secondary">{s.status}</Badge>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </TabsContent>
-
-                <TabsContent value="bookings" className="mt-4">
-                  {previewData.bookings.length === 0 ? (
-                    <p className="text-muted-foreground text-center py-8">No bookings available</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {previewData.bookings.map((b) => (
-                        <div key={b.id} className="flex items-center justify-between p-3 border rounded-lg">
-                          <div>
-                            <p className="font-medium">{b.guest_name || "Guest"}</p>
-                            <p className="text-sm text-muted-foreground">
-                              {b.check_in && format(new Date(b.check_in), "MMM d")} -{" "}
-                              {b.check_out && format(new Date(b.check_out), "MMM d, yyyy")}
-                            </p>
-                          </div>
-                          <p className="font-mono font-medium">{formatCurrency(b.total_amount)}</p>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </TabsContent>
-
-                <TabsContent value="expenses" className="mt-4">
-                  {previewData.recentExpenses.length === 0 ? (
-                    <p className="text-muted-foreground text-center py-8">No expenses available</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {previewData.recentExpenses.map((e) => (
-                        <div key={e.id} className="flex items-center justify-between p-3 border rounded-lg">
-                          <div>
-                            <p className="font-medium">{e.purpose || e.vendor || "Expense"}</p>
-                            <p className="text-sm text-muted-foreground">
-                              {format(new Date(e.date), "MMM d, yyyy")}
-                            </p>
-                          </div>
-                          <p className="font-mono font-medium">{formatCurrency(e.amount)}</p>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </TabsContent>
-              </Tabs>
-            </div>
-          ) : null}
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

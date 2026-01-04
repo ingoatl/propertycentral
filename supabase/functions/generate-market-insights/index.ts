@@ -301,10 +301,12 @@ Generate a JSON response with these sections. For demand drivers, use REAL upcom
   ],
   "demandDrivers": [
     {
-      "event": "Specific event name (e.g., 'Atlanta Falcons vs Cowboys', 'Shaky Knees Music Festival', 'Dragon Con 2026')",
+      "event": "Specific event name with venue location",
       "date": "YYYY-MM-DD format - MUST be after ${currentDate.toISOString().split('T')[0]}",
-      "impact": "Expected 20-40% rate increase due to high demand",
-      "category": "Sports" | "Music" | "Festival" | "Business" | "Seasonal"
+      "impact": "Expected rate increase and demand level",
+      "category": "Sports" | "Music" | "Festival" | "Business" | "Seasonal" | "World Cup",
+      "venue": "Venue name and location",
+      "distance": "Distance from property"
     }
   ],
   "strengthsForArea": [
@@ -312,19 +314,45 @@ Generate a JSON response with these sections. For demand drivers, use REAL upcom
   ]
 }
 
-CRITICAL for demandDrivers:
-- Generate 6-8 real upcoming events for ${city} area
-- All dates MUST be in the future (after ${currentDate.toISOString().split('T')[0]})
-- Use YYYY-MM-DD format for dates (e.g., "${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-15")
-- Include specific event names: Atlanta Falcons games, Atlanta Hawks games, Atlanta United matches, concerts at State Farm Arena, Dragon Con, Shaky Knees, SEC Championship, Peach Bowl, conferences at Georgia World Congress Center
-- Include seasonal drivers: Spring Break (March), Summer travel (June-August), Holiday season (November-December)
-- Be specific about the venue and expected impact on rental demand
+CRITICAL for demandDrivers - INCLUDE THESE MAJOR EVENTS:
 
-Generate 4-5 comparable properties based on typical ${city} area STR data.
-Generate 3-4 future opportunities relevant to ${city}/${state}.
-Generate 6-8 demand drivers with specific future dates.
-Generate 4-5 location strengths.
-Be specific and realistic based on ${city} metro market conditions.`;
+1. **FIFA WORLD CUP 2026** (MOST IMPORTANT - Atlanta is a host city):
+   - Multiple games at Mercedes-Benz Stadium June-July 2026
+   - Expected 400%+ rate increases during match days
+   - Include at least 2-3 World Cup related entries
+
+2. **Major Metro Atlanta Events to include**:
+   - SEC Championship (December, Mercedes-Benz Stadium)
+   - Chick-fil-A Peach Bowl (December 30-31, Mercedes-Benz Stadium)
+   - Dragon Con (Labor Day weekend, Downtown Atlanta - 85,000+ attendees)
+   - Shaky Knees Music Festival (May, Central Park Atlanta)
+   - Music Midtown (September, Piedmont Park)
+   - Atlanta Dogwood Festival (April, Piedmont Park)
+   - Atlanta Pride Festival (October, Piedmont Park)
+   - Taste of Atlanta (October, Midtown)
+   - Atlanta Jazz Festival (May, Piedmont Park - FREE, 150,000+ attendees)
+
+3. **Sports - include home games**:
+   - Atlanta Falcons (NFL) - Mercedes-Benz Stadium
+   - Atlanta Hawks (NBA) - State Farm Arena  
+   - Atlanta United (MLS) - Mercedes-Benz Stadium
+   - Atlanta Braves (MLB) - Truist Park (Cobb County)
+
+4. **Business/Conference Events**:
+   - Georgia World Congress Center events
+   - Tech conferences, trade shows
+
+5. **Local city festivals** near the property's specific location
+
+For each event include:
+- Exact venue name and city/neighborhood
+- How far it is from the property (approximate distance)
+- Why it's relevant to their property's location
+
+Generate 8-10 demand drivers with emphasis on World Cup 2026 and major crowd drivers.
+Generate 4-5 comparable properties.
+Generate 3-4 future opportunities.
+Generate 4-5 location strengths specific to the property's neighborhood.`;
     }
 
     const openaiResponse = await fetch("https://api.openai.com/v1/chat/completions", {

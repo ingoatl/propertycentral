@@ -332,15 +332,20 @@ export default function OwnerDashboard() {
     setInsightsProgress(0);
     setInsightsStep("Connecting to market data sources...");
     
-    // Real progress steps with meaningful descriptions
+    // Detailed progress steps with value descriptions - slower progression
     const progressSteps = [
-      { progress: 10, step: "Analyzing your property's performance..." },
-      { progress: 25, step: "Scanning comparable rentals in your area..." },
-      { progress: 40, step: "Gathering occupancy and rate data..." },
-      { progress: 55, step: "Identifying demand drivers and events..." },
-      { progress: 70, step: "Generating AI-powered insights..." },
-      { progress: 85, step: "Preparing personalized recommendations..." },
-      { progress: 95, step: "Finalizing your market report..." },
+      { progress: 8, step: "Connecting to market data sources...", detail: "Accessing real-time rental market APIs" },
+      { progress: 15, step: "Analyzing your property's performance...", detail: "Reviewing your revenue and booking history" },
+      { progress: 22, step: "Scanning 50+ comparable rentals...", detail: "Finding properties similar to yours within 5 miles" },
+      { progress: 30, step: "Gathering occupancy data from AirDNA...", detail: "Premium market intelligence data" },
+      { progress: 38, step: "Analyzing seasonal rate trends...", detail: "Historical pricing patterns in your area" },
+      { progress: 45, step: "Identifying major events & demand drivers...", detail: "Sports, concerts, festivals, corporate travel" },
+      { progress: 52, step: "Researching World Cup 2026 impact...", detail: "Atlanta is a host city - massive demand expected" },
+      { progress: 60, step: "Evaluating corporate housing demand...", detail: "Fortune 500 relocation & travel data" },
+      { progress: 68, step: "Analyzing insurance placement trends...", detail: "Storm season & displacement housing needs" },
+      { progress: 75, step: "Generating AI-powered insights...", detail: "Custom recommendations for your property" },
+      { progress: 82, step: "Preparing revenue optimization tips...", detail: "Pricing strategies to maximize earnings" },
+      { progress: 88, step: "Finalizing your personalized report...", detail: "This data is worth $500+ from market research firms" },
     ];
     
     let stepIndex = 0;
@@ -350,7 +355,7 @@ export default function OwnerDashboard() {
         setInsightsStep(progressSteps[stepIndex].step);
         stepIndex++;
       }
-    }, 1200);
+    }, 1800); // Slower 1.8 second intervals
 
     try {
       const { data, error } = await supabase.functions.invoke("generate-market-insights", {
@@ -365,8 +370,13 @@ export default function OwnerDashboard() {
         return;
       }
 
+      // Smoothly complete to 100%
+      setInsightsProgress(95);
+      setInsightsStep("Almost there...");
+      await new Promise(resolve => setTimeout(resolve, 500));
       setInsightsProgress(100);
-      setInsightsStep("Complete!");
+      setInsightsStep("Complete! Your insights are ready.");
+      await new Promise(resolve => setTimeout(resolve, 300));
       setMarketInsights(data);
     } catch (err) {
       console.error("Error loading market insights:", err);
