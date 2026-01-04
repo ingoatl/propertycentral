@@ -4392,6 +4392,50 @@ export type Database = {
           },
         ]
       }
+      owner_portal_sessions: {
+        Row: {
+          created_at: string
+          email: string
+          expires_at: string
+          id: string
+          ip_address: string | null
+          owner_id: string
+          token: string
+          used_at: string | null
+          user_agent: string | null
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          expires_at: string
+          id?: string
+          ip_address?: string | null
+          owner_id: string
+          token: string
+          used_at?: string | null
+          user_agent?: string | null
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          expires_at?: string
+          id?: string
+          ip_address?: string | null
+          owner_id?: string
+          token?: string
+          used_at?: string | null
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "owner_portal_sessions_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "property_owners"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       owner_statement_archive: {
         Row: {
           created_at: string | null
@@ -5698,6 +5742,7 @@ export type Database = {
       }
       property_owners: {
         Row: {
+          auth_user_id: string | null
           created_at: string
           email: string
           id: string
@@ -5713,6 +5758,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          auth_user_id?: string | null
           created_at?: string
           email: string
           id?: string
@@ -5728,6 +5774,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          auth_user_id?: string | null
           created_at?: string
           email?: string
           id?: string
