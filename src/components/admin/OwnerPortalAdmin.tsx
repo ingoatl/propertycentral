@@ -27,16 +27,20 @@ import {
   Search,
 } from "lucide-react";
 
-interface OwnerWithProperty {
+interface OwnerProperty {
+  id: string;
+  name: string;
+  address: string | null;
+}
+
+interface OwnerWithProperties {
   id: string;
   name: string;
   email: string;
   phone: string | null;
   second_owner_name: string | null;
   second_owner_email: string | null;
-  property_id: string | null;
-  property_name: string | null;
-  property_address: string | null;
+  properties: OwnerProperty[];
   last_invite_sent: string | null;
   last_portal_access: string | null;
 }
@@ -49,7 +53,7 @@ interface OwnerStats {
 }
 
 export function OwnerPortalAdmin() {
-  const [owners, setOwners] = useState<OwnerWithProperty[]>([]);
+  const [owners, setOwners] = useState<OwnerWithProperties[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [sendingInvite, setSendingInvite] = useState<string | null>(null);
@@ -94,18 +98,20 @@ export function OwnerPortalAdmin() {
         .select("owner_id, created_at, used_at")
         .order("created_at", { ascending: false });
 
-      // Combine data
-      const ownersWithProperties: OwnerWithProperty[] = (ownersData || []).map((owner) => {
-        const property = propertiesData?.find((p) => p.owner_id === owner.id);
+      // Combine data - support multiple properties per owner
+      const ownersWithProperties: OwnerWithProperties[] = (ownersData || []).map((owner) => {
+        const ownerProperties = propertiesData?.filter((p) => p.owner_id === owner.id) || [];
         const sessions = sessionsData?.filter((s) => s.owner_id === owner.id) || [];
         const lastInvite = sessions[0];
         const lastAccess = sessions.find((s) => s.used_at);
 
         return {
           ...owner,
-          property_id: property?.id || null,
-          property_name: property?.name || null,
-          property_address: property?.address || null,
+          properties: ownerProperties.map(p => ({
+            id: p.id,
+            name: p.name,
+            address: p.address,
+          })),
           last_invite_sent: lastInvite?.created_at || null,
           last_portal_access: lastAccess?.used_at || null,
         };
@@ -119,7 +125,7 @@ export function OwnerPortalAdmin() {
       
       setStats({
         totalOwners: ownersWithProperties.length,
-        withProperties: ownersWithProperties.filter((o) => o.property_id).length,
+        withProperties: ownersWithProperties.filter((o) => o.properties.length > 0).length,
         invitedThisMonth: ownersWithProperties.filter(
           (o) => o.last_invite_sent && new Date(o.last_invite_sent) >= thisMonth
         ).length,
@@ -135,13 +141,13 @@ export function OwnerPortalAdmin() {
     }
   };
 
-  const sendInvite = async (owner: OwnerWithProperty) => {
-    if (!owner.property_id) {
-      toast.error("Owner has no active property");
+  const sendInvite = async (owner: OwnerWithProperties, propertyId: string) => {
+    if (!propertyId) {
+      toast.error("No property selected");
       return;
     }
 
-    setSendingInvite(owner.id);
+    setSendingInvite(`${owner.id}-${propertyId}`);
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
@@ -158,9 +164,8 @@ export function OwnerPortalAdmin() {
             Authorization: `Bearer ${session.access_token}`,
           },
           body: JSON.stringify({
-            ownerId: owner.id,
-            email: owner.email,
-            propertyId: owner.property_id,
+            owner_id: owner.id,
+            property_id: propertyId,
           }),
         }
       );
@@ -181,9 +186,9 @@ export function OwnerPortalAdmin() {
     }
   };
 
-  const openPortalAsOwner = async (owner: OwnerWithProperty) => {
-    if (!owner.property_id) {
-      toast.error("Owner has no active property");
+  const openPortalAsOwner = async (owner: OwnerWithProperties, property: OwnerProperty) => {
+    if (!property.id) {
+      toast.error("No property selected");
       return;
     }
 
@@ -198,8 +203,8 @@ export function OwnerPortalAdmin() {
           token: token,
           expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
           is_admin_preview: true,
-          property_id: owner.property_id,
-          property_name: owner.property_name,
+          property_id: property.id,
+          property_name: property.name,
         });
 
       if (error) {
@@ -210,7 +215,7 @@ export function OwnerPortalAdmin() {
       
       // Open the owner portal with the token in URL
       window.open(`/owner?token=${token}`, "_blank");
-      toast.success(`Opening portal as ${owner.name}`);
+      toast.success(`Opening portal for ${property.name}`);
     } catch (error) {
       console.error("Error opening portal:", error);
       toast.error("Failed to open portal");
@@ -221,7 +226,7 @@ export function OwnerPortalAdmin() {
     (o) =>
       o.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       o.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      o.property_address?.toLowerCase().includes(searchTerm.toLowerCase())
+      o.properties.some(p => p.address?.toLowerCase().includes(searchTerm.toLowerCase()) || p.name.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
 
@@ -329,75 +334,98 @@ export function OwnerPortalAdmin() {
             </TableHeader>
             <TableBody>
               {filteredOwners.map((owner) => (
-                <TableRow key={owner.id}>
-                  <TableCell>
-                    <div>
-                      <p className="font-medium">{owner.name}</p>
-                      <p className="text-sm text-muted-foreground">{owner.email}</p>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    {owner.property_address ? (
-                      <div className="max-w-[200px] truncate" title={owner.property_address}>
-                        {owner.property_address}
+                owner.properties.length > 0 ? (
+                  owner.properties.map((property, idx) => (
+                    <TableRow key={`${owner.id}-${property.id}`}>
+                      <TableCell>
+                        {idx === 0 && (
+                          <div>
+                            <p className="font-medium">{owner.name}</p>
+                            <p className="text-sm text-muted-foreground">{owner.email}</p>
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <div className="max-w-[200px]">
+                          <p className="font-medium truncate" title={property.name}>{property.name}</p>
+                          <p className="text-xs text-muted-foreground truncate" title={property.address || ''}>{property.address}</p>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {idx === 0 && owner.last_invite_sent ? (
+                          <div className="flex items-center gap-1 text-sm">
+                            <Mail className="h-3 w-3" />
+                            {format(new Date(owner.last_invite_sent), "MMM d, yyyy")}
+                          </div>
+                        ) : idx === 0 ? (
+                          <span className="text-muted-foreground text-sm">Never</span>
+                        ) : null}
+                      </TableCell>
+                      <TableCell>
+                        {idx === 0 && owner.last_portal_access ? (
+                          <div className="flex items-center gap-1 text-sm text-emerald-600">
+                            <CheckCircle className="h-3 w-3" />
+                            {format(new Date(owner.last_portal_access), "MMM d, yyyy")}
+                          </div>
+                        ) : idx === 0 ? (
+                          <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                            <Clock className="h-3 w-3" />
+                            Not accessed
+                          </div>
+                        ) : null}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openPortalAsOwner(owner, property)}
+                            title={`Open portal for ${property.name}`}
+                          >
+                            <ExternalLink className="h-4 w-4 mr-1" />
+                            Open
+                          </Button>
+                          <Button
+                            variant="default"
+                            size="sm"
+                            onClick={() => sendInvite(owner, property.id)}
+                            disabled={sendingInvite === `${owner.id}-${property.id}`}
+                          >
+                            {sendingInvite === `${owner.id}-${property.id}` ? (
+                              <RefreshCw className="h-4 w-4 mr-1 animate-spin" />
+                            ) : (
+                              <Send className="h-4 w-4 mr-1" />
+                            )}
+                            Send
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow key={owner.id}>
+                    <TableCell>
+                      <div>
+                        <p className="font-medium">{owner.name}</p>
+                        <p className="text-sm text-muted-foreground">{owner.email}</p>
                       </div>
-                    ) : (
+                    </TableCell>
+                    <TableCell>
                       <Badge variant="outline" className="text-amber-600">
                         No Property
                       </Badge>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {owner.last_invite_sent ? (
-                      <div className="flex items-center gap-1 text-sm">
-                        <Mail className="h-3 w-3" />
-                        {format(new Date(owner.last_invite_sent), "MMM d, yyyy")}
-                      </div>
-                    ) : (
-                      <span className="text-muted-foreground text-sm">Never</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {owner.last_portal_access ? (
-                      <div className="flex items-center gap-1 text-sm text-emerald-600">
-                        <CheckCircle className="h-3 w-3" />
-                        {format(new Date(owner.last_portal_access), "MMM d, yyyy")}
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                        <Clock className="h-3 w-3" />
-                        Not accessed
-                      </div>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => openPortalAsOwner(owner)}
-                        disabled={!owner.property_id}
-                        title="Open full portal as this owner"
-                      >
-                        <ExternalLink className="h-4 w-4 mr-1" />
-                        Open Portal
-                      </Button>
-                      <Button
-                        variant="default"
-                        size="sm"
-                        onClick={() => sendInvite(owner)}
-                        disabled={sendingInvite === owner.id || !owner.property_id}
-                      >
-                        {sendingInvite === owner.id ? (
-                          <RefreshCw className="h-4 w-4 mr-1 animate-spin" />
-                        ) : (
-                          <Send className="h-4 w-4 mr-1" />
-                        )}
-                        Send Invite
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
+                    </TableCell>
+                    <TableCell>
+                      <span className="text-muted-foreground text-sm">-</span>
+                    </TableCell>
+                    <TableCell>
+                      <span className="text-muted-foreground text-sm">-</span>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <span className="text-muted-foreground text-sm">No actions available</span>
+                    </TableCell>
+                  </TableRow>
+                )
               ))}
             </TableBody>
           </Table>
