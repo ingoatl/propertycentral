@@ -12,12 +12,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { format, startOfMonth, endOfMonth, parseISO } from "date-fns";
-import { Check, Home, DollarSign, Eye, RotateCcw, AlertTriangle, RefreshCw, CreditCard, Loader2, Banknote } from "lucide-react";
+import { Check, Home, DollarSign, Eye, RotateCcw, AlertTriangle, RefreshCw, CreditCard, Loader2, Banknote, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { MonthlyEmailPreviewModal } from "./MonthlyEmailPreviewModal";
 import { calculateDueFromOwnerFromLineItems, ServiceType, getSettlementAmount, getSettlementLabel, formatCurrency } from "@/lib/reconciliationCalculations";
 import { VisitValidationPreview } from "./VisitValidationPreview";
 import { TenantPaymentReview } from "./TenantPaymentReview";
+import { DeleteExpenseDialog } from "@/components/expenses/DeleteExpenseDialog";
 
 interface ReconciliationReviewModalProps {
   reconciliationId: string;
@@ -40,6 +41,7 @@ export const ReconciliationReviewModal = ({
   const [showEmailPreview, setShowEmailPreview] = useState(false);
   const [revenueOverride, setRevenueOverride] = useState<string>("");
   const [showOverrideInput, setShowOverrideInput] = useState(false);
+  const [deleteExpense, setDeleteExpense] = useState<{ id: string; description: string; amount: number } | null>(null);
   const queryClient = useQueryClient();
 
   // Set up real-time subscriptions for line item changes
@@ -1001,6 +1003,7 @@ export const ReconciliationReviewModal = ({
                   getIcon={getItemIcon}
                   showWarnings
                   visitDetails={data?.visitDetailsMap?.[item.item_id]}
+                  onDelete={item.item_type === 'expense' ? (expenseInfo: { id: string; description: string; amount: number }) => setDeleteExpense(expenseInfo) : undefined}
                 />
               ))
             )}
@@ -1034,7 +1037,8 @@ export const ReconciliationReviewModal = ({
                   key={item.id} 
                   item={item} 
                   onToggleVerified={(id, val) => toggleVerifiedMutation.mutate({ itemId: id, currentValue: val })} 
-                  getIcon={getItemIcon} 
+                  getIcon={getItemIcon}
+                  onDelete={item.item_type === 'expense' ? (expenseInfo: { id: string; description: string; amount: number }) => setDeleteExpense(expenseInfo) : undefined}
                 />
               ))
             )}
@@ -1387,11 +1391,24 @@ export const ReconciliationReviewModal = ({
         reconciliation={reconciliation}
         onSuccess={onSuccess}
       />
+
+      <DeleteExpenseDialog
+        open={!!deleteExpense}
+        onOpenChange={(open) => !open && setDeleteExpense(null)}
+        expenseId={deleteExpense?.id || ""}
+        expenseDescription={deleteExpense?.description || ""}
+        expenseAmount={deleteExpense?.amount}
+        reconciliationId={reconciliationId}
+        onDeleted={() => {
+          refetch();
+          toast.success("Expense deleted and removed from reconciliation");
+        }}
+      />
     </Dialog>
   );
 };
 
-const LineItemRow = ({ item, onToggleVerified, getIcon, showWarnings = false, visitDetails }: any) => {
+const LineItemRow = ({ item, onToggleVerified, getIcon, showWarnings = false, visitDetails, onDelete }: any) => {
   const isExpense = item.item_type === 'visit' || item.item_type === 'expense' || item.item_type === 'pass_through_fee' || item.amount < 0;
   const displayAmount = item.item_type === 'visit' || item.item_type === 'expense' || item.item_type === 'pass_through_fee'
     ? Math.abs(item.amount) 
@@ -1432,6 +1449,16 @@ const LineItemRow = ({ item, onToggleVerified, getIcon, showWarnings = false, vi
       return `${displayHours}:${minutes.toString().padStart(2, '0')} ${period}`;
     } catch {
       return time;
+    }
+  };
+
+  const handleDelete = () => {
+    if (onDelete && item.item_type === 'expense' && item.item_id) {
+      onDelete({
+        id: item.item_id,
+        description: item.description || 'Expense',
+        amount: Math.abs(item.amount)
+      });
     }
   };
   
@@ -1514,9 +1541,22 @@ const LineItemRow = ({ item, onToggleVerified, getIcon, showWarnings = false, vi
           )}
         </div>
       </div>
-      <p className={`font-semibold ${isExpense ? "text-red-600" : "text-green-600"}`}>
-        {isExpense ? "-" : "+"}${displayAmount.toFixed(2)}
-      </p>
+      <div className="flex items-center gap-2">
+        <p className={`font-semibold ${isExpense ? "text-red-600" : "text-green-600"}`}>
+          {isExpense ? "-" : "+"}${displayAmount.toFixed(2)}
+        </p>
+        {onDelete && item.item_type === 'expense' && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+            onClick={handleDelete}
+            title="Delete expense"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        )}
+      </div>
     </div>
   );
 };
