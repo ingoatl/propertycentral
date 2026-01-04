@@ -14,6 +14,88 @@ export type Database = {
   }
   public: {
     Tables: {
+      accommodation_requests: {
+        Row: {
+          created_at: string | null
+          decision_date: string | null
+          decision_made_by: string | null
+          decision_reason: string | null
+          documentation_path: string | null
+          documentation_received: boolean | null
+          id: string
+          interactive_process_notes: string | null
+          notes: string | null
+          property_id: string | null
+          request_date: string
+          request_description: string | null
+          request_type: string | null
+          status: string | null
+          tenant_email: string | null
+          tenant_name: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          decision_date?: string | null
+          decision_made_by?: string | null
+          decision_reason?: string | null
+          documentation_path?: string | null
+          documentation_received?: boolean | null
+          id?: string
+          interactive_process_notes?: string | null
+          notes?: string | null
+          property_id?: string | null
+          request_date: string
+          request_description?: string | null
+          request_type?: string | null
+          status?: string | null
+          tenant_email?: string | null
+          tenant_name: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          decision_date?: string | null
+          decision_made_by?: string | null
+          decision_reason?: string | null
+          documentation_path?: string | null
+          documentation_received?: boolean | null
+          id?: string
+          interactive_process_notes?: string | null
+          notes?: string | null
+          property_id?: string | null
+          request_date?: string
+          request_description?: string | null
+          request_type?: string | null
+          status?: string | null
+          tenant_email?: string | null
+          tenant_name?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "accommodation_requests_decision_made_by_fkey"
+            columns: ["decision_made_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "accommodation_requests_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "comprehensive_property_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "accommodation_requests_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       appliance_warranties: {
         Row: {
           appliance_type: string
@@ -106,6 +188,91 @@ export type Database = {
             columns: ["property_id"]
             isOneToOne: false
             referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      audit_access_log: {
+        Row: {
+          accessed_at: string | null
+          id: string
+          ip_address: string | null
+          sections_viewed: string[] | null
+          token_id: string | null
+          user_agent: string | null
+        }
+        Insert: {
+          accessed_at?: string | null
+          id?: string
+          ip_address?: string | null
+          sections_viewed?: string[] | null
+          token_id?: string | null
+          user_agent?: string | null
+        }
+        Update: {
+          accessed_at?: string | null
+          id?: string
+          ip_address?: string | null
+          sections_viewed?: string[] | null
+          token_id?: string | null
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_access_log_token_id_fkey"
+            columns: ["token_id"]
+            isOneToOne: false
+            referencedRelation: "audit_access_tokens"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      audit_access_tokens: {
+        Row: {
+          access_scope: Json | null
+          accessed_count: number | null
+          accessed_from_ips: string[] | null
+          created_at: string | null
+          created_by: string | null
+          expires_at: string
+          id: string
+          is_active: boolean | null
+          last_accessed_at: string | null
+          notes: string | null
+          token: string
+        }
+        Insert: {
+          access_scope?: Json | null
+          accessed_count?: number | null
+          accessed_from_ips?: string[] | null
+          created_at?: string | null
+          created_by?: string | null
+          expires_at: string
+          id?: string
+          is_active?: boolean | null
+          last_accessed_at?: string | null
+          notes?: string | null
+          token?: string
+        }
+        Update: {
+          access_scope?: Json | null
+          accessed_count?: number | null
+          accessed_from_ips?: string[] | null
+          created_at?: string | null
+          created_by?: string | null
+          expires_at?: string
+          id?: string
+          is_active?: boolean | null
+          last_accessed_at?: string | null
+          notes?: string | null
+          token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_access_tokens_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -442,6 +609,62 @@ export type Database = {
             columns: ["charge_id"]
             isOneToOne: false
             referencedRelation: "monthly_charges"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      compliance_training_log: {
+        Row: {
+          certificate_path: string | null
+          created_at: string | null
+          expiration_date: string | null
+          hours_completed: number | null
+          id: string
+          notes: string | null
+          passed: boolean | null
+          training_date: string
+          training_name: string
+          training_provider: string | null
+          training_type: string
+          user_id: string | null
+          user_name: string
+        }
+        Insert: {
+          certificate_path?: string | null
+          created_at?: string | null
+          expiration_date?: string | null
+          hours_completed?: number | null
+          id?: string
+          notes?: string | null
+          passed?: boolean | null
+          training_date: string
+          training_name: string
+          training_provider?: string | null
+          training_type: string
+          user_id?: string | null
+          user_name: string
+        }
+        Update: {
+          certificate_path?: string | null
+          created_at?: string | null
+          expiration_date?: string | null
+          hours_completed?: number | null
+          id?: string
+          notes?: string | null
+          passed?: boolean | null
+          training_date?: string
+          training_name?: string
+          training_provider?: string | null
+          training_type?: string
+          user_id?: string | null
+          user_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "compliance_training_log_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -2602,6 +2825,94 @@ export type Database = {
           },
           {
             foreignKeyName: "maintenance_troubleshooting_guides_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      management_agreements: {
+        Row: {
+          additional_fees: Json | null
+          agreement_date: string
+          created_at: string | null
+          document_path: string | null
+          effective_date: string
+          id: string
+          management_fee_percentage: number | null
+          notes: string | null
+          order_minimum_fee: number | null
+          owner_id: string | null
+          property_id: string | null
+          signed_by_company: boolean | null
+          signed_by_company_at: string | null
+          signed_by_owner: boolean | null
+          signed_by_owner_at: string | null
+          status: string | null
+          termination_date: string | null
+          termination_reason: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          additional_fees?: Json | null
+          agreement_date: string
+          created_at?: string | null
+          document_path?: string | null
+          effective_date: string
+          id?: string
+          management_fee_percentage?: number | null
+          notes?: string | null
+          order_minimum_fee?: number | null
+          owner_id?: string | null
+          property_id?: string | null
+          signed_by_company?: boolean | null
+          signed_by_company_at?: string | null
+          signed_by_owner?: boolean | null
+          signed_by_owner_at?: string | null
+          status?: string | null
+          termination_date?: string | null
+          termination_reason?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          additional_fees?: Json | null
+          agreement_date?: string
+          created_at?: string | null
+          document_path?: string | null
+          effective_date?: string
+          id?: string
+          management_fee_percentage?: number | null
+          notes?: string | null
+          order_minimum_fee?: number | null
+          owner_id?: string | null
+          property_id?: string | null
+          signed_by_company?: boolean | null
+          signed_by_company_at?: string | null
+          signed_by_owner?: boolean | null
+          signed_by_owner_at?: string | null
+          status?: string | null
+          termination_date?: string | null
+          termination_reason?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "management_agreements_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "property_owners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "management_agreements_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "comprehensive_property_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "management_agreements_property_id_fkey"
             columns: ["property_id"]
             isOneToOne: false
             referencedRelation: "properties"
@@ -5858,6 +6169,103 @@ export type Database = {
           role_name?: string
         }
         Relationships: []
+      }
+      tenant_applications: {
+        Row: {
+          applicant_email: string | null
+          applicant_name: string
+          applicant_phone: string | null
+          application_date: string
+          background_check_passed: boolean | null
+          created_at: string | null
+          credit_check_passed: boolean | null
+          decision_date: string | null
+          decision_made_by: string | null
+          decision_reason: string | null
+          denial_letter_sent: boolean | null
+          denial_letter_sent_at: string | null
+          id: string
+          income_requirement_met: boolean | null
+          income_verified: boolean | null
+          notes: string | null
+          property_id: string | null
+          references_checked: boolean | null
+          rental_history_verified: boolean | null
+          screening_criteria_used: Json | null
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          applicant_email?: string | null
+          applicant_name: string
+          applicant_phone?: string | null
+          application_date: string
+          background_check_passed?: boolean | null
+          created_at?: string | null
+          credit_check_passed?: boolean | null
+          decision_date?: string | null
+          decision_made_by?: string | null
+          decision_reason?: string | null
+          denial_letter_sent?: boolean | null
+          denial_letter_sent_at?: string | null
+          id?: string
+          income_requirement_met?: boolean | null
+          income_verified?: boolean | null
+          notes?: string | null
+          property_id?: string | null
+          references_checked?: boolean | null
+          rental_history_verified?: boolean | null
+          screening_criteria_used?: Json | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          applicant_email?: string | null
+          applicant_name?: string
+          applicant_phone?: string | null
+          application_date?: string
+          background_check_passed?: boolean | null
+          created_at?: string | null
+          credit_check_passed?: boolean | null
+          decision_date?: string | null
+          decision_made_by?: string | null
+          decision_reason?: string | null
+          denial_letter_sent?: boolean | null
+          denial_letter_sent_at?: string | null
+          id?: string
+          income_requirement_met?: boolean | null
+          income_verified?: boolean | null
+          notes?: string | null
+          property_id?: string | null
+          references_checked?: boolean | null
+          rental_history_verified?: boolean | null
+          screening_criteria_used?: Json | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tenant_applications_decision_made_by_fkey"
+            columns: ["decision_made_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tenant_applications_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "comprehensive_property_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tenant_applications_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       tenant_payments: {
         Row: {

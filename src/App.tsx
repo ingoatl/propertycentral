@@ -40,6 +40,7 @@ const BookDiscoveryCall = lazy(() => import("./pages/BookDiscoveryCall"));
 const PaymentSetup = lazy(() => import("./pages/PaymentSetup"));
 const OwnerPaymentSetup = lazy(() => import("./pages/OwnerPaymentSetup"));
 const OwnerPaymentSuccess = lazy(() => import("./pages/OwnerPaymentSuccess"));
+const AuditPortal = lazy(() => import("./pages/AuditPortal"));
 // Optimized QueryClient with caching and stale time
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -85,6 +86,7 @@ const App = () => (
             <Route path="/payment-success" element={<PaymentSetup />} />
             <Route path="/owner-payment-setup" element={<OwnerPaymentSetup />} />
             <Route path="/owner-payment-success" element={<OwnerPaymentSuccess />} />
+            <Route path="/audit/:token" element={<AuditPortal />} />
             <Route path="*" element={
               <Layout>
                 <Suspense fallback={<PageLoader />}>
