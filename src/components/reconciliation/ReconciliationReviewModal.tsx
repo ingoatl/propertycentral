@@ -421,6 +421,52 @@ export const ReconciliationReviewModal = ({
     enabled: open,
   });
 
+  // Subscribe to visits and expenses changes for this property (after data is available)
+  useEffect(() => {
+    if (!open || !data?.reconciliation?.property_id) return;
+
+    const propertyId = data.reconciliation.property_id;
+    
+    const visitsChannel = supabase
+      .channel(`reconciliation-visits-${propertyId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'visits',
+          filter: `property_id=eq.${propertyId}`
+        },
+        (payload) => {
+          console.log('Visit changed, refetching reconciliation data:', payload);
+          refetch();
+        }
+      )
+      .subscribe();
+
+    const expensesChannel = supabase
+      .channel(`reconciliation-expenses-${propertyId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'expenses',
+          filter: `property_id=eq.${propertyId}`
+        },
+        (payload) => {
+          console.log('Expense changed, refetching reconciliation data:', payload);
+          refetch();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(visitsChannel);
+      supabase.removeChannel(expensesChannel);
+    };
+  }, [open, data?.reconciliation?.property_id, refetch]);
+
   const toggleVerifiedMutation = useMutation({
     mutationFn: async ({ itemId, currentValue }: { itemId: string; currentValue: boolean }) => {
       const { data: { user } } = await supabase.auth.getUser();
