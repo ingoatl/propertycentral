@@ -196,13 +196,20 @@ serve(async (req: Request): Promise<Response> => {
     // For co-hosting: owner keeps revenue, net_to_owner = what they owe us, so actual_net = revenue - net_to_owner
     // For full-service: we collect revenue, net_to_owner = what we pay them, so actual_net = net_to_owner
     const isCohosting = owner.service_type === 'cohosting';
-    const statements = rawStatements.map(s => ({
-      ...s,
-      // Calculate actual net owner earnings based on service type
-      actual_net_earnings: isCohosting 
+    console.log(`Service type: ${owner.service_type}, isCohosting: ${isCohosting}`);
+    
+    const statements = rawStatements.map(s => {
+      const actualNet = isCohosting 
         ? (s.total_revenue || 0) - (s.net_to_owner || 0)  // Co-hosting: revenue minus fees owed
-        : (s.net_to_owner || 0)  // Full-service: net_to_owner is already correct
-    }));
+        : (s.net_to_owner || 0);  // Full-service: net_to_owner is already correct
+      
+      console.log(`Statement ${s.reconciliation_month}: revenue=${s.total_revenue}, net_to_owner=${s.net_to_owner}, actual_net_earnings=${actualNet}`);
+      
+      return {
+        ...s,
+        actual_net_earnings: actualNet
+      };
+    });
     
     // Merge reviews from both queries (direct property_id match and via booking join), deduplicate by id
     const reviewsById = reviewsResult.data || [];
