@@ -41,6 +41,7 @@ import { OwnerMarketInsightsEnhanced } from "./components/OwnerMarketInsightsEnh
 import { OwnerPropertyTab } from "./components/OwnerPropertyTab";
 import { OwnerRevenueForecast } from "./components/OwnerRevenueForecast";
 import { UpcomingEventsTimeline } from "./components/UpcomingEventsTimeline";
+import { StatementViewer } from "./components/StatementViewer";
 
 interface OwnerSession {
   ownerId: string;
@@ -164,6 +165,7 @@ export default function OwnerDashboard() {
   });
   const [activeTab, setActiveTab] = useState("overview");
   const [downloadingPdf, setDownloadingPdf] = useState<string | null>(null);
+  const [viewingStatement, setViewingStatement] = useState<Statement | null>(null);
   const [visiblePasswords, setVisiblePasswords] = useState<Set<string>>(new Set());
   const [marketInsights, setMarketInsights] = useState<MarketInsightsData | null>(null);
   const [loadingInsights, setLoadingInsights] = useState(false);
@@ -495,19 +497,31 @@ export default function OwnerDashboard() {
     }
   };
 
+  // Open statement in inline viewer instead of window.open (avoids ad blocker issues)
+  const openStatementViewer = (statement: Statement) => {
+    setViewingStatement(statement);
+  };
+
+  // Fetch statement PDF - returns data needed by StatementViewer
+  const fetchStatementPdf = async (statementId: string) => {
+    const { data, error } = await supabase.functions.invoke("owner-statement-pdf", {
+      body: { reconciliationId: statementId, token: sessionToken },
+    });
+
+    if (error) throw error;
+    if (data?.error) throw new Error(data.error);
+    
+    return {
+      signedUrl: data.signedUrl,
+      pdfBase64: data.pdfBase64,
+    };
+  };
+
+  // Legacy download function - still used for direct downloads
   const downloadStatement = async (statement: Statement) => {
     setDownloadingPdf(statement.id);
     try {
-      // Use edge function to bypass RLS
-      const { data, error } = await supabase.functions.invoke("owner-statement-pdf", {
-        body: { reconciliationId: statement.id, token: sessionToken },
-      });
-
-      if (error) throw error;
-      if (data?.error) {
-        toast.error(data.error);
-        return;
-      }
+      const data = await fetchStatementPdf(statement.id);
 
       // Handle signed URL - fetch as blob to avoid browser blocking
       if (data.signedUrl) {
@@ -518,16 +532,20 @@ export default function OwnerDashboard() {
           const blob = await response.blob();
           const blobUrl = URL.createObjectURL(blob);
           
-          // Open in new tab (blob URL is not blocked)
-          window.open(blobUrl, "_blank");
+          // Create download link
+          const link = document.createElement("a");
+          link.href = blobUrl;
+          link.download = `statement-${statement.reconciliation_month}.pdf`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
           
           // Cleanup after a delay
-          setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
-          toast.success("Statement opened");
+          setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+          toast.success("Statement downloaded");
         } catch (fetchError) {
-          console.error("Fetch error, trying direct open:", fetchError);
-          // Fallback: try direct open (may be blocked by some browsers)
-          window.open(data.signedUrl, "_blank");
+          console.error("Fetch error:", fetchError);
+          toast.error("Failed to download statement");
         }
         return;
       }
@@ -542,7 +560,15 @@ export default function OwnerDashboard() {
         const byteArray = new Uint8Array(byteNumbers);
         const blob = new Blob([byteArray], { type: "application/pdf" });
         const url = URL.createObjectURL(blob);
-        window.open(url, "_blank");
+        
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `statement-${statement.reconciliation_month}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
         toast.success("Statement downloaded");
         return;
       }
@@ -823,18 +849,28 @@ export default function OwnerDashboard() {
                           </span>
                         </div>
                       </div>
-                      <Button
-                        onClick={() => downloadStatement(latestStatement)}
-                        disabled={downloadingPdf === latestStatement.id}
-                        className="gap-2"
-                      >
-                        {downloadingPdf === latestStatement.id ? (
-                          <RefreshCw className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Download className="h-4 w-4" />
-                        )}
-                        Download PDF
-                      </Button>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          onClick={() => openStatementViewer(latestStatement)}
+                          className="gap-2"
+                        >
+                          <Eye className="h-4 w-4" />
+                          View
+                        </Button>
+                        <Button
+                          onClick={() => downloadStatement(latestStatement)}
+                          disabled={downloadingPdf === latestStatement.id}
+                          className="gap-2"
+                        >
+                          {downloadingPdf === latestStatement.id ? (
+                            <RefreshCw className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Download className="h-4 w-4" />
+                          )}
+                          Download
+                        </Button>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
@@ -968,12 +1004,21 @@ export default function OwnerDashboard() {
                             </div>
                           </div>
                         </div>
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            onClick={() => openStatementViewer(statement)}
+                            title="View Statement"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
                           <Button
                             variant="outline"
                             size="icon"
                             onClick={() => downloadStatement(statement)}
                             disabled={downloadingPdf === statement.id}
+                            title="Download Statement"
                           >
                             {downloadingPdf === statement.id ? (
                               <RefreshCw className="h-4 w-4 animate-spin" />
@@ -1021,6 +1066,15 @@ export default function OwnerDashboard() {
           </p>
         </div>
       </footer>
+
+      {/* Statement Viewer Modal */}
+      <StatementViewer
+        open={!!viewingStatement}
+        onOpenChange={(open) => !open && setViewingStatement(null)}
+        statement={viewingStatement}
+        fetchPdf={fetchStatementPdf}
+        propertyName={property?.name}
+      />
     </div>
   );
 }
