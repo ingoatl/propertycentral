@@ -147,12 +147,15 @@ serve(async (req: Request): Promise<Response> => {
         .order("reconciliation_month", { ascending: false })
         .limit(60), // 5 years of data
       
-      // Expenses - Show ALL expenses for the property (owners should see all receipts logged)
-      // This includes billed, reconciled, AND new expenses with receipts not yet processed
+      // Expenses - Show expenses that are either:
+      // 1. Billed (part of approved reconciliations), OR
+      // 2. Recent (within last 6 months) - captures new unbilled expenses
+      // This prevents old unbilled expenses from showing up (data hygiene issue)
       supabase
         .from("expenses")
-        .select("id, date, amount, purpose, vendor, category, file_path, original_receipt_path, email_screenshot_path, items_detail")
+        .select("id, date, amount, purpose, vendor, category, file_path, original_receipt_path, email_screenshot_path, items_detail, billed, reconciliation_id")
         .eq("property_id", property.id)
+        .or(`billed.eq.true,date.gte.${new Date(Date.now() - 180 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]}`)
         .order("date", { ascending: false })
         .limit(200),
       
@@ -627,6 +630,58 @@ serve(async (req: Request): Promise<Response> => {
 
     console.log("Performance metrics calculated:", performance);
 
+    // DATA VALIDATION WATCHDOG - Check for data anomalies and log warnings
+    const dataWarnings: string[] = [];
+    const currentYear = new Date().getFullYear();
+    const sixMonthsAgo = new Date();
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+    
+    // Check for unbilled expenses older than 6 months (data hygiene issue)
+    const oldUnbilledExpenses = expenses.filter((e: any) => {
+      const expenseDate = new Date(e.date);
+      return !e.billed && expenseDate < sixMonthsAgo;
+    });
+    if (oldUnbilledExpenses.length > 0) {
+      const warning = `Found ${oldUnbilledExpenses.length} unbilled expense(s) older than 6 months - may need reconciliation`;
+      console.warn("[DATA WATCHDOG]", warning, oldUnbilledExpenses.map((e: any) => ({ id: e.id, date: e.date, amount: e.amount })));
+      dataWarnings.push(warning);
+    }
+    
+    // Check for expenses with dates outside reasonable range (future or very old)
+    const suspiciousDateExpenses = expenses.filter((e: any) => {
+      const expenseDate = new Date(e.date);
+      return expenseDate.getFullYear() < currentYear - 2 || expenseDate > new Date();
+    });
+    if (suspiciousDateExpenses.length > 0) {
+      const warning = `Found ${suspiciousDateExpenses.length} expense(s) with suspicious dates (older than 2 years or in the future)`;
+      console.warn("[DATA WATCHDOG]", warning, suspiciousDateExpenses.map((e: any) => ({ id: e.id, date: e.date, purpose: e.purpose?.substring(0, 50) })));
+      dataWarnings.push(warning);
+    }
+    
+    // Check for statements with zero revenue but should have bookings
+    const statementsWithZeroRevenue = statements.filter((s: any) => 
+      (s.total_revenue === 0 || s.total_revenue === null) && 
+      s.status !== 'draft' && s.status !== 'preview'
+    );
+    if (statementsWithZeroRevenue.length > 0) {
+      console.warn("[DATA WATCHDOG] Found statements with zero revenue:", statementsWithZeroRevenue.map((s: any) => s.reconciliation_month));
+    }
+    
+    // Validate that statement months match expense dates
+    const expensesByMonth: Record<string, number> = {};
+    expenses.forEach((e: any) => {
+      const month = e.date?.substring(0, 7);
+      if (month) {
+        expensesByMonth[month] = (expensesByMonth[month] || 0) + 1;
+      }
+    });
+    
+    console.log("[DATA WATCHDOG] Expense distribution by month:", expensesByMonth);
+    
+    if (dataWarnings.length > 0) {
+      console.warn(`[DATA WATCHDOG] ${dataWarnings.length} data issue(s) detected for property ${property.name}`);
+    }
+
     // Build response with owner names
     const response = {
       owner: {
@@ -670,6 +725,7 @@ serve(async (req: Request): Promise<Response> => {
           strFromBookings: calculatedSTRRevenue,
         }
       },
+      dataWarnings, // Include any data quality warnings for admin awareness
     };
 
     return new Response(

@@ -595,10 +595,19 @@ export const ReconciliationList = () => {
     }) || [];
   }, [reconciliations, showOffboarded, selectedMonth]);
 
-  // Get only reconciliations for managed (active) properties
+  // Get reconciliations for managed (active) properties
+  // For preview/draft reconciliations: only show if property is in activeProperties (has unbilled items)
+  // For completed reconciliations (approved, statement_sent, paid): always show regardless of activeProperties
   const managedReconciliations = useMemo(() => {
     const managedPropertyIds = new Set(activeProperties?.map((p: any) => p.id) || []);
-    return filteredReconciliations.filter((rec: any) => managedPropertyIds.has(rec.property_id));
+    return filteredReconciliations.filter((rec: any) => {
+      // Completed reconciliations (non-preview/draft) should always show
+      if (rec.status !== 'preview' && rec.status !== 'draft') {
+        return true;
+      }
+      // Preview/draft reconciliations only show if property has unbilled items
+      return managedPropertyIds.has(rec.property_id);
+    });
   }, [filteredReconciliations, activeProperties]);
 
   // Get properties missing reconciliations for the selected month
