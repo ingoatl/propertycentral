@@ -704,6 +704,7 @@ export default function OwnerDashboard() {
                   isLoading={false}
                   loadingProgress={100}
                   loadingStep=""
+                  isSuperhost={performanceMetrics.averageRating !== null && performanceMetrics.averageRating >= 4.8 && performanceMetrics.reviewCount >= 10}
                 />
               </div>
             ) : (

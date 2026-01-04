@@ -71,6 +71,7 @@ interface OwnerMarketInsightsEnhancedProps {
   isLoading: boolean;
   loadingProgress: number;
   loadingStep: string;
+  isSuperhost?: boolean;
 }
 
 const eventImages: Record<string, string> = {
@@ -108,6 +109,7 @@ export function OwnerMarketInsightsEnhanced({
   isLoading,
   loadingProgress,
   loadingStep,
+  isSuperhost = false,
 }: OwnerMarketInsightsEnhancedProps) {
   const trendColors = {
     rising: "text-emerald-600 bg-emerald-100 dark:bg-emerald-900/30",
@@ -142,34 +144,34 @@ export function OwnerMarketInsightsEnhanced({
 
   return (
     <div className="space-y-6">
-      {/* PeachHaus Marketing Strategy */}
+      {/* How PeachHaus Maximizes Property Performance */}
       <Card className="border-none shadow-lg overflow-hidden bg-gradient-to-br from-primary/5 via-background to-primary/10">
         <CardHeader className="pb-2">
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2 text-lg">
               <Megaphone className="h-5 w-5 text-primary" />
-              How PeachHaus Drives Your Bookings
+              How PeachHaus Maximizes Your Property Performance
             </CardTitle>
             <Badge variant="secondary" className="gap-1">
               <Zap className="h-3 w-3" />
-              Active Marketing
+              Active Management
             </Badge>
           </div>
         </CardHeader>
         <CardContent className="pt-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="p-4 bg-background/80 rounded-xl border border-primary/10">
               <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 rounded-lg bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
-                  <Trophy className="h-5 w-5 text-amber-600" />
+                <div className="w-10 h-10 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
+                  <Star className="h-5 w-5 text-emerald-600" />
                 </div>
                 <div>
-                  <p className="font-semibold">Superhost Status</p>
-                  <p className="text-xs text-muted-foreground">Airbnb Recognition</p>
+                  <p className="font-semibold">Multi-Channel Distribution</p>
+                  <p className="text-xs text-muted-foreground">Maximum Exposure</p>
                 </div>
               </div>
               <p className="text-sm text-muted-foreground">
-                Your property maintains Superhost status with priority search placement and enhanced visibility.
+                Listed on Airbnb, VRBO, Booking.com, and our direct booking site for maximum visibility.
               </p>
             </div>
             
@@ -190,19 +192,51 @@ export function OwnerMarketInsightsEnhanced({
             
             <div className="p-4 bg-background/80 rounded-xl border border-primary/10">
               <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
-                  <Star className="h-5 w-5 text-emerald-600" />
+                <div className="w-10 h-10 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
+                  <Briefcase className="h-5 w-5 text-purple-600" />
                 </div>
                 <div>
-                  <p className="font-semibold">Multi-Platform</p>
-                  <p className="text-xs text-muted-foreground">Maximum Exposure</p>
+                  <p className="font-semibold">Corporate & Insurance</p>
+                  <p className="text-xs text-muted-foreground">Premium Placements</p>
                 </div>
               </div>
               <p className="text-sm text-muted-foreground">
-                Listed on Airbnb, VRBO, Booking.com, and our direct booking site for maximum visibility.
+                Partnerships with Fortune 500 companies and major insurers for guaranteed, longer-term stays.
+              </p>
+            </div>
+            
+            <div className="p-4 bg-background/80 rounded-xl border border-primary/10">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-10 h-10 rounded-lg bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
+                  <Users className="h-5 w-5 text-amber-600" />
+                </div>
+                <div>
+                  <p className="font-semibold">24/7 Guest Support</p>
+                  <p className="text-xs text-muted-foreground">5-Star Service</p>
+                </div>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Professional guest communication and review management to maintain top ratings.
               </p>
             </div>
           </div>
+
+          {/* Superhost Status - Only show if property has it */}
+          {isSuperhost && (
+            <div className="mt-4 p-4 bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 rounded-xl border border-amber-200/50 dark:border-amber-700/50">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
+                  <Trophy className="h-5 w-5 text-amber-600" />
+                </div>
+                <div>
+                  <p className="font-semibold text-amber-800 dark:text-amber-200">Superhost Status Achieved</p>
+                  <p className="text-sm text-amber-700/80 dark:text-amber-300/80">
+                    Your property maintains Superhost status with priority search placement and enhanced visibility on Airbnb.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 

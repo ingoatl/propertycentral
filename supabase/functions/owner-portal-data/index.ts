@@ -145,10 +145,10 @@ serve(async (req: Request): Promise<Response> => {
         .order("start_date", { ascending: false })
         .limit(50),
       
-      // Reviews
+      // Reviews - use correct column names
       supabase
         .from("ownerrez_reviews")
-        .select("id, guest_name, rating, review_text, review_date, source")
+        .select("id, guest_name, star_rating, review_text, review_date, review_source")
         .eq("property_id", property.id)
         .order("review_date", { ascending: false })
         .limit(50),
@@ -262,10 +262,10 @@ serve(async (req: Request): Promise<Response> => {
 
     const occupancyRate = daysThisYear > 0 ? Math.min(100, Math.round((bookedDays / daysThisYear) * 100)) : 0;
 
-    // Calculate average rating
-    const ratingsWithValue = reviews.filter(r => r.rating && r.rating > 0);
+    // Calculate average rating using star_rating column
+    const ratingsWithValue = reviews.filter(r => r.star_rating && r.star_rating > 0);
     const averageRating = ratingsWithValue.length > 0
-      ? ratingsWithValue.reduce((sum, r) => sum + r.rating, 0) / ratingsWithValue.length
+      ? ratingsWithValue.reduce((sum, r) => sum + r.star_rating, 0) / ratingsWithValue.length
       : null;
 
     // Build monthly revenue data for charts
@@ -284,14 +284,14 @@ serve(async (req: Request): Promise<Response> => {
     const monthlyRevenueArray = Object.values(monthlyRevenue)
       .sort((a, b) => a.month.localeCompare(b.month));
 
-    // Format reviews for frontend
+    // Format reviews for frontend - map star_rating to rating
     const formattedReviews = reviews.map(r => ({
       id: r.id,
       guestName: r.guest_name,
-      rating: r.rating,
+      rating: r.star_rating,
       text: r.review_text,
       date: r.review_date,
-      source: r.source || "OwnerRez",
+      source: r.review_source || "OwnerRez",
     }));
 
     // Format email insights for owner highlights
