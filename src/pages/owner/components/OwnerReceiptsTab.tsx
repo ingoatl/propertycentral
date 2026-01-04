@@ -169,7 +169,7 @@ export function OwnerReceiptsTab({ expenses, propertyId, token }: OwnerReceiptsT
       return;
     }
 
-    // Check if it's an HTML file - open in viewer instead of downloading
+    // Check if it's an HTML file - always open in viewer for HTML
     const isHtml = receiptPath.toLowerCase().endsWith('.html') || receiptPath.toLowerCase().endsWith('.htm');
     if (isHtml) {
       setViewingReceipt(expense);
@@ -179,6 +179,8 @@ export function OwnerReceiptsTab({ expenses, propertyId, token }: OwnerReceiptsT
 
     setDownloadingId(expense.id);
     try {
+      console.log("Downloading receipt:", receiptPath);
+      
       // Use edge function to bypass RLS
       const { data, error } = await supabase.functions.invoke("owner-receipt-url", {
         body: { expenseId: expense.id, token, filePath: receiptPath },
@@ -187,14 +189,18 @@ export function OwnerReceiptsTab({ expenses, propertyId, token }: OwnerReceiptsT
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
       
+      console.log("Got signed URL, fetching as blob...");
+      
       // Fetch the file as blob to avoid browser blocking
       const response = await fetch(data.signedUrl);
       if (!response.ok) throw new Error("Failed to fetch file");
       
       const blob = await response.blob();
+      console.log("Blob received, type:", blob.type, "size:", blob.size);
       
       // Check content type - if HTML, open in viewer instead
-      if (blob.type.includes('html') || blob.type.includes('text')) {
+      if (blob.type.includes('html') || blob.type.includes('text/html')) {
+        console.log("Content is HTML, opening in viewer");
         setViewingReceipt(expense);
         toast.info("Opening receipt in viewer");
         return;
