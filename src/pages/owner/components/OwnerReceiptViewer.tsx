@@ -254,13 +254,19 @@ export function OwnerReceiptViewer({ expense, onClose, token }: OwnerReceiptView
               </div>
             </div>
           ) : contentType === "pdf" && blobUrl ? (
-            // PDF: Use embed with blob URL - renders inline without external services
-            <embed
-              src={blobUrl}
+            // PDF: Use object with iframe fallback - better browser support
+            <object
+              data={blobUrl}
               type="application/pdf"
               className="w-full h-full min-h-[600px]"
               title="Receipt PDF"
-            />
+            >
+              <iframe
+                src={blobUrl}
+                className="w-full h-full min-h-[600px] border-0"
+                title="Receipt PDF"
+              />
+            </object>
           ) : contentType === "html" && htmlContent ? (
             // HTML: Use srcdoc with sanitized content - never blocked by ad blockers
             <iframe

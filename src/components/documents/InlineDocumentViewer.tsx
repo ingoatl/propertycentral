@@ -235,13 +235,19 @@ export function InlineDocumentViewer({
               </div>
             </div>
           ) : contentType === "pdf" && blobUrl ? (
-            // PDF: Use embed with blob URL - works offline and avoids external services
-            <embed
-              src={blobUrl}
+            // PDF: Use object with iframe fallback - better browser support
+            <object
+              data={blobUrl}
               type="application/pdf"
               className="w-full h-full min-h-[600px]"
               title="PDF Document"
-            />
+            >
+              <iframe
+                src={blobUrl}
+                className="w-full h-full min-h-[600px] border-0"
+                title="PDF Document"
+              />
+            </object>
           ) : contentType === "html" && htmlContent ? (
             // HTML: Use srcdoc with sanitized content
             <iframe
