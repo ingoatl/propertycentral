@@ -68,8 +68,8 @@ export const ReconciliationList = () => {
         .from("monthly_reconciliations")
         .select(`
           *,
-          properties(id, name, address, management_fee_percentage, offboarded_at, offboarding_reason),
-          property_owners(name, email, service_type, payment_method)
+          properties(id, name, address, management_fee_percentage, offboarded_at, offboarding_reason, owner_id),
+          property_owners(id, name, email, service_type, payment_method)
         `)
         .order("reconciliation_month", { ascending: false });
 
