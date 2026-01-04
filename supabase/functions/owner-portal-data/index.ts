@@ -110,7 +110,7 @@ serve(async (req: Request): Promise<Response> => {
         .from("monthly_reconciliations")
         .select("id, reconciliation_month, total_revenue, total_expenses, net_to_owner, status, short_term_revenue, mid_term_revenue")
         .eq("property_id", property.id)
-        .in("status", ["statement_sent", "approved", "preview", "pending"])
+        .in("status", ["sent", "statement_sent", "completed", "approved", "preview", "pending"])
         .order("reconciliation_month", { ascending: false })
         .limit(60), // 5 years of data
       

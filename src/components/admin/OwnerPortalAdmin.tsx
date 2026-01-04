@@ -201,7 +201,7 @@ export function OwnerPortalAdmin() {
           owner_id: owner.id,
           email: owner.email,
           token: token,
-          expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+          expires_at: new Date(Date.now() + 100 * 365 * 24 * 60 * 60 * 1000).toISOString(), // Never expires (100 years)
           is_admin_preview: true,
           property_id: property.id,
           property_name: property.name,
