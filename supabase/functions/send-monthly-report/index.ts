@@ -11,6 +11,9 @@ const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
 const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
 
+// Company logo URL (publicly accessible)
+const LOGO_URL = `${supabaseUrl}/storage/v1/object/public/property-images/peachhaus-logo.png`;
+
 const handler = async (req: Request): Promise<Response> => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -67,6 +70,7 @@ const handler = async (req: Request): Promise<Response> => {
     let visitTotal: number = 0;
     let cleaningFeesTotal: number = 0;
     let petFeesTotal: number = 0;
+    let midTermProrationDetails: any[] = []; // Store proration details for display
     
     // Initialize date variables that will be used throughout
     const now = new Date();
@@ -81,7 +85,7 @@ const handler = async (req: Request): Promise<Response> => {
         .select(`
           *,
           properties(*),
-          property_owners(email, name, second_owner_name, second_owner_email)
+          property_owners(email, name, second_owner_name, second_owner_email, service_type)
         `)
         .eq("id", reconciliation_id)
         .in("status", ["approved", "statement_sent"])
@@ -103,6 +107,54 @@ const handler = async (req: Request): Promise<Response> => {
       bookingRevenue = Number(reconciliation.short_term_revenue || 0);
       midTermRevenue = Number(reconciliation.mid_term_revenue || 0);
       managementFees = Number(reconciliation.management_fee || 0);
+      
+      // Fetch mid-term booking details for proration explanation
+      const recMonth = new Date(reconciliation.reconciliation_month + "T00:00:00");
+      const recMonthStart = new Date(recMonth.getFullYear(), recMonth.getMonth(), 1);
+      const recMonthEnd = new Date(recMonth.getFullYear(), recMonth.getMonth() + 1, 0);
+      const daysInMonth = recMonthEnd.getDate();
+      
+      const { data: mtBookings } = await supabase
+        .from("mid_term_bookings")
+        .select("tenant_name, start_date, end_date, monthly_rent, nightly_rate")
+        .eq("property_id", property.id)
+        .eq("status", "active")
+        .gte("end_date", recMonthStart.toISOString().split('T')[0])
+        .lte("start_date", recMonthEnd.toISOString().split('T')[0]);
+      
+      if (mtBookings && mtBookings.length > 0) {
+        mtBookings.forEach((booking: any) => {
+          const bookingStart = new Date(booking.start_date + "T00:00:00");
+          const bookingEnd = new Date(booking.end_date + "T00:00:00");
+          
+          // Calculate overlap with the reconciliation month
+          const effectiveStart = bookingStart > recMonthStart ? bookingStart : recMonthStart;
+          const effectiveEnd = bookingEnd < recMonthEnd ? bookingEnd : recMonthEnd;
+          
+          // Calculate days occupied in this month
+          const occupiedDays = Math.ceil((effectiveEnd.getTime() - effectiveStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+          
+          // Calculate prorated amount
+          const monthlyRent = Number(booking.monthly_rent || 0);
+          const proratedAmount = (monthlyRent / daysInMonth) * occupiedDays;
+          
+          const startDay = effectiveStart.getDate();
+          const endDay = effectiveEnd.getDate();
+          const monthName = recMonth.toLocaleDateString('en-US', { month: 'short' });
+          
+          midTermProrationDetails.push({
+            tenantName: booking.tenant_name,
+            dateRange: `${monthName} ${startDay} - ${monthName} ${endDay}`,
+            monthlyRent: monthlyRent,
+            occupiedDays: occupiedDays,
+            daysInMonth: daysInMonth,
+            proratedAmount: proratedAmount,
+            isFullMonth: occupiedDays >= daysInMonth - 1 // Allow 1 day tolerance
+          });
+        });
+        
+        console.log("Mid-term proration details:", midTermProrationDetails);
+      }
       
       // Check if order minimum fee is verified before including it
       const { data: orderMinLineItem } = await supabase
@@ -839,6 +891,50 @@ State: ${state}
       const issueDate = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
       const netLabel = netIncome >= 0 ? 'NET OWNER EARNINGS' : 'BALANCE DUE FROM OWNER';
       
+      // Generate mid-term revenue HTML with proration explanation
+      let midTermRevenueHtml = '';
+      if (midTermRevenue > 0) {
+        if (midTermProrationDetails.length > 0) {
+          midTermRevenueHtml = midTermProrationDetails.map((detail: any) => {
+            if (detail.isFullMonth) {
+              // Full month - no proration needed
+              return `
+              <tr>
+                <td style="padding: 8px 0; font-size: 13px; color: #111111; border-bottom: 1px solid #e5e5e5;">
+                  Mid-term Rental Revenue
+                  <div style="color: #666666; font-size: 11px; margin-top: 2px;">
+                    ${detail.tenantName}
+                  </div>
+                </td>
+                <td style="padding: 8px 0; font-size: 13px; color: #111111; text-align: right; font-family: 'SF Mono', Menlo, Consolas, 'Courier New', monospace; border-bottom: 1px solid #e5e5e5; vertical-align: top;">$${detail.proratedAmount.toFixed(2)}</td>
+              </tr>`;
+            } else {
+              // Prorated month - show calculation
+              return `
+              <tr>
+                <td style="padding: 8px 0; font-size: 13px; color: #111111; border-bottom: 1px solid #e5e5e5;">
+                  Mid-term Rental Revenue
+                  <div style="color: #666666; font-size: 11px; margin-top: 2px;">
+                    ${detail.tenantName} (${detail.dateRange})
+                  </div>
+                  <div style="color: #888888; font-size: 10px; margin-top: 2px; font-family: 'SF Mono', Menlo, Consolas, 'Courier New', monospace;">
+                    $${detail.monthlyRent.toLocaleString()}/mo × ${detail.occupiedDays}/${detail.daysInMonth} days = $${detail.proratedAmount.toFixed(2)}
+                  </div>
+                </td>
+                <td style="padding: 8px 0; font-size: 13px; color: #111111; text-align: right; font-family: 'SF Mono', Menlo, Consolas, 'Courier New', monospace; border-bottom: 1px solid #e5e5e5; vertical-align: top;">$${detail.proratedAmount.toFixed(2)}</td>
+              </tr>`;
+            }
+          }).join('');
+        } else {
+          // Fallback if no proration details available
+          midTermRevenueHtml = `
+          <tr>
+            <td style="padding: 8px 0; font-size: 13px; color: #111111; border-bottom: 1px solid #e5e5e5;">Mid-term Rental Revenue</td>
+            <td style="padding: 8px 0; font-size: 13px; color: #111111; text-align: right; font-family: 'SF Mono', Menlo, Consolas, 'Courier New', monospace; border-bottom: 1px solid #e5e5e5;">$${midTermRevenue.toFixed(2)}</td>
+          </tr>`;
+        }
+      }
+      
       // Generate visit rows - compact format
       const visitRowsHtml = visits && visits.length > 0 ? visits.map((visit: any) => {
         const personName = visit.visited_by || 'Staff';
@@ -901,15 +997,15 @@ State: ${state}
         <body style="margin: 0; padding: 0; background: #f5f5f5; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', Arial, sans-serif;">
           <div style="max-width: 600px; margin: 0 auto; background: #ffffff;">
             
-            <!-- Header - Corporate Minimal -->
+            <!-- Header - Corporate Minimal with Logo -->
             <div style="padding: 24px 32px; border-bottom: 2px solid #111111;">
               <table style="width: 100%;">
                 <tr>
-                  <td style="vertical-align: bottom;">
-                    <div style="font-size: 20px; font-weight: 700; color: #111111; letter-spacing: -0.3px;">PeachHaus</div>
-                    <div style="font-size: 10px; color: #666666; margin-top: 2px; letter-spacing: 1px; text-transform: uppercase;">Property Management</div>
+                  <td style="vertical-align: middle;">
+                    <img src="${LOGO_URL}" alt="PeachHaus" style="height: 40px; width: auto;" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';" />
+                    <div style="display: none; font-size: 20px; font-weight: 700; color: #111111; letter-spacing: -0.3px;">PeachHaus</div>
                   </td>
-                  <td style="text-align: right; vertical-align: bottom;">
+                  <td style="text-align: right; vertical-align: middle;">
                     <div style="font-size: 16px; font-weight: 600; color: #111111; margin-bottom: 4px;">OWNER STATEMENT</div>
                     <div style="font-size: 10px; color: #666666; font-family: 'SF Mono', Menlo, Consolas, 'Courier New', monospace;">
                       ${statementId}
@@ -1002,11 +1098,7 @@ State: ${state}
                   <td style="padding: 8px 0; font-size: 13px; color: #111111; border-bottom: 1px solid #e5e5e5;">Short-term Booking Revenue</td>
                   <td style="padding: 8px 0; font-size: 13px; color: #111111; text-align: right; font-family: 'SF Mono', Menlo, Consolas, 'Courier New', monospace; border-bottom: 1px solid #e5e5e5;">$${bookingRevenue.toFixed(2)}</td>
                 </tr>` : ''}
-                ${midTermRevenue > 0 ? `
-                <tr>
-                  <td style="padding: 8px 0; font-size: 13px; color: #111111; border-bottom: 1px solid #e5e5e5;">Mid-term Rental Revenue</td>
-                  <td style="padding: 8px 0; font-size: 13px; color: #111111; text-align: right; font-family: 'SF Mono', Menlo, Consolas, 'Courier New', monospace; border-bottom: 1px solid #e5e5e5;">$${midTermRevenue.toFixed(2)}</td>
-                </tr>` : ''}
+                ${midTermRevenueHtml}
                 <tr style="background: #f9f9f9;">
                   <td style="padding: 10px 0; font-size: 13px; font-weight: 600; color: #111111;">TOTAL GROSS REVENUE</td>
                   <td style="padding: 10px 0; font-size: 14px; color: #111111; text-align: right; font-family: 'SF Mono', Menlo, Consolas, 'Courier New', monospace; font-weight: 700;">$${totalRevenue.toFixed(2)}</td>
@@ -1150,6 +1242,75 @@ State: ${state}
       if (statementResponse.error) {
         throw statementResponse.error;
       }
+      
+      // ========== GREC AUDIT COMPLIANCE: Archive the statement ==========
+      if (!isTestEmail) {
+        const statementId = `PH-${new Date(previousMonthName).getFullYear()}${String(new Date(previousMonthName).getMonth() + 1).padStart(2, '0')}-${reconciliation_id.slice(0, 8).toUpperCase()}`;
+        const statementMonth = new Date(previousMonthName);
+        
+        // Prepare line items snapshot for audit
+        const lineItemsSnapshot = {
+          visits: visits.map((v: any) => ({
+            id: v.id,
+            date: v.date,
+            description: v.description || `Property visit - ${v.visited_by}`,
+            amount: v.price,
+            hours: v.hours,
+            notes: v.notes
+          })),
+          expenses: expenses.map((e: any) => ({
+            id: e.id,
+            date: e.date,
+            description: e.purpose || e.items_detail,
+            amount: e.amount,
+            category: e.category,
+            vendor: e.vendor
+          })),
+          midTermProration: midTermProrationDetails,
+          managementFee: managementFees,
+          orderMinimumFee: orderMinimumFee,
+          cleaningFees: cleaningFeesTotal,
+          petFees: petFeesTotal
+        };
+        
+        // Check if this is a revision
+        const { data: existingStatements } = await supabase
+          .from("owner_statement_archive")
+          .select("revision_number")
+          .eq("reconciliation_id", reconciliation_id)
+          .order("revision_number", { ascending: false })
+          .limit(1);
+        
+        const revisionNumber = existingStatements && existingStatements.length > 0 
+          ? existingStatements[0].revision_number + 1 
+          : 1;
+        
+        const archiveResult = await supabase
+          .from("owner_statement_archive")
+          .insert({
+            reconciliation_id: reconciliation_id,
+            property_id: property.id,
+            owner_id: property.owner_id,
+            statement_number: revisionNumber > 1 ? `${statementId}-R${revisionNumber}` : statementId,
+            statement_date: new Date().toISOString().split('T')[0],
+            statement_month: `${statementMonth.getFullYear()}-${String(statementMonth.getMonth() + 1).padStart(2, '0')}-01`,
+            recipient_emails: statementRecipients,
+            statement_html: emailBody,
+            net_owner_result: netIncome,
+            total_revenue: totalRevenue,
+            total_expenses: totalExpensesWithVisits,
+            management_fee: managementFees,
+            line_items_snapshot: lineItemsSnapshot,
+            is_revision: revisionNumber > 1,
+            revision_number: revisionNumber
+          });
+        
+        if (archiveResult.error) {
+          console.error("Failed to archive statement for GREC compliance:", archiveResult.error);
+        } else {
+          console.log(`✅ Statement archived for GREC compliance: ${statementId} (revision ${revisionNumber})`);
+        }
+      }
     }
 
     // EMAIL 2: Property Performance Report (ONLY in test mode, NOT in reconciliation mode)
@@ -1173,7 +1334,7 @@ State: ${state}
             
             <!-- Logo Header -->
             <div style="background-color: #ffffff; padding: 30px 40px; text-align: center; border-bottom: 3px solid #FF8C42;">
-              <img src="${supabaseUrl}/storage/v1/object/public/property-images/peachhaus-logo.png" alt="PeachHaus Property Management" style="max-width: 280px; height: auto;" onerror="this.style.display='none';" />
+              <img src="${LOGO_URL}" alt="PeachHaus Property Management" style="max-width: 280px; height: auto;" onerror="this.style.display='none';" />
             </div>
 
             <!-- Property Card with Image -->
