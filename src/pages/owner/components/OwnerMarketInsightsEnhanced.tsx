@@ -113,6 +113,31 @@ export const OwnerMarketInsightsEnhanced = memo(function OwnerMarketInsightsEnha
 
   // Loading state with smooth animated progress bar and engaging content
   if (isLoading) {
+    // Get current month to personalize tips
+    const currentMonth = new Date().getMonth(); // 0 = January
+    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    const currentMonthName = monthNames[currentMonth];
+    const nextMonth = monthNames[(currentMonth + 1) % 12];
+    
+    // Month-specific tips that rotate based on current month
+    const getSeasonalTip = () => {
+      const tips: Record<number, string> = {
+        0: `🏈 Super Bowl parties & NFL playoffs drive ${currentMonthName} bookings across Atlanta`,
+        1: `💝 Valentine's getaways & Presidents Day weekend boost ${currentMonthName} demand`,
+        2: `🌸 Spring break season & St. Patrick's events fill ${currentMonthName} calendars`,
+        3: `🌷 Masters Golf Tournament nearby draws corporate travelers in ${currentMonthName}`,
+        4: `🎓 Graduation season at Emory, Georgia Tech & Georgia State peaks in ${currentMonthName}`,
+        5: `☀️ Summer travel season kicks off with strong ${currentMonthName} family bookings`,
+        6: `🎆 Fourth of July celebrations drive premium ${currentMonthName} rates`,
+        7: `🏫 Back-to-school moves & university orientations boost ${currentMonthName} demand`,
+        8: `🐉 Dragon Con & Labor Day weekend bring 100,000+ visitors in ${currentMonthName}`,
+        9: `🎃 Halloween events & fall foliage attract ${currentMonthName} leisure travelers`,
+        10: `🏈 College football rivalry games pack Atlanta in ${currentMonthName}`,
+        11: `🏆 SEC Championship & Peach Bowl drive massive ${currentMonthName} demand`,
+      };
+      return tips[currentMonth] || `📊 This report aggregates data from AirDNA, PriceLabs & local market APIs`;
+    };
+    
     // Tips to show during loading based on property type
     const loadingTips = isMTROnly ? [
       "💼 Corporate housing in Atlanta commands 20-30% premium over standard rental rates",
@@ -125,7 +150,7 @@ export const OwnerMarketInsightsEnhanced = memo(function OwnerMarketInsightsEnha
       "⚽ FIFA World Cup 2026 games in Atlanta could drive 400%+ rate increases",
       "🎸 Mercedes-Benz Stadium hosts 70+ major events annually",
       "📊 This report aggregates data from AirDNA, PriceLabs & local market APIs",
-      "🏆 SEC Championship & Peach Bowl drive massive December demand",
+      getSeasonalTip(), // Use current month tip
       "🎤 Music Midtown & Shaky Knees attract 50,000+ visitors each",
       "🐉 Dragon Con brings 85,000+ attendees every Labor Day weekend",
     ];
