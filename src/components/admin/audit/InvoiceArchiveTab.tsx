@@ -19,9 +19,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { RefreshCw, FileText, Download, ExternalLink, Receipt } from "lucide-react";
+import { RefreshCw, Receipt } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
+import { ReceiptViewer } from "./ReceiptViewer";
 
 interface ExpenseRecord {
   id: string;
@@ -32,6 +33,9 @@ interface ExpenseRecord {
   category: string | null;
   order_number: string | null;
   file_path: string | null;
+  email_screenshot_path: string | null;
+  original_receipt_path: string | null;
+  items_detail: string | null;
   property_id: string;
   property_name?: string;
   created_at: string;
@@ -96,18 +100,9 @@ export function InvoiceArchiveTab() {
     }).format(amount);
   };
 
-  const downloadReceipt = async (filePath: string) => {
-    try {
-      const { data, error } = await supabase.storage
-        .from("expense-documents")
-        .createSignedUrl(filePath, 60);
-
-      if (error) throw error;
-      window.open(data.signedUrl, "_blank");
-    } catch (error) {
-      toast.error("Failed to download receipt");
-    }
-  };
+  // Stats calculation now includes original receipts
+  const hasReceipt = (exp: ExpenseRecord) => 
+    exp.file_path || exp.original_receipt_path || exp.email_screenshot_path;
 
   const filteredExpenses = expenses.filter((exp) =>
     exp.vendor?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -119,8 +114,8 @@ export function InvoiceArchiveTab() {
   const stats = {
     total: filteredExpenses.length,
     totalAmount: filteredExpenses.reduce((sum, e) => sum + e.amount, 0),
-    withReceipts: filteredExpenses.filter((e) => e.file_path).length,
-    withoutReceipts: filteredExpenses.filter((e) => !e.file_path).length,
+    withReceipts: filteredExpenses.filter((e) => hasReceipt(e)).length,
+    withoutReceipts: filteredExpenses.filter((e) => !hasReceipt(e)).length,
   };
 
   if (loading) {
@@ -222,20 +217,14 @@ export function InvoiceArchiveTab() {
                     {formatCurrency(exp.amount)}
                   </TableCell>
                   <TableCell>
-                    {exp.file_path ? (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => downloadReceipt(exp.file_path!)}
-                      >
-                        <Download className="h-4 w-4 mr-1" />
-                        View
-                      </Button>
-                    ) : (
-                      <Badge variant="outline" className="text-amber-600">
-                        Missing
-                      </Badge>
-                    )}
+                    <ReceiptViewer
+                      filePath={exp.file_path}
+                      emailScreenshotPath={exp.email_screenshot_path}
+                      originalReceiptPath={exp.original_receipt_path}
+                      expenseDescription={exp.items_detail || exp.purpose}
+                      vendor={exp.vendor || undefined}
+                      amount={exp.amount}
+                    />
                   </TableCell>
                 </TableRow>
               ))}

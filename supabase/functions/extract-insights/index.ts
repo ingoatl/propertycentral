@@ -817,6 +817,30 @@ ANALYZE CAREFULLY - Extract ALL order details including order number and deliver
         .from('expenses')
         .update({ email_insight_id: insight.id })
         .eq('id', expenseId);
+      
+      // Trigger attachment extraction for original receipts (in background)
+      if (gmailMessageId && property) {
+        try {
+          console.log('Triggering attachment extraction for expense:', expenseId);
+          fetch(
+            `${supabaseUrl}/functions/v1/extract-email-attachments`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${supabaseServiceKey}`,
+              },
+              body: JSON.stringify({
+                gmailMessageId,
+                expenseId,
+                propertyId: property.id
+              })
+            }
+          ).catch(err => console.error('Background attachment extraction error:', err));
+        } catch (attachErr) {
+          console.error('Failed to trigger attachment extraction:', attachErr);
+        }
+      }
     }
 
     console.log('Saved email insight:', insight.id);
