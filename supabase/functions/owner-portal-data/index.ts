@@ -148,19 +148,22 @@ serve(async (req: Request): Promise<Response> => {
         .order("start_date", { ascending: false })
         .limit(200), // Extended for ALL historical data
       
-      // Reviews - use correct column names
+      // Reviews - direct property_id match
       supabase
         .from("ownerrez_reviews")
-        .select("id, guest_name, star_rating, review_text, review_date, review_source, property_name")
+        .select("id, guest_name, star_rating, review_text, review_date, review_source")
         .eq("property_id", property.id)
         .order("review_date", { ascending: false })
         .limit(50),
       
-      // Fallback: Reviews by property name (in case they're linked by listing name)
+      // Fallback: Reviews via booking join (for reviews linked by booking_id to bookings with this property)
       supabase
         .from("ownerrez_reviews")
-        .select("id, guest_name, star_rating, review_text, review_date, review_source, property_name")
-        .ilike("property_name", `%${property.name}%`)
+        .select(`
+          id, guest_name, star_rating, review_text, review_date, review_source, booking_id,
+          ownerrez_bookings!inner(property_id, ownerrez_listing_name)
+        `)
+        .eq("ownerrez_bookings.property_id", property.id)
         .order("review_date", { ascending: false })
         .limit(50),
       
@@ -201,18 +204,31 @@ serve(async (req: Request): Promise<Response> => {
         : (s.net_to_owner || 0)  // Full-service: net_to_owner is already correct
     }));
     
-    // Merge reviews from both queries (by property_id and by property name), deduplicate by id
+    // Merge reviews from both queries (direct property_id match and via booking join), deduplicate by id
     const reviewsById = reviewsResult.data || [];
-    const reviewsByListing = reviewsByListingResult.data || [];
-    const reviewIdSet = new Set(reviewsById.map(r => r.id));
+    const reviewsByBooking = (reviewsByListingResult.data || []).map((r: any) => ({
+      id: r.id,
+      guest_name: r.guest_name,
+      star_rating: r.star_rating,
+      review_text: r.review_text,
+      review_date: r.review_date,
+      review_source: r.review_source,
+    }));
+    const reviewIdSet = new Set(reviewsById.map((r: any) => r.id));
     const mergedReviews = [...reviewsById];
-    for (const r of reviewsByListing) {
+    for (const r of reviewsByBooking) {
       if (!reviewIdSet.has(r.id)) {
         mergedReviews.push(r);
         reviewIdSet.add(r.id);
       }
     }
     const reviews = mergedReviews;
+    
+    console.log("Reviews fetched:", {
+      directMatch: reviewsById.length,
+      viaBookingJoin: reviewsByBooking.length,
+      merged: reviews.length,
+    });
 
     console.log("Data fetched:", {
       statements: statements.length,
@@ -221,7 +237,7 @@ serve(async (req: Request): Promise<Response> => {
       strBookings: strBookings.length,
       mtrBookings: mtrBookings.length,
       reviews: reviews.length,
-      reviewsByListing: reviewsByListing.length,
+      reviewsByBooking: reviewsByBooking.length,
       emailInsights: emailInsights.length,
     });
 
