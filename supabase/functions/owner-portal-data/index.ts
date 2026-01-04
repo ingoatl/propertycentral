@@ -1,6 +1,11 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.58.0";
 
+// Declare EdgeRuntime for background tasks
+declare const EdgeRuntime: {
+  waitUntil: (promise: Promise<unknown>) => void;
+};
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -8,6 +13,31 @@ const corsHeaders = {
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
 const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+
+// Background task to sync OwnerRez data
+async function syncOwnerRezInBackground(): Promise<void> {
+  try {
+    console.log("Starting background OwnerRez sync...");
+    const response = await fetch(`${supabaseUrl}/functions/v1/sync-ownerrez`, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${supabaseAnonKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({}),
+    });
+    
+    if (response.ok) {
+      const result = await response.json();
+      console.log("Background OwnerRez sync completed:", result.message || "Success");
+    } else {
+      console.error("Background OwnerRez sync failed:", response.status, await response.text());
+    }
+  } catch (error) {
+    console.error("Background OwnerRez sync error:", error);
+  }
+}
 
 serve(async (req: Request): Promise<Response> => {
   if (req.method === "OPTIONS") {
@@ -17,6 +47,9 @@ serve(async (req: Request): Promise<Response> => {
   try {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     const { token, ownerId, propertyId } = await req.json();
+    
+    // Trigger OwnerRez sync in background (non-blocking)
+    EdgeRuntime.waitUntil(syncOwnerRezInBackground());
 
     console.log("Owner portal data request:", { token, ownerId, propertyId });
 
