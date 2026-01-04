@@ -1168,7 +1168,7 @@ State: ${state}
                 Questions about this statement? Reply to this email or contact <a href="mailto:info@peachhausgroup.com" style="color: #111111; text-decoration: underline;">info@peachhausgroup.com</a>
               </p>
               <div style="font-size: 10px; color: #999999; border-top: 1px solid #e5e5e5; padding-top: 12px; margin-top: 12px;">
-                <div style="margin-bottom: 4px;">PeachHaus Property Management</div>
+                <div style="margin-bottom: 4px;">PeachHaus Group LLC</div>
                 <div>This is an official financial statement. Please retain for your records.</div>
                 <div style="margin-top: 8px; font-family: 'SF Mono', Menlo, Consolas, 'Courier New', monospace;">${statementId} • ${issueDate}</div>
               </div>
@@ -1184,7 +1184,7 @@ State: ${state}
     const recipientEmail = isTestEmail ? test_email : ownerEmail;
     
     // Send from admin@peachhausgroup.com (verified domain)
-    const fromEmail = "PeachHaus Property Management <admin@peachhausgroup.com>";
+    const fromEmail = "PeachHaus Group LLC <admin@peachhausgroup.com>";
 
     console.log(`Sending email to ${recipientEmail} from ${fromEmail}...`);
 

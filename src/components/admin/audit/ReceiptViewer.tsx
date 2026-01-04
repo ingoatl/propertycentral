@@ -45,17 +45,24 @@ export function ReceiptViewer({
   const hasEmailScreenshot = !!emailScreenshotPath;
   const hasAnyReceipt = hasOriginal || hasEmailScreenshot;
 
-  // Get the active file path
+  // Get the active file path - prioritize what's available
   const getActiveFilePath = () => {
-    if (activeTab === "original") {
+    if (activeTab === "original" && hasOriginal) {
       return originalReceiptPath || filePath;
     }
-    return emailScreenshotPath;
+    if (activeTab === "email" && hasEmailScreenshot) {
+      return emailScreenshotPath;
+    }
+    // Fallback to whatever is available
+    return originalReceiptPath || filePath || emailScreenshotPath;
   };
 
   const openReceipt = async () => {
     const path = getActiveFilePath();
-    if (!path) return;
+    if (!path) {
+      toast.error("No receipt available for this expense");
+      return;
+    }
 
     setLoading(true);
     try {
@@ -63,14 +70,22 @@ export function ReceiptViewer({
         .from("expense-documents")
         .createSignedUrl(path, 3600); // 1 hour expiry
 
-      if (error) throw error;
+      if (error) {
+        console.error("Storage error:", error);
+        throw new Error(`Could not access file: ${error.message}`);
+      }
+      
+      if (!data?.signedUrl) {
+        throw new Error("No URL returned from storage");
+      }
+      
       setSignedUrl(data.signedUrl);
       setIsOpen(true);
       setZoom(1);
       setRotation(0);
     } catch (error) {
       console.error("Error getting signed URL:", error);
-      toast.error("Failed to load receipt");
+      toast.error(error instanceof Error ? error.message : "Failed to load receipt");
     } finally {
       setLoading(false);
     }
