@@ -1,458 +1,178 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { toast } from "sonner";
-import { Download, FileText, Search, Filter, RefreshCw, Archive, DollarSign, Building2, Calendar } from "lucide-react";
-import { format, parseISO } from "date-fns";
+import { Label } from "@/components/ui/label";
+import {
+  FileText,
+  FileCheck,
+  DollarSign,
+  Home,
+  Users,
+  GraduationCap,
+  Share2,
+  Copy,
+  CheckCircle,
+  RefreshCw,
+  Shield,
+} from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { format, addDays } from "date-fns";
 
-interface StatementArchive {
-  id: string;
-  reconciliation_id: string;
-  property_id: string;
-  owner_id: string;
-  statement_number: string;
-  statement_date: string;
-  statement_month: string;
-  recipient_emails: string[];
-  statement_pdf_path: string | null;
-  net_owner_result: number;
-  total_revenue: number;
-  total_expenses: number;
-  management_fee: number;
-  is_revision: boolean;
-  revision_number: number;
-  created_at: string;
-  properties?: { name: string; address: string };
-  property_owners?: { name: string; email: string };
-}
+import { StatementArchiveTab } from "./audit/StatementArchiveTab";
+import { ManagementAgreementsTab } from "./audit/ManagementAgreementsTab";
+import { SecurityDepositLedger } from "./audit/SecurityDepositLedger";
+import { RentRollTab } from "./audit/RentRollTab";
+import { FairHousingTab } from "./audit/FairHousingTab";
+import { TrainingLogTab } from "./audit/TrainingLogTab";
 
 interface AuditStats {
   totalStatements: number;
-  totalRevenue: number;
-  totalExpenses: number;
-  totalManagementFees: number;
-  propertiesDocumented: number;
+  totalAgreements: number;
+  totalProperties: number;
+  totalApplications: number;
+  totalTrainingRecords: number;
 }
 
 export function GRECAuditDashboard() {
-  const [statements, setStatements] = useState<StatementArchive[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [propertyFilter, setPropertyFilter] = useState<string>("all");
-  const [properties, setProperties] = useState<{ id: string; name: string }[]>([]);
   const [stats, setStats] = useState<AuditStats>({
     totalStatements: 0,
-    totalRevenue: 0,
-    totalExpenses: 0,
-    totalManagementFees: 0,
-    propertiesDocumented: 0,
+    totalAgreements: 0,
+    totalProperties: 0,
+    totalApplications: 0,
+    totalTrainingRecords: 0,
   });
-  const [downloading, setDownloading] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
+  const [shareLink, setShareLink] = useState("");
+  const [generatingLink, setGeneratingLink] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
+  const [expirationDays, setExpirationDays] = useState(30);
+  const { toast } = useToast();
 
   useEffect(() => {
-    loadStatements();
-    loadProperties();
-  }, [propertyFilter]);
+    loadStats();
+  }, []);
 
-  const loadProperties = async () => {
-    const { data, error } = await supabase
-      .from("properties")
-      .select("id, name")
-      .order("name");
-
-    if (!error && data) {
-      setProperties(data);
-    }
-  };
-
-  const loadStatements = async () => {
+  const loadStats = async () => {
     setLoading(true);
     try {
-      let query = supabase
-        .from("owner_statement_archive")
-        .select("*")
-        .order("statement_date", { ascending: false });
+      const { count: stmtCount } = await supabase.from("owner_statement_archive").select("*", { count: "exact", head: true });
+      const { count: agreementCount } = await supabase.from("management_agreements").select("*", { count: "exact", head: true });
+      const { count: propCount } = await supabase.from("properties").select("*", { count: "exact", head: true }).is("offboarded_at", null);
+      const { count: appCount } = await supabase.from("tenant_applications").select("*", { count: "exact", head: true });
+      const { count: trainCount } = await supabase.from("compliance_training_log").select("*", { count: "exact", head: true });
 
-      if (propertyFilter !== "all") {
-        query = query.eq("property_id", propertyFilter);
-      }
-
-      const { data: statementsData, error } = await query;
-
-      if (error) throw error;
-
-      // Fetch properties and owners separately
-      const propertyIds = [...new Set((statementsData || []).map((s) => s.property_id).filter(Boolean))];
-      const ownerIds = [...new Set((statementsData || []).map((s) => s.owner_id).filter(Boolean))];
-
-      let propertiesMap: Record<string, { name: string; address: string }> = {};
-      let ownersMap: Record<string, { name: string; email: string }> = {};
-
-      if (propertyIds.length > 0) {
-        const { data: propertiesData } = await supabase
-          .from("properties")
-          .select("id, name, address")
-          .in("id", propertyIds);
-        
-        propertiesData?.forEach((p) => {
-          propertiesMap[p.id] = { name: p.name, address: p.address };
-        });
-      }
-
-      if (ownerIds.length > 0) {
-        const { data: ownersData } = await supabase
-          .from("property_owners")
-          .select("id, name, email")
-          .in("id", ownerIds);
-        
-        ownersData?.forEach((o) => {
-          ownersMap[o.id] = { name: o.name, email: o.email };
-        });
-      }
-
-      // Merge the data
-      const enrichedStatements = (statementsData || []).map((s) => ({
-        ...s,
-        properties: s.property_id ? propertiesMap[s.property_id] : undefined,
-        property_owners: s.owner_id ? ownersMap[s.owner_id] : undefined,
-      }));
-
-      setStatements(enrichedStatements);
-
-      // Calculate stats
-      const uniqueProperties = new Set((statementsData || []).map((s) => s.property_id));
       setStats({
-        totalStatements: statementsData?.length || 0,
-        totalRevenue: (statementsData || []).reduce((sum, s) => sum + Number(s.total_revenue || 0), 0),
-        totalExpenses: (statementsData || []).reduce((sum, s) => sum + Number(s.total_expenses || 0), 0),
-        totalManagementFees: (statementsData || []).reduce((sum, s) => sum + Number(s.management_fee || 0), 0),
-        propertiesDocumented: uniqueProperties.size,
+        totalStatements: stmtCount || 0,
+        totalAgreements: agreementCount || 0,
+        totalProperties: propCount || 0,
+        totalApplications: appCount || 0,
+        totalTrainingRecords: trainCount || 0,
       });
-    } catch (error: any) {
-      console.error("Error loading statements:", error);
-      toast.error("Failed to load statement archive");
+    } catch (error) {
+      console.error("Error loading stats:", error);
     } finally {
       setLoading(false);
     }
   };
 
-  const downloadPdf = async (statement: StatementArchive) => {
-    setDownloading(statement.id);
+  const generateShareLink = async () => {
+    setGeneratingLink(true);
     try {
-      // If we have a stored PDF path, download from storage
-      if (statement.statement_pdf_path) {
-        const { data, error } = await supabase.storage
-          .from("statement-pdfs")
-          .download(statement.statement_pdf_path);
+      const expiresAt = addDays(new Date(), expirationDays);
+      const { data, error } = await supabase.from("audit_access_tokens").insert({
+        expires_at: expiresAt.toISOString(),
+        notes: `Generated on ${format(new Date(), "MMM d, yyyy")} for GREC audit`,
+      }).select("token").single();
 
-        if (error) throw error;
-
-        const url = URL.createObjectURL(data);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `${statement.statement_number}.pdf`;
-        a.click();
-        URL.revokeObjectURL(url);
-        toast.success("PDF downloaded");
-      } else {
-        // Regenerate PDF on demand
-        const { data: session } = await supabase.auth.getSession();
-        if (!session.session) {
-          toast.error("Please log in to download PDFs");
-          return;
-        }
-
-        const response = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-statement-pdf`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${session.session.access_token}`,
-            },
-            body: JSON.stringify({ reconciliation_id: statement.reconciliation_id }),
-          }
-        );
-
-        if (!response.ok) {
-          throw new Error("Failed to generate PDF");
-        }
-
-        const result = await response.json();
-        
-        if (result.pdfBase64) {
-          // Convert base64 to blob and download
-          const binaryString = atob(result.pdfBase64);
-          const bytes = new Uint8Array(binaryString.length);
-          for (let i = 0; i < binaryString.length; i++) {
-            bytes[i] = binaryString.charCodeAt(i);
-          }
-          const blob = new Blob([bytes], { type: "application/pdf" });
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement("a");
-          a.href = url;
-          a.download = result.fileName || `${statement.statement_number}.pdf`;
-          a.click();
-          URL.revokeObjectURL(url);
-          toast.success("PDF downloaded");
-        }
-      }
-    } catch (error: any) {
-      console.error("Error downloading PDF:", error);
-      toast.error("Failed to download PDF");
+      if (error) throw error;
+      const link = `${window.location.origin}/audit/${data.token}`;
+      setShareLink(link);
+      toast({ title: "Audit Link Generated", description: `Link expires on ${format(expiresAt, "MMM d, yyyy")}` });
+    } catch (error) {
+      console.error("Error generating link:", error);
+      toast({ title: "Error", description: "Failed to generate shareable link", variant: "destructive" });
     } finally {
-      setDownloading(null);
+      setGeneratingLink(false);
     }
   };
 
-  const exportAllStatements = async () => {
-    toast.info("Preparing export...");
-    
-    // Export as CSV for now (simpler than zip of PDFs)
-    const headers = ["Statement ID", "Property", "Owner", "Period", "Revenue", "Expenses", "Management Fee", "Net Result", "Date Sent"];
-    const rows = statements.map((s) => [
-      s.statement_number,
-      s.properties?.name || "",
-      s.property_owners?.name || "",
-      s.statement_month ? format(parseISO(s.statement_month), "MMMM yyyy") : "",
-      s.total_revenue?.toFixed(2) || "0.00",
-      s.total_expenses?.toFixed(2) || "0.00",
-      s.management_fee?.toFixed(2) || "0.00",
-      s.net_owner_result?.toFixed(2) || "0.00",
-      s.statement_date ? format(parseISO(s.statement_date), "MM/dd/yyyy") : "",
-    ]);
-
-    const csvContent = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
-    const blob = new Blob([csvContent], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `GREC-Audit-Export-${format(new Date(), "yyyy-MM-dd")}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast.success("Export complete");
+  const copyLink = () => {
+    navigator.clipboard.writeText(shareLink);
+    setLinkCopied(true);
+    setTimeout(() => setLinkCopied(false), 2000);
+    toast({ title: "Link Copied" });
   };
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
-  };
-
-  const filteredStatements = statements.filter((s) => {
-    if (!searchTerm) return true;
-    const search = searchTerm.toLowerCase();
-    return (
-      s.statement_number.toLowerCase().includes(search) ||
-      s.properties?.name?.toLowerCase().includes(search) ||
-      s.property_owners?.name?.toLowerCase().includes(search)
-    );
-  });
+  if (loading) {
+    return <div className="flex items-center justify-center py-12"><RefreshCw className="h-8 w-8 animate-spin text-muted-foreground" /></div>;
+  }
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h2 className="text-2xl font-bold">GREC Audit Compliance Dashboard</h2>
-          <p className="text-muted-foreground">
-            Georgia Real Estate Commission compliant statement archive
-          </p>
+          <h2 className="text-2xl font-bold flex items-center gap-2"><Shield className="h-6 w-6 text-primary" />GREC Audit Compliance Dashboard</h2>
+          <p className="text-muted-foreground mt-1">Georgia Real Estate Commission compliant record keeping</p>
         </div>
-        <Button onClick={exportAllStatements} variant="outline">
-          <Download className="w-4 h-4 mr-2" />
-          Export All
-        </Button>
+        <Dialog open={isShareDialogOpen} onOpenChange={setIsShareDialogOpen}>
+          <DialogTrigger asChild><Button variant="outline"><Share2 className="h-4 w-4 mr-2" />Share with Auditor</Button></DialogTrigger>
+          <DialogContent>
+            <DialogHeader><DialogTitle>Generate Shareable Audit Link</DialogTitle></DialogHeader>
+            <div className="space-y-4 py-4">
+              <p className="text-sm text-muted-foreground">Generate a secure, time-limited link for GREC auditors.</p>
+              <div className="space-y-2"><Label>Link Expiration (days)</Label><Input type="number" value={expirationDays} onChange={(e) => setExpirationDays(parseInt(e.target.value) || 30)} min={1} max={90} /></div>
+              {!shareLink ? (
+                <Button onClick={generateShareLink} className="w-full" disabled={generatingLink}>{generatingLink ? <><RefreshCw className="h-4 w-4 mr-2 animate-spin" />Generating...</> : "Generate Audit Link"}</Button>
+              ) : (
+                <div className="space-y-3">
+                  <div className="flex gap-2"><Input value={shareLink} readOnly className="text-sm" /><Button onClick={copyLink} variant="outline" size="icon">{linkCopied ? <CheckCircle className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}</Button></div>
+                  <p className="text-xs text-muted-foreground">This link will expire in {expirationDays} days.</p>
+                  <Button variant="outline" onClick={() => setShareLink("")} className="w-full">Generate New Link</Button>
+                </div>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-4">
-              <div className="p-3 bg-primary/10 rounded-lg">
-                <FileText className="w-5 h-5 text-primary" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Total Statements</p>
-                <p className="text-2xl font-bold">{stats.totalStatements}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-4">
-              <div className="p-3 bg-green-500/10 rounded-lg">
-                <DollarSign className="w-5 h-5 text-green-500" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Total Revenue</p>
-                <p className="text-2xl font-bold">{formatCurrency(stats.totalRevenue)}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-4">
-              <div className="p-3 bg-amber-500/10 rounded-lg">
-                <Archive className="w-5 h-5 text-amber-500" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Management Fees</p>
-                <p className="text-2xl font-bold">{formatCurrency(stats.totalManagementFees)}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-4">
-              <div className="p-3 bg-blue-500/10 rounded-lg">
-                <Building2 className="w-5 h-5 text-blue-500" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Properties Documented</p>
-                <p className="text-2xl font-bold">{stats.propertiesDocumented}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <div className="bg-card border rounded-lg p-4"><FileText className="h-5 w-5 text-primary mb-2" /><div className="text-2xl font-bold">{stats.totalStatements}</div><div className="text-sm text-muted-foreground">Statements</div></div>
+        <div className="bg-card border rounded-lg p-4"><FileCheck className="h-5 w-5 text-green-600 mb-2" /><div className="text-2xl font-bold">{stats.totalAgreements}</div><div className="text-sm text-muted-foreground">Agreements</div></div>
+        <div className="bg-card border rounded-lg p-4"><Home className="h-5 w-5 text-blue-600 mb-2" /><div className="text-2xl font-bold">{stats.totalProperties}</div><div className="text-sm text-muted-foreground">Properties</div></div>
+        <div className="bg-card border rounded-lg p-4"><Users className="h-5 w-5 text-purple-600 mb-2" /><div className="text-2xl font-bold">{stats.totalApplications}</div><div className="text-sm text-muted-foreground">Applications</div></div>
+        <div className="bg-card border rounded-lg p-4"><GraduationCap className="h-5 w-5 text-orange-600 mb-2" /><div className="text-2xl font-bold">{stats.totalTrainingRecords}</div><div className="text-sm text-muted-foreground">Training</div></div>
       </div>
 
-      {/* Filters */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-lg flex items-center gap-2">
-            <Filter className="w-4 h-4" />
-            Filters
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap gap-4">
-            <div className="flex-1 min-w-[200px]">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search statements..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-9"
-                />
-              </div>
-            </div>
-            <Select value={propertyFilter} onValueChange={setPropertyFilter}>
-              <SelectTrigger className="w-[200px]">
-                <SelectValue placeholder="Filter by property" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Properties</SelectItem>
-                {properties.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    {p.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button variant="outline" onClick={loadStatements}>
-              <RefreshCw className="w-4 h-4 mr-2" />
-              Refresh
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+        <div className="flex items-start gap-3"><Shield className="h-5 w-5 text-green-600 mt-0.5" /><div><h4 className="font-medium text-green-900">GREC Compliance Status</h4><p className="text-sm text-green-800 mt-1">Records retained 3+ years. All financial statements, agreements, and fair housing documentation archived.</p></div></div>
+      </div>
 
-      {/* Statements Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Statement Archive</CardTitle>
-          <CardDescription>
-            All owner statements sent, stored for 3+ year retention per GREC requirements
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <div className="flex items-center justify-center py-8">
-              <RefreshCw className="w-6 h-6 animate-spin text-muted-foreground" />
-            </div>
-          ) : filteredStatements.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              No statements found
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Statement ID</TableHead>
-                  <TableHead>Property</TableHead>
-                  <TableHead>Owner</TableHead>
-                  <TableHead>Period</TableHead>
-                  <TableHead className="text-right">Net Result</TableHead>
-                  <TableHead>Sent</TableHead>
-                  <TableHead className="text-right">PDF</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredStatements.map((statement) => (
-                  <TableRow key={statement.id}>
-                    <TableCell className="font-mono text-sm">
-                      {statement.statement_number}
-                      {statement.is_revision && (
-                        <Badge variant="outline" className="ml-2 text-xs">
-                          R{statement.revision_number}
-                        </Badge>
-                      )}
-                    </TableCell>
-                    <TableCell>{statement.properties?.name || "—"}</TableCell>
-                    <TableCell>{statement.property_owners?.name || "—"}</TableCell>
-                    <TableCell>
-                      {statement.statement_month
-                        ? format(parseISO(statement.statement_month), "MMMM yyyy")
-                        : "—"}
-                    </TableCell>
-                    <TableCell className="text-right font-mono">
-                      <span className={statement.net_owner_result >= 0 ? "text-green-600" : "text-red-600"}>
-                        {formatCurrency(statement.net_owner_result || 0)}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      {statement.statement_date
-                        ? format(parseISO(statement.statement_date), "MM/dd/yyyy")
-                        : "—"}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => downloadPdf(statement)}
-                        disabled={downloading === statement.id}
-                      >
-                        {downloading === statement.id ? (
-                          <RefreshCw className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <Download className="w-4 h-4" />
-                        )}
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+      <Tabs defaultValue="statements" className="space-y-4">
+        <TabsList className="flex flex-wrap h-auto gap-1">
+          <TabsTrigger value="statements"><FileText className="h-4 w-4 mr-1" />Statements</TabsTrigger>
+          <TabsTrigger value="agreements"><FileCheck className="h-4 w-4 mr-1" />Agreements</TabsTrigger>
+          <TabsTrigger value="deposits"><DollarSign className="h-4 w-4 mr-1" />Deposits</TabsTrigger>
+          <TabsTrigger value="rentroll"><Home className="h-4 w-4 mr-1" />Rent Roll</TabsTrigger>
+          <TabsTrigger value="fairhousing"><Users className="h-4 w-4 mr-1" />Fair Housing</TabsTrigger>
+          <TabsTrigger value="training"><GraduationCap className="h-4 w-4 mr-1" />Training</TabsTrigger>
+        </TabsList>
+        <TabsContent value="statements"><StatementArchiveTab /></TabsContent>
+        <TabsContent value="agreements"><ManagementAgreementsTab /></TabsContent>
+        <TabsContent value="deposits"><SecurityDepositLedger /></TabsContent>
+        <TabsContent value="rentroll"><RentRollTab /></TabsContent>
+        <TabsContent value="fairhousing"><FairHousingTab /></TabsContent>
+        <TabsContent value="training"><TrainingLogTab /></TabsContent>
+      </Tabs>
     </div>
   );
 }
