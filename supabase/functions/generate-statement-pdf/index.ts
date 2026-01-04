@@ -343,9 +343,9 @@ async function generatePdf(data: StatementData): Promise<Uint8Array> {
   
   const black = rgb(0, 0, 0);
   const gray = rgb(0.45, 0.45, 0.45);
-  const lightGray = rgb(0.85, 0.85, 0.85);
-  const darkBg = rgb(0.12, 0.12, 0.12);
-  const accentGreen = rgb(0.1, 0.6, 0.3);
+  const lightGray = rgb(0.9, 0.9, 0.9);
+  const darkBg = rgb(0.07, 0.07, 0.07);
+  // No colors - monochrome professional style to match email
   
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-US", {
@@ -454,7 +454,7 @@ async function generatePdf(data: StatementData): Promise<Uint8Array> {
   page.drawLine({ start: { x: margin, y }, end: { x: width - margin, y }, thickness: 0.5, color: lightGray });
   y -= 11;
   page.drawText("GROSS REVENUE", { x: margin, y, size: 9, font: helveticaBold, color: black });
-  page.drawText(formatCurrency(data.grossRevenue), { x: width - margin - 65, y, size: 9, font: helveticaBold, color: accentGreen });
+  page.drawText(formatCurrency(data.grossRevenue), { x: width - margin - 65, y, size: 9, font: helveticaBold, color: black });
   y -= 20;
   
   // === EXPENSES SECTION ===
@@ -548,7 +548,7 @@ async function generatePdf(data: StatementData): Promise<Uint8Array> {
   page.drawLine({ start: { x: margin, y }, end: { x: width - margin, y }, thickness: 1.2, color: black });
   y -= 14;
   page.drawText(netLabel, { x: margin, y, size: 11, font: helveticaBold, color: black });
-  page.drawText(formatCurrency(data.netOwnerEarnings), { x: width - margin - 75, y, size: 11, font: helveticaBold, color: isPositiveNet ? accentGreen : rgb(0.7, 0.2, 0.2) });
+  page.drawText(formatCurrency(data.netOwnerEarnings), { x: width - margin - 75, y, size: 11, font: helveticaBold, color: black });
   y -= 22;
   
   // === YTD SUMMARY BOX (only for Jan 2026+) ===
@@ -568,7 +568,7 @@ async function generatePdf(data: StatementData): Promise<Uint8Array> {
     const colWidth = (width - 2 * margin - 20) / 3;
     page.drawText(`Revenue: ${formatCurrency(data.ytdRevenue)}`, { x: margin + 10, y: y - 26, size: 8, font: helvetica, color: gray });
     page.drawText(`Expenses: ${formatCurrency(data.ytdExpenses)}`, { x: margin + 10 + colWidth, y: y - 26, size: 8, font: helvetica, color: gray });
-    page.drawText(`Net to Owner: ${formatCurrency(data.ytdNetOwner)}`, { x: margin + 10 + colWidth * 2, y: y - 26, size: 8, font: helveticaBold, color: accentGreen });
+    page.drawText(`Net to Owner: ${formatCurrency(data.ytdNetOwner)}`, { x: margin + 10 + colWidth * 2, y: y - 26, size: 8, font: helveticaBold, color: black });
     
     y -= 45;
   }
