@@ -13,8 +13,8 @@ const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 // Company information
 const COMPANY = {
   name: "PeachHaus Property Management",
-  address: "2625 Piedmont Rd NE, Suite 56-269, Atlanta, GA 30324",
-  phone: "(404) 698-9987",
+  address: "1860 Sandy Plains Rd Ste 204 #4023, Marietta, GA 30066",
+  phone: "(404) 800-5932",
   email: "info@peachhausgroup.com",
   website: "www.peachhausgroup.com",
 };
@@ -63,6 +63,7 @@ interface StatementData {
   totalExpenses: number;
   netOwnerEarnings: number;
   serviceType: 'cohosting' | 'full_service';
+  showYtd: boolean;
   ytdRevenue: number;
   ytdExpenses: number;
   ytdNetOwner: number;
@@ -104,19 +105,28 @@ const handler = async (req: Request): Promise<Response> => {
     const recMonthEnd = new Date(recMonth.getFullYear(), recMonth.getMonth() + 1, 0);
     const daysInMonth = recMonthEnd.getDate();
     
-    // Calculate YTD totals
-    const yearStart = new Date(recMonth.getFullYear(), 0, 1);
-    const { data: ytdData } = await supabase
-      .from("monthly_reconciliations")
-      .select("total_revenue, total_expenses, net_to_owner")
-      .eq("property_id", reconciliation.property_id)
-      .gte("reconciliation_month", yearStart.toISOString().split('T')[0])
-      .lte("reconciliation_month", reconciliation.reconciliation_month)
-      .in("status", ["sent", "statement_sent", "completed"]);
+    // Calculate YTD totals - only show for statements from January 2026 onwards
+    const ytdCutoffDate = new Date(2026, 0, 1); // January 1, 2026
+    const showYtd = recMonth >= ytdCutoffDate;
     
-    const ytdRevenue = (ytdData || []).reduce((sum, r) => sum + Number(r.total_revenue || 0), 0);
-    const ytdExpenses = (ytdData || []).reduce((sum, r) => sum + Number(r.total_expenses || 0), 0);
-    const ytdNetOwner = (ytdData || []).reduce((sum, r) => sum + Number(r.net_to_owner || 0), 0);
+    let ytdRevenue = 0;
+    let ytdExpenses = 0;
+    let ytdNetOwner = 0;
+    
+    if (showYtd) {
+      const yearStart = new Date(recMonth.getFullYear(), 0, 1);
+      const { data: ytdData } = await supabase
+        .from("monthly_reconciliations")
+        .select("total_revenue, total_expenses, net_to_owner")
+        .eq("property_id", reconciliation.property_id)
+        .gte("reconciliation_month", yearStart.toISOString().split('T')[0])
+        .lte("reconciliation_month", reconciliation.reconciliation_month)
+        .in("status", ["sent", "statement_sent", "completed"]);
+      
+      ytdRevenue = (ytdData || []).reduce((sum, r) => sum + Number(r.total_revenue || 0), 0);
+      ytdExpenses = (ytdData || []).reduce((sum, r) => sum + Number(r.total_expenses || 0), 0);
+      ytdNetOwner = (ytdData || []).reduce((sum, r) => sum + Number(r.net_to_owner || 0), 0);
+    }
     
     // Calculate mid-term proration details
     const { data: mtBookings } = await supabase
@@ -264,6 +274,7 @@ const handler = async (req: Request): Promise<Response> => {
       totalExpenses,
       netOwnerEarnings,
       serviceType: reconciliation.property_owners?.service_type || "cohosting",
+      showYtd,
       ytdRevenue,
       ytdExpenses,
       ytdNetOwner,
@@ -522,8 +533,8 @@ async function generatePdf(data: StatementData): Promise<Uint8Array> {
   page.drawText(formatCurrency(data.netOwnerEarnings), { x: width - margin - 75, y, size: 11, font: helveticaBold, color: isPositiveNet ? accentGreen : rgb(0.7, 0.2, 0.2) });
   y -= 22;
   
-  // === YTD SUMMARY BOX ===
-  if (y > 120) {
+  // === YTD SUMMARY BOX (only for Jan 2026+) ===
+  if (data.showYtd && y > 120) {
     page.drawRectangle({
       x: margin,
       y: y - 35,
