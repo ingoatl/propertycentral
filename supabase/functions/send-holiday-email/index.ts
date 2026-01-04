@@ -529,26 +529,31 @@ function buildHolidayEmailHtml({
           
           <!-- Signature Section -->
           <tr>
-            <td style="padding: 36px 48px 24px 48px;">
-              <table cellpadding="0" cellspacing="0" width="100%">
+            <td style="padding: 36px 48px 16px 48px; text-align: center;">
+              <p style="margin: 0 0 16px 0; font-family: Georgia, serif; font-size: 14px; color: #8a8a8a; text-transform: uppercase; letter-spacing: 2px;">
+                WARMEST REGARDS
+              </p>
+              <img src="${signatureUrl}" 
+                   alt="Anja & Ingo Schaer" 
+                   style="height: 50px; width: auto; margin-bottom: 12px;"
+                   onerror="this.style.display='none'">
+              <p style="margin: 0 0 4px 0; font-family: Georgia, serif; font-size: 13px; color: #8a8a8a; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;">
+                PEACHHAUS GROUP
+              </p>
+              <p style="margin: 16px 0 0 0; font-family: Georgia, serif; font-size: 12px; color: #8a8a8a;">
+                (404) 800-5932 | info@peachhausgroup.com
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 16px 48px 24px 48px;">
+              <table cellpadding="0" cellspacing="0" width="100%" align="center">
                 <tr>
-                  <td valign="middle" style="width: 100px;">
+                  <td align="center">
                     <img src="${hostsPhotoUrl}" 
                          alt="Anja & Ingo" 
-                         width="90" 
-                         style="width: 90px; height: auto; border-radius: 50%; border: 2px solid #e8e4de;"
-                         onerror="this.style.display='none'">
-                  </td>
-                  <td valign="middle" style="padding-left: 20px;">
-                    <p style="margin: 0 0 6px 0; font-family: 'Cormorant Garamond', Georgia, 'Times New Roman', serif; font-size: 18px; font-weight: 600; color: #1a1a1a;">
-                      Warmly,
-                    </p>
-                    <p style="margin: 0 0 4px 0; font-family: Georgia, 'Times New Roman', serif; font-size: 15px; color: #4a4a4a;">
-                      Anja & Ingo
-                    </p>
-                    <p style="margin: 0; font-family: Georgia, 'Times New Roman', serif; font-size: 13px; color: #8a8a8a; font-style: italic;">
-                      PeachHaus Group
-                    </p>
+                         width="80" 
+                         style="width: 80px; height: auto; border-radius: 50%; border: 2px solid #e8e4de;">
                   </td>
                 </tr>
               </table>

@@ -101,7 +101,7 @@ serve(async (req: Request): Promise<Response> => {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${supabaseServiceKey}`,
         },
-        body: JSON.stringify({ reconciliationId }),
+        body: JSON.stringify({ reconciliation_id: reconciliationId }),
       });
 
       console.log("Generate PDF response status:", generateResponse.status);
