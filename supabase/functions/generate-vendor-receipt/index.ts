@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { PDFDocument, rgb, StandardFonts } from "https://esm.sh/pdf-lib@1.17.1";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -33,12 +34,6 @@ Deno.serve(async (req) => {
 
     if (batchMode) {
       console.log("Batch mode: finding expenses without receipts (excluding email-sourced expenses)");
-      // ONLY generate receipts for truly manual expenses:
-      // - No existing file_path (uploaded receipt)
-      // - No original_receipt_path (already generated)
-      // - No email_screenshot_path (real email receipt)
-      // - No email_insight_id (came from email extraction - should have email receipt)
-      // - Only for PeachHaus services or manual vendor entries
       const { data: expenses, error } = await supabase
         .from("expenses")
         .select("id, date, amount, vendor, purpose, category, items_detail, property_id, email_insight_id, email_screenshot_path")
@@ -54,7 +49,7 @@ Deno.serve(async (req) => {
         throw error;
       }
       expensesToProcess = expenses || [];
-      console.log(`Found ${expensesToProcess.length} truly manual expenses to process (excluded email-sourced)`);
+      console.log(`Found ${expensesToProcess.length} truly manual expenses to process`);
     } else if (expenseId) {
       const { data: expense, error } = await supabase
         .from("expenses")
@@ -78,18 +73,18 @@ Deno.serve(async (req) => {
           .eq("id", expense.property_id)
           .single();
 
-        // Generate HTML receipt
-        const html = generateProfessionalExpenseReceipt(expense, property);
+        // Generate PDF receipt
+        const pdfBytes = await generatePdfReceipt(expense, property);
 
-        // Create file path
-        const fileName = `vendor-receipt-${expense.id}.html`;
+        // Create file path - now as PDF
+        const fileName = `vendor-receipt-${expense.id}.pdf`;
         const filePath = `receipts/vendor/${fileName}`;
 
         // Upload to storage
         const { error: uploadError } = await supabase.storage
           .from("expense-documents")
-          .upload(filePath, html, {
-            contentType: "text/html",
+          .upload(filePath, pdfBytes, {
+            contentType: "application/pdf",
             upsert: true,
           });
 
@@ -112,7 +107,7 @@ Deno.serve(async (req) => {
         }
 
         generated++;
-        console.log(`Generated receipt for expense ${expense.id}`);
+        console.log(`Generated PDF receipt for expense ${expense.id}`);
       } catch (err: unknown) {
         console.error(`Error processing expense ${expense.id}:`, err);
         failed++;
@@ -144,10 +139,27 @@ Deno.serve(async (req) => {
   }
 });
 
-function generateProfessionalExpenseReceipt(
+async function generatePdfReceipt(
   expense: ExpenseData, 
   property: { name: string; address: string } | null
-): string {
+): Promise<Uint8Array> {
+  const pdfDoc = await PDFDocument.create();
+  const page = pdfDoc.addPage([612, 792]); // Letter size
+  
+  const helvetica = await pdfDoc.embedFont(StandardFonts.Helvetica);
+  const helveticaBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+  
+  // Colors
+  const darkGray = rgb(0.1, 0.1, 0.1);
+  const mediumGray = rgb(0.4, 0.4, 0.4);
+  const lightGray = rgb(0.6, 0.6, 0.6);
+  const accentColor = rgb(0.878, 0.478, 0.259); // PeachHaus orange #E07A42
+  const greenColor = rgb(0.086, 0.396, 0.204);
+  
+  const { width, height } = page.getSize();
+  let y = height - 60;
+  
+  // Format data
   const date = new Date(expense.date);
   const formattedDate = date.toLocaleDateString("en-US", {
     year: "numeric",
@@ -161,9 +173,8 @@ function generateProfessionalExpenseReceipt(
     day: "numeric",
   });
   
-  // Generate receipt number
   const receiptNumber = `EXP-${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, '0')}-${expense.id.slice(0, 6).toUpperCase()}`;
-
+  
   const amount = new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
@@ -174,280 +185,301 @@ function generateProfessionalExpenseReceipt(
   const vendor = expense.vendor || "PeachHaus Property Management";
   const category = expense.category ? expense.category.charAt(0).toUpperCase() + expense.category.slice(1) : "General";
 
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Expense Receipt - ${receiptNumber}</title>
-  <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+  // ======== HEADER ========
+  // Logo text
+  page.drawText("Peach", {
+    x: 50,
+    y: y,
+    size: 24,
+    font: helveticaBold,
+    color: darkGray,
+  });
+  page.drawText("Haus", {
+    x: 50 + helveticaBold.widthOfTextAtSize("Peach", 24),
+    y: y,
+    size: 24,
+    font: helveticaBold,
+    color: accentColor,
+  });
+  
+  // Receipt type badge
+  page.drawText("EXPENSE RECEIPT", {
+    x: width - 50 - helveticaBold.widthOfTextAtSize("EXPENSE RECEIPT", 10),
+    y: y + 4,
+    size: 10,
+    font: helveticaBold,
+    color: mediumGray,
+  });
+  
+  y -= 35;
+  
+  // Receipt meta
+  page.drawText(`Receipt No: ${receiptNumber}`, {
+    x: 50,
+    y: y,
+    size: 10,
+    font: helvetica,
+    color: lightGray,
+  });
+  
+  page.drawText(`Issue Date: ${generatedDate}`, {
+    x: width - 50 - helvetica.widthOfTextAtSize(`Issue Date: ${generatedDate}`, 10),
+    y: y,
+    size: 10,
+    font: helvetica,
+    color: lightGray,
+  });
+  
+  y -= 10;
+  
+  // Divider line
+  page.drawLine({
+    start: { x: 50, y: y },
+    end: { x: width - 50, y: y },
+    thickness: 1,
+    color: rgb(0.9, 0.9, 0.9),
+  });
+  
+  // ======== AMOUNT SECTION ========
+  y -= 50;
+  
+  page.drawText("AMOUNT", {
+    x: width / 2 - helveticaBold.widthOfTextAtSize("AMOUNT", 10) / 2,
+    y: y,
+    size: 10,
+    font: helveticaBold,
+    color: lightGray,
+  });
+  
+  y -= 45;
+  
+  page.drawText(amount, {
+    x: width / 2 - helveticaBold.widthOfTextAtSize(amount, 42) / 2,
+    y: y,
+    size: 42,
+    font: helveticaBold,
+    color: darkGray,
+  });
+  
+  y -= 25;
+  
+  // Paid status
+  page.drawText("PAID", {
+    x: width / 2 - helveticaBold.widthOfTextAtSize("PAID", 11) / 2,
+    y: y,
+    size: 11,
+    font: helveticaBold,
+    color: greenColor,
+  });
+  
+  y -= 30;
+  
+  // Divider line
+  page.drawLine({
+    start: { x: 50, y: y },
+    end: { x: width - 50, y: y },
+    thickness: 1,
+    color: rgb(0.9, 0.9, 0.9),
+  });
+  
+  // ======== PROPERTY SECTION ========
+  y -= 35;
+  
+  page.drawText("PROPERTY", {
+    x: 50,
+    y: y,
+    size: 10,
+    font: helveticaBold,
+    color: lightGray,
+  });
+  
+  y -= 20;
+  
+  page.drawText(property?.address || property?.name || "Property", {
+    x: 50,
+    y: y,
+    size: 14,
+    font: helveticaBold,
+    color: darkGray,
+  });
+  
+  y -= 30;
+  
+  // Divider line
+  page.drawLine({
+    start: { x: 50, y: y },
+    end: { x: width - 50, y: y },
+    thickness: 1,
+    color: rgb(0.9, 0.9, 0.9),
+  });
+  
+  // ======== TRANSACTION DETAILS ========
+  y -= 35;
+  
+  page.drawText("TRANSACTION DETAILS", {
+    x: 50,
+    y: y,
+    size: 10,
+    font: helveticaBold,
+    color: lightGray,
+  });
+  
+  y -= 30;
+  
+  // Transaction Date
+  page.drawText("Transaction Date", {
+    x: 50,
+    y: y,
+    size: 12,
+    font: helvetica,
+    color: mediumGray,
+  });
+  page.drawText(formattedDate, {
+    x: width - 50 - helveticaBold.widthOfTextAtSize(formattedDate, 12),
+    y: y,
+    size: 12,
+    font: helveticaBold,
+    color: darkGray,
+  });
+  
+  y -= 25;
+  
+  // Vendor
+  page.drawText("Vendor", {
+    x: 50,
+    y: y,
+    size: 12,
+    font: helvetica,
+    color: mediumGray,
+  });
+  page.drawText(vendor, {
+    x: width - 50 - helveticaBold.widthOfTextAtSize(vendor, 12),
+    y: y,
+    size: 12,
+    font: helveticaBold,
+    color: darkGray,
+  });
+  
+  y -= 25;
+  
+  // Category
+  page.drawText("Category", {
+    x: 50,
+    y: y,
+    size: 12,
+    font: helvetica,
+    color: mediumGray,
+  });
+  page.drawText(category, {
+    x: width - 50 - helveticaBold.widthOfTextAtSize(category, 12),
+    y: y,
+    size: 12,
+    font: helveticaBold,
+    color: darkGray,
+  });
+  
+  // ======== DESCRIPTION ========
+  if (description && description !== category) {
+    y -= 40;
     
-    * { margin: 0; padding: 0; box-sizing: border-box; }
+    page.drawLine({
+      start: { x: 50, y: y + 10 },
+      end: { x: width - 50, y: y + 10 },
+      thickness: 1,
+      color: rgb(0.9, 0.9, 0.9),
+    });
     
-    body {
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      background: #FAFAFA;
-      color: #1A1A1A;
-      font-size: 14px;
-      line-height: 1.5;
-      padding: 32px 16px;
-      -webkit-font-smoothing: antialiased;
+    y -= 20;
+    
+    page.drawText("DESCRIPTION", {
+      x: 50,
+      y: y,
+      size: 10,
+      font: helveticaBold,
+      color: lightGray,
+    });
+    
+    y -= 25;
+    
+    // Draw accent line
+    page.drawLine({
+      start: { x: 50, y: y + 30 },
+      end: { x: 50, y: y - 10 },
+      thickness: 3,
+      color: accentColor,
+    });
+    
+    // Wrap and draw description text
+    const descLines = wrapText(description, 70);
+    for (const line of descLines) {
+      page.drawText(line, {
+        x: 60,
+        y: y,
+        size: 11,
+        font: helvetica,
+        color: mediumGray,
+      });
+      y -= 16;
     }
-    
-    .receipt {
-      max-width: 520px;
-      margin: 0 auto;
-      background: #FFFFFF;
-      border: 1px solid #E5E5E5;
+  }
+  
+  // ======== FOOTER ========
+  y = 100;
+  
+  page.drawLine({
+    start: { x: 50, y: y },
+    end: { x: width - 50, y: y },
+    thickness: 1,
+    color: rgb(0.9, 0.9, 0.9),
+  });
+  
+  y -= 30;
+  
+  page.drawText("PeachHaus Group LLC", {
+    x: width / 2 - helveticaBold.widthOfTextAtSize("PeachHaus Group LLC", 11) / 2,
+    y: y,
+    size: 11,
+    font: helveticaBold,
+    color: darkGray,
+  });
+  
+  y -= 18;
+  
+  page.drawText("info@peachhausgroup.com", {
+    x: width / 2 - helvetica.widthOfTextAtSize("info@peachhausgroup.com", 10) / 2,
+    y: y,
+    size: 10,
+    font: helvetica,
+    color: lightGray,
+  });
+  
+  y -= 25;
+  
+  page.drawText("This receipt confirms payment for property management services rendered.", {
+    x: width / 2 - helvetica.widthOfTextAtSize("This receipt confirms payment for property management services rendered.", 8) / 2,
+    y: y,
+    size: 8,
+    font: helvetica,
+    color: lightGray,
+  });
+  
+  return await pdfDoc.save();
+}
+
+function wrapText(text: string, maxChars: number): string[] {
+  const words = text.split(' ');
+  const lines: string[] = [];
+  let currentLine = '';
+  
+  for (const word of words) {
+    if ((currentLine + ' ' + word).trim().length <= maxChars) {
+      currentLine = (currentLine + ' ' + word).trim();
+    } else {
+      if (currentLine) lines.push(currentLine);
+      currentLine = word;
     }
-    
-    /* Header */
-    .header {
-      padding: 40px 40px 32px;
-      border-bottom: 1px solid #E5E5E5;
-    }
-    
-    .brand {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 24px;
-    }
-    
-    .logo {
-      font-size: 18px;
-      font-weight: 600;
-      letter-spacing: -0.02em;
-      color: #1A1A1A;
-    }
-    
-    .logo-accent {
-      color: #E07A42;
-    }
-    
-    .receipt-type {
-      font-size: 11px;
-      font-weight: 500;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: #666666;
-      background: #F5F5F5;
-      padding: 6px 12px;
-    }
-    
-    .receipt-meta {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 4px 24px;
-      font-size: 12px;
-      color: #666666;
-    }
-    
-    .receipt-meta dt {
-      font-weight: 400;
-    }
-    
-    .receipt-meta dd {
-      font-weight: 500;
-      color: #1A1A1A;
-      font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
-      font-size: 11px;
-    }
-    
-    /* Amount Section */
-    .amount-section {
-      padding: 32px 40px;
-      background: #FAFAFA;
-      border-bottom: 1px solid #E5E5E5;
-      text-align: center;
-    }
-    
-    .amount-label {
-      font-size: 11px;
-      font-weight: 500;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      color: #666666;
-      margin-bottom: 8px;
-    }
-    
-    .amount-value {
-      font-size: 42px;
-      font-weight: 600;
-      letter-spacing: -0.02em;
-      color: #1A1A1A;
-      font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
-      font-feature-settings: 'tnum' 1;
-    }
-    
-    .amount-status {
-      display: inline-block;
-      margin-top: 12px;
-      font-size: 11px;
-      font-weight: 500;
-      letter-spacing: 0.05em;
-      text-transform: uppercase;
-      color: #166534;
-      background: #DCFCE7;
-      padding: 4px 10px;
-    }
-    
-    /* Details Section */
-    .details {
-      padding: 32px 40px;
-    }
-    
-    .section-title {
-      font-size: 11px;
-      font-weight: 500;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      color: #666666;
-      margin-bottom: 16px;
-      padding-bottom: 8px;
-      border-bottom: 1px solid #E5E5E5;
-    }
-    
-    .detail-grid {
-      display: grid;
-      gap: 16px;
-    }
-    
-    .detail-row {
-      display: grid;
-      grid-template-columns: 140px 1fr;
-      gap: 16px;
-    }
-    
-    .detail-label {
-      font-size: 13px;
-      color: #666666;
-    }
-    
-    .detail-value {
-      font-size: 13px;
-      font-weight: 500;
-      color: #1A1A1A;
-      text-align: right;
-    }
-    
-    .property-section {
-      margin-bottom: 24px;
-    }
-    
-    .property-address {
-      font-size: 15px;
-      font-weight: 500;
-      color: #1A1A1A;
-      line-height: 1.4;
-    }
-    
-    /* Description */
-    .description-section {
-      margin-top: 24px;
-      padding-top: 24px;
-      border-top: 1px solid #E5E5E5;
-    }
-    
-    .description-content {
-      font-size: 13px;
-      color: #4A4A4A;
-      line-height: 1.6;
-      background: #FAFAFA;
-      padding: 16px;
-      border-left: 2px solid #E07A42;
-    }
-    
-    /* Footer */
-    .footer {
-      padding: 24px 40px;
-      border-top: 1px solid #E5E5E5;
-      background: #FAFAFA;
-    }
-    
-    .company-info {
-      font-size: 11px;
-      color: #666666;
-      text-align: center;
-      line-height: 1.6;
-    }
-    
-    .company-name {
-      font-weight: 600;
-      color: #1A1A1A;
-      margin-bottom: 4px;
-    }
-    
-    .legal-text {
-      margin-top: 16px;
-      font-size: 10px;
-      color: #999999;
-      text-align: center;
-    }
-  </style>
-</head>
-<body>
-  <div class="receipt">
-    <div class="header">
-      <div class="brand">
-        <div class="logo">Peach<span class="logo-accent">Haus</span></div>
-        <div class="receipt-type">Expense Receipt</div>
-      </div>
-      <dl class="receipt-meta">
-        <dt>Receipt No.</dt>
-        <dd>${receiptNumber}</dd>
-        <dt>Issue Date</dt>
-        <dd>${generatedDate}</dd>
-      </dl>
-    </div>
-    
-    <div class="amount-section">
-      <div class="amount-label">Amount</div>
-      <div class="amount-value">${amount}</div>
-      <div class="amount-status">Paid</div>
-    </div>
-    
-    <div class="details">
-      <div class="property-section">
-        <div class="section-title">Property</div>
-        <div class="property-address">${property?.address || "Property"}</div>
-      </div>
-      
-      <div class="section-title">Transaction Details</div>
-      <div class="detail-grid">
-        <div class="detail-row">
-          <span class="detail-label">Transaction Date</span>
-          <span class="detail-value">${formattedDate}</span>
-        </div>
-        <div class="detail-row">
-          <span class="detail-label">Vendor</span>
-          <span class="detail-value">${vendor}</span>
-        </div>
-        <div class="detail-row">
-          <span class="detail-label">Category</span>
-          <span class="detail-value">${category}</span>
-        </div>
-      </div>
-      
-      ${description && description !== category ? `
-      <div class="description-section">
-        <div class="section-title">Description</div>
-        <div class="description-content">${description}</div>
-      </div>
-      ` : ''}
-    </div>
-    
-    <div class="footer">
-      <div class="company-info">
-        <div class="company-name">PeachHaus Group LLC</div>
-        info@peachhausgroup.com
-      </div>
-      <div class="legal-text">
-        This receipt confirms payment for property management services rendered.
-      </div>
-    </div>
-  </div>
-</body>
-</html>`;
+  }
+  if (currentLine) lines.push(currentLine);
+  
+  return lines;
 }
