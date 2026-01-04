@@ -17,7 +17,9 @@ import {
   FileSpreadsheet, 
   History,
   Archive,
-  CreditCard
+  CreditCard,
+  ExternalLink,
+  TestTube2
 } from "lucide-react";
 import { toast } from "sonner";
 import { generateAuditReport } from "@/lib/exportAuditReport";
@@ -48,6 +50,8 @@ export const ReconciliationCardActions = ({
   const [isExporting, setIsExporting] = useState(false);
   const [showAuditTrail, setShowAuditTrail] = useState(false);
   const [sendingPaymentEmail, setSendingPaymentEmail] = useState(false);
+  const [sendingDashboardInvite, setSendingDashboardInvite] = useState(false);
+  const [sendingTestPaymentEmail, setSendingTestPaymentEmail] = useState(false);
   
   const canSendEmails = 
     (reconciliation.status === "approved" || reconciliation.status === "statement_sent") && 
@@ -63,6 +67,35 @@ export const ReconciliationCardActions = ({
       toast.error("Failed to export audit report");
     } finally {
       setIsExporting(false);
+    }
+  };
+
+  const handleSendDashboardInvite = async () => {
+    const owner = reconciliation.properties?.property_owners;
+    if (!owner) {
+      toast.error("No owner found for this property");
+      return;
+    }
+
+    try {
+      setSendingDashboardInvite(true);
+      
+      const { data, error } = await supabase.functions.invoke('owner-magic-link', {
+        body: {
+          owner_id: owner.id,
+          send_email: true
+        }
+      });
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      toast.success(`Dashboard invite sent to ${owner.email}${data.second_owner_invited ? ' and second owner' : ''}`);
+    } catch (error: any) {
+      console.error("Error sending dashboard invite:", error);
+      toast.error("Failed to send dashboard invite");
+    } finally {
+      setSendingDashboardInvite(false);
     }
   };
 
@@ -101,6 +134,30 @@ export const ReconciliationCardActions = ({
     }
   };
 
+  const handleSendTestPaymentEmail = async () => {
+    try {
+      setSendingTestPaymentEmail(true);
+      
+      const { data, error } = await supabase.functions.invoke('send-billing-transition-email', {
+        body: {
+          ownerName: "Test Owner",
+          ownerEmail: "info@peachhausgroup.com",
+          ownerId: reconciliation.properties?.property_owners?.id || "test",
+          propertyName: reconciliation.properties?.name || 'Test Property'
+        }
+      });
+
+      if (error) throw error;
+
+      toast.success("Test payment setup email sent to info@peachhausgroup.com");
+    } catch (error: any) {
+      console.error("Error sending test payment email:", error);
+      toast.error("Failed to send test payment email");
+    } finally {
+      setSendingTestPaymentEmail(false);
+    }
+  };
+
   return (
     <>
       <div className="flex flex-col gap-2 w-full">
@@ -122,15 +179,16 @@ export const ReconciliationCardActions = ({
                 variant="outline"
                 size="sm"
                 className="flex-1"
-                onClick={onSendPerformanceEmail}
-                disabled={sendingPerformance || sendingStatement}
+                onClick={handleSendDashboardInvite}
+                disabled={sendingDashboardInvite || sendingStatement}
+                title="Send owner their dashboard access link"
               >
-                {sendingPerformance ? (
+                {sendingDashboardInvite ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
                   <>
-                    <Mail className="w-4 h-4 mr-1" />
-                    <span className="hidden sm:inline">Performance</span>
+                    <ExternalLink className="w-4 h-4 mr-1" />
+                    <span className="hidden sm:inline">Dashboard</span>
                   </>
                 )}
               </Button>
@@ -140,6 +198,7 @@ export const ReconciliationCardActions = ({
                 className="flex-1"
                 onClick={onSendOwnerStatement}
                 disabled={sendingPerformance || sendingStatement}
+                title="Send statement email to owner"
               >
                 {sendingStatement ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -163,7 +222,7 @@ export const ReconciliationCardActions = ({
                 <span className="ml-1 hidden sm:inline">More</span>
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
+            <DropdownMenuContent align="end" className="w-56">
               <DropdownMenuItem onClick={() => setShowAuditTrail(true)}>
                 <History className="w-4 h-4 mr-2" />
                 View Audit Trail
@@ -178,6 +237,7 @@ export const ReconciliationCardActions = ({
               </DropdownMenuItem>
               
               <DropdownMenuSeparator />
+              
               <DropdownMenuItem 
                 onClick={handleSendPaymentTransitionEmail} 
                 disabled={sendingPaymentEmail}
@@ -188,6 +248,19 @@ export const ReconciliationCardActions = ({
                   <CreditCard className="w-4 h-4 mr-2" />
                 )}
                 Send Payment Setup Email
+              </DropdownMenuItem>
+              
+              <DropdownMenuItem 
+                onClick={handleSendTestPaymentEmail} 
+                disabled={sendingTestPaymentEmail}
+                className="text-blue-600"
+              >
+                {sendingTestPaymentEmail ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <TestTube2 className="w-4 h-4 mr-2" />
+                )}
+                Test Payment Email (info@)
               </DropdownMenuItem>
               
               {!isOffboarded && (
