@@ -236,6 +236,54 @@ export const MonthlyEmailPreviewModal = ({
         // Set revenue split
         setShortTermRevenue(reconciliation.short_term_revenue || 0);
         setMidTermRevenue(reconciliation.mid_term_revenue || 0);
+        
+        // Fetch mid-term booking details for proration explanation
+        if (reconciliation.mid_term_revenue && reconciliation.mid_term_revenue > 0 && reconciliation.properties?.id) {
+          try {
+            const recMonth = new Date(reconciliation.reconciliation_month + "T00:00:00");
+            const recMonthStart = new Date(recMonth.getFullYear(), recMonth.getMonth(), 1);
+            const recMonthEnd = new Date(recMonth.getFullYear(), recMonth.getMonth() + 1, 0);
+            const daysInMonth = recMonthEnd.getDate();
+            
+            const { data: mtBookings } = await supabase
+              .from("mid_term_bookings")
+              .select("tenant_name, start_date, end_date, monthly_rent")
+              .eq("property_id", reconciliation.properties.id)
+              .eq("status", "active")
+              .gte("end_date", recMonthStart.toISOString().split('T')[0])
+              .lte("start_date", recMonthEnd.toISOString().split('T')[0]);
+            
+            if (mtBookings && mtBookings.length > 0) {
+              const prorationDetails = mtBookings.map((booking: any) => {
+                const bookingStart = new Date(booking.start_date + "T00:00:00");
+                const bookingEnd = new Date(booking.end_date + "T00:00:00");
+                
+                const effectiveStart = bookingStart > recMonthStart ? bookingStart : recMonthStart;
+                const effectiveEnd = bookingEnd < recMonthEnd ? bookingEnd : recMonthEnd;
+                
+                const occupiedDays = Math.ceil((effectiveEnd.getTime() - effectiveStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+                const monthlyRent = Number(booking.monthly_rent || 0);
+                const proratedAmount = (monthlyRent / daysInMonth) * occupiedDays;
+                
+                const monthName = recMonth.toLocaleDateString('en-US', { month: 'short' });
+                
+                return {
+                  tenantName: booking.tenant_name,
+                  dateRange: `${monthName} ${effectiveStart.getDate()} - ${monthName} ${effectiveEnd.getDate()}`,
+                  monthlyRent,
+                  occupiedDays,
+                  daysInMonth,
+                  proratedAmount,
+                  isFullMonth: occupiedDays >= daysInMonth - 1
+                };
+              });
+              
+              setMidTermProration(prorationDetails);
+            }
+          } catch (prorationError) {
+            console.error("Error fetching proration details:", prorationError);
+          }
+        }
       } catch (error) {
         console.error("Error fetching line items:", error);
       }
@@ -554,10 +602,22 @@ export const MonthlyEmailPreviewModal = ({
                       </tr>
                     )}
                     {midTermRevenue > 0 && (
-                      <tr className="border-b border-gray-200">
-                        <td className="py-2 text-xs text-black">Mid-term Rental Revenue</td>
-                        <td className="py-2 text-xs text-black text-right font-mono">${midTermRevenue.toFixed(2)}</td>
-                      </tr>
+                      <>
+                        <tr className="border-b border-gray-200">
+                          <td className="py-2 text-xs text-black">
+                            <div>Mid-term Rental Revenue</div>
+                            {midTermProration.length > 0 && midTermProration.map((p, idx) => (
+                              <div key={idx} className="text-[10px] text-gray-500 mt-1 pl-2 border-l-2 border-gray-200">
+                                {p.tenantName} ({p.dateRange})<br/>
+                                <span className="font-mono">
+                                  ${p.monthlyRent.toLocaleString()}/mo × {p.occupiedDays}/{p.daysInMonth} days = ${p.proratedAmount.toFixed(2)}
+                                </span>
+                              </div>
+                            ))}
+                          </td>
+                          <td className="py-2 text-xs text-black text-right font-mono align-top">${midTermRevenue.toFixed(2)}</td>
+                        </tr>
+                      </>
                     )}
                     <tr className="bg-gray-50">
                       <td className="py-2.5 text-xs font-semibold text-black">TOTAL GROSS REVENUE</td>
