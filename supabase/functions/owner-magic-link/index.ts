@@ -39,7 +39,7 @@ const sendMagicLinkEmail = async (
         : "SHORT-TERM";
 
     const storageUrl = "https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images";
-    const logoUrl = `${storageUrl}/peachhaus-logo-full.png`;
+    const logoUrl = `${storageUrl}/peachhaus-logo.png`;
     const headshotUrl = `${storageUrl}/ingo-headshot.png`;
     const signatureUrl = `${storageUrl}/ingo-signature.png`;
 
