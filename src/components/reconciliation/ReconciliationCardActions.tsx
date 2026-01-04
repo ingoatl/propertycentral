@@ -180,9 +180,10 @@ export const ReconciliationCardActions = ({
                 size="sm"
                 className="flex-1"
                 onClick={() => {
-                  const owner = reconciliation.properties?.property_owners;
-                  if (owner?.id) {
-                    window.open(`/owner-dashboard?owner=${owner.id}`, '_blank');
+                  // property_owners is a direct join on reconciliation, not nested under properties
+                  const ownerId = reconciliation.property_owners?.id || reconciliation.properties?.owner_id;
+                  if (ownerId) {
+                    window.open(`/owner-dashboard?owner=${ownerId}`, '_blank');
                   } else {
                     toast.error("No owner found for this property");
                   }
