@@ -143,7 +143,7 @@ serve(async (req: Request): Promise<Response> => {
       // MTR bookings - ALL historical data
       supabase
         .from("mid_term_bookings")
-        .select("id, tenant_name, tenant_email, start_date, end_date, monthly_rent, security_deposit, status, notes")
+        .select("id, tenant_name, tenant_email, start_date, end_date, monthly_rent, deposit_amount, status, notes")
         .eq("property_id", property.id)
         .order("start_date", { ascending: false })
         .limit(200), // Extended for ALL historical data
