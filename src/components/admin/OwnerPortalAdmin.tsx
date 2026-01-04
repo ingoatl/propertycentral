@@ -20,6 +20,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import {
@@ -98,6 +105,7 @@ export function OwnerPortalAdmin() {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewData, setPreviewData] = useState<OwnerDashboardData | null>(null);
   const [loadingPreview, setLoadingPreview] = useState(false);
+  const [allOwnerProperties, setAllOwnerProperties] = useState<OwnerWithProperty[]>([]);
 
   useEffect(() => {
     loadOwners();
@@ -228,7 +236,17 @@ export function OwnerPortalAdmin() {
 
     setLoadingPreview(true);
     setPreviewOpen(true);
+    
+    // Store the current owner and all owners with properties for switching
+    setAllOwnerProperties(owners.filter(o => o.property_id));
 
+    await loadPreviewDataForOwner(owner);
+  };
+
+  const loadPreviewDataForOwner = async (owner: OwnerWithProperty) => {
+    if (!owner.property_id) return;
+    
+    setLoadingPreview(true);
     try {
       // Load statements
       const { data: statements } = await supabase
@@ -465,13 +483,38 @@ export function OwnerPortalAdmin() {
       <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Building2 className="h-5 w-5" />
-              Owner Dashboard Preview
-            </DialogTitle>
-            <DialogDescription>
-              {previewData?.owner.name} - {previewData?.owner.property_address}
-            </DialogDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <DialogTitle className="flex items-center gap-2">
+                  <Building2 className="h-5 w-5" />
+                  Owner Dashboard Preview
+                </DialogTitle>
+                <DialogDescription>
+                  {previewData?.owner.name} - {previewData?.owner.property_address}
+                </DialogDescription>
+              </div>
+              {/* Property Switcher */}
+              {allOwnerProperties.length > 1 && (
+                <Select 
+                  value={previewData?.owner.id || ""} 
+                  onValueChange={(ownerId) => {
+                    const owner = allOwnerProperties.find(o => o.id === ownerId);
+                    if (owner) loadPreviewDataForOwner(owner);
+                  }}
+                >
+                  <SelectTrigger className="w-[220px]">
+                    <SelectValue placeholder="Switch property" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {allOwnerProperties.map((o) => (
+                      <SelectItem key={o.id} value={o.id}>
+                        <span className="truncate max-w-[180px]">{o.property_address || o.name}</span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
           </DialogHeader>
 
           {loadingPreview ? (
