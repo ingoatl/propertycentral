@@ -361,37 +361,18 @@ export function ReceiptViewer({
               <div className="flex items-center justify-center min-h-full">
                 {isPdfFile(currentPath) ? (
                   <div className="w-full h-full min-h-[70vh] flex flex-col items-center justify-center gap-6">
-                    {/* PDF: Use object tag with fallback, plus prominent action buttons */}
-                    <object
-                      data={signedUrl}
-                      type="application/pdf"
+                    {/* PDF: Use Google Docs Viewer as primary (more reliable than native), with fallback */}
+                    <iframe
+                      src={`https://docs.google.com/gview?url=${encodeURIComponent(signedUrl)}&embedded=true`}
                       className="w-full h-[60vh] border rounded-lg bg-white"
+                      title="PDF Preview"
                       style={{
                         transform: `scale(${zoom}) rotate(${rotation}deg)`,
                         transformOrigin: "center center",
                       }}
-                    >
-                      {/* Fallback for browsers that block PDF embedding */}
-                      <div className="flex flex-col items-center justify-center h-full bg-muted/50 rounded-lg p-8 gap-4">
-                        <FileText className="h-16 w-16 text-muted-foreground" />
-                        <p className="text-lg font-medium">PDF Preview Blocked</p>
-                        <p className="text-sm text-muted-foreground text-center max-w-md">
-                          Your browser is blocking the PDF preview. Use the buttons below to view or download the receipt.
-                        </p>
-                        <div className="flex gap-3 mt-2">
-                          <Button onClick={() => window.open(signedUrl, "_blank")}>
-                            <ExternalLink className="h-4 w-4 mr-2" />
-                            Open PDF in New Tab
-                          </Button>
-                          <Button variant="outline" onClick={downloadReceipt}>
-                            <Download className="h-4 w-4 mr-2" />
-                            Download PDF
-                          </Button>
-                        </div>
-                      </div>
-                    </object>
+                    />
                     {/* Always show action buttons for PDF */}
-                    <div className="flex gap-3">
+                    <div className="flex gap-3 flex-wrap justify-center">
                       <Button variant="default" size="lg" onClick={() => window.open(signedUrl, "_blank")}>
                         <ExternalLink className="h-4 w-4 mr-2" />
                         Open PDF in New Tab
@@ -401,6 +382,9 @@ export function ReceiptViewer({
                         Download PDF
                       </Button>
                     </div>
+                    <p className="text-xs text-muted-foreground text-center max-w-md">
+                      If the preview doesn't load, use the buttons above to view or download the PDF directly.
+                    </p>
                   </div>
                 ) : (
                   <img
