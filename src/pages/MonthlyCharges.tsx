@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ReconciliationList } from "@/components/reconciliation/ReconciliationList";
 import { UploadLogoButton } from "@/components/reconciliation/UploadLogoButton";
 import { SendTestPerformanceEmailButton } from "@/components/reconciliation/SendTestPerformanceEmailButton";
+import { DeleteExpenseDialog } from "@/components/expenses/DeleteExpenseDialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
@@ -107,6 +108,9 @@ export default function MonthlyCharges() {
   const [filterType, setFilterType] = useState<string>("all");
   const [filterDateFrom, setFilterDateFrom] = useState<string>("");
   const [filterDateTo, setFilterDateTo] = useState<string>("");
+  
+  // Delete expense state
+  const [deleteExpense, setDeleteExpense] = useState<{ id: string; description: string; amount: number } | null>(null);
 
   useEffect(() => {
     checkAdminStatus();
@@ -917,21 +921,38 @@ export default function MonthlyCharges() {
                     )}
                   </TableCell>
                   <TableCell>
-                    {transaction.stripe_payment_intent_id && (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        asChild
-                      >
-                        <a
-                          href={`https://dashboard.stripe.com/payments/${transaction.stripe_payment_intent_id}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
+                    <div className="flex items-center gap-1">
+                      {transaction.stripe_payment_intent_id && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          asChild
                         >
-                          <ExternalLink className="w-4 h-4" />
-                        </a>
-                      </Button>
-                    )}
+                          <a
+                            href={`https://dashboard.stripe.com/payments/${transaction.stripe_payment_intent_id}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            <ExternalLink className="w-4 h-4" />
+                          </a>
+                        </Button>
+                      )}
+                      {transaction.type === 'expense' && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                          onClick={() => setDeleteExpense({
+                            id: transaction.id,
+                            description: transaction.description,
+                            amount: transaction.amount
+                          })}
+                          title="Delete expense"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      )}
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -947,6 +968,18 @@ export default function MonthlyCharges() {
       </Card>
         </TabsContent>
       </Tabs>
+      
+      <DeleteExpenseDialog
+        open={!!deleteExpense}
+        onOpenChange={(open) => !open && setDeleteExpense(null)}
+        expenseId={deleteExpense?.id || ""}
+        expenseDescription={deleteExpense?.description || ""}
+        expenseAmount={deleteExpense?.amount}
+        onDeleted={() => {
+          loadTransactions();
+          setDeleteExpense(null);
+        }}
+      />
     </div>
   );
 }
