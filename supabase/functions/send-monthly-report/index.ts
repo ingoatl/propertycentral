@@ -327,17 +327,18 @@ const handler = async (req: Request): Promise<Response> => {
       if (uniqueExpenseIds.length > 0) {
         const { data: expenseData } = await supabase
           .from("expenses")
-          .select("id, date, amount, purpose, category, vendor, order_number, items_detail, line_items, file_path")
+          .select("id, date, amount, purpose, category, vendor, order_number, items_detail, line_items, file_path, original_receipt_path, email_screenshot_path")
           .in("id", uniqueExpenseIds);
         
         detailedExpenses = expenseData || [];
         
-        // Generate signed URLs for receipts
+        // Generate signed URLs for receipts - prioritize original_receipt_path > file_path > email_screenshot_path
         for (const expense of detailedExpenses) {
-          if (expense.file_path) {
+          const receiptPath = expense.original_receipt_path || expense.file_path || expense.email_screenshot_path;
+          if (receiptPath) {
             const { data: signedUrlData } = await supabase.storage
               .from('expense-documents')
-              .createSignedUrl(expense.file_path, 60 * 60 * 24 * 7); // 7 days
+              .createSignedUrl(receiptPath, 60 * 60 * 24 * 7); // 7 days
             
             if (signedUrlData?.signedUrl) {
               expense.receipt_url = signedUrlData.signedUrl;

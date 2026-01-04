@@ -23,6 +23,7 @@ import { RefreshCw, Receipt } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { ReceiptViewer } from "./ReceiptViewer";
+import { getExpenseDisplayName, hasReceipt } from "@/lib/expense-utils";
 
 interface ExpenseRecord {
   id: string;
@@ -100,9 +101,7 @@ export function InvoiceArchiveTab() {
     }).format(amount);
   };
 
-  // Stats calculation now includes original receipts
-  const hasReceipt = (exp: ExpenseRecord) => 
-    exp.file_path || exp.original_receipt_path || exp.email_screenshot_path;
+  // Stats calculation now includes original receipts - using imported utility
 
   const filteredExpenses = expenses.filter((exp) =>
     exp.vendor?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -207,8 +206,14 @@ export function InvoiceArchiveTab() {
                     {exp.property_name}
                   </TableCell>
                   <TableCell>{exp.vendor || "-"}</TableCell>
-                  <TableCell className="max-w-[200px] truncate">
-                    {exp.purpose || exp.category || "-"}
+                  <TableCell className="max-w-[250px]" title={exp.purpose || exp.items_detail || ""}>
+                    <span className="line-clamp-2">
+                      {getExpenseDisplayName({
+                        items_detail: exp.items_detail,
+                        purpose: exp.purpose,
+                        category: exp.category,
+                      })}
+                    </span>
                   </TableCell>
                   <TableCell className="font-mono text-sm">
                     {exp.order_number || "-"}

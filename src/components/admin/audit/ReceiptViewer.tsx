@@ -7,12 +7,12 @@ import {
   Download, 
   ZoomIn, 
   ZoomOut, 
-  Maximize2, 
   X,
   FileText,
   Image as ImageIcon,
   ExternalLink,
-  RotateCw
+  RotateCw,
+  AlertCircle
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -39,8 +39,10 @@ export function ReceiptViewer({
   const [loading, setLoading] = useState(false);
   const [signedUrl, setSignedUrl] = useState<string | null>(null);
   const [rotation, setRotation] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+  const [htmlContent, setHtmlContent] = useState<string | null>(null);
 
-  // Determine which receipts are available
+  // Determine which receipts are available - prioritize original/file over email screenshot
   const hasOriginal = !!(originalReceiptPath || filePath);
   const hasEmailScreenshot = !!emailScreenshotPath;
   const hasAnyReceipt = hasOriginal || hasEmailScreenshot;
@@ -57,6 +59,19 @@ export function ReceiptViewer({
     return originalReceiptPath || filePath || emailScreenshotPath;
   };
 
+  const isHtmlFile = (path: string | null | undefined) => {
+    return path?.toLowerCase().endsWith(".html") || path?.toLowerCase().endsWith(".htm");
+  };
+
+  const isPdfFile = (path: string | null | undefined) => {
+    return path?.toLowerCase().endsWith(".pdf");
+  };
+
+  const isImageFile = (path: string | null | undefined) => {
+    const ext = path?.toLowerCase();
+    return ext?.endsWith(".png") || ext?.endsWith(".jpg") || ext?.endsWith(".jpeg") || ext?.endsWith(".webp") || ext?.endsWith(".gif");
+  };
+
   const openReceipt = async () => {
     const path = getActiveFilePath();
     if (!path) {
@@ -65,27 +80,50 @@ export function ReceiptViewer({
     }
 
     setLoading(true);
+    setError(null);
+    setHtmlContent(null);
+    
     try {
-      const { data, error } = await supabase.storage
+      const { data, error: storageError } = await supabase.storage
         .from("expense-documents")
         .createSignedUrl(path, 3600); // 1 hour expiry
 
-      if (error) {
-        console.error("Storage error:", error);
-        throw new Error(`Could not access file: ${error.message}`);
+      if (storageError) {
+        console.error("Storage error:", storageError);
+        throw new Error(`Could not access file: ${storageError.message}`);
       }
       
       if (!data?.signedUrl) {
         throw new Error("No URL returned from storage");
       }
+
+      // For HTML files, fetch the content and render it differently to avoid browser blocking
+      if (isHtmlFile(path)) {
+        try {
+          const response = await fetch(data.signedUrl);
+          if (response.ok) {
+            const html = await response.text();
+            setHtmlContent(html);
+          } else {
+            throw new Error("Failed to fetch HTML content");
+          }
+        } catch (fetchError) {
+          console.error("Error fetching HTML:", fetchError);
+          // Fallback to signed URL
+          setSignedUrl(data.signedUrl);
+        }
+      } else {
+        setSignedUrl(data.signedUrl);
+      }
       
-      setSignedUrl(data.signedUrl);
       setIsOpen(true);
       setZoom(1);
       setRotation(0);
-    } catch (error) {
-      console.error("Error getting signed URL:", error);
-      toast.error(error instanceof Error ? error.message : "Failed to load receipt");
+    } catch (err) {
+      console.error("Error getting signed URL:", err);
+      const errorMessage = err instanceof Error ? err.message : "Failed to load receipt";
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -93,18 +131,34 @@ export function ReceiptViewer({
 
   const downloadReceipt = async () => {
     const path = getActiveFilePath();
-    if (!path) return;
+    if (!path) {
+      toast.error("No receipt available to download");
+      return;
+    }
 
     try {
-      const { data, error } = await supabase.storage
+      const { data, error: storageError } = await supabase.storage
         .from("expense-documents")
-        .createSignedUrl(path, 60);
+        .createSignedUrl(path, 300); // 5 min expiry for download
 
-      if (error) throw error;
+      if (storageError) throw storageError;
       
-      // Open in new tab for download
-      window.open(data.signedUrl, "_blank");
-    } catch (error) {
+      if (!data?.signedUrl) {
+        throw new Error("Could not generate download URL");
+      }
+      
+      // Create a temporary link to trigger download
+      const link = document.createElement('a');
+      link.href = data.signedUrl;
+      link.download = path.split('/').pop() || 'receipt';
+      link.target = '_blank';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      toast.success("Download started");
+    } catch (err) {
+      console.error("Download error:", err);
       toast.error("Failed to download receipt");
     }
   };
@@ -113,14 +167,12 @@ export function ReceiptViewer({
   const handleZoomOut = () => setZoom((z) => Math.max(z - 0.25, 0.5));
   const handleRotate = () => setRotation((r) => (r + 90) % 360);
 
-  const isPdf = (path: string | null | undefined) => {
-    return path?.toLowerCase().endsWith(".pdf");
-  };
-
   const switchTab = async (tab: "original" | "email") => {
     setActiveTab(tab);
     setZoom(1);
     setRotation(0);
+    setError(null);
+    setHtmlContent(null);
     
     const path = tab === "original" 
       ? (originalReceiptPath || filePath) 
@@ -129,14 +181,28 @@ export function ReceiptViewer({
     if (path) {
       setLoading(true);
       try {
-        const { data, error } = await supabase.storage
+        const { data, error: storageError } = await supabase.storage
           .from("expense-documents")
           .createSignedUrl(path, 3600);
 
-        if (error) throw error;
-        setSignedUrl(data.signedUrl);
-      } catch (error) {
-        console.error("Error getting signed URL:", error);
+        if (storageError) throw storageError;
+        
+        if (isHtmlFile(path)) {
+          try {
+            const response = await fetch(data.signedUrl);
+            if (response.ok) {
+              const html = await response.text();
+              setHtmlContent(html);
+            }
+          } catch {
+            setSignedUrl(data.signedUrl);
+          }
+        } else {
+          setSignedUrl(data.signedUrl);
+        }
+      } catch (err) {
+        console.error("Error getting signed URL:", err);
+        setError("Failed to load receipt");
         toast.error("Failed to load receipt");
       } finally {
         setLoading(false);
@@ -146,7 +212,7 @@ export function ReceiptViewer({
 
   if (!hasAnyReceipt) {
     return (
-      <Badge variant="outline" className="text-amber-600">
+      <Badge variant="outline" className="text-amber-600 border-amber-300">
         Missing
       </Badge>
     );
@@ -158,6 +224,8 @@ export function ReceiptViewer({
       currency: "USD",
     }).format(value);
   };
+
+  const currentPath = getActiveFilePath();
 
   return (
     <>
@@ -171,7 +239,7 @@ export function ReceiptViewer({
         >
           {loading ? (
             <RotateCw className="h-4 w-4 animate-spin" />
-          ) : hasOriginal ? (
+          ) : isPdfFile(currentPath) ? (
             <FileText className="h-4 w-4" />
           ) : (
             <ImageIcon className="h-4 w-4" />
@@ -180,7 +248,7 @@ export function ReceiptViewer({
         </Button>
         {hasOriginal && (
           <Badge variant="secondary" className="text-xs">
-            Original
+            {isPdfFile(originalReceiptPath || filePath) ? "PDF" : "Original"}
           </Badge>
         )}
       </div>
@@ -228,16 +296,16 @@ export function ReceiptViewer({
 
             {/* Toolbar */}
             <div className="flex items-center gap-2 mt-3">
-              <Button variant="outline" size="sm" onClick={handleZoomOut}>
+              <Button variant="outline" size="sm" onClick={handleZoomOut} disabled={!htmlContent && !signedUrl}>
                 <ZoomOut className="h-4 w-4" />
               </Button>
               <span className="text-sm min-w-[60px] text-center">
                 {Math.round(zoom * 100)}%
               </span>
-              <Button variant="outline" size="sm" onClick={handleZoomIn}>
+              <Button variant="outline" size="sm" onClick={handleZoomIn} disabled={!htmlContent && !signedUrl}>
                 <ZoomIn className="h-4 w-4" />
               </Button>
-              <Button variant="outline" size="sm" onClick={handleRotate}>
+              <Button variant="outline" size="sm" onClick={handleRotate} disabled={!htmlContent && !signedUrl}>
                 <RotateCw className="h-4 w-4" />
               </Button>
               <div className="flex-1" />
@@ -249,6 +317,7 @@ export function ReceiptViewer({
                 variant="outline"
                 size="sm"
                 onClick={() => signedUrl && window.open(signedUrl, "_blank")}
+                disabled={!signedUrl}
               >
                 <ExternalLink className="h-4 w-4 mr-1" />
                 Open in New Tab
@@ -262,9 +331,35 @@ export function ReceiptViewer({
               <div className="flex items-center justify-center h-full">
                 <RotateCw className="h-8 w-8 animate-spin text-muted-foreground" />
               </div>
+            ) : error ? (
+              <div className="flex flex-col items-center justify-center h-full text-destructive gap-4">
+                <AlertCircle className="h-12 w-12" />
+                <div className="text-center">
+                  <p className="font-medium">Failed to load receipt</p>
+                  <p className="text-sm text-muted-foreground mt-1">{error}</p>
+                </div>
+                <Button variant="outline" onClick={openReceipt}>
+                  Try Again
+                </Button>
+              </div>
+            ) : htmlContent ? (
+              // Render HTML content in a sandboxed div (avoids iframe blocking)
+              <div 
+                className="flex items-center justify-center min-h-full"
+                style={{
+                  transform: `scale(${zoom}) rotate(${rotation}deg)`,
+                  transformOrigin: "center top",
+                }}
+              >
+                <div 
+                  className="bg-white rounded-lg shadow-lg max-w-full overflow-hidden p-4"
+                  dangerouslySetInnerHTML={{ __html: htmlContent }}
+                  style={{ maxWidth: '100%' }}
+                />
+              </div>
             ) : signedUrl ? (
               <div className="flex items-center justify-center min-h-full">
-                {isPdf(getActiveFilePath()) ? (
+                {isPdfFile(currentPath) ? (
                   <iframe
                     src={signedUrl}
                     className="w-full h-full min-h-[70vh] border rounded-lg bg-white"
@@ -284,14 +379,16 @@ export function ReceiptViewer({
                       transformOrigin: "center center",
                     }}
                     onError={() => {
+                      setError("Failed to load image");
                       toast.error("Failed to load image");
                     }}
                   />
                 )}
               </div>
             ) : (
-              <div className="flex items-center justify-center h-full text-muted-foreground">
-                No receipt available
+              <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-2">
+                <AlertCircle className="h-8 w-8" />
+                <p>No receipt available</p>
               </div>
             )}
           </div>

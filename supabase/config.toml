@@ -377,3 +377,6 @@ verify_jwt = true
 
 [functions.extract-email-attachments]
 verify_jwt = true
+
+[functions.owner-magic-link]
+verify_jwt = false
