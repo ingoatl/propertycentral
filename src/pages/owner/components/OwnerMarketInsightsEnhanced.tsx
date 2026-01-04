@@ -115,15 +115,19 @@ export const OwnerMarketInsightsEnhanced = memo(function OwnerMarketInsightsEnha
   if (isLoading) {
     // Tips to show during loading based on property type
     const loadingTips = isMTROnly ? [
-      "💼 Corporate housing in Atlanta commands 20-30% premium over STR rates",
+      "💼 Corporate housing in Atlanta commands 20-30% premium over standard rental rates",
       "🏥 Metro Atlanta has 60+ hospitals hiring travel nurses year-round",
-      "🏢 Fortune 500 HQs: Home Depot, Delta, Coca-Cola, UPS all relocate executives here",
-      "📊 This report includes data from AirDNA, Furnished Finder & corporate housing databases",
+      "🏢 Fortune 500 HQs: Home Depot, Delta, Coca-Cola, UPS all relocate executives to Atlanta",
+      "📊 This report includes data from corporate housing databases & relocation companies",
+      "🏠 Insurance placements average 2-6 month stays with guaranteed payments",
+      "🎓 Emory & Morehouse medical programs drive consistent housing demand",
     ] : [
       "⚽ FIFA World Cup 2026 games in Atlanta could drive 400%+ rate increases",
       "🎸 Mercedes-Benz Stadium hosts 70+ major events annually",
       "📊 This report aggregates data from AirDNA, PriceLabs & local market APIs",
       "🏆 SEC Championship & Peach Bowl drive massive December demand",
+      "🎤 Music Midtown & Shaky Knees attract 50,000+ visitors each",
+      "🐉 Dragon Con brings 85,000+ attendees every Labor Day weekend",
     ];
     
     const tipIndex = Math.floor((loadingProgress / 25)) % loadingTips.length;

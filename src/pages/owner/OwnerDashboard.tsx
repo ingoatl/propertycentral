@@ -332,8 +332,24 @@ export default function OwnerDashboard() {
     setInsightsProgress(0);
     setInsightsStep("Connecting to market data sources...");
     
-    // Detailed progress steps with value descriptions - slower progression
-    const progressSteps = [
+    // Get property rental type to customize loading steps
+    const isMTR = property?.rental_type === 'mid_term';
+    
+    // Detailed progress steps with value descriptions - customized by property type
+    const progressSteps = isMTR ? [
+      { progress: 8, step: "Connecting to corporate housing databases...", detail: "Accessing relocation & travel nurse platforms" },
+      { progress: 15, step: "Analyzing your property's performance...", detail: "Reviewing MTR booking history & revenue" },
+      { progress: 22, step: "Scanning comparable furnished rentals...", detail: "Finding similar corporate housing in your area" },
+      { progress: 30, step: "Evaluating Fortune 500 relocation trends...", detail: "Home Depot, Delta, Coca-Cola, UPS data" },
+      { progress: 38, step: "Analyzing healthcare traveler demand...", detail: "Travel nurse placement data from 60+ Atlanta hospitals" },
+      { progress: 45, step: "Reviewing insurance placement trends...", detail: "Storm season & family displacement housing" },
+      { progress: 52, step: "Gathering corporate project timelines...", detail: "Major construction & consulting assignments" },
+      { progress: 60, step: "Analyzing university rotation schedules...", detail: "Medical residency & internship housing demand" },
+      { progress: 68, step: "Evaluating extended stay pricing...", detail: "Optimal monthly rates for your market" },
+      { progress: 75, step: "Generating AI-powered insights...", detail: "Custom recommendations for corporate housing" },
+      { progress: 82, step: "Preparing partnership strategies...", detail: "Relocation companies & insurance adjusters" },
+      { progress: 88, step: "Finalizing your personalized report...", detail: "This corporate housing data is worth $500+" },
+    ] : [
       { progress: 8, step: "Connecting to market data sources...", detail: "Accessing real-time rental market APIs" },
       { progress: 15, step: "Analyzing your property's performance...", detail: "Reviewing your revenue and booking history" },
       { progress: 22, step: "Scanning 50+ comparable rentals...", detail: "Finding properties similar to yours within 5 miles" },
@@ -683,8 +699,8 @@ export default function OwnerDashboard() {
             {loadingInsights ? (
               <OwnerMarketInsightsEnhanced
                 propertyName={property?.name || "Your Property"}
-                propertyBeds={5}
-                propertyBaths={3}
+                propertyBeds={property?.bedrooms || 5}
+                propertyBaths={property?.bathrooms || 3}
                 currentOccupancy={0}
                 avgMonthlyRevenue={0}
                 comparables={[]}
@@ -696,6 +712,7 @@ export default function OwnerDashboard() {
                 isLoading={true}
                 loadingProgress={insightsProgress}
                 loadingStep={insightsStep}
+                rentalType={property?.rental_type as "hybrid" | "mid_term" | "long_term" | null}
               />
             ) : marketInsights?.aiInsights ? (
               <div className="space-y-6">
@@ -827,7 +844,7 @@ export default function OwnerDashboard() {
           </TabsContent>
 
           <TabsContent value="receipts">
-            {property && <OwnerReceiptsTab expenses={expenses} propertyId={property.id} />}
+            {property && <OwnerReceiptsTab expenses={expenses} propertyId={property.id} token={sessionToken || undefined} />}
           </TabsContent>
 
           <TabsContent value="property">
