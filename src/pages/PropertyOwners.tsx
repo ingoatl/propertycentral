@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Building2, CreditCard, DollarSign, ExternalLink, Plus, Trash2, Wallet, Edit, Phone, Mail } from "lucide-react";
+import { Building2, CreditCard, DollarSign, ExternalLink, Plus, Trash2, Wallet, Edit, Phone, Mail, Send, Loader2 } from "lucide-react";
 import { z } from "zod";
 import { AddPaymentMethod } from "@/components/AddPaymentMethod";
 import {
@@ -87,6 +87,27 @@ const PropertyOwners = () => {
     second_owner_name: "",
     second_owner_email: "",
   });
+  const [sendingInvite, setSendingInvite] = useState<string | null>(null);
+
+  const handleSendPortalInvite = async (owner: PropertyOwner) => {
+    setSendingInvite(owner.id);
+    try {
+      const { data, error } = await supabase.functions.invoke("owner-magic-link", {
+        body: { owner_id: owner.id, send_email: true },
+      });
+
+      if (error) throw error;
+
+      toast.success(`Portal invite sent to ${owner.email}!`, {
+        description: "They'll receive a magic link to access their dashboard.",
+      });
+    } catch (error: any) {
+      console.error("Error sending portal invite:", error);
+      toast.error("Failed to send portal invite: " + (error.message || "Unknown error"));
+    } finally {
+      setSendingInvite(null);
+    }
+  };
 
   useEffect(() => {
     checkAdminStatus();
@@ -536,6 +557,21 @@ const PropertyOwners = () => {
                       </CardDescription>
                     </div>
                     <div className="flex gap-2 items-center">
+                      <Button
+                        variant="default"
+                        size="sm"
+                        onClick={() => handleSendPortalInvite(owner)}
+                        disabled={sendingInvite === owner.id}
+                        title="Send portal invite to owner"
+                        className="gap-2"
+                      >
+                        {sendingInvite === owner.id ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Send className="w-4 h-4" />
+                        )}
+                        Invite to Portal
+                      </Button>
                       <Button
                         variant="ghost"
                         size="icon"

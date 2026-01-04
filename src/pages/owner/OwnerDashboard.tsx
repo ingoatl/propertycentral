@@ -16,6 +16,13 @@ import {
   Home,
   LogOut,
   RefreshCw,
+  Key,
+  Wifi,
+  Lock,
+  ExternalLink,
+  Copy,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -53,6 +60,15 @@ interface PropertyData {
   rental_type: string | null;
 }
 
+interface Credential {
+  id: string;
+  service_name: string;
+  username: string | null;
+  password: string | null;
+  url: string | null;
+  notes: string | null;
+}
+
 export default function OwnerDashboard() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -61,8 +77,10 @@ export default function OwnerDashboard() {
   const [property, setProperty] = useState<PropertyData | null>(null);
   const [statements, setStatements] = useState<Statement[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [credentials, setCredentials] = useState<Credential[]>([]);
   const [activeTab, setActiveTab] = useState("overview");
   const [downloadingPdf, setDownloadingPdf] = useState<string | null>(null);
+  const [visiblePasswords, setVisiblePasswords] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const token = searchParams.get("token");
@@ -178,6 +196,15 @@ export default function OwnerDashboard() {
           .limit(50);
 
         setExpenses(expensesData || []);
+
+        // Load property credentials
+        const { data: credentialsData } = await supabase
+          .from("property_credentials")
+          .select("id, service_name, username, password, url, notes")
+          .eq("property_id", propertyData.id)
+          .order("service_name");
+
+        setCredentials((credentialsData || []) as Credential[]);
       }
     } catch (err) {
       console.error("Error loading owner data:", err);
@@ -223,6 +250,23 @@ export default function OwnerDashboard() {
       style: "currency",
       currency: "USD",
     }).format(amount);
+  };
+
+  const togglePasswordVisibility = (id: string) => {
+    setVisiblePasswords(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(id)) {
+        newSet.delete(id);
+      } else {
+        newSet.add(id);
+      }
+      return newSet;
+    });
+  };
+
+  const copyToClipboard = (text: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    toast.success(`${label} copied to clipboard`);
   };
 
   if (loading) {
@@ -335,6 +379,7 @@ export default function OwnerDashboard() {
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="statements">Statements</TabsTrigger>
             <TabsTrigger value="expenses">Expenses</TabsTrigger>
+            <TabsTrigger value="property">Property Info</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview">
@@ -497,6 +542,143 @@ export default function OwnerDashboard() {
                 )}
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="property">
+            <div className="grid gap-6">
+              {/* Property Address Card */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Home className="h-5 w-5" />
+                    Property Details
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Address</p>
+                      <p className="font-medium text-lg">{property?.address}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Property Name</p>
+                      <p className="font-medium">{property?.name}</p>
+                    </div>
+                    {property?.rental_type && (
+                      <div>
+                        <p className="text-sm text-muted-foreground">Rental Type</p>
+                        <Badge variant="secondary" className="mt-1">
+                          {property.rental_type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
+                        </Badge>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Credentials Card */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Key className="h-5 w-5" />
+                    Access & Credentials
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {credentials.length === 0 ? (
+                    <p className="text-muted-foreground text-center py-8">
+                      No credentials on file. Contact your property manager to add WiFi, lock codes, and other access information.
+                    </p>
+                  ) : (
+                    <div className="space-y-4">
+                      {credentials.map((cred) => (
+                        <div key={cred.id} className="border rounded-lg p-4">
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-2">
+                              {cred.service_name.toLowerCase().includes('wifi') ? (
+                                <Wifi className="h-4 w-4 text-blue-500" />
+                              ) : cred.service_name.toLowerCase().includes('lock') || 
+                                 cred.service_name.toLowerCase().includes('door') ||
+                                 cred.service_name.toLowerCase().includes('gate') ? (
+                                <Lock className="h-4 w-4 text-amber-500" />
+                              ) : (
+                                <Key className="h-4 w-4 text-muted-foreground" />
+                              )}
+                              <span className="font-medium">{cred.service_name}</span>
+                            </div>
+                            {cred.url && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => window.open(cred.url!, '_blank')}
+                              >
+                                <ExternalLink className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
+                          
+                          <div className="grid gap-3">
+                            {cred.username && (
+                              <div className="flex items-center justify-between bg-muted/50 rounded-md px-3 py-2">
+                                <div>
+                                  <p className="text-xs text-muted-foreground">Username / Network</p>
+                                  <p className="font-mono text-sm">{cred.username}</p>
+                                </div>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  onClick={() => copyToClipboard(cred.username!, 'Username')}
+                                >
+                                  <Copy className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
+                            )}
+                            
+                            {cred.password && (
+                              <div className="flex items-center justify-between bg-muted/50 rounded-md px-3 py-2">
+                                <div>
+                                  <p className="text-xs text-muted-foreground">Password / Code</p>
+                                  <p className="font-mono text-sm">
+                                    {visiblePasswords.has(cred.id) ? cred.password : '••••••••'}
+                                  </p>
+                                </div>
+                                <div className="flex gap-1">
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8"
+                                    onClick={() => togglePasswordVisibility(cred.id)}
+                                  >
+                                    {visiblePasswords.has(cred.id) ? (
+                                      <EyeOff className="h-3.5 w-3.5" />
+                                    ) : (
+                                      <Eye className="h-3.5 w-3.5" />
+                                    )}
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8"
+                                    onClick={() => copyToClipboard(cred.password!, 'Password')}
+                                  >
+                                    <Copy className="h-3.5 w-3.5" />
+                                  </Button>
+                                </div>
+                              </div>
+                            )}
+                            
+                            {cred.notes && (
+                              <p className="text-sm text-muted-foreground mt-1">{cred.notes}</p>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
         </Tabs>
       </main>
