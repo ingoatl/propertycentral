@@ -968,7 +968,7 @@ State: ${state}
         return result;
       }).join('') : '';
       
-      // Generate expense rows - compact format
+      // Generate expense rows - compact format (no receipt links - use portal instead)
       const expenseRowsHtml = expenses && expenses.length > 0 ? expenses.map((expense: any) => {
         const description = expense.purpose || expense.items_detail || 'Maintenance & Supplies';
         const dateStr = new Date(expense.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
@@ -979,7 +979,6 @@ State: ${state}
           <td style="padding: 8px 0; font-size: 13px; color: #111111; border-bottom: 1px solid #e5e5e5;">
             ${description}${vendor}
             <span style="color: #666666; font-size: 11px; margin-left: 8px;">${dateStr}</span>
-            ${expense.receipt_url ? `<a href="${expense.receipt_url}" style="color: #111111; text-decoration: underline; font-size: 11px; margin-left: 8px;">Receipt</a>` : ''}
           </td>
           <td style="padding: 8px 0; font-size: 13px; color: #111111; text-align: right; font-family: 'SF Mono', Menlo, Consolas, 'Courier New', monospace; border-bottom: 1px solid #e5e5e5; vertical-align: top;">
             $${Number(expense.amount).toFixed(2)}
@@ -1158,6 +1157,21 @@ State: ${state}
                         </td>
                       </tr>
                     </table>
+                  </td>
+                </tr>
+              </table>
+            </div>
+
+            <!-- Owner Portal CTA -->
+            <div style="padding: 20px 32px; background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); border-top: 1px solid #e5e5e5;">
+              <table style="width: 100%;">
+                <tr>
+                  <td style="vertical-align: middle;">
+                    <div style="font-size: 13px; font-weight: 600; color: #111111; margin-bottom: 4px;">View Your Owner Portal</div>
+                    <div style="font-size: 11px; color: #666666;">Access all receipts, bookings, and performance data anytime</div>
+                  </td>
+                  <td style="text-align: right; vertical-align: middle;">
+                    <a href="https://ijsxcaaqphaciaenlegl.lovable.app/owner" style="display: inline-block; background: #111111; color: #ffffff; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-size: 12px; font-weight: 600;">Open Portal →</a>
                   </td>
                 </tr>
               </table>
