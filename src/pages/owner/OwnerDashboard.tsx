@@ -23,9 +23,14 @@ import {
   Copy,
   Eye,
   EyeOff,
+  BarChart3,
+  Users,
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
+import { OwnerReceiptsTab } from "./components/OwnerReceiptsTab";
+import { OwnerBookingsTab } from "./components/OwnerBookingsTab";
+import { OwnerPerformanceCharts } from "./components/OwnerPerformanceCharts";
 
 interface OwnerSession {
   ownerId: string;
@@ -51,6 +56,8 @@ interface Expense {
   purpose: string | null;
   vendor: string | null;
   category: string | null;
+  file_path: string | null;
+  original_receipt_path: string | null;
 }
 
 interface PropertyData {
@@ -183,17 +190,17 @@ export default function OwnerDashboard() {
           .eq("property_id", propertyData.id)
           .in("status", ["statement_sent", "approved"])
           .order("reconciliation_month", { ascending: false })
-          .limit(12);
+          .limit(24);
 
         setStatements((statementsData || []) as Statement[]);
 
-        // Load recent expenses
+        // Load ALL expenses with receipt paths
         const { data: expensesData } = await supabase
           .from("expenses")
-          .select("id, date, amount, purpose, vendor, category")
+          .select("id, date, amount, purpose, vendor, category, file_path, original_receipt_path")
           .eq("property_id", propertyData.id)
           .order("date", { ascending: false })
-          .limit(50);
+          .limit(200);
 
         setExpenses(expensesData || []);
 
@@ -271,21 +278,24 @@ export default function OwnerDashboard() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <RefreshCw className="h-8 w-8 animate-spin text-muted-foreground" />
+      <div className="min-h-screen bg-gradient-to-br from-background via-muted/30 to-background flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <RefreshCw className="h-10 w-10 animate-spin text-primary" />
+          <p className="text-muted-foreground">Loading your dashboard...</p>
+        </div>
       </div>
     );
   }
 
   if (!session) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <Card className="max-w-md w-full">
-          <CardHeader className="text-center">
-            <div className="mx-auto mb-4 w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
-              <Home className="h-6 w-6 text-primary" />
+      <div className="min-h-screen bg-gradient-to-br from-background via-muted/30 to-background flex items-center justify-center p-4">
+        <Card className="max-w-md w-full shadow-2xl border-none">
+          <CardHeader className="text-center pb-2">
+            <div className="mx-auto mb-4 w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-lg">
+              <Home className="h-8 w-8 text-primary-foreground" />
             </div>
-            <CardTitle>Owner Portal</CardTitle>
+            <CardTitle className="text-2xl">Owner Portal</CardTitle>
           </CardHeader>
           <CardContent className="text-center space-y-4">
             <p className="text-muted-foreground">
@@ -293,7 +303,7 @@ export default function OwnerDashboard() {
             </p>
             <p className="text-sm text-muted-foreground">
               Don't have a link? Contact us at{" "}
-              <a href="mailto:info@peachhausgroup.com" className="text-primary underline">
+              <a href="mailto:info@peachhausgroup.com" className="text-primary underline font-medium">
                 info@peachhausgroup.com
               </a>
             </p>
@@ -308,65 +318,65 @@ export default function OwnerDashboard() {
   const latestStatement = statements[0];
 
   return (
-    <div className="min-h-screen bg-muted/30">
+    <div className="min-h-screen bg-gradient-to-br from-background via-muted/20 to-background">
       {/* Header */}
-      <header className="bg-background border-b">
-        <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-              <Building2 className="h-5 w-5 text-primary" />
+      <header className="bg-background/80 backdrop-blur-md border-b sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-lg">
+              <Building2 className="h-6 w-6 text-primary-foreground" />
             </div>
             <div>
-              <h1 className="font-semibold">{property?.name || "Your Property"}</h1>
-              <p className="text-sm text-muted-foreground">{session.ownerName}</p>
+              <h1 className="font-bold text-lg">{property?.name || "Your Property"}</h1>
+              <p className="text-sm text-muted-foreground">Welcome back, {session.ownerName}</p>
             </div>
           </div>
-          <Button variant="ghost" size="sm" onClick={handleLogout}>
-            <LogOut className="h-4 w-4 mr-2" />
-            Logout
+          <Button variant="ghost" size="sm" onClick={handleLogout} className="gap-2">
+            <LogOut className="h-4 w-4" />
+            <span className="hidden sm:inline">Logout</span>
           </Button>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="max-w-6xl mx-auto px-4 py-8">
+      <main className="max-w-7xl mx-auto px-4 py-8">
         {/* Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-          <Card>
+          <Card className="bg-gradient-to-br from-emerald-50 to-emerald-100/50 border-none shadow-lg dark:from-emerald-950/30 dark:to-emerald-900/20">
             <CardContent className="pt-6">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-emerald-100 flex items-center justify-center">
-                  <DollarSign className="h-5 w-5 text-emerald-600" />
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 rounded-2xl bg-emerald-500/20 flex items-center justify-center">
+                  <DollarSign className="h-7 w-7 text-emerald-600" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">YTD Revenue</p>
-                  <p className="text-2xl font-bold">{formatCurrency(totalRevenue)}</p>
+                  <p className="text-sm text-muted-foreground font-medium">YTD Revenue</p>
+                  <p className="text-3xl font-bold tracking-tight">{formatCurrency(totalRevenue)}</p>
                 </div>
               </div>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="bg-gradient-to-br from-blue-50 to-blue-100/50 border-none shadow-lg dark:from-blue-950/30 dark:to-blue-900/20">
             <CardContent className="pt-6">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
-                  <TrendingUp className="h-5 w-5 text-blue-600" />
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 rounded-2xl bg-blue-500/20 flex items-center justify-center">
+                  <TrendingUp className="h-7 w-7 text-blue-600" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">YTD Net Earnings</p>
-                  <p className="text-2xl font-bold">{formatCurrency(totalNet)}</p>
+                  <p className="text-sm text-muted-foreground font-medium">YTD Net Earnings</p>
+                  <p className="text-3xl font-bold tracking-tight">{formatCurrency(totalNet)}</p>
                 </div>
               </div>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="bg-gradient-to-br from-purple-50 to-purple-100/50 border-none shadow-lg dark:from-purple-950/30 dark:to-purple-900/20">
             <CardContent className="pt-6">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center">
-                  <Calendar className="h-5 w-5 text-purple-600" />
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 rounded-2xl bg-purple-500/20 flex items-center justify-center">
+                  <Calendar className="h-7 w-7 text-purple-600" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Statements</p>
-                  <p className="text-2xl font-bold">{statements.length}</p>
+                  <p className="text-sm text-muted-foreground font-medium">Statements</p>
+                  <p className="text-3xl font-bold tracking-tight">{statements.length}</p>
                 </div>
               </div>
             </CardContent>
@@ -375,43 +385,66 @@ export default function OwnerDashboard() {
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="mb-6">
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="statements">Statements</TabsTrigger>
-            <TabsTrigger value="expenses">Expenses</TabsTrigger>
-            <TabsTrigger value="property">Property Info</TabsTrigger>
+          <TabsList className="mb-6 bg-muted/50 p-1 h-auto flex-wrap">
+            <TabsTrigger value="overview" className="gap-2">
+              <BarChart3 className="h-4 w-4" />
+              <span className="hidden sm:inline">Overview</span>
+            </TabsTrigger>
+            <TabsTrigger value="bookings" className="gap-2">
+              <Users className="h-4 w-4" />
+              <span className="hidden sm:inline">Bookings</span>
+            </TabsTrigger>
+            <TabsTrigger value="statements" className="gap-2">
+              <FileText className="h-4 w-4" />
+              <span className="hidden sm:inline">Statements</span>
+            </TabsTrigger>
+            <TabsTrigger value="receipts" className="gap-2">
+              <Receipt className="h-4 w-4" />
+              <span className="hidden sm:inline">Receipts</span>
+            </TabsTrigger>
+            <TabsTrigger value="property" className="gap-2">
+              <Home className="h-4 w-4" />
+              <span className="hidden sm:inline">Property</span>
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview">
-            <div className="grid gap-6">
+            <div className="space-y-6">
+              {/* Performance Charts */}
+              <OwnerPerformanceCharts statements={statements} propertyName={property?.name} />
+
+              {/* Latest Statement Quick View */}
               {latestStatement && (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
+                <Card className="border-none shadow-lg">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="flex items-center gap-2 text-lg">
                       <FileText className="h-5 w-5" />
                       Latest Statement
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between p-4 bg-muted/30 rounded-xl">
                       <div>
-                        <p className="text-lg font-medium">
+                        <p className="text-xl font-bold">
                           {format(new Date(latestStatement.reconciliation_month), "MMMM yyyy")}
                         </p>
                         <div className="flex gap-4 mt-2 text-sm text-muted-foreground">
                           <span>Revenue: {formatCurrency(latestStatement.total_revenue || 0)}</span>
-                          <span>Net: {formatCurrency(latestStatement.net_to_owner || 0)}</span>
+                          <span>•</span>
+                          <span className="text-emerald-600 font-medium">
+                            Net: {formatCurrency(latestStatement.net_to_owner || 0)}
+                          </span>
                         </div>
                       </div>
                       <Button
-                        variant="outline"
                         onClick={() => downloadStatement(latestStatement)}
                         disabled={downloadingPdf === latestStatement.id}
+                        className="gap-2"
                       >
                         {downloadingPdf === latestStatement.id ? (
-                          <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                          <RefreshCw className="h-4 w-4 animate-spin" />
                         ) : (
-                          <Download className="h-4 w-4 mr-2" />
+                          <Download className="h-4 w-4" />
                         )}
                         Download PDF
                       </Button>
@@ -419,72 +452,56 @@ export default function OwnerDashboard() {
                   </CardContent>
                 </Card>
               )}
-
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Receipt className="h-5 w-5" />
-                    Recent Expenses
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {expenses.length === 0 ? (
-                    <p className="text-muted-foreground text-center py-4">No recent expenses</p>
-                  ) : (
-                    <div className="space-y-3">
-                      {expenses.slice(0, 5).map((expense) => (
-                        <div key={expense.id} className="flex items-center justify-between py-2 border-b last:border-0">
-                          <div>
-                            <p className="font-medium">{expense.purpose || expense.category || "Expense"}</p>
-                            <p className="text-sm text-muted-foreground">
-                              {expense.vendor ? `${expense.vendor} • ` : ""}
-                              {format(new Date(expense.date), "MMM d, yyyy")}
-                            </p>
-                          </div>
-                          <p className="font-mono">{formatCurrency(expense.amount)}</p>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
             </div>
           </TabsContent>
 
+          <TabsContent value="bookings">
+            {property && <OwnerBookingsTab propertyId={property.id} />}
+          </TabsContent>
+
           <TabsContent value="statements">
-            <Card>
+            <Card className="border-none shadow-lg">
               <CardHeader>
-                <CardTitle>Statement History</CardTitle>
+                <CardTitle className="flex items-center gap-2">
+                  <FileText className="h-5 w-5" />
+                  Statement History
+                </CardTitle>
               </CardHeader>
               <CardContent>
                 {statements.length === 0 ? (
-                  <p className="text-muted-foreground text-center py-8">No statements available yet</p>
+                  <div className="py-12 text-center">
+                    <FileText className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
+                    <p className="text-muted-foreground">No statements available yet</p>
+                  </div>
                 ) : (
                   <div className="space-y-2">
                     {statements.map((statement) => (
                       <div
                         key={statement.id}
-                        className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors"
+                        className="flex items-center justify-between p-4 border rounded-xl hover:bg-muted/30 transition-colors"
                       >
                         <div className="flex items-center gap-4">
-                          <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center">
-                            <FileText className="h-5 w-5" />
+                          <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center">
+                            <FileText className="h-6 w-6" />
                           </div>
                           <div>
-                            <p className="font-medium">
+                            <p className="font-semibold">
                               {format(new Date(statement.reconciliation_month), "MMMM yyyy")}
                             </p>
                             <div className="flex gap-3 text-sm text-muted-foreground">
                               <span>Revenue: {formatCurrency(statement.total_revenue || 0)}</span>
-                              <span>Net: {formatCurrency(statement.net_to_owner || 0)}</span>
+                              <span>•</span>
+                              <span className="text-emerald-600">Net: {formatCurrency(statement.net_to_owner || 0)}</span>
                             </div>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <Badge variant="secondary">{statement.status}</Badge>
+                        <div className="flex items-center gap-3">
+                          <Badge variant="secondary" className="capitalize">
+                            {statement.status.replace(/_/g, " ")}
+                          </Badge>
                           <Button
-                            variant="ghost"
-                            size="sm"
+                            variant="outline"
+                            size="icon"
                             onClick={() => downloadStatement(statement)}
                             disabled={downloadingPdf === statement.id}
                           >
@@ -503,51 +520,14 @@ export default function OwnerDashboard() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="expenses">
-            <Card>
-              <CardHeader>
-                <CardTitle>Expense History</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {expenses.length === 0 ? (
-                  <p className="text-muted-foreground text-center py-8">No expenses recorded</p>
-                ) : (
-                  <div className="space-y-2">
-                    {expenses.map((expense) => (
-                      <div
-                        key={expense.id}
-                        className="flex items-center justify-between p-4 border rounded-lg"
-                      >
-                        <div className="flex items-center gap-4">
-                          <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center">
-                            <Receipt className="h-5 w-5" />
-                          </div>
-                          <div>
-                            <p className="font-medium">{expense.purpose || expense.category || "Expense"}</p>
-                            <p className="text-sm text-muted-foreground">
-                              {expense.vendor ? `${expense.vendor} • ` : ""}
-                              {format(new Date(expense.date), "MMM d, yyyy")}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {expense.category && (
-                            <Badge variant="outline">{expense.category}</Badge>
-                          )}
-                          <p className="font-mono font-medium">{formatCurrency(expense.amount)}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+          <TabsContent value="receipts">
+            {property && <OwnerReceiptsTab expenses={expenses} propertyId={property.id} />}
           </TabsContent>
 
           <TabsContent value="property">
             <div className="grid gap-6">
               {/* Property Address Card */}
-              <Card>
+              <Card className="border-none shadow-lg">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Home className="h-5 w-5" />
@@ -556,28 +536,30 @@ export default function OwnerDashboard() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    <div>
-                      <p className="text-sm text-muted-foreground">Address</p>
-                      <p className="font-medium text-lg">{property?.address}</p>
+                    <div className="p-4 bg-muted/30 rounded-xl">
+                      <p className="text-sm text-muted-foreground mb-1">Address</p>
+                      <p className="font-semibold text-lg">{property?.address}</p>
                     </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Property Name</p>
-                      <p className="font-medium">{property?.name}</p>
-                    </div>
-                    {property?.rental_type && (
-                      <div>
-                        <p className="text-sm text-muted-foreground">Rental Type</p>
-                        <Badge variant="secondary" className="mt-1">
-                          {property.rental_type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
-                        </Badge>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="p-4 bg-muted/30 rounded-xl">
+                        <p className="text-sm text-muted-foreground mb-1">Property Name</p>
+                        <p className="font-semibold">{property?.name}</p>
                       </div>
-                    )}
+                      {property?.rental_type && (
+                        <div className="p-4 bg-muted/30 rounded-xl">
+                          <p className="text-sm text-muted-foreground mb-1">Rental Type</p>
+                          <Badge variant="secondary" className="mt-1">
+                            {property.rental_type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
+                          </Badge>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </CardContent>
               </Card>
 
               {/* Credentials Card */}
-              <Card>
+              <Card className="border-none shadow-lg">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Key className="h-5 w-5" />
@@ -586,43 +568,58 @@ export default function OwnerDashboard() {
                 </CardHeader>
                 <CardContent>
                   {credentials.length === 0 ? (
-                    <p className="text-muted-foreground text-center py-8">
-                      No credentials on file. Contact your property manager to add WiFi, lock codes, and other access information.
-                    </p>
+                    <div className="py-12 text-center">
+                      <Key className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
+                      <p className="text-muted-foreground">
+                        No credentials on file. Contact your property manager to add WiFi, lock codes, and other access information.
+                      </p>
+                    </div>
                   ) : (
                     <div className="space-y-4">
                       {credentials.map((cred) => (
-                        <div key={cred.id} className="border rounded-lg p-4">
+                        <div key={cred.id} className="border rounded-xl p-4 hover:bg-muted/20 transition-colors">
                           <div className="flex items-center justify-between mb-3">
-                            <div className="flex items-center gap-2">
-                              {cred.service_name.toLowerCase().includes('wifi') ? (
-                                <Wifi className="h-4 w-4 text-blue-500" />
-                              ) : cred.service_name.toLowerCase().includes('lock') || 
-                                 cred.service_name.toLowerCase().includes('door') ||
-                                 cred.service_name.toLowerCase().includes('gate') ? (
-                                <Lock className="h-4 w-4 text-amber-500" />
-                              ) : (
-                                <Key className="h-4 w-4 text-muted-foreground" />
-                              )}
-                              <span className="font-medium">{cred.service_name}</span>
+                            <div className="flex items-center gap-3">
+                              <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                                cred.service_name.toLowerCase().includes('wifi') 
+                                  ? 'bg-blue-100 text-blue-600' 
+                                  : cred.service_name.toLowerCase().includes('lock') || 
+                                    cred.service_name.toLowerCase().includes('door') ||
+                                    cred.service_name.toLowerCase().includes('gate')
+                                    ? 'bg-amber-100 text-amber-600'
+                                    : 'bg-muted text-muted-foreground'
+                              }`}>
+                                {cred.service_name.toLowerCase().includes('wifi') ? (
+                                  <Wifi className="h-5 w-5" />
+                                ) : cred.service_name.toLowerCase().includes('lock') || 
+                                   cred.service_name.toLowerCase().includes('door') ||
+                                   cred.service_name.toLowerCase().includes('gate') ? (
+                                  <Lock className="h-5 w-5" />
+                                ) : (
+                                  <Key className="h-5 w-5" />
+                                )}
+                              </div>
+                              <span className="font-semibold">{cred.service_name}</span>
                             </div>
                             {cred.url && (
                               <Button
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => window.open(cred.url!, '_blank')}
+                                className="gap-2"
                               >
                                 <ExternalLink className="h-4 w-4" />
+                                Open
                               </Button>
                             )}
                           </div>
                           
                           <div className="grid gap-3">
                             {cred.username && (
-                              <div className="flex items-center justify-between bg-muted/50 rounded-md px-3 py-2">
+                              <div className="flex items-center justify-between bg-muted/50 rounded-lg px-4 py-3">
                                 <div>
-                                  <p className="text-xs text-muted-foreground">Username / Network</p>
-                                  <p className="font-mono text-sm">{cred.username}</p>
+                                  <p className="text-xs text-muted-foreground mb-0.5">Username / Network</p>
+                                  <p className="font-mono font-medium">{cred.username}</p>
                                 </div>
                                 <Button
                                   variant="ghost"
@@ -630,16 +627,16 @@ export default function OwnerDashboard() {
                                   className="h-8 w-8"
                                   onClick={() => copyToClipboard(cred.username!, 'Username')}
                                 >
-                                  <Copy className="h-3.5 w-3.5" />
+                                  <Copy className="h-4 w-4" />
                                 </Button>
                               </div>
                             )}
                             
                             {cred.password && (
-                              <div className="flex items-center justify-between bg-muted/50 rounded-md px-3 py-2">
+                              <div className="flex items-center justify-between bg-muted/50 rounded-lg px-4 py-3">
                                 <div>
-                                  <p className="text-xs text-muted-foreground">Password / Code</p>
-                                  <p className="font-mono text-sm">
+                                  <p className="text-xs text-muted-foreground mb-0.5">Password / Code</p>
+                                  <p className="font-mono font-medium">
                                     {visiblePasswords.has(cred.id) ? cred.password : '••••••••'}
                                   </p>
                                 </div>
@@ -651,9 +648,9 @@ export default function OwnerDashboard() {
                                     onClick={() => togglePasswordVisibility(cred.id)}
                                   >
                                     {visiblePasswords.has(cred.id) ? (
-                                      <EyeOff className="h-3.5 w-3.5" />
+                                      <EyeOff className="h-4 w-4" />
                                     ) : (
-                                      <Eye className="h-3.5 w-3.5" />
+                                      <Eye className="h-4 w-4" />
                                     )}
                                   </Button>
                                   <Button
@@ -662,14 +659,14 @@ export default function OwnerDashboard() {
                                     className="h-8 w-8"
                                     onClick={() => copyToClipboard(cred.password!, 'Password')}
                                   >
-                                    <Copy className="h-3.5 w-3.5" />
+                                    <Copy className="h-4 w-4" />
                                   </Button>
                                 </div>
                               </div>
                             )}
                             
                             {cred.notes && (
-                              <p className="text-sm text-muted-foreground mt-1">{cred.notes}</p>
+                              <p className="text-sm text-muted-foreground px-1">{cred.notes}</p>
                             )}
                           </div>
                         </div>
@@ -684,9 +681,14 @@ export default function OwnerDashboard() {
       </main>
 
       {/* Footer */}
-      <footer className="border-t mt-12">
-        <div className="max-w-6xl mx-auto px-4 py-6 text-center text-sm text-muted-foreground">
-          <p>PeachHaus Group LLC • Questions? Email info@peachhausgroup.com</p>
+      <footer className="border-t mt-12 bg-muted/30">
+        <div className="max-w-7xl mx-auto px-4 py-8 text-center">
+          <p className="text-sm text-muted-foreground">
+            PeachHaus Group LLC • Questions? Email{" "}
+            <a href="mailto:info@peachhausgroup.com" className="text-primary underline">
+              info@peachhausgroup.com
+            </a>
+          </p>
         </div>
       </footer>
     </div>
