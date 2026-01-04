@@ -4399,7 +4399,10 @@ export type Database = {
           expires_at: string
           id: string
           ip_address: string | null
+          is_admin_preview: boolean | null
           owner_id: string
+          property_id: string | null
+          property_name: string | null
           token: string
           used_at: string | null
           user_agent: string | null
@@ -4410,7 +4413,10 @@ export type Database = {
           expires_at: string
           id?: string
           ip_address?: string | null
+          is_admin_preview?: boolean | null
           owner_id: string
+          property_id?: string | null
+          property_name?: string | null
           token: string
           used_at?: string | null
           user_agent?: string | null
@@ -4421,7 +4427,10 @@ export type Database = {
           expires_at?: string
           id?: string
           ip_address?: string | null
+          is_admin_preview?: boolean | null
           owner_id?: string
+          property_id?: string | null
+          property_name?: string | null
           token?: string
           used_at?: string | null
           user_agent?: string | null
