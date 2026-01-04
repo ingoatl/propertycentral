@@ -317,70 +317,104 @@ serve(async (req: Request): Promise<Response> => {
     // For future months without statements, calculate from bookings
     
     // Track detailed breakdown for UI display
-    const mtrBreakdown: { month: string; tenant: string; amount: number; source: string; days?: number }[] = [];
-    const strBreakdown: { guest: string; checkIn: string; checkOut: string; amount: number; source: string }[] = [];
+    const mtrBreakdown: { month: string; tenant: string; amount: number; source: string; days?: number; startDate?: string; endDate?: string; monthlyRent?: number }[] = [];
+    const strBreakdown: { guest: string; checkIn: string; checkOut: string; amount: number; source: string; nights?: number }[] = [];
     
     // First, get MTR from statements (already adjusted during reconciliation)
+    // We need to correlate with actual bookings to show tenant names
     let mtrFromStatements = 0;
     const monthsWithStatements = new Set<string>();
+    
+    // Build a map of which tenants were in which months for name attribution
+    const tenantsByMonth: Record<string, { tenant: string; rent: number; days: number; startDate: string; endDate: string }[]> = {};
+    for (const b of mtrBookings) {
+      if (!b.start_date || !b.end_date || !b.monthly_rent) continue;
+      const startDate = new Date(b.start_date);
+      const endDate = new Date(b.end_date);
+      
+      let currentDate = new Date(startDate);
+      while (currentDate <= endDate) {
+        const monthKey = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`;
+        const monthStart = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+        const monthEnd = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+        const daysInMonth = monthEnd.getDate();
+        
+        const effectiveStart = startDate > monthStart ? startDate : monthStart;
+        const effectiveEnd = endDate < monthEnd ? endDate : monthEnd;
+        const daysOccupied = Math.max(1, Math.ceil((effectiveEnd.getTime() - effectiveStart.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+        
+        if (!tenantsByMonth[monthKey]) tenantsByMonth[monthKey] = [];
+        tenantsByMonth[monthKey].push({
+          tenant: b.tenant_name || 'MTR Guest',
+          rent: b.monthly_rent,
+          days: daysOccupied,
+          startDate: b.start_date,
+          endDate: b.end_date,
+        });
+        
+        currentDate.setMonth(currentDate.getMonth() + 1);
+        currentDate.setDate(1);
+      }
+    }
     
     for (const s of statements) {
       const monthKey = s.reconciliation_month?.substring(0, 7) || '';
       if (!monthKey) continue;
       monthsWithStatements.add(monthKey);
       
-      // If revenue_override is set and less than total, use it proportionally
-      // revenue_override = 0 means no revenue that month (manual adjustment)
+      const statementMtr = s.mid_term_revenue || 0;
+      if (statementMtr <= 0) continue;
+      
+      // If revenue_override is set and less than total, calculate adjusted MTR
+      let finalMtr = statementMtr;
       if (s.revenue_override !== null && s.revenue_override !== undefined) {
-        // revenue_override replaces total_revenue, so calculate MTR proportion
         const originalTotal = (s.short_term_revenue || 0) + (s.mid_term_revenue || 0);
         if (originalTotal > 0 && s.revenue_override < originalTotal) {
-          // Reduce MTR proportionally to the override
           const ratio = s.revenue_override / originalTotal;
-          const adjustedMtr = (s.mid_term_revenue || 0) * ratio;
-          mtrFromStatements += adjustedMtr;
+          finalMtr = statementMtr * ratio;
+          console.log(`Month ${monthKey}: MTR adjusted from $${statementMtr} to $${finalMtr.toFixed(2)} (override ratio: ${ratio.toFixed(2)})`);
+        }
+      }
+      
+      mtrFromStatements += finalMtr;
+      
+      // Attribute to actual tenants from that month
+      const tenantsInMonth = tenantsByMonth[monthKey] || [];
+      if (tenantsInMonth.length > 0) {
+        // If multiple tenants, prorate the statement amount based on expected rent proportions
+        const totalExpectedRent = tenantsInMonth.reduce((sum, t) => sum + (t.rent * t.days / 30), 0);
+        for (const t of tenantsInMonth) {
+          const expectedRent = t.rent * t.days / 30;
+          const share = totalExpectedRent > 0 ? (expectedRent / totalExpectedRent) * finalMtr : finalMtr;
           mtrBreakdown.push({
             month: monthKey,
-            tenant: 'Statement (adjusted)',
-            amount: adjustedMtr,
+            tenant: t.tenant,
+            amount: share,
             source: 'statement',
+            days: t.days,
+            startDate: t.startDate,
+            endDate: t.endDate,
+            monthlyRent: t.rent,
           });
-          console.log(`Month ${monthKey}: MTR adjusted from $${s.mid_term_revenue} to $${adjustedMtr.toFixed(2)} (override ratio: ${ratio.toFixed(2)})`);
-        } else {
-          // Override is >= original, use full MTR
-          mtrFromStatements += s.mid_term_revenue || 0;
-          if (s.mid_term_revenue && s.mid_term_revenue > 0) {
-            mtrBreakdown.push({
-              month: monthKey,
-              tenant: 'Statement',
-              amount: s.mid_term_revenue,
-              source: 'statement',
-            });
-          }
         }
       } else {
-        // No override, use statement's mid_term_revenue
-        mtrFromStatements += s.mid_term_revenue || 0;
-        if (s.mid_term_revenue && s.mid_term_revenue > 0) {
-          mtrBreakdown.push({
-            month: monthKey,
-            tenant: 'Statement',
-            amount: s.mid_term_revenue,
-            source: 'statement',
-          });
-        }
+        // No booking data, just show as statement
+        mtrBreakdown.push({
+          month: monthKey,
+          tenant: 'Mid-Term Tenant',
+          amount: finalMtr,
+          source: 'statement',
+        });
       }
     }
     
     // For months without statements (future bookings), calculate from bookings
     let mtrFromFutureBookings = 0;
-    const nowDate = new Date();
     for (const b of mtrBookings) {
       if (!b.start_date || !b.end_date || !b.monthly_rent) continue;
       const startDate = new Date(b.start_date);
       const endDate = new Date(b.end_date);
       
-      // Prorate across months
       let currentDate = new Date(startDate);
       while (currentDate <= endDate) {
         const monthKey = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`;
@@ -401,8 +435,11 @@ serve(async (req: Request): Promise<Response> => {
             month: monthKey,
             tenant: b.tenant_name || 'MTR Guest',
             amount: proratedRent,
-            source: 'booking',
+            source: 'projected',
             days: daysOccupied,
+            startDate: b.start_date,
+            endDate: b.end_date,
+            monthlyRent: b.monthly_rent,
           });
         }
         
@@ -411,14 +448,18 @@ serve(async (req: Request): Promise<Response> => {
       }
     }
     
-    // Build STR breakdown
+    // Build STR breakdown with nights calculation
     for (const b of validSTRBookings) {
+      const checkIn = new Date(b.check_in);
+      const checkOut = new Date(b.check_out);
+      const nights = Math.ceil((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24));
       strBreakdown.push({
         guest: b.guest_name || 'Guest',
         checkIn: b.check_in,
         checkOut: b.check_out,
         amount: b.total_amount || 0,
         source: b.ownerrez_listing_name || 'OwnerRez',
+        nights: nights,
       });
     }
     
@@ -467,63 +508,67 @@ serve(async (req: Request): Promise<Response> => {
     ? ratingsWithValue.reduce((sum, r) => sum + r.star_rating, 0) / ratingsWithValue.length
     : null;
 
-  // Build monthly revenue data for charts - combine reconciliation + booking data
+  // Build monthly revenue data for charts - use statement data as source of truth
   const monthlyRevenue: Record<string, { month: string; str: number; mtr: number; total: number }> = {};
   
-  // First, populate STR from reconciliation data (most accurate when available)
+  // First, populate from reconciliation data (most accurate - already includes adjustments)
   statements.forEach(s => {
     const month = s.reconciliation_month;
     if (!monthlyRevenue[month]) {
       monthlyRevenue[month] = { month, str: 0, mtr: 0, total: 0 };
     }
+    // Use statement values - they include manual adjustments/overrides
     monthlyRevenue[month].str = s.short_term_revenue || 0;
-    // Don't use reconciliation MTR - we'll calculate from bookings
+    monthlyRevenue[month].mtr = s.mid_term_revenue || 0;
+    monthlyRevenue[month].total = (s.short_term_revenue || 0) + (s.mid_term_revenue || 0);
   });
 
-  // Supplement STR with booking data for months without reconciliation
+  // For months WITHOUT statements, supplement from booking data
   validSTRBookings.forEach(b => {
     if (!b.check_in || b.total_amount <= 0) return;
     const month = b.check_in.substring(0, 7) + '-01'; // Format as YYYY-MM-01
-    if (!monthlyRevenue[month]) {
-      monthlyRevenue[month] = { month, str: 0, mtr: 0, total: 0 };
-    }
-    // Only add if no reconciliation data for this month
-    if (monthlyRevenue[month].str === 0) {
+    // Only add if no statement data for this month
+    if (!monthlyRevenue[month] || (monthlyRevenue[month].str === 0 && monthlyRevenue[month].mtr === 0)) {
+      if (!monthlyRevenue[month]) {
+        monthlyRevenue[month] = { month, str: 0, mtr: 0, total: 0 };
+      }
       monthlyRevenue[month].str += b.total_amount;
     }
   });
 
-  // ALWAYS calculate MTR from mid_term_bookings (source of truth)
+  // For MTR, only add future months that don't have statements yet
   mtrBookings.forEach(b => {
     if (!b.start_date || !b.end_date || !b.monthly_rent) return;
     const startDate = new Date(b.start_date);
     const endDate = new Date(b.end_date);
     
-    // Prorate across the months the booking spans
     let currentDate = new Date(startDate);
     while (currentDate <= endDate) {
       const monthKey = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-01`;
-      const monthStart = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
-      const monthEnd = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
-      const daysInMonth = monthEnd.getDate();
       
-      const effectiveStart = startDate > monthStart ? startDate : monthStart;
-      const effectiveEnd = endDate < monthEnd ? endDate : monthEnd;
-      const daysOccupied = Math.max(1, Math.ceil((effectiveEnd.getTime() - effectiveStart.getTime()) / (1000 * 60 * 60 * 24)) + 1);
-      const proratedRent = (b.monthly_rent / daysInMonth) * daysOccupied;
-      
-      if (!monthlyRevenue[monthKey]) {
-        monthlyRevenue[monthKey] = { month: monthKey, str: 0, mtr: 0, total: 0 };
+      // ONLY add MTR for months WITHOUT statement data
+      if (!monthsWithStatements.has(monthKey.substring(0, 7))) {
+        const monthStart = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+        const monthEnd = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+        const daysInMonth = monthEnd.getDate();
+        
+        const effectiveStart = startDate > monthStart ? startDate : monthStart;
+        const effectiveEnd = endDate < monthEnd ? endDate : monthEnd;
+        const daysOccupied = Math.max(1, Math.ceil((effectiveEnd.getTime() - effectiveStart.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+        const proratedRent = (b.monthly_rent / daysInMonth) * daysOccupied;
+        
+        if (!monthlyRevenue[monthKey]) {
+          monthlyRevenue[monthKey] = { month: monthKey, str: 0, mtr: 0, total: 0 };
+        }
+        monthlyRevenue[monthKey].mtr += proratedRent;
       }
-      monthlyRevenue[monthKey].mtr += proratedRent;
       
-      // Move to next month
       currentDate.setMonth(currentDate.getMonth() + 1);
       currentDate.setDate(1);
     }
   });
 
-  // Recalculate totals for each month
+  // Recalculate totals for months supplemented with booking data
   Object.keys(monthlyRevenue).forEach(key => {
     monthlyRevenue[key].total = monthlyRevenue[key].str + monthlyRevenue[key].mtr;
   });
