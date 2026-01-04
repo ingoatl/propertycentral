@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, useMemo, memo } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -37,6 +37,7 @@ import { OwnerReviewsCard } from "./components/OwnerReviewsCard";
 import { OwnerMarketInsightsEnhanced } from "./components/OwnerMarketInsightsEnhanced";
 import { OwnerPropertyTab } from "./components/OwnerPropertyTab";
 import { OwnerRevenueForecast } from "./components/OwnerRevenueForecast";
+import { UpcomingEventsTimeline } from "./components/UpcomingEventsTimeline";
 
 interface OwnerSession {
   ownerId: string;
@@ -421,20 +422,20 @@ export default function OwnerDashboard() {
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = useCallback(() => {
     localStorage.removeItem("owner_session");
     setSession(null);
     toast.success("Logged out successfully");
-  };
+  }, []);
 
-  const formatCurrency = (amount: number) => {
+  const formatCurrency = useCallback((amount: number) => {
     return new Intl.NumberFormat("en-US", {
       style: "currency",
       currency: "USD",
     }).format(amount);
-  };
+  }, []);
 
-  const togglePasswordVisibility = (id: string) => {
+  const togglePasswordVisibility = useCallback((id: string) => {
     setVisiblePasswords(prev => {
       const newSet = new Set(prev);
       if (newSet.has(id)) {
@@ -444,15 +445,15 @@ export default function OwnerDashboard() {
       }
       return newSet;
     });
-  };
+  }, []);
 
-  const copyToClipboard = (text: string, label: string) => {
+  const copyToClipboard = useCallback((text: string, label: string) => {
     navigator.clipboard.writeText(text);
     toast.success(`${label} copied to clipboard`);
-  };
+  }, []);
 
-  // Get property image URL
-  const getPropertyImageUrl = () => {
+  // Memoize property image URL to prevent recalculation
+  const propertyImageUrl = useMemo(() => {
     if (!property?.image_path) return null;
     
     // If it's already a full URL, use it directly
@@ -466,9 +467,7 @@ export default function OwnerDashboard() {
       .getPublicUrl(property.image_path);
     
     return data?.publicUrl;
-  };
-
-  const propertyImageUrl = getPropertyImageUrl();
+  }, [property?.image_path]);
 
   if (loading) {
     return (
@@ -711,6 +710,8 @@ export default function OwnerDashboard() {
 
                 <OwnerMarketInsightsEnhanced
                   propertyName={property?.name || "Your Property"}
+                  propertyAddress={property?.address}
+                  propertyCity={property?.address?.split(",")[1]?.trim()}
                   propertyBeds={marketInsights.property?.bedrooms || 5}
                   propertyBaths={marketInsights.property?.bathrooms || 3}
                   currentNightlyRate={property?.rental_type === 'hybrid' ? 280 : undefined}
