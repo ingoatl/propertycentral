@@ -139,7 +139,23 @@ const handler = async (req: Request): Promise<Response> => {
       .lte("start_date", recMonthEnd.toISOString().split('T')[0]);
     
     const midTermProrationDetails: MidTermProration[] = [];
-    if (mtBookings && mtBookings.length > 0) {
+    
+    // Check if there's a revenue override - if so, use it instead of calculated proration
+    const hasOverride = reconciliation.revenue_override !== null && reconciliation.revenue_override !== undefined && reconciliation.revenue_override > 0;
+    
+    if (hasOverride && mtBookings && mtBookings.length > 0) {
+      // Use override amount - show as full month with manual adjustment
+      const booking = mtBookings[0];
+      midTermProrationDetails.push({
+        tenantName: booking.tenant_name,
+        dateRange: `${recMonth.toLocaleDateString('en-US', { month: 'short' })} (Manual Adjustment)`,
+        monthlyRent: Number(reconciliation.revenue_override),
+        occupiedDays: daysInMonth,
+        daysInMonth: daysInMonth,
+        proratedAmount: Number(reconciliation.revenue_override),
+        isFullMonth: true
+      });
+    } else if (mtBookings && mtBookings.length > 0) {
       mtBookings.forEach((booking: any) => {
         const bookingStart = new Date(booking.start_date + "T00:00:00");
         const bookingEnd = new Date(booking.end_date + "T00:00:00");
@@ -249,6 +265,10 @@ const handler = async (req: Request): Promise<Response> => {
 
     const statementId = `PH-${periodYear}${String(monthDate.getMonth() + 1).padStart(2, "0")}-${reconciliation.id.slice(0, 8).toUpperCase()}`;
     const ownerAccountId = `OWN-${reconciliation.property_owners?.id?.slice(0, 6).toUpperCase() || 'XXXXX'}`;
+    
+    // Check for revenue_override - if set, use it as the mid-term revenue
+    const hasRevenueOverride = reconciliation.revenue_override !== null && reconciliation.revenue_override !== undefined && reconciliation.revenue_override > 0;
+    const displayMidTermRevenue = hasRevenueOverride ? Number(reconciliation.revenue_override) : Number(reconciliation.mid_term_revenue || 0);
 
     const statementData: StatementData = {
       statementId,
@@ -263,7 +283,7 @@ const handler = async (req: Request): Promise<Response> => {
       periodMonth,
       periodYear,
       shortTermRevenue: Number(reconciliation.short_term_revenue || 0),
-      midTermRevenue: Number(reconciliation.mid_term_revenue || 0),
+      midTermRevenue: displayMidTermRevenue,
       midTermProrationDetails,
       grossRevenue,
       managementFee,
