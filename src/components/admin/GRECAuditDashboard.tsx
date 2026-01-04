@@ -23,6 +23,11 @@ import {
   CheckCircle,
   RefreshCw,
   Shield,
+  Landmark,
+  Receipt,
+  Wallet,
+  FolderOpen,
+  ShieldCheck,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format, addDays } from "date-fns";
@@ -33,6 +38,11 @@ import { SecurityDepositLedger } from "./audit/SecurityDepositLedger";
 import { RentRollTab } from "./audit/RentRollTab";
 import { FairHousingTab } from "./audit/FairHousingTab";
 import { TrainingLogTab } from "./audit/TrainingLogTab";
+import { TrustAccountTab } from "./audit/TrustAccountTab";
+import { InvoiceArchiveTab } from "./audit/InvoiceArchiveTab";
+import { OwnerDistributionsTab } from "./audit/OwnerDistributionsTab";
+import { LeaseDocumentsTab } from "./audit/LeaseDocumentsTab";
+import { InsuranceTab } from "./audit/InsuranceTab";
 
 interface AuditStats {
   totalStatements: number;
@@ -40,6 +50,7 @@ interface AuditStats {
   totalProperties: number;
   totalApplications: number;
   totalTrainingRecords: number;
+  totalDistributions: number;
 }
 
 export function GRECAuditDashboard() {
@@ -49,6 +60,7 @@ export function GRECAuditDashboard() {
     totalProperties: 0,
     totalApplications: 0,
     totalTrainingRecords: 0,
+    totalDistributions: 0,
   });
   const [loading, setLoading] = useState(true);
   const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
@@ -65,18 +77,31 @@ export function GRECAuditDashboard() {
   const loadStats = async () => {
     setLoading(true);
     try {
-      const { count: stmtCount } = await supabase.from("owner_statement_archive").select("*", { count: "exact", head: true });
+      // Count statements from both archive and reconciliations
+      const { count: archiveCount } = await supabase
+        .from("owner_statement_archive")
+        .select("*", { count: "exact", head: true });
+      
+      const { count: recCount } = await supabase
+        .from("monthly_reconciliations")
+        .select("*", { count: "exact", head: true })
+        .eq("status", "statement_sent");
+      
+      const totalStatements = Math.max(archiveCount || 0, recCount || 0);
+      
       const { count: agreementCount } = await supabase.from("management_agreements").select("*", { count: "exact", head: true });
       const { count: propCount } = await supabase.from("properties").select("*", { count: "exact", head: true }).is("offboarded_at", null);
       const { count: appCount } = await supabase.from("tenant_applications").select("*", { count: "exact", head: true });
       const { count: trainCount } = await supabase.from("compliance_training_log").select("*", { count: "exact", head: true });
+      const { count: distCount } = await supabase.from("owner_distributions").select("*", { count: "exact", head: true });
 
       setStats({
-        totalStatements: stmtCount || 0,
+        totalStatements,
         totalAgreements: agreementCount || 0,
         totalProperties: propCount || 0,
         totalApplications: appCount || 0,
         totalTrainingRecords: trainCount || 0,
+        totalDistributions: distCount || 0,
       });
     } catch (error) {
       console.error("Error loading stats:", error);
@@ -145,31 +170,42 @@ export function GRECAuditDashboard() {
         </Dialog>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         <div className="bg-card border rounded-lg p-4"><FileText className="h-5 w-5 text-primary mb-2" /><div className="text-2xl font-bold">{stats.totalStatements}</div><div className="text-sm text-muted-foreground">Statements</div></div>
         <div className="bg-card border rounded-lg p-4"><FileCheck className="h-5 w-5 text-green-600 mb-2" /><div className="text-2xl font-bold">{stats.totalAgreements}</div><div className="text-sm text-muted-foreground">Agreements</div></div>
         <div className="bg-card border rounded-lg p-4"><Home className="h-5 w-5 text-blue-600 mb-2" /><div className="text-2xl font-bold">{stats.totalProperties}</div><div className="text-sm text-muted-foreground">Properties</div></div>
         <div className="bg-card border rounded-lg p-4"><Users className="h-5 w-5 text-purple-600 mb-2" /><div className="text-2xl font-bold">{stats.totalApplications}</div><div className="text-sm text-muted-foreground">Applications</div></div>
         <div className="bg-card border rounded-lg p-4"><GraduationCap className="h-5 w-5 text-orange-600 mb-2" /><div className="text-2xl font-bold">{stats.totalTrainingRecords}</div><div className="text-sm text-muted-foreground">Training</div></div>
+        <div className="bg-card border rounded-lg p-4"><Wallet className="h-5 w-5 text-emerald-600 mb-2" /><div className="text-2xl font-bold">{stats.totalDistributions}</div><div className="text-sm text-muted-foreground">Distributions</div></div>
       </div>
 
       <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-        <div className="flex items-start gap-3"><Shield className="h-5 w-5 text-green-600 mt-0.5" /><div><h4 className="font-medium text-green-900">GREC Compliance Status</h4><p className="text-sm text-green-800 mt-1">Records retained 3+ years. All financial statements, agreements, and fair housing documentation archived.</p></div></div>
+        <div className="flex items-start gap-3"><Shield className="h-5 w-5 text-green-600 mt-0.5" /><div><h4 className="font-medium text-green-900">GREC Compliance Status</h4><p className="text-sm text-green-800 mt-1">Records retained 3+ years. All financial statements, agreements, trust account records, and fair housing documentation archived per GREC requirements.</p></div></div>
       </div>
 
       <Tabs defaultValue="statements" className="space-y-4">
-        <TabsList className="flex flex-wrap h-auto gap-1">
-          <TabsTrigger value="statements"><FileText className="h-4 w-4 mr-1" />Statements</TabsTrigger>
-          <TabsTrigger value="agreements"><FileCheck className="h-4 w-4 mr-1" />Agreements</TabsTrigger>
-          <TabsTrigger value="deposits"><DollarSign className="h-4 w-4 mr-1" />Deposits</TabsTrigger>
-          <TabsTrigger value="rentroll"><Home className="h-4 w-4 mr-1" />Rent Roll</TabsTrigger>
-          <TabsTrigger value="fairhousing"><Users className="h-4 w-4 mr-1" />Fair Housing</TabsTrigger>
-          <TabsTrigger value="training"><GraduationCap className="h-4 w-4 mr-1" />Training</TabsTrigger>
+        <TabsList className="flex flex-wrap h-auto gap-1 p-1">
+          <TabsTrigger value="statements" className="text-xs sm:text-sm"><FileText className="h-4 w-4 mr-1" />Statements</TabsTrigger>
+          <TabsTrigger value="agreements" className="text-xs sm:text-sm"><FileCheck className="h-4 w-4 mr-1" />Agreements</TabsTrigger>
+          <TabsTrigger value="trust" className="text-xs sm:text-sm"><Landmark className="h-4 w-4 mr-1" />Trust Account</TabsTrigger>
+          <TabsTrigger value="deposits" className="text-xs sm:text-sm"><DollarSign className="h-4 w-4 mr-1" />Deposits</TabsTrigger>
+          <TabsTrigger value="distributions" className="text-xs sm:text-sm"><Wallet className="h-4 w-4 mr-1" />Distributions</TabsTrigger>
+          <TabsTrigger value="invoices" className="text-xs sm:text-sm"><Receipt className="h-4 w-4 mr-1" />Invoices</TabsTrigger>
+          <TabsTrigger value="rentroll" className="text-xs sm:text-sm"><Home className="h-4 w-4 mr-1" />Rent Roll</TabsTrigger>
+          <TabsTrigger value="leases" className="text-xs sm:text-sm"><FolderOpen className="h-4 w-4 mr-1" />Leases</TabsTrigger>
+          <TabsTrigger value="insurance" className="text-xs sm:text-sm"><ShieldCheck className="h-4 w-4 mr-1" />Insurance</TabsTrigger>
+          <TabsTrigger value="fairhousing" className="text-xs sm:text-sm"><Users className="h-4 w-4 mr-1" />Fair Housing</TabsTrigger>
+          <TabsTrigger value="training" className="text-xs sm:text-sm"><GraduationCap className="h-4 w-4 mr-1" />Training</TabsTrigger>
         </TabsList>
         <TabsContent value="statements"><StatementArchiveTab /></TabsContent>
         <TabsContent value="agreements"><ManagementAgreementsTab /></TabsContent>
+        <TabsContent value="trust"><TrustAccountTab /></TabsContent>
         <TabsContent value="deposits"><SecurityDepositLedger /></TabsContent>
+        <TabsContent value="distributions"><OwnerDistributionsTab /></TabsContent>
+        <TabsContent value="invoices"><InvoiceArchiveTab /></TabsContent>
         <TabsContent value="rentroll"><RentRollTab /></TabsContent>
+        <TabsContent value="leases"><LeaseDocumentsTab /></TabsContent>
+        <TabsContent value="insurance"><InsuranceTab /></TabsContent>
         <TabsContent value="fairhousing"><FairHousingTab /></TabsContent>
         <TabsContent value="training"><TrainingLogTab /></TabsContent>
       </Tabs>

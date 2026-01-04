@@ -10,6 +10,15 @@ const corsHeaders = {
 const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
 const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
+// Company information
+const COMPANY = {
+  name: "PeachHaus Property Management",
+  address: "2625 Piedmont Rd NE, Suite 56-269, Atlanta, GA 30324",
+  phone: "(404) 698-9987",
+  email: "info@peachhausgroup.com",
+  website: "www.peachhausgroup.com",
+};
+
 interface LineItem {
   description: string;
   amount: number;
@@ -32,9 +41,12 @@ interface MidTermProration {
 interface StatementData {
   statementId: string;
   statementDate: string;
+  periodStartDate: string;
+  periodEndDate: string;
   propertyName: string;
   propertyAddress: string;
   ownerName: string;
+  ownerAccountId: string;
   periodMonth: string;
   periodYear: string;
   shortTermRevenue: number;
@@ -51,6 +63,9 @@ interface StatementData {
   totalExpenses: number;
   netOwnerEarnings: number;
   serviceType: 'cohosting' | 'full_service';
+  ytdRevenue: number;
+  ytdExpenses: number;
+  ytdNetOwner: number;
 }
 
 const handler = async (req: Request): Promise<Response> => {
@@ -66,7 +81,7 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error("reconciliation_id is required");
     }
 
-    console.log(`Generating real PDF for reconciliation: ${reconciliation_id}`);
+    console.log(`Generating professional PDF for reconciliation: ${reconciliation_id}`);
 
     // Fetch reconciliation data
     const { data: reconciliation, error: recError } = await supabase
@@ -74,7 +89,7 @@ const handler = async (req: Request): Promise<Response> => {
       .select(`
         *,
         properties(*),
-        property_owners(name, email, service_type)
+        property_owners(id, name, email, service_type)
       `)
       .eq("id", reconciliation_id)
       .single();
@@ -83,12 +98,27 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error("Reconciliation not found");
     }
 
-    // Calculate mid-term proration details
+    // Calculate period dates
     const recMonth = new Date(reconciliation.reconciliation_month + "T00:00:00");
     const recMonthStart = new Date(recMonth.getFullYear(), recMonth.getMonth(), 1);
     const recMonthEnd = new Date(recMonth.getFullYear(), recMonth.getMonth() + 1, 0);
     const daysInMonth = recMonthEnd.getDate();
     
+    // Calculate YTD totals
+    const yearStart = new Date(recMonth.getFullYear(), 0, 1);
+    const { data: ytdData } = await supabase
+      .from("monthly_reconciliations")
+      .select("total_revenue, total_expenses, net_to_owner")
+      .eq("property_id", reconciliation.property_id)
+      .gte("reconciliation_month", yearStart.toISOString().split('T')[0])
+      .lte("reconciliation_month", reconciliation.reconciliation_month)
+      .in("status", ["sent", "statement_sent", "completed"]);
+    
+    const ytdRevenue = (ytdData || []).reduce((sum, r) => sum + Number(r.total_revenue || 0), 0);
+    const ytdExpenses = (ytdData || []).reduce((sum, r) => sum + Number(r.total_expenses || 0), 0);
+    const ytdNetOwner = (ytdData || []).reduce((sum, r) => sum + Number(r.net_to_owner || 0), 0);
+    
+    // Calculate mid-term proration details
     const { data: mtBookings } = await supabase
       .from("mid_term_bookings")
       .select("tenant_name, start_date, end_date, monthly_rent, nightly_rate")
@@ -207,13 +237,17 @@ const handler = async (req: Request): Promise<Response> => {
     const periodYear = monthDate.getFullYear().toString();
 
     const statementId = `PH-${periodYear}${String(monthDate.getMonth() + 1).padStart(2, "0")}-${reconciliation.id.slice(0, 8).toUpperCase()}`;
+    const ownerAccountId = `OWN-${reconciliation.property_owners?.id?.slice(0, 6).toUpperCase() || 'XXXXX'}`;
 
     const statementData: StatementData = {
       statementId,
       statementDate: new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" }),
+      periodStartDate: recMonthStart.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+      periodEndDate: recMonthEnd.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
       propertyName: reconciliation.properties?.name || "Property",
       propertyAddress: reconciliation.properties?.address || "",
       ownerName: reconciliation.property_owners?.name || "Property Owner",
+      ownerAccountId,
       periodMonth,
       periodYear,
       shortTermRevenue: Number(reconciliation.short_term_revenue || 0),
@@ -230,6 +264,9 @@ const handler = async (req: Request): Promise<Response> => {
       totalExpenses,
       netOwnerEarnings,
       serviceType: reconciliation.property_owners?.service_type || "cohosting",
+      ytdRevenue,
+      ytdExpenses,
+      ytdNetOwner,
     };
 
     // Generate actual PDF using pdf-lib
@@ -264,6 +301,24 @@ const handler = async (req: Request): Promise<Response> => {
   }
 };
 
+// Helper to wrap long text
+function wrapText(text: string, maxChars: number): string[] {
+  const words = text.split(' ');
+  const lines: string[] = [];
+  let currentLine = '';
+  
+  for (const word of words) {
+    if ((currentLine + ' ' + word).trim().length <= maxChars) {
+      currentLine = (currentLine + ' ' + word).trim();
+    } else {
+      if (currentLine) lines.push(currentLine);
+      currentLine = word.length > maxChars ? word.substring(0, maxChars - 3) + '...' : word;
+    }
+  }
+  if (currentLine) lines.push(currentLine);
+  return lines;
+}
+
 async function generatePdf(data: StatementData): Promise<Uint8Array> {
   const pdfDoc = await PDFDocument.create();
   const page = pdfDoc.addPage([612, 792]); // Letter size
@@ -272,12 +327,14 @@ async function generatePdf(data: StatementData): Promise<Uint8Array> {
   const helveticaBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
   
   const { width, height } = page.getSize();
-  const margin = 50;
+  const margin = 45;
   let y = height - margin;
   
   const black = rgb(0, 0, 0);
-  const gray = rgb(0.4, 0.4, 0.4);
-  const lightGray = rgb(0.9, 0.9, 0.9);
+  const gray = rgb(0.45, 0.45, 0.45);
+  const lightGray = rgb(0.85, 0.85, 0.85);
+  const darkBg = rgb(0.12, 0.12, 0.12);
+  const accentGreen = rgb(0.1, 0.6, 0.3);
   
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-US", {
@@ -294,36 +351,45 @@ async function generatePdf(data: StatementData): Promise<Uint8Array> {
     });
   };
 
-  // === HEADER ===
-  page.drawText("PeachHaus Property Management", { x: margin, y, size: 16, font: helveticaBold, color: black });
-  page.drawText("OWNER STATEMENT", { x: width - margin - 120, y, size: 14, font: helveticaBold, color: black });
-  y -= 18;
-  page.drawText(data.statementId, { x: width - margin - 120, y, size: 9, font: helvetica, color: gray });
-  y -= 25;
+  // === HEADER WITH COMPANY INFO ===
+  page.drawText(COMPANY.name, { x: margin, y, size: 14, font: helveticaBold, color: black });
+  y -= 12;
+  page.drawText(COMPANY.address, { x: margin, y, size: 8, font: helvetica, color: gray });
+  y -= 10;
+  page.drawText(`${COMPANY.phone} | ${COMPANY.email}`, { x: margin, y, size: 8, font: helvetica, color: gray });
+  
+  // Statement title on right
+  page.drawText("OWNER STATEMENT", { x: width - margin - 105, y: height - margin, size: 12, font: helveticaBold, color: black });
+  page.drawText(data.statementId, { x: width - margin - 105, y: height - margin - 12, size: 8, font: helvetica, color: gray });
+  page.drawText(`Generated: ${data.statementDate}`, { x: width - margin - 105, y: height - margin - 22, size: 7, font: helvetica, color: gray });
+  
+  y -= 8;
   
   // Horizontal line
   page.drawLine({ start: { x: margin, y }, end: { x: width - margin, y }, thickness: 1.5, color: black });
-  y -= 20;
+  y -= 18;
   
-  // === PROPERTY & PERIOD INFO ===
-  page.drawText("Property:", { x: margin, y, size: 9, font: helvetica, color: gray });
-  page.drawText("Statement Period:", { x: width / 2 + 20, y, size: 9, font: helvetica, color: gray });
-  y -= 14;
-  page.drawText(data.propertyName, { x: margin, y, size: 11, font: helveticaBold, color: black });
-  page.drawText(`${data.periodMonth} ${data.periodYear}`, { x: width / 2 + 20, y, size: 11, font: helveticaBold, color: black });
+  // === PROPERTY & OWNER INFO ===
+  page.drawText("PROPERTY", { x: margin, y, size: 8, font: helveticaBold, color: gray });
+  page.drawText("PREPARED FOR", { x: width / 2 + 10, y, size: 8, font: helveticaBold, color: gray });
   y -= 12;
-  page.drawText(data.propertyAddress, { x: margin, y, size: 9, font: helvetica, color: gray });
-  page.drawText(`Prepared for: ${data.ownerName}`, { x: width / 2 + 20, y, size: 9, font: helvetica, color: gray });
-  y -= 25;
+  page.drawText(data.propertyName, { x: margin, y, size: 10, font: helveticaBold, color: black });
+  page.drawText(data.ownerName, { x: width / 2 + 10, y, size: 10, font: helveticaBold, color: black });
+  y -= 11;
+  page.drawText(data.propertyAddress, { x: margin, y, size: 8, font: helvetica, color: gray });
+  page.drawText(`Account: ${data.ownerAccountId}`, { x: width / 2 + 10, y, size: 8, font: helvetica, color: gray });
+  y -= 11;
+  page.drawText(`Period: ${data.periodStartDate} - ${data.periodEndDate}`, { x: margin, y, size: 8, font: helvetica, color: gray });
+  y -= 18;
   
   // === NET OWNER EARNINGS BOX ===
-  const boxHeight = 45;
+  const boxHeight = 42;
   page.drawRectangle({
     x: margin,
     y: y - boxHeight,
     width: width - 2 * margin,
     height: boxHeight,
-    color: rgb(0.05, 0.05, 0.05),
+    color: darkBg,
   });
   
   const isPositiveNet = data.netOwnerEarnings >= 0;
@@ -331,125 +397,162 @@ async function generatePdf(data: StatementData): Promise<Uint8Array> {
     ? (isPositiveNet ? "NET OWNER EARNINGS" : "BALANCE DUE FROM OWNER")
     : "NET OWNER PAYOUT";
   
-  page.drawText(netLabel, { x: margin + 15, y: y - 20, size: 9, font: helvetica, color: rgb(1, 1, 1) });
-  page.drawText(`For period ${data.periodMonth} ${data.periodYear}`, { x: margin + 15, y: y - 32, size: 8, font: helvetica, color: rgb(0.7, 0.7, 0.7) });
-  page.drawText(formatCurrency(data.netOwnerEarnings), { x: width - margin - 100, y: y - 28, size: 18, font: helveticaBold, color: rgb(1, 1, 1) });
-  y -= boxHeight + 20;
+  page.drawText(netLabel, { x: margin + 12, y: y - 16, size: 9, font: helveticaBold, color: rgb(1, 1, 1) });
+  page.drawText(`Statement Period: ${data.periodMonth} ${data.periodYear}`, { x: margin + 12, y: y - 28, size: 7, font: helvetica, color: rgb(0.7, 0.7, 0.7) });
+  
+  const netAmountText = formatCurrency(Math.abs(data.netOwnerEarnings));
+  page.drawText(netAmountText, { x: width - margin - 95, y: y - 24, size: 18, font: helveticaBold, color: rgb(1, 1, 1) });
+  y -= boxHeight + 16;
   
   // === REVENUE SECTION ===
   page.drawText("REVENUE", { x: margin, y, size: 10, font: helveticaBold, color: black });
-  y -= 5;
+  y -= 4;
   page.drawLine({ start: { x: margin, y }, end: { x: width - margin, y }, thickness: 0.5, color: lightGray });
-  y -= 15;
+  y -= 14;
   
   // Mid-term revenue with proration
   if (data.midTermRevenue > 0) {
     if (data.midTermProrationDetails.length > 0) {
       for (const detail of data.midTermProrationDetails) {
-        page.drawText("Mid-term Rental Revenue", { x: margin, y, size: 10, font: helvetica, color: black });
-        page.drawText(formatCurrency(detail.proratedAmount), { x: width - margin - 70, y, size: 10, font: helvetica, color: black });
-        y -= 12;
-        page.drawText(`${detail.tenantName} (${detail.dateRange})`, { x: margin + 10, y, size: 8, font: helvetica, color: gray });
-        y -= 10;
+        page.drawText("Mid-term Rental Income", { x: margin, y, size: 9, font: helvetica, color: black });
+        page.drawText(formatCurrency(detail.proratedAmount), { x: width - margin - 65, y, size: 9, font: helvetica, color: black });
+        y -= 11;
+        const tenantInfo = `Tenant: ${detail.tenantName} (${detail.dateRange})`;
+        page.drawText(tenantInfo.substring(0, 70), { x: margin + 8, y, size: 7, font: helvetica, color: gray });
+        y -= 9;
         if (!detail.isFullMonth) {
-          page.drawText(`${formatCurrency(detail.monthlyRent)}/mo × ${detail.occupiedDays}/${detail.daysInMonth} days = ${formatCurrency(detail.proratedAmount)}`, { x: margin + 10, y, size: 7, font: helvetica, color: gray });
-          y -= 12;
+          page.drawText(`Proration: ${formatCurrency(detail.monthlyRent)}/mo × ${detail.occupiedDays}/${detail.daysInMonth} days`, { x: margin + 8, y, size: 7, font: helvetica, color: gray });
+          y -= 11;
         }
       }
     } else {
-      page.drawText("Mid-term Rental Revenue", { x: margin, y, size: 10, font: helvetica, color: black });
-      page.drawText(formatCurrency(data.midTermRevenue), { x: width - margin - 70, y, size: 10, font: helvetica, color: black });
-      y -= 15;
+      page.drawText("Mid-term Rental Income", { x: margin, y, size: 9, font: helvetica, color: black });
+      page.drawText(formatCurrency(data.midTermRevenue), { x: width - margin - 65, y, size: 9, font: helvetica, color: black });
+      y -= 13;
     }
   }
   
   // Short-term revenue
   if (data.shortTermRevenue > 0) {
-    page.drawText("Short-term Bookings", { x: margin, y, size: 10, font: helvetica, color: black });
-    page.drawText(formatCurrency(data.shortTermRevenue), { x: width - margin - 70, y, size: 10, font: helvetica, color: black });
-    y -= 15;
+    page.drawText("Short-term Booking Income", { x: margin, y, size: 9, font: helvetica, color: black });
+    page.drawText(formatCurrency(data.shortTermRevenue), { x: width - margin - 65, y, size: 9, font: helvetica, color: black });
+    y -= 13;
   }
   
   // Gross revenue total
   page.drawLine({ start: { x: margin, y }, end: { x: width - margin, y }, thickness: 0.5, color: lightGray });
-  y -= 12;
-  page.drawText("GROSS REVENUE", { x: margin, y, size: 10, font: helveticaBold, color: black });
-  page.drawText(formatCurrency(data.grossRevenue), { x: width - margin - 70, y, size: 10, font: helveticaBold, color: black });
-  y -= 25;
+  y -= 11;
+  page.drawText("GROSS REVENUE", { x: margin, y, size: 9, font: helveticaBold, color: black });
+  page.drawText(formatCurrency(data.grossRevenue), { x: width - margin - 65, y, size: 9, font: helveticaBold, color: accentGreen });
+  y -= 20;
   
   // === EXPENSES SECTION ===
   page.drawText("EXPENSES", { x: margin, y, size: 10, font: helveticaBold, color: black });
-  y -= 5;
+  y -= 4;
   page.drawLine({ start: { x: margin, y }, end: { x: width - margin, y }, thickness: 0.5, color: lightGray });
-  y -= 15;
+  y -= 14;
   
   // Management fee
-  page.drawText(`Management Fee (${data.managementFeePercentage}%)`, { x: margin, y, size: 10, font: helvetica, color: black });
-  page.drawText(formatCurrency(data.managementFee), { x: width - margin - 70, y, size: 10, font: helvetica, color: black });
-  y -= 15;
+  page.drawText(`Management Fee (${data.managementFeePercentage}% of revenue)`, { x: margin, y, size: 9, font: helvetica, color: black });
+  page.drawText(formatCurrency(data.managementFee), { x: width - margin - 65, y, size: 9, font: helvetica, color: black });
+  y -= 13;
   
   // Order minimum fee
   if (data.orderMinimumFee > 0) {
-    page.drawText("Order Minimum Fee", { x: margin, y, size: 10, font: helvetica, color: black });
-    page.drawText(formatCurrency(data.orderMinimumFee), { x: width - margin - 70, y, size: 10, font: helvetica, color: black });
-    y -= 15;
+    page.drawText("Order Minimum Fee", { x: margin, y, size: 9, font: helvetica, color: black });
+    page.drawText(formatCurrency(data.orderMinimumFee), { x: width - margin - 65, y, size: 9, font: helvetica, color: black });
+    y -= 13;
   }
   
-  // Visits
+  // Visits - with better text handling
   for (const visit of data.visits) {
-    const visitText = visit.date ? `${visit.description} - ${formatDate(visit.date)}` : visit.description;
-    page.drawText(visitText.substring(0, 50), { x: margin, y, size: 10, font: helvetica, color: black });
-    page.drawText(formatCurrency(visit.amount), { x: width - margin - 70, y, size: 10, font: helvetica, color: black });
-    y -= 15;
+    if (y < 140) break;
     
-    // Stop if running low on space
-    if (y < 150) break;
+    const visitDate = visit.date ? ` - ${formatDate(visit.date)}` : '';
+    let visitDesc = visit.description || 'Property Visit';
+    // Truncate at 60 chars for better fit
+    if (visitDesc.length > 60) {
+      visitDesc = visitDesc.substring(0, 57) + '...';
+    }
+    page.drawText(`${visitDesc}${visitDate}`, { x: margin, y, size: 9, font: helvetica, color: black });
+    page.drawText(formatCurrency(visit.amount), { x: width - margin - 65, y, size: 9, font: helvetica, color: black });
+    y -= 13;
   }
   
-  // Expenses
+  // Expenses - with better text handling
   for (const expense of data.expenses) {
-    const expText = expense.date ? `${expense.description} - ${formatDate(expense.date)}` : expense.description;
-    page.drawText(expText.substring(0, 50), { x: margin, y, size: 10, font: helvetica, color: black });
-    page.drawText(formatCurrency(expense.amount), { x: width - margin - 70, y, size: 10, font: helvetica, color: black });
-    y -= 15;
+    if (y < 140) break;
     
-    if (y < 150) break;
+    const expDate = expense.date ? ` - ${formatDate(expense.date)}` : '';
+    let expDesc = expense.description || expense.category || 'Expense';
+    // Truncate at 60 chars
+    if (expDesc.length > 60) {
+      expDesc = expDesc.substring(0, 57) + '...';
+    }
+    page.drawText(`${expDesc}${expDate}`, { x: margin, y, size: 9, font: helvetica, color: black });
+    page.drawText(formatCurrency(expense.amount), { x: width - margin - 65, y, size: 9, font: helvetica, color: black });
+    y -= 13;
   }
   
   // Cleaning fees
   if (data.cleaningFees > 0) {
-    page.drawText("Cleaning Fees", { x: margin, y, size: 10, font: helvetica, color: black });
-    page.drawText(formatCurrency(data.cleaningFees), { x: width - margin - 70, y, size: 10, font: helvetica, color: black });
-    y -= 15;
+    page.drawText("Cleaning Fees", { x: margin, y, size: 9, font: helvetica, color: black });
+    page.drawText(formatCurrency(data.cleaningFees), { x: width - margin - 65, y, size: 9, font: helvetica, color: black });
+    y -= 13;
   }
   
   // Pet fees
   if (data.petFees > 0) {
-    page.drawText("Pet Fees", { x: margin, y, size: 10, font: helvetica, color: black });
-    page.drawText(formatCurrency(data.petFees), { x: width - margin - 70, y, size: 10, font: helvetica, color: black });
-    y -= 15;
+    page.drawText("Pet Fees", { x: margin, y, size: 9, font: helvetica, color: black });
+    page.drawText(formatCurrency(data.petFees), { x: width - margin - 65, y, size: 9, font: helvetica, color: black });
+    y -= 13;
   }
   
   // Total expenses
   page.drawLine({ start: { x: margin, y }, end: { x: width - margin, y }, thickness: 0.5, color: lightGray });
-  y -= 12;
-  page.drawText("TOTAL EXPENSES", { x: margin, y, size: 10, font: helveticaBold, color: black });
-  page.drawText(`(${formatCurrency(data.totalExpenses)})`, { x: width - margin - 80, y, size: 10, font: helveticaBold, color: black });
-  y -= 25;
+  y -= 11;
+  page.drawText("TOTAL EXPENSES", { x: margin, y, size: 9, font: helveticaBold, color: black });
+  page.drawText(`(${formatCurrency(data.totalExpenses)})`, { x: width - margin - 75, y, size: 9, font: helveticaBold, color: rgb(0.7, 0.2, 0.2) });
+  y -= 18;
   
-  // === NET RESULT ===
-  page.drawLine({ start: { x: margin, y }, end: { x: width - margin, y }, thickness: 1, color: black });
-  y -= 15;
-  page.drawText(netLabel, { x: margin, y, size: 12, font: helveticaBold, color: black });
-  page.drawText(formatCurrency(data.netOwnerEarnings), { x: width - margin - 80, y, size: 12, font: helveticaBold, color: black });
+  // === NET RESULT LINE ===
+  page.drawLine({ start: { x: margin, y }, end: { x: width - margin, y }, thickness: 1.2, color: black });
+  y -= 14;
+  page.drawText(netLabel, { x: margin, y, size: 11, font: helveticaBold, color: black });
+  page.drawText(formatCurrency(data.netOwnerEarnings), { x: width - margin - 75, y, size: 11, font: helveticaBold, color: isPositiveNet ? accentGreen : rgb(0.7, 0.2, 0.2) });
+  y -= 22;
+  
+  // === YTD SUMMARY BOX ===
+  if (y > 120) {
+    page.drawRectangle({
+      x: margin,
+      y: y - 35,
+      width: width - 2 * margin,
+      height: 35,
+      color: rgb(0.97, 0.97, 0.97),
+      borderColor: lightGray,
+      borderWidth: 0.5,
+    });
+    
+    page.drawText(`YEAR-TO-DATE SUMMARY (${data.periodYear})`, { x: margin + 10, y: y - 12, size: 8, font: helveticaBold, color: black });
+    
+    const colWidth = (width - 2 * margin - 20) / 3;
+    page.drawText(`Revenue: ${formatCurrency(data.ytdRevenue)}`, { x: margin + 10, y: y - 26, size: 8, font: helvetica, color: gray });
+    page.drawText(`Expenses: ${formatCurrency(data.ytdExpenses)}`, { x: margin + 10 + colWidth, y: y - 26, size: 8, font: helvetica, color: gray });
+    page.drawText(`Net to Owner: ${formatCurrency(data.ytdNetOwner)}`, { x: margin + 10 + colWidth * 2, y: y - 26, size: 8, font: helveticaBold, color: accentGreen });
+    
+    y -= 45;
+  }
   
   // === FOOTER ===
-  const footerY = 40;
+  const footerY = 50;
   page.drawLine({ start: { x: margin, y: footerY + 15 }, end: { x: width - margin, y: footerY + 15 }, thickness: 0.5, color: lightGray });
-  page.drawText("PeachHaus Property Management | www.peachhausgroup.com", { x: margin, y: footerY, size: 8, font: helvetica, color: gray });
-  page.drawText(`Generated: ${data.statementDate}`, { x: width - margin - 100, y: footerY, size: 8, font: helvetica, color: gray });
   
-  return pdfDoc.save();
+  page.drawText("All funds held in GREC-registered trust account.", { x: margin, y: footerY, size: 7, font: helvetica, color: gray });
+  page.drawText(`${COMPANY.name} | ${COMPANY.phone} | ${COMPANY.email}`, { x: margin, y: footerY - 10, size: 7, font: helvetica, color: gray });
+  page.drawText("Questions? Contact us within 30 days of statement date. Retain for 3+ years per GREC guidelines.", { x: margin, y: footerY - 20, size: 7, font: helvetica, color: gray });
+  
+  return await pdfDoc.save();
 }
 
 serve(handler);
