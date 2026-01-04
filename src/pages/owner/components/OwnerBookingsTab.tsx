@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -9,16 +9,10 @@ import {
   Clock,
   Home,
   Building2,
-  TrendingUp,
   CalendarDays,
 } from "lucide-react";
 import { format, differenceInDays, isAfter, isBefore, addDays } from "date-fns";
-import { supabase } from "@/integrations/supabase/client";
 import { BookingCalendarView } from "./BookingCalendarView";
-
-interface OwnerBookingsTabProps {
-  propertyId: string;
-}
 
 interface OwnerrezBooking {
   id: string;
@@ -38,6 +32,14 @@ interface MidTermBooking {
   status: string;
 }
 
+interface OwnerBookingsTabProps {
+  propertyId: string;
+  bookings?: {
+    str: OwnerrezBooking[];
+    mtr: MidTermBooking[];
+  };
+}
+
 type CombinedBooking = {
   id: string;
   guestName: string;
@@ -49,50 +51,22 @@ type CombinedBooking = {
   nights: number;
 };
 
-export function OwnerBookingsTab({ propertyId }: OwnerBookingsTabProps) {
-  const [ownerrezBookings, setOwnerrezBookings] = useState<OwnerrezBooking[]>([]);
-  const [midTermBookings, setMidTermBookings] = useState<MidTermBooking[]>([]);
-  const [loading, setLoading] = useState(true);
+export function OwnerBookingsTab({ propertyId, bookings }: OwnerBookingsTabProps) {
   const [activeTab, setActiveTab] = useState("all");
 
-  useEffect(() => {
-    const fetchBookings = async () => {
-      try {
-        // Fetch OwnerRez bookings
-        const { data: orBookings } = await supabase
-          .from("ownerrez_bookings")
-          .select("id, guest_name, check_in, check_out, total_amount, booking_status")
-          .eq("property_id", propertyId)
-          .order("check_in", { ascending: false })
-          .limit(100);
+  const ownerrezBookings = bookings?.str || [];
+  const midTermBookings = bookings?.mtr || [];
 
-        setOwnerrezBookings(orBookings || []);
-
-        // Fetch mid-term bookings
-        const { data: mtBookings } = await supabase
-          .from("mid_term_bookings")
-          .select("id, tenant_name, start_date, end_date, monthly_rent, status")
-          .eq("property_id", propertyId)
-          .order("start_date", { ascending: false })
-          .limit(50);
-
-        setMidTermBookings(mtBookings || []);
-      } catch (err) {
-        console.error("Error fetching bookings:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchBookings();
-  }, [propertyId]);
-
-  // Combine and normalize bookings
+  // Combine and normalize bookings - filter out canceled and owner blocks
   const allBookings = useMemo<CombinedBooking[]>(() => {
     const combined: CombinedBooking[] = [];
 
     ownerrezBookings.forEach((b) => {
       if (b.check_in && b.check_out) {
+        // Skip canceled bookings and owner blocks (zero amount)
+        const status = (b.booking_status || "confirmed").toLowerCase();
+        if (status === "canceled" || status === "cancelled") return;
+        
         const checkIn = new Date(b.check_in);
         const checkOut = new Date(b.check_out);
         combined.push({
@@ -134,7 +108,7 @@ export function OwnerBookingsTab({ propertyId }: OwnerBookingsTabProps) {
     return allBookings;
   }, [allBookings, activeTab]);
 
-  // Calculate stats
+  // Calculate stats - exclude zero-amount bookings from revenue
   const stats = useMemo(() => {
     const now = new Date();
     const next30Days = addDays(now, 30);
@@ -143,12 +117,11 @@ export function OwnerBookingsTab({ propertyId }: OwnerBookingsTabProps) {
       isAfter(b.checkIn, now) && isBefore(b.checkIn, next30Days)
     );
     
-    const totalRevenue = allBookings.reduce((sum, b) => sum + b.amount, 0);
-    const avgNightly = allBookings.length > 0 
-      ? totalRevenue / allBookings.reduce((sum, b) => sum + b.nights, 0)
-      : 0;
-    
-    const totalNights = allBookings.reduce((sum, b) => sum + b.nights, 0);
+    // Only count revenue from paid bookings
+    const paidBookings = allBookings.filter(b => b.amount > 0);
+    const totalRevenue = paidBookings.reduce((sum, b) => sum + b.amount, 0);
+    const totalNights = paidBookings.reduce((sum, b) => sum + b.nights, 0);
+    const avgNightly = totalNights > 0 ? totalRevenue / totalNights : 0;
 
     return {
       totalBookings: allBookings.length,
@@ -184,7 +157,7 @@ export function OwnerBookingsTab({ propertyId }: OwnerBookingsTabProps) {
     }
   };
 
-  if (loading) {
+  if (!bookings) {
     return (
       <div className="flex items-center justify-center py-12">
         <div className="animate-pulse flex flex-col items-center gap-4">

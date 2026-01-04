@@ -52,7 +52,7 @@ serve(async (req: Request): Promise<Response> => {
       );
     }
 
-    // Fetch owner details
+    // Fetch owner details including second owner
     const { data: owner, error: ownerError } = await supabase
       .from("property_owners")
       .select("id, name, email, phone, second_owner_name, second_owner_email")
@@ -101,6 +101,8 @@ serve(async (req: Request): Promise<Response> => {
       strBookingsResult,
       mtrBookingsResult,
       reviewsResult,
+      emailInsightsResult,
+      propertyDetailsResult,
     ] = await Promise.all([
       // Monthly reconciliations (statements)
       supabase
@@ -111,11 +113,12 @@ serve(async (req: Request): Promise<Response> => {
         .order("reconciliation_month", { ascending: false })
         .limit(24),
       
-      // Expenses
+      // Expenses - ONLY show approved expenses (billed or with reconciliation)
       supabase
         .from("expenses")
         .select("id, date, amount, purpose, vendor, category, file_path, original_receipt_path, email_screenshot_path, items_detail")
         .eq("property_id", property.id)
+        .or("billed.eq.true,reconciliation_id.not.is.null")
         .order("date", { ascending: false })
         .limit(200),
       
@@ -126,7 +129,7 @@ serve(async (req: Request): Promise<Response> => {
         .eq("property_id", property.id)
         .order("service_name"),
       
-      // STR bookings (OwnerRez)
+      // STR bookings (OwnerRez) - exclude canceled and zero-amount
       supabase
         .from("ownerrez_bookings")
         .select("id, booking_id, guest_name, check_in, check_out, total_amount, management_fee, booking_status, ownerrez_listing_name")
@@ -149,6 +152,22 @@ serve(async (req: Request): Promise<Response> => {
         .eq("property_id", property.id)
         .order("review_date", { ascending: false })
         .limit(50),
+      
+      // Email insights - positive sentiment for owner engagement
+      supabase
+        .from("email_insights")
+        .select("id, subject, summary, sentiment, category, created_at, email_date")
+        .eq("property_id", property.id)
+        .in("sentiment", ["positive", "neutral"])
+        .order("created_at", { ascending: false })
+        .limit(20),
+      
+      // Comprehensive property data for details
+      supabase
+        .from("comprehensive_property_data")
+        .select("bedrooms, bathrooms, square_feet, max_guests, amenities")
+        .eq("id", property.id)
+        .maybeSingle(),
     ]);
 
     const statements = statementsResult.data || [];
@@ -157,6 +176,8 @@ serve(async (req: Request): Promise<Response> => {
     const strBookings = strBookingsResult.data || [];
     const mtrBookings = mtrBookingsResult.data || [];
     const reviews = reviewsResult.data || [];
+    const emailInsights = emailInsightsResult.data || [];
+    const propertyDetails = propertyDetailsResult.data;
 
     console.log("Data fetched:", {
       statements: statements.length,
@@ -165,7 +186,15 @@ serve(async (req: Request): Promise<Response> => {
       strBookings: strBookings.length,
       mtrBookings: mtrBookings.length,
       reviews: reviews.length,
+      emailInsights: emailInsights.length,
     });
+
+    // Filter valid bookings for revenue calculations (exclude canceled and owner blocks)
+    const validSTRBookings = strBookings.filter(b => 
+      b.total_amount > 0 && 
+      b.booking_status !== 'canceled' && 
+      b.booking_status !== 'Canceled'
+    );
 
     // Calculate performance metrics from actual data
     // Primary source: reconciliation data (most accurate)
@@ -174,7 +203,7 @@ serve(async (req: Request): Promise<Response> => {
     const totalMTRRevenue = statements.reduce((sum, s) => sum + (s.mid_term_revenue || 0), 0);
 
     // Fallback: calculate from bookings if reconciliation data is incomplete
-    const calculatedSTRRevenue = strBookings.reduce((sum, b) => sum + (b.total_amount || 0), 0);
+    const calculatedSTRRevenue = validSTRBookings.reduce((sum, b) => sum + (b.total_amount || 0), 0);
     const calculatedMTRRevenue = mtrBookings.reduce((sum, b) => {
       if (!b.start_date || !b.end_date || !b.monthly_rent) return sum;
       const startDate = new Date(b.start_date);
@@ -189,15 +218,15 @@ serve(async (req: Request): Promise<Response> => {
     const mtrRevenue = totalMTRRevenue > 0 ? totalMTRRevenue : calculatedMTRRevenue;
     const totalRevenue = totalReconRevenue > 0 ? totalReconRevenue : (strRevenue + mtrRevenue);
 
-    // Calculate occupancy rate
+    // Calculate occupancy rate using only valid bookings
     const now = new Date();
     const yearStart = new Date(now.getFullYear(), 0, 1);
     const daysThisYear = Math.ceil((now.getTime() - yearStart.getTime()) / (1000 * 60 * 60 * 24));
     
     let bookedDays = 0;
     
-    // Count STR booked days
-    strBookings.forEach(b => {
+    // Count STR booked days (only valid bookings)
+    validSTRBookings.forEach(b => {
       if (!b.check_in || !b.check_out) return;
       const checkIn = new Date(b.check_in);
       const checkOut = new Date(b.check_out);
@@ -254,13 +283,25 @@ serve(async (req: Request): Promise<Response> => {
       source: r.source || "OwnerRez",
     }));
 
+    // Format email insights for owner highlights
+    const ownerHighlights = emailInsights
+      .filter(e => e.sentiment === 'positive' || e.category === 'booking_confirmation')
+      .slice(0, 5)
+      .map(e => ({
+        id: e.id,
+        subject: e.subject,
+        summary: e.summary,
+        category: e.category,
+        date: e.email_date || e.created_at,
+      }));
+
     // Build performance object
     const performance = {
       totalRevenue,
       strRevenue,
       mtrRevenue,
-      totalBookings: strBookings.length + mtrBookings.length,
-      strBookings: strBookings.length,
+      totalBookings: validSTRBookings.length + mtrBookings.length,
+      strBookings: validSTRBookings.length,
       mtrBookings: mtrBookings.length,
       occupancyRate,
       averageRating,
@@ -269,12 +310,14 @@ serve(async (req: Request): Promise<Response> => {
 
     console.log("Performance metrics calculated:", performance);
 
-    // Build response
+    // Build response with owner names
     const response = {
       owner: {
         id: owner.id,
         name: owner.name,
         email: owner.email,
+        secondOwnerName: owner.second_owner_name,
+        secondOwnerEmail: owner.second_owner_email,
       },
       property: {
         id: property.id,
@@ -283,6 +326,11 @@ serve(async (req: Request): Promise<Response> => {
         rental_type: property.rental_type,
         image_path: property.image_path,
         management_fee_percentage: property.management_fee_percentage,
+        bedrooms: propertyDetails?.bedrooms,
+        bathrooms: propertyDetails?.bathrooms,
+        square_feet: propertyDetails?.square_feet,
+        max_guests: propertyDetails?.max_guests,
+        amenities: propertyDetails?.amenities,
       },
       statements,
       expenses,
@@ -294,6 +342,7 @@ serve(async (req: Request): Promise<Response> => {
       reviews: formattedReviews,
       performance,
       monthlyRevenue: monthlyRevenueArray,
+      ownerHighlights,
     };
 
     return new Response(
