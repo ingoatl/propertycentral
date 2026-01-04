@@ -544,8 +544,76 @@ serve(async (req) => {
       }
     }
 
+    // Sync reviews from OwnerRez bookings (reviews are linked to bookings)
+    console.log('\n========== SYNCING REVIEWS ==========');
+    let totalReviewsSynced = 0;
+    
+    for (const booking of allBookings) {
+      try {
+        // Fetch reviews for this booking
+        const reviewsResponse = await fetch(
+          `https://api.ownerrez.com/v2/bookings/${booking.id}/reviews`,
+          {
+            headers: {
+              'Authorization': authHeader,
+              'Content-Type': 'application/json',
+            },
+          }
+        );
+        
+        if (reviewsResponse.ok) {
+          const reviewsData = await reviewsResponse.json();
+          const reviews = reviewsData.items || [];
+          
+          for (const review of reviews) {
+            // Get guest name from the booking
+            let guestName = 'Guest';
+            if (booking.guest) {
+              guestName = booking.guest.name || `${booking.guest.first_name || ''} ${booking.guest.last_name || ''}`.trim() || 'Guest';
+            } else if (booking.guest_id && guestsMap.has(booking.guest_id)) {
+              const guest = guestsMap.get(booking.guest_id)!;
+              guestName = guest.name || `${guest.first_name || ''} ${guest.last_name || ''}`.trim() || 'Guest';
+            }
+            
+            // Find local property ID for this booking
+            const propertyName = listings.find(l => l.property_id === booking.property_id)?.name || '';
+            const localPropertyId = getLocalPropertyId(propertyName);
+            
+            // Upsert review
+            const { error } = await supabase
+              .from('ownerrez_reviews')
+              .upsert({
+                booking_id: booking.id.toString(),
+                ownerrez_review_id: review.id?.toString() || `review_${booking.id}`,
+                guest_name: guestName,
+                property_id: localPropertyId,
+                star_rating: review.overall_rating || review.rating || 5,
+                review_text: review.public_review || review.comment || review.text || '',
+                review_date: review.created_utc || review.date || new Date().toISOString(),
+                review_source: 'OwnerRez',
+              }, {
+                onConflict: 'booking_id',
+              });
+            
+            if (error) {
+              console.error(`Failed to upsert review for booking ${booking.id}:`, error);
+            } else {
+              totalReviewsSynced++;
+              console.log(`Synced review for booking ${booking.id}: ${guestName}`);
+            }
+          }
+        }
+      } catch (reviewError) {
+        // Reviews endpoint may not exist for all bookings, continue silently
+        continue;
+      }
+    }
+    
+    console.log(`Total Reviews Synced: ${totalReviewsSynced}`);
+
     console.log('\n========== SYNC SUMMARY ==========');
     console.log(`Total Bookings Synced: ${totalSyncedBookings}`);
+    console.log(`Total Reviews Synced: ${totalReviewsSynced}`);
     console.log(`Total Revenue: $${totalRevenue.toFixed(2)}`);
     console.log(`Total Management Fees: $${totalManagementFees.toFixed(2)}`);
     console.log(`Total Cleaning Fees (pass-through): $${totalCleaningFees.toFixed(2)}`);
@@ -558,6 +626,7 @@ serve(async (req) => {
         properties: listings.length,
         summary: {
           totalBookings: totalSyncedBookings,
+          totalReviews: totalReviewsSynced,
           totalRevenue: totalRevenue.toFixed(2),
           totalManagementFees: totalManagementFees.toFixed(2),
           totalCleaningFees: totalCleaningFees.toFixed(2),

@@ -308,13 +308,13 @@ serve(async (req: Request): Promise<Response> => {
     );
 
     // Calculate performance metrics from actual data
-    // Primary source: reconciliation data (most accurate)
-    const totalReconRevenue = statements.reduce((sum, s) => sum + (s.total_revenue || 0), 0);
-    const totalSTRRevenue = statements.reduce((sum, s) => sum + (s.short_term_revenue || 0), 0);
-    const totalMTRRevenue = statements.reduce((sum, s) => sum + (s.mid_term_revenue || 0), 0);
-
-    // Fallback: calculate from bookings if reconciliation data is incomplete
+    // STR revenue: from reconciliation data (most accurate), fallback to bookings
+    const totalSTRFromRecon = statements.reduce((sum, s) => sum + (s.short_term_revenue || 0), 0);
     const calculatedSTRRevenue = validSTRBookings.reduce((sum, b) => sum + (b.total_amount || 0), 0);
+    const strRevenue = totalSTRFromRecon > 0 ? totalSTRFromRecon : calculatedSTRRevenue;
+
+    // MTR revenue: ALWAYS calculate from mid_term_bookings table (source of truth)
+    // This ensures accuracy regardless of reconciliation data
     const calculatedMTRRevenue = mtrBookings.reduce((sum, b) => {
       if (!b.start_date || !b.end_date || !b.monthly_rent) return sum;
       const startDate = new Date(b.start_date);
@@ -323,11 +323,12 @@ serve(async (req: Request): Promise<Response> => {
       const months = days / 30;
       return sum + (b.monthly_rent * months);
     }, 0);
-
-    // Use reconciliation revenue if available, otherwise use calculated
-    const strRevenue = totalSTRRevenue > 0 ? totalSTRRevenue : calculatedSTRRevenue;
-    const mtrRevenue = totalMTRRevenue > 0 ? totalMTRRevenue : calculatedMTRRevenue;
-    const totalRevenue = totalReconRevenue > 0 ? totalReconRevenue : (strRevenue + mtrRevenue);
+    const mtrRevenue = calculatedMTRRevenue;
+    
+    console.log(`MTR revenue calculated from mid_term_bookings: $${mtrRevenue.toFixed(2)} (${mtrBookings.length} bookings)`);
+    
+    // Total revenue is STR + MTR
+    const totalRevenue = strRevenue + mtrRevenue;
 
     // Calculate occupancy rate using only valid bookings
     const now = new Date();
@@ -371,32 +372,30 @@ serve(async (req: Request): Promise<Response> => {
   // Build monthly revenue data for charts - combine reconciliation + booking data
   const monthlyRevenue: Record<string, { month: string; str: number; mtr: number; total: number }> = {};
   
-  // First, populate from reconciliation data (most accurate when available)
+  // First, populate STR from reconciliation data (most accurate when available)
   statements.forEach(s => {
     const month = s.reconciliation_month;
     if (!monthlyRevenue[month]) {
       monthlyRevenue[month] = { month, str: 0, mtr: 0, total: 0 };
     }
     monthlyRevenue[month].str = s.short_term_revenue || 0;
-    monthlyRevenue[month].mtr = s.mid_term_revenue || 0;
-    monthlyRevenue[month].total = s.total_revenue || 0;
+    // Don't use reconciliation MTR - we'll calculate from bookings
   });
 
-  // Supplement with booking data for months without reconciliation
-  // This provides historical context even when reconciliations haven't been created yet
+  // Supplement STR with booking data for months without reconciliation
   validSTRBookings.forEach(b => {
     if (!b.check_in || b.total_amount <= 0) return;
     const month = b.check_in.substring(0, 7) + '-01'; // Format as YYYY-MM-01
-    if (!monthlyRevenue[month] || monthlyRevenue[month].total === 0) {
-      if (!monthlyRevenue[month]) {
-        monthlyRevenue[month] = { month, str: 0, mtr: 0, total: 0 };
-      }
+    if (!monthlyRevenue[month]) {
+      monthlyRevenue[month] = { month, str: 0, mtr: 0, total: 0 };
+    }
+    // Only add if no reconciliation data for this month
+    if (monthlyRevenue[month].str === 0) {
       monthlyRevenue[month].str += b.total_amount;
-      monthlyRevenue[month].total += b.total_amount;
     }
   });
 
-  // Add MTR booking revenue for months without reconciliation
+  // ALWAYS calculate MTR from mid_term_bookings (source of truth)
   mtrBookings.forEach(b => {
     if (!b.start_date || !b.end_date || !b.monthly_rent) return;
     const startDate = new Date(b.start_date);
@@ -415,13 +414,10 @@ serve(async (req: Request): Promise<Response> => {
       const daysOccupied = Math.max(1, Math.ceil((effectiveEnd.getTime() - effectiveStart.getTime()) / (1000 * 60 * 60 * 24)) + 1);
       const proratedRent = (b.monthly_rent / daysInMonth) * daysOccupied;
       
-      if (!monthlyRevenue[monthKey] || monthlyRevenue[monthKey].total === 0) {
-        if (!monthlyRevenue[monthKey]) {
-          monthlyRevenue[monthKey] = { month: monthKey, str: 0, mtr: 0, total: 0 };
-        }
-        monthlyRevenue[monthKey].mtr += proratedRent;
-        monthlyRevenue[monthKey].total += proratedRent;
+      if (!monthlyRevenue[monthKey]) {
+        monthlyRevenue[monthKey] = { month: monthKey, str: 0, mtr: 0, total: 0 };
       }
+      monthlyRevenue[monthKey].mtr += proratedRent;
       
       // Move to next month
       currentDate.setMonth(currentDate.getMonth() + 1);
@@ -429,8 +425,13 @@ serve(async (req: Request): Promise<Response> => {
     }
   });
 
-    const monthlyRevenueArray = Object.values(monthlyRevenue)
-      .sort((a, b) => a.month.localeCompare(b.month));
+  // Recalculate totals for each month
+  Object.keys(monthlyRevenue).forEach(key => {
+    monthlyRevenue[key].total = monthlyRevenue[key].str + monthlyRevenue[key].mtr;
+  });
+
+  const monthlyRevenueArray = Object.values(monthlyRevenue)
+    .sort((a, b) => a.month.localeCompare(b.month));
 
     // Format reviews for frontend - map star_rating to rating
     const formattedReviews = reviews.map(r => ({
