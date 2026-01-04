@@ -1230,12 +1230,55 @@ State: ${state}
 
       console.log(`Sending statement to: ${statementRecipients.join(', ')} from ${fromEmail}...`);
 
-      statementResponse = await resend.emails.send({
+      // Generate PDF HTML for attachment
+      let pdfAttachment: any = null;
+      try {
+        const pdfResponse = await fetch(`${supabaseUrl}/functions/v1/generate-statement-pdf`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${supabaseKey}`,
+          },
+          body: JSON.stringify({ reconciliation_id }),
+        });
+        
+        if (pdfResponse.ok) {
+          const pdfData = await pdfResponse.json();
+          if (pdfData.html) {
+            // Encode HTML as base64 for attachment
+            const encoder = new TextEncoder();
+            const htmlBytes = encoder.encode(pdfData.html);
+            const base64Html = btoa(String.fromCharCode(...htmlBytes));
+            
+            const fileName = `PeachHaus-Statement-${property.name.replace(/[^a-zA-Z0-9]/g, '-')}-${previousMonthName.replace(' ', '-')}.html`;
+            
+            pdfAttachment = {
+              filename: fileName,
+              content: base64Html,
+            };
+            console.log(`PDF attachment generated: ${fileName}`);
+          }
+        } else {
+          console.error("Failed to generate PDF:", await pdfResponse.text());
+        }
+      } catch (pdfError) {
+        console.error("Error generating PDF for attachment:", pdfError);
+      }
+
+      // Send email with or without attachment
+      const emailPayload: any = {
         from: fromEmail,
         to: statementRecipients,
         subject: statementSubject,
         html: emailBody,
-      });
+      };
+      
+      if (pdfAttachment) {
+        emailPayload.attachments = [pdfAttachment];
+        console.log("Email will include PDF attachment");
+      }
+
+      statementResponse = await resend.emails.send(emailPayload);
 
       console.log("Statement email sent:", statementResponse);
 
