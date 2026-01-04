@@ -116,12 +116,21 @@ export default {
             transform: "translateY(-4px)",
           },
         },
+        "shimmer": {
+          "0%": {
+            transform: "translateX(-100%)",
+          },
+          "100%": {
+            transform: "translateX(200%)",
+          },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
         "collapsible-down": "collapsible-down 500ms cubic-bezier(0.16, 1, 0.3, 1)",
         "collapsible-up": "collapsible-up 400ms cubic-bezier(0.16, 1, 0.3, 1)",
+        "shimmer": "shimmer 2s infinite ease-in-out",
       },
     },
   },
