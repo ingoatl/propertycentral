@@ -1,15 +1,13 @@
 import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Expense } from "@/types";
 import { ChevronLeft, Search } from "lucide-react";
 import { ExpenseDetailModal } from "@/components/ExpenseDetailModal";
-import { ForceDeleteExpenseDialog } from "@/components/ForceDeleteExpenseDialog";
+import { DeleteExpenseDialog } from "@/components/expenses/DeleteExpenseDialog";
 import { ExpenseSummaryCard } from "@/components/expenses/ExpenseSummaryCard";
 import { MonthlyExpenseGroup } from "@/components/expenses/MonthlyExpenseGroup";
-import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
 
 interface PropertyExpenseViewProps {
   propertyId: string;
@@ -32,7 +30,7 @@ export const PropertyExpenseView = ({
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [billedFilter, setBilledFilter] = useState<"all" | "billed" | "unbilled">("all");
-  const [forceDeleteExpense, setForceDeleteExpense] = useState<{ id: string; description: string } | null>(null);
+  const [deleteExpense, setDeleteExpense] = useState<{ id: string; description: string; amount: number } | null>(null);
 
   // Filter expenses based on search term and billed status
   const filteredExpenses = expenses.filter((expense) => {
@@ -95,63 +93,15 @@ export const PropertyExpenseView = ({
   const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
   const handleDelete = async (id: string, expense: Expense) => {
-    try {
-      // Check if expense is in any reconciliation line items
-      const { data: lineItems, error: lineItemsError } = await supabase
-        .from("reconciliation_line_items")
-        .select("id, reconciliation_id, reconciliation:monthly_reconciliations(status)")
-        .eq("item_type", "expense")
-        .eq("item_id", id);
-
-      if (lineItemsError) throw lineItemsError;
-
-      // Check if any are in approved/sent reconciliations
-      const inApprovedRecon = lineItems?.some((item: any) => 
-        item.reconciliation?.status === "approved" || 
-        item.reconciliation?.status === "statement_sent"
-      );
-
-      if (inApprovedRecon) {
-        // Open the force delete dialog instead of blocking
-        const description = expense.vendor 
-          ? `${expense.vendor} - $${expense.amount.toFixed(2)} on ${new Date(expense.date).toLocaleDateString()}`
-          : `$${expense.amount.toFixed(2)} on ${new Date(expense.date).toLocaleDateString()}`;
-        setForceDeleteExpense({ id, description });
-        return;
-      }
-
-      // Normal deletion flow - confirm first
-      if (!confirm("Are you sure you want to delete this expense?")) {
-        return;
-      }
-
-      // Delete from reconciliation line items first (if in draft reconciliations)
-      if (lineItems && lineItems.length > 0) {
-        const { error: deleteLineItemsError } = await supabase
-          .from("reconciliation_line_items")
-          .delete()
-          .eq("item_type", "expense")
-          .eq("item_id", id);
-
-        if (deleteLineItemsError) throw deleteLineItemsError;
-      }
-
-      // Delete the expense
-      const { error } = await supabase
-        .from("expenses")
-        .delete()
-        .eq("id", id);
-
-      if (error) throw error;
-
-      toast.success("Expense deleted");
-      
-      // Refresh the data from parent
-      await onExpenseDeleted();
-    } catch (error: any) {
-      console.error("Error deleting expense:", error);
-      toast.error("Failed to delete expense");
-    }
+    // Always use the delete dialog with reason logging
+    const description = expense.vendor 
+      ? `${expense.vendor} - ${expense.purpose || 'Expense'}`
+      : expense.purpose || 'Expense';
+    setDeleteExpense({ 
+      id, 
+      description,
+      amount: expense.amount
+    });
   };
 
   const handleViewExpense = (expense: Expense) => {
@@ -254,11 +204,12 @@ export const PropertyExpenseView = ({
         onOpenChange={setIsDetailModalOpen}
       />
 
-      <ForceDeleteExpenseDialog
-        open={!!forceDeleteExpense}
-        onOpenChange={(open) => !open && setForceDeleteExpense(null)}
-        expenseId={forceDeleteExpense?.id || ""}
-        expenseDescription={forceDeleteExpense?.description || ""}
+      <DeleteExpenseDialog
+        open={!!deleteExpense}
+        onOpenChange={(open) => !open && setDeleteExpense(null)}
+        expenseId={deleteExpense?.id || ""}
+        expenseDescription={deleteExpense?.description || ""}
+        expenseAmount={deleteExpense?.amount}
         onDeleted={onExpenseDeleted}
       />
     </div>
