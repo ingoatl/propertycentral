@@ -139,6 +139,11 @@ serve(async (req) => {
     const city = addressParts[1]?.trim() || "Atlanta";
     const state = addressParts[2]?.trim()?.split(" ")[0] || "GA";
 
+    // Get current date for accurate event dates
+    const currentDate = new Date();
+    const currentYear = currentDate.getFullYear();
+    const currentMonth = currentDate.getMonth() + 1;
+
     // Build context for AI
     const propertyContext = {
       name: property.name,
@@ -159,10 +164,13 @@ serve(async (req) => {
     };
 
     // Generate AI insights
-    const aiPrompt = `You are a real estate market analyst for PeachHaus Property Management. Generate market insights for this property:
+    const aiPrompt = `You are a real estate market analyst for PeachHaus Property Management. Generate market insights for this property.
+
+IMPORTANT: Today's date is ${currentDate.toISOString().split('T')[0]}. All events MUST be in the future from this date.
 
 Property: ${propertyContext.name}
 Address: ${propertyContext.address}
+City: ${city}, ${state}
 Bedrooms: ${propertyContext.bedrooms}, Bathrooms: ${propertyContext.bathrooms}
 Rental Type: ${propertyContext.rentalType || "Hybrid (STR + MTR)"}
 Current Performance:
@@ -172,13 +180,13 @@ Current Performance:
 - Occupancy Rate: ${occupancyRate}%
 - Average Rating: ${averageRating ? averageRating.toFixed(2) : "No reviews yet"}
 
-Generate a JSON response with these sections (use real market data patterns for the Atlanta metro area):
+Generate a JSON response with these sections. For demand drivers, use REAL upcoming events in the ${city} area with ACTUAL future dates in YYYY-MM-DD format:
 
 {
   "comparableProperties": [
     {
       "name": "Comparable property name",
-      "area": "Specific area/neighborhood",
+      "area": "Specific area/neighborhood in ${city}",
       "distance": "< X miles",
       "bedrooms": number,
       "bathrooms": number,
@@ -204,9 +212,10 @@ Generate a JSON response with these sections (use real market data patterns for 
   ],
   "demandDrivers": [
     {
-      "event": "Event name",
-      "date": "Date or timeframe",
-      "impact": "Brief description of demand impact"
+      "event": "Specific event name (e.g., 'Atlanta Falcons vs Cowboys', 'Shaky Knees Music Festival', 'Dragon Con 2026')",
+      "date": "YYYY-MM-DD format - MUST be after ${currentDate.toISOString().split('T')[0]}",
+      "impact": "Expected 20-40% rate increase due to high demand",
+      "category": "Sports" | "Music" | "Festival" | "Business" | "Seasonal"
     }
   ],
   "strengthsForArea": [
@@ -214,11 +223,19 @@ Generate a JSON response with these sections (use real market data patterns for 
   ]
 }
 
+CRITICAL for demandDrivers:
+- Generate 6-8 real upcoming events for ${city} area
+- All dates MUST be in the future (after ${currentDate.toISOString().split('T')[0]})
+- Use YYYY-MM-DD format for dates (e.g., "${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-15")
+- Include specific event names: Atlanta Falcons games, Atlanta Hawks games, Atlanta United matches, concerts at State Farm Arena, Dragon Con, Shaky Knees, SEC Championship, Peach Bowl, conferences at Georgia World Congress Center
+- Include seasonal drivers: Spring Break (March), Summer travel (June-August), Holiday season (November-December)
+- Be specific about the venue and expected impact on rental demand
+
 Generate 4-5 comparable properties based on typical ${city} area STR data.
-Generate 3-4 future opportunities relevant to Atlanta/Georgia.
-Generate 4-5 demand drivers for the area.
+Generate 3-4 future opportunities relevant to ${city}/${state}.
+Generate 6-8 demand drivers with specific future dates.
 Generate 4-5 location strengths.
-Be specific and realistic based on Atlanta metro market conditions.`;
+Be specific and realistic based on ${city} metro market conditions.`;
 
     const openaiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",

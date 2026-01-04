@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { memo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -22,6 +22,7 @@ import {
   Trophy,
   Zap
 } from "lucide-react";
+import { UpcomingEventsTimeline } from "./UpcomingEventsTimeline";
 
 interface ComparableProperty {
   name: string;
@@ -57,6 +58,8 @@ interface DemandDriver {
 
 interface OwnerMarketInsightsEnhancedProps {
   propertyName: string;
+  propertyAddress?: string;
+  propertyCity?: string;
   propertyBeds: number;
   propertyBaths: number;
   currentNightlyRate?: number;
@@ -74,27 +77,11 @@ interface OwnerMarketInsightsEnhancedProps {
   isSuperhost?: boolean;
 }
 
-const eventImages: Record<string, string> = {
-  "FIFA World Cup": "https://images.unsplash.com/photo-1579952363873-27f3bade9f55?w=400&h=250&fit=crop",
-  "Super Bowl": "https://images.unsplash.com/photo-1504450758481-7338eba7524a?w=400&h=250&fit=crop",
-  "Concert": "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=400&h=250&fit=crop",
-  "Convention": "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=400&h=250&fit=crop",
-  "Marathon": "https://images.unsplash.com/photo-1452626038306-9aae5e071dd3?w=400&h=250&fit=crop",
-  "Festival": "https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?w=400&h=250&fit=crop",
-  "default": "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=400&h=250&fit=crop"
-};
-
-const getEventImage = (eventName: string): string => {
-  for (const [key, url] of Object.entries(eventImages)) {
-    if (eventName.toLowerCase().includes(key.toLowerCase())) {
-      return url;
-    }
-  }
-  return eventImages.default;
-};
-
-export function OwnerMarketInsightsEnhanced({
+// Memoize the entire component to prevent unnecessary re-renders
+export const OwnerMarketInsightsEnhanced = memo(function OwnerMarketInsightsEnhanced({
   propertyName,
+  propertyAddress,
+  propertyCity,
   propertyBeds,
   propertyBaths,
   currentNightlyRate,
@@ -313,35 +300,13 @@ export function OwnerMarketInsightsEnhanced({
         </CardContent>
       </Card>
 
-      {/* Upcoming Events with Images */}
+      {/* Upcoming Events Timeline */}
       {demandDrivers.length > 0 && (
-        <Card className="border-none shadow-lg overflow-hidden">
-          <CardHeader className="pb-2 bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/20 dark:to-orange-950/20">
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <Calendar className="h-5 w-5 text-amber-600" />
-              Upcoming Events Driving Demand
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {demandDrivers.slice(0, 6).map((driver, idx) => (
-                <div key={idx} className="group relative overflow-hidden rounded-xl">
-                  <img
-                    src={getEventImage(driver.event)}
-                    alt={driver.event}
-                    className="w-full h-40 object-cover group-hover:scale-105 transition-transform duration-300"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
-                  <div className="absolute bottom-0 left-0 right-0 p-4 text-white">
-                    <p className="font-semibold text-sm">{driver.event}</p>
-                    <p className="text-xs opacity-90">{driver.date}</p>
-                    <p className="text-xs mt-1 opacity-75">{driver.impact}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+        <UpcomingEventsTimeline
+          events={demandDrivers}
+          propertyAddress={propertyAddress}
+          propertyCity={propertyCity}
+        />
       )}
 
       {/* Comparable Properties */}
@@ -504,4 +469,4 @@ export function OwnerMarketInsightsEnhanced({
       )}
     </div>
   );
-}
+});
