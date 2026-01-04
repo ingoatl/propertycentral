@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Shield, AlertTriangle } from "lucide-react";
 import { StatementArchiveTab } from "@/components/admin/audit/StatementArchiveTab";
 import { RentRollTab } from "@/components/admin/audit/RentRollTab";
+import { InvoiceArchiveTab } from "@/components/admin/audit/InvoiceArchiveTab";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function AuditPortal() {
@@ -62,8 +63,13 @@ export default function AuditPortal() {
         </div>
         <div className="bg-white rounded-lg shadow-sm border p-6">
           <Tabs defaultValue="statements">
-            <TabsList><TabsTrigger value="statements">Statements</TabsTrigger><TabsTrigger value="rentroll">Rent Roll</TabsTrigger></TabsList>
+            <TabsList>
+              <TabsTrigger value="statements">Statements</TabsTrigger>
+              <TabsTrigger value="invoices">Invoices & Receipts</TabsTrigger>
+              <TabsTrigger value="rentroll">Rent Roll</TabsTrigger>
+            </TabsList>
             <TabsContent value="statements" className="mt-4"><StatementArchiveTab /></TabsContent>
+            <TabsContent value="invoices" className="mt-4"><InvoiceArchiveTab /></TabsContent>
             <TabsContent value="rentroll" className="mt-4"><RentRollTab /></TabsContent>
           </Tabs>
         </div>
