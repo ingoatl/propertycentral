@@ -309,30 +309,48 @@ serve(async (req) => {
     }
 
     // Fetch ALL bookings from OwnerRez WITH CHARGES for fee breakdown
+    // Go back 36 months to capture all historical data
     const startDate = new Date();
-    startDate.setMonth(startDate.getMonth() - 12);
+    startDate.setMonth(startDate.getMonth() - 36);
     
     console.log('Fetching all bookings with guest and charges details from OwnerRez...');
-    const allBookingsResponse = await fetch(
-      `https://api.ownerrez.com/v2/bookings?since_utc=${startDate.toISOString()}&expand=guest,charges`,
-      {
-        headers: {
-          'Authorization': authHeader,
-          'Content-Type': 'application/json',
-        },
-      }
-    );
+    console.log(`Date range: ${startDate.toISOString()} to now`);
+    
+    // Paginate through ALL bookings
+    let allBookings: OwnerRezBooking[] = [];
+    let offset = 0;
+    const limit = 100;
+    
+    while (true) {
+      const bookingsResponse = await fetch(
+        `https://api.ownerrez.com/v2/bookings?since_utc=${startDate.toISOString()}&expand=guest,charges&limit=${limit}&offset=${offset}`,
+        {
+          headers: {
+            'Authorization': authHeader,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
 
-    if (!allBookingsResponse.ok) {
-      const errorText = await allBookingsResponse.text();
-      console.error('Failed to fetch bookings from OwnerRez');
-      console.error(`Status: ${allBookingsResponse.status}, Response:`, errorText);
-      throw new Error(`Failed to fetch bookings: ${allBookingsResponse.statusText}`);
+      if (!bookingsResponse.ok) {
+        const errorText = await bookingsResponse.text();
+        console.error('Failed to fetch bookings from OwnerRez');
+        console.error(`Status: ${bookingsResponse.status}, Response:`, errorText);
+        throw new Error(`Failed to fetch bookings: ${bookingsResponse.statusText}`);
+      }
+
+      const bookingsData = await bookingsResponse.json();
+      const items: OwnerRezBooking[] = bookingsData.items || [];
+      allBookings = allBookings.concat(items);
+      
+      console.log(`Fetched ${items.length} bookings (offset: ${offset}, total so far: ${allBookings.length})`);
+      
+      if (items.length < limit) {
+        break; // No more pages
+      }
+      offset += limit;
     }
 
-    const allBookingsData = await allBookingsResponse.json();
-    const allBookings: OwnerRezBooking[] = allBookingsData.items || [];
-    
     console.log(`Found ${allBookings.length} total bookings`);
     
     // Log the first booking structure to see what fields are available
@@ -351,13 +369,13 @@ serve(async (req) => {
     const guestStartDate = new Date();
     guestStartDate.setFullYear(1970); // Use 1970 to get ALL guests ever
     
-    let offset = 0;
-    const limit = 100; // Fetch 100 guests per page
+    let guestOffset = 0;
+    const guestLimit = 100; // Fetch 100 guests per page
     let hasMoreGuests = true;
     
     while (hasMoreGuests) {
       const guestsResponse = await fetch(
-        `https://api.ownerrez.com/v2/guests?created_since_utc=${guestStartDate.toISOString()}&limit=${limit}&offset=${offset}`,
+        `https://api.ownerrez.com/v2/guests?created_since_utc=${guestStartDate.toISOString()}&limit=${guestLimit}&offset=${guestOffset}`,
         {
           headers: {
             'Authorization': authHeader,
@@ -370,7 +388,7 @@ serve(async (req) => {
         const guestsData = await guestsResponse.json();
         const guests: OwnerRezGuest[] = guestsData.items || [];
         
-        console.log(`Fetched ${guests.length} guests at offset ${offset}`);
+        console.log(`Fetched ${guests.length} guests at offset ${guestOffset}`);
         
         // Add guests to map
         for (const guest of guests) {
@@ -378,10 +396,10 @@ serve(async (req) => {
         }
         
         // Check if we got a full page - if not, we're done
-        if (guests.length < limit) {
+        if (guests.length < guestLimit) {
           hasMoreGuests = false;
         } else {
-          offset += limit;
+          guestOffset += guestLimit;
         }
       } else {
         console.error('Failed to fetch guests:', guestsResponse.status, await guestsResponse.text());

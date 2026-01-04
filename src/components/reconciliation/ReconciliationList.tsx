@@ -1100,6 +1100,7 @@ export const ReconciliationList = () => {
                       {groupedByMonth[month].map((rec: any) => {
                         const isOffboarded = !!rec.properties?.offboarded_at;
                         const isFullService = rec.service_type === 'full_service';
+                        const isStatementSent = !!rec.statement_sent_at || rec.status === 'statement_sent';
                         
                         return (
                           <Card 
@@ -1107,9 +1108,20 @@ export const ReconciliationList = () => {
                             className={`overflow-hidden transition-all duration-200 hover:shadow-md ${
                               isOffboarded 
                                 ? 'opacity-75 border-dashed border-muted-foreground/30 bg-muted/20' 
-                                : ''
+                                : isStatementSent
+                                  ? 'ring-2 ring-green-500 dark:ring-green-400 bg-green-50/30 dark:bg-green-950/20'
+                                  : ''
                             }`}
                           >
+                            {/* Statement Sent Banner */}
+                            {isStatementSent && !isOffboarded && (
+                              <div className="bg-green-100 dark:bg-green-950/50 border-b border-green-200 dark:border-green-800 px-4 py-2 flex items-center gap-2">
+                                <Check className="w-4 h-4 text-green-600 dark:text-green-400" />
+                                <span className="text-xs text-green-700 dark:text-green-300 font-medium">
+                                  Statement Sent {rec.statement_sent_at && format(new Date(rec.statement_sent_at), "MMM dd, yyyy")}
+                                </span>
+                              </div>
+                            )}
                             {/* Archived Banner */}
                             {isOffboarded && (
                               <div className="bg-muted/50 border-b border-dashed px-4 py-2 flex items-center gap-2">
