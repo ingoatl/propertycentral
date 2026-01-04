@@ -1400,8 +1400,12 @@ export const ReconciliationReviewModal = ({
         expenseAmount={deleteExpense?.amount}
         reconciliationId={reconciliationId}
         onDeleted={() => {
+          // Refetch the current reconciliation data
           refetch();
-          toast.success("Expense deleted and removed from reconciliation");
+          // Also invalidate parent queries to update lists
+          queryClient.invalidateQueries({ queryKey: ["reconciliations"] });
+          queryClient.invalidateQueries({ queryKey: ["expenses"] });
+          setDeleteExpense(null);
         }}
       />
     </Dialog>

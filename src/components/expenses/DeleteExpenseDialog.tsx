@@ -59,22 +59,39 @@ export const DeleteExpenseDialog = ({
       return;
     }
 
+    if (!expenseId) {
+      toast.error("No expense ID provided");
+      return;
+    }
+
     setLoading(true);
+    console.log("Starting expense deletion for:", expenseId);
+    
     try {
       // Get current user
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError) {
+        console.error("Auth error:", userError);
+        throw new Error("Authentication error: " + userError.message);
+      }
       if (!user) throw new Error("Not authenticated");
 
       // Get user profile for name
-      const { data: profile } = await supabase
+      const { data: profile, error: profileError } = await supabase
         .from("profiles")
         .select("first_name, email")
         .eq("id", user.id)
         .single();
 
+      if (profileError) {
+        console.warn("Profile fetch warning:", profileError);
+      }
+
       const userName = profile?.first_name || profile?.email || user.email || "Unknown user";
       const reasonLabel = DELETION_REASONS.find(r => r.value === selectedReason)?.label || selectedReason;
       const fullReason = `${reasonLabel}${additionalNotes ? `: ${additionalNotes}` : ""}`;
+
+      console.log("Deleting expense with reason:", fullReason, "by user:", userName);
 
       // Get the reconciliation line items for this expense
       const { data: lineItems, error: lineItemsError } = await supabase
@@ -83,14 +100,19 @@ export const DeleteExpenseDialog = ({
         .eq("item_type", "expense")
         .eq("item_id", expenseId);
 
-      if (lineItemsError) throw lineItemsError;
+      if (lineItemsError) {
+        console.error("Error fetching line items:", lineItemsError);
+        throw lineItemsError;
+      }
+
+      console.log("Found line items to delete:", lineItems?.length || 0);
 
       // Log the deletion in reconciliation audit log for each affected reconciliation
       if (lineItems && lineItems.length > 0) {
         const uniqueReconIds = [...new Set(lineItems.map(li => li.reconciliation_id))];
         
         for (const reconId of uniqueReconIds) {
-          await supabase.from("reconciliation_audit_log").insert({
+          const { error: auditError } = await supabase.from("reconciliation_audit_log").insert({
             reconciliation_id: reconId,
             user_id: user.id,
             action: "expense_deleted",
@@ -105,16 +127,25 @@ export const DeleteExpenseDialog = ({
               deletion_notes: additionalNotes,
             },
           });
+          
+          if (auditError) {
+            console.warn("Audit log error (non-fatal):", auditError);
+          }
         }
 
-        // Delete from reconciliation line items
+        // Delete from reconciliation line items first
         const { error: deleteLineItemsError } = await supabase
           .from("reconciliation_line_items")
           .delete()
           .eq("item_type", "expense")
           .eq("item_id", expenseId);
 
-        if (deleteLineItemsError) throw deleteLineItemsError;
+        if (deleteLineItemsError) {
+          console.error("Error deleting line items:", deleteLineItemsError);
+          throw new Error("Failed to remove expense from reconciliation: " + deleteLineItemsError.message);
+        }
+        
+        console.log("Deleted line items successfully");
       }
 
       // If there's a specific reconciliation context and it wasn't in lineItems, log there too
@@ -136,25 +167,32 @@ export const DeleteExpenseDialog = ({
         });
       }
 
-      // Delete the expense
+      // Delete the expense from the expenses table
       const { error: deleteError } = await supabase
         .from("expenses")
         .delete()
         .eq("id", expenseId);
 
-      if (deleteError) throw deleteError;
+      if (deleteError) {
+        console.error("Error deleting expense:", deleteError);
+        throw new Error("Failed to delete expense: " + deleteError.message);
+      }
+
+      console.log("Expense deleted successfully:", expenseId);
 
       toast.success("Expense deleted successfully", {
         description: `Deleted by ${userName} - ${reasonLabel}`,
       });
       
-      // Reset state
+      // Reset state and close dialog
       setSelectedReason("");
       setAdditionalNotes("");
       onOpenChange(false);
+      
+      // Trigger the callback to refresh data
       onDeleted();
     } catch (error: any) {
-      console.error("Error deleting expense:", error);
+      console.error("Error in expense deletion:", error);
       toast.error(error.message || "Failed to delete expense");
     } finally {
       setLoading(false);
