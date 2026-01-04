@@ -79,7 +79,7 @@ const handler = async (req: Request): Promise<Response> => {
     const firstDayOfPreviousMonth = new Date(lastDayOfPreviousMonth.getFullYear(), lastDayOfPreviousMonth.getMonth(), 1);
 
     // Variable for portal URL with magic link token
-    let portalUrl = "https://peachhausgroup.lovable.app/owner";
+    let portalUrl = "https://propertycentral.lovable.app/owner";
 
     if (isReconciliationMode) {
       // RECONCILIATION MODE: Fetch approved reconciliation data (or already sent statements)
@@ -121,7 +121,7 @@ const handler = async (req: Request): Promise<Response> => {
           });
 
         if (!sessionError) {
-          portalUrl = `https://peachhausgroup.lovable.app/owner?token=${token}`;
+          portalUrl = `https://propertycentral.lovable.app/owner?token=${token}`;
           console.log(`Generated magic link for owner portal: ${portalUrl}`);
         } else {
           console.error("Failed to create portal session:", sessionError);

@@ -56,7 +56,7 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     // Get app URL from env or use default
-    const appUrl = Deno.env.get("VITE_APP_URL") || "https://peachhausgroup.lovable.app";
+    const appUrl = Deno.env.get("VITE_APP_URL") || "https://propertycentral.lovable.app";
     const portalUrl = `${appUrl}/owner?token=${token}`;
 
     console.log(`Magic link generated for ${owner.email}: ${portalUrl}`);

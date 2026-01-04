@@ -228,6 +228,33 @@ export function OwnerPortalAdmin() {
     }
   };
 
+  const openPortalAsOwner = async (owner: OwnerWithProperty) => {
+    if (!owner.property_id) {
+      toast.error("Owner has no active property");
+      return;
+    }
+
+    try {
+      // Create a test session in localStorage to simulate owner login
+      const sessionData = {
+        ownerId: owner.id,
+        ownerName: owner.name,
+        email: owner.email,
+        propertyId: owner.property_id,
+        propertyName: owner.property_name,
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24 hours
+      };
+      localStorage.setItem("owner_session", JSON.stringify(sessionData));
+      
+      // Open the owner portal in a new tab
+      window.open("/owner", "_blank");
+      toast.success(`Opening portal as ${owner.name}`);
+    } catch (error) {
+      console.error("Error opening portal:", error);
+      toast.error("Failed to open portal");
+    }
+  };
+
   const loadOwnerPreview = async (owner: OwnerWithProperty) => {
     if (!owner.property_id) {
       toast.error("Owner has no active property");
@@ -456,6 +483,16 @@ export function OwnerPortalAdmin() {
                       >
                         <Eye className="h-4 w-4 mr-1" />
                         Preview
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => openPortalAsOwner(owner)}
+                        disabled={!owner.property_id}
+                        title="Open full portal as this owner"
+                      >
+                        <ExternalLink className="h-4 w-4 mr-1" />
+                        Open Portal
                       </Button>
                       <Button
                         variant="default"
