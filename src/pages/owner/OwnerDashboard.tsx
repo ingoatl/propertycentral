@@ -8,7 +8,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Building2,
   Receipt,
-  TrendingUp,
   FileText,
   Download,
   Home,
@@ -51,6 +50,8 @@ interface Statement {
   total_expenses: number;
   net_to_owner: number;
   status: string;
+  short_term_revenue?: number;
+  mid_term_revenue?: number;
 }
 
 interface Expense {
@@ -82,27 +83,31 @@ interface Credential {
   notes: string | null;
 }
 
+interface Review {
+  id: string;
+  guestName: string | null;
+  rating: number;
+  text: string;
+  date: string;
+  source: string;
+}
+
+interface PerformanceMetrics {
+  totalRevenue: number;
+  strRevenue: number;
+  mtrRevenue: number;
+  totalBookings: number;
+  strBookings: number;
+  mtrBookings: number;
+  occupancyRate: number;
+  averageRating: number | null;
+  reviewCount: number;
+}
+
 interface MarketInsightsData {
   property: any;
-  performance: {
-    totalRevenue: number;
-    strRevenue: number;
-    mtrRevenue: number;
-    totalBookings: number;
-    strBookings: number;
-    mtrBookings: number;
-    occupancyRate: number;
-    averageRating: number | null;
-    reviewCount: number;
-  };
-  reviews: Array<{
-    id: string;
-    guestName: string | null;
-    rating: number;
-    text: string;
-    date: string;
-    source: string;
-  }>;
+  performance: PerformanceMetrics;
+  reviews: Review[];
   monthlyRevenue: any[];
   aiInsights: {
     comparableProperties: any[];
@@ -128,6 +133,18 @@ export default function OwnerDashboard() {
   const [statements, setStatements] = useState<Statement[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [credentials, setCredentials] = useState<Credential[]>([]);
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [performanceMetrics, setPerformanceMetrics] = useState<PerformanceMetrics>({
+    totalRevenue: 0,
+    strRevenue: 0,
+    mtrRevenue: 0,
+    totalBookings: 0,
+    strBookings: 0,
+    mtrBookings: 0,
+    occupancyRate: 0,
+    averageRating: null,
+    reviewCount: 0,
+  });
   const [activeTab, setActiveTab] = useState("overview");
   const [downloadingPdf, setDownloadingPdf] = useState<string | null>(null);
   const [visiblePasswords, setVisiblePasswords] = useState<Set<string>>(new Set());
@@ -137,7 +154,7 @@ export default function OwnerDashboard() {
   useEffect(() => {
     const token = searchParams.get("token");
     if (token) {
-      validateToken(token);
+      loadAllDataWithToken(token);
     } else {
       const storedSession = localStorage.getItem("owner_session");
       if (storedSession) {
@@ -146,7 +163,7 @@ export default function OwnerDashboard() {
           const expiresAt = new Date(parsed.expiresAt);
           if (expiresAt > new Date()) {
             setSession(parsed);
-            loadOwnerData(parsed.ownerId);
+            loadAllData(parsed.ownerId, parsed.propertyId);
           } else {
             localStorage.removeItem("owner_session");
             setLoading(false);
@@ -161,38 +178,37 @@ export default function OwnerDashboard() {
     }
   }, [searchParams]);
 
-  const validateToken = async (token: string) => {
+  const loadAllDataWithToken = async (token: string) => {
     try {
-      const { data, error } = await supabase
-        .from("owner_portal_sessions")
-        .select(`
-          *,
-          property_owners(id, name, email)
-        `)
-        .eq("token", token)
-        .gt("expires_at", new Date().toISOString())
-        .single();
+      console.log("Loading all data with token...");
+      
+      const { data, error } = await supabase.functions.invoke("owner-portal-data", {
+        body: { token },
+      });
 
-      if (error || !data) {
+      if (error) {
+        console.error("Edge function error:", error);
         toast.error("Invalid or expired link. Please request a new one.");
         setLoading(false);
         return;
       }
 
-      // Only mark as used if not an admin preview (admin previews can be reused)
-      if (!data.is_admin_preview && !data.used_at) {
-        await supabase
-          .from("owner_portal_sessions")
-          .update({ used_at: new Date().toISOString() })
-          .eq("id", data.id);
+      if (data.error) {
+        console.error("Data error:", data.error);
+        toast.error(data.error);
+        setLoading(false);
+        return;
       }
 
+      console.log("Owner portal data loaded:", data);
+
+      // Set all the state from the response
       const ownerSession: OwnerSession = {
-        ownerId: data.owner_id,
-        ownerName: data.property_owners?.name || "Owner",
-        email: data.email,
-        propertyId: data.property_id || undefined,
-        propertyName: data.property_name || undefined,
+        ownerId: data.owner.id,
+        ownerName: data.owner.name,
+        email: data.owner.email,
+        propertyId: data.property?.id,
+        propertyName: data.property?.name,
       };
 
       const sessionData = {
@@ -200,95 +216,91 @@ export default function OwnerDashboard() {
         expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
       };
       localStorage.setItem("owner_session", JSON.stringify(sessionData));
+      
       setSession(ownerSession);
+      setProperty(data.property);
+      setStatements(data.statements || []);
+      setExpenses(data.expenses || []);
+      setCredentials(data.credentials || []);
+      setReviews(data.reviews || []);
+      setPerformanceMetrics(data.performance || {
+        totalRevenue: 0,
+        strRevenue: 0,
+        mtrRevenue: 0,
+        totalBookings: 0,
+        strBookings: 0,
+        mtrBookings: 0,
+        occupancyRate: 0,
+        averageRating: null,
+        reviewCount: 0,
+      });
 
       navigate("/owner", { replace: true });
-      
-      // If property_id is in the session, use it directly
-      if (data.property_id) {
-        loadOwnerDataWithProperty(data.owner_id, data.property_id);
-      } else {
-        loadOwnerData(data.owner_id);
-      }
       toast.success("Welcome to your owner portal!");
-    } catch (err) {
-      console.error("Token validation error:", err);
-      toast.error("Failed to validate access link");
-      setLoading(false);
-    }
-  };
 
-  const loadOwnerDataWithProperty = async (ownerId: string, propertyId: string) => {
-    try {
-      const { data: propertyData } = await supabase
-        .from("properties")
-        .select("id, name, address, rental_type, image_path")
-        .eq("id", propertyId)
-        .single();
-
-      if (propertyData) {
-        setProperty(propertyData);
-        await loadPropertyDetails(propertyData);
+      // Load AI market insights separately
+      if (data.property?.id) {
+        loadMarketInsights(data.property.id);
       }
     } catch (err) {
-      console.error("Error loading owner data with property:", err);
+      console.error("Error loading data with token:", err);
       toast.error("Failed to load your data");
     } finally {
       setLoading(false);
     }
   };
 
-  const loadOwnerData = async (ownerId: string) => {
+  const loadAllData = async (ownerId: string, propertyId?: string) => {
     try {
-      const { data: propertyData } = await supabase
-        .from("properties")
-        .select("id, name, address, rental_type, image_path")
-        .eq("owner_id", ownerId)
-        .is("offboarded_at", null)
-        .single();
+      console.log("Loading all data for owner:", ownerId, "property:", propertyId);
+      
+      const { data, error } = await supabase.functions.invoke("owner-portal-data", {
+        body: { ownerId, propertyId },
+      });
 
-      if (propertyData) {
-        setProperty(propertyData);
-        await loadPropertyDetails(propertyData);
+      if (error) {
+        console.error("Edge function error:", error);
+        toast.error("Failed to load your data");
+        setLoading(false);
+        return;
+      }
+
+      if (data.error) {
+        console.error("Data error:", data.error);
+        toast.error(data.error);
+        setLoading(false);
+        return;
+      }
+
+      console.log("Owner portal data loaded:", data);
+
+      setProperty(data.property);
+      setStatements(data.statements || []);
+      setExpenses(data.expenses || []);
+      setCredentials(data.credentials || []);
+      setReviews(data.reviews || []);
+      setPerformanceMetrics(data.performance || {
+        totalRevenue: 0,
+        strRevenue: 0,
+        mtrRevenue: 0,
+        totalBookings: 0,
+        strBookings: 0,
+        mtrBookings: 0,
+        occupancyRate: 0,
+        averageRating: null,
+        reviewCount: 0,
+      });
+
+      // Load AI market insights separately
+      if (data.property?.id) {
+        loadMarketInsights(data.property.id);
       }
     } catch (err) {
-      console.error("Error loading owner data:", err);
+      console.error("Error loading data:", err);
       toast.error("Failed to load your data");
     } finally {
       setLoading(false);
     }
-  };
-
-  const loadPropertyDetails = async (propertyData: PropertyData) => {
-    const { data: statementsData } = await supabase
-      .from("monthly_reconciliations")
-      .select("id, reconciliation_month, total_revenue, total_expenses, net_to_owner, status")
-      .eq("property_id", propertyData.id)
-      .in("status", ["statement_sent", "approved"])
-      .order("reconciliation_month", { ascending: false })
-      .limit(24);
-
-    setStatements((statementsData || []) as Statement[]);
-
-    const { data: expensesData } = await supabase
-      .from("expenses")
-      .select("id, date, amount, purpose, vendor, category, file_path, original_receipt_path, email_screenshot_path")
-      .eq("property_id", propertyData.id)
-      .order("date", { ascending: false })
-      .limit(200);
-
-    setExpenses(expensesData || []);
-
-    const { data: credentialsData } = await supabase
-      .from("property_credentials")
-      .select("id, service_name, username, password, url, notes")
-      .eq("property_id", propertyData.id)
-      .order("service_name");
-
-    setCredentials((credentialsData || []) as Credential[]);
-
-    // Load market insights
-    loadMarketInsights(propertyData.id);
   };
 
   const loadMarketInsights = async (propertyId: string) => {
@@ -364,6 +376,25 @@ export default function OwnerDashboard() {
     toast.success(`${label} copied to clipboard`);
   };
 
+  // Get property image URL
+  const getPropertyImageUrl = () => {
+    if (!property?.image_path) return null;
+    
+    // If it's already a full URL, use it directly
+    if (property.image_path.startsWith('http')) {
+      return property.image_path;
+    }
+    
+    // Otherwise, get from Supabase storage
+    const { data } = supabase.storage
+      .from("property-images")
+      .getPublicUrl(property.image_path);
+    
+    return data?.publicUrl;
+  };
+
+  const propertyImageUrl = getPropertyImageUrl();
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-background via-muted/30 to-background flex items-center justify-center">
@@ -402,41 +433,30 @@ export default function OwnerDashboard() {
   }
 
   const latestStatement = statements[0];
-  const performanceMetrics = marketInsights?.performance || {
-    totalRevenue: statements.reduce((sum, s) => sum + (s.total_revenue || 0), 0),
-    strRevenue: 0,
-    mtrRevenue: 0,
-    totalBookings: 0,
-    strBookings: 0,
-    mtrBookings: 0,
-    occupancyRate: 0,
-    averageRating: null,
-    reviewCount: 0,
-  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-muted/20 to-background">
       {/* Hero Header with Property Image */}
       <header className="relative">
-        {property?.image_path && (
+        {propertyImageUrl && (
           <div className="absolute inset-0 h-64 md:h-80">
             <img
-              src={property.image_path}
-              alt={property.name}
+              src={propertyImageUrl}
+              alt={property?.name || "Property"}
               className="w-full h-full object-cover"
             />
             <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-background" />
           </div>
         )}
         
-        <div className={`relative ${property?.image_path ? 'pt-8 pb-32 md:pb-40' : 'py-6'} bg-gradient-to-br from-primary/10 to-primary/5`}>
+        <div className={`relative ${propertyImageUrl ? 'pt-8 pb-32 md:pb-40' : 'py-6'} bg-gradient-to-br from-primary/10 to-primary/5`}>
           <div className="max-w-7xl mx-auto px-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
                 <div className="w-14 h-14 rounded-2xl bg-white/90 dark:bg-background/90 backdrop-blur flex items-center justify-center shadow-lg">
                   <Building2 className="h-7 w-7 text-primary" />
                 </div>
-                <div className={property?.image_path ? 'text-white' : ''}>
+                <div className={propertyImageUrl ? 'text-white' : ''}>
                   <h1 className="font-bold text-2xl md:text-3xl">{property?.name || "Your Property"}</h1>
                   <div className="flex items-center gap-2 text-sm opacity-90">
                     <MapPin className="h-4 w-4" />
@@ -445,7 +465,7 @@ export default function OwnerDashboard() {
                 </div>
               </div>
               <Button 
-                variant={property?.image_path ? "secondary" : "ghost"} 
+                variant={propertyImageUrl ? "secondary" : "ghost"} 
                 size="sm" 
                 onClick={handleLogout} 
                 className="gap-2"
@@ -455,13 +475,13 @@ export default function OwnerDashboard() {
               </Button>
             </div>
             
-            <div className={`mt-4 ${property?.image_path ? 'text-white/90' : 'text-muted-foreground'}`}>
+            <div className={`mt-4 ${propertyImageUrl ? 'text-white/90' : 'text-muted-foreground'}`}>
               <p className="text-lg">Welcome back, {session.ownerName}</p>
-              {marketInsights?.performance?.averageRating && (
+              {performanceMetrics.averageRating && (
                 <div className="flex items-center gap-2 mt-2">
                   <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
-                  <span className="font-semibold">{marketInsights.performance.averageRating.toFixed(1)}</span>
-                  <span className="text-sm">({marketInsights.performance.reviewCount} reviews)</span>
+                  <span className="font-semibold">{performanceMetrics.averageRating.toFixed(1)}</span>
+                  <span className="text-sm">({performanceMetrics.reviewCount} reviews)</span>
                 </div>
               )}
             </div>
@@ -512,11 +532,11 @@ export default function OwnerDashboard() {
               <OwnerPerformanceCharts statements={statements} propertyName={property?.name} />
 
               {/* Reviews Section */}
-              {marketInsights?.reviews && marketInsights.reviews.length > 0 && (
+              {reviews.length > 0 && (
                 <OwnerReviewsCard
-                  reviews={marketInsights.reviews}
-                  averageRating={marketInsights.performance.averageRating}
-                  reviewCount={marketInsights.performance.reviewCount}
+                  reviews={reviews}
+                  averageRating={performanceMetrics.averageRating}
+                  reviewCount={performanceMetrics.reviewCount}
                   propertyName={property?.name}
                 />
               )}
@@ -597,9 +617,9 @@ export default function OwnerDashboard() {
                   propertyBeds={marketInsights.property?.bedrooms || 5}
                   propertyBaths={marketInsights.property?.bathrooms || 3}
                   currentNightlyRate={property?.rental_type === 'hybrid' ? 280 : undefined}
-                  currentOccupancy={marketInsights.performance.occupancyRate}
+                  currentOccupancy={performanceMetrics.occupancyRate}
                   avgMonthlyRevenue={marketInsights.monthlyRevenue.length > 0 
-                    ? marketInsights.monthlyRevenue.reduce((sum, m) => sum + m.revenue, 0) / marketInsights.monthlyRevenue.length
+                    ? marketInsights.monthlyRevenue.reduce((sum: number, m: any) => sum + (m.total || m.revenue || 0), 0) / marketInsights.monthlyRevenue.length
                     : 0}
                   comparables={marketInsights.aiInsights.comparableProperties || []}
                   marketMetrics={marketInsights.aiInsights.marketMetrics || {
@@ -861,7 +881,7 @@ export default function OwnerDashboard() {
         <div className="max-w-7xl mx-auto px-4 py-8 text-center">
           <p className="text-sm text-muted-foreground">
             PeachHaus Group LLC • Questions? Email{" "}
-            <a href="mailto:info@peachhausgroup.com" className="text-primary underline">
+            <a href="mailto:info@peachhausgroup.com" className="text-primary underline font-medium">
               info@peachhausgroup.com
             </a>
           </p>

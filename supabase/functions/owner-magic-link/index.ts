@@ -35,10 +35,18 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error("Owner not found");
     }
 
+    // Fetch owner's active property
+    const { data: property } = await supabase
+      .from("properties")
+      .select("id, name")
+      .eq("owner_id", owner_id)
+      .is("offboarded_at", null)
+      .single();
+
     // Generate secure token
     const token = crypto.randomUUID() + "-" + crypto.randomUUID();
     
-    // Create session with 24-hour expiry
+    // Create session with 24-hour expiry - include property info
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
     
     const { error: sessionError } = await supabase
@@ -48,6 +56,8 @@ const handler = async (req: Request): Promise<Response> => {
         token,
         email: owner.email,
         expires_at: expiresAt,
+        property_id: property?.id || null,
+        property_name: property?.name || null,
       });
 
     if (sessionError) {
