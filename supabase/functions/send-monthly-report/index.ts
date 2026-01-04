@@ -78,6 +78,9 @@ const handler = async (req: Request): Promise<Response> => {
     const lastDayOfPreviousMonth = new Date(firstDayOfCurrentMonth.getTime() - 1);
     const firstDayOfPreviousMonth = new Date(lastDayOfPreviousMonth.getFullYear(), lastDayOfPreviousMonth.getMonth(), 1);
 
+    // Variable for portal URL with magic link token
+    let portalUrl = "https://peachhausgroup.lovable.app/owner";
+
     if (isReconciliationMode) {
       // RECONCILIATION MODE: Fetch approved reconciliation data (or already sent statements)
       const { data: reconciliation, error: recError } = await supabase
@@ -85,7 +88,7 @@ const handler = async (req: Request): Promise<Response> => {
         .select(`
           *,
           properties(*),
-          property_owners(email, name, second_owner_name, second_owner_email, service_type)
+          property_owners(id, email, name, second_owner_name, second_owner_email, service_type)
         `)
         .eq("id", reconciliation_id)
         .in("status", ["approved", "statement_sent"])
@@ -97,9 +100,32 @@ const handler = async (req: Request): Promise<Response> => {
 
       property = reconciliation.properties;
       ownerEmail = reconciliation.property_owners?.email;
+      const ownerId = reconciliation.property_owners?.id;
       
       if (!ownerEmail) {
         throw new Error("Owner email not found");
+      }
+
+      // Generate magic link token for portal access (30-day expiry for statement emails)
+      if (ownerId) {
+        const token = crypto.randomUUID() + "-" + crypto.randomUUID();
+        const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(); // 30 days
+        
+        const { error: sessionError } = await supabase
+          .from("owner_portal_sessions")
+          .insert({
+            owner_id: ownerId,
+            token,
+            email: ownerEmail,
+            expires_at: expiresAt,
+          });
+
+        if (!sessionError) {
+          portalUrl = `https://peachhausgroup.lovable.app/owner?token=${token}`;
+          console.log(`Generated magic link for owner portal: ${portalUrl}`);
+        } else {
+          console.error("Failed to create portal session:", sessionError);
+        }
       }
 
       // Use reconciliation data instead of live queries
@@ -1171,7 +1197,7 @@ State: ${state}
                     <div style="font-size: 11px; color: #666666;">Access all receipts, bookings, and performance data anytime</div>
                   </td>
                   <td style="text-align: right; vertical-align: middle;">
-                    <a href="https://ijsxcaaqphaciaenlegl.lovable.app/owner" style="display: inline-block; background: #111111; color: #ffffff; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-size: 12px; font-weight: 600;">Open Portal →</a>
+                    <a href="${portalUrl}" style="display: inline-block; background: #111111; color: #ffffff; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-size: 12px; font-weight: 600;">Open Portal →</a>
                   </td>
                 </tr>
               </table>
