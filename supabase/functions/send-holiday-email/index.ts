@@ -411,9 +411,9 @@ function buildHolidayEmailHtml({
 }) {
   const currentYear = new Date().getFullYear();
 
-  // Hosted image URLs
-  const hostsPhotoUrl = "https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/Gemini_Generated_Image_1rel501rel501rel.png";
-  const signatureUrl = "https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/Screenshot_41.jpg";
+  // Hosted image URLs - same signature/headshot as property tab dashboard
+  const hostsPhotoUrl = "https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/ingo-headshot.png";
+  const signatureUrl = "https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/ingo-signature.png";
 
   // Use CID reference for inline image (most reliable), fall back to external URL
   let imageHtml = '';

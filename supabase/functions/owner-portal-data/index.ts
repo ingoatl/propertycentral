@@ -262,24 +262,72 @@ serve(async (req: Request): Promise<Response> => {
 
     const occupancyRate = daysThisYear > 0 ? Math.min(100, Math.round((bookedDays / daysThisYear) * 100)) : 0;
 
-    // Calculate average rating using star_rating column
-    const ratingsWithValue = reviews.filter(r => r.star_rating && r.star_rating > 0);
-    const averageRating = ratingsWithValue.length > 0
-      ? ratingsWithValue.reduce((sum, r) => sum + r.star_rating, 0) / ratingsWithValue.length
-      : null;
+  // Calculate average rating using star_rating column
+  const ratingsWithValue = reviews.filter(r => r.star_rating && r.star_rating > 0);
+  const averageRating = ratingsWithValue.length > 0
+    ? ratingsWithValue.reduce((sum, r) => sum + r.star_rating, 0) / ratingsWithValue.length
+    : null;
 
-    // Build monthly revenue data for charts
-    const monthlyRevenue: Record<string, { month: string; str: number; mtr: number; total: number }> = {};
-    
-    statements.forEach(s => {
-      const month = s.reconciliation_month;
+  // Build monthly revenue data for charts - combine reconciliation + booking data
+  const monthlyRevenue: Record<string, { month: string; str: number; mtr: number; total: number }> = {};
+  
+  // First, populate from reconciliation data (most accurate when available)
+  statements.forEach(s => {
+    const month = s.reconciliation_month;
+    if (!monthlyRevenue[month]) {
+      monthlyRevenue[month] = { month, str: 0, mtr: 0, total: 0 };
+    }
+    monthlyRevenue[month].str = s.short_term_revenue || 0;
+    monthlyRevenue[month].mtr = s.mid_term_revenue || 0;
+    monthlyRevenue[month].total = s.total_revenue || 0;
+  });
+
+  // Supplement with booking data for months without reconciliation
+  // This provides historical context even when reconciliations haven't been created yet
+  validSTRBookings.forEach(b => {
+    if (!b.check_in || b.total_amount <= 0) return;
+    const month = b.check_in.substring(0, 7) + '-01'; // Format as YYYY-MM-01
+    if (!monthlyRevenue[month] || monthlyRevenue[month].total === 0) {
       if (!monthlyRevenue[month]) {
         monthlyRevenue[month] = { month, str: 0, mtr: 0, total: 0 };
       }
-      monthlyRevenue[month].str = s.short_term_revenue || 0;
-      monthlyRevenue[month].mtr = s.mid_term_revenue || 0;
-      monthlyRevenue[month].total = s.total_revenue || 0;
-    });
+      monthlyRevenue[month].str += b.total_amount;
+      monthlyRevenue[month].total += b.total_amount;
+    }
+  });
+
+  // Add MTR booking revenue for months without reconciliation
+  mtrBookings.forEach(b => {
+    if (!b.start_date || !b.end_date || !b.monthly_rent) return;
+    const startDate = new Date(b.start_date);
+    const endDate = new Date(b.end_date);
+    
+    // Prorate across the months the booking spans
+    let currentDate = new Date(startDate);
+    while (currentDate <= endDate) {
+      const monthKey = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-01`;
+      const monthStart = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+      const monthEnd = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+      const daysInMonth = monthEnd.getDate();
+      
+      const effectiveStart = startDate > monthStart ? startDate : monthStart;
+      const effectiveEnd = endDate < monthEnd ? endDate : monthEnd;
+      const daysOccupied = Math.max(1, Math.ceil((effectiveEnd.getTime() - effectiveStart.getTime()) / (1000 * 60 * 60 * 24)) + 1);
+      const proratedRent = (b.monthly_rent / daysInMonth) * daysOccupied;
+      
+      if (!monthlyRevenue[monthKey] || monthlyRevenue[monthKey].total === 0) {
+        if (!monthlyRevenue[monthKey]) {
+          monthlyRevenue[monthKey] = { month: monthKey, str: 0, mtr: 0, total: 0 };
+        }
+        monthlyRevenue[monthKey].mtr += proratedRent;
+        monthlyRevenue[monthKey].total += proratedRent;
+      }
+      
+      // Move to next month
+      currentDate.setMonth(currentDate.getMonth() + 1);
+      currentDate.setDate(1);
+    }
+  });
 
     const monthlyRevenueArray = Object.values(monthlyRevenue)
       .sort((a, b) => a.month.localeCompare(b.month));
