@@ -7,8 +7,10 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Plus, FileText, Trash2, Upload, CheckCircle, XCircle } from "lucide-react";
+import { Plus, FileText, Trash2, Upload, CheckCircle, XCircle, ExternalLink, Link2, Info, Copy, Edit2 } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 interface DocumentTemplate {
   id: string;
@@ -18,6 +20,8 @@ interface DocumentTemplate {
   signwell_template_id: string | null;
   is_active: boolean;
   created_at: string;
+  contract_type: string | null;
+  google_drive_url: string | null;
 }
 
 export function DocumentTemplatesManager() {
@@ -25,11 +29,16 @@ export function DocumentTemplatesManager() {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [showWebhookInfo, setShowWebhookInfo] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     description: "",
     file: null as File | null,
+    contract_type: "co_hosting" as string,
+    google_drive_url: "",
   });
+
+  const webhookUrl = `https://ijsxcaaqphaciaenlegl.supabase.co/functions/v1/signwell-webhook`;
 
   useEffect(() => {
     loadTemplates();
@@ -55,7 +64,6 @@ export function DocumentTemplatesManager() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      // Validate file type
       const validTypes = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
       if (!validTypes.includes(file.type)) {
         toast.error('Please upload a PDF or DOCX file');
@@ -75,7 +83,6 @@ export function DocumentTemplatesManager() {
     try {
       setUploading(true);
 
-      // Upload file to storage
       const fileExt = formData.file.name.split('.').pop();
       const fileName = `${crypto.randomUUID()}.${fileExt}`;
       const filePath = `templates/${fileName}`;
@@ -86,15 +93,12 @@ export function DocumentTemplatesManager() {
 
       if (uploadError) throw uploadError;
 
-      // Get public URL
       const { data: urlData } = supabase.storage
         .from('signed-documents')
         .getPublicUrl(filePath);
 
-      // Get current user
       const { data: { user } } = await supabase.auth.getUser();
 
-      // Create template record
       const { error: insertError } = await supabase
         .from('document_templates')
         .insert({
@@ -103,13 +107,15 @@ export function DocumentTemplatesManager() {
           file_path: urlData.publicUrl,
           created_by: user?.id,
           is_active: true,
+          contract_type: formData.contract_type,
+          google_drive_url: formData.google_drive_url || null,
         });
 
       if (insertError) throw insertError;
 
       toast.success('Template uploaded successfully');
       setDialogOpen(false);
-      setFormData({ name: "", description: "", file: null });
+      setFormData({ name: "", description: "", file: null, contract_type: "co_hosting", google_drive_url: "" });
       loadTemplates();
     } catch (error: any) {
       console.error('Error uploading template:', error);
@@ -153,8 +159,57 @@ export function DocumentTemplatesManager() {
     }
   };
 
+  const copyWebhookUrl = () => {
+    navigator.clipboard.writeText(webhookUrl);
+    toast.success('Webhook URL copied to clipboard');
+  };
+
+  const getContractTypeBadge = (type: string | null) => {
+    switch (type) {
+      case 'co_hosting':
+        return <Badge variant="secondary" className="bg-blue-100 text-blue-700">Co-Hosting</Badge>;
+      case 'full_service':
+        return <Badge variant="secondary" className="bg-purple-100 text-purple-700">Full-Service</Badge>;
+      default:
+        return <Badge variant="outline">Not Set</Badge>;
+    }
+  };
+
   return (
     <div className="space-y-6">
+      {/* SignWell Webhook Setup Info */}
+      <Alert className="border-primary/20 bg-primary/5">
+        <Info className="h-4 w-4" />
+        <AlertTitle className="flex items-center justify-between">
+          <span>SignWell Webhook Configuration</span>
+          <Button variant="ghost" size="sm" onClick={() => setShowWebhookInfo(!showWebhookInfo)}>
+            {showWebhookInfo ? 'Hide' : 'Show Details'}
+          </Button>
+        </AlertTitle>
+        {showWebhookInfo && (
+          <AlertDescription className="mt-3 space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Configure this webhook URL in your SignWell dashboard to receive document status updates:
+            </p>
+            <div className="flex items-center gap-2 p-2 bg-muted rounded-md">
+              <code className="flex-1 text-xs break-all">{webhookUrl}</code>
+              <Button variant="ghost" size="icon" onClick={copyWebhookUrl} className="shrink-0">
+                <Copy className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="text-xs text-muted-foreground space-y-1">
+              <p><strong>Steps to configure:</strong></p>
+              <ol className="list-decimal list-inside space-y-1 ml-2">
+                <li>Go to <a href="https://www.signwell.com/settings/api" target="_blank" rel="noopener noreferrer" className="text-primary underline">SignWell API Settings</a></li>
+                <li>Click "Add Webhook Endpoint"</li>
+                <li>Paste the webhook URL above</li>
+                <li>Select events: <code>document_completed</code>, <code>document_signed</code>, <code>document_viewed</code></li>
+              </ol>
+            </div>
+          </AlertDescription>
+        )}
+      </Alert>
+
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold">Document Templates</h2>
@@ -173,6 +228,9 @@ export function DocumentTemplatesManager() {
           <CardContent className="py-12 text-center">
             <FileText className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
             <p className="text-muted-foreground">No templates yet. Upload your first template to get started.</p>
+            <p className="text-xs text-muted-foreground mt-2">
+              Tip: Use DOCX files with [[placeholder]] tags for dynamic field replacement
+            </p>
           </CardContent>
         </Card>
       ) : (
@@ -181,14 +239,17 @@ export function DocumentTemplatesManager() {
             <Card key={template.id}>
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between">
-                  <div>
+                  <div className="space-y-1">
                     <CardTitle className="flex items-center gap-2">
                       <FileText className="w-5 h-5" />
                       {template.name}
                     </CardTitle>
                     {template.description && (
-                      <CardDescription className="mt-1">{template.description}</CardDescription>
+                      <CardDescription>{template.description}</CardDescription>
                     )}
+                    <div className="flex items-center gap-2 pt-1">
+                      {getContractTypeBadge(template.contract_type)}
+                    </div>
                   </div>
                   <div className="flex items-center gap-2">
                     <Badge 
@@ -213,15 +274,36 @@ export function DocumentTemplatesManager() {
                   </div>
                 </div>
               </CardHeader>
-              <CardContent>
-                <a 
-                  href={template.file_path} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="text-sm text-primary hover:underline"
-                >
-                  View Document
-                </a>
+              <CardContent className="space-y-2">
+                <div className="flex flex-wrap gap-3">
+                  <a 
+                    href={template.file_path} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+                  >
+                    <FileText className="w-3 h-3" />
+                    View Document
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                  {template.google_drive_url && (
+                    <a 
+                      href={template.google_drive_url} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-sm text-blue-600 hover:underline"
+                    >
+                      <Edit2 className="w-3 h-3" />
+                      Edit in Google Drive
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  )}
+                </div>
+                {!template.google_drive_url && (
+                  <p className="text-xs text-muted-foreground">
+                    No Google Drive link configured. You can add one to easily edit the source document.
+                  </p>
+                )}
               </CardContent>
             </Card>
           ))}
@@ -229,11 +311,11 @@ export function DocumentTemplatesManager() {
       )}
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>Upload Document Template</DialogTitle>
             <DialogDescription>
-              Upload a PDF or DOCX file to use as an agreement template
+              Upload a PDF or DOCX file to use as an agreement template. DOCX files can include [[placeholder]] tags for dynamic fields.
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -243,20 +325,55 @@ export function DocumentTemplatesManager() {
                 id="name"
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="Innkeeper Agreement"
+                placeholder="Co-Hosting Agreement"
                 required
               />
             </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="contract_type">Contract Type *</Label>
+              <Select 
+                value={formData.contract_type} 
+                onValueChange={(value) => setFormData({ ...formData, contract_type: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select contract type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="co_hosting">Co-Hosting Agreement</SelectItem>
+                  <SelectItem value="full_service">Full-Service Management Agreement</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="description">Description</Label>
               <Textarea
                 id="description"
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                placeholder="Standard agreement for mid-term rentals..."
+                placeholder="Standard agreement for co-hosting partners..."
                 rows={2}
               />
             </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="google_drive_url" className="flex items-center gap-2">
+                <Link2 className="w-4 h-4" />
+                Google Drive Link (Optional)
+              </Label>
+              <Input
+                id="google_drive_url"
+                type="url"
+                value={formData.google_drive_url}
+                onChange={(e) => setFormData({ ...formData, google_drive_url: e.target.value })}
+                placeholder="https://docs.google.com/document/d/..."
+              />
+              <p className="text-xs text-muted-foreground">
+                Link to the editable source document in Google Drive for future updates
+              </p>
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="file">Document File (PDF or DOCX) *</Label>
               <div className="flex items-center gap-2">
@@ -274,6 +391,7 @@ export function DocumentTemplatesManager() {
                 </p>
               )}
             </div>
+
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
                 Cancel

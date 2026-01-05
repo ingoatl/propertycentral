@@ -861,6 +861,7 @@ export type Database = {
           description: string | null
           field_mappings: Json | null
           file_path: string
+          google_drive_url: string | null
           id: string
           is_active: boolean | null
           name: string
@@ -874,6 +875,7 @@ export type Database = {
           description?: string | null
           field_mappings?: Json | null
           file_path: string
+          google_drive_url?: string | null
           id?: string
           is_active?: boolean | null
           name: string
@@ -887,6 +889,7 @@ export type Database = {
           description?: string | null
           field_mappings?: Json | null
           file_path?: string
+          google_drive_url?: string | null
           id?: string
           is_active?: boolean | null
           name?: string
