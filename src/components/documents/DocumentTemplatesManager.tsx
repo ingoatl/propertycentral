@@ -13,6 +13,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { Check, ChevronsUpDown } from "lucide-react";
+import { extractPdfTextWithPositions } from "@/utils/pdfTextExtractor";
 
 interface DocumentTemplate {
   id: string;
@@ -193,26 +194,35 @@ export function DocumentTemplatesManager() {
 
       if (insertError) throw insertError;
 
-      // Now detect fields in the PDF using AI
+      // Extract text positions from PDF client-side for accurate field detection
       toast.info('Analyzing PDF for field positions...');
       
       try {
+        // Extract text with positions from PDF using PDF.js
+        const { textPositions, totalPages } = await extractPdfTextWithPositions(urlData.publicUrl);
+        
+        console.log(`Extracted ${textPositions.length} text items from ${totalPages} pages`);
+        
+        // Send to AI for intelligent field detection
         const { data: fieldData, error: fieldError } = await supabase.functions.invoke('detect-pdf-fields', {
           body: { 
-            pdfUrl: urlData.publicUrl,
+            textPositions,
             templateId: insertedTemplate.id,
+            totalPages,
           },
         });
 
         if (fieldError) {
           console.error('Field detection error:', fieldError);
-          toast.warning('Template uploaded, but field detection failed. Default positions will be used.');
+          toast.warning('Template uploaded, but field detection failed. You can re-analyze later.');
         } else if (fieldData?.fields?.length > 0) {
-          toast.success(`Detected ${fieldData.fields.length} fillable fields`);
+          toast.success(`Detected ${fieldData.fields.length} fillable fields with accurate positions`);
+        } else {
+          toast.warning('No fillable fields detected. You may need to add fields manually.');
         }
       } catch (fieldErr) {
         console.error('Field detection error:', fieldErr);
-        // Don't fail the whole upload if field detection fails
+        toast.warning('Could not analyze PDF for fields. You can re-analyze later.');
       }
 
       toast.success('Template uploaded successfully');
@@ -288,29 +298,31 @@ export function DocumentTemplatesManager() {
     try {
       setReanalyzing(template.id);
       
-      const { data, error } = await supabase.functions.invoke('analyze-document-fields', {
+      // Extract text positions from PDF
+      const { textPositions, totalPages } = await extractPdfTextWithPositions(template.file_path);
+      
+      console.log(`Re-analyzing: extracted ${textPositions.length} text items from ${totalPages} pages`);
+      
+      // Send to AI for field detection
+      const { data, error } = await supabase.functions.invoke('detect-pdf-fields', {
         body: { 
+          textPositions,
           templateId: template.id,
-          forceReanalyze: true,
+          totalPages,
         },
       });
 
       if (error) throw error;
       
-      if (data?.detected_contract_type && data.detected_contract_type !== template.contract_type) {
-        await supabase
-          .from('document_templates')
-          .update({ contract_type: data.detected_contract_type })
-          .eq('id', template.id);
-        
-        toast.success(`Updated type: ${CONTRACT_TYPE_OPTIONS.find(o => o.value === data.detected_contract_type)?.label || data.detected_contract_type}`);
+      if (data?.fields?.length > 0) {
+        toast.success(`Re-detected ${data.fields.length} fillable fields with accurate positions`);
         loadTemplates();
       } else {
-        toast.success('Document analyzed successfully');
+        toast.warning('No fillable fields detected');
       }
     } catch (error: any) {
       console.error('Error re-analyzing:', error);
-      toast.error('Failed to re-analyze document');
+      toast.error('Failed to re-analyze document: ' + (error.message || 'Unknown error'));
     } finally {
       setReanalyzing(null);
     }

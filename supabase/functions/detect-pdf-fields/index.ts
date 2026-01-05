@@ -6,6 +6,16 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+interface TextPosition {
+  text: string;
+  x: number; // percentage
+  y: number; // percentage
+  width: number;
+  height: number;
+  page: number;
+  lineIndex: number;
+}
+
 interface DetectedField {
   api_id: string;
   label: string;
@@ -34,92 +44,80 @@ serve(async (req) => {
     }
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
-    const { pdfUrl, templateId } = await req.json();
+    const { textPositions, templateId, totalPages } = await req.json();
 
-    if (!pdfUrl) {
+    if (!textPositions || !Array.isArray(textPositions)) {
       return new Response(
-        JSON.stringify({ error: "PDF URL is required" }),
+        JSON.stringify({ error: "Text positions are required" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    console.log("Detecting fields in PDF:", pdfUrl.substring(0, 50) + "...");
+    console.log(`Analyzing ${textPositions.length} text items across ${totalPages} pages`);
 
-    // Use AI to analyze the PDF and detect field positions
-    // We'll send the PDF URL to the AI and ask it to identify fillable areas
-    const prompt = `You are a document analysis expert. Analyze this PDF document and detect ALL fillable areas that need to be signed or filled in by users.
+    // Format text items for AI analysis - group by lines
+    const linesByPage: Record<number, { text: string; x: number; y: number; lineText: string }[]> = {};
+    
+    for (const item of textPositions as TextPosition[]) {
+      if (!linesByPage[item.page]) {
+        linesByPage[item.page] = [];
+      }
+      linesByPage[item.page].push({
+        text: item.text,
+        x: item.x,
+        y: item.y,
+        lineText: item.text,
+      });
+    }
 
-For a typical Property Management Agreement, look for:
-1. **Header Fields (Page 1, top section):**
-   - "Effective Date:" or date fields (usually near the top)
-   - "Owner(s):" or owner name fields
-   - "Residing at:" or owner address fields
-   - Phone number fields
-   - Email fields
+    // Create a summary of the document structure for AI
+    const documentSummary = Object.entries(linesByPage)
+      .map(([page, lines]) => {
+        const sortedLines = lines.sort((a, b) => a.y - b.y);
+        return `--- Page ${page} ---\n${sortedLines.map(l => 
+          `[y:${l.y.toFixed(1)}%, x:${l.x.toFixed(1)}%] "${l.text}"`
+        ).join('\n')}`;
+      })
+      .join('\n\n');
 
-2. **Property Information (Page 1):**
-   - "Property Address:" fields
-   - Property details fields
+    const prompt = `You are analyzing a document to detect fillable fields. Below is the text content with exact positions (x,y as percentages from top-left).
 
-3. **Checkboxes (throughout document):**
-   - Any checkbox options like "Co-Hosting" or "Full Management"
-   - Service selection checkboxes
+${documentSummary}
 
-4. **Signature Blocks (usually last pages):**
-   - Owner signature lines (look for "OWNER:" or "Owner Signature")
-   - Manager/Host signature lines
-   - Date fields next to signatures
-   - "Print Name" fields
+TASK: Identify ALL fillable areas where someone needs to input information. Look for:
 
-For each field detected, provide:
-- api_id: A snake_case identifier (e.g., "effective_date", "owner_name", "owner_signature")
-- label: Human-readable label
-- type: One of "text", "date", "email", "phone", "signature", "checkbox"
-- page: Page number (1-indexed)
-- x: Left position as percentage (0-100) from left edge
-- y: Top position as percentage (0-100) from top edge
-- width: Width as percentage
-- height: Height as percentage
-- filled_by: "admin" for fields pre-filled by host/manager, "guest" for fields the owner fills
-- required: true/false
+1. **Labels followed by underlines or blank spaces** (e.g., "Owner(s): ___", "Address: ____")
+2. **Signature blocks** (lines that say "OWNER:", "MANAGER:", "Signature:", etc.)
+3. **Date fields** (near signatures or standalone "Date: ___")
+4. **Checkboxes** (☐, □, or [ ] symbols)
+5. **Print Name fields** (usually near signatures)
 
-FIELD TYPE RULES:
-- "effective_date" -> type: "date", filled_by: "admin" (host sets the date)
-- "owner_name", "owner_address", "owner_phone", "owner_email" -> filled_by: "guest"
-- "property_address" -> filled_by: "admin" (host pre-fills)
-- "owner_signature", "second_owner_signature" -> type: "signature", filled_by: "guest"
-- "manager_signature", "host_signature" -> type: "signature", filled_by: "admin"
-- All date fields next to owner signatures -> filled_by: "guest"
+For each field, return EXACT position based on the coordinates provided. The field input area should START right after the label text.
 
-POSITIONING TIPS:
-- Fields are typically positioned right after their labels
-- Signature blocks are usually at the bottom of the last page or pages
-- Look for underlines (______) which indicate fillable areas
-- Estimate positions based on typical document layouts
+RULES for filled_by:
+- "guest" = Owner/Tenant fills (owner_name, owner_address, owner_phone, owner_email, owner signatures, their dates)
+- "admin" = Manager/Host fills (effective_date, property_address, manager signatures, management fees)
 
-Return a JSON object with this structure:
+Return ONLY a JSON object:
 {
   "fields": [
     {
-      "api_id": "effective_date",
-      "label": "Effective Date",
-      "type": "date",
+      "api_id": "owner_name",
+      "label": "Owner(s)",
+      "type": "text",
       "page": 1,
-      "x": 58,
-      "y": 6,
-      "width": 25,
+      "x": 18.5,
+      "y": 35.2,
+      "width": 50,
       "height": 3,
-      "filled_by": "admin",
+      "filled_by": "guest",
       "required": true
-    },
-    // ... more fields
-  ],
-  "total_pages": 10
+    }
+  ]
 }
 
-This is a Property Management Agreement PDF. Please analyze it and return the field positions.`;
+IMPORTANT: Use the EXACT y values from the text positions. If "Owner(s):" is at y:35.2%, the field should be at approximately y:35%.`;
 
-    // Call Lovable AI to analyze the document
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -129,104 +127,73 @@ This is a Property Management Agreement PDF. Please analyze it and return the fi
       body: JSON.stringify({
         model: "google/gemini-2.5-flash",
         messages: [
-          {
-            role: "user",
-            content: [
-              { type: "text", text: prompt },
-              { 
-                type: "text", 
-                text: `The PDF is located at: ${pdfUrl}\n\nBased on this being a Property Management Agreement, provide the field positions. Use your knowledge of typical agreement layouts to position fields accurately.`
-              }
-            ]
-          }
+          { role: "user", content: prompt }
         ],
-        temperature: 0.2,
+        max_tokens: 4000,
       }),
     });
 
     if (!response.ok) {
       const errorText = await response.text();
       console.error("AI API error:", response.status, errorText);
-      
-      // Fallback to default field positions for a standard agreement
-      const defaultFields = getDefaultFieldPositions();
-      
-      if (templateId) {
-        await supabase
-          .from("document_templates")
-          .update({ field_mappings: defaultFields })
-          .eq("id", templateId);
-      }
-
-      return new Response(
-        JSON.stringify({ 
-          success: true, 
-          fields: defaultFields,
-          source: "default",
-          message: "Using default field positions"
-        }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      throw new Error("AI analysis failed");
     }
 
     const aiResponse = await response.json();
     const content = aiResponse.choices?.[0]?.message?.content || "";
     
-    console.log("AI Response received, parsing...");
+    console.log("AI response:", content.substring(0, 500));
 
-    // Extract JSON from the response
     let detectedFields: DetectedField[] = [];
-    let totalPages = 10;
 
     try {
-      // Try to parse JSON from the response
+      // Extract JSON from the response
       const jsonMatch = content.match(/\{[\s\S]*"fields"[\s\S]*\}/);
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[0]);
         detectedFields = parsed.fields || [];
-        totalPages = parsed.total_pages || 10;
-      } else {
-        // Try parsing the entire content as JSON
-        const parsed = JSON.parse(content);
-        detectedFields = parsed.fields || [];
-        totalPages = parsed.total_pages || 10;
       }
     } catch (parseError) {
-      console.error("Failed to parse AI response, using defaults:", parseError);
-      detectedFields = getDefaultFieldPositions();
+      console.error("Failed to parse AI response:", parseError);
     }
 
-    // Validate and clean up the fields
-    const validatedFields = detectedFields.map((field: any) => ({
-      api_id: field.api_id || `field_${Math.random().toString(36).substr(2, 9)}`,
-      label: field.label || "Unknown Field",
-      type: validateFieldType(field.type),
-      page: Math.max(1, Math.min(totalPages, field.page || 1)),
-      x: Math.max(0, Math.min(100, field.x || 10)),
-      y: Math.max(0, Math.min(100, field.y || 10)),
-      width: Math.max(5, Math.min(90, field.width || 30)),
-      height: Math.max(2, Math.min(20, field.height || 4)),
-      filled_by: field.filled_by === "admin" ? "admin" : "guest",
-      required: field.required !== false,
-    }));
+    // Validate and clean fields
+    const validatedFields = detectedFields
+      .filter((f: any) => f.api_id && f.page && typeof f.x === 'number' && typeof f.y === 'number')
+      .map((field: any) => ({
+        api_id: String(field.api_id).replace(/[^a-z0-9_]/gi, '_').toLowerCase(),
+        label: String(field.label || field.api_id),
+        type: validateFieldType(field.type),
+        page: Math.max(1, Math.min(totalPages || 20, Number(field.page))),
+        x: Math.max(0, Math.min(100, Number(field.x))),
+        y: Math.max(0, Math.min(100, Number(field.y))),
+        width: Math.max(5, Math.min(80, Number(field.width) || 30)),
+        height: Math.max(2, Math.min(15, Number(field.height) || 3)),
+        filled_by: field.filled_by === "admin" ? "admin" : "guest",
+        required: field.required !== false,
+      }));
 
-    console.log(`Detected ${validatedFields.length} fields across ${totalPages} pages`);
+    console.log(`Detected ${validatedFields.length} fields`);
 
     // Save to template if templateId provided
-    if (templateId) {
-      await supabase
+    if (templateId && validatedFields.length > 0) {
+      const { error: updateError } = await supabase
         .from("document_templates")
         .update({ field_mappings: validatedFields })
         .eq("id", templateId);
       
-      console.log("Saved field mappings to template:", templateId);
+      if (updateError) {
+        console.error("Error saving fields:", updateError);
+      } else {
+        console.log("Saved field mappings to template:", templateId);
+      }
     }
 
     return new Response(
       JSON.stringify({ 
         success: true, 
         fields: validatedFields,
-        totalPages,
+        totalPages: totalPages || 1,
         source: "ai"
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -244,180 +211,4 @@ This is a Property Management Agreement PDF. Please analyze it and return the fi
 function validateFieldType(type: string): DetectedField["type"] {
   const validTypes = ["text", "date", "email", "phone", "signature", "checkbox"];
   return validTypes.includes(type) ? type as DetectedField["type"] : "text";
-}
-
-function getDefaultFieldPositions(): DetectedField[] {
-  return [
-    // Page 1 - Header fields
-    {
-      api_id: "effective_date",
-      label: "Effective Date",
-      type: "date",
-      page: 1,
-      x: 58,
-      y: 5.5,
-      width: 25,
-      height: 3,
-      filled_by: "admin",
-      required: true,
-    },
-    {
-      api_id: "owner_name",
-      label: "Owner(s)",
-      type: "text",
-      page: 1,
-      x: 22,
-      y: 18.5,
-      width: 60,
-      height: 3,
-      filled_by: "guest",
-      required: true,
-    },
-    {
-      api_id: "owner_address",
-      label: "Residing at",
-      type: "text",
-      page: 1,
-      x: 27,
-      y: 21.5,
-      width: 55,
-      height: 3,
-      filled_by: "guest",
-      required: true,
-    },
-    {
-      api_id: "owner_phone",
-      label: "Phone",
-      type: "phone",
-      page: 1,
-      x: 18,
-      y: 24.5,
-      width: 25,
-      height: 3,
-      filled_by: "guest",
-      required: true,
-    },
-    {
-      api_id: "owner_email",
-      label: "Email",
-      type: "email",
-      page: 1,
-      x: 55,
-      y: 24.5,
-      width: 30,
-      height: 3,
-      filled_by: "guest",
-      required: true,
-    },
-    {
-      api_id: "property_address",
-      label: "Property Address",
-      type: "text",
-      page: 1,
-      x: 32,
-      y: 27.5,
-      width: 50,
-      height: 3,
-      filled_by: "admin",
-      required: true,
-    },
-    // Page 2 - Checkboxes for service type
-    {
-      api_id: "service_cohosting",
-      label: "Co-Hosting",
-      type: "checkbox",
-      page: 2,
-      x: 10,
-      y: 12,
-      width: 4,
-      height: 3,
-      filled_by: "admin",
-      required: false,
-    },
-    {
-      api_id: "service_full_management",
-      label: "Full Management",
-      type: "checkbox",
-      page: 2,
-      x: 10,
-      y: 18,
-      width: 4,
-      height: 3,
-      filled_by: "admin",
-      required: false,
-    },
-    // Page 10 - Signature block
-    {
-      api_id: "owner_signature",
-      label: "Owner Signature",
-      type: "signature",
-      page: 10,
-      x: 10,
-      y: 70,
-      width: 35,
-      height: 8,
-      filled_by: "guest",
-      required: true,
-    },
-    {
-      api_id: "owner_signature_date",
-      label: "Date",
-      type: "date",
-      page: 10,
-      x: 10,
-      y: 82,
-      width: 20,
-      height: 3,
-      filled_by: "guest",
-      required: true,
-    },
-    {
-      api_id: "owner_print_name",
-      label: "Print Name",
-      type: "text",
-      page: 10,
-      x: 10,
-      y: 88,
-      width: 35,
-      height: 3,
-      filled_by: "guest",
-      required: true,
-    },
-    {
-      api_id: "manager_signature",
-      label: "Manager Signature",
-      type: "signature",
-      page: 10,
-      x: 55,
-      y: 70,
-      width: 35,
-      height: 8,
-      filled_by: "admin",
-      required: true,
-    },
-    {
-      api_id: "manager_signature_date",
-      label: "Date",
-      type: "date",
-      page: 10,
-      x: 55,
-      y: 82,
-      width: 20,
-      height: 3,
-      filled_by: "admin",
-      required: true,
-    },
-    {
-      api_id: "manager_print_name",
-      label: "Print Name",
-      type: "text",
-      page: 10,
-      x: 55,
-      y: 88,
-      width: 35,
-      height: 3,
-      filled_by: "admin",
-      required: true,
-    },
-  ];
 }
