@@ -57,10 +57,17 @@ export function InlineField({
     }
   }, [isActive, field.type]);
 
-  const fontSize = Math.max(11, Math.min(14, 13 * scale));
+  const fontSize = Math.max(10, Math.min(12, 11 * scale));
+
+  // Compact field heights based on type
+  const getFieldHeight = () => {
+    if (field.type === "signature") return "h-[50px] max-h-[50px]";
+    if (field.type === "checkbox" || field.type === "radio") return "h-[22px] max-h-[22px] w-[22px] max-w-[22px]";
+    return "h-[24px] max-h-[24px]"; // text, date, email, phone
+  };
 
   // DocuSign-style field wrapper classes
-  const baseFieldClass = "w-full transition-all duration-150";
+  const baseFieldClass = "transition-all duration-150";
   const pendingClass = "bg-[#fff8dc] border-2 border-[#fae052] hover:bg-[#fff5cc]";
   const completedClass = "bg-[#e8f5e9] border-2 border-[#4caf50]";
   const activeClass = "bg-white border-2 border-[#2196f3] shadow-lg ring-2 ring-[#2196f3]/20";
@@ -75,7 +82,7 @@ export function InlineField({
           className={cn(
             baseFieldClass, 
             readOnlyClass,
-            "h-full min-h-[50px] rounded flex items-center justify-center"
+            "w-full h-[50px] rounded flex items-center justify-center"
           )}
         >
           {hasSignature ? (
@@ -87,7 +94,7 @@ export function InlineField({
           ) : (
             <div className="flex items-center gap-1 text-[#999] text-xs">
               <Lock className="h-3 w-3" />
-              <span>Awaiting signature</span>
+              <span>Awaiting</span>
             </div>
           )}
         </div>
@@ -100,7 +107,7 @@ export function InlineField({
         className={cn(
           baseFieldClass,
           hasSignature ? completedClass : pendingClass,
-          "h-full min-h-[50px] rounded flex items-center justify-center cursor-pointer"
+          "w-full h-[50px] rounded flex items-center justify-center cursor-pointer"
         )}
         style={{ fontSize }}
       >
@@ -109,15 +116,15 @@ export function InlineField({
             <img 
               src={signatureData || (value as string)} 
               alt="Signature" 
-              className="max-h-[45px] max-w-full object-contain" 
+              className="max-h-[40px] max-w-full object-contain" 
             />
-            <div className="absolute top-1 right-1 bg-green-500 rounded-full p-0.5">
-              <Check className="h-2.5 w-2.5 text-white" />
+            <div className="absolute top-0 right-0 bg-green-500 rounded-full p-0.5">
+              <Check className="h-2 w-2 text-white" />
             </div>
           </div>
         ) : (
-          <div className="flex items-center gap-2 text-[#b8860b] font-semibold">
-            <Pencil className="h-4 w-4" />
+          <div className="flex items-center gap-1 text-[#b8860b] font-semibold text-xs">
+            <Pencil className="h-3 w-3" />
             <span>Sign</span>
           </div>
         )}
@@ -133,8 +140,6 @@ export function InlineField({
         type="button"
         onClick={() => {
           if (!isReadOnly) {
-            // For radio: always set to true (parent handles clearing others in group)
-            // For checkbox: toggle
             if (field.type === "radio") {
               onChange(true);
             } else {
@@ -144,7 +149,8 @@ export function InlineField({
         }}
         disabled={isReadOnly}
         className={cn(
-          "flex items-center justify-center h-full w-full cursor-pointer gap-1",
+          "flex items-center justify-center cursor-pointer",
+          "w-[22px] h-[22px]",
           isReadOnly ? "opacity-60 cursor-not-allowed" : "hover:bg-[#fff5cc]",
           isSelected ? completedClass : pendingClass,
           "rounded transition-all duration-150"
@@ -153,18 +159,17 @@ export function InlineField({
         <div className={cn(
           "flex items-center justify-center",
           field.type === "radio" ? "rounded-full" : "rounded",
-          "h-5 w-5 border-2 transition-colors",
+          "h-4 w-4 border-2 transition-colors",
           isSelected 
             ? "border-[#4caf50] bg-[#4caf50]" 
             : "border-[#fae052] bg-white"
         )}>
           {isSelected && (
             field.type === "radio" 
-              ? <div className="w-2 h-2 rounded-full bg-white" />
-              : <Check className="h-3 w-3 text-white" />
+              ? <div className="w-1.5 h-1.5 rounded-full bg-white" />
+              : <Check className="h-2.5 w-2.5 text-white" />
           )}
         </div>
-        {isSelected && <Check className="h-3 w-3 text-green-600" />}
       </button>
     );
   }
@@ -175,11 +180,11 @@ export function InlineField({
     if (isReadOnly) {
       return (
         <div 
-          className={cn(baseFieldClass, readOnlyClass, "h-full flex items-center px-2 rounded text-[#666]")}
+          className={cn(baseFieldClass, readOnlyClass, "w-full h-[24px] flex items-center px-1.5 rounded text-[#666]")}
           style={{ fontSize }}
         >
-          <Lock className="h-3 w-3 mr-1.5 flex-shrink-0 text-[#999]" />
-          <span className="truncate">{dateValue ? format(dateValue, "MM/dd/yyyy") : "—"}</span>
+          <Lock className="h-2.5 w-2.5 mr-1 flex-shrink-0 text-[#999]" />
+          <span className="truncate">{dateValue ? format(dateValue, "MM/dd/yy") : "—"}</span>
         </div>
       );
     }
@@ -192,17 +197,17 @@ export function InlineField({
             className={cn(
               baseFieldClass,
               isCompleted ? completedClass : pendingClass,
-              "h-full flex items-center justify-between px-2 rounded cursor-pointer"
+              "w-full h-[24px] flex items-center justify-between px-1.5 rounded cursor-pointer"
             )}
             style={{ fontSize }}
           >
-            <span className={cn(dateValue ? "text-[#333]" : "text-[#b8860b]")}>
-              {dateValue ? format(dateValue, "MM/dd/yyyy") : "Select date"}
+            <span className={cn(dateValue ? "text-[#333]" : "text-[#b8860b]", "text-xs")}>
+              {dateValue ? format(dateValue, "MM/dd/yy") : "Date"}
             </span>
             {isCompleted ? (
-              <Check className="h-3.5 w-3.5 text-green-600 flex-shrink-0" />
+              <Check className="h-3 w-3 text-green-600 flex-shrink-0" />
             ) : (
-              <CalendarIcon className="h-3.5 w-3.5 text-[#b8860b] flex-shrink-0" />
+              <CalendarIcon className="h-3 w-3 text-[#b8860b] flex-shrink-0" />
             )}
           </button>
         </PopoverTrigger>
@@ -228,11 +233,11 @@ export function InlineField({
   if (isReadOnly) {
     return (
       <div 
-        className={cn(baseFieldClass, readOnlyClass, "h-full flex items-center px-2 rounded text-[#666]")}
+        className={cn(baseFieldClass, readOnlyClass, "w-full h-[24px] flex items-center px-1.5 rounded text-[#666]")}
         style={{ fontSize }}
       >
-        <Lock className="h-3 w-3 mr-1.5 flex-shrink-0 text-[#999]" />
-        <span className="truncate">{(value as string) || "—"}</span>
+        <Lock className="h-2.5 w-2.5 mr-1 flex-shrink-0 text-[#999]" />
+        <span className="truncate text-xs">{(value as string) || "—"}</span>
       </div>
     );
   }
@@ -252,7 +257,7 @@ export function InlineField({
           }
         }}
         placeholder={field.label}
-        className={cn(baseFieldClass, activeClass, "h-full px-2 rounded")}
+        className={cn(baseFieldClass, activeClass, "w-full h-[24px] px-1.5 rounded text-xs")}
         style={{ fontSize }}
         autoFocus
       />
@@ -266,16 +271,16 @@ export function InlineField({
       className={cn(
         baseFieldClass,
         isCompleted ? completedClass : pendingClass,
-        "h-full flex items-center px-2 rounded text-left cursor-pointer"
+        "w-full h-[24px] flex items-center px-1.5 rounded text-left cursor-pointer"
       )}
       style={{ fontSize }}
     >
       {value ? (
-        <span className="truncate text-[#333] flex-1">{value as string}</span>
+        <span className="truncate text-[#333] flex-1 text-xs">{value as string}</span>
       ) : (
-        <span className="text-[#b8860b] truncate flex-1">Enter {field.label.toLowerCase()}</span>
+        <span className="text-[#b8860b] truncate flex-1 text-xs">{field.label}</span>
       )}
-      {isCompleted && <Check className="h-3.5 w-3.5 ml-1 text-green-600 flex-shrink-0" />}
+      {isCompleted && <Check className="h-3 w-3 ml-1 text-green-600 flex-shrink-0" />}
     </button>
   );
 }

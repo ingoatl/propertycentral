@@ -236,6 +236,14 @@ export function DocumentTemplatesManager() {
         } else if (fieldData?.fields?.length > 0) {
           const source = fieldData.source === 'acroform' ? 'exact form field positions' : 'AI analysis';
           toast.success(`Detected ${fieldData.fields.length} fillable fields using ${source}`);
+          
+          // Auto-open preview for manual adjustment
+          await loadTemplates();
+          const updatedTemplate = {
+            ...insertedTemplate,
+            field_mappings: fieldData.fields,
+          };
+          setPreviewTemplate(updatedTemplate as DocumentTemplate);
         } else {
           toast.warning('No fillable fields detected. You may need to add fields manually.');
         }
