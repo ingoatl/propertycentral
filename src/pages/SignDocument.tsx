@@ -1,10 +1,10 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
-import { Loader2, CheckCircle, AlertCircle, ChevronLeft, ChevronRight, ZoomIn, ZoomOut } from "lucide-react";
+import { Loader2, CheckCircle, AlertCircle, ZoomIn, ZoomOut } from "lucide-react";
 import { Document, Page, pdfjs } from "react-pdf";
 import { InlineField, FieldData } from "@/components/signing/InlineField";
 import { InlineSignature } from "@/components/signing/InlineSignature";
@@ -42,7 +42,7 @@ const SignDocument = () => {
   const { token } = useParams<{ token: string }>();
   const navigate = useNavigate();
   const containerRef = useRef<HTMLDivElement>(null);
-  const pageRef = useRef<HTMLDivElement>(null);
+  const pageRefs = useRef<Map<number, HTMLDivElement>>(new Map());
   
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -55,7 +55,6 @@ const SignDocument = () => {
   
   // PDF states
   const [numPages, setNumPages] = useState<number>(0);
-  const [currentPage, setCurrentPage] = useState(1);
   const [scale, setScale] = useState(1.0);
   const [pageWidth, setPageWidth] = useState(800);
   
@@ -76,7 +75,7 @@ const SignDocument = () => {
   useEffect(() => {
     const updateWidth = () => {
       if (containerRef.current) {
-        const width = Math.min(containerRef.current.offsetWidth - 32, 900);
+        const width = Math.min(containerRef.current.offsetWidth - 48, 850);
         setPageWidth(width);
       }
     };
@@ -173,7 +172,7 @@ const SignDocument = () => {
     const requiredFields = signerFields.filter(f => f.required && f.filled_by === "guest");
     const missingFields = requiredFields.filter(f => {
       if (f.type === "signature") return !signatureData;
-      if (f.type === "checkbox") return false; // Checkboxes can be false
+      if (f.type === "checkbox") return false;
       return !fieldValues[f.api_id];
     });
 
@@ -210,27 +209,24 @@ const SignDocument = () => {
     }
   };
 
-  const goToPage = (page: number) => {
-    if (page >= 1 && page <= numPages) {
-      setCurrentPage(page);
-      setActiveFieldId(null);
-      setShowSignatureFor(null);
-    }
-  };
-
   const navigateToField = (field: FieldData) => {
-    setCurrentPage(field.page);
+    // Scroll to the page containing the field
+    const pageEl = pageRefs.current.get(field.page);
+    if (pageEl) {
+      pageEl.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+    
     setActiveFieldId(null);
     setShowSignatureFor(null);
     
-    // Small delay to ensure page renders before focusing
+    // Small delay to ensure page is visible before focusing
     setTimeout(() => {
       if (field.type === "signature") {
         setShowSignatureFor(field.api_id);
       } else {
         setActiveFieldId(field.api_id);
       }
-    }, 100);
+    }, 300);
   };
 
   const handleStart = () => {
@@ -268,12 +264,14 @@ const SignDocument = () => {
   const zoomIn = () => setScale(prev => Math.min(prev + 0.25, 2));
   const zoomOut = () => setScale(prev => Math.max(prev - 0.25, 0.5));
 
-  const fieldsOnCurrentPage = signerFields.filter(f => f.page === currentPage);
   const canFinish = signatureData && agreedToTerms && signerFields.filter(f => f.required && f.filled_by === "guest").every(f => {
     if (f.type === "signature") return !!signatureData;
     if (f.type === "checkbox") return true;
     return !!fieldValues[f.api_id];
   });
+
+  // Get fields for a specific page
+  const getFieldsForPage = (pageNum: number) => signerFields.filter(f => f.page === pageNum);
 
   if (loading) {
     return (
@@ -325,9 +323,9 @@ const SignDocument = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#404040] flex flex-col">
+    <div className="min-h-screen bg-[#525252] flex flex-col">
       {/* Header */}
-      <header className="bg-[#1a1a1a] text-white px-4 py-3 flex items-center justify-between">
+      <header className="bg-[#1a1a1a] text-white px-4 py-3 flex items-center justify-between sticky top-0 z-50">
         <div className="flex items-center gap-4">
           <span className="text-2xl">🍑</span>
           <div className="min-w-0">
@@ -355,15 +353,15 @@ const SignDocument = () => {
         fields={signerFields}
         completedFields={completedFields}
         signatureData={signatureData}
-        currentPage={currentPage}
+        currentPage={1}
         onNavigateToField={navigateToField}
         onStart={handleStart}
         onNext={handleNext}
       />
 
-      {/* Document Area */}
-      <main ref={containerRef} className="flex-1 overflow-auto p-2 sm:p-4">
-        <div className="max-w-4xl mx-auto">
+      {/* Document Area - Scrollable */}
+      <main ref={containerRef} className="flex-1 overflow-auto py-6">
+        <div className="max-w-4xl mx-auto px-4">
           {data?.pdfUrl ? (
             <Document
               file={data.pdfUrl}
@@ -380,60 +378,82 @@ const SignDocument = () => {
                 </div>
               }
             >
-              <div ref={pageRef} className="relative bg-white shadow-2xl rounded-lg overflow-hidden">
-                <Page
-                  pageNumber={currentPage}
-                  width={pageWidth * scale}
-                  renderTextLayer={false}
-                  renderAnnotationLayer={false}
-                />
-                
-                {/* Field Overlays */}
-                {fieldsOnCurrentPage.map((field) => {
-                  const isActive = activeFieldId === field.api_id;
-                  const isCompleted = completedFields.has(field.api_id) || (field.type === "signature" && !!signatureData);
-                  const isReadOnly = field.filled_by === "admin";
-                  const isShowingSignature = showSignatureFor === field.api_id;
-                  const value = fieldValues[field.api_id];
+              {/* Render ALL pages in a scrollable list */}
+              <div className="space-y-4">
+                {Array.from({ length: numPages }, (_, index) => {
+                  const pageNum = index + 1;
+                  const fieldsOnPage = getFieldsForPage(pageNum);
                   
                   return (
                     <div
-                      key={field.api_id}
-                      className="absolute"
-                      style={{
-                        left: `${field.x}%`,
-                        top: `${field.y}%`,
-                        width: `${field.width}%`,
-                        minHeight: field.type === "signature" ? "60px" : `${field.height}%`,
-                        zIndex: isActive || isShowingSignature ? 100 : 10,
+                      key={pageNum}
+                      ref={(el) => {
+                        if (el) pageRefs.current.set(pageNum, el);
                       }}
+                      className="relative bg-white shadow-xl rounded-lg overflow-hidden mx-auto"
+                      style={{ width: pageWidth * scale }}
                     >
-                      {isShowingSignature ? (
-                        <InlineSignature
-                          onAdopt={handleSignatureAdopt}
-                          onCancel={() => setShowSignatureFor(null)}
-                        />
-                      ) : (
-                        <InlineField
-                          field={field}
-                          value={value}
-                          onChange={(val) => handleFieldChange(field.api_id, val)}
-                          isActive={isActive}
-                          isCompleted={isCompleted}
-                          isReadOnly={isReadOnly}
-                          signatureData={signatureData}
-                          onFocus={() => {
-                            if (field.type === "signature") {
-                              setShowSignatureFor(field.api_id);
-                            } else {
-                              setActiveFieldId(field.api_id);
-                            }
-                          }}
-                          onBlur={() => setActiveFieldId(null)}
-                          onSignatureClick={() => setShowSignatureFor(field.api_id)}
-                          scale={scale}
-                        />
-                      )}
+                      {/* Page number indicator */}
+                      <div className="absolute top-2 right-2 bg-black/50 text-white text-xs px-2 py-1 rounded z-20">
+                        Page {pageNum} of {numPages}
+                      </div>
+                      
+                      <Page
+                        pageNumber={pageNum}
+                        width={pageWidth * scale}
+                        renderTextLayer={false}
+                        renderAnnotationLayer={false}
+                      />
+                      
+                      {/* Field Overlays for this page */}
+                      {fieldsOnPage.map((field) => {
+                        const isActive = activeFieldId === field.api_id;
+                        const isCompleted = completedFields.has(field.api_id) || (field.type === "signature" && !!signatureData);
+                        const isReadOnly = field.filled_by === "admin";
+                        const isShowingSignature = showSignatureFor === field.api_id;
+                        const value = fieldValues[field.api_id];
+                        
+                        return (
+                          <div
+                            key={field.api_id}
+                            className="absolute"
+                            style={{
+                              left: `${field.x}%`,
+                              top: `${field.y}%`,
+                              width: `${field.width}%`,
+                              minHeight: field.type === "signature" ? "60px" : `${field.height}%`,
+                              zIndex: isActive || isShowingSignature ? 100 : 10,
+                            }}
+                          >
+                            {isShowingSignature ? (
+                              <InlineSignature
+                                onAdopt={handleSignatureAdopt}
+                                onCancel={() => setShowSignatureFor(null)}
+                              />
+                            ) : (
+                              <InlineField
+                                field={field}
+                                value={value}
+                                onChange={(val) => handleFieldChange(field.api_id, val)}
+                                isActive={isActive}
+                                isCompleted={isCompleted}
+                                isReadOnly={isReadOnly}
+                                signatureData={signatureData}
+                                onFocus={() => {
+                                  if (field.type === "signature") {
+                                    setShowSignatureFor(field.api_id);
+                                  } else {
+                                    setActiveFieldId(field.api_id);
+                                  }
+                                }}
+                                onBlur={() => setActiveFieldId(null)}
+                                onSignatureClick={() => setShowSignatureFor(field.api_id)}
+                                scale={scale}
+                              />
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   );
                 })}
@@ -448,32 +468,20 @@ const SignDocument = () => {
         </div>
       </main>
 
-      {/* Footer - Page Navigation & Zoom */}
-      <footer className="bg-[#2d2d2d] px-4 py-2 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => goToPage(currentPage - 1)}
-            disabled={currentPage <= 1}
-            className="text-white/70 hover:text-white hover:bg-white/10 h-8 w-8 p-0"
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-          <span className="text-white/70 text-sm min-w-[80px] text-center">
-            Page {currentPage} of {numPages}
-          </span>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => goToPage(currentPage + 1)}
-            disabled={currentPage >= numPages}
-            className="text-white/70 hover:text-white hover:bg-white/10 h-8 w-8 p-0"
-          >
-            <ChevronRight className="h-4 w-4" />
-          </Button>
+      {/* Fixed Footer - Zoom & Terms */}
+      <footer className="bg-[#1a1a1a] px-4 py-3 flex items-center justify-between border-t border-white/10 sticky bottom-0 z-50">
+        <div className="flex items-center gap-3">
+          <Checkbox
+            id="terms"
+            checked={agreedToTerms}
+            onCheckedChange={(checked) => setAgreedToTerms(checked === true)}
+            className="border-white/40 data-[state=checked]:bg-[#fae052] data-[state=checked]:border-[#fae052]"
+          />
+          <label htmlFor="terms" className="text-sm text-white/70 cursor-pointer">
+            I agree to use electronic records and signatures
+          </label>
         </div>
-
+        
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="sm" onClick={zoomOut} className="text-white/70 hover:text-white hover:bg-white/10 h-8 w-8 p-0">
             <ZoomOut className="h-4 w-4" />
@@ -484,19 +492,6 @@ const SignDocument = () => {
           </Button>
         </div>
       </footer>
-
-      {/* Terms Agreement */}
-      <div className="bg-[#1a1a1a] px-4 py-3 flex items-center justify-center gap-3 border-t border-white/10">
-        <Checkbox
-          id="terms"
-          checked={agreedToTerms}
-          onCheckedChange={(checked) => setAgreedToTerms(checked === true)}
-          className="border-white/40 data-[state=checked]:bg-[#fae052] data-[state=checked]:border-[#fae052]"
-        />
-        <label htmlFor="terms" className="text-sm text-white/70 cursor-pointer">
-          I agree to use electronic records and signatures
-        </label>
-      </div>
     </div>
   );
 };
