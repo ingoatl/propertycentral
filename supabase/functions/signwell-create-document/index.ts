@@ -83,36 +83,38 @@ serve(async (req) => {
     const allFields = [...prefilledFields, ...(fieldValues || [])];
 
     // Build recipients array with proper signing order:
-    // 1. Manager (You) signs first
-    // 2. Owner 1 signs second
+    // 1. Owner signs first (receives email immediately)
+    // 2. Manager (You) signs second (receives email after owner signs)
     // 3. Owner 2 (optional) signs third
     const recipients: any[] = [
       {
         id: '1',
-        name: hostName,
-        email: hostEmail,
-        placeholder_name: 'Manager',
-        signing_order: 1,
-        send_email: true,  // Send email to manager
-      },
-      {
-        id: '2',
         name: guestName,
         email: guestEmail,
         placeholder_name: 'Owner',
+        signing_order: 1,
+        send_email: true,  // Send email to owner immediately
+      },
+      {
+        id: '2',
+        name: hostName,
+        email: hostEmail,
+        placeholder_name: 'Manager',
         signing_order: 2,
-        send_email: true,  // Send email to owner after manager signs
+        send_email: true,  // Send email to manager after owner signs
       },
     ];
 
-    // Add second owner if requested
+    // Add second owner if requested (signs after first owner, before manager)
     if (includeSecondOwner && secondOwnerName && secondOwnerEmail) {
-      recipients.push({
+      // Adjust manager to signing_order 3
+      recipients[1].signing_order = 3;
+      recipients.splice(1, 0, {
         id: '3',
         name: secondOwnerName,
         email: secondOwnerEmail,
         placeholder_name: 'Owner2',
-        signing_order: 3,
+        signing_order: 2,
         send_email: true,
       });
     }
@@ -157,7 +159,7 @@ serve(async (req) => {
       .from('booking_documents')
       .update({
         signwell_document_id: signwellData.id,
-        status: 'pending_manager',
+        status: 'pending_owner',  // Owner signs first
         sent_at: new Date().toISOString(),
       })
       .eq('id', documentId);
@@ -188,7 +190,7 @@ serve(async (req) => {
     return new Response(JSON.stringify({
       success: true,
       signwellDocumentId: signwellData.id,
-      message: 'Document created. You will receive an email to sign first.',
+      message: 'Document created. Owner will receive an email to sign first, then you will receive yours.',
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

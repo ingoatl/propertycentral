@@ -120,16 +120,17 @@ serve(async (req) => {
 
       case 'document_signed':
         const signerPlaceholder = data.recipient?.placeholder_name;
-        if (signerPlaceholder === 'Guest') {
+        // Handle Owner signing (first signer)
+        if (signerPlaceholder === 'Owner' || signerPlaceholder === 'Guest') {
           updateData.guest_signed_at = new Date().toISOString();
-          updateData.status = 'pending_host';
-          auditAction = 'guest_signed';
+          updateData.status = 'pending_manager';  // Now waiting for manager
+          auditAction = 'owner_signed';
           
           // Add timeline entry for lead
           if (lead) {
             await supabase.from('lead_timeline').insert({
               lead_id: lead.id,
-              action: 'contract_guest_signed',
+              action: 'contract_owner_signed',
               metadata: {
                 document_id: bookingDoc.id,
                 signwell_id: signwellDocumentId,
@@ -137,14 +138,30 @@ serve(async (req) => {
               },
             });
           }
-        } else if (signerPlaceholder === 'Host') {
-          updateData.host_signed_at = new Date().toISOString();
-          auditAction = 'host_signed';
+        // Handle Owner2 signing (optional second owner)
+        } else if (signerPlaceholder === 'Owner2') {
+          auditAction = 'owner2_signed';
           
           if (lead) {
             await supabase.from('lead_timeline').insert({
               lead_id: lead.id,
-              action: 'contract_host_signed',
+              action: 'contract_owner2_signed',
+              metadata: {
+                document_id: bookingDoc.id,
+                signwell_id: signwellDocumentId,
+                signed_by: data.recipient?.email,
+              },
+            });
+          }
+        // Handle Manager signing (last signer)
+        } else if (signerPlaceholder === 'Manager' || signerPlaceholder === 'Host') {
+          updateData.host_signed_at = new Date().toISOString();
+          auditAction = 'manager_signed';
+          
+          if (lead) {
+            await supabase.from('lead_timeline').insert({
+              lead_id: lead.id,
+              action: 'contract_manager_signed',
               metadata: {
                 document_id: bookingDoc.id,
                 signwell_id: signwellDocumentId,
