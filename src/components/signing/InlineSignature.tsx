@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import ReactSignatureCanvas from "react-signature-canvas";
 import { Button } from "@/components/ui/button";
-import { RotateCcw, Check } from "lucide-react";
+import { RotateCcw, Check, X } from "lucide-react";
 
 interface InlineSignatureProps {
   onAdopt: (signatureData: string) => void;
@@ -31,66 +31,61 @@ export function InlineSignature({ onAdopt, onCancel }: InlineSignatureProps) {
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-2xl border-2 border-blue-500 p-4 space-y-3 min-w-[300px]">
-      <div className="text-center">
-        <h3 className="font-semibold text-sm text-gray-900">Draw Your Signature</h3>
-        <p className="text-xs text-gray-500">Sign in the box below</p>
+    <div className="bg-white rounded-lg shadow-2xl border-2 border-[#2196f3] p-3 min-w-[280px] max-w-[320px]">
+      <div className="flex items-center justify-between mb-2">
+        <h3 className="font-semibold text-sm text-[#333]">Draw Your Signature</h3>
+        <button 
+          onClick={onCancel}
+          className="text-[#999] hover:text-[#666] p-1"
+        >
+          <X className="h-4 w-4" />
+        </button>
       </div>
       
-      <div className="relative border-2 border-dashed border-gray-300 rounded-lg bg-gray-50 overflow-hidden">
+      <div className="relative border-2 border-dashed border-[#ddd] rounded bg-[#fafafa] overflow-hidden">
         <ReactSignatureCanvas
           ref={sigCanvasRef}
-          penColor="black"
+          penColor="#1a1a2e"
           canvasProps={{
             className: "w-full",
-            style: { width: "100%", height: "100px" },
+            style: { width: "100%", height: "80px" },
           }}
           onEnd={handleEnd}
         />
         
         {isEmpty && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <p className="text-gray-400 text-sm">Sign here</p>
+            <p className="text-[#bbb] text-sm">Sign here</p>
           </div>
         )}
         
         {/* Signature line */}
-        <div className="absolute bottom-3 left-4 right-4 border-b border-gray-300" />
+        <div className="absolute bottom-4 left-3 right-3 border-b border-[#ccc]" />
       </div>
 
-      <div className="flex justify-between items-center gap-2">
+      <div className="flex justify-between items-center gap-2 mt-3">
         <Button
           type="button"
           variant="ghost"
           size="sm"
           onClick={handleClear}
           disabled={isEmpty}
-          className="text-gray-500 hover:text-gray-700"
+          className="text-[#666] hover:text-[#333] text-xs h-8"
         >
           <RotateCcw className="h-3 w-3 mr-1" />
           Clear
         </Button>
         
-        <div className="flex gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={onCancel}
-          >
-            Cancel
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            onClick={handleAdopt}
-            disabled={isEmpty}
-            className="bg-[#fae052] text-black hover:bg-[#f5d93a]"
-          >
-            <Check className="h-3 w-3 mr-1" />
-            Adopt & Sign
-          </Button>
-        </div>
+        <Button
+          type="button"
+          size="sm"
+          onClick={handleAdopt}
+          disabled={isEmpty}
+          className="bg-[#fae052] text-[#1a1a2e] hover:bg-[#f5d93a] font-semibold text-xs h-8 px-4 disabled:opacity-40"
+        >
+          <Check className="h-3 w-3 mr-1" />
+          Adopt Signature
+        </Button>
       </div>
     </div>
   );

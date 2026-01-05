@@ -80,25 +80,27 @@ serve(async (req) => {
       })
       .join('\n\n');
 
-    const prompt = `You are analyzing a document to detect fillable fields. Below is the text content with exact positions (x,y as percentages from top-left).
+    const prompt = `Analyze this document to detect fillable fields. Text content with positions (x,y as % from top-left):
 
 ${documentSummary}
 
-TASK: Identify ALL fillable areas where someone needs to input information. Look for:
+DETECT these field types:
+1. Text fields: Labels like "Owner(s):", "Name:", "Address:" followed by underlines/blanks
+2. Signature blocks: "OWNER:", "MANAGER:", "Signature:" labels
+3. Date fields: "Date:" labels or near signatures
+4. Email/Phone: Clearly labeled email or phone fields
 
-1. **Labels followed by underlines or blank spaces** (e.g., "Owner(s): ___", "Address: ____")
-2. **Signature blocks** (lines that say "OWNER:", "MANAGER:", "Signature:", etc.)
-3. **Date fields** (near signatures or standalone "Date: ___")
-4. **Checkboxes** (☐, □, or [ ] symbols)
-5. **Print Name fields** (usually near signatures)
+POSITIONING RULES (CRITICAL):
+- y position: Use the EXACT y% from the label's position  
+- x position: Position the INPUT AREA after the label. If label is at x:5% and is ~15% wide, start field at x:20%
+- width: Make text fields 40-50% wide, signatures 35% wide, dates 20% wide
+- height: Text fields 3%, signatures 8%
 
-For each field, return EXACT position based on the coordinates provided. The field input area should START right after the label text.
+FILLED_BY RULES:
+- "guest": Owner/Tenant fields (owner_name, owner_address, owner_phone, owner_email, OWNER signatures)
+- "admin": Manager/Company fields (effective_date, property_address, MANAGER/HOST signatures)
 
-RULES for filled_by:
-- "guest" = Owner/Tenant fills (owner_name, owner_address, owner_phone, owner_email, owner signatures, their dates)
-- "admin" = Manager/Host fills (effective_date, property_address, manager signatures, management fees)
-
-Return ONLY a JSON object:
+Return ONLY valid JSON:
 {
   "fields": [
     {
@@ -106,9 +108,9 @@ Return ONLY a JSON object:
       "label": "Owner(s)",
       "type": "text",
       "page": 1,
-      "x": 18.5,
+      "x": 25,
       "y": 35.2,
-      "width": 50,
+      "width": 45,
       "height": 3,
       "filled_by": "guest",
       "required": true
@@ -116,7 +118,7 @@ Return ONLY a JSON object:
   ]
 }
 
-IMPORTANT: Use the EXACT y values from the text positions. If "Owner(s):" is at y:35.2%, the field should be at approximately y:35%.`;
+Use EXACT y values from the text. The x should be offset from label to show the input area.`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
