@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 export interface FieldData {
   api_id: string;
   label: string;
-  type: "text" | "date" | "email" | "phone" | "signature" | "checkbox";
+  type: "text" | "date" | "email" | "phone" | "signature" | "checkbox" | "radio";
   page: number;
   x: number;
   y: number;
@@ -18,6 +18,7 @@ export interface FieldData {
   height: number;
   filled_by: "admin" | "guest";
   required: boolean;
+  group_name?: string; // For radio buttons - fields with same group_name are mutually exclusive
 }
 
 interface InlineFieldProps {
@@ -124,35 +125,46 @@ export function InlineField({
     );
   }
 
-  if (field.type === "checkbox") {
+  if (field.type === "checkbox" || field.type === "radio") {
+    const isSelected = value === true;
+    
     return (
       <button 
         type="button"
         onClick={() => {
           if (!isReadOnly) {
-            onChange(value !== true);
+            // For radio: always set to true (parent handles clearing others in group)
+            // For checkbox: toggle
+            if (field.type === "radio") {
+              onChange(true);
+            } else {
+              onChange(!isSelected);
+            }
           }
         }}
         disabled={isReadOnly}
         className={cn(
-          "flex items-center justify-center h-full w-full cursor-pointer",
+          "flex items-center justify-center h-full w-full cursor-pointer gap-1",
           isReadOnly ? "opacity-60 cursor-not-allowed" : "hover:bg-[#fff5cc]",
-          value === true ? completedClass : pendingClass,
+          isSelected ? completedClass : pendingClass,
           "rounded transition-all duration-150"
         )}
       >
-        <Checkbox
-          checked={value === true}
-          onCheckedChange={(checked) => !isReadOnly && onChange(checked === true)}
-          disabled={isReadOnly}
-          className={cn(
-            "h-6 w-6 rounded pointer-events-none",
-            value === true ? "border-[#4caf50] bg-[#4caf50] text-white" : "border-[#fae052] border-2 bg-white"
+        <div className={cn(
+          "flex items-center justify-center",
+          field.type === "radio" ? "rounded-full" : "rounded",
+          "h-5 w-5 border-2 transition-colors",
+          isSelected 
+            ? "border-[#4caf50] bg-[#4caf50]" 
+            : "border-[#fae052] bg-white"
+        )}>
+          {isSelected && (
+            field.type === "radio" 
+              ? <div className="w-2 h-2 rounded-full bg-white" />
+              : <Check className="h-3 w-3 text-white" />
           )}
-        />
-        {value === true && (
-          <Check className="h-3 w-3 text-green-600 ml-1" />
-        )}
+        </div>
+        {isSelected && <Check className="h-3 w-3 text-green-600" />}
       </button>
     );
   }
