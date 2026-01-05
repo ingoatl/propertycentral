@@ -7,10 +7,12 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Plus, FileText, Trash2, Upload, CheckCircle, XCircle, ExternalLink, Link2, Info, Copy, Edit2 } from "lucide-react";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Plus, FileText, Trash2, Upload, CheckCircle, XCircle, ExternalLink, Link2, Edit2, Loader2, Sparkles, RefreshCw } from "lucide-react";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
+import { Check, ChevronsUpDown } from "lucide-react";
 
 interface DocumentTemplate {
   id: string;
@@ -24,21 +26,32 @@ interface DocumentTemplate {
   google_drive_url: string | null;
 }
 
+const CONTRACT_TYPE_OPTIONS = [
+  { value: "co_hosting", label: "Co-Hosting Agreement" },
+  { value: "full_service", label: "Full-Service Management Agreement" },
+  { value: "rental_agreement", label: "Rental/Lease Agreement" },
+  { value: "addendum", label: "Addendum" },
+  { value: "pet_policy", label: "Pet Policy Agreement" },
+  { value: "early_termination", label: "Early Termination Agreement" },
+  { value: "other", label: "Other" },
+];
+
 export function DocumentTemplatesManager() {
   const [templates, setTemplates] = useState<DocumentTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [showWebhookInfo, setShowWebhookInfo] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [reanalyzing, setReanalyzing] = useState<string | null>(null);
+  const [contractTypeOpen, setContractTypeOpen] = useState(false);
+  const [detectedType, setDetectedType] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: "",
     description: "",
     file: null as File | null,
-    contract_type: "co_hosting" as string,
+    contract_type: "",
     google_drive_url: "",
   });
-
-  const webhookUrl = `https://ijsxcaaqphaciaenlegl.supabase.co/functions/v1/signwell-webhook`;
 
   useEffect(() => {
     loadTemplates();
@@ -61,7 +74,57 @@ export function DocumentTemplatesManager() {
     }
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const analyzeDocument = async (file: File): Promise<{ contract_type: string; name: string } | null> => {
+    try {
+      setAnalyzing(true);
+      
+      // Upload file temporarily to analyze
+      const fileExt = file.name.split('.').pop();
+      const tempFileName = `temp_${crypto.randomUUID()}.${fileExt}`;
+      const tempPath = `temp/${tempFileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('signed-documents')
+        .upload(tempPath, file);
+
+      if (uploadError) {
+        console.error('Temp upload error:', uploadError);
+        return null;
+      }
+
+      const { data: urlData } = supabase.storage
+        .from('signed-documents')
+        .getPublicUrl(tempPath);
+
+      // Call analyze function
+      const { data, error } = await supabase.functions.invoke('analyze-document-fields', {
+        body: { 
+          fileUrl: urlData.publicUrl,
+          detectTypeOnly: true 
+        },
+      });
+
+      // Clean up temp file
+      await supabase.storage.from('signed-documents').remove([tempPath]);
+
+      if (error) {
+        console.error('Analysis error:', error);
+        return null;
+      }
+
+      return {
+        contract_type: data?.detected_contract_type || 'other',
+        name: data?.suggested_name || '',
+      };
+    } catch (err) {
+      console.error('Error analyzing document:', err);
+      return null;
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       const validTypes = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
@@ -69,14 +132,28 @@ export function DocumentTemplatesManager() {
         toast.error('Please upload a PDF or DOCX file');
         return;
       }
+      
       setFormData({ ...formData, file });
+      setDetectedType(null);
+      
+      // Analyze document to detect type
+      const result = await analyzeDocument(file);
+      if (result) {
+        setDetectedType(result.contract_type);
+        setFormData(prev => ({
+          ...prev,
+          contract_type: result.contract_type,
+          name: prev.name || result.name,
+        }));
+        toast.success(`Detected: ${CONTRACT_TYPE_OPTIONS.find(o => o.value === result.contract_type)?.label || result.contract_type}`);
+      }
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name || !formData.file) {
-      toast.error('Please provide a name and upload a file');
+    if (!formData.name || !formData.file || !formData.contract_type) {
+      toast.error('Please provide a name, contract type, and upload a file');
       return;
     }
 
@@ -115,7 +192,8 @@ export function DocumentTemplatesManager() {
 
       toast.success('Template uploaded successfully');
       setDialogOpen(false);
-      setFormData({ name: "", description: "", file: null, contract_type: "co_hosting", google_drive_url: "" });
+      setFormData({ name: "", description: "", file: null, contract_type: "", google_drive_url: "" });
+      setDetectedType(null);
       loadTemplates();
     } catch (error: any) {
       console.error('Error uploading template:', error);
@@ -159,57 +237,61 @@ export function DocumentTemplatesManager() {
     }
   };
 
-  const copyWebhookUrl = () => {
-    navigator.clipboard.writeText(webhookUrl);
-    toast.success('Webhook URL copied to clipboard');
+  const handleReanalyze = async (template: DocumentTemplate) => {
+    try {
+      setReanalyzing(template.id);
+      
+      const { data, error } = await supabase.functions.invoke('analyze-document-fields', {
+        body: { 
+          templateId: template.id,
+          forceReanalyze: true,
+        },
+      });
+
+      if (error) throw error;
+      
+      if (data?.detected_contract_type && data.detected_contract_type !== template.contract_type) {
+        await supabase
+          .from('document_templates')
+          .update({ contract_type: data.detected_contract_type })
+          .eq('id', template.id);
+        
+        toast.success(`Updated type: ${CONTRACT_TYPE_OPTIONS.find(o => o.value === data.detected_contract_type)?.label || data.detected_contract_type}`);
+        loadTemplates();
+      } else {
+        toast.success('Document analyzed successfully');
+      }
+    } catch (error: any) {
+      console.error('Error re-analyzing:', error);
+      toast.error('Failed to re-analyze document');
+    } finally {
+      setReanalyzing(null);
+    }
   };
 
   const getContractTypeBadge = (type: string | null) => {
-    switch (type) {
-      case 'co_hosting':
-        return <Badge variant="secondary" className="bg-blue-100 text-blue-700">Co-Hosting</Badge>;
-      case 'full_service':
-        return <Badge variant="secondary" className="bg-purple-100 text-purple-700">Full-Service</Badge>;
-      default:
-        return <Badge variant="outline">Not Set</Badge>;
-    }
+    const option = CONTRACT_TYPE_OPTIONS.find(o => o.value === type);
+    if (!option) return <Badge variant="outline">Not Set</Badge>;
+    
+    const colorMap: Record<string, string> = {
+      co_hosting: "bg-blue-100 text-blue-700",
+      full_service: "bg-purple-100 text-purple-700",
+      rental_agreement: "bg-green-100 text-green-700",
+      addendum: "bg-yellow-100 text-yellow-700",
+      pet_policy: "bg-orange-100 text-orange-700",
+      early_termination: "bg-red-100 text-red-700",
+      other: "bg-gray-100 text-gray-700",
+    };
+    
+    return (
+      <Badge variant="secondary" className={colorMap[type || 'other'] || colorMap.other}>
+        {option.label}
+      </Badge>
+    );
   };
 
   return (
     <div className="space-y-6">
-      {/* SignWell Webhook Setup Info */}
-      <Alert className="border-primary/20 bg-primary/5">
-        <Info className="h-4 w-4" />
-        <AlertTitle className="flex items-center justify-between">
-          <span>SignWell Webhook Configuration</span>
-          <Button variant="ghost" size="sm" onClick={() => setShowWebhookInfo(!showWebhookInfo)}>
-            {showWebhookInfo ? 'Hide' : 'Show Details'}
-          </Button>
-        </AlertTitle>
-        {showWebhookInfo && (
-          <AlertDescription className="mt-3 space-y-3">
-            <p className="text-sm text-muted-foreground">
-              Configure this webhook URL in your SignWell dashboard to receive document status updates:
-            </p>
-            <div className="flex items-center gap-2 p-2 bg-muted rounded-md">
-              <code className="flex-1 text-xs break-all">{webhookUrl}</code>
-              <Button variant="ghost" size="icon" onClick={copyWebhookUrl} className="shrink-0">
-                <Copy className="h-4 w-4" />
-              </Button>
-            </div>
-            <div className="text-xs text-muted-foreground space-y-1">
-              <p><strong>Steps to configure:</strong></p>
-              <ol className="list-decimal list-inside space-y-1 ml-2">
-                <li>Go to <a href="https://www.signwell.com/settings/api" target="_blank" rel="noopener noreferrer" className="text-primary underline">SignWell API Settings</a></li>
-                <li>Click "Add Webhook Endpoint"</li>
-                <li>Paste the webhook URL above</li>
-                <li>Select events: <code>document_completed</code>, <code>document_signed</code>, <code>document_viewed</code></li>
-              </ol>
-            </div>
-          </AlertDescription>
-        )}
-      </Alert>
-
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold">Document Templates</h2>
@@ -252,6 +334,19 @@ export function DocumentTemplatesManager() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleReanalyze(template)}
+                      disabled={reanalyzing === template.id}
+                      title="Re-analyze document"
+                    >
+                      {reanalyzing === template.id ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <RefreshCw className="w-4 h-4" />
+                      )}
+                    </Button>
                     <Badge 
                       variant={template.is_active ? "default" : "secondary"}
                       className="cursor-pointer"
@@ -299,11 +394,6 @@ export function DocumentTemplatesManager() {
                     </a>
                   )}
                 </div>
-                {!template.google_drive_url && (
-                  <p className="text-xs text-muted-foreground">
-                    No Google Drive link configured. You can add one to easily edit the source document.
-                  </p>
-                )}
               </CardContent>
             </Card>
           ))}
@@ -315,10 +405,40 @@ export function DocumentTemplatesManager() {
           <DialogHeader>
             <DialogTitle>Upload Document Template</DialogTitle>
             <DialogDescription>
-              Upload a PDF or DOCX file to use as an agreement template. DOCX files can include [[placeholder]] tags for dynamic fields.
+              Upload a PDF or DOCX file. The AI will automatically detect the contract type.
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="file">Document File (PDF or DOCX) *</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  id="file"
+                  type="file"
+                  accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                  onChange={handleFileChange}
+                  className="flex-1"
+                />
+              </div>
+              {analyzing && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Analyzing document...</span>
+                </div>
+              )}
+              {detectedType && !analyzing && (
+                <div className="flex items-center gap-2 text-sm text-green-600">
+                  <Sparkles className="w-4 h-4" />
+                  <span>Detected: {CONTRACT_TYPE_OPTIONS.find(o => o.value === detectedType)?.label}</span>
+                </div>
+              )}
+              {formData.file && (
+                <p className="text-sm text-muted-foreground">
+                  Selected: {formData.file.name}
+                </p>
+              )}
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="name">Template Name *</Label>
               <Input
@@ -331,19 +451,64 @@ export function DocumentTemplatesManager() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="contract_type">Contract Type *</Label>
-              <Select 
-                value={formData.contract_type} 
-                onValueChange={(value) => setFormData({ ...formData, contract_type: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select contract type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="co_hosting">Co-Hosting Agreement</SelectItem>
-                  <SelectItem value="full_service">Full-Service Management Agreement</SelectItem>
-                </SelectContent>
-              </Select>
+              <Label>Contract Type *</Label>
+              <Popover open={contractTypeOpen} onOpenChange={setContractTypeOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={contractTypeOpen}
+                    className="w-full justify-between"
+                    disabled={analyzing}
+                  >
+                    {formData.contract_type
+                      ? CONTRACT_TYPE_OPTIONS.find((option) => option.value === formData.contract_type)?.label || formData.contract_type
+                      : "Select contract type..."}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-full p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder="Search or enter custom type..." />
+                    <CommandList>
+                      <CommandEmpty>
+                        <Button
+                          variant="ghost"
+                          className="w-full justify-start"
+                          onClick={() => {
+                            setContractTypeOpen(false);
+                          }}
+                        >
+                          Use as custom type
+                        </Button>
+                      </CommandEmpty>
+                      <CommandGroup>
+                        {CONTRACT_TYPE_OPTIONS.map((option) => (
+                          <CommandItem
+                            key={option.value}
+                            value={option.value}
+                            onSelect={(currentValue) => {
+                              setFormData({ ...formData, contract_type: currentValue });
+                              setContractTypeOpen(false);
+                            }}
+                          >
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4",
+                                formData.contract_type === option.value ? "opacity-100" : "opacity-0"
+                              )}
+                            />
+                            {option.label}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+              <p className="text-xs text-muted-foreground">
+                AI detected type can be overridden if needed
+              </p>
             </div>
 
             <div className="space-y-2">
@@ -370,33 +535,15 @@ export function DocumentTemplatesManager() {
                 placeholder="https://docs.google.com/document/d/..."
               />
               <p className="text-xs text-muted-foreground">
-                Link to the editable source document in Google Drive for future updates
+                Link to the editable source document in Google Drive
               </p>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="file">Document File (PDF or DOCX) *</Label>
-              <div className="flex items-center gap-2">
-                <Input
-                  id="file"
-                  type="file"
-                  accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                  onChange={handleFileChange}
-                  className="flex-1"
-                />
-              </div>
-              {formData.file && (
-                <p className="text-sm text-muted-foreground">
-                  Selected: {formData.file.name}
-                </p>
-              )}
             </div>
 
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={uploading} className="gap-2">
+              <Button type="submit" disabled={uploading || analyzing} className="gap-2">
                 <Upload className="w-4 h-4" />
                 {uploading ? 'Uploading...' : 'Upload Template'}
               </Button>

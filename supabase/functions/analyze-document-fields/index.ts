@@ -13,51 +13,64 @@ serve(async (req) => {
   }
 
   try {
-    const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
-    if (!OPENAI_API_KEY || !SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+    if (!LOVABLE_API_KEY || !SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
       throw new Error("Missing required environment variables");
     }
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-    const { templateId, forceReanalyze } = await req.json();
+    const { templateId, forceReanalyze, fileUrl, detectTypeOnly } = await req.json();
 
-    console.log("Analyzing document fields for template:", templateId, "forceReanalyze:", forceReanalyze);
+    console.log("Analyzing document - templateId:", templateId, "fileUrl:", fileUrl, "detectTypeOnly:", detectTypeOnly);
 
-    // Get template details
-    const { data: template, error: templateError } = await supabase
-      .from("document_templates")
-      .select("*")
-      .eq("id", templateId)
-      .single();
+    let documentUrl = fileUrl;
+    let template = null;
 
-    if (templateError || !template) {
-      throw new Error("Template not found");
+    // If templateId provided, fetch from database
+    if (templateId) {
+      const { data: templateData, error: templateError } = await supabase
+        .from("document_templates")
+        .select("*")
+        .eq("id", templateId)
+        .single();
+
+      if (templateError || !templateData) {
+        throw new Error("Template not found");
+      }
+
+      template = templateData;
+      documentUrl = template.file_path;
+
+      // Check if we already have cached field mappings (unless force re-analyze)
+      if (!forceReanalyze && !detectTypeOnly && template.field_mappings && Array.isArray(template.field_mappings) && template.field_mappings.length > 0) {
+        console.log("Using cached field mappings");
+        return new Response(
+          JSON.stringify({
+            success: true,
+            fields: template.field_mappings,
+            detected_contract_type: template.contract_type,
+            cached: true,
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
     }
 
-    // Check if we already have cached field mappings (unless force re-analyze)
-    if (!forceReanalyze && template.field_mappings && Array.isArray(template.field_mappings) && template.field_mappings.length > 0) {
-      console.log("Using cached field mappings");
-      return new Response(
-        JSON.stringify({
-          success: true,
-          fields: template.field_mappings,
-          cached: true,
-        }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    if (!documentUrl) {
+      throw new Error("No document URL provided");
     }
 
     // Download the document file
-    const fileUrl = template.file_path.startsWith("http")
-      ? template.file_path
-      : `${SUPABASE_URL}/storage/v1/object/public/onboarding-documents/${template.file_path}`;
+    const fileUrlFull = documentUrl.startsWith("http")
+      ? documentUrl
+      : `${SUPABASE_URL}/storage/v1/object/public/onboarding-documents/${documentUrl}`;
 
-    console.log("Fetching document from:", fileUrl);
+    console.log("Fetching document from:", fileUrlFull);
 
-    const fileResponse = await fetch(fileUrl);
+    const fileResponse = await fetch(fileUrlFull);
     if (!fileResponse.ok) {
       throw new Error(`Failed to fetch document: ${fileResponse.status}`);
     }
@@ -67,15 +80,13 @@ serve(async (req) => {
     let documentText = "";
 
     // Check if it's a DOCX file
-    if (template.file_path.toLowerCase().endsWith(".docx")) {
-      // DOCX files are ZIP archives - extract document.xml content
+    if (documentUrl.toLowerCase().endsWith(".docx")) {
       try {
         const { default: JSZip } = await import("https://esm.sh/jszip@3.10.1");
         const zip = await JSZip.loadAsync(fileBuffer);
         const documentXml = await zip.file("word/document.xml")?.async("string");
         
         if (documentXml) {
-          // Extract text from XML, removing tags
           documentText = documentXml
             .replace(/<w:t[^>]*>/g, "")
             .replace(/<\/w:t>/g, " ")
@@ -85,80 +96,97 @@ serve(async (req) => {
         }
       } catch (zipError) {
         console.error("Error parsing DOCX:", zipError);
-        // Try treating as plain text
         documentText = new TextDecoder().decode(fileBuffer);
       }
     } else {
-      // For other files, try to extract as text
       documentText = new TextDecoder().decode(fileBuffer);
     }
 
     console.log("Extracted document text length:", documentText.length);
     console.log("Document preview:", documentText.substring(0, 500));
 
-    // Use AI to analyze the document and identify fields - ENHANCED for signature detection
-    const aiPrompt = `Analyze this rental/lease agreement document and identify ALL fields that need to be filled in, INCLUDING signature blocks.
+    // Use AI to analyze the document
+    const aiPrompt = detectTypeOnly 
+      ? `Analyze this document and determine its type and suggest a name.
+
+Document content:
+${documentText.substring(0, 10000)}
+
+Determine the document type from these options:
+- "co_hosting" - Co-hosting agreement where owner stays involved in management
+- "full_service" - Full-service property management agreement where owner hands off completely
+- "rental_agreement" - Guest/tenant rental or lease agreement
+- "addendum" - Supplement or addendum to another document
+- "pet_policy" - Pet policy agreement
+- "early_termination" - Early termination agreement
+- "other" - Any other type of document
+
+Also suggest a concise name for this template.
+
+Return ONLY a JSON object like:
+{
+  "detected_contract_type": "co_hosting",
+  "suggested_name": "Co-Hosting Management Agreement"
+}
+
+Return ONLY the JSON, no other text.`
+      : `Analyze this property management/rental agreement document and identify ALL fields that need to be filled in, INCLUDING signature blocks.
 
 Document content:
 ${documentText.substring(0, 15000)}
 
-IMPORTANT: Look carefully for:
+FIRST, determine the document type from these options:
+- "co_hosting" - Co-hosting agreement
+- "full_service" - Full-service property management agreement  
+- "rental_agreement" - Guest/tenant rental or lease agreement
+- "addendum" - Supplement or addendum
+- "pet_policy" - Pet policy agreement
+- "early_termination" - Early termination agreement
+- "other" - Any other type
+
+THEN, identify ALL fillable fields including:
 1. Regular form fields (name blanks, date blanks, amounts, addresses)
-2. SIGNATURE BLOCKS - These are critical! Look for:
+2. SIGNATURE BLOCKS - Look for:
    - "Guest Signature" or "Tenant Signature" lines
-   - "Guest Name (print)" lines
-   - "Host/Agent Signature" or "Landlord Signature" lines
-   - "Host Name (print)" lines
+   - "Owner Signature" or "Host Signature" lines
    - Date lines near signatures
-   - Any lines with "Signature", "Sign", "(print)", "X___" patterns
 
 For each field found, determine:
 1. The field name/label (use snake_case for api_id)
 2. The field type: "text", "number", "date", "email", "phone", "textarea", "checkbox", "signature"
-3. Who should fill it: "admin" (property manager fills before sending) or "guest" (tenant fills/signs)
+3. Who should fill it: "admin" (filled before sending) or "guest" (owner fills during signing)
 4. A user-friendly label
-5. The category: "property", "financial", "dates", "occupancy", "contact", "identification", "vehicle", "emergency", "acknowledgment", "signature", "other"
+5. The category: "property", "financial", "dates", "occupancy", "contact", "identification", "signature", "other"
 
-Rules for determining admin vs guest:
-- Admin fills: property address, rent amounts, deposit, lease dates, property rules, policies, landlord info, property name
-- Guest fills/signs: guest personal info, emergency contacts, vehicle info, acknowledgments, initials
-- Guest SIGNS: guest_signature, guest_date_signed
-- Host/Admin SIGNS: host_signature, host_date_signed, agent_signature
+Rules for admin vs guest:
+- Admin fills: effective_date, host info
+- Guest/Owner fills: their personal info (name, address, phone, email), property address, package selection, signatures
 
-CRITICAL SIGNATURE FIELDS TO DETECT:
-- guest_name_print (type: text, filled_by: guest, category: signature) - Guest prints their name
-- guest_signature (type: signature, filled_by: guest, category: signature) - Guest signature
-- guest_date_signed (type: date, filled_by: guest, category: signature) - Date guest signs
-- host_name_print (type: text, filled_by: admin, category: signature) - Host/Agent prints name
-- host_signature (type: signature, filled_by: admin, category: signature) - Host/Agent signature  
-- host_date_signed (type: date, filled_by: admin, category: signature) - Date host signs
+Return a JSON object with this structure:
+{
+  "detected_contract_type": "co_hosting",
+  "suggested_name": "Co-Hosting Agreement",
+  "fields": [
+    {"api_id": "effective_date", "label": "Effective Date", "type": "date", "filled_by": "admin", "category": "dates"},
+    {"api_id": "owner_name", "label": "Owner Name", "type": "text", "filled_by": "guest", "category": "contact"},
+    {"api_id": "owner_signature", "label": "Owner Signature", "type": "signature", "filled_by": "guest", "category": "signature"}
+  ]
+}
 
-Return a JSON array of field objects. Example format:
-[
-  {"api_id": "property_address", "label": "Property Address", "type": "text", "filled_by": "admin", "category": "property"},
-  {"api_id": "monthly_rent", "label": "Monthly Rent", "type": "number", "filled_by": "admin", "category": "financial"},
-  {"api_id": "guest_name_print", "label": "Guest Name (Print)", "type": "text", "filled_by": "guest", "category": "signature"},
-  {"api_id": "guest_signature", "label": "Guest Signature", "type": "signature", "filled_by": "guest", "category": "signature"},
-  {"api_id": "guest_date_signed", "label": "Guest Date Signed", "type": "date", "filled_by": "guest", "category": "signature"},
-  {"api_id": "host_name_print", "label": "Host/Agent Name (Print)", "type": "text", "filled_by": "admin", "category": "signature"},
-  {"api_id": "host_signature", "label": "Host/Agent Signature", "type": "signature", "filled_by": "admin", "category": "signature"},
-  {"api_id": "host_date_signed", "label": "Host Date Signed", "type": "date", "filled_by": "admin", "category": "signature"}
-]
+Return ONLY the JSON, no other text.`;
 
-Return ONLY the JSON array, no other text.`;
-
-    const aiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
+    const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${OPENAI_API_KEY}`,
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "gpt-4o-mini",
+        model: "google/gemini-2.5-flash",
         messages: [
           {
             role: "system",
-            content: "You are an expert at analyzing legal documents and identifying form fields AND signature blocks. Return only valid JSON arrays. Pay special attention to signature lines at the end of documents.",
+            content: "You are an expert at analyzing legal documents and identifying form fields AND signature blocks. Return only valid JSON. Pay special attention to document type detection and signature lines.",
           },
           { role: "user", content: aiPrompt },
         ],
@@ -168,94 +196,91 @@ Return ONLY the JSON array, no other text.`;
 
     if (!aiResponse.ok) {
       const errorText = await aiResponse.text();
-      console.error("OpenAI API error:", errorText);
-      throw new Error(`OpenAI API error: ${aiResponse.status}`);
+      console.error("AI API error:", errorText);
+      throw new Error(`AI API error: ${aiResponse.status}`);
     }
 
     const aiData = await aiResponse.json();
-    const aiContent = aiData.choices?.[0]?.message?.content || "[]";
+    const aiContent = aiData.choices?.[0]?.message?.content || "{}";
     
     console.log("AI response:", aiContent);
 
     // Parse the AI response
-    let fields: Array<{
-      api_id: string;
-      label: string;
-      type: string;
-      filled_by: string;
-      category: string;
-    }> = [];
+    let parsedResult: {
+      detected_contract_type?: string;
+      suggested_name?: string;
+      fields?: Array<{
+        api_id: string;
+        label: string;
+        type: string;
+        filled_by: string;
+        category: string;
+      }>;
+    } = {};
 
     try {
-      // Extract JSON from the response (handle markdown code blocks)
       let jsonStr = aiContent;
       if (jsonStr.includes("```json")) {
         jsonStr = jsonStr.split("```json")[1].split("```")[0];
       } else if (jsonStr.includes("```")) {
         jsonStr = jsonStr.split("```")[1].split("```")[0];
       }
-      fields = JSON.parse(jsonStr.trim());
+      parsedResult = JSON.parse(jsonStr.trim());
     } catch (parseError) {
       console.error("Error parsing AI response:", parseError);
-      // Return comprehensive default fields including signatures if parsing fails
-      fields = [
-        { api_id: "property_address", label: "Property Address", type: "text", filled_by: "admin", category: "property" },
-        { api_id: "monthly_rent", label: "Monthly Rent", type: "number", filled_by: "admin", category: "financial" },
-        { api_id: "security_deposit", label: "Security Deposit", type: "number", filled_by: "admin", category: "financial" },
-        { api_id: "lease_start_date", label: "Lease Start Date", type: "date", filled_by: "admin", category: "dates" },
-        { api_id: "lease_end_date", label: "Lease End Date", type: "date", filled_by: "admin", category: "dates" },
-        { api_id: "guest_name", label: "Guest Name", type: "text", filled_by: "admin", category: "contact" },
-        { api_id: "guest_email", label: "Guest Email", type: "email", filled_by: "admin", category: "contact" },
-        { api_id: "guest_name_print", label: "Guest Name (Print)", type: "text", filled_by: "guest", category: "signature" },
-        { api_id: "guest_signature", label: "Guest Signature", type: "signature", filled_by: "guest", category: "signature" },
-        { api_id: "guest_date_signed", label: "Guest Date Signed", type: "date", filled_by: "guest", category: "signature" },
-        { api_id: "host_name_print", label: "Host/Agent Name (Print)", type: "text", filled_by: "admin", category: "signature" },
-        { api_id: "host_signature", label: "Host/Agent Signature", type: "signature", filled_by: "admin", category: "signature" },
-        { api_id: "host_date_signed", label: "Host Date Signed", type: "date", filled_by: "admin", category: "signature" },
-      ];
+      parsedResult = {
+        detected_contract_type: "other",
+        suggested_name: "Document Template",
+        fields: [],
+      };
     }
 
-    // Ensure we always have essential fields
-    const hasGuestName = fields.some(f => f.api_id === "guest_name" || f.api_id === "tenant_name");
-    const hasGuestEmail = fields.some(f => f.api_id === "guest_email" || f.api_id === "tenant_email");
-    const hasGuestSignature = fields.some(f => f.api_id === "guest_signature" || f.api_id === "tenant_signature");
-    const hasHostSignature = fields.some(f => f.api_id === "host_signature" || f.api_id === "agent_signature" || f.api_id === "landlord_signature");
-    
-    if (!hasGuestName) {
-      fields.unshift({ api_id: "guest_name", label: "Guest Name", type: "text", filled_by: "admin", category: "contact" });
-    }
-    if (!hasGuestEmail) {
-      fields.splice(1, 0, { api_id: "guest_email", label: "Guest Email", type: "email", filled_by: "admin", category: "contact" });
-    }
-    
-    // Always ensure signature fields exist
-    if (!hasGuestSignature) {
-      fields.push({ api_id: "guest_name_print", label: "Guest Name (Print)", type: "text", filled_by: "guest", category: "signature" });
-      fields.push({ api_id: "guest_signature", label: "Guest Signature", type: "signature", filled_by: "guest", category: "signature" });
-      fields.push({ api_id: "guest_date_signed", label: "Guest Date Signed", type: "date", filled_by: "guest", category: "signature" });
-    }
-    if (!hasHostSignature) {
-      fields.push({ api_id: "host_name_print", label: "Host/Agent Name (Print)", type: "text", filled_by: "admin", category: "signature" });
-      fields.push({ api_id: "host_signature", label: "Host/Agent Signature", type: "signature", filled_by: "admin", category: "signature" });
-      fields.push({ api_id: "host_date_signed", label: "Host Date Signed", type: "date", filled_by: "admin", category: "signature" });
+    const detectedType = parsedResult.detected_contract_type || "other";
+    const suggestedName = parsedResult.suggested_name || "Document Template";
+    let fields = parsedResult.fields || [];
+
+    // If not detectTypeOnly, ensure we have essential fields
+    if (!detectTypeOnly && fields.length > 0) {
+      const hasOwnerSignature = fields.some(f => 
+        f.api_id.includes("owner_signature") || f.api_id.includes("guest_signature")
+      );
+      const hasHostSignature = fields.some(f => 
+        f.api_id.includes("host_signature") || f.api_id.includes("agent_signature")
+      );
+      
+      if (!hasOwnerSignature) {
+        fields.push({ api_id: "owner_signature", label: "Owner Signature", type: "signature", filled_by: "guest", category: "signature" });
+        fields.push({ api_id: "owner_date_signed", label: "Owner Date Signed", type: "date", filled_by: "guest", category: "signature" });
+      }
+      if (!hasHostSignature) {
+        fields.push({ api_id: "host_signature", label: "Host/Agent Signature", type: "signature", filled_by: "admin", category: "signature" });
+        fields.push({ api_id: "host_date_signed", label: "Host Date Signed", type: "date", filled_by: "admin", category: "signature" });
+      }
     }
 
-    console.log("Detected fields:", fields.length);
+    // Update template if we have one
+    if (template && !detectTypeOnly) {
+      const { error: updateError } = await supabase
+        .from("document_templates")
+        .update({ 
+          field_mappings: fields,
+          contract_type: detectedType,
+        })
+        .eq("id", templateId);
 
-    // Cache the field mappings in the database
-    const { error: updateError } = await supabase
-      .from("document_templates")
-      .update({ field_mappings: fields })
-      .eq("id", templateId);
-
-    if (updateError) {
-      console.error("Error caching field mappings:", updateError);
+      if (updateError) {
+        console.error("Error updating template:", updateError);
+      }
     }
+
+    console.log("Detected type:", detectedType, "Fields:", fields.length);
 
     return new Response(
       JSON.stringify({
         success: true,
-        fields,
+        detected_contract_type: detectedType,
+        suggested_name: suggestedName,
+        fields: detectTypeOnly ? undefined : fields,
         cached: false,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
