@@ -85,7 +85,7 @@ serve(async (req) => {
     // Build recipients array with proper signing order:
     // 1. Owner signs first (receives email immediately)
     // 2. Manager (You) signs second (receives email after owner signs)
-    // 3. Owner 2 (optional) signs third
+    // 3. Owner 2 (optional) signs between owner1 and manager
     const recipients: any[] = [
       {
         id: '1',
@@ -93,7 +93,6 @@ serve(async (req) => {
         email: guestEmail,
         placeholder_name: 'Owner',
         signing_order: 1,
-        send_email: true,  // Send email to owner immediately
       },
       {
         id: '2',
@@ -101,7 +100,6 @@ serve(async (req) => {
         email: hostEmail,
         placeholder_name: 'Manager',
         signing_order: 2,
-        send_email: true,  // Send email to manager after owner signs
       },
     ];
 
@@ -115,34 +113,38 @@ serve(async (req) => {
         email: secondOwnerEmail,
         placeholder_name: 'Owner2',
         signing_order: 2,
-        send_email: true,
       });
     }
 
     console.log('Recipients:', JSON.stringify(recipients, null, 2));
+    console.log('File URL:', template.file_path);
 
     // Create document with SignWell API
-    // embedded_signing: false so SignWell sends emails to each party in order
+    // When embedded_signing is false, SignWell automatically sends emails to recipients
+    const requestBody = {
+      test_mode: false,  // Production mode - set to true for testing
+      name: `${template.name} - ${guestName}`,
+      embedded_signing: false,  // Email-based signing - recipients get emails
+      reminders: true,  // Enable automatic reminders
+      apply_signing_order: true,  // Enforce signing order (owner first, then manager)
+      recipients,
+      files: [
+        {
+          name: template.name,
+          file_url: template.file_path,
+        },
+      ],
+    };
+
+    console.log('SignWell request body:', JSON.stringify(requestBody, null, 2));
+
     const signwellResponse = await fetch('https://www.signwell.com/api/v1/documents', {
       method: 'POST',
       headers: {
         'X-Api-Key': signwellApiKey,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        name: `${template.name} - ${guestName}`,
-        embedded_signing: false,  // Use email-based signing so parties receive emails
-        reminders: true,  // Enable reminders
-        apply_signing_order: true,  // Enforce signing order
-        recipients,
-        files: [
-          {
-            name: template.name,
-            file_url: template.file_path,
-          },
-        ],
-        fields: allFields,
-      }),
+      body: JSON.stringify(requestBody),
     });
 
     if (!signwellResponse.ok) {
