@@ -110,12 +110,6 @@ serve(async (req) => {
     console.log('Recipients:', JSON.stringify(recipients, null, 2));
     console.log('File URL:', template.file_path);
 
-    // SignWell requires a 2-step process for documents from files:
-    // Step 1: Create document as draft with draft: true
-    // Step 2: Use the embedded_edit_url to add fields, OR send directly if template has signature markers
-    
-    // For now, we'll create the document and request the edit URL
-    // This allows users to add signature fields via SignWell's UI
     // Ensure file name has .pdf extension - SignWell requires it
     const fileUrl = template.file_path as string;
     const urlPath = fileUrl.split('/').pop() || '';
@@ -124,18 +118,20 @@ serve(async (req) => {
       ? template.name 
       : `${template.name}.${fileExtension}`;
 
+    // Create and SEND document directly (not as draft)
+    // SignWell will use text tags in PDF for field placement if present
+    // Otherwise, recipients can place their own signature
     const requestBody = {
-      test_mode: false,  // Production mode - set to true for testing
-      draft: true,  // Create as draft first so fields can be added
+      test_mode: false,
+      draft: false,  // Send immediately - not a draft
       name: `${template.name} - ${guestName}`,
-      embedded_signing: false,  // Email-based signing - recipients get emails
-      embedded_signing_enabled: false,
-      reminders: true,  // Enable automatic reminders
-      apply_signing_order: true,  // Enforce signing order (owner first, then manager)
+      embedded_signing: false,  // Email-based signing
+      reminders: true,
+      apply_signing_order: true,
       recipients,
       files: [
         {
-          name: templateNameWithExt,  // Must include file extension
+          name: templateNameWithExt,
           file_url: fileUrl,
         },
       ],
@@ -159,32 +155,16 @@ serve(async (req) => {
     }
 
     const signwellData = await signwellResponse.json();
-    console.log('SignWell draft document created:', signwellData.id);
-
-    // Get the edit URL so the user can add signature fields
-    const editUrlResponse = await fetch(`https://www.signwell.com/api/v1/documents/${signwellData.id}/embedded_edit_url`, {
-      method: 'GET',
-      headers: {
-        'X-Api-Key': signwellApiKey,
-        'Content-Type': 'application/json',
-      },
-    });
-
-    let embeddedEditUrl = null;
-    if (editUrlResponse.ok) {
-      const editData = await editUrlResponse.json();
-      embeddedEditUrl = editData.embedded_edit_url;
-      console.log('Got embedded edit URL:', embeddedEditUrl);
-    }
+    console.log('SignWell document created and sent:', signwellData.id);
+    console.log('SignWell response:', JSON.stringify(signwellData, null, 2));
 
     // Update booking document record with SignWell ID
     const { error: updateError } = await supabase
       .from('booking_documents')
       .update({
         signwell_document_id: signwellData.id,
-        embedded_edit_url: embeddedEditUrl,
-        status: 'draft',  // Document is in draft mode
-        is_draft: true,
+        status: 'pending_owner',
+        is_draft: false,
         sent_at: new Date().toISOString(),
       })
       .eq('id', documentId);
@@ -197,7 +177,7 @@ serve(async (req) => {
     // Create audit log entry
     await supabase.from('document_audit_log').insert({
       document_id: documentId,
-      action: 'draft_created',
+      action: 'sent',
       performed_by: hostEmail,
       metadata: {
         signwell_document_id: signwellData.id,
@@ -209,16 +189,13 @@ serve(async (req) => {
         second_owner_name: secondOwnerName,
         second_owner_email: secondOwnerEmail,
         created_from: 'file',
-        requires_field_placement: true,
       },
     });
 
     return new Response(JSON.stringify({
       success: true,
       signwellDocumentId: signwellData.id,
-      embeddedEditUrl: embeddedEditUrl,
-      isDraft: true,
-      message: 'Draft document created. Please add signature fields in SignWell, then send to recipients.',
+      message: 'Contract sent! Owner will receive an email to sign first.',
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
