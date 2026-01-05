@@ -317,7 +317,7 @@ serve(async (req) => {
 
     for (const signer of signerDetails) {
       await resend.emails.send({
-        from: "PeachHaus Group <contracts@peachhausgroup.com>",
+        from: "PeachHaus Group <onboarding@resend.dev>",
         to: [signer.email],
         subject: `🎉 Document Complete: ${document.document_name || document.document_templates?.name || "Agreement"}`,
         html: buildCompletionEmailHtml(

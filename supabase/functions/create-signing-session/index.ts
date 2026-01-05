@@ -204,7 +204,7 @@ serve(async (req) => {
     );
 
     const emailResult = await resend.emails.send({
-      from: "PeachHaus Group <contracts@peachhausgroup.com>",
+      from: "PeachHaus Group <onboarding@resend.dev>",
       to: [ownerEmail],
       subject: `📝 Your Agreement is Ready for Signature - ${template.name}`,
       html: emailHtml,
