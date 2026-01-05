@@ -143,32 +143,28 @@ export function SendContractButton({ lead, onContractSent }: SendContractButtonP
 
       if (docError) throw docError;
 
-      // Create SignWell document - owner fills everything except effective date
-      const { data: signwellResult, error: signwellError } = await supabase.functions.invoke(
-        "signwell-create-document",
+      // Create signing session using our custom signing solution
+      const { data: signingResult, error: signingError } = await supabase.functions.invoke(
+        "create-signing-session",
         {
           body: {
-            bookingId: null,
-            templateId: template.id,
-            guestName: recipientName,
-            guestEmail: recipientEmail,
-            hostName: "PeachHaus Group",
-            hostEmail: "anja@peachhausgroup.com",
-            fieldValues: [],
             documentId: bookingDoc.id,
+            templateId: template.id,
+            ownerName: recipientName,
+            ownerEmail: recipientEmail,
+            leadId: lead.id,
           },
         }
       );
 
-      if (signwellError) throw signwellError;
+      if (signingError) throw signingError;
 
-      // Update lead with SignWell document ID and advance stage
+      // Update lead and advance stage
       const { data: { user } } = await supabase.auth.getUser();
       
       await supabase
         .from("leads")
         .update({
-          signwell_document_id: signwellResult.signwellDocumentId,
           stage: "contract_out",
           stage_changed_at: new Date().toISOString(),
         })
@@ -185,32 +181,12 @@ export function SendContractButton({ lead, onContractSent }: SendContractButtonP
         metadata: {
           contract_type: template.contract_type,
           template_name: template.name,
-          signwell_document_id: signwellResult.signwellDocumentId,
           document_id: bookingDoc.id,
+          signing_url: signingResult.signingUrl,
         },
       });
 
-      // Send notification email to lead about the contract
-      await supabase.functions.invoke("send-lead-notification", {
-        body: {
-          leadId: lead.id,
-          type: "email",
-          subject: "Your Property Management Agreement from PeachHaus",
-          message: `Hi ${recipientName.split(" ")[0]},
-
-Thank you for choosing PeachHaus to help manage your property! We're excited to partner with you.
-
-We've prepared your agreement. Please review and sign the document at your earliest convenience.
-
-You'll receive a separate email from SignWell with the signing link.
-
-If you have any questions about the agreement, please don't hesitate to reach out. We're here to help!
-
-Looking forward to working together.`,
-        },
-      });
-
-      return signwellResult;
+      return signingResult;
     },
     onSuccess: () => {
       toast.success("Contract sent successfully!");

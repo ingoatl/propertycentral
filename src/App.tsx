@@ -43,6 +43,7 @@ const OwnerPaymentSuccess = lazy(() => import("./pages/OwnerPaymentSuccess"));
 const AuditPortal = lazy(() => import("./pages/AuditPortal"));
 const OwnerDashboard = lazy(() => import("./pages/owner/OwnerDashboard"));
 const OwnerPortalManagement = lazy(() => import("./pages/OwnerPortalManagement"));
+const SignDocument = lazy(() => import("./pages/SignDocument"));
 
 // Optimized QueryClient with caching and stale time
 const queryClient = new QueryClient({
@@ -91,6 +92,7 @@ const App = () => (
             <Route path="/owner-payment-success" element={<OwnerPaymentSuccess />} />
             <Route path="/audit/:token" element={<AuditPortal />} />
             <Route path="/owner" element={<OwnerDashboard />} />
+            <Route path="/sign/:token" element={<SignDocument />} />
             <Route path="*" element={
               <Layout>
                 <Suspense fallback={<PageLoader />}>

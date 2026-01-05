@@ -336,8 +336,10 @@ export type Database = {
       }
       booking_documents: {
         Row: {
+          all_signed_at: string | null
           booking_id: string | null
           completed_at: string | null
+          completion_certificate_path: string | null
           contract_type: string | null
           created_at: string | null
           created_by: string | null
@@ -358,13 +360,16 @@ export type Database = {
           recipient_name: string | null
           sent_at: string | null
           signed_document_path: string | null
+          signed_pdf_path: string | null
           signwell_document_id: string | null
           status: string | null
           template_id: string | null
         }
         Insert: {
+          all_signed_at?: string | null
           booking_id?: string | null
           completed_at?: string | null
+          completion_certificate_path?: string | null
           contract_type?: string | null
           created_at?: string | null
           created_by?: string | null
@@ -385,13 +390,16 @@ export type Database = {
           recipient_name?: string | null
           sent_at?: string | null
           signed_document_path?: string | null
+          signed_pdf_path?: string | null
           signwell_document_id?: string | null
           status?: string | null
           template_id?: string | null
         }
         Update: {
+          all_signed_at?: string | null
           booking_id?: string | null
           completed_at?: string | null
+          completion_certificate_path?: string | null
           contract_type?: string | null
           created_at?: string | null
           created_by?: string | null
@@ -412,6 +420,7 @@ export type Database = {
           recipient_name?: string | null
           sent_at?: string | null
           signed_document_path?: string | null
+          signed_pdf_path?: string | null
           signwell_document_id?: string | null
           status?: string | null
           template_id?: string | null
@@ -6203,6 +6212,65 @@ export type Database = {
             columns: ["owner_id"]
             isOneToOne: false
             referencedRelation: "property_owners"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      signing_tokens: {
+        Row: {
+          created_at: string
+          document_id: string
+          expires_at: string
+          id: string
+          ip_address: string | null
+          signature_data: string | null
+          signed_at: string | null
+          signer_email: string
+          signer_name: string
+          signer_type: string
+          signing_order: number
+          token: string
+          updated_at: string
+          user_agent: string | null
+        }
+        Insert: {
+          created_at?: string
+          document_id: string
+          expires_at: string
+          id?: string
+          ip_address?: string | null
+          signature_data?: string | null
+          signed_at?: string | null
+          signer_email: string
+          signer_name: string
+          signer_type: string
+          signing_order?: number
+          token: string
+          updated_at?: string
+          user_agent?: string | null
+        }
+        Update: {
+          created_at?: string
+          document_id?: string
+          expires_at?: string
+          id?: string
+          ip_address?: string | null
+          signature_data?: string | null
+          signed_at?: string | null
+          signer_email?: string
+          signer_name?: string
+          signer_type?: string
+          signing_order?: number
+          token?: string
+          updated_at?: string
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "signing_tokens_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "booking_documents"
             referencedColumns: ["id"]
           },
         ]
