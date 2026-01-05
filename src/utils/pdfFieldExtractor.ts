@@ -36,7 +36,7 @@ export interface PdfExtractionResult {
 
 /**
  * Extract form fields (AcroForm/Widget annotations) and text from a PDF
- * This is the primary method - it extracts actual fillable fields with exact positions
+ * Using viewport.convertToViewportRectangle for accurate coordinate conversion
  */
 export async function extractPdfFormFields(pdfUrl: string): Promise<PdfExtractionResult> {
   try {
@@ -56,8 +56,8 @@ export async function extractPdfFormFields(pdfUrl: string): Promise<PdfExtractio
     for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
       const page = await pdf.getPage(pageNum);
       const viewport = page.getViewport({ scale: 1.0 });
-      const pageWidth = viewport.width;
-      const pageHeight = viewport.height;
+      const viewportWidth = viewport.width;
+      const viewportHeight = viewport.height;
       
       // Extract annotations (form fields)
       const annotations = await page.getAnnotations();
@@ -67,14 +67,21 @@ export async function extractPdfFormFields(pdfUrl: string): Promise<PdfExtractio
         if (annot.subtype === 'Widget' && annot.rect) {
           hasAcroForm = true;
           
-          const [x1, y1, x2, y2] = annot.rect;
+          // Use viewport.convertToViewportRectangle for accurate conversion
+          // This handles the PDF coordinate system (origin bottom-left) to screen (origin top-left)
+          const viewportRect = viewport.convertToViewportRectangle(annot.rect);
           
-          // Convert PDF coordinates to percentages
-          // PDF coordinates have origin at bottom-left, we need top-left
-          const xPercent = (x1 / pageWidth) * 100;
-          const yPercent = ((pageHeight - y2) / pageHeight) * 100; // Flip Y axis
-          const widthPercent = ((x2 - x1) / pageWidth) * 100;
-          const heightPercent = ((y2 - y1) / pageHeight) * 100;
+          // viewportRect returns [x1, y1, x2, y2] in viewport coordinates
+          const screenX1 = Math.min(viewportRect[0], viewportRect[2]);
+          const screenY1 = Math.min(viewportRect[1], viewportRect[3]);
+          const screenX2 = Math.max(viewportRect[0], viewportRect[2]);
+          const screenY2 = Math.max(viewportRect[1], viewportRect[3]);
+          
+          // Convert to percentages
+          const xPercent = (screenX1 / viewportWidth) * 100;
+          const yPercent = (screenY1 / viewportHeight) * 100;
+          const widthPercent = ((screenX2 - screenX1) / viewportWidth) * 100;
+          const heightPercent = ((screenY2 - screenY1) / viewportHeight) * 100;
           
           // Determine field type from annotation
           let fieldType: ExtractedFormField['fieldType'] = 'text';
@@ -104,7 +111,7 @@ export async function extractPdfFormFields(pdfUrl: string): Promise<PdfExtractio
             page: pageNum,
             x: Math.max(0, Math.min(xPercent, 100)),
             y: Math.max(0, Math.min(yPercent, 100)),
-            width: Math.max(1, Math.min(widthPercent, 50)),
+            width: Math.max(1, Math.min(widthPercent, 80)),
             height: Math.max(0.5, Math.min(heightPercent, 20)),
             rect: annot.rect,
             value: annot.fieldValue || undefined,
@@ -114,33 +121,44 @@ export async function extractPdfFormFields(pdfUrl: string): Promise<PdfExtractio
         }
       }
       
-      // Also extract text content for fallback detection
+      // Also extract text content for fallback detection and context
       const textContent = await page.getTextContent();
       
       for (const item of textContent.items) {
         if ('str' in item && item.str.trim()) {
           const tx = item.transform;
-          const x = tx[4];
-          const y = tx[5];
-          const width = item.width || 50;
-          const height = item.height || 12;
+          // Transform gives us [scaleX, skewY, skewX, scaleY, translateX, translateY]
+          const pdfX = tx[4];
+          const pdfY = tx[5];
+          const itemWidth = item.width || 50;
+          const itemHeight = item.height || 12;
           
-          // Convert to percentages
-          const xPercent = (x / pageWidth) * 100;
-          const yPercent = ((pageHeight - y - height) / pageHeight) * 100;
-          const widthPercent = (width / pageWidth) * 100;
-          const heightPercent = (height / pageHeight) * 100;
+          // Convert text position using viewport
+          // Text y is at baseline, so adjust for height
+          const textRect = [pdfX, pdfY, pdfX + itemWidth, pdfY + itemHeight];
+          const viewportRect = viewport.convertToViewportRectangle(textRect);
+          
+          const screenX = Math.min(viewportRect[0], viewportRect[2]);
+          const screenY = Math.min(viewportRect[1], viewportRect[3]);
+          const screenWidth = Math.abs(viewportRect[2] - viewportRect[0]);
+          const screenHeight = Math.abs(viewportRect[3] - viewportRect[1]);
           
           textPositions.push({
             text: item.str,
-            x: xPercent,
-            y: yPercent,
-            width: widthPercent,
-            height: heightPercent,
+            x: (screenX / viewportWidth) * 100,
+            y: (screenY / viewportHeight) * 100,
+            width: (screenWidth / viewportWidth) * 100,
+            height: (screenHeight / viewportHeight) * 100,
             page: pageNum,
           });
         }
       }
+    }
+    
+    // If no AcroForm fields, use pattern detection
+    if (!hasAcroForm && textPositions.length > 0) {
+      const patternFields = detectFieldsFromPatterns(textPositions);
+      formFields.push(...patternFields);
     }
     
     console.log(`PDF extraction: ${formFields.length} form fields, ${textPositions.length} text items, hasAcroForm: ${hasAcroForm}`);
@@ -158,28 +176,11 @@ export async function extractPdfFormFields(pdfUrl: string): Promise<PdfExtractio
 }
 
 /**
- * Detect underline patterns in text that indicate fillable areas
- * This is used as a fallback when no AcroForm fields are found
+ * Detect fields from text patterns when no AcroForm exists
+ * Looks for: underlines (___), checkboxes (☐□), labels with colons
  */
-export function detectUnderlinePatterns(textPositions: TextPosition[]): ExtractedFormField[] {
+function detectFieldsFromPatterns(textPositions: TextPosition[]): ExtractedFormField[] {
   const fields: ExtractedFormField[] = [];
-  
-  // Look for patterns like:
-  // - Text followed by "______" or "___________"
-  // - "☐" or "□" checkboxes
-  // - Labels like "Name:", "Date:", "Signature:" near empty space
-  
-  const labelPatterns = [
-    { pattern: /owner.*name/i, type: 'text' as const, apiId: 'owner_name' },
-    { pattern: /owner.*signature/i, type: 'signature' as const, apiId: 'owner_signature' },
-    { pattern: /second.*owner.*name/i, type: 'text' as const, apiId: 'second_owner_name' },
-    { pattern: /second.*owner.*signature/i, type: 'signature' as const, apiId: 'second_owner_signature' },
-    { pattern: /property.*address/i, type: 'text' as const, apiId: 'property_address' },
-    { pattern: /owner.*address/i, type: 'text' as const, apiId: 'owner_address' },
-    { pattern: /date/i, type: 'date' as const, apiId: 'date' },
-    { pattern: /email/i, type: 'text' as const, apiId: 'owner_email' },
-    { pattern: /phone/i, type: 'text' as const, apiId: 'owner_phone' },
-  ];
   
   // Group text by page
   const byPage = new Map<number, TextPosition[]>();
@@ -188,76 +189,152 @@ export function detectUnderlinePatterns(textPositions: TextPosition[]): Extracte
     byPage.get(tp.page)!.push(tp);
   }
   
-  // Look for checkbox patterns (☐, □, ◯)
-  const checkboxPattern = /[☐□◯○]/;
-  const packagePatterns = [
-    /18\s*%/i,
-    /20\s*%/i,
-    /25\s*%/i,
-    /tier\s*1/i,
-    /tier\s*2/i,
-    /tier\s*3/i,
-    /basic/i,
-    /standard/i,
-    /premium/i,
+  // Field label patterns
+  const fieldPatterns = [
+    { pattern: /owner\(?s?\)?:?\s*$/i, type: 'text' as const, apiId: 'owner_name' },
+    { pattern: /owner.*name/i, type: 'text' as const, apiId: 'owner_name' },
+    { pattern: /owner.*signature/i, type: 'signature' as const, apiId: 'owner_signature' },
+    { pattern: /second.*owner.*name/i, type: 'text' as const, apiId: 'second_owner_name' },
+    { pattern: /second.*owner.*signature/i, type: 'signature' as const, apiId: 'second_owner_signature' },
+    { pattern: /property.*address/i, type: 'text' as const, apiId: 'property_address' },
+    { pattern: /^address:?\s*$/i, type: 'text' as const, apiId: 'owner_address' },
+    { pattern: /owner.*address/i, type: 'text' as const, apiId: 'owner_address' },
+    { pattern: /effective.*date/i, type: 'date' as const, apiId: 'effective_date' },
+    { pattern: /^date:?\s*$/i, type: 'date' as const, apiId: 'signature_date' },
+    { pattern: /email:?\s*$/i, type: 'text' as const, apiId: 'owner_email' },
+    { pattern: /phone:?\s*$/i, type: 'text' as const, apiId: 'owner_phone' },
   ];
   
+  // Package selection patterns (percentages)
+  const packagePatterns = [
+    { pattern: /15\s*%/, apiId: 'package_15' },
+    { pattern: /18\s*%/, apiId: 'package_18' },
+    { pattern: /20\s*%/, apiId: 'package_20' },
+    { pattern: /25\s*%/, apiId: 'package_25' },
+  ];
+  
+  // Checkbox/radio markers
+  const checkboxMarkers = /[☐□◯○◻▢]/;
+  
   for (const [page, items] of byPage) {
+    // Sort by Y then X for line grouping
+    items.sort((a, b) => {
+      const yDiff = a.y - b.y;
+      return Math.abs(yDiff) < 1.5 ? a.x - b.x : yDiff;
+    });
+    
     for (let i = 0; i < items.length; i++) {
       const item = items[i];
       
-      // Check for checkbox markers
-      if (checkboxPattern.test(item.text)) {
-        // Look for nearby text to determine what this checkbox is for
+      // Check for checkbox/radio markers
+      if (checkboxMarkers.test(item.text)) {
+        // Look for text to the right on the same line
         const nearbyText = items
           .filter(t => 
-            Math.abs(t.y - item.y) < 3 && // Same line roughly
-            t.x > item.x && t.x < item.x + 40 // To the right
+            Math.abs(t.y - item.y) < 2 && // Same line (within 2%)
+            t.x > item.x && t.x < item.x + 60 // To the right, within 60%
           )
           .map(t => t.text)
           .join(' ');
         
-        // Check if this is a package selection checkbox
-        const isPackage = packagePatterns.some(p => p.test(nearbyText));
+        // Check if this is a package selection
+        const packageMatch = packagePatterns.find(p => p.pattern.test(nearbyText));
         
-        fields.push({
-          fieldName: isPackage ? `package_${fields.length}` : `checkbox_${fields.length}`,
-          fieldType: isPackage ? 'radio' : 'checkbox',
-          page,
-          x: item.x,
-          y: item.y,
-          width: 3,
-          height: 3,
-          groupName: isPackage ? 'package_selection' : undefined,
-        });
+        if (packageMatch) {
+          fields.push({
+            fieldName: packageMatch.apiId,
+            fieldType: 'radio',
+            page,
+            x: item.x,
+            y: item.y,
+            width: 4,
+            height: 3,
+            groupName: 'package_selection',
+            isRequired: true,
+          });
+        } else {
+          fields.push({
+            fieldName: `checkbox_${page}_${fields.length}`,
+            fieldType: 'checkbox',
+            page,
+            x: item.x,
+            y: item.y,
+            width: 4,
+            height: 3,
+          });
+        }
+        continue;
       }
       
-      // Check for label patterns
-      for (const { pattern, type, apiId } of labelPatterns) {
-        if (pattern.test(item.text)) {
-          // Look for underline or empty space after this label
-          const underlineItem = items.find(t => 
-            t.page === page &&
-            Math.abs(t.y - item.y) < 2 &&
-            t.x > item.x + item.width &&
-            /_{3,}/.test(t.text)
-          );
-          
-          if (underlineItem) {
+      // Check for underline patterns (field input areas)
+      if (/_{4,}/.test(item.text)) {
+        // This is an underline - look for label to the left
+        const labelCandidate = items
+          .filter(t => 
+            Math.abs(t.y - item.y) < 2 && // Same line
+            t.x < item.x && // To the left
+            t.x > item.x - 30 // Within reasonable distance
+          )
+          .sort((a, b) => b.x - a.x)[0]; // Closest to underline
+        
+        if (labelCandidate) {
+          const matchedPattern = fieldPatterns.find(p => p.pattern.test(labelCandidate.text));
+          if (matchedPattern) {
             fields.push({
-              fieldName: apiId,
-              fieldType: type,
+              fieldName: matchedPattern.apiId,
+              fieldType: matchedPattern.type,
               page,
-              x: underlineItem.x,
-              y: underlineItem.y,
-              width: underlineItem.width,
-              height: type === 'signature' ? 8 : 4,
+              x: item.x,
+              y: item.y - 0.5, // Slightly above the underline
+              width: item.width,
+              height: matchedPattern.type === 'signature' ? 6 : 3,
             });
           }
         }
+        continue;
+      }
+      
+      // Check for label patterns (colon at end suggests input follows)
+      const matchedPattern = fieldPatterns.find(p => p.pattern.test(item.text));
+      if (matchedPattern) {
+        // Look for underline or empty space after this label
+        const underlineAfter = items.find(t => 
+          Math.abs(t.y - item.y) < 2 &&
+          t.x > item.x + item.width - 2 &&
+          t.x < item.x + item.width + 50 &&
+          /_{3,}/.test(t.text)
+        );
+        
+        // Calculate field position (after the label)
+        const fieldX = underlineAfter ? underlineAfter.x : item.x + item.width + 2;
+        const fieldWidth = underlineAfter ? underlineAfter.width : 40;
+        
+        fields.push({
+          fieldName: matchedPattern.apiId,
+          fieldType: matchedPattern.type,
+          page,
+          x: Math.min(fieldX, 90),
+          y: item.y,
+          width: Math.min(fieldWidth, 50),
+          height: matchedPattern.type === 'signature' ? 6 : 3,
+        });
       }
     }
   }
   
-  return fields;
+  // Remove duplicates by api_id (keep first occurrence)
+  const seen = new Set<string>();
+  return fields.filter(f => {
+    if (seen.has(f.fieldName)) return false;
+    seen.add(f.fieldName);
+    return true;
+  });
+}
+
+/**
+ * Detect underline patterns in text that indicate fillable areas
+ * This is used as a fallback when no AcroForm fields are found
+ */
+export function detectUnderlinePatterns(textPositions: TextPosition[]): ExtractedFormField[] {
+  return detectFieldsFromPatterns(textPositions);
 }
