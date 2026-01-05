@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -28,14 +28,47 @@ interface SendContractButtonProps {
   onContractSent?: () => void;
 }
 
-type ContractType = "cohosting_agreement" | "management_agreement";
+interface DocumentTemplate {
+  id: string;
+  name: string;
+  contract_type: string | null;
+  is_active: boolean;
+}
 
 export function SendContractButton({ lead, onContractSent }: SendContractButtonProps) {
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
-  const [contractType, setContractType] = useState<ContractType>("cohosting_agreement");
+  const [templates, setTemplates] = useState<DocumentTemplate[]>([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>("");
   const [recipientEmail, setRecipientEmail] = useState(lead.email || "");
   const [recipientName, setRecipientName] = useState(lead.name || "");
+
+  // Load available templates when dialog opens
+  useEffect(() => {
+    if (open) {
+      loadTemplates();
+    }
+  }, [open]);
+
+  const loadTemplates = async () => {
+    const { data, error } = await supabase
+      .from("document_templates")
+      .select("id, name, contract_type, is_active")
+      .eq("is_active", true)
+      .order("name");
+
+    if (error) {
+      console.error("Error loading templates:", error);
+      return;
+    }
+
+    setTemplates(data || []);
+    
+    // Auto-select first template if only one exists
+    if (data && data.length === 1) {
+      setSelectedTemplateId(data[0].id);
+    }
+  };
 
   const sendContract = useMutation({
     mutationFn: async () => {
@@ -43,22 +76,17 @@ export function SendContractButton({ lead, onContractSent }: SendContractButtonP
         throw new Error("Recipient name and email are required");
       }
 
-      // 1. Find the appropriate template based on contract type
-      const { data: templates, error: templateError } = await supabase
-        .from("document_templates")
-        .select("*")
-        .eq("contract_type", contractType)
-        .eq("is_active", true)
-        .limit(1);
-
-      if (templateError) throw templateError;
-      if (!templates || templates.length === 0) {
-        throw new Error(`No active template found for ${contractType}`);
+      if (!selectedTemplateId) {
+        throw new Error("Please select a contract template");
       }
 
-      const template = templates[0];
+      // Find the selected template
+      const template = templates.find(t => t.id === selectedTemplateId);
+      if (!template) {
+        throw new Error("Selected template not found");
+      }
 
-      // 2. Create or get the property owner
+      // Create or get the property owner
       let ownerId: string | null = lead.owner_id || null;
 
       if (!ownerId) {
@@ -80,7 +108,7 @@ export function SendContractButton({ lead, onContractSent }: SendContractButtonP
               email: recipientEmail,
               phone: lead.phone,
               payment_method: "ach",
-              service_type: contractType === "management_agreement" ? "full_service" : "cohosting",
+              service_type: template.contract_type === "full_service" ? "full_service" : "cohosting",
             })
             .select()
             .single();
@@ -96,7 +124,7 @@ export function SendContractButton({ lead, onContractSent }: SendContractButtonP
         }
       }
 
-      // 3. Create the booking document record
+      // Create the booking document record
       const { data: bookingDoc, error: docError } = await supabase
         .from("booking_documents")
         .insert({
@@ -106,7 +134,7 @@ export function SendContractButton({ lead, onContractSent }: SendContractButtonP
           recipient_email: recipientEmail,
           document_name: `${template.name} - ${recipientName}`,
           document_type: "contract",
-          contract_type: contractType,
+          contract_type: template.contract_type,
           status: "draft",
           is_draft: true,
         })
@@ -115,7 +143,7 @@ export function SendContractButton({ lead, onContractSent }: SendContractButtonP
 
       if (docError) throw docError;
 
-      // 4. Create SignWell document
+      // Create SignWell document - owner fills everything except effective date
       const { data: signwellResult, error: signwellError } = await supabase.functions.invoke(
         "signwell-create-document",
         {
@@ -134,7 +162,7 @@ export function SendContractButton({ lead, onContractSent }: SendContractButtonP
 
       if (signwellError) throw signwellError;
 
-      // 5. Update lead with SignWell document ID and advance stage
+      // Update lead with SignWell document ID and advance stage
       const { data: { user } } = await supabase.auth.getUser();
       
       await supabase
@@ -146,22 +174,23 @@ export function SendContractButton({ lead, onContractSent }: SendContractButtonP
         })
         .eq("id", lead.id);
 
-      // 6. Add timeline entry
+      // Add timeline entry
       await supabase.from("lead_timeline").insert({
         lead_id: lead.id,
-        action: `Contract sent: ${contractType === "management_agreement" ? "Full-Service Management" : "Co-Hosting"} agreement`,
+        action: `Contract sent: ${template.name}`,
         performed_by_user_id: user?.id,
         performed_by_name: user?.email,
         previous_stage: lead.stage,
         new_stage: "contract_out",
         metadata: {
-          contract_type: contractType,
+          contract_type: template.contract_type,
+          template_name: template.name,
           signwell_document_id: signwellResult.signwellDocumentId,
           document_id: bookingDoc.id,
         },
       });
 
-      // 7. Send notification email to lead about the contract
+      // Send notification email to lead about the contract
       await supabase.functions.invoke("send-lead-notification", {
         body: {
           leadId: lead.id,
@@ -171,7 +200,7 @@ export function SendContractButton({ lead, onContractSent }: SendContractButtonP
 
 Thank you for choosing PeachHaus to help manage your property! We're excited to partner with you.
 
-We've prepared your ${contractType === "management_agreement" ? "Full-Service Property Management" : "Co-Hosting"} agreement. Please review and sign the document at your earliest convenience.
+We've prepared your agreement. Please review and sign the document at your earliest convenience.
 
 You'll receive a separate email from SignWell with the signing link.
 
@@ -202,6 +231,19 @@ Looking forward to working together.`,
     return null;
   }
 
+  const getContractTypeLabel = (type: string | null) => {
+    switch (type) {
+      case "co_hosting":
+        return "Co-Hosting";
+      case "full_service":
+        return "Full-Service";
+      case "rental_agreement":
+        return "Rental Agreement";
+      default:
+        return type || "Other";
+    }
+  };
+
   return (
     <>
       <Button
@@ -219,38 +261,42 @@ Looking forward to working together.`,
           <DialogHeader>
             <DialogTitle>Send Contract to {lead.name}</DialogTitle>
             <DialogDescription>
-              Select the contract type and confirm recipient details.
+              Select the contract template and confirm recipient details. The owner will fill in their address, property details, and select their package during signing.
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label>Contract Type</Label>
+              <Label>Contract Template *</Label>
               <Select
-                value={contractType}
-                onValueChange={(v) => setContractType(v as ContractType)}
+                value={selectedTemplateId}
+                onValueChange={setSelectedTemplateId}
               >
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue placeholder="Select a contract template..." />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="cohosting_agreement">
-                    Co-Hosting Agreement
-                  </SelectItem>
-                  <SelectItem value="management_agreement">
-                    Full-Service Management Agreement
-                  </SelectItem>
+                  {templates.map((template) => (
+                    <SelectItem key={template.id} value={template.id}>
+                      {template.name}
+                      {template.contract_type && (
+                        <span className="text-muted-foreground ml-2">
+                          ({getContractTypeLabel(template.contract_type)})
+                        </span>
+                      )}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
-              <p className="text-xs text-muted-foreground">
-                {contractType === "management_agreement"
-                  ? "Full-service: We handle everything, owner receives payouts"
-                  : "Co-hosting: Owner manages bookings, we assist with operations"}
-              </p>
+              {templates.length === 0 && (
+                <p className="text-xs text-muted-foreground">
+                  No active templates found. Please upload templates first.
+                </p>
+              )}
             </div>
 
             <div className="space-y-2">
-              <Label>Recipient Name</Label>
+              <Label>Recipient Name *</Label>
               <Input
                 value={recipientName}
                 onChange={(e) => setRecipientName(e.target.value)}
@@ -259,7 +305,7 @@ Looking forward to working together.`,
             </div>
 
             <div className="space-y-2">
-              <Label>Recipient Email</Label>
+              <Label>Recipient Email *</Label>
               <Input
                 type="email"
                 value={recipientEmail}
@@ -268,12 +314,15 @@ Looking forward to working together.`,
               />
             </div>
 
-            {lead.property_address && (
-              <div className="p-3 bg-muted rounded-lg">
-                <p className="text-sm font-medium">Property</p>
-                <p className="text-sm text-muted-foreground">{lead.property_address}</p>
-              </div>
-            )}
+            <div className="p-3 bg-muted/50 rounded-lg text-sm text-muted-foreground">
+              <p className="font-medium text-foreground mb-1">Owner will fill during signing:</p>
+              <ul className="list-disc list-inside space-y-1">
+                <li>Their mailing address</li>
+                <li>Property address</li>
+                <li>Service package selection</li>
+                <li>Signature</li>
+              </ul>
+            </div>
           </div>
 
           <DialogFooter>
@@ -282,7 +331,7 @@ Looking forward to working together.`,
             </Button>
             <Button
               onClick={() => sendContract.mutate()}
-              disabled={sendContract.isPending || !recipientEmail || !recipientName}
+              disabled={sendContract.isPending || !recipientEmail || !recipientName || !selectedTemplateId}
             >
               {sendContract.isPending ? (
                 <>

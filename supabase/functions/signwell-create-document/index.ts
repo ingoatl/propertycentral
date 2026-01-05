@@ -28,7 +28,7 @@ serve(async (req) => {
       documentId 
     } = await req.json();
 
-    console.log('Creating SignWell document for booking:', bookingId);
+    console.log('Creating SignWell document for booking:', bookingId, 'document:', documentId);
 
     // Initialize Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -45,6 +45,32 @@ serve(async (req) => {
     if (templateError || !template) {
       throw new Error('Template not found');
     }
+
+    // Build field values - only pre-fill effective date and owner contact info
+    // Owner fills: address, property address, package selection during signing
+    const today = new Date().toLocaleDateString('en-US', { 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    });
+
+    const prefilledFields = [
+      {
+        api_id: 'effective_date',
+        value: today,
+      },
+      {
+        api_id: 'owner_name',
+        value: guestName,
+      },
+      {
+        api_id: 'owner_email',
+        value: guestEmail,
+      },
+    ];
+
+    // Merge with any additional field values passed in
+    const allFields = [...prefilledFields, ...(fieldValues || [])];
 
     // Create document with SignWell API - NO automatic emails (reminders: false)
     const signwellResponse = await fetch('https://www.signwell.com/api/v1/documents', {
@@ -80,7 +106,7 @@ serve(async (req) => {
             file_url: template.file_path,
           },
         ],
-        fields: fieldValues || [],
+        fields: allFields,
       }),
     });
 
@@ -129,6 +155,7 @@ serve(async (req) => {
         signwell_document_id: signwellData.id,
         guest_name: guestName,
         guest_email: guestEmail,
+        prefilled_fields: ['effective_date', 'owner_name', 'owner_email'],
       },
     });
 
