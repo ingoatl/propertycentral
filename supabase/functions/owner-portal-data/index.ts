@@ -141,7 +141,7 @@ serve(async (req: Request): Promise<Response> => {
       // Monthly reconciliations (statements) - fetch all historical data (24 months)
       supabase
         .from("monthly_reconciliations")
-        .select("id, reconciliation_month, total_revenue, total_expenses, net_to_owner, status, short_term_revenue, mid_term_revenue, revenue_override")
+        .select("id, reconciliation_month, total_revenue, total_expenses, management_fee, net_to_owner, status, short_term_revenue, mid_term_revenue, revenue_override")
         .eq("property_id", property.id)
         .in("status", ["sent", "statement_sent", "completed", "approved", "preview", "pending"])
         .order("reconciliation_month", { ascending: false })
@@ -538,7 +538,12 @@ serve(async (req: Request): Promise<Response> => {
     monthlyRevenue[month].str = s.short_term_revenue || 0;
     monthlyRevenue[month].mtr = s.mid_term_revenue || 0;
     monthlyRevenue[month].total = (s.short_term_revenue || 0) + (s.mid_term_revenue || 0);
-    monthlyRevenue[month].expenses = s.total_expenses || 0;
+    
+    // Include both actual expenses AND management fee in the expenses shown
+    const actualExpenses = Math.abs(s.total_expenses || 0);
+    const managementFee = Math.abs(s.management_fee || 0);
+    monthlyRevenue[month].expenses = actualExpenses + managementFee;
+    
     // For co-hosting: actual_net = revenue - net_to_owner (net_to_owner is what they owe us)
     // For full-service: actual_net = net_to_owner
     const actualNet = isCohosting 
