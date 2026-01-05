@@ -223,6 +223,28 @@ export function DocumentTemplatesManager() {
     if (!confirm('Are you sure you want to delete this template?')) return;
 
     try {
+      // Check if template is in use by any documents
+      const { data: usedDocs, error: checkError } = await supabase
+        .from('booking_documents')
+        .select('id')
+        .eq('template_id', id)
+        .limit(1);
+
+      if (checkError) throw checkError;
+
+      if (usedDocs && usedDocs.length > 0) {
+        // Template is in use - just deactivate it instead
+        const { error: deactivateError } = await supabase
+          .from('document_templates')
+          .update({ is_active: false })
+          .eq('id', id);
+
+        if (deactivateError) throw deactivateError;
+        toast.success('Template deactivated (in use by existing documents)');
+        loadTemplates();
+        return;
+      }
+
       const { error } = await supabase
         .from('document_templates')
         .delete()
@@ -233,7 +255,7 @@ export function DocumentTemplatesManager() {
       loadTemplates();
     } catch (error: any) {
       console.error('Error deleting template:', error);
-      toast.error('Failed to delete template');
+      toast.error('Failed to delete template: ' + (error.message || 'Unknown error'));
     }
   };
 
