@@ -4,7 +4,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
-import { Loader2, CheckCircle, AlertCircle, ChevronDown, ChevronUp, ArrowRight } from "lucide-react";
+import { Loader2, CheckCircle, AlertCircle, ChevronDown, ChevronUp, ArrowRight, Check } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { Document, Page, pdfjs } from "react-pdf";
 import { InlineField, FieldData } from "@/components/signing/InlineField";
 import { InlineSignature } from "@/components/signing/InlineSignature";
@@ -279,11 +280,14 @@ const SignDocument = () => {
     }
   };
 
-  const canFinish = signatureData && agreedToTerms && signerFields.filter(f => f.required).every(f => {
+  // Check if all required fields are complete
+  const allRequiredComplete = signerFields.filter(f => f.required).every(f => {
     if (f.type === "signature") return !!signatureData;
-    if (f.type === "checkbox") return true;
+    if (f.type === "checkbox") return fieldValues[f.api_id] === true || fieldValues[f.api_id] === false;
     return !!fieldValues[f.api_id];
   });
+  
+  const canFinish = signatureData && agreedToTerms && allRequiredComplete;
 
   const getFieldsForPage = (pageNum: number) => [...signerFields, ...adminFields].filter(f => f.page === pageNum);
 
@@ -357,9 +361,14 @@ const SignDocument = () => {
           <Button
             onClick={handleSubmitSignature}
             disabled={!canFinish || submitting}
-            className="bg-[#fae052] text-[#1a1a2e] hover:bg-[#f5d93a] font-semibold px-6 disabled:opacity-40"
+            className={cn(
+              "font-semibold px-6 transition-all duration-300",
+              canFinish 
+                ? "bg-[#4caf50] text-white hover:bg-[#43a047] animate-pulse shadow-lg shadow-green-500/30" 
+                : "bg-[#fae052] text-[#1a1a2e] hover:bg-[#f5d93a] disabled:opacity-40"
+            )}
           >
-            {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "FINISH"}
+            {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : canFinish ? "✓ FINISH" : "FINISH"}
           </Button>
         </div>
       </header>
@@ -383,8 +392,8 @@ const SignDocument = () => {
         </div>
       </div>
 
-      {/* Floating NEXT Button - DocuSign style */}
-      {completedRequired < totalRequired && (
+      {/* Floating Button - NEXT or FINISH READY */}
+      {completedRequired < totalRequired ? (
         <div className="fixed bottom-20 right-6 z-50">
           <Button
             onClick={activeFieldId || showSignatureFor ? handleNext : handleStart}
@@ -393,6 +402,28 @@ const SignDocument = () => {
           >
             {activeFieldId || showSignatureFor ? "NEXT" : "START"}
             <ArrowRight className="h-5 w-5" />
+          </Button>
+        </div>
+      ) : canFinish ? (
+        <div className="fixed bottom-20 right-6 z-50">
+          <Button
+            onClick={handleSubmitSignature}
+            disabled={submitting}
+            size="lg"
+            className="bg-[#4caf50] text-white hover:bg-[#43a047] font-bold shadow-2xl rounded-full px-6 gap-2"
+          >
+            <Check className="h-5 w-5" />
+            FINISH
+          </Button>
+        </div>
+      ) : (
+        <div className="fixed bottom-20 right-6 z-50">
+          <Button
+            onClick={() => setAgreedToTerms(true)}
+            size="lg"
+            className="bg-[#fae052] text-[#1a1a2e] hover:bg-[#f5d93a] font-bold shadow-2xl rounded-full px-6 gap-2 animate-pulse"
+          >
+            Agree & Continue
           </Button>
         </div>
       )}

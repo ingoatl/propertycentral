@@ -126,10 +126,19 @@ export function InlineField({
 
   if (field.type === "checkbox") {
     return (
-      <div 
+      <button 
+        type="button"
+        onClick={() => {
+          if (!isReadOnly) {
+            onChange(value !== true);
+          }
+        }}
+        disabled={isReadOnly}
         className={cn(
-          "flex items-center justify-center h-full",
-          isReadOnly ? "opacity-60 pointer-events-none" : ""
+          "flex items-center justify-center h-full w-full cursor-pointer",
+          isReadOnly ? "opacity-60 cursor-not-allowed" : "hover:bg-[#fff5cc]",
+          value === true ? completedClass : pendingClass,
+          "rounded transition-all duration-150"
         )}
       >
         <Checkbox
@@ -137,11 +146,14 @@ export function InlineField({
           onCheckedChange={(checked) => !isReadOnly && onChange(checked === true)}
           disabled={isReadOnly}
           className={cn(
-            "h-5 w-5 rounded",
-            !isReadOnly && !value && "border-[#fae052] border-2 bg-[#fff8dc]"
+            "h-6 w-6 rounded pointer-events-none",
+            value === true ? "border-[#4caf50] bg-[#4caf50] text-white" : "border-[#fae052] border-2 bg-white"
           )}
         />
-      </div>
+        {value === true && (
+          <Check className="h-3 w-3 text-green-600 ml-1" />
+        )}
+      </button>
     );
   }
 
@@ -182,7 +194,7 @@ export function InlineField({
             )}
           </button>
         </PopoverTrigger>
-        <PopoverContent className="w-auto p-0" align="start">
+        <PopoverContent className="w-auto p-0 pointer-events-auto z-[200]" align="start" sideOffset={5}>
           <Calendar
             mode="single"
             selected={dateValue}
@@ -193,6 +205,7 @@ export function InlineField({
               }
             }}
             initialFocus
+            className="pointer-events-auto"
           />
         </PopoverContent>
       </Popover>
