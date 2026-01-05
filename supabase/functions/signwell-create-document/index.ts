@@ -25,10 +25,16 @@ serve(async (req) => {
       hostName, 
       hostEmail,
       fieldValues,
-      documentId 
+      documentId,
+      includeSecondOwner,
+      secondOwnerName,
+      secondOwnerEmail,
     } = await req.json();
 
     console.log('Creating SignWell document for booking:', bookingId, 'document:', documentId);
+    console.log('Manager (Host):', hostName, hostEmail);
+    console.log('Owner 1 (Guest):', guestName, guestEmail);
+    console.log('Include Second Owner:', includeSecondOwner, secondOwnerName, secondOwnerEmail);
 
     // Initialize Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -67,12 +73,54 @@ serve(async (req) => {
         api_id: 'owner_email',
         value: guestEmail,
       },
+      {
+        api_id: 'manager_name',
+        value: hostName,
+      },
     ];
 
     // Merge with any additional field values passed in
     const allFields = [...prefilledFields, ...(fieldValues || [])];
 
-    // Create document with SignWell API - NO automatic emails (reminders: false)
+    // Build recipients array with proper signing order:
+    // 1. Manager (You) signs first
+    // 2. Owner 1 signs second
+    // 3. Owner 2 (optional) signs third
+    const recipients: any[] = [
+      {
+        id: '1',
+        name: hostName,
+        email: hostEmail,
+        placeholder_name: 'Manager',
+        signing_order: 1,
+        send_email: true,  // Send email to manager
+      },
+      {
+        id: '2',
+        name: guestName,
+        email: guestEmail,
+        placeholder_name: 'Owner',
+        signing_order: 2,
+        send_email: true,  // Send email to owner after manager signs
+      },
+    ];
+
+    // Add second owner if requested
+    if (includeSecondOwner && secondOwnerName && secondOwnerEmail) {
+      recipients.push({
+        id: '3',
+        name: secondOwnerName,
+        email: secondOwnerEmail,
+        placeholder_name: 'Owner2',
+        signing_order: 3,
+        send_email: true,
+      });
+    }
+
+    console.log('Recipients:', JSON.stringify(recipients, null, 2));
+
+    // Create document with SignWell API
+    // embedded_signing: false so SignWell sends emails to each party in order
     const signwellResponse = await fetch('https://www.signwell.com/api/v1/documents', {
       method: 'POST',
       headers: {
@@ -81,25 +129,10 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         name: `${template.name} - ${guestName}`,
-        embedded_signing: true,
-        reminders: false, // CRITICAL: No automatic emails to recipients
-        apply_signing_order: true,
-        recipients: [
-          {
-            id: '1',
-            name: guestName,
-            email: guestEmail,
-            placeholder_name: 'Guest',
-            signing_order: 1,
-          },
-          {
-            id: '2',
-            name: hostName,
-            email: hostEmail,
-            placeholder_name: 'Host',
-            signing_order: 2,
-          },
-        ],
+        embedded_signing: false,  // Use email-based signing so parties receive emails
+        reminders: true,  // Enable reminders
+        apply_signing_order: true,  // Enforce signing order
+        recipients,
         files: [
           {
             name: template.name,
@@ -119,25 +152,13 @@ serve(async (req) => {
     const signwellData = await signwellResponse.json();
     console.log('SignWell document created:', signwellData.id);
 
-    // Extract signing URLs for both guest and host
-    const guestRecipient = signwellData.recipients?.find((r: any) => r.placeholder_name === 'Guest');
-    const hostRecipient = signwellData.recipients?.find((r: any) => r.placeholder_name === 'Host');
-
-    const guestSigningUrl = guestRecipient?.embedded_signing_url || null;
-    const hostSigningUrl = hostRecipient?.embedded_signing_url || null;
-
-    console.log('Guest signing URL obtained:', !!guestSigningUrl);
-    console.log('Host signing URL obtained:', !!hostSigningUrl);
-
-    // Update booking document record with SignWell ID and signing URLs
+    // Update booking document record with SignWell ID
     const { error: updateError } = await supabase
       .from('booking_documents')
       .update({
         signwell_document_id: signwellData.id,
-        status: 'pending_guest',
+        status: 'pending_manager',
         sent_at: new Date().toISOString(),
-        guest_signing_url: guestSigningUrl,
-        host_signing_url: hostSigningUrl,
       })
       .eq('id', documentId);
 
@@ -153,17 +174,21 @@ serve(async (req) => {
       performed_by: hostEmail,
       metadata: {
         signwell_document_id: signwellData.id,
-        guest_name: guestName,
-        guest_email: guestEmail,
-        prefilled_fields: ['effective_date', 'owner_name', 'owner_email'],
+        manager_name: hostName,
+        manager_email: hostEmail,
+        owner_name: guestName,
+        owner_email: guestEmail,
+        include_second_owner: includeSecondOwner,
+        second_owner_name: secondOwnerName,
+        second_owner_email: secondOwnerEmail,
+        prefilled_fields: ['effective_date', 'owner_name', 'owner_email', 'manager_name'],
       },
     });
 
     return new Response(JSON.stringify({
       success: true,
       signwellDocumentId: signwellData.id,
-      guestSigningUrl,
-      hostSigningUrl,
+      message: 'Document created. You will receive an email to sign first.',
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
