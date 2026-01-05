@@ -200,8 +200,9 @@ export function SendContractButton({ lead, onContractSent }: SendContractButtonP
     },
   });
 
-  // Only show button for appropriate stages
-  const showButton = ["call_attended", "send_contract"].includes(lead.stage);
+  // Show button for most stages except completed ones
+  const hideForStages = ["contract_signed", "ops_handoff", "lost"];
+  const showButton = !hideForStages.includes(lead.stage);
 
   if (!showButton) {
     return null;

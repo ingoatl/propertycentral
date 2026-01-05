@@ -17,6 +17,9 @@ interface SigningRequest {
   leadId?: string;
 }
 
+const LOGO_URL = "https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/peachhaus-logo.png";
+const APP_URL = "https://id-preview--9ed06ecd-51b7-4166-a07a-107b37f1e8c1.lovable.app";
+
 const generateSecureToken = (): string => {
   const array = new Uint8Array(32);
   crypto.getRandomValues(array);
@@ -29,6 +32,8 @@ const buildSigningEmailHtml = (
   signingUrl: string,
   expiresIn: string
 ): string => {
+  const issueDate = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+  
   return `
 <!DOCTYPE html>
 <html>
@@ -37,71 +42,93 @@ const buildSigningEmailHtml = (
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Document Ready for Signature</title>
 </head>
-<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8f9fa;">
-  <table role="presentation" style="width: 100%; border-collapse: collapse;">
-    <tr>
-      <td align="center" style="padding: 40px 20px;">
-        <table role="presentation" style="width: 100%; max-width: 600px; border-collapse: collapse; background-color: #ffffff; border-radius: 16px; box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);">
-          <!-- Header -->
-          <tr>
-            <td style="padding: 40px 40px 20px; text-align: center; background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%); border-radius: 16px 16px 0 0;">
-              <div style="font-size: 48px; margin-bottom: 16px;">🍑</div>
-              <h1 style="margin: 0; color: #1f2937; font-size: 24px; font-weight: 700;">PeachHaus Group</h1>
-            </td>
-          </tr>
-          
-          <!-- Content -->
-          <tr>
-            <td style="padding: 40px;">
-              <h2 style="margin: 0 0 16px; color: #1f2937; font-size: 22px; font-weight: 600;">
-                Hi ${recipientName.split(" ")[0]},
-              </h2>
-              <p style="margin: 0 0 24px; color: #4b5563; font-size: 16px; line-height: 1.6;">
-                Your agreement is ready for signature. Please review and sign the document at your convenience.
-              </p>
-              
-              <!-- Document Card -->
-              <div style="background-color: #fef3c7; border-radius: 12px; padding: 24px; margin-bottom: 32px; border-left: 4px solid #f59e0b;">
-                <div style="display: flex; align-items: center; margin-bottom: 8px;">
-                  <span style="font-size: 20px; margin-right: 12px;">📄</span>
-                  <span style="color: #92400e; font-weight: 600; font-size: 14px;">DOCUMENT TO SIGN</span>
-                </div>
-                <p style="margin: 0; color: #1f2937; font-size: 18px; font-weight: 600;">
-                  ${documentName}
-                </p>
-              </div>
-              
-              <!-- CTA Button -->
-              <div style="text-align: center; margin-bottom: 32px;">
-                <a href="${signingUrl}" style="display: inline-block; background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%); color: #1f2937; text-decoration: none; padding: 16px 48px; border-radius: 8px; font-weight: 700; font-size: 16px; box-shadow: 0 4px 14px rgba(245, 158, 11, 0.4);">
-                  ✍️ Review & Sign Document
-                </a>
-              </div>
-              
-              <!-- Expiry Notice -->
-              <div style="background-color: #f3f4f6; border-radius: 8px; padding: 16px; text-align: center;">
-                <p style="margin: 0; color: #6b7280; font-size: 14px;">
-                  ⏰ This link expires in <strong>${expiresIn}</strong>
-                </p>
-              </div>
-            </td>
-          </tr>
-          
-          <!-- Footer -->
-          <tr>
-            <td style="padding: 24px 40px; background-color: #f9fafb; border-radius: 0 0 16px 16px; border-top: 1px solid #e5e7eb;">
-              <p style="margin: 0 0 8px; color: #6b7280; font-size: 12px; text-align: center;">
-                🔒 This document is legally binding under the ESIGN Act
-              </p>
-              <p style="margin: 0; color: #9ca3af; font-size: 12px; text-align: center;">
-                Questions? Reply to this email or call us at (555) 123-4567
-              </p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
+<body style="margin: 0; padding: 0; background: #f5f5f5; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', Arial, sans-serif;">
+  <div style="max-width: 600px; margin: 0 auto; background: #ffffff;">
+    
+    <!-- Header - Corporate Minimal with Logo -->
+    <div style="padding: 24px 32px; border-bottom: 2px solid #111111;">
+      <table style="width: 100%;">
+        <tr>
+          <td style="vertical-align: middle;">
+            <img src="${LOGO_URL}" alt="PeachHaus" style="height: 40px; width: auto;" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';" />
+            <div style="display: none; font-size: 20px; font-weight: 700; color: #111111; letter-spacing: -0.3px;">PeachHaus</div>
+          </td>
+          <td style="text-align: right; vertical-align: middle;">
+            <div style="font-size: 16px; font-weight: 600; color: #111111; margin-bottom: 4px;">DOCUMENT FOR SIGNATURE</div>
+            <div style="font-size: 10px; color: #666666; font-family: 'SF Mono', Menlo, Consolas, 'Courier New', monospace;">
+              ${issueDate}
+            </div>
+          </td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- Document Info -->
+    <div style="padding: 20px 32px; background: #f9f9f9; border-bottom: 1px solid #e5e5e5;">
+      <table style="width: 100%;">
+        <tr>
+          <td style="vertical-align: top; width: 50%;">
+            <div style="font-size: 10px; color: #666666; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Document</div>
+            <div style="font-size: 14px; font-weight: 600; color: #111111;">${documentName}</div>
+          </td>
+          <td style="vertical-align: top; text-align: right;">
+            <div style="font-size: 10px; color: #666666; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Expires</div>
+            <div style="font-size: 14px; font-weight: 600; color: #111111;">${expiresIn}</div>
+          </td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- Greeting -->
+    <div style="padding: 24px 32px 16px 32px;">
+      <p style="font-size: 14px; line-height: 1.6; color: #111111; margin: 0;">
+        Dear ${recipientName.split(" ")[0]},
+      </p>
+      <p style="font-size: 13px; line-height: 1.6; color: #444444; margin: 12px 0 0 0;">
+        Your property management agreement with PeachHaus Group is ready for signature. Please review the document and sign at your convenience.
+      </p>
+    </div>
+
+    <!-- CTA Button -->
+    <div style="padding: 0 32px 24px 32px;">
+      <table style="width: 100%; border: 2px solid #111111;">
+        <tr>
+          <td style="padding: 20px; text-align: center;">
+            <a href="${signingUrl}" style="display: inline-block; background: #111111; color: #ffffff; text-decoration: none; padding: 14px 40px; font-weight: 600; font-size: 14px; letter-spacing: 0.3px;">
+              REVIEW & SIGN DOCUMENT
+            </a>
+          </td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- What to expect -->
+    <div style="padding: 0 32px 24px 32px;">
+      <div style="font-size: 10px; color: #666666; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px;">What you'll complete</div>
+      <table style="width: 100%;">
+        <tr>
+          <td style="padding: 8px 0; font-size: 13px; color: #111111; border-bottom: 1px solid #e5e5e5;">Review agreement terms</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px 0; font-size: 13px; color: #111111; border-bottom: 1px solid #e5e5e5;">Fill in property address</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px 0; font-size: 13px; color: #111111; border-bottom: 1px solid #e5e5e5;">Add your electronic signature</td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- Footer -->
+    <div style="padding: 20px 32px; background: #f9f9f9; border-top: 1px solid #e5e5e5;">
+      <p style="margin: 0 0 8px; color: #666666; font-size: 11px;">
+        This document is legally binding under the Electronic Signatures in Global and National Commerce Act (ESIGN).
+      </p>
+      <p style="margin: 0; color: #999999; font-size: 11px;">
+        Questions? Contact us at info@peachhausgroup.com
+      </p>
+    </div>
+
+  </div>
 </body>
 </html>
 `;
@@ -194,7 +221,7 @@ serve(async (req) => {
 
     // Send signing email to the first signer (owner)
     const ownerToken = tokens.find(t => t.signer_type === "owner");
-    const signingUrl = `https://peachhaus.lovable.app/sign/${ownerToken.token}`;
+    const signingUrl = `${APP_URL}/sign/${ownerToken.token}`;
     
     const emailHtml = buildSigningEmailHtml(
       ownerName,

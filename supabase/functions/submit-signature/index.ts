@@ -7,6 +7,8 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+const APP_URL = "https://id-preview--9ed06ecd-51b7-4166-a07a-107b37f1e8c1.lovable.app";
+
 interface SubmitSignatureRequest {
   token: string;
   signatureData: string; // Base64 signature image
@@ -300,7 +302,7 @@ serve(async (req) => {
 
       if (nextSigner && nextSigner.signing_order > signingToken.signing_order) {
         // Send email to next signer
-        const signingUrl = `https://peachhaus.lovable.app/sign/${nextSigner.token}`;
+        const signingUrl = `${APP_URL}/sign/${nextSigner.token}`;
         
         await resend.emails.send({
           from: "PeachHaus Group <onboarding@resend.dev>",
