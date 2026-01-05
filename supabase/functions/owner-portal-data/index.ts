@@ -526,18 +526,25 @@ serve(async (req: Request): Promise<Response> => {
     : null;
 
   // Build monthly revenue data for charts - use statement data as source of truth
-  const monthlyRevenue: Record<string, { month: string; str: number; mtr: number; total: number }> = {};
+  const monthlyRevenue: Record<string, { month: string; str: number; mtr: number; total: number; expenses: number; net: number }> = {};
   
   // First, populate from reconciliation data (most accurate - already includes adjustments)
   statements.forEach(s => {
     const month = s.reconciliation_month;
     if (!monthlyRevenue[month]) {
-      monthlyRevenue[month] = { month, str: 0, mtr: 0, total: 0 };
+      monthlyRevenue[month] = { month, str: 0, mtr: 0, total: 0, expenses: 0, net: 0 };
     }
     // Use statement values - they include manual adjustments/overrides
     monthlyRevenue[month].str = s.short_term_revenue || 0;
     monthlyRevenue[month].mtr = s.mid_term_revenue || 0;
     monthlyRevenue[month].total = (s.short_term_revenue || 0) + (s.mid_term_revenue || 0);
+    monthlyRevenue[month].expenses = s.total_expenses || 0;
+    // For co-hosting: actual_net = revenue - net_to_owner (net_to_owner is what they owe us)
+    // For full-service: actual_net = net_to_owner
+    const actualNet = isCohosting 
+      ? (s.total_revenue || 0) - (s.net_to_owner || 0)
+      : (s.net_to_owner || 0);
+    monthlyRevenue[month].net = actualNet;
   });
 
   // For months WITHOUT statements, supplement from booking data
@@ -547,7 +554,7 @@ serve(async (req: Request): Promise<Response> => {
     // Only add if no statement data for this month
     if (!monthlyRevenue[month] || (monthlyRevenue[month].str === 0 && monthlyRevenue[month].mtr === 0)) {
       if (!monthlyRevenue[month]) {
-        monthlyRevenue[month] = { month, str: 0, mtr: 0, total: 0 };
+        monthlyRevenue[month] = { month, str: 0, mtr: 0, total: 0, expenses: 0, net: 0 };
       }
       monthlyRevenue[month].str += b.total_amount;
     }
@@ -575,7 +582,7 @@ serve(async (req: Request): Promise<Response> => {
         const proratedRent = (b.monthly_rent / daysInMonth) * daysOccupied;
         
         if (!monthlyRevenue[monthKey]) {
-          monthlyRevenue[monthKey] = { month: monthKey, str: 0, mtr: 0, total: 0 };
+          monthlyRevenue[monthKey] = { month: monthKey, str: 0, mtr: 0, total: 0, expenses: 0, net: 0 };
         }
         monthlyRevenue[monthKey].mtr += proratedRent;
       }
@@ -585,9 +592,13 @@ serve(async (req: Request): Promise<Response> => {
     }
   });
 
-  // Recalculate totals for months supplemented with booking data
+  // Recalculate totals and net for months supplemented with booking data
   Object.keys(monthlyRevenue).forEach(key => {
     monthlyRevenue[key].total = monthlyRevenue[key].str + monthlyRevenue[key].mtr;
+    // For months without statements, net = total (no expenses known)
+    if (monthlyRevenue[key].net === 0 && monthlyRevenue[key].total > 0) {
+      monthlyRevenue[key].net = monthlyRevenue[key].total - monthlyRevenue[key].expenses;
+    }
   });
 
   const monthlyRevenueArray = Object.values(monthlyRevenue)
