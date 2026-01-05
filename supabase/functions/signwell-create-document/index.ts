@@ -116,6 +116,14 @@ serve(async (req) => {
     
     // For now, we'll create the document and request the edit URL
     // This allows users to add signature fields via SignWell's UI
+    // Ensure file name has .pdf extension - SignWell requires it
+    const fileUrl = template.file_path as string;
+    const urlPath = fileUrl.split('/').pop() || '';
+    const fileExtension = urlPath.includes('.') ? urlPath.split('.').pop() : 'pdf';
+    const templateNameWithExt = template.name.endsWith(`.${fileExtension}`) 
+      ? template.name 
+      : `${template.name}.${fileExtension}`;
+
     const requestBody = {
       test_mode: false,  // Production mode - set to true for testing
       draft: true,  // Create as draft first so fields can be added
@@ -127,8 +135,8 @@ serve(async (req) => {
       recipients,
       files: [
         {
-          name: template.name,
-          file_url: template.file_path,
+          name: templateNameWithExt,  // Must include file extension
+          file_url: fileUrl,
         },
       ],
     };
