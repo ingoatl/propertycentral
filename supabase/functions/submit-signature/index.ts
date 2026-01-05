@@ -240,7 +240,7 @@ serve(async (req) => {
 
     // Send confirmation email to the signer
     await resend.emails.send({
-      from: "PeachHaus Group <onboarding@resend.dev>",
+      from: "PeachHaus Group <info@peachhausgroup.com>",
       to: [signingToken.signer_email],
       subject: `✅ You've signed: ${documentName}`,
       html: buildConfirmationEmailHtml(signingToken.signer_name, documentName),
@@ -305,7 +305,7 @@ serve(async (req) => {
         const signingUrl = `${APP_URL}/sign/${nextSigner.token}`;
         
         await resend.emails.send({
-          from: "PeachHaus Group <onboarding@resend.dev>",
+          from: "PeachHaus Group <info@peachhausgroup.com>",
           to: [nextSigner.signer_email],
           subject: `📝 Your signature is needed - ${documentName}`,
           html: buildNextSignerEmailHtml(
