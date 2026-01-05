@@ -86,8 +86,16 @@ export function TemplateFieldPreview({
   }, [pageWidth]);
 
   const fieldsOnPage = localFields.filter(f => f.page === currentPage);
-  const guestFields = localFields.filter(f => f.filled_by === "guest");
-  const adminFields = localFields.filter(f => f.filled_by === "admin");
+  
+  // Group fields by filled_by to detect signing parties
+  const ownerFields = localFields.filter(f => f.filled_by === "guest" || f.api_id.includes("owner"));
+  const adminFields = localFields.filter(f => f.filled_by === "admin" || f.api_id.includes("manager"));
+  
+  // Determine signing parties from field types
+  const signingParties = [
+    ...(ownerFields.length > 0 ? ["Owner"] : []),
+    ...(adminFields.length > 0 ? ["Admin"] : []),
+  ];
 
   const getFieldColor = (field: FieldData) => {
     if (field.filled_by === "admin") return "bg-blue-500/20 border-blue-500";
@@ -221,39 +229,34 @@ export function TemplateFieldPreview({
                   />
                 )}
 
-                {/* Field Overlays */}
-                {showFields && fieldsOnPage.map((field) => (
-                  <div
-                    key={field.api_id}
-                    onMouseDown={(e) => handleMouseDown(e, field)}
-                    className={cn(
-                      "absolute border-2 rounded transition-all",
-                      getFieldColor(field),
-                      selectedField === field.api_id && "ring-2 ring-offset-1 ring-black",
-                      isDragging && selectedField === field.api_id ? "cursor-grabbing" : "cursor-grab"
-                    )}
-                    style={{
-                      left: `${field.x}%`,
-                      top: `${field.y}%`,
-                      width: field.type === "checkbox" || field.type === "radio" ? "22px" : `${field.width}%`,
-                      height: field.type === "signature" ? "50px" : field.type === "checkbox" || field.type === "radio" ? "22px" : "24px",
-                      minHeight: field.type === "signature" ? "50px" : field.type === "checkbox" || field.type === "radio" ? "22px" : "24px",
-                    }}
-                  >
-                    {/* Field Label */}
-                    <div className="absolute -top-5 left-0 text-[10px] bg-black text-white px-1 rounded whitespace-nowrap flex items-center gap-1">
-                      <Move className="h-2 w-2" />
-                      {field.label}
-                    </div>
-                    
-                    {/* Coordinates Display */}
-                    {selectedField === field.api_id && (
-                      <div className="absolute -bottom-6 left-0 text-[9px] bg-gray-800 text-white px-1 rounded whitespace-nowrap">
-                        x:{field.x.toFixed(1)}% y:{field.y.toFixed(1)}% w:{field.width.toFixed(1)}%
-                      </div>
-                    )}
-                  </div>
-                ))}
+                {/* Field Overlays - Clean, minimal */}
+                {showFields && fieldsOnPage.map((field) => {
+                  const fieldHeight = field.type === "signature" 
+                    ? Math.min(field.height || 4, 5)
+                    : field.type === "checkbox" || field.type === "radio"
+                      ? 2.2
+                      : Math.min(field.height || 2.5, 3);
+                  
+                  return (
+                    <div
+                      key={field.api_id}
+                      onMouseDown={(e) => handleMouseDown(e, field)}
+                      className={cn(
+                        "absolute border-2 rounded-sm transition-all",
+                        getFieldColor(field),
+                        selectedField === field.api_id && "ring-2 ring-offset-1 ring-primary shadow-lg",
+                        isDragging && selectedField === field.api_id ? "cursor-grabbing opacity-80" : "cursor-grab hover:opacity-90"
+                      )}
+                      style={{
+                        left: `${field.x}%`,
+                        top: `${field.y}%`,
+                        width: field.type === "checkbox" || field.type === "radio" ? "2.2%" : `${field.width}%`,
+                        height: `${fieldHeight}%`,
+                      }}
+                      title={field.label}
+                    />
+                  );
+                })}
 
                 {/* Page indicator */}
                 <div className="absolute bottom-2 right-2 text-xs text-[#666] bg-white/90 px-2 py-1 rounded shadow">
@@ -289,20 +292,23 @@ export function TemplateFieldPreview({
           </div>
 
           {/* Field List Sidebar */}
-          <div className="w-80 border-l bg-white flex flex-col">
+          <div className="w-72 border-l bg-background flex flex-col">
             <div className="p-4 border-b">
-              <h3 className="font-semibold text-sm mb-2">Detected Fields</h3>
-              <div className="flex gap-2 text-xs flex-wrap">
-                <Badge variant="outline" className="bg-[#fae052]/20">
-                  Guest: {guestFields.length}
-                </Badge>
-                <Badge variant="outline" className="bg-blue-100">
-                  Admin: {adminFields.length}
-                </Badge>
+              <h3 className="font-semibold text-sm mb-2">Signing Parties</h3>
+              <div className="flex gap-2 text-xs flex-wrap mb-3">
+                {signingParties.map(party => (
+                  <Badge key={party} variant="outline" className={party === "Owner" ? "bg-[#fae052]/20" : "bg-blue-100"}>
+                    {party}
+                  </Badge>
+                ))}
               </div>
-              <p className="text-xs text-muted-foreground mt-2">
-                <Move className="h-3 w-3 inline mr-1" />
-                Drag fields to reposition
+              <div className="flex gap-2 text-xs">
+                <span className="text-muted-foreground">Owner: {ownerFields.length}</span>
+                <span className="text-muted-foreground">Admin: {adminFields.length}</span>
+              </div>
+              <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
+                <Move className="h-3 w-3" />
+                Drag to reposition
               </p>
             </div>
 
@@ -314,88 +320,84 @@ export function TemplateFieldPreview({
                 </div>
               ) : (
                 <div className="space-y-1">
-                  {localFields.map((field) => (
-                    <button
-                      key={field.api_id}
-                      onClick={() => {
-                        setCurrentPage(field.page);
-                        setSelectedField(field.api_id);
-                      }}
-                      className={cn(
-                        "w-full text-left p-2 rounded text-sm transition-colors",
-                        selectedField === field.api_id
-                          ? "bg-[#fae052]/30"
-                          : "hover:bg-gray-100"
-                      )}
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="font-medium truncate">{field.label}</span>
-                        <Badge variant="outline" className="text-[10px] h-5">
-                          {field.type}
-                        </Badge>
-                      </div>
-                      <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
-                        <span>Page {field.page}</span>
-                        <span>•</span>
-                        <span className={field.filled_by === "admin" ? "text-blue-600" : "text-amber-600"}>
-                          {field.filled_by === "admin" ? "Admin fills" : "Guest fills"}
-                        </span>
-                        {field.required && (
-                          <>
-                            <span>•</span>
-                            <span className="text-red-500">Required</span>
-                          </>
+                  {localFields.map((field) => {
+                    const partyLabel = field.filled_by === "admin" || field.api_id.includes("manager") ? "Admin" : "Owner";
+                    
+                    return (
+                      <button
+                        key={field.api_id}
+                        onClick={() => {
+                          setCurrentPage(field.page);
+                          setSelectedField(field.api_id);
+                        }}
+                        className={cn(
+                          "w-full text-left p-2 rounded text-sm transition-colors",
+                          selectedField === field.api_id
+                            ? "bg-primary/10 border border-primary/30"
+                            : "hover:bg-muted"
                         )}
-                      </div>
-                      {field.group_name && (
-                        <div className="text-xs text-purple-600 mt-1">
-                          Group: {field.group_name}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-medium truncate text-xs">{field.label}</span>
+                          <div className="flex items-center gap-1">
+                            <Badge variant="outline" className="text-[9px] h-4 px-1">
+                              {field.type}
+                            </Badge>
+                            {field.required && (
+                              <span className="text-[9px] text-destructive">*</span>
+                            )}
+                          </div>
                         </div>
-                      )}
-                      {/* Position info */}
-                      <div className="text-[10px] text-gray-400 mt-1 font-mono">
-                        x:{field.x.toFixed(1)} y:{field.y.toFixed(1)} w:{field.width.toFixed(1)} h:{field.height.toFixed(1)}
-                      </div>
-                      
-                      {/* Size adjustment buttons when selected */}
-                      {selectedField === field.api_id && (
-                        <div className="flex gap-1 mt-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-6 px-2 text-xs"
-                            onClick={(e) => { e.stopPropagation(); updateFieldSize(field.api_id, 'width', -5); }}
-                          >
-                            W-
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-6 px-2 text-xs"
-                            onClick={(e) => { e.stopPropagation(); updateFieldSize(field.api_id, 'width', 5); }}
-                          >
-                            W+
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-6 px-2 text-xs"
-                            onClick={(e) => { e.stopPropagation(); updateFieldSize(field.api_id, 'height', -1); }}
-                          >
-                            H-
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-6 px-2 text-xs"
-                            onClick={(e) => { e.stopPropagation(); updateFieldSize(field.api_id, 'height', 1); }}
-                          >
-                            H+
-                          </Button>
+                        <div className="flex items-center gap-2 mt-1 text-[10px] text-muted-foreground">
+                          <span>P{field.page}</span>
+                          <span className={partyLabel === "Admin" ? "text-blue-600" : "text-amber-600"}>
+                            {partyLabel}
+                          </span>
+                          {field.group_name && (
+                            <span className="text-purple-600">{field.group_name}</span>
+                          )}
                         </div>
-                      )}
-                    </button>
-                  ))}
+                        
+                        {/* Size adjustment - compact */}
+                        {selectedField === field.api_id && (
+                          <div className="flex gap-1 mt-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-5 px-1.5 text-[10px]"
+                              onClick={(e) => { e.stopPropagation(); updateFieldSize(field.api_id, 'width', -5); }}
+                            >
+                              W-
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-5 px-1.5 text-[10px]"
+                              onClick={(e) => { e.stopPropagation(); updateFieldSize(field.api_id, 'width', 5); }}
+                            >
+                              W+
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-5 px-1.5 text-[10px]"
+                              onClick={(e) => { e.stopPropagation(); updateFieldSize(field.api_id, 'height', -0.5); }}
+                            >
+                              H-
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-5 px-1.5 text-[10px]"
+                              onClick={(e) => { e.stopPropagation(); updateFieldSize(field.api_id, 'height', 0.5); }}
+                            >
+                              H+
+                            </Button>
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
               )}
             </ScrollArea>

@@ -139,47 +139,50 @@ serve(async (req) => {
 DOCUMENT:
 ${documentContent}
 
+SIGNING PARTIES:
+- "Owner" or "guest" = property owner who signs the document
+- "Admin" = property manager/host who signs the document
+
 FIELD DETECTION RULES:
 
 1. TEXT FIELDS:
-   - "Owner(s):" or "Owner Name:" → api_id: "owner_name", filled_by: "guest"
-   - "Address:" (owner's address) → api_id: "owner_address", filled_by: "guest" 
-   - "Phone:" or "Phone Number:" → api_id: "owner_phone", type: "phone", filled_by: "guest"
-   - "Email:" → api_id: "owner_email", type: "email", filled_by: "guest"
-   - "Property Address" → api_id: "property_address", filled_by: "guest" (OWNER fills this)
+   - "Owner(s):" or "Owner Name:" → api_id: "owner_name", filled_by: "guest" (Owner)
+   - "Address:" (owner's address) → api_id: "owner_address", filled_by: "guest" (Owner)
+   - "Phone:" or "Phone Number:" → api_id: "owner_phone", type: "phone", filled_by: "guest" (Owner)
+   - "Email:" → api_id: "owner_email", type: "email", filled_by: "guest" (Owner)
+   - "Property Address" → api_id: "property_address", filled_by: "guest" (Owner fills this)
+   - "Print Name" near Owner → api_id: "owner_print_name", filled_by: "guest" (Owner)
+   - "Print Name" near Manager → api_id: "manager_print_name", filled_by: "admin" (Admin)
 
 2. DATE FIELDS:
-   - "Effective Date:" or "Date:" at document start → api_id: "effective_date", filled_by: "admin"
-   - "Date:" near signatures → api_id: "signature_date", filled_by: "guest"
+   - "Effective Date:" at document start → api_id: "effective_date", filled_by: "admin" (Admin)
+   - "Date:" near Owner signature → api_id: "owner_signature_date", filled_by: "guest" (Owner)
+   - "Date:" near Manager signature → api_id: "manager_signature_date", filled_by: "admin" (Admin)
 
 3. PACKAGE SELECTION (RADIO BUTTONS) - MANDATORY:
    - Lines with ☐ or □ followed by percentage (15%, 18%, 20%, 25%) are RADIO buttons
    - All must have type: "radio" and group_name: "package_selection"
    - api_id: "package_15", "package_18", "package_20", "package_25" based on percentage
-   - filled_by: "guest" (owner chooses package)
+   - filled_by: "guest" (Owner chooses package)
    - required: true (ONE must be selected)
 
 4. SIGNATURES:
-   - "Owner Signature" or "Signature of Owner" → api_id: "owner_signature", filled_by: "guest"
-   - "Second Owner" or "Co-Owner Signature" → api_id: "second_owner_signature", filled_by: "guest"
-   - "Manager" or "Host" signature → api_id: "manager_signature", filled_by: "admin"
+   - "Owner Signature" or "Signature" under OWNER section → api_id: "owner_signature", filled_by: "guest" (Owner)
+   - "Second Owner" or "Co-Owner" or "OWNER 2" → api_id: "second_owner_signature", filled_by: "guest" (Owner)
+   - "Manager" or "MANAGER" section signature → api_id: "manager_signature", filled_by: "admin" (Admin)
 
 POSITIONING RULES:
-- Field Y position must MATCH the label's y% value from the document
-- Field X starts AFTER label text ends (endX% + 2%)
-- Text/date fields: width 40-50%, height 2.5%
-- Signature fields: position BELOW label (y + 4%), height 5%
-- Radio buttons: width 4%, height 2.5%
+- Field Y position: MATCH the label's y% value
+- Field X: starts AFTER label text ends (use endX% + 2%)
+- Text/date fields: width 35-45%, height 2.5%
+- Signature fields: position BELOW label (y + 3%), width 35%, height 4%
+- Radio buttons: width 3%, height 2%
 
 CRITICAL:
-- property_address MUST be filled_by: "guest" (the owner provides the property address)
-- ALL Package selection options (percentages like 15%, 18%, 20%, 25%) are RADIO buttons with:
-  - type: "radio"
-  - group_name: "package_selection"
-  - required: true
-  - filled_by: "guest"
-- Position fields EXACTLY where you see labels - use the y% from the document
-- For fields next to checkboxes/radio markers (☐□), position the field AT the marker, not after it
+- Detect signing parties: Owner (filled_by: "guest") and Admin (filled_by: "admin")
+- property_address is filled_by: "guest" (Owner provides this)
+- Radio buttons for package selection: type "radio", group_name "package_selection", required true
+- Keep field heights SMALL (2-2.5% for text, 4% max for signatures)
 
 Return ONLY valid JSON:
 {
@@ -191,12 +194,13 @@ Return ONLY valid JSON:
       "page": 1,
       "x": 25,
       "y": 18.5,
-      "width": 50,
+      "width": 40,
       "height": 2.5,
       "filled_by": "guest",
       "required": true
     }
-  ]
+  ],
+  "signing_parties": ["Owner", "Admin"]
 }`;
 
     console.log("Sending to AI for analysis...");
@@ -257,8 +261,10 @@ Return ONLY valid JSON:
         page: Math.max(1, Math.min(totalPages || 20, Number(field.page))),
         x: Math.max(0, Math.min(95, Number(field.x))),
         y: Math.max(0, Math.min(95, Number(field.y))),
-        width: Math.max(5, Math.min(70, Number(field.width) || 40)),
-        height: field.type === 'signature' ? 5 : Math.max(2, Math.min(8, Number(field.height) || 2.5)),
+        width: Math.max(5, Math.min(60, Number(field.width) || 35)),
+        height: field.type === 'signature' 
+          ? Math.min(4, Number(field.height) || 4)
+          : Math.min(2.5, Number(field.height) || 2.5),
         filled_by: field.filled_by === "admin" ? "admin" : "guest",
         required: field.required !== false,
         ...(field.group_name && { group_name: String(field.group_name) }),
