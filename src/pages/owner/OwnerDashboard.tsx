@@ -42,8 +42,6 @@ import { OwnerPropertyTab } from "./components/OwnerPropertyTab";
 import { OwnerRevenueForecast } from "./components/OwnerRevenueForecast";
 import { UpcomingEventsTimeline } from "./components/UpcomingEventsTimeline";
 import { StatementViewer } from "./components/StatementViewer";
-import { OwnerFinancialSummary } from "./components/OwnerFinancialSummary";
-import { OwnerYTDPerformance } from "./components/OwnerYTDPerformance";
 
 interface OwnerSession {
   ownerId: string;
@@ -845,29 +843,6 @@ export default function OwnerDashboard() {
 
           <TabsContent value="overview">
             <div className="space-y-8">
-              {/* Hero Financial Summary Row */}
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* This Month at a Glance - Takes 2 columns */}
-                <div className="lg:col-span-2">
-                  <OwnerFinancialSummary 
-                    statements={statements}
-                    isCohosting={property?.rental_type === 'hybrid' || property?.rental_type === 'mid_term'}
-                    managementFeePercentage={18}
-                    propertyName={property?.name}
-                  />
-                </div>
-                
-                {/* YTD Performance - Takes 1 column */}
-                <div className="lg:col-span-1">
-                  <OwnerYTDPerformance 
-                    statements={statements}
-                    occupancyRate={performanceMetrics.occupancyRate}
-                    totalBookings={performanceMetrics.totalBookings}
-                    isCohosting={property?.rental_type === 'hybrid' || property?.rental_type === 'mid_term'}
-                  />
-                </div>
-              </div>
-
               {/* Performance Overview */}
               <OwnerPerformanceOverview 
                 metrics={performanceMetrics}
