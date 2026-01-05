@@ -48,6 +48,8 @@ interface MonthlyRevenueData {
   str: number;
   mtr: number;
   total: number;
+  expenses?: number;
+  net?: number;
 }
 
 interface OwnerPerformanceChartsProps {
@@ -84,8 +86,8 @@ export function OwnerPerformanceCharts({ statements, monthlyRevenueData, propert
         month: format(new Date(d.month), "MMM yy"),
         fullMonth: format(new Date(d.month), "MMMM yyyy"),
         revenue: d.total || 0,
-        expenses: 0, // Not available in enriched data
-        net: d.total || 0, // Use total as net approximation when no reconciliation
+        expenses: d.expenses || 0,
+        net: d.net || d.total || 0,
       }));
     }
 
