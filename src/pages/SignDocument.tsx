@@ -65,17 +65,54 @@ const SignDocument = () => {
   const [completedFields, setCompletedFields] = useState<Set<string>>(new Set());
   const [showFieldList, setShowFieldList] = useState(false);
 
-  // Filter fields for current signer (only guest fields)
-  const signerFields = (data?.fields || []).filter(f => f.filled_by === "guest");
+  // Filter fields for current signer
+  // Owner 2 fields are NOT mandatory - they become active only when clicked
+  const allGuestFields = (data?.fields || []).filter(f => f.filled_by === "guest");
   const adminFields = (data?.fields || []).filter(f => f.filled_by === "admin");
-
-  // Calculate progress
-  const totalRequired = signerFields.filter(f => f.required).length;
-  const completedRequired = signerFields.filter(f => {
-    if (!f.required) return false;
+  
+  // Determine if a field belongs to Owner 2 (secondary signer) based on label/group
+  const isOwner2Field = (f: FieldData) => {
+    const label = f.label.toLowerCase();
+    return label.includes("owner 2") || label.includes("owner2") || label.includes("second owner");
+  };
+  
+  // Required fields are: Owner 1 fields that are marked required + radio groups (one selection per group)
+  const signerFields = allGuestFields;
+  
+  // Get all unique radio groups
+  const radioGroups = new Set<string>();
+  signerFields.filter(f => f.type === "radio" && f.group_name).forEach(f => radioGroups.add(f.group_name!));
+  
+  // Check if a radio group is complete (at least one selected)
+  const isRadioGroupComplete = (groupName: string) => {
+    const groupFields = signerFields.filter(f => f.type === "radio" && f.group_name === groupName);
+    return groupFields.some(f => fieldValues[f.api_id] === true);
+  };
+  
+  // Calculate required fields - Owner 2 fields are NOT required
+  const requiredFields = signerFields.filter(f => {
+    if (isOwner2Field(f)) return false; // Owner 2 fields are optional
+    if (f.type === "radio") return false; // Radio handled separately by group
+    return f.required;
+  });
+  
+  // Count completed required fields
+  const completedRequired = requiredFields.filter(f => {
     if (f.type === "signature") return !!signatureData;
     return completedFields.has(f.api_id);
   }).length;
+  
+  // Total required = required fields + radio groups (each group counts as 1)
+  const totalRequired = requiredFields.length + radioGroups.size;
+  
+  // Completed radio groups
+  const completedRadioGroups = Array.from(radioGroups).filter(g => isRadioGroupComplete(g)).length;
+  
+  // Total completed
+  const totalCompleted = completedRequired + completedRadioGroups;
+  
+  // Remaining fields to complete
+  const remainingCount = totalRequired - totalCompleted;
 
   useEffect(() => {
     if (token) {
@@ -277,18 +314,39 @@ const SignDocument = () => {
     return a.y - b.y;
   });
 
+  // Check if a field is incomplete - Owner 2 fields are considered complete (optional)
   const isFieldIncomplete = (f: FieldData) => {
+    // Owner 2 fields are optional, never considered incomplete for navigation
+    if (isOwner2Field(f)) return false;
+    
     if (f.type === "signature") return !signatureData;
     if (f.type === "radio" && f.group_name) {
       // For radio groups, check if ANY field in the group is selected
-      const groupFields = signerFields.filter(gf => gf.type === "radio" && gf.group_name === f.group_name);
-      return !groupFields.some(gf => fieldValues[gf.api_id] === true);
+      return !isRadioGroupComplete(f.group_name);
     }
     return !completedFields.has(f.api_id);
   };
 
+  // Get fields that need to be completed (excluding Owner 2 and completed radio groups)
+  const getRequiredIncompleteFields = () => {
+    const seen = new Set<string>();
+    return sortedSignerFields.filter(f => {
+      if (isOwner2Field(f)) return false;
+      
+      // For radio groups, only include first incomplete field from each group
+      if (f.type === "radio" && f.group_name) {
+        if (seen.has(f.group_name)) return false;
+        if (isRadioGroupComplete(f.group_name)) return false;
+        seen.add(f.group_name);
+        return true;
+      }
+      
+      return isFieldIncomplete(f);
+    });
+  };
+
   const findNextIncompleteField = () => {
-    return sortedSignerFields.find(f => isFieldIncomplete(f));
+    return getRequiredIncompleteFields()[0];
   };
 
   const handleStart = () => {
@@ -299,48 +357,39 @@ const SignDocument = () => {
   };
 
   const handleNext = () => {
+    const incompleteFields = getRequiredIncompleteFields();
     const currentId = activeFieldId || showSignatureFor;
+    
+    // Find current field's position in document order
     const currentIdx = sortedSignerFields.findIndex(f => f.api_id === currentId);
     
-    // Find next incomplete field after current position
-    for (let i = currentIdx + 1; i < sortedSignerFields.length; i++) {
-      const f = sortedSignerFields[i];
-      if (isFieldIncomplete(f)) {
+    // Find the next incomplete field that comes after current position
+    for (const f of incompleteFields) {
+      const fieldIdx = sortedSignerFields.findIndex(sf => sf.api_id === f.api_id);
+      if (fieldIdx > currentIdx) {
         navigateToField(f);
         return;
       }
     }
     
-    // Wrap around to find first incomplete from start
-    for (let i = 0; i <= currentIdx; i++) {
-      const f = sortedSignerFields[i];
-      if (isFieldIncomplete(f)) {
-        navigateToField(f);
-        return;
-      }
+    // If no field after current, wrap to first incomplete
+    if (incompleteFields.length > 0) {
+      navigateToField(incompleteFields[0]);
+      return;
     }
     
-    // All fields complete - show toast
+    // All fields complete
     toast.success("All fields complete! Click FINISH to submit.");
   };
 
-  // Check if all required fields are complete
-  // For radio groups, only ONE selection in the group is required
-  const radioGroups = new Set<string>();
-  signerFields.filter(f => f.type === "radio" && f.group_name).forEach(f => radioGroups.add(f.group_name!));
+  // Check if all required fields are complete (excluding Owner 2 fields)
+  const radioGroupsComplete = Array.from(radioGroups).every(groupName => isRadioGroupComplete(groupName));
   
-  const radioGroupsComplete = Array.from(radioGroups).every(groupName => {
-    const groupFields = signerFields.filter(f => f.type === "radio" && f.group_name === groupName);
-    return groupFields.some(f => fieldValues[f.api_id] === true);
+  const nonRadioFieldsComplete = requiredFields.every(f => {
+    if (f.type === "signature") return !!signatureData;
+    if (f.type === "checkbox") return true;
+    return !!fieldValues[f.api_id];
   });
-  
-  const nonRadioFieldsComplete = signerFields
-    .filter(f => f.required && f.type !== "radio")
-    .every(f => {
-      if (f.type === "signature") return !!signatureData;
-      if (f.type === "checkbox") return true; // Checkboxes don't need to be checked to proceed
-      return !!fieldValues[f.api_id];
-    });
   
   const allRequiredComplete = radioGroupsComplete && nonRadioFieldsComplete;
   const canFinish = signatureData && agreedToTerms && allRequiredComplete;
@@ -433,8 +482,13 @@ const SignDocument = () => {
       <div className="bg-[#fae052] px-4 py-2 flex items-center justify-between shadow-sm">
         <div className="flex items-center gap-4">
           <span className="font-semibold text-[#1a1a2e] text-sm">
-            {completedRequired} of {totalRequired} required fields complete
+            {totalCompleted} of {totalRequired} required fields complete
           </span>
+          {remainingCount > 0 && (
+            <span className="text-[#1a1a2e]/70 text-xs">
+              ({remainingCount} remaining)
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <Button
@@ -448,15 +502,16 @@ const SignDocument = () => {
         </div>
       </div>
 
-      {/* Sticky NEXT/START Button - Upper right of document area */}
-      <div className="sticky top-20 z-40 flex justify-end pr-6 -mb-14 pointer-events-none">
-        {completedRequired < totalRequired ? (
+      {/* Floating NEXT/START Button - Right side of document, closer to content */}
+      <div className="fixed right-4 top-1/3 z-40">
+        {remainingCount > 0 ? (
           <Button
             onClick={activeFieldId || showSignatureFor ? handleNext : handleStart}
             size="lg"
-            className="bg-[#fae052] text-[#1a1a2e] hover:bg-[#f5d93a] font-bold shadow-2xl rounded-full px-8 gap-2 animate-pulse text-base pointer-events-auto"
+            className="bg-[#fae052] text-[#1a1a2e] hover:bg-[#f5d93a] font-bold shadow-2xl rounded-full px-6 py-6 gap-2 animate-pulse text-sm flex-col h-auto"
           >
-            {activeFieldId || showSignatureFor ? "NEXT" : "START"}
+            <span className="text-lg">{activeFieldId || showSignatureFor ? "NEXT" : "START"}</span>
+            <span className="text-xs font-normal opacity-80">{remainingCount} left</span>
             <ArrowRight className="h-5 w-5" />
           </Button>
         ) : canFinish ? (
@@ -464,18 +519,20 @@ const SignDocument = () => {
             onClick={handleSubmitSignature}
             disabled={submitting}
             size="lg"
-            className="bg-[#4caf50] text-white hover:bg-[#43a047] font-bold shadow-2xl rounded-full px-8 gap-2 text-base pointer-events-auto"
+            className="bg-[#4caf50] text-white hover:bg-[#43a047] font-bold shadow-2xl rounded-full px-6 py-6 gap-2 text-sm flex-col h-auto animate-pulse"
           >
-            <Check className="h-5 w-5" />
-            FINISH SIGNING
+            <Check className="h-6 w-6" />
+            <span className="text-lg">FINISH</span>
+            <span className="text-xs font-normal opacity-80">& Submit</span>
           </Button>
         ) : (
           <Button
             onClick={() => setAgreedToTerms(true)}
             size="lg"
-            className="bg-[#fae052] text-[#1a1a2e] hover:bg-[#f5d93a] font-bold shadow-2xl rounded-full px-8 gap-2 animate-pulse text-base pointer-events-auto"
+            className="bg-[#fae052] text-[#1a1a2e] hover:bg-[#f5d93a] font-bold shadow-2xl rounded-full px-6 py-6 gap-2 animate-pulse text-sm flex-col h-auto"
           >
-            Agree & Continue
+            <span className="text-lg">AGREE</span>
+            <span className="text-xs font-normal opacity-80">to continue</span>
           </Button>
         )}
       </div>
@@ -485,7 +542,20 @@ const SignDocument = () => {
         <div className="bg-white border-b shadow-sm px-4 py-3 max-h-48 overflow-y-auto">
           <div className="grid gap-1">
             {signerFields.map((field) => {
-              const isFieldComplete = field.type === "signature" ? !!signatureData : completedFields.has(field.api_id);
+              const isOwner2 = isOwner2Field(field);
+              let isFieldComplete = false;
+              
+              if (field.type === "signature") {
+                isFieldComplete = !!signatureData;
+              } else if (field.type === "radio" && field.group_name) {
+                isFieldComplete = isRadioGroupComplete(field.group_name);
+              } else {
+                isFieldComplete = completedFields.has(field.api_id);
+              }
+              
+              // Show Owner 2 fields as optional/muted
+              const isOptional = isOwner2 || (!field.required && field.type !== "radio");
+              
               return (
                 <button
                   key={field.api_id}
@@ -493,19 +563,27 @@ const SignDocument = () => {
                     navigateToField(field);
                     setShowFieldList(false);
                   }}
-                  className={`text-left px-3 py-2 rounded text-sm flex items-center gap-2 transition-colors ${
+                  className={cn(
+                    "text-left px-3 py-2 rounded text-sm flex items-center gap-2 transition-colors",
                     isFieldComplete 
                       ? "bg-green-50 text-green-700" 
-                      : "bg-[#fff8dc] text-[#8b7355] hover:bg-[#fff5cc]"
-                  }`}
+                      : isOptional
+                        ? "bg-gray-50 text-gray-500 hover:bg-gray-100"
+                        : "bg-[#fff8dc] text-[#8b7355] hover:bg-[#fff5cc]"
+                  )}
                 >
                   {isFieldComplete ? (
                     <CheckCircle className="h-4 w-4 text-green-500 flex-shrink-0" />
                   ) : (
-                    <div className="w-4 h-4 rounded-full border-2 border-[#fae052] flex-shrink-0" />
+                    <div className={cn(
+                      "w-4 h-4 rounded-full border-2 flex-shrink-0",
+                      isOptional ? "border-gray-300" : "border-[#fae052]"
+                    )} />
                   )}
                   <span className="truncate">
-                    {field.label} {field.required && !isFieldComplete && <span className="text-red-500">*</span>}
+                    {field.label}
+                    {isOptional && <span className="text-xs ml-1">(optional)</span>}
+                    {!isOptional && !isFieldComplete && <span className="text-red-500 ml-1">*</span>}
                   </span>
                   <span className="text-xs text-[#999] ml-auto flex-shrink-0">Page {field.page}</span>
                 </button>
