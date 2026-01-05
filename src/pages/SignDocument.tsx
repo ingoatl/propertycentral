@@ -225,9 +225,9 @@ const SignDocument = () => {
     setSignatureData(sigData);
     setShowSignatureFor(null);
     
-    // Mark all guest signature fields as complete
+    // Only mark Owner 1 signature fields as complete - NOT Owner 2
     signerFields
-      .filter(f => f.type === "signature")
+      .filter(f => f.type === "signature" && !isOwner2Field(f))
       .forEach(f => {
         setCompletedFields(prev => new Set([...prev, f.api_id]));
       });
@@ -309,9 +309,10 @@ const SignDocument = () => {
   // Sort fields in document reading order: page, then Y (top to bottom), then X (left to right)
   const sortedSignerFields = [...signerFields].sort((a, b) => {
     if (a.page !== b.page) return a.page - b.page;
-    // If within 3% Y, treat as same line and sort by X
-    if (Math.abs(a.y - b.y) < 3) return a.x - b.x;
-    return a.y - b.y;
+    // Sort by Y first (top to bottom), then by X for same line
+    const yDiff = a.y - b.y;
+    if (Math.abs(yDiff) > 2) return yDiff; // Different lines
+    return a.x - b.x; // Same line, sort by X
   });
 
   // Check if a field is incomplete - Owner 2 fields are considered complete (optional)
@@ -327,22 +328,36 @@ const SignDocument = () => {
     return !completedFields.has(f.api_id);
   };
 
-  // Get fields that need to be completed (excluding Owner 2 and completed radio groups)
+  // Get fields that need to be completed in document order
   const getRequiredIncompleteFields = () => {
-    const seen = new Set<string>();
-    return sortedSignerFields.filter(f => {
-      if (isOwner2Field(f)) return false;
+    const seenGroups = new Set<string>();
+    const result: FieldData[] = [];
+    
+    for (const f of sortedSignerFields) {
+      // Skip Owner 2 fields entirely
+      if (isOwner2Field(f)) continue;
       
-      // For radio groups, only include first incomplete field from each group
+      // For radio groups - only add ONE field per incomplete group
       if (f.type === "radio" && f.group_name) {
-        if (seen.has(f.group_name)) return false;
-        if (isRadioGroupComplete(f.group_name)) return false;
-        seen.add(f.group_name);
-        return true;
+        // Skip if we've already handled this group
+        if (seenGroups.has(f.group_name)) continue;
+        seenGroups.add(f.group_name);
+        
+        // If group is complete, skip it
+        if (isRadioGroupComplete(f.group_name)) continue;
+        
+        // Group is incomplete - add the first radio of this group
+        result.push(f);
+        continue;
       }
       
-      return isFieldIncomplete(f);
-    });
+      // For non-radio fields, add if incomplete
+      if (isFieldIncomplete(f)) {
+        result.push(f);
+      }
+    }
+    
+    return result;
   };
 
   const findNextIncompleteField = () => {
@@ -358,28 +373,49 @@ const SignDocument = () => {
 
   const handleNext = () => {
     const incompleteFields = getRequiredIncompleteFields();
+    
+    if (incompleteFields.length === 0) {
+      toast.success("All fields complete! Click FINISH to submit.");
+      return;
+    }
+    
     const currentId = activeFieldId || showSignatureFor;
     
-    // Find current field's position in document order
-    const currentIdx = sortedSignerFields.findIndex(f => f.api_id === currentId);
+    // If no current field, go to first incomplete
+    if (!currentId) {
+      navigateToField(incompleteFields[0]);
+      return;
+    }
     
-    // Find the next incomplete field that comes after current position
+    // Find current field's position in document order
+    const currentField = sortedSignerFields.find(f => f.api_id === currentId);
+    if (!currentField) {
+      navigateToField(incompleteFields[0]);
+      return;
+    }
+    
+    // Find the next incomplete field that comes after current position in document
+    const currentPage = currentField.page;
+    const currentY = currentField.y;
+    
     for (const f of incompleteFields) {
-      const fieldIdx = sortedSignerFields.findIndex(sf => sf.api_id === f.api_id);
-      if (fieldIdx > currentIdx) {
+      // Field is "after" if: later page, OR same page and lower Y, OR same page/Y and higher X
+      if (f.page > currentPage) {
+        navigateToField(f);
+        return;
+      }
+      if (f.page === currentPage && f.y > currentY + 2) {
+        navigateToField(f);
+        return;
+      }
+      if (f.page === currentPage && Math.abs(f.y - currentY) <= 2 && f.x > currentField.x) {
         navigateToField(f);
         return;
       }
     }
     
     // If no field after current, wrap to first incomplete
-    if (incompleteFields.length > 0) {
-      navigateToField(incompleteFields[0]);
-      return;
-    }
-    
-    // All fields complete
-    toast.success("All fields complete! Click FINISH to submit.");
+    navigateToField(incompleteFields[0]);
   };
 
   // Check if all required fields are complete (excluding Owner 2 fields)
