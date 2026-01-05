@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
-import { Loader2, CheckCircle, AlertCircle, ChevronDown, ChevronUp } from "lucide-react";
+import { Loader2, CheckCircle, AlertCircle, ChevronDown, ChevronUp, ArrowRight } from "lucide-react";
 import { Document, Page, pdfjs } from "react-pdf";
 import { InlineField, FieldData } from "@/components/signing/InlineField";
 import { InlineSignature } from "@/components/signing/InlineSignature";
@@ -372,15 +372,6 @@ const SignDocument = () => {
           </span>
         </div>
         <div className="flex items-center gap-2">
-          {completedRequired < totalRequired && (
-            <Button
-              onClick={activeFieldId || showSignatureFor ? handleNext : handleStart}
-              size="sm"
-              className="bg-[#1a1a2e] text-white hover:bg-[#2a2a4e] text-xs px-4"
-            >
-              {activeFieldId || showSignatureFor ? "NEXT" : "START"}
-            </Button>
-          )}
           <Button
             onClick={() => setShowFieldList(!showFieldList)}
             size="sm"
@@ -391,6 +382,20 @@ const SignDocument = () => {
           </Button>
         </div>
       </div>
+
+      {/* Floating NEXT Button - DocuSign style */}
+      {completedRequired < totalRequired && (
+        <div className="fixed bottom-20 right-6 z-50">
+          <Button
+            onClick={activeFieldId || showSignatureFor ? handleNext : handleStart}
+            size="lg"
+            className="bg-[#fae052] text-[#1a1a2e] hover:bg-[#f5d93a] font-bold shadow-2xl rounded-full px-6 gap-2 animate-pulse"
+          >
+            {activeFieldId || showSignatureFor ? "NEXT" : "START"}
+            <ArrowRight className="h-5 w-5" />
+          </Button>
+        </div>
+      )}
 
       {/* Field List Dropdown */}
       {showFieldList && (
@@ -463,6 +468,7 @@ const SignDocument = () => {
                       <Page
                         pageNumber={pageNum}
                         width={pageWidth * scale}
+                        scale={1.5}
                         renderTextLayer={false}
                         renderAnnotationLayer={false}
                         onLoadSuccess={(page) => onPageLoadSuccess(pageNum, page)}
