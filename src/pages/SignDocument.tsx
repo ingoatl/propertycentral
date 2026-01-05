@@ -147,7 +147,30 @@ const SignDocument = () => {
     });
   }, []);
 
-  const handleFieldChange = (fieldId: string, value: string | boolean) => {
+  const handleFieldChange = (fieldId: string, value: string | boolean, field?: FieldData) => {
+    // For radio fields, clear other selections in the same group
+    if (field?.type === "radio" && field.group_name && value === true) {
+      const groupFields = [...signerFields, ...adminFields].filter(
+        f => f.type === "radio" && f.group_name === field.group_name && f.api_id !== fieldId
+      );
+      
+      setFieldValues(prev => {
+        const next = { ...prev, [fieldId]: value };
+        groupFields.forEach(f => {
+          next[f.api_id] = false;
+        });
+        return next;
+      });
+      
+      setCompletedFields(prev => {
+        const next = new Set(prev);
+        next.add(fieldId);
+        // Don't remove group fields from completed - the group itself is complete
+        return next;
+      });
+      return;
+    }
+    
     setFieldValues(prev => ({ ...prev, [fieldId]: value }));
     
     if (value || value === false) {
@@ -281,12 +304,24 @@ const SignDocument = () => {
   };
 
   // Check if all required fields are complete
-  const allRequiredComplete = signerFields.filter(f => f.required).every(f => {
-    if (f.type === "signature") return !!signatureData;
-    if (f.type === "checkbox") return fieldValues[f.api_id] === true || fieldValues[f.api_id] === false;
-    return !!fieldValues[f.api_id];
+  // For radio groups, only ONE selection in the group is required
+  const radioGroups = new Set<string>();
+  signerFields.filter(f => f.type === "radio" && f.group_name).forEach(f => radioGroups.add(f.group_name!));
+  
+  const radioGroupsComplete = Array.from(radioGroups).every(groupName => {
+    const groupFields = signerFields.filter(f => f.type === "radio" && f.group_name === groupName);
+    return groupFields.some(f => fieldValues[f.api_id] === true);
   });
   
+  const nonRadioFieldsComplete = signerFields
+    .filter(f => f.required && f.type !== "radio")
+    .every(f => {
+      if (f.type === "signature") return !!signatureData;
+      if (f.type === "checkbox") return true; // Checkboxes don't need to be checked to proceed
+      return !!fieldValues[f.api_id];
+    });
+  
+  const allRequiredComplete = radioGroupsComplete && nonRadioFieldsComplete;
   const canFinish = signatureData && agreedToTerms && allRequiredComplete;
 
   const getFieldsForPage = (pageNum: number) => [...signerFields, ...adminFields].filter(f => f.page === pageNum);
@@ -499,7 +534,6 @@ const SignDocument = () => {
                       <Page
                         pageNumber={pageNum}
                         width={pageWidth * scale}
-                        scale={1.5}
                         renderTextLayer={false}
                         renderAnnotationLayer={false}
                         onLoadSuccess={(page) => onPageLoadSuccess(pageNum, page)}
@@ -535,7 +569,7 @@ const SignDocument = () => {
                               <InlineField
                                 field={field}
                                 value={value}
-                                onChange={(val) => handleFieldChange(field.api_id, val)}
+                                onChange={(val) => handleFieldChange(field.api_id, val, field)}
                                 isActive={isActive}
                                 isCompleted={isCompleted}
                                 isReadOnly={isReadOnly}

@@ -19,7 +19,7 @@ interface TextPosition {
 interface DetectedField {
   api_id: string;
   label: string;
-  type: "text" | "date" | "email" | "phone" | "signature" | "checkbox";
+  type: "text" | "date" | "email" | "phone" | "signature" | "checkbox" | "radio";
   page: number;
   x: number;
   y: number;
@@ -27,6 +27,7 @@ interface DetectedField {
   height: number;
   filled_by: "admin" | "guest";
   required: boolean;
+  group_name?: string;
 }
 
 serve(async (req) => {
@@ -55,9 +56,40 @@ serve(async (req) => {
 
     console.log(`Analyzing ${textPositions.length} text items across ${totalPages} pages`);
 
-    // Format text lines with clear structure - group by page and sort by y
+    // Pre-process: find field labels and their exact positions
+    const fieldLabels: Array<{
+      label: string;
+      page: number;
+      labelX: number;
+      labelY: number;
+      labelWidth: number;
+      lineText: string;
+    }> = [];
+
+    // Common field patterns to detect
+    const fieldPatterns = [
+      { pattern: /effective\s*date/i, type: "date", api_id: "effective_date", filled_by: "admin" },
+      { pattern: /owner\(?s?\)?:/i, type: "text", api_id: "owner_name", filled_by: "guest" },
+      { pattern: /^address:/i, type: "text", api_id: "owner_address", filled_by: "guest" },
+      { pattern: /residing\s*at/i, type: "text", api_id: "owner_address", filled_by: "guest" },
+      { pattern: /phone:/i, type: "phone", api_id: "owner_phone", filled_by: "guest" },
+      { pattern: /email:/i, type: "email", api_id: "owner_email", filled_by: "guest" },
+      { pattern: /property\s*address/i, type: "text", api_id: "property_address", filled_by: "admin" },
+      { pattern: /☐.*15%|15%.*package|hybrid.*15%/i, type: "radio", api_id: "package_15", filled_by: "guest", group: "package_selection" },
+      { pattern: /☐.*20%|20%.*package|full.*service.*20%/i, type: "radio", api_id: "package_20", filled_by: "guest", group: "package_selection" },
+      { pattern: /☐.*25%|25%.*package|premium.*25%/i, type: "radio", api_id: "package_25", filled_by: "guest", group: "package_selection" },
+      { pattern: /management\s*fee.*%/i, type: "radio", api_id: "management_fee", filled_by: "guest", group: "package_selection" },
+    ];
+
+    // Find signature blocks
+    const signaturePatterns = [
+      { pattern: /owner\s*signature|signature.*owner/i, api_id: "owner_signature", filled_by: "guest" },
+      { pattern: /manager\s*signature|signature.*manager|host\s*signature/i, api_id: "manager_signature", filled_by: "admin" },
+      { pattern: /second\s*owner|co-?owner/i, api_id: "second_owner_signature", filled_by: "guest" },
+    ];
+
+    // Group text by page and y-position to find lines
     const linesByPage: Record<number, TextPosition[]> = {};
-    
     for (const item of textPositions as TextPosition[]) {
       if (!linesByPage[item.page]) {
         linesByPage[item.page] = [];
@@ -65,54 +97,68 @@ serve(async (req) => {
       linesByPage[item.page].push(item);
     }
 
-    // Create structured document view for AI - one line per entry with clear coordinates
+    // Sort each page by y position
+    for (const page in linesByPage) {
+      linesByPage[page].sort((a, b) => a.y - b.y);
+    }
+
+    // Build structured document with labeled lines
     const documentLines: string[] = [];
+    const linePositions: Array<{page: number; y: number; text: string; x: number; endX: number}> = [];
     
     for (const [pageStr, lines] of Object.entries(linesByPage)) {
       const page = parseInt(pageStr);
-      const sortedLines = lines.sort((a, b) => a.y - b.y);
-      
       documentLines.push(`\n=== PAGE ${page} ===`);
       
-      for (const line of sortedLines) {
-        // Include the text and its EXACT y position
-        documentLines.push(`LINE y=${line.y.toFixed(1)}% x=${line.x.toFixed(1)}%: "${line.text}"`);
+      for (const line of lines) {
+        const entry = {
+          page,
+          y: line.y,
+          text: line.text,
+          x: line.x,
+          endX: line.x + line.width,
+        };
+        linePositions.push(entry);
+        documentLines.push(`[y=${line.y.toFixed(1)}% x=${line.x.toFixed(1)}%-${(line.x + line.width).toFixed(1)}%] "${line.text}"`);
       }
     }
 
     const documentContent = documentLines.join('\n');
 
-    const prompt = `You are analyzing a legal document to detect where form fields should be placed. 
+    // Use AI to analyze document and detect fields with precise positioning
+    const prompt = `Analyze this legal document and detect FILLABLE FORM FIELDS. Each line shows its EXACT position as [y=Y% x=startX%-endX%].
 
-DOCUMENT CONTENT (each line shows its y% position from top):
+DOCUMENT:
 ${documentContent}
 
-TASK: Find FILLABLE FIELDS where users need to enter information.
+RULES FOR FIELD DETECTION:
+1. Find labels like "Owner(s):", "Address:", "Phone:", "Email:", "Effective Date:", "Property Address:"
+2. For each label, the INPUT FIELD goes AFTER the label on the SAME LINE
+3. The field's Y position must MATCH the label's y% value exactly
+4. The field's X position starts AFTER where the label text ends (use endX% + 2%)
+5. Field width should fill remaining space (usually 40-60%)
 
-FIELD DETECTION RULES:
-1. Look for labels followed by underlines/blanks: "Owner(s): ___", "Address: ___", "Phone: ___"
-2. Look for signature blocks: lines with "OWNER:", "MANAGER:", "HOST:" 
-3. Each label is on its OWN LINE with a UNIQUE y position
+RADIO/CHECKBOX RULES:
+- Lines with ☐ or □ followed by percentage (15%, 20%, 25%) are RADIO buttons for package selection
+- All package options should have group_name: "package_selection"
+- They are mutually exclusive (only one can be selected)
 
-CRITICAL POSITIONING RULES:
-- Use the EXACT y% value from the LINE where the label appears
-- x position: Start the input AFTER the label. If label is short (like "Phone:"), start at x=20%. If label is long, start further right.
-- Each field must have a DIFFERENT y position matching its source line
-- Don't stack multiple fields at the same y position
+SIGNATURE RULES:
+- "Owner Signature" or similar = signature field for guest
+- "Manager Signature" or "Host Signature" = signature field for admin
+- Signature fields should be BELOW the label text (y + 4%)
+- Signature height should be 5-6%
 
-FIELD TYPES:
-- "text": Name, address, general text
-- "email": Email fields
-- "phone": Phone fields  
-- "date": Date fields
-- "signature": Signature areas (place below the label, height=6%)
-- "checkbox": Checkbox items
+FILLED_BY RULES:
+- "guest": Owner fills these (owner name, address, phone, email, OWNER signature, package selection)
+- "admin": Manager/Host fills these (effective_date, property_address, MANAGER signature)
 
-FILLED_BY:
-- "guest": Owner/Tenant fills these (owner_name, owner_address, owner_phone, owner_email, OWNER signature)
-- "admin": Manager fills these (effective_date, property_address, MANAGER/HOST signature)
+REQUIRED:
+- All text/date/email/phone fields with underlines are required
+- Package selection (radio group) is required
+- Signatures are required
 
-Respond with ONLY this JSON structure:
+Return ONLY valid JSON:
 {
   "fields": [
     {
@@ -120,29 +166,32 @@ Respond with ONLY this JSON structure:
       "label": "Owner(s)",
       "type": "text",
       "page": 1,
-      "x": 22,
-      "y": 32.5,
-      "width": 55,
+      "x": 25,
+      "y": 18.5,
+      "width": 50,
       "height": 2.5,
       "filled_by": "guest",
       "required": true
     },
     {
-      "api_id": "owner_address",
-      "label": "Address",
-      "type": "text", 
+      "api_id": "package_15",
+      "label": "Hybrid Package 15%",
+      "type": "radio",
       "page": 1,
-      "x": 22,
-      "y": 35.8,
-      "width": 55,
+      "x": 10,
+      "y": 45.2,
+      "width": 5,
       "height": 2.5,
       "filled_by": "guest",
-      "required": true
+      "required": true,
+      "group_name": "package_selection"
     }
   ]
 }
 
-IMPORTANT: Each field's y value must match its label's LINE y value from the document. Do NOT use the same y for multiple fields.`;
+KEY: Use the EXACT y% values from the document. Each field must have a UNIQUE y position matching where it appears in the document.`;
+
+    console.log("Sending to AI for analysis...");
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -162,13 +211,22 @@ IMPORTANT: Each field's y value must match its label's LINE y value from the doc
     if (!response.ok) {
       const errorText = await response.text();
       console.error("AI API error:", response.status, errorText);
+      
+      if (response.status === 429) {
+        return new Response(
+          JSON.stringify({ error: "Rate limit exceeded. Please try again in a moment." }),
+          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      
       throw new Error("AI analysis failed");
     }
 
     const aiResponse = await response.json();
     const content = aiResponse.choices?.[0]?.message?.content || "";
     
-    console.log("AI response:", content.substring(0, 800));
+    console.log("AI response received, parsing...");
+    console.log("AI content preview:", content.substring(0, 500));
 
     let detectedFields: DetectedField[] = [];
 
@@ -183,30 +241,22 @@ IMPORTANT: Each field's y value must match its label's LINE y value from the doc
       console.error("Failed to parse AI response:", parseError);
     }
 
-    // Validate and clean fields - ensure unique y positions
-    const usedYPositions = new Map<string, number>(); // page-y -> count
-    
+    // Validate and clean fields
     const validatedFields = detectedFields
       .filter((f: any) => f.api_id && f.page && typeof f.x === 'number' && typeof f.y === 'number')
       .map((field: any) => {
-        const key = `${field.page}-${Math.round(field.y)}`;
-        const count = usedYPositions.get(key) || 0;
-        usedYPositions.set(key, count + 1);
-        
-        // If this y position is already used, offset slightly
-        const yOffset = count * 3.5;
-        
         return {
           api_id: String(field.api_id).replace(/[^a-z0-9_]/gi, '_').toLowerCase(),
           label: String(field.label || field.api_id),
           type: validateFieldType(field.type),
           page: Math.max(1, Math.min(totalPages || 20, Number(field.page))),
           x: Math.max(0, Math.min(95, Number(field.x))),
-          y: Math.max(0, Math.min(95, Number(field.y) + yOffset)),
-          width: Math.max(10, Math.min(70, Number(field.width) || 40)),
-          height: field.type === 'signature' ? 6 : Math.max(2, Math.min(8, Number(field.height) || 2.5)),
+          y: Math.max(0, Math.min(95, Number(field.y))),
+          width: Math.max(5, Math.min(70, Number(field.width) || 40)),
+          height: field.type === 'signature' ? 5 : Math.max(2, Math.min(8, Number(field.height) || 2.5)),
           filled_by: field.filled_by === "admin" ? "admin" : "guest",
           required: field.required !== false,
+          ...(field.group_name && { group_name: String(field.group_name) }),
         };
       });
 
@@ -246,6 +296,6 @@ IMPORTANT: Each field's y value must match its label's LINE y value from the doc
 });
 
 function validateFieldType(type: string): DetectedField["type"] {
-  const validTypes = ["text", "date", "email", "phone", "signature", "checkbox"];
+  const validTypes = ["text", "date", "email", "phone", "signature", "checkbox", "radio"];
   return validTypes.includes(type) ? type as DetectedField["type"] : "text";
 }
