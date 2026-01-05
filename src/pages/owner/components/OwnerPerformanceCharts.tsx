@@ -86,8 +86,8 @@ export function OwnerPerformanceCharts({ statements, monthlyRevenueData, propert
         month: format(new Date(d.month), "MMM yy"),
         fullMonth: format(new Date(d.month), "MMMM yyyy"),
         revenue: d.total || 0,
-        expenses: d.expenses || 0,
-        net: d.net || d.total || 0,
+        expenses: typeof d.expenses === 'number' ? d.expenses : 0,
+        net: typeof d.net === 'number' ? d.net : (d.total || 0),
       }));
     }
 
