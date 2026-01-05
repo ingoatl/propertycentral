@@ -127,9 +127,9 @@ export function DocumentTemplatesManager() {
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const validTypes = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
-      if (!validTypes.includes(file.type)) {
-        toast.error('Please upload a PDF or DOCX file');
+      // Only allow PDF files
+      if (file.type !== 'application/pdf') {
+        toast.error('Please upload a PDF file. DOCX files are no longer supported.');
         return;
       }
       
@@ -176,7 +176,8 @@ export function DocumentTemplatesManager() {
 
       const { data: { user } } = await supabase.auth.getUser();
 
-      const { error: insertError } = await supabase
+      // Insert template first
+      const { data: insertedTemplate, error: insertError } = await supabase
         .from('document_templates')
         .insert({
           name: formData.name,
@@ -186,9 +187,33 @@ export function DocumentTemplatesManager() {
           is_active: true,
           contract_type: formData.contract_type,
           google_drive_url: formData.google_drive_url || null,
-        });
+        })
+        .select()
+        .single();
 
       if (insertError) throw insertError;
+
+      // Now detect fields in the PDF using AI
+      toast.info('Analyzing PDF for field positions...');
+      
+      try {
+        const { data: fieldData, error: fieldError } = await supabase.functions.invoke('detect-pdf-fields', {
+          body: { 
+            pdfUrl: urlData.publicUrl,
+            templateId: insertedTemplate.id,
+          },
+        });
+
+        if (fieldError) {
+          console.error('Field detection error:', fieldError);
+          toast.warning('Template uploaded, but field detection failed. Default positions will be used.');
+        } else if (fieldData?.fields?.length > 0) {
+          toast.success(`Detected ${fieldData.fields.length} fillable fields`);
+        }
+      } catch (fieldErr) {
+        console.error('Field detection error:', fieldErr);
+        // Don't fail the whole upload if field detection fails
+      }
 
       toast.success('Template uploaded successfully');
       setDialogOpen(false);
@@ -331,9 +356,9 @@ export function DocumentTemplatesManager() {
         <Card>
           <CardContent className="py-12 text-center">
             <FileText className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-            <p className="text-muted-foreground">No templates yet. Upload your first template to get started.</p>
+            <p className="text-muted-foreground">No templates yet. Upload your first PDF template to get started.</p>
             <p className="text-xs text-muted-foreground mt-2">
-              Tip: Use DOCX files with [[placeholder]] tags for dynamic field replacement
+              AI will automatically detect fillable fields and their positions
             </p>
           </CardContent>
         </Card>
@@ -427,17 +452,17 @@ export function DocumentTemplatesManager() {
           <DialogHeader>
             <DialogTitle>Upload Document Template</DialogTitle>
             <DialogDescription>
-              Upload a PDF or DOCX file. The AI will automatically detect the contract type.
+              Upload a PDF file. AI will automatically detect fields and their positions for signing.
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="file">Document File (PDF or DOCX) *</Label>
+              <Label htmlFor="file">Document File (PDF only) *</Label>
               <div className="flex items-center gap-2">
                 <Input
                   id="file"
                   type="file"
-                  accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                  accept=".pdf,application/pdf"
                   onChange={handleFileChange}
                   className="flex-1"
                 />
