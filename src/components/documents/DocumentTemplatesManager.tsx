@@ -8,12 +8,26 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Plus, FileText, Trash2, Upload, CheckCircle, XCircle, ExternalLink, Link2, Edit2, Loader2, Sparkles, RefreshCw } from "lucide-react";
+import { Plus, FileText, Trash2, Upload, CheckCircle, XCircle, ExternalLink, Link2, Edit2, Loader2, Sparkles, RefreshCw, Eye } from "lucide-react";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { Check, ChevronsUpDown } from "lucide-react";
 import { extractPdfTextWithPositions } from "@/utils/pdfTextExtractor";
+import { TemplateFieldPreview } from "./TemplateFieldPreview";
+
+interface FieldData {
+  api_id: string;
+  label: string;
+  type: "text" | "date" | "email" | "phone" | "signature" | "checkbox";
+  page: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  filled_by: "admin" | "guest";
+  required: boolean;
+}
 
 interface DocumentTemplate {
   id: string;
@@ -25,6 +39,7 @@ interface DocumentTemplate {
   created_at: string;
   contract_type: string | null;
   google_drive_url: string | null;
+  field_mappings?: unknown;
 }
 
 const CONTRACT_TYPE_OPTIONS = [
@@ -46,6 +61,7 @@ export function DocumentTemplatesManager() {
   const [reanalyzing, setReanalyzing] = useState<string | null>(null);
   const [contractTypeOpen, setContractTypeOpen] = useState(false);
   const [detectedType, setDetectedType] = useState<string | null>(null);
+  const [previewTemplate, setPreviewTemplate] = useState<DocumentTemplate | null>(null);
   const [formData, setFormData] = useState({
     name: "",
     description: "",
@@ -396,6 +412,14 @@ export function DocumentTemplatesManager() {
                     <Button
                       variant="ghost"
                       size="icon"
+                      onClick={() => setPreviewTemplate(template)}
+                      title="Preview field detection"
+                    >
+                      <Eye className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
                       onClick={() => handleReanalyze(template)}
                       disabled={reanalyzing === template.id}
                       title="Re-analyze document"
@@ -610,6 +634,21 @@ export function DocumentTemplatesManager() {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Template Field Preview Dialog */}
+      {previewTemplate && (
+        <TemplateFieldPreview
+          open={!!previewTemplate}
+          onOpenChange={(open) => !open && setPreviewTemplate(null)}
+          pdfUrl={previewTemplate.file_path}
+          fields={(previewTemplate.field_mappings as FieldData[]) || []}
+          templateName={previewTemplate.name}
+          onReanalyze={() => {
+            handleReanalyze(previewTemplate);
+            setPreviewTemplate(null);
+          }}
+        />
+      )}
     </div>
   );
 }
