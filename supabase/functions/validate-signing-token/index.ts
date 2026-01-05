@@ -166,7 +166,7 @@ serve(async (req) => {
       signedAt: t.signed_at,
     })) || [];
 
-    // Get field mappings and filter by signer type
+    // Get field mappings with positions and filter by signer type
     const allFieldMappings = template?.field_mappings || [];
     const savedFieldValues = signingToken.booking_documents?.field_configuration || {};
     
@@ -181,9 +181,23 @@ serve(async (req) => {
     
     const filledByValue = signerTypeToFilledBy[signingToken.signer_type] || "guest";
     
-    // Filter fields that this signer needs to fill
+    // Filter fields that this signer needs to fill OR see (admin-filled for context)
+    // For the signing UI, we show all fields but only make guest-filled fields editable
     const signerFields = Array.isArray(allFieldMappings) 
-      ? allFieldMappings.filter((f: any) => f.filled_by === filledByValue)
+      ? allFieldMappings.map((f: any) => ({
+          ...f,
+          // Include position data
+          api_id: f.api_id,
+          label: f.label,
+          type: f.type || "text",
+          page: f.page || 1,
+          x: f.x || 10,
+          y: f.y || 10,
+          width: f.width || 30,
+          height: f.height || 4,
+          filled_by: f.filled_by || "guest",
+          required: f.required !== false,
+        }))
       : [];
 
     return new Response(

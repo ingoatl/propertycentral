@@ -1,5 +1,8 @@
 project_id = "ijsxcaaqphaciaenlegl"
 
+[functions.detect-pdf-fields]
+verify_jwt = true
+
 [functions.generate-statement-pdf]
 verify_jwt = false
 
