@@ -144,6 +144,7 @@ export default function OwnerDashboard() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
+  const [isAdminAccess, setIsAdminAccess] = useState(false);
   const [session, setSession] = useState<OwnerSession | null>(null);
   const [property, setProperty] = useState<PropertyData | null>(null);
   const [statements, setStatements] = useState<Statement[]>([]);
@@ -269,6 +270,7 @@ export default function OwnerDashboard() {
     } else if (ownerIdParam) {
       // Admin access - load data directly by owner ID (no token required)
       console.log("Admin access mode - loading owner:", ownerIdParam);
+      setIsAdminAccess(true);
       loadAllData(ownerIdParam, null);
     } else {
       const storedSession = localStorage.getItem("owner_session");
@@ -660,7 +662,7 @@ export default function OwnerDashboard() {
     );
   }
 
-  if (!session) {
+  if (!session && !isAdminAccess) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-background via-muted/30 to-background flex items-center justify-center p-4">
         <Card className="max-w-md w-full shadow-2xl border-none">
@@ -680,6 +682,30 @@ export default function OwnerDashboard() {
                 info@peachhausgroup.com
               </a>
             </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // If still no session after loading in admin mode, show error
+  if (!session) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-background via-muted/30 to-background flex items-center justify-center p-4">
+        <Card className="max-w-md w-full shadow-2xl border-none">
+          <CardHeader className="text-center pb-2">
+            <div className="mx-auto mb-4 w-16 h-16 rounded-2xl bg-gradient-to-br from-destructive to-destructive/80 flex items-center justify-center shadow-lg">
+              <AlertCircle className="h-8 w-8 text-destructive-foreground" />
+            </div>
+            <CardTitle className="text-2xl">Owner Not Found</CardTitle>
+          </CardHeader>
+          <CardContent className="text-center space-y-4">
+            <p className="text-muted-foreground">
+              Could not load data for this owner. The owner may not exist or may not have any active properties.
+            </p>
+            <Button onClick={() => navigate(-1)} variant="outline">
+              Go Back
+            </Button>
           </CardContent>
         </Card>
       </div>
