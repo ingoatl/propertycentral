@@ -110,97 +110,21 @@ serve(async (req) => {
     console.log('Recipients:', JSON.stringify(recipients, null, 2));
     console.log('File URL:', template.file_path);
 
-    // Define signature fields for each recipient
-    // These are positioned at the bottom of the document where signatures typically go
-    const fields: any[] = [
-      // Owner signature field
-      {
-        api_id: 'owner_signature',
-        type: 'signature',
-        required: true,
-        recipient_id: '1',
-        page: 1,
-        x: 50,
-        y: 700,
-        width: 200,
-        height: 50,
-      },
-      // Owner date field
-      {
-        api_id: 'owner_date',
-        type: 'date',
-        required: true,
-        recipient_id: '1',
-        page: 1,
-        x: 300,
-        y: 700,
-        width: 100,
-        height: 30,
-      },
-      // Manager signature field
-      {
-        api_id: 'manager_signature',
-        type: 'signature',
-        required: true,
-        recipient_id: '2',
-        page: 1,
-        x: 50,
-        y: 750,
-        width: 200,
-        height: 50,
-      },
-      // Manager date field
-      {
-        api_id: 'manager_date',
-        type: 'date',
-        required: true,
-        recipient_id: '2',
-        page: 1,
-        x: 300,
-        y: 750,
-        width: 100,
-        height: 30,
-      },
-    ];
-
-    // Add Owner2 fields if included
-    if (includeSecondOwner && secondOwnerName && secondOwnerEmail) {
-      fields.push(
-        {
-          api_id: 'owner2_signature',
-          type: 'signature',
-          required: true,
-          recipient_id: '3',
-          page: 1,
-          x: 50,
-          y: 800,
-          width: 200,
-          height: 50,
-        },
-        {
-          api_id: 'owner2_date',
-          type: 'date',
-          required: true,
-          recipient_id: '3',
-          page: 1,
-          x: 300,
-          y: 800,
-          width: 100,
-          height: 30,
-        }
-      );
-    }
-
-    // Create document with SignWell API
-    // When embedded_signing is false, SignWell automatically sends emails to recipients
+    // SignWell requires a 2-step process for documents from files:
+    // Step 1: Create document as draft with draft: true
+    // Step 2: Use the embedded_edit_url to add fields, OR send directly if template has signature markers
+    
+    // For now, we'll create the document and request the edit URL
+    // This allows users to add signature fields via SignWell's UI
     const requestBody = {
       test_mode: false,  // Production mode - set to true for testing
+      draft: true,  // Create as draft first so fields can be added
       name: `${template.name} - ${guestName}`,
       embedded_signing: false,  // Email-based signing - recipients get emails
+      embedded_signing_enabled: false,
       reminders: true,  // Enable automatic reminders
       apply_signing_order: true,  // Enforce signing order (owner first, then manager)
       recipients,
-      fields,  // Include signature fields
       files: [
         {
           name: template.name,
@@ -227,14 +151,32 @@ serve(async (req) => {
     }
 
     const signwellData = await signwellResponse.json();
-    console.log('SignWell document created:', signwellData.id);
+    console.log('SignWell draft document created:', signwellData.id);
+
+    // Get the edit URL so the user can add signature fields
+    const editUrlResponse = await fetch(`https://www.signwell.com/api/v1/documents/${signwellData.id}/embedded_edit_url`, {
+      method: 'GET',
+      headers: {
+        'X-Api-Key': signwellApiKey,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    let embeddedEditUrl = null;
+    if (editUrlResponse.ok) {
+      const editData = await editUrlResponse.json();
+      embeddedEditUrl = editData.embedded_edit_url;
+      console.log('Got embedded edit URL:', embeddedEditUrl);
+    }
 
     // Update booking document record with SignWell ID
     const { error: updateError } = await supabase
       .from('booking_documents')
       .update({
         signwell_document_id: signwellData.id,
-        status: 'pending_owner',  // Owner signs first
+        embedded_edit_url: embeddedEditUrl,
+        status: 'draft',  // Document is in draft mode
+        is_draft: true,
         sent_at: new Date().toISOString(),
       })
       .eq('id', documentId);
@@ -247,7 +189,7 @@ serve(async (req) => {
     // Create audit log entry
     await supabase.from('document_audit_log').insert({
       document_id: documentId,
-      action: 'created',
+      action: 'draft_created',
       performed_by: hostEmail,
       metadata: {
         signwell_document_id: signwellData.id,
@@ -259,13 +201,16 @@ serve(async (req) => {
         second_owner_name: secondOwnerName,
         second_owner_email: secondOwnerEmail,
         created_from: 'file',
+        requires_field_placement: true,
       },
     });
 
     return new Response(JSON.stringify({
       success: true,
       signwellDocumentId: signwellData.id,
-      message: 'Document created. Owner will receive an email to sign first, then you will receive yours.',
+      embeddedEditUrl: embeddedEditUrl,
+      isDraft: true,
+      message: 'Draft document created. Please add signature fields in SignWell, then send to recipients.',
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

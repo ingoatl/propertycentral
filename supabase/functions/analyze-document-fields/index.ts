@@ -200,7 +200,24 @@ Return ONLY the JSON, no other text.`;
       throw new Error(`AI API error: ${aiResponse.status}`);
     }
 
-    const aiData = await aiResponse.json();
+    let aiData;
+    try {
+      aiData = await aiResponse.json();
+    } catch (jsonError) {
+      console.error("Error parsing AI response JSON:", jsonError);
+      // Return default values if AI response is not valid JSON
+      return new Response(
+        JSON.stringify({
+          success: true,
+          detected_contract_type: "other",
+          suggested_name: "Document Template",
+          fields: [],
+          cached: false,
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const aiContent = aiData.choices?.[0]?.message?.content || "{}";
     
     console.log("AI response:", aiContent);
