@@ -14,6 +14,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { cn } from "@/lib/utils";
 import { Check, ChevronsUpDown } from "lucide-react";
 import { extractPdfTextWithPositions } from "@/utils/pdfTextExtractor";
+import { extractPdfFormFields } from "@/utils/pdfFieldExtractor";
 import { TemplateFieldPreview } from "./TemplateFieldPreview";
 
 interface FieldData {
@@ -210,18 +211,19 @@ export function DocumentTemplatesManager() {
 
       if (insertError) throw insertError;
 
-      // Extract text positions from PDF client-side for accurate field detection
+      // Extract form fields and text positions from PDF using hybrid approach
       toast.info('Analyzing PDF for field positions...');
       
       try {
-        // Extract text with positions from PDF using PDF.js
-        const { textPositions, totalPages } = await extractPdfTextWithPositions(urlData.publicUrl);
+        // First, try to extract actual form fields using getAnnotations()
+        const { formFields, textPositions, totalPages, hasAcroForm } = await extractPdfFormFields(urlData.publicUrl);
         
-        console.log(`Extracted ${textPositions.length} text items from ${totalPages} pages`);
+        console.log(`Extracted ${formFields.length} AcroForm fields, ${textPositions.length} text items from ${totalPages} pages`);
         
-        // Send to AI for intelligent field detection
+        // Send both form fields and text positions to edge function
         const { data: fieldData, error: fieldError } = await supabase.functions.invoke('detect-pdf-fields', {
           body: { 
+            formFields: hasAcroForm ? formFields : undefined,
             textPositions,
             templateId: insertedTemplate.id,
             totalPages,
@@ -232,7 +234,8 @@ export function DocumentTemplatesManager() {
           console.error('Field detection error:', fieldError);
           toast.warning('Template uploaded, but field detection failed. You can re-analyze later.');
         } else if (fieldData?.fields?.length > 0) {
-          toast.success(`Detected ${fieldData.fields.length} fillable fields with accurate positions`);
+          const source = fieldData.source === 'acroform' ? 'exact form field positions' : 'AI analysis';
+          toast.success(`Detected ${fieldData.fields.length} fillable fields using ${source}`);
         } else {
           toast.warning('No fillable fields detected. You may need to add fields manually.');
         }
@@ -314,14 +317,15 @@ export function DocumentTemplatesManager() {
     try {
       setReanalyzing(template.id);
       
-      // Extract text positions from PDF
-      const { textPositions, totalPages } = await extractPdfTextWithPositions(template.file_path);
+      // Use hybrid extraction with getAnnotations()
+      const { formFields, textPositions, totalPages, hasAcroForm } = await extractPdfFormFields(template.file_path);
       
-      console.log(`Re-analyzing: extracted ${textPositions.length} text items from ${totalPages} pages`);
+      console.log(`Re-analyzing: extracted ${formFields.length} AcroForm fields, ${textPositions.length} text items from ${totalPages} pages`);
       
-      // Send to AI for field detection
+      // Send to edge function
       const { data, error } = await supabase.functions.invoke('detect-pdf-fields', {
         body: { 
+          formFields: hasAcroForm ? formFields : undefined,
           textPositions,
           templateId: template.id,
           totalPages,
@@ -331,7 +335,8 @@ export function DocumentTemplatesManager() {
       if (error) throw error;
       
       if (data?.fields?.length > 0) {
-        toast.success(`Re-detected ${data.fields.length} fillable fields with accurate positions`);
+        const source = data.source === 'acroform' ? 'exact form field positions' : 'AI analysis';
+        toast.success(`Re-detected ${data.fields.length} fillable fields using ${source}`);
         loadTemplates();
       } else {
         toast.warning('No fillable fields detected');

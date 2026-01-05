@@ -13,7 +13,19 @@ interface TextPosition {
   width: number;
   height: number;
   page: number;
-  lineIndex: number;
+  lineIndex?: number;
+}
+
+interface FormField {
+  fieldName: string;
+  fieldType: string;
+  page: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  groupName?: string;
+  isRequired?: boolean;
 }
 
 interface DetectedField {
@@ -45,48 +57,53 @@ serve(async (req) => {
     }
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
-    const { textPositions, templateId, totalPages } = await req.json();
+    const { textPositions, formFields, templateId, totalPages } = await req.json();
 
+    // If we have AcroForm fields from getAnnotations(), use them directly
+    if (formFields && Array.isArray(formFields) && formFields.length > 0) {
+      console.log(`Using ${formFields.length} pre-extracted AcroForm fields`);
+      
+      const detectedFields = await mapFormFieldsToSemanticFields(
+        formFields as FormField[],
+        textPositions as TextPosition[],
+        lovableApiKey,
+        totalPages
+      );
+      
+      // Save to template
+      if (templateId && detectedFields.length > 0) {
+        const { error: updateError } = await supabase
+          .from("document_templates")
+          .update({ field_mappings: detectedFields })
+          .eq("id", templateId);
+        
+        if (updateError) {
+          console.error("Error saving fields:", updateError);
+        } else {
+          console.log("Saved field mappings to template:", templateId);
+        }
+      }
+
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          fields: detectedFields,
+          totalPages: totalPages || 1,
+          source: "acroform"
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Fallback to AI-based detection from text positions
     if (!textPositions || !Array.isArray(textPositions)) {
       return new Response(
-        JSON.stringify({ error: "Text positions are required" }),
+        JSON.stringify({ error: "Text positions or form fields are required" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    console.log(`Analyzing ${textPositions.length} text items across ${totalPages} pages`);
-
-    // Pre-process: find field labels and their exact positions
-    const fieldLabels: Array<{
-      label: string;
-      page: number;
-      labelX: number;
-      labelY: number;
-      labelWidth: number;
-      lineText: string;
-    }> = [];
-
-    // Common field patterns to detect
-    const fieldPatterns = [
-      { pattern: /effective\s*date/i, type: "date", api_id: "effective_date", filled_by: "admin" },
-      { pattern: /owner\(?s?\)?:/i, type: "text", api_id: "owner_name", filled_by: "guest" },
-      { pattern: /^address:/i, type: "text", api_id: "owner_address", filled_by: "guest" },
-      { pattern: /residing\s*at/i, type: "text", api_id: "owner_address", filled_by: "guest" },
-      { pattern: /phone:/i, type: "phone", api_id: "owner_phone", filled_by: "guest" },
-      { pattern: /email:/i, type: "email", api_id: "owner_email", filled_by: "guest" },
-      { pattern: /property\s*address/i, type: "text", api_id: "property_address", filled_by: "admin" },
-      { pattern: /☐.*15%|15%.*package|hybrid.*15%/i, type: "radio", api_id: "package_15", filled_by: "guest", group: "package_selection" },
-      { pattern: /☐.*20%|20%.*package|full.*service.*20%/i, type: "radio", api_id: "package_20", filled_by: "guest", group: "package_selection" },
-      { pattern: /☐.*25%|25%.*package|premium.*25%/i, type: "radio", api_id: "package_25", filled_by: "guest", group: "package_selection" },
-      { pattern: /management\s*fee.*%/i, type: "radio", api_id: "management_fee", filled_by: "guest", group: "package_selection" },
-    ];
-
-    // Find signature blocks
-    const signaturePatterns = [
-      { pattern: /owner\s*signature|signature.*owner/i, api_id: "owner_signature", filled_by: "guest" },
-      { pattern: /manager\s*signature|signature.*manager|host\s*signature/i, api_id: "manager_signature", filled_by: "admin" },
-      { pattern: /second\s*owner|co-?owner/i, api_id: "second_owner_signature", filled_by: "guest" },
-    ];
+    console.log(`Fallback: Analyzing ${textPositions.length} text items across ${totalPages} pages`);
 
     // Group text by page and y-position to find lines
     const linesByPage: Record<number, TextPosition[]> = {};
@@ -104,21 +121,12 @@ serve(async (req) => {
 
     // Build structured document with labeled lines
     const documentLines: string[] = [];
-    const linePositions: Array<{page: number; y: number; text: string; x: number; endX: number}> = [];
     
     for (const [pageStr, lines] of Object.entries(linesByPage)) {
       const page = parseInt(pageStr);
       documentLines.push(`\n=== PAGE ${page} ===`);
       
       for (const line of lines) {
-        const entry = {
-          page,
-          y: line.y,
-          text: line.text,
-          x: line.x,
-          endX: line.x + line.width,
-        };
-        linePositions.push(entry);
         documentLines.push(`[y=${line.y.toFixed(1)}% x=${line.x.toFixed(1)}%-${(line.x + line.width).toFixed(1)}%] "${line.text}"`);
       }
     }
@@ -131,32 +139,42 @@ serve(async (req) => {
 DOCUMENT:
 ${documentContent}
 
-RULES FOR FIELD DETECTION:
-1. Find labels like "Owner(s):", "Address:", "Phone:", "Email:", "Effective Date:", "Property Address:"
-2. For each label, the INPUT FIELD goes AFTER the label on the SAME LINE
-3. The field's Y position must MATCH the label's y% value exactly
-4. The field's X position starts AFTER where the label text ends (use endX% + 2%)
-5. Field width should fill remaining space (usually 40-60%)
+FIELD DETECTION RULES:
 
-RADIO/CHECKBOX RULES:
-- Lines with ☐ or □ followed by percentage (15%, 20%, 25%) are RADIO buttons for package selection
-- All package options should have group_name: "package_selection"
-- They are mutually exclusive (only one can be selected)
+1. TEXT FIELDS:
+   - "Owner(s):" or "Owner Name:" → api_id: "owner_name", filled_by: "guest"
+   - "Address:" (owner's address) → api_id: "owner_address", filled_by: "guest" 
+   - "Phone:" or "Phone Number:" → api_id: "owner_phone", type: "phone", filled_by: "guest"
+   - "Email:" → api_id: "owner_email", type: "email", filled_by: "guest"
+   - "Property Address" → api_id: "property_address", filled_by: "guest" (OWNER fills this)
 
-SIGNATURE RULES:
-- "Owner Signature" or similar = signature field for guest
-- "Manager Signature" or "Host Signature" = signature field for admin
-- Signature fields should be BELOW the label text (y + 4%)
-- Signature height should be 5-6%
+2. DATE FIELDS:
+   - "Effective Date:" or "Date:" at document start → api_id: "effective_date", filled_by: "admin"
+   - "Date:" near signatures → api_id: "signature_date", filled_by: "guest"
 
-FILLED_BY RULES:
-- "guest": Owner fills these (owner name, address, phone, email, OWNER signature, package selection)
-- "admin": Manager/Host fills these (effective_date, property_address, MANAGER signature)
+3. PACKAGE SELECTION (RADIO BUTTONS) - MANDATORY:
+   - Lines with ☐ or □ followed by percentage (15%, 18%, 20%, 25%) are RADIO buttons
+   - All must have type: "radio" and group_name: "package_selection"
+   - api_id: "package_15", "package_18", "package_20", "package_25" based on percentage
+   - filled_by: "guest" (owner chooses package)
+   - required: true (ONE must be selected)
 
-REQUIRED:
-- All text/date/email/phone fields with underlines are required
-- Package selection (radio group) is required
-- Signatures are required
+4. SIGNATURES:
+   - "Owner Signature" or "Signature of Owner" → api_id: "owner_signature", filled_by: "guest"
+   - "Second Owner" or "Co-Owner Signature" → api_id: "second_owner_signature", filled_by: "guest"
+   - "Manager" or "Host" signature → api_id: "manager_signature", filled_by: "admin"
+
+POSITIONING RULES:
+- Field Y position must MATCH the label's y% value from the document
+- Field X starts AFTER label text ends (endX% + 2%)
+- Text/date fields: width 40-50%, height 2.5%
+- Signature fields: position BELOW label (y + 4%), height 5%
+- Radio buttons: width 4%, height 2.5%
+
+IMPORTANT:
+- property_address is filled by "guest" (the owner provides this)
+- Package selection radio buttons are REQUIRED (at least one must be selected)
+- Use EXACT y% values from the document
 
 Return ONLY valid JSON:
 {
@@ -172,24 +190,9 @@ Return ONLY valid JSON:
       "height": 2.5,
       "filled_by": "guest",
       "required": true
-    },
-    {
-      "api_id": "package_15",
-      "label": "Hybrid Package 15%",
-      "type": "radio",
-      "page": 1,
-      "x": 10,
-      "y": 45.2,
-      "width": 5,
-      "height": 2.5,
-      "filled_by": "guest",
-      "required": true,
-      "group_name": "package_selection"
     }
   ]
-}
-
-KEY: Use the EXACT y% values from the document. Each field must have a UNIQUE y position matching where it appears in the document.`;
+}`;
 
     console.log("Sending to AI for analysis...");
 
@@ -226,12 +229,10 @@ KEY: Use the EXACT y% values from the document. Each field must have a UNIQUE y 
     const content = aiResponse.choices?.[0]?.message?.content || "";
     
     console.log("AI response received, parsing...");
-    console.log("AI content preview:", content.substring(0, 500));
 
     let detectedFields: DetectedField[] = [];
 
     try {
-      // Extract JSON from the response
       const jsonMatch = content.match(/\{[\s\S]*"fields"[\s\S]*\}/);
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[0]);
@@ -244,25 +245,23 @@ KEY: Use the EXACT y% values from the document. Each field must have a UNIQUE y 
     // Validate and clean fields
     const validatedFields = detectedFields
       .filter((f: any) => f.api_id && f.page && typeof f.x === 'number' && typeof f.y === 'number')
-      .map((field: any) => {
-        return {
-          api_id: String(field.api_id).replace(/[^a-z0-9_]/gi, '_').toLowerCase(),
-          label: String(field.label || field.api_id),
-          type: validateFieldType(field.type),
-          page: Math.max(1, Math.min(totalPages || 20, Number(field.page))),
-          x: Math.max(0, Math.min(95, Number(field.x))),
-          y: Math.max(0, Math.min(95, Number(field.y))),
-          width: Math.max(5, Math.min(70, Number(field.width) || 40)),
-          height: field.type === 'signature' ? 5 : Math.max(2, Math.min(8, Number(field.height) || 2.5)),
-          filled_by: field.filled_by === "admin" ? "admin" : "guest",
-          required: field.required !== false,
-          ...(field.group_name && { group_name: String(field.group_name) }),
-        };
-      });
+      .map((field: any) => ({
+        api_id: String(field.api_id).replace(/[^a-z0-9_]/gi, '_').toLowerCase(),
+        label: String(field.label || field.api_id),
+        type: validateFieldType(field.type),
+        page: Math.max(1, Math.min(totalPages || 20, Number(field.page))),
+        x: Math.max(0, Math.min(95, Number(field.x))),
+        y: Math.max(0, Math.min(95, Number(field.y))),
+        width: Math.max(5, Math.min(70, Number(field.width) || 40)),
+        height: field.type === 'signature' ? 5 : Math.max(2, Math.min(8, Number(field.height) || 2.5)),
+        filled_by: field.filled_by === "admin" ? "admin" : "guest",
+        required: field.required !== false,
+        ...(field.group_name && { group_name: String(field.group_name) }),
+      }));
 
-    console.log(`Detected ${validatedFields.length} fields`);
+    console.log(`Detected ${validatedFields.length} fields via AI`);
 
-    // Save to template if templateId provided
+    // Save to template
     if (templateId && validatedFields.length > 0) {
       const { error: updateError } = await supabase
         .from("document_templates")
@@ -294,6 +293,138 @@ KEY: Use the EXACT y% values from the document. Each field must have a UNIQUE y 
     );
   }
 });
+
+/**
+ * Map pre-extracted AcroForm fields to semantic field types using AI
+ */
+async function mapFormFieldsToSemanticFields(
+  formFields: FormField[],
+  textPositions: TextPosition[],
+  apiKey: string,
+  totalPages: number
+): Promise<DetectedField[]> {
+  // Build context about what text is near each field
+  const fieldsWithContext = formFields.map(field => {
+    // Find text items near this field
+    const nearbyText = textPositions
+      .filter(t => 
+        t.page === field.page &&
+        Math.abs(t.y - field.y) < 5 // Within 5% vertically
+      )
+      .sort((a, b) => {
+        // Prefer text to the left of the field
+        const aLeft = a.x < field.x;
+        const bLeft = b.x < field.x;
+        if (aLeft && !bLeft) return -1;
+        if (!aLeft && bLeft) return 1;
+        return Math.abs(a.y - field.y) - Math.abs(b.y - field.y);
+      })
+      .slice(0, 3)
+      .map(t => t.text)
+      .join(' ');
+
+    return {
+      ...field,
+      nearbyText: nearbyText || 'unknown',
+    };
+  });
+
+  const prompt = `Map these PDF form fields to semantic field types. Each field has its exact position and nearby text.
+
+FIELDS:
+${JSON.stringify(fieldsWithContext, null, 2)}
+
+MAP EACH FIELD TO:
+- api_id: semantic identifier (owner_name, owner_address, property_address, owner_phone, owner_email, effective_date, owner_signature, manager_signature, second_owner_signature, package_15, package_18, package_20, package_25)
+- label: human readable label
+- type: text, date, email, phone, signature, checkbox, or radio
+- filled_by: "guest" (owner) or "admin" (manager)
+- group_name: for radio buttons, use "package_selection"
+- required: true/false
+
+RULES:
+- Property address is filled by "guest" (owner provides this)
+- Package percentage options are radio buttons with group_name "package_selection"
+- Use exact x, y, width, height from the input
+
+Return JSON:
+{
+  "fields": [
+    { "api_id": "...", "label": "...", "type": "...", "page": 1, "x": 10, "y": 20, "width": 40, "height": 3, "filled_by": "guest", "required": true }
+  ]
+}`;
+
+  const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "google/gemini-2.5-flash",
+      messages: [{ role: "user", content: prompt }],
+      max_tokens: 4000,
+    }),
+  });
+
+  if (!response.ok) {
+    console.error("AI mapping failed, using direct conversion");
+    // Fallback: directly convert fields without semantic mapping
+    return formFields.map((f, i) => ({
+      api_id: f.fieldName || `field_${i}`,
+      label: f.fieldName || `Field ${i + 1}`,
+      type: validateFieldType(f.fieldType),
+      page: f.page,
+      x: f.x,
+      y: f.y,
+      width: f.width,
+      height: f.height,
+      filled_by: "guest" as const,
+      required: f.isRequired || false,
+      ...(f.groupName && { group_name: f.groupName }),
+    }));
+  }
+
+  const aiResponse = await response.json();
+  const content = aiResponse.choices?.[0]?.message?.content || "";
+
+  try {
+    const jsonMatch = content.match(/\{[\s\S]*"fields"[\s\S]*\}/);
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]);
+      return (parsed.fields || []).map((field: any) => ({
+        api_id: String(field.api_id || 'unknown').replace(/[^a-z0-9_]/gi, '_').toLowerCase(),
+        label: String(field.label || field.api_id),
+        type: validateFieldType(field.type),
+        page: Math.max(1, Math.min(totalPages, Number(field.page))),
+        x: Number(field.x),
+        y: Number(field.y),
+        width: Number(field.width),
+        height: Number(field.height),
+        filled_by: field.filled_by === "admin" ? "admin" : "guest",
+        required: field.required !== false,
+        ...(field.group_name && { group_name: String(field.group_name) }),
+      }));
+    }
+  } catch (e) {
+    console.error("Failed to parse AI mapping:", e);
+  }
+
+  // Fallback
+  return formFields.map((f, i) => ({
+    api_id: f.fieldName || `field_${i}`,
+    label: f.fieldName || `Field ${i + 1}`,
+    type: validateFieldType(f.fieldType),
+    page: f.page,
+    x: f.x,
+    y: f.y,
+    width: f.width,
+    height: f.height,
+    filled_by: "guest" as const,
+    required: f.isRequired || false,
+    ...(f.groupName && { group_name: f.groupName }),
+  }));
+}
 
 function validateFieldType(type: string): DetectedField["type"] {
   const validTypes = ["text", "date", "email", "phone", "signature", "checkbox", "radio"];

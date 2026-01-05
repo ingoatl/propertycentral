@@ -427,36 +427,36 @@ const SignDocument = () => {
         </div>
       </div>
 
-      {/* Floating Button - NEXT or FINISH READY */}
+      {/* Floating Button - Positioned closer to document, above footer */}
       {completedRequired < totalRequired ? (
-        <div className="fixed bottom-20 right-6 z-50">
+        <div className="fixed bottom-16 left-1/2 -translate-x-1/2 z-40">
           <Button
             onClick={activeFieldId || showSignatureFor ? handleNext : handleStart}
             size="lg"
-            className="bg-[#fae052] text-[#1a1a2e] hover:bg-[#f5d93a] font-bold shadow-2xl rounded-full px-6 gap-2 animate-pulse"
+            className="bg-[#fae052] text-[#1a1a2e] hover:bg-[#f5d93a] font-bold shadow-2xl rounded-full px-8 gap-2 animate-pulse text-base"
           >
             {activeFieldId || showSignatureFor ? "NEXT" : "START"}
             <ArrowRight className="h-5 w-5" />
           </Button>
         </div>
       ) : canFinish ? (
-        <div className="fixed bottom-20 right-6 z-50">
+        <div className="fixed bottom-16 left-1/2 -translate-x-1/2 z-40">
           <Button
             onClick={handleSubmitSignature}
             disabled={submitting}
             size="lg"
-            className="bg-[#4caf50] text-white hover:bg-[#43a047] font-bold shadow-2xl rounded-full px-6 gap-2"
+            className="bg-[#4caf50] text-white hover:bg-[#43a047] font-bold shadow-2xl rounded-full px-8 gap-2 text-base"
           >
             <Check className="h-5 w-5" />
-            FINISH
+            FINISH SIGNING
           </Button>
         </div>
       ) : (
-        <div className="fixed bottom-20 right-6 z-50">
+        <div className="fixed bottom-16 left-1/2 -translate-x-1/2 z-40">
           <Button
             onClick={() => setAgreedToTerms(true)}
             size="lg"
-            className="bg-[#fae052] text-[#1a1a2e] hover:bg-[#f5d93a] font-bold shadow-2xl rounded-full px-6 gap-2 animate-pulse"
+            className="bg-[#fae052] text-[#1a1a2e] hover:bg-[#f5d93a] font-bold shadow-2xl rounded-full px-8 gap-2 animate-pulse text-base"
           >
             Agree & Continue
           </Button>
