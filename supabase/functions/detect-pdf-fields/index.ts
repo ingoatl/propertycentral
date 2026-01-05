@@ -171,10 +171,15 @@ POSITIONING RULES:
 - Signature fields: position BELOW label (y + 4%), height 5%
 - Radio buttons: width 4%, height 2.5%
 
-IMPORTANT:
-- property_address is filled by "guest" (the owner provides this)
-- Package selection radio buttons are REQUIRED (at least one must be selected)
-- Use EXACT y% values from the document
+CRITICAL:
+- property_address MUST be filled_by: "guest" (the owner provides the property address)
+- ALL Package selection options (percentages like 15%, 18%, 20%, 25%) are RADIO buttons with:
+  - type: "radio"
+  - group_name: "package_selection"
+  - required: true
+  - filled_by: "guest"
+- Position fields EXACTLY where you see labels - use the y% from the document
+- For fields next to checkboxes/radio markers (☐□), position the field AT the marker, not after it
 
 Return ONLY valid JSON:
 {
