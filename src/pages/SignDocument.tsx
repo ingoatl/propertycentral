@@ -269,11 +269,26 @@ const SignDocument = () => {
     }, 300);
   };
 
+  // Sort fields in document reading order: page, then Y (top to bottom), then X (left to right)
+  const sortedSignerFields = [...signerFields].sort((a, b) => {
+    if (a.page !== b.page) return a.page - b.page;
+    // If within 3% Y, treat as same line and sort by X
+    if (Math.abs(a.y - b.y) < 3) return a.x - b.x;
+    return a.y - b.y;
+  });
+
+  const isFieldIncomplete = (f: FieldData) => {
+    if (f.type === "signature") return !signatureData;
+    if (f.type === "radio" && f.group_name) {
+      // For radio groups, check if ANY field in the group is selected
+      const groupFields = signerFields.filter(gf => gf.type === "radio" && gf.group_name === f.group_name);
+      return !groupFields.some(gf => fieldValues[gf.api_id] === true);
+    }
+    return !completedFields.has(f.api_id);
+  };
+
   const findNextIncompleteField = () => {
-    return signerFields.find(f => {
-      if (f.type === "signature") return !signatureData;
-      return !completedFields.has(f.api_id);
-    });
+    return sortedSignerFields.find(f => isFieldIncomplete(f));
   };
 
   const handleStart = () => {
@@ -284,23 +299,29 @@ const SignDocument = () => {
   };
 
   const handleNext = () => {
-    const currentIdx = signerFields.findIndex(f => f.api_id === activeFieldId || f.api_id === showSignatureFor);
+    const currentId = activeFieldId || showSignatureFor;
+    const currentIdx = sortedSignerFields.findIndex(f => f.api_id === currentId);
     
-    for (let i = currentIdx + 1; i < signerFields.length; i++) {
-      const f = signerFields[i];
-      if (f.type === "signature" ? !signatureData : !completedFields.has(f.api_id)) {
+    // Find next incomplete field after current position
+    for (let i = currentIdx + 1; i < sortedSignerFields.length; i++) {
+      const f = sortedSignerFields[i];
+      if (isFieldIncomplete(f)) {
         navigateToField(f);
         return;
       }
     }
     
+    // Wrap around to find first incomplete from start
     for (let i = 0; i <= currentIdx; i++) {
-      const f = signerFields[i];
-      if (f.type === "signature" ? !signatureData : !completedFields.has(f.api_id)) {
+      const f = sortedSignerFields[i];
+      if (isFieldIncomplete(f)) {
         navigateToField(f);
         return;
       }
     }
+    
+    // All fields complete - show toast
+    toast.success("All fields complete! Click FINISH to submit.");
   };
 
   // Check if all required fields are complete
@@ -543,6 +564,20 @@ const SignDocument = () => {
                         const isShowingSignature = showSignatureFor === field.api_id;
                         const value = fieldValues[field.api_id];
                         
+                        // Calculate compact heights based on field type
+                        const getFieldStyle = () => {
+                          if (field.type === "signature") {
+                            return { height: "50px", minHeight: "50px" };
+                          }
+                          if (field.type === "checkbox" || field.type === "radio") {
+                            return { height: "22px", width: "22px", minHeight: "22px" };
+                          }
+                          // Text, date, email, phone - compact to fit between lines
+                          return { height: "24px", minHeight: "24px" };
+                        };
+                        
+                        const fieldStyle = getFieldStyle();
+                        
                         return (
                           <div
                             key={field.api_id}
@@ -550,9 +585,9 @@ const SignDocument = () => {
                             style={{
                               left: `${field.x}%`,
                               top: `${field.y}%`,
-                              width: `${field.width}%`,
-                              height: field.type === "signature" ? "auto" : `${Math.max(field.height, 3)}%`,
-                              minHeight: field.type === "signature" ? "50px" : "24px",
+                              width: field.type === "checkbox" || field.type === "radio" ? fieldStyle.width : `${field.width}%`,
+                              height: fieldStyle.height,
+                              minHeight: fieldStyle.minHeight,
                               zIndex: isActive || isShowingSignature ? 100 : 10,
                             }}
                           >

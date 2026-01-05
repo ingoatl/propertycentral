@@ -235,9 +235,9 @@ export function TemplateFieldPreview({
                     style={{
                       left: `${field.x}%`,
                       top: `${field.y}%`,
-                      width: `${field.width}%`,
-                      height: field.type === "signature" ? "6%" : `${Math.max(field.height, 2.5)}%`,
-                      minHeight: field.type === "signature" ? "40px" : "20px",
+                      width: field.type === "checkbox" || field.type === "radio" ? "22px" : `${field.width}%`,
+                      height: field.type === "signature" ? "50px" : field.type === "checkbox" || field.type === "radio" ? "22px" : "24px",
+                      minHeight: field.type === "signature" ? "50px" : field.type === "checkbox" || field.type === "radio" ? "22px" : "24px",
                     }}
                   >
                     {/* Field Label */}
