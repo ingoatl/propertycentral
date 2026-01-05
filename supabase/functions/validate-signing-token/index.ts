@@ -126,11 +126,32 @@ serve(async (req) => {
     let pdfUrl = null;
     
     if (template?.file_path) {
-      const { data: signedUrl } = await supabase.storage
-        .from("onboarding-documents")
-        .createSignedUrl(template.file_path, 3600); // 1 hour
-      
-      pdfUrl = signedUrl?.signedUrl;
+      // Check if file_path is a full URL or a relative path
+      if (template.file_path.startsWith('http')) {
+        // It's already a full URL - use it directly
+        // Check if it's a PDF that can be previewed
+        if (template.file_path.toLowerCase().endsWith('.pdf')) {
+          pdfUrl = template.file_path;
+        } else {
+          // For non-PDF files (docx, etc.), we can't preview them in iframe
+          // Could potentially use Google Docs viewer as fallback
+          pdfUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(template.file_path)}&embedded=true`;
+        }
+      } else {
+        // It's a relative path - create signed URL
+        const bucketName = template.file_path.includes('signed-documents') ? 'signed-documents' : 'onboarding-documents';
+        const { data: signedUrl } = await supabase.storage
+          .from(bucketName)
+          .createSignedUrl(template.file_path, 3600); // 1 hour
+        
+        if (signedUrl?.signedUrl) {
+          if (template.file_path.toLowerCase().endsWith('.pdf')) {
+            pdfUrl = signedUrl.signedUrl;
+          } else {
+            pdfUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(signedUrl.signedUrl)}&embedded=true`;
+          }
+        }
+      }
     }
 
     // Get all signers for this document with their status
