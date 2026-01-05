@@ -13,6 +13,7 @@ interface SubmitSignatureRequest {
   token: string;
   signatureData: string; // Base64 signature image
   agreedToTerms: boolean;
+  fieldValues?: Record<string, string | boolean>; // Form field values filled by signer
 }
 
 const buildConfirmationEmailHtml = (
@@ -142,7 +143,7 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     const resend = new Resend(resendApiKey);
 
-    const { token, signatureData, agreedToTerms }: SubmitSignatureRequest = await req.json();
+    const { token, signatureData, agreedToTerms, fieldValues }: SubmitSignatureRequest = await req.json();
 
     if (!agreedToTerms) {
       return new Response(
@@ -166,6 +167,7 @@ serve(async (req) => {
           id,
           document_name,
           template_id,
+          field_configuration,
           document_templates (name)
         )
       `)
@@ -200,7 +202,7 @@ serve(async (req) => {
                          signingToken.booking_documents?.document_templates?.name || 
                          "Agreement";
 
-    // Update the signing token with signature
+    // Update the signing token with signature and field values
     await supabase
       .from("signing_tokens")
       .update({
@@ -208,8 +210,20 @@ serve(async (req) => {
         signature_data: signatureData,
         ip_address: ipAddress,
         user_agent: userAgent,
+        field_values: fieldValues || {},
       })
       .eq("id", signingToken.id);
+
+    // Merge field values into booking_documents.field_configuration
+    if (fieldValues && Object.keys(fieldValues).length > 0) {
+      const existingFieldConfig = signingToken.booking_documents?.field_configuration || {};
+      const mergedFieldConfig = { ...existingFieldConfig, ...fieldValues };
+      
+      await supabase
+        .from("booking_documents")
+        .update({ field_configuration: mergedFieldConfig })
+        .eq("id", signingToken.document_id);
+    }
 
     // Log audit entry
     await supabase.from("document_audit_log").insert({
@@ -220,6 +234,7 @@ serve(async (req) => {
         signer_name: signingToken.signer_name,
         signer_type: signingToken.signer_type,
         consent_given: true,
+        field_values: fieldValues,
       },
       ip_address: ipAddress,
       user_agent: userAgent,

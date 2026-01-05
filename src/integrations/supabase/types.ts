@@ -6221,6 +6221,7 @@ export type Database = {
           created_at: string
           document_id: string
           expires_at: string
+          field_values: Json | null
           id: string
           ip_address: string | null
           signature_data: string | null
@@ -6237,6 +6238,7 @@ export type Database = {
           created_at?: string
           document_id: string
           expires_at: string
+          field_values?: Json | null
           id?: string
           ip_address?: string | null
           signature_data?: string | null
@@ -6253,6 +6255,7 @@ export type Database = {
           created_at?: string
           document_id?: string
           expires_at?: string
+          field_values?: Json | null
           id?: string
           ip_address?: string | null
           signature_data?: string | null

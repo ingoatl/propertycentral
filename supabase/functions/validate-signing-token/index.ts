@@ -40,11 +40,13 @@ serve(async (req) => {
           recipient_name,
           recipient_email,
           status,
+          field_configuration,
           document_templates (
             id,
             name,
             file_path,
-            contract_type
+            contract_type,
+            field_mappings
           )
         )
       `)
@@ -164,6 +166,26 @@ serve(async (req) => {
       signedAt: t.signed_at,
     })) || [];
 
+    // Get field mappings and filter by signer type
+    const allFieldMappings = template?.field_mappings || [];
+    const savedFieldValues = signingToken.booking_documents?.field_configuration || {};
+    
+    // Map signer_type to filled_by value
+    const signerTypeToFilledBy: Record<string, string> = {
+      "owner": "guest",
+      "second_owner": "guest",
+      "guest": "guest",
+      "manager": "admin",
+      "host": "admin",
+    };
+    
+    const filledByValue = signerTypeToFilledBy[signingToken.signer_type] || "guest";
+    
+    // Filter fields that this signer needs to fill
+    const signerFields = Array.isArray(allFieldMappings) 
+      ? allFieldMappings.filter((f: any) => f.filled_by === filledByValue)
+      : [];
+
     return new Response(
       JSON.stringify({
         valid: true,
@@ -177,6 +199,8 @@ serve(async (req) => {
         pdfUrl,
         signers,
         expiresAt: signingToken.expires_at,
+        fields: signerFields,
+        savedFieldValues,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
