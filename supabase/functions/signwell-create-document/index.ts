@@ -52,39 +52,30 @@ serve(async (req) => {
       throw new Error('Template not found');
     }
 
-    // Build field values - only pre-fill effective date and owner contact info
-    // Owner fills: address, property address, package selection during signing
-    const today = new Date().toLocaleDateString('en-US', { 
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric' 
-    });
+    // Check if template has a SignWell template ID (preferred method)
+    if (template.signwell_template_id) {
+      console.log('Using SignWell template:', template.signwell_template_id);
+      return await createFromSignWellTemplate(
+        signwellApiKey,
+        supabase,
+        template,
+        guestName,
+        guestEmail,
+        hostName,
+        hostEmail,
+        documentId,
+        includeSecondOwner,
+        secondOwnerName,
+        secondOwnerEmail
+      );
+    }
 
-    const prefilledFields = [
-      {
-        api_id: 'effective_date',
-        value: today,
-      },
-      {
-        api_id: 'owner_name',
-        value: guestName,
-      },
-      {
-        api_id: 'owner_email',
-        value: guestEmail,
-      },
-      {
-        api_id: 'manager_name',
-        value: hostName,
-      },
-    ];
-
-    // Merge with any additional field values passed in
-    const allFields = [...prefilledFields, ...(fieldValues || [])];
-
+    // Otherwise, create document from file with signature fields
+    console.log('Creating document from file with signature fields');
+    
     // Build recipients array with proper signing order:
     // 1. Owner signs first (receives email immediately)
-    // 2. Manager (You) signs second (receives email after owner signs)
+    // 2. Manager signs second (receives email after owner signs)
     // 3. Owner 2 (optional) signs between owner1 and manager
     const recipients: any[] = [
       {
@@ -119,6 +110,87 @@ serve(async (req) => {
     console.log('Recipients:', JSON.stringify(recipients, null, 2));
     console.log('File URL:', template.file_path);
 
+    // Define signature fields for each recipient
+    // These are positioned at the bottom of the document where signatures typically go
+    const fields: any[] = [
+      // Owner signature field
+      {
+        api_id: 'owner_signature',
+        type: 'signature',
+        required: true,
+        recipient_id: '1',
+        page: 1,
+        x: 50,
+        y: 700,
+        width: 200,
+        height: 50,
+      },
+      // Owner date field
+      {
+        api_id: 'owner_date',
+        type: 'date',
+        required: true,
+        recipient_id: '1',
+        page: 1,
+        x: 300,
+        y: 700,
+        width: 100,
+        height: 30,
+      },
+      // Manager signature field
+      {
+        api_id: 'manager_signature',
+        type: 'signature',
+        required: true,
+        recipient_id: '2',
+        page: 1,
+        x: 50,
+        y: 750,
+        width: 200,
+        height: 50,
+      },
+      // Manager date field
+      {
+        api_id: 'manager_date',
+        type: 'date',
+        required: true,
+        recipient_id: '2',
+        page: 1,
+        x: 300,
+        y: 750,
+        width: 100,
+        height: 30,
+      },
+    ];
+
+    // Add Owner2 fields if included
+    if (includeSecondOwner && secondOwnerName && secondOwnerEmail) {
+      fields.push(
+        {
+          api_id: 'owner2_signature',
+          type: 'signature',
+          required: true,
+          recipient_id: '3',
+          page: 1,
+          x: 50,
+          y: 800,
+          width: 200,
+          height: 50,
+        },
+        {
+          api_id: 'owner2_date',
+          type: 'date',
+          required: true,
+          recipient_id: '3',
+          page: 1,
+          x: 300,
+          y: 800,
+          width: 100,
+          height: 30,
+        }
+      );
+    }
+
     // Create document with SignWell API
     // When embedded_signing is false, SignWell automatically sends emails to recipients
     const requestBody = {
@@ -128,6 +200,7 @@ serve(async (req) => {
       reminders: true,  // Enable automatic reminders
       apply_signing_order: true,  // Enforce signing order (owner first, then manager)
       recipients,
+      fields,  // Include signature fields
       files: [
         {
           name: template.name,
@@ -185,7 +258,7 @@ serve(async (req) => {
         include_second_owner: includeSecondOwner,
         second_owner_name: secondOwnerName,
         second_owner_email: secondOwnerEmail,
-        prefilled_fields: ['effective_date', 'owner_name', 'owner_email', 'manager_name'],
+        created_from: 'file',
       },
     });
 
@@ -205,3 +278,122 @@ serve(async (req) => {
     });
   }
 });
+
+// Helper function to create document from SignWell template
+async function createFromSignWellTemplate(
+  signwellApiKey: string,
+  supabase: any,
+  template: any,
+  guestName: string,
+  guestEmail: string,
+  hostName: string,
+  hostEmail: string,
+  documentId: string,
+  includeSecondOwner?: boolean,
+  secondOwnerName?: string,
+  secondOwnerEmail?: string
+) {
+  const corsHeaders = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  };
+
+  // Build recipients array - must match placeholder names in the SignWell template
+  const recipients: any[] = [
+    {
+      id: '1',
+      placeholder_name: 'Owner',
+      name: guestName,
+      email: guestEmail,
+    },
+    {
+      id: '2',
+      placeholder_name: 'Manager',
+      name: hostName,
+      email: hostEmail,
+    },
+  ];
+
+  // Add second owner if requested
+  if (includeSecondOwner && secondOwnerName && secondOwnerEmail) {
+    recipients.push({
+      id: '3',
+      placeholder_name: 'Owner2',
+      name: secondOwnerName,
+      email: secondOwnerEmail,
+    });
+  }
+
+  console.log('Template recipients:', JSON.stringify(recipients, null, 2));
+
+  // Create document from SignWell template
+  const requestBody = {
+    test_mode: false,
+    template_id: template.signwell_template_id,
+    embedded_signing: false,
+    reminders: true,
+    recipients,
+  };
+
+  console.log('SignWell template request:', JSON.stringify(requestBody, null, 2));
+
+  const signwellResponse = await fetch('https://www.signwell.com/api/v1/document_templates/documents/', {
+    method: 'POST',
+    headers: {
+      'X-Api-Key': signwellApiKey,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(requestBody),
+  });
+
+  if (!signwellResponse.ok) {
+    const errorText = await signwellResponse.text();
+    console.error('SignWell Template API error:', errorText);
+    throw new Error(`SignWell Template API error: ${errorText}`);
+  }
+
+  const signwellData = await signwellResponse.json();
+  console.log('SignWell document created from template:', signwellData.id);
+
+  // Update booking document record with SignWell ID
+  const { error: updateError } = await supabase
+    .from('booking_documents')
+    .update({
+      signwell_document_id: signwellData.id,
+      status: 'pending_owner',
+      sent_at: new Date().toISOString(),
+    })
+    .eq('id', documentId);
+
+  if (updateError) {
+    console.error('Error updating booking document:', updateError);
+    throw updateError;
+  }
+
+  // Create audit log entry
+  await supabase.from('document_audit_log').insert({
+    document_id: documentId,
+    action: 'created',
+    performed_by: hostEmail,
+    metadata: {
+      signwell_document_id: signwellData.id,
+      signwell_template_id: template.signwell_template_id,
+      manager_name: hostName,
+      manager_email: hostEmail,
+      owner_name: guestName,
+      owner_email: guestEmail,
+      include_second_owner: includeSecondOwner,
+      second_owner_name: secondOwnerName,
+      second_owner_email: secondOwnerEmail,
+      created_from: 'template',
+    },
+  });
+
+  return new Response(JSON.stringify({
+    success: true,
+    signwellDocumentId: signwellData.id,
+    message: 'Document created from template. Owner will receive an email to sign first.',
+  }), {
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
+}
