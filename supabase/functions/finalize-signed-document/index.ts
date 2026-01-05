@@ -8,14 +8,28 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+const LOGO_URL = "https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/peachhaus-logo.png";
+
 const buildCompletionEmailHtml = (
   recipientName: string,
   documentName: string,
-  signers: { name: string; email: string; signedAt: string }[]
+  signers: { name: string; email: string; signedAt: string; type: string }[],
+  downloadUrl: string
 ): string => {
-  const signersList = signers.map(s => 
-    `<li style="margin-bottom: 8px;"><strong>${s.name}</strong> (${s.email}) - ${new Date(s.signedAt).toLocaleDateString()}</li>`
-  ).join("");
+  const issueDate = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+  
+  const signerRows = signers.map(s => `
+    <tr>
+      <td style="padding: 12px 0; border-bottom: 1px solid #e5e5e5;">
+        <div style="font-size: 13px; font-weight: 600; color: #111111;">${s.name}</div>
+        <div style="font-size: 11px; color: #666666;">${s.email}</div>
+      </td>
+      <td style="padding: 12px 0; border-bottom: 1px solid #e5e5e5; text-align: right;">
+        <div style="font-size: 11px; color: #666666; text-transform: uppercase;">${s.type.replace('_', ' ')}</div>
+        <div style="font-size: 11px; color: #10b981;">✓ ${new Date(s.signedAt).toLocaleDateString()}</div>
+      </td>
+    </tr>
+  `).join('');
 
   return `
 <!DOCTYPE html>
@@ -23,55 +37,111 @@ const buildCompletionEmailHtml = (
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document Complete</title>
 </head>
-<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8f9fa;">
-  <table role="presentation" style="width: 100%; border-collapse: collapse;">
-    <tr>
-      <td align="center" style="padding: 40px 20px;">
-        <table role="presentation" style="width: 100%; max-width: 600px; border-collapse: collapse; background-color: #ffffff; border-radius: 16px; box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);">
-          <tr>
-            <td style="padding: 40px 40px 20px; text-align: center; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 16px 16px 0 0;">
-              <div style="font-size: 48px; margin-bottom: 16px;">🎉</div>
-              <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: 700;">Document Complete!</h1>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding: 40px;">
-              <h2 style="margin: 0 0 16px; color: #1f2937; font-size: 20px; font-weight: 600;">
-                Hi ${recipientName.split(" ")[0]},
-              </h2>
-              <p style="margin: 0 0 24px; color: #4b5563; font-size: 16px; line-height: 1.6;">
-                Great news! All parties have signed the agreement. The document is now complete and legally binding.
-              </p>
-              
-              <div style="background-color: #ecfdf5; border-radius: 12px; padding: 24px; margin-bottom: 24px; border-left: 4px solid #10b981;">
-                <p style="margin: 0 0 8px; color: #065f46; font-weight: 600; font-size: 14px;">COMPLETED DOCUMENT</p>
-                <p style="margin: 0 0 16px; color: #1f2937; font-size: 18px; font-weight: 600;">${documentName}</p>
-                <p style="margin: 0 0 8px; color: #065f46; font-weight: 600; font-size: 14px;">SIGNED BY:</p>
-                <ul style="margin: 0; padding-left: 20px; color: #1f2937;">
-                  ${signersList}
-                </ul>
-              </div>
-              
-              <p style="margin: 0; color: #6b7280; font-size: 14px;">
-                A copy of the signed document is attached to this email for your records.
-              </p>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding: 24px 40px; background-color: #f9fafb; border-radius: 0 0 16px 16px; border-top: 1px solid #e5e7eb;">
-              <p style="margin: 0 0 8px; color: #6b7280; font-size: 12px; text-align: center;">
-                🔒 This document is legally binding under the ESIGN Act
-              </p>
-              <p style="margin: 0; color: #9ca3af; font-size: 12px; text-align: center;">
-                🍑 PeachHaus Group • Property Management Made Simple
-              </p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
+<body style="margin: 0; padding: 0; background: #f5f5f5; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', Arial, sans-serif;">
+  <div style="max-width: 600px; margin: 0 auto; background: #ffffff;">
+    
+    <!-- Header -->
+    <div style="padding: 24px 32px; border-bottom: 2px solid #10b981;">
+      <table style="width: 100%;">
+        <tr>
+          <td style="vertical-align: middle;">
+            <img src="${LOGO_URL}" alt="PeachHaus" style="height: 40px; width: auto;" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';" />
+            <div style="display: none; font-size: 20px; font-weight: 700; color: #111111; letter-spacing: -0.3px;">PeachHaus</div>
+          </td>
+          <td style="text-align: right; vertical-align: middle;">
+            <div style="font-size: 16px; font-weight: 600; color: #10b981; margin-bottom: 4px;">✓ DOCUMENT COMPLETE</div>
+            <div style="font-size: 10px; color: #666666; font-family: 'SF Mono', Menlo, Consolas, 'Courier New', monospace;">
+              ${issueDate}
+            </div>
+          </td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- Success Banner -->
+    <div style="padding: 24px 32px; background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%); border-bottom: 1px solid #a7f3d0;">
+      <table style="width: 100%;">
+        <tr>
+          <td style="vertical-align: middle;">
+            <div style="font-size: 32px; margin-right: 16px;">🎉</div>
+          </td>
+          <td style="vertical-align: middle; width: 100%;">
+            <div style="font-size: 18px; font-weight: 700; color: #065f46; margin-bottom: 4px;">Agreement Fully Executed</div>
+            <div style="font-size: 13px; color: #047857;">All parties have signed. The document is now legally binding.</div>
+          </td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- Document Details -->
+    <div style="padding: 24px 32px;">
+      <div style="font-size: 10px; color: #666666; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">Document</div>
+      <div style="font-size: 16px; font-weight: 600; color: #111111; margin-bottom: 24px;">${documentName}</div>
+      
+      <div style="font-size: 10px; color: #666666; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px;">Signatures</div>
+      <table style="width: 100%; border-collapse: collapse;">
+        ${signerRows}
+      </table>
+    </div>
+
+    <!-- Download Button -->
+    <div style="padding: 0 32px 32px 32px;">
+      <table style="width: 100%; border: 2px solid #10b981; border-radius: 8px; overflow: hidden;">
+        <tr>
+          <td style="padding: 20px; text-align: center; background: #ecfdf5;">
+            <div style="font-size: 12px; color: #065f46; margin-bottom: 12px;">Your signed copy is attached to this email</div>
+            <a href="${downloadUrl}" style="display: inline-block; background: #10b981; color: #ffffff; text-decoration: none; padding: 12px 32px; font-weight: 600; font-size: 14px; letter-spacing: 0.3px; border-radius: 6px;">
+              📄 DOWNLOAD SIGNED DOCUMENT
+            </a>
+          </td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- What's Next -->
+    <div style="padding: 24px 32px; background: #f9f9f9; border-top: 1px solid #e5e5e5;">
+      <div style="font-size: 10px; color: #666666; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px;">What Happens Next</div>
+      <table style="width: 100%;">
+        <tr>
+          <td style="padding: 8px 0; font-size: 13px; color: #111111; border-bottom: 1px solid #e5e5e5;">
+            <span style="color: #10b981; margin-right: 8px;">1.</span>
+            Keep your signed copy for your records
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 8px 0; font-size: 13px; color: #111111; border-bottom: 1px solid #e5e5e5;">
+            <span style="color: #10b981; margin-right: 8px;">2.</span>
+            Our team will begin the onboarding process
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 8px 0; font-size: 13px; color: #111111;">
+            <span style="color: #10b981; margin-right: 8px;">3.</span>
+            You'll receive updates as we get your property ready
+          </td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- Footer -->
+    <div style="padding: 20px 32px; background: #111111;">
+      <table style="width: 100%;">
+        <tr>
+          <td>
+            <p style="margin: 0 0 8px; color: #a3a3a3; font-size: 11px;">
+              This document is legally binding under the Electronic Signatures in Global and National Commerce Act (ESIGN).
+            </p>
+            <p style="margin: 0; color: #737373; font-size: 11px;">
+              🍑 PeachHaus Group • info@peachhausgroup.com
+            </p>
+          </td>
+        </tr>
+      </table>
+    </div>
+
+  </div>
 </body>
 </html>
 `;
@@ -119,24 +189,57 @@ serve(async (req) => {
 
     if (sigError) throw sigError;
 
-    // Get the original PDF
+    console.log("Found", signatures?.length, "signatures for document");
+
+    // Get the original PDF - try both storage buckets
+    let pdfBytes: ArrayBuffer | null = null;
+    const templatePath = document.document_templates?.file_path;
+    
+    if (templatePath) {
+      // If it's a full URL, extract the path
+      let storagePath = templatePath;
+      if (templatePath.startsWith('http')) {
+        // Extract path from URL like https://.../storage/v1/object/public/bucket/path
+        const match = templatePath.match(/\/storage\/v1\/object\/public\/([^/]+)\/(.+)/);
+        if (match) {
+          const [, bucket, path] = match;
+          const { data, error } = await supabase.storage.from(bucket).download(path);
+          if (!error && data) {
+            pdfBytes = await data.arrayBuffer();
+          }
+        }
+      } else {
+        // Try signed-documents bucket first
+        const { data: pdfData, error: downloadError } = await supabase.storage
+          .from("signed-documents")
+          .download(storagePath);
+
+        if (!downloadError && pdfData) {
+          pdfBytes = await pdfData.arrayBuffer();
+        } else {
+          // Fallback to onboarding-documents bucket
+          const { data: pdfData2 } = await supabase.storage
+            .from("onboarding-documents")
+            .download(storagePath);
+          
+          if (pdfData2) {
+            pdfBytes = await pdfData2.arrayBuffer();
+          }
+        }
+      }
+    }
+
     let pdfDoc: PDFDocument;
     
-    if (document.document_templates?.file_path) {
-      const { data: pdfData, error: downloadError } = await supabase.storage
-        .from("onboarding-documents")
-        .download(document.document_templates.file_path);
-
-      if (downloadError) throw downloadError;
-      
-      const pdfBytes = await pdfData.arrayBuffer();
+    if (pdfBytes) {
       pdfDoc = await PDFDocument.load(pdfBytes);
     } else {
-      // Create a new PDF if no template
+      // Create a new PDF if no template found
+      console.log("No template PDF found, creating certificate-only document");
       pdfDoc = await PDFDocument.create();
       const page = pdfDoc.addPage();
-      const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-      page.drawText("Signed Agreement", { x: 50, y: 750, size: 24, font });
+      const font = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+      page.drawText(document.document_name || "Signed Agreement", { x: 50, y: 750, size: 24, font });
     }
 
     // Add signature certificate page
@@ -165,6 +268,15 @@ serve(async (req) => {
     
     yPos -= 20;
     certPage.drawText(`Document ID: ${documentId}`, {
+      x: 50,
+      y: yPos,
+      size: 10,
+      font,
+      color: rgb(0.4, 0.4, 0.4),
+    });
+    
+    yPos -= 15;
+    certPage.drawText(`Completed: ${new Date().toLocaleString()}`, {
       x: 50,
       y: yPos,
       size: 10,
@@ -207,7 +319,7 @@ serve(async (req) => {
       });
       
       yPos -= 15;
-      certPage.drawText(`Signed: ${new Date(sig.signed_at).toLocaleString()}`, {
+      certPage.drawText(`Signed: ${sig.signed_at ? new Date(sig.signed_at).toLocaleString() : "N/A"}`, {
         x: 70,
         y: yPos,
         size: 10,
@@ -258,7 +370,7 @@ serve(async (req) => {
     });
     
     yPos -= 15;
-    certPage.drawText("🍑 PeachHaus Group • Property Management Made Simple", {
+    certPage.drawText("PeachHaus Group • Property Management Made Simple", {
       x: 50,
       y: yPos,
       size: 9,
@@ -278,7 +390,12 @@ serve(async (req) => {
         upsert: true,
       });
 
-    if (uploadError) throw uploadError;
+    if (uploadError) {
+      console.error("Upload error:", uploadError);
+      throw uploadError;
+    }
+
+    console.log("Uploaded signed PDF to:", fileName);
 
     // Update document with signed PDF path
     await supabase
@@ -303,29 +420,50 @@ serve(async (req) => {
       },
     });
 
-    // Get signed URL for email attachment
-    const { data: signedUrl } = await supabase.storage
+    // Get signed URL for email download link
+    const { data: signedUrlData } = await supabase.storage
       .from("signed-documents")
       .createSignedUrl(fileName, 604800); // 7 days
 
-    // Send completion emails to all signers
+    const downloadUrl = signedUrlData?.signedUrl || "";
+
+    // Send completion emails with PDF attachment to all signers
     const signerDetails = signatures?.map(s => ({
       name: s.signer_name,
       email: s.signer_email,
       signedAt: s.signed_at,
+      type: s.signer_type,
     })) || [];
 
+    // Convert PDF bytes to base64 for attachment
+    const pdfBase64 = btoa(String.fromCharCode(...new Uint8Array(modifiedPdfBytes)));
+    const documentDisplayName = document.document_name || document.document_templates?.name || "Agreement";
+
+    console.log("Sending completion emails to", signerDetails.length, "signers with PDF attachment");
+
     for (const signer of signerDetails) {
-      await resend.emails.send({
-        from: "PeachHaus Group <info@peachhausgroup.com>",
-        to: [signer.email],
-        subject: `🎉 Document Complete: ${document.document_name || document.document_templates?.name || "Agreement"}`,
-        html: buildCompletionEmailHtml(
-          signer.name,
-          document.document_name || document.document_templates?.name || "Agreement",
-          signerDetails
-        ),
-      });
+      try {
+        await resend.emails.send({
+          from: "PeachHaus Group <info@peachhausgroup.com>",
+          to: [signer.email],
+          subject: `🎉 Agreement Complete: ${documentDisplayName}`,
+          html: buildCompletionEmailHtml(
+            signer.name,
+            documentDisplayName,
+            signerDetails,
+            downloadUrl
+          ),
+          attachments: [
+            {
+              filename: `${documentDisplayName.replace(/[^a-zA-Z0-9]/g, '_')}_Signed.pdf`,
+              content: pdfBase64,
+            },
+          ],
+        });
+        console.log("Sent completion email with attachment to:", signer.email);
+      } catch (emailError) {
+        console.error("Error sending email to", signer.email, ":", emailError);
+      }
     }
 
     // Update lead stage if associated
@@ -360,7 +498,7 @@ serve(async (req) => {
       JSON.stringify({
         success: true,
         signedPdfPath: fileName,
-        signedUrl: signedUrl?.signedUrl,
+        signedUrl: downloadUrl,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
