@@ -660,6 +660,20 @@ export function DocumentTemplatesManager() {
             handleReanalyze(previewTemplate);
             setPreviewTemplate(null);
           }}
+          onSave={async (updatedFields) => {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const { error } = await supabase
+              .from('document_templates')
+              .update({ field_mappings: JSON.parse(JSON.stringify(updatedFields)) })
+              .eq('id', previewTemplate.id);
+            
+            if (error) {
+              toast.error('Failed to save fields');
+              throw error;
+            }
+            toast.success('Fields saved successfully');
+            loadTemplates();
+          }}
         />
       )}
     </div>
