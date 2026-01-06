@@ -9,6 +9,9 @@ verify_jwt = false
 [functions.ai-property-chat]
 verify_jwt = true
 
+[functions.analyze-document-intelligent]
+verify_jwt = true
+
 [functions.build-lead-context]
 verify_jwt = true
 

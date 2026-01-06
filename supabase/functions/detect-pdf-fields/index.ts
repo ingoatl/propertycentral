@@ -119,8 +119,9 @@ serve(async (req) => {
       linesByPage[page].sort((a, b) => a.y - b.y);
     }
 
-    // Build structured document with labeled lines
+    // Build structured document with labeled lines - chunk for large documents
     const documentLines: string[] = [];
+    const MAX_PAGES_PER_CHUNK = 5;
     
     for (const [pageStr, lines] of Object.entries(linesByPage)) {
       const page = parseInt(pageStr);
@@ -132,12 +133,30 @@ serve(async (req) => {
     }
 
     const documentContent = documentLines.join('\n');
+    
+    // Process in chunks for large documents
+    const allFields: DetectedField[] = [];
+    const chunks: string[] = [];
+    const chunkSize = 12000;
+    
+    for (let i = 0; i < documentContent.length; i += chunkSize) {
+      chunks.push(documentContent.substring(i, i + chunkSize));
+    }
+    
+    console.log(`Processing ${chunks.length} chunk(s) of document content`);
 
-    // Use AI to analyze document and detect fields with precise positioning
-    const prompt = `Analyze this legal document and detect FILLABLE FORM FIELDS. Each line shows its EXACT position as [y=Y% x=startX%-endX%].
+    // Use tool calling for reliable JSON output
+    for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex++) {
+      const chunk = chunks[chunkIndex];
+      let retries = 0;
+      const maxRetries = 3;
+      
+      while (retries < maxRetries) {
+        try {
+          const prompt = `Analyze this legal document section and detect FILLABLE FORM FIELDS. Each line shows its EXACT position as [y=Y% x=startX%-endX%].
 
-DOCUMENT:
-${documentContent}
+DOCUMENT SECTION (Part ${chunkIndex + 1}/${chunks.length}):
+${chunk}
 
 SIGNING PARTIES:
 - "Owner" or "guest" = property owner who signs the document
@@ -146,131 +165,172 @@ SIGNING PARTIES:
 FIELD DETECTION RULES:
 
 1. TEXT FIELDS:
-   - "Owner(s):" or "Owner Name:" → api_id: "owner_name", filled_by: "guest" (Owner)
-   - "Address:" (owner's address) → api_id: "owner_address", filled_by: "guest" (Owner)
-   - "Phone:" or "Phone Number:" → api_id: "owner_phone", type: "phone", filled_by: "guest" (Owner)
-   - "Email:" → api_id: "owner_email", type: "email", filled_by: "guest" (Owner)
-   - "Property Address" → api_id: "property_address", filled_by: "guest" (Owner fills this)
-   - "Print Name" near Owner → api_id: "owner_print_name", filled_by: "guest" (Owner)
-   - "Print Name" near Manager → api_id: "manager_print_name", filled_by: "admin" (Admin)
+   - "Owner(s):" or "Owner Name:" → api_id: "owner_name", filled_by: "guest"
+   - "Address:" (owner's address) → api_id: "owner_address", filled_by: "guest"
+   - "Phone:" → api_id: "owner_phone", type: "phone", filled_by: "guest"
+   - "Email:" → api_id: "owner_email", type: "email", filled_by: "guest"
+   - "Property Address" → api_id: "property_address", filled_by: "guest"
 
 2. DATE FIELDS:
-   - "Effective Date:" at document start → api_id: "effective_date", filled_by: "admin" (Admin)
-   - "Date:" near Owner signature → api_id: "owner_signature_date", filled_by: "guest" (Owner)
-   - "Date:" near Manager signature → api_id: "manager_signature_date", filled_by: "admin" (Admin)
+   - "Effective Date:" → api_id: "effective_date", filled_by: "admin"
+   - "Date:" near Owner signature → api_id: "owner_signature_date", filled_by: "guest"
+   - "Date:" near Manager signature → api_id: "manager_signature_date", filled_by: "admin"
 
-3. PACKAGE SELECTION (RADIO BUTTONS) - MANDATORY:
+3. PACKAGE SELECTION (RADIO BUTTONS):
    - Lines with ☐ or □ followed by percentage (15%, 18%, 20%, 25%) are RADIO buttons
-   - All must have type: "radio" and group_name: "package_selection"
-   - api_id: "package_15", "package_18", "package_20", "package_25" based on percentage
-   - filled_by: "guest" (Owner chooses package)
-   - required: true (ONE must be selected)
+   - type: "radio", group_name: "package_selection", filled_by: "guest"
 
 4. SIGNATURES:
-   - "Owner Signature" or "Signature" under OWNER section → api_id: "owner_signature", filled_by: "guest" (Owner)
-   - "Second Owner" or "Co-Owner" or "OWNER 2" → api_id: "second_owner_signature", filled_by: "guest" (Owner)
-   - "Manager" or "MANAGER" section signature → api_id: "manager_signature", filled_by: "admin" (Admin)
+   - "Owner Signature" → api_id: "owner_signature", filled_by: "guest"
+   - "Second Owner" or "OWNER 2" → api_id: "second_owner_signature", filled_by: "guest"
+   - "Manager" signature → api_id: "manager_signature", filled_by: "admin"
 
-POSITIONING RULES:
-- Field Y position: MATCH the label's y% value
-- Field X: starts AFTER label text ends (use endX% + 2%)
-- Text/date fields: width 35-45%, height 2.5%
-- Signature fields: position BELOW label (y + 3%), width 35%, height 4%
-- Radio buttons: width 3%, height 2%
+POSITIONING: Use exact y% from labels, field x starts after label ends`;
 
-CRITICAL:
-- Detect signing parties: Owner (filled_by: "guest") and Admin (filled_by: "admin")
-- property_address is filled_by: "guest" (Owner provides this)
-- Radio buttons for package selection: type "radio", group_name "package_selection", required true
-- Keep field heights SMALL (2-2.5% for text, 4% max for signatures)
+          const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${lovableApiKey}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              model: "google/gemini-2.5-flash",
+              messages: [
+                { role: "user", content: prompt }
+              ],
+              tools: [
+                {
+                  type: "function",
+                  function: {
+                    name: "extract_fields",
+                    description: "Extract all detected fillable fields from the document",
+                    parameters: {
+                      type: "object",
+                      properties: {
+                        fields: {
+                          type: "array",
+                          items: {
+                            type: "object",
+                            properties: {
+                              api_id: { type: "string" },
+                              label: { type: "string" },
+                              type: { type: "string", enum: ["text", "date", "email", "phone", "signature", "checkbox", "radio"] },
+                              page: { type: "number" },
+                              x: { type: "number" },
+                              y: { type: "number" },
+                              width: { type: "number" },
+                              height: { type: "number" },
+                              filled_by: { type: "string", enum: ["admin", "guest"] },
+                              required: { type: "boolean" },
+                              group_name: { type: "string" }
+                            },
+                            required: ["api_id", "label", "type", "page", "x", "y", "filled_by"]
+                          }
+                        },
+                        signing_parties: {
+                          type: "array",
+                          items: { type: "string" }
+                        }
+                      },
+                      required: ["fields"]
+                    }
+                  }
+                }
+              ],
+              tool_choice: { type: "function", function: { name: "extract_fields" } },
+            }),
+          });
 
-Return ONLY valid JSON:
-{
-  "fields": [
-    {
-      "api_id": "owner_name",
-      "label": "Owner(s)",
-      "type": "text",
-      "page": 1,
-      "x": 25,
-      "y": 18.5,
-      "width": 40,
-      "height": 2.5,
-      "filled_by": "guest",
-      "required": true
-    }
-  ],
-  "signing_parties": ["Owner", "Admin"]
-}`;
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error("AI API error:", response.status, errorText);
+            
+            if (response.status === 429) {
+              console.log("Rate limited, waiting before retry...");
+              await new Promise(resolve => setTimeout(resolve, 2000 * (retries + 1)));
+              retries++;
+              continue;
+            }
+            throw new Error("AI analysis failed");
+          }
 
-    console.log("Sending to AI for analysis...");
-
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${lovableApiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          { role: "user", content: prompt }
-        ],
-        max_tokens: 4000,
-      }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("AI API error:", response.status, errorText);
-      
-      if (response.status === 429) {
-        return new Response(
-          JSON.stringify({ error: "Rate limit exceeded. Please try again in a moment." }),
-          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+          const aiResponse = await response.json();
+          
+          // Extract from tool call
+          const toolCall = aiResponse.choices?.[0]?.message?.tool_calls?.[0];
+          if (toolCall && toolCall.function?.arguments) {
+            const parsed = JSON.parse(toolCall.function.arguments);
+            if (parsed.fields && Array.isArray(parsed.fields)) {
+              for (const field of parsed.fields) {
+                allFields.push({
+                  api_id: String(field.api_id).replace(/[^a-z0-9_]/gi, '_').toLowerCase(),
+                  label: String(field.label || field.api_id),
+                  type: validateFieldType(field.type),
+                  page: Math.max(1, Math.min(totalPages || 20, Number(field.page))),
+                  x: Math.max(0, Math.min(95, Number(field.x))),
+                  y: Math.max(0, Math.min(95, Number(field.y))),
+                  width: Math.max(5, Math.min(60, Number(field.width) || 35)),
+                  height: field.type === 'signature' 
+                    ? Math.min(4, Number(field.height) || 4)
+                    : Math.min(2.5, Number(field.height) || 2.5),
+                  filled_by: field.filled_by === "admin" ? "admin" : "guest",
+                  required: field.required !== false,
+                  ...(field.group_name && { group_name: String(field.group_name) }),
+                });
+              }
+              console.log(`Extracted ${parsed.fields.length} fields from chunk ${chunkIndex + 1}`);
+            }
+          } else {
+            // Fallback: try to parse content as JSON
+            const content = aiResponse.choices?.[0]?.message?.content || "";
+            try {
+              const jsonMatch = content.match(/\{[\s\S]*"fields"[\s\S]*\}/);
+              if (jsonMatch) {
+                const parsed = JSON.parse(jsonMatch[0]);
+                for (const field of (parsed.fields || [])) {
+                  allFields.push({
+                    api_id: String(field.api_id).replace(/[^a-z0-9_]/gi, '_').toLowerCase(),
+                    label: String(field.label || field.api_id),
+                    type: validateFieldType(field.type),
+                    page: Math.max(1, Math.min(totalPages || 20, Number(field.page))),
+                    x: Math.max(0, Math.min(95, Number(field.x))),
+                    y: Math.max(0, Math.min(95, Number(field.y))),
+                    width: Math.max(5, Math.min(60, Number(field.width) || 35)),
+                    height: field.type === 'signature' 
+                      ? Math.min(4, Number(field.height) || 4)
+                      : Math.min(2.5, Number(field.height) || 2.5),
+                    filled_by: field.filled_by === "admin" ? "admin" : "guest",
+                    required: field.required !== false,
+                    ...(field.group_name && { group_name: String(field.group_name) }),
+                  });
+                }
+              }
+            } catch (parseError) {
+              console.error("Failed to parse AI response:", parseError);
+            }
+          }
+          
+          break; // Success, exit retry loop
+        } catch (error) {
+          console.error(`Error in chunk ${chunkIndex + 1}, attempt ${retries + 1}:`, error);
+          retries++;
+          if (retries >= maxRetries) {
+            console.log("Max retries reached for chunk, continuing with next");
+          }
+        }
       }
-      
-      throw new Error("AI analysis failed");
     }
 
-    const aiResponse = await response.json();
-    const content = aiResponse.choices?.[0]?.message?.content || "";
-    
-    console.log("AI response received, parsing...");
-
-    let detectedFields: DetectedField[] = [];
-
-    try {
-      const jsonMatch = content.match(/\{[\s\S]*"fields"[\s\S]*\}/);
-      if (jsonMatch) {
-        const parsed = JSON.parse(jsonMatch[0]);
-        detectedFields = parsed.fields || [];
+    // Deduplicate by api_id
+    const uniqueFields = new Map<string, DetectedField>();
+    for (const field of allFields) {
+      if (!uniqueFields.has(field.api_id)) {
+        uniqueFields.set(field.api_id, field);
       }
-    } catch (parseError) {
-      console.error("Failed to parse AI response:", parseError);
     }
+    const validatedFields = Array.from(uniqueFields.values());
 
-    // Validate and clean fields
-    const validatedFields = detectedFields
-      .filter((f: any) => f.api_id && f.page && typeof f.x === 'number' && typeof f.y === 'number')
-      .map((field: any) => ({
-        api_id: String(field.api_id).replace(/[^a-z0-9_]/gi, '_').toLowerCase(),
-        label: String(field.label || field.api_id),
-        type: validateFieldType(field.type),
-        page: Math.max(1, Math.min(totalPages || 20, Number(field.page))),
-        x: Math.max(0, Math.min(95, Number(field.x))),
-        y: Math.max(0, Math.min(95, Number(field.y))),
-        width: Math.max(5, Math.min(60, Number(field.width) || 35)),
-        height: field.type === 'signature' 
-          ? Math.min(4, Number(field.height) || 4)
-          : Math.min(2.5, Number(field.height) || 2.5),
-        filled_by: field.filled_by === "admin" ? "admin" : "guest",
-        required: field.required !== false,
-        ...(field.group_name && { group_name: String(field.group_name) }),
-      }));
-
-    console.log(`Detected ${validatedFields.length} fields via AI`);
+    console.log(`Detected ${validatedFields.length} unique fields via AI`);
 
     // Save to template
     if (templateId && validatedFields.length > 0) {
