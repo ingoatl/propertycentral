@@ -133,12 +133,16 @@ const SignDocument = () => {
            f.api_id.toLowerCase().includes("date");
   };
   
-  // Calculate required fields - Owner 2 fields and date fields (auto-filled) are NOT required
+  // Calculate required fields for current signer
   const requiredFields = signerFields.filter(f => {
-    if (isAdminSigner) return false; // Admin signer checks handled separately
+    if (isAdminSigner) {
+      // For admin: only signature fields are required
+      return f.type === "signature";
+    }
+    // For guests: exclude Owner 2 fields, radio groups, date fields
     if (isOwner2Field(f)) return false; // Owner 2 fields are optional
     if (f.type === "radio") return false; // Radio handled separately by group
-    if (isDateField(f)) return false; // Date fields are auto-filled
+    if (isDateField(f)) return false; // Date fields are auto-filled by admin
     return f.required;
   });
   
@@ -199,6 +203,9 @@ const SignDocument = () => {
         const initialValues: Record<string, string | boolean> = {};
         const completed = new Set<string>();
         
+        // Determine if current signer is admin (last signer)
+        const isAdminSignerFromResult = result.signerType === "manager" || result.signerType === "host";
+        
         // Get current EST date in YYYY-MM-DD format
         const getESTDate = () => {
           const now = new Date();
@@ -206,7 +213,15 @@ const SignDocument = () => {
         };
         const estDate = getESTDate();
         
+        // Helper to detect date fields
+        const isDateFieldCheck = (f: FieldData) => {
+          return f.type === "date" || 
+                 f.label.toLowerCase().includes("date") ||
+                 f.api_id.toLowerCase().includes("date");
+        };
+        
         result.fields?.forEach((field: FieldData) => {
+          // Always load saved values from previous signers
           if (result.savedFieldValues?.[field.api_id] !== undefined) {
             initialValues[field.api_id] = result.savedFieldValues[field.api_id];
             if (result.savedFieldValues[field.api_id]) {
@@ -214,12 +229,15 @@ const SignDocument = () => {
             }
           } else if (field.type === "checkbox") {
             initialValues[field.api_id] = false;
-          } else if (field.type === "date" || 
-                     field.label.toLowerCase().includes("date") ||
-                     field.api_id.toLowerCase().includes("date")) {
-            // Auto-fill date fields with current EST date
-            initialValues[field.api_id] = estDate;
-            completed.add(field.api_id);
+          } else if (isDateFieldCheck(field)) {
+            // Date fields: EMPTY for owner (first signer), AUTO-FILL for admin (last signer)
+            if (isAdminSignerFromResult) {
+              initialValues[field.api_id] = estDate;
+              completed.add(field.api_id);
+            } else {
+              // Leave empty for owner - admin will fill the effective date
+              initialValues[field.api_id] = "";
+            }
           } else {
             initialValues[field.api_id] = "";
           }
@@ -334,14 +352,19 @@ const SignDocument = () => {
 
     // Removed terms agreement check - signing IS consent
 
-    // Check required non-Owner2 fields (Owner 2 fields are optional)
+    // Check required fields for current signer (Owner 2 fields are optional for guests)
     const missingFields: FieldData[] = [];
     const checkedRadioGroups = new Set<string>();
     
     for (const f of signerFields) {
-      // Skip Owner 2 fields - they're optional
-      if (isOwner2Field(f)) {
+      // Skip Owner 2 fields for guest signers - they're optional
+      if (!isAdminSigner && isOwner2Field(f)) {
         console.log(`Skipping Owner 2 field: ${f.api_id}`);
+        continue;
+      }
+      
+      // Skip date fields - they are auto-filled for admin
+      if (isDateField(f)) {
         continue;
       }
       
@@ -486,8 +509,8 @@ const SignDocument = () => {
     const result: FieldData[] = [];
     
     for (const f of sortedSignerFields) {
-      // Skip Owner 2 fields entirely
-      if (isOwner2Field(f)) continue;
+      // Skip Owner 2 fields entirely (only for guest signers)
+      if (!isAdminSigner && isOwner2Field(f)) continue;
       
       // For radio groups - only add ONE field per incomplete group
       if (f.type === "radio" && f.group_name) {
@@ -552,7 +575,7 @@ const SignDocument = () => {
     // Find the next incomplete field after current position in sorted order
     for (let i = currentIdx + 1; i < sortedSignerFields.length; i++) {
       const f = sortedSignerFields[i];
-      if (isOwner2Field(f)) continue;
+      if (!isAdminSigner && isOwner2Field(f)) continue;
       
       // Check if this field is in our incomplete list
       const isIncomplete = incompleteFields.some(inc => inc.api_id === f.api_id);
@@ -588,7 +611,12 @@ const SignDocument = () => {
   const allRequiredComplete = radioGroupsComplete && nonRadioFieldsComplete;
   const canFinish = signatureData && allRequiredComplete; // Removed agreedToTerms requirement
 
-  const getFieldsForPage = (pageNum: number) => [...signerFields, ...adminFields].filter(f => f.page === pageNum);
+  // For admin: show ALL fields (guest + admin) so they can see owner-filled data
+  // For guest: show only signerFields (guest fields) + admin fields as read-only
+  const getFieldsForPage = (pageNum: number) => {
+    const allFields = data?.fields || [];
+    return allFields.filter(f => f.page === pageNum);
+  };
 
   if (loading) {
     return (
@@ -816,9 +844,40 @@ const SignDocument = () => {
           <div className="px-4 py-4 space-y-3">
             {/* Section Header */}
             <div className="border-b pb-3">
-              <h2 className="text-lg font-semibold text-[#1a1a2e]">Complete Your Information</h2>
-              <p className="text-sm text-gray-500 mt-1">Fill in each field below, then tap Finish</p>
+              <h2 className="text-lg font-semibold text-[#1a1a2e]">
+                {isAdminSigner ? "Review & Sign" : "Complete Your Information"}
+              </h2>
+              <p className="text-sm text-gray-500 mt-1">
+                {isAdminSigner 
+                  ? "Review the owner's information below, then sign to complete" 
+                  : "Fill in each field below, then tap Finish"}
+              </p>
             </div>
+            
+            {/* For admin: Show owner-filled fields as read-only summary */}
+            {isAdminSigner && allGuestFields.length > 0 && (
+              <div className="bg-gray-50 rounded-xl border border-gray-200 p-4 space-y-3">
+                <h3 className="text-sm font-semibold text-gray-600 flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4 text-green-500" />
+                  Owner Information (Completed)
+                </h3>
+                <div className="space-y-2">
+                  {allGuestFields.filter(f => f.type !== "signature").map((field) => {
+                    const value = fieldValues[field.api_id];
+                    if (!value) return null;
+                    
+                    return (
+                      <div key={field.api_id} className="flex justify-between items-center py-1.5 border-b border-gray-100 last:border-0">
+                        <span className="text-xs text-gray-500">{field.label}</span>
+                        <span className="text-sm font-medium text-gray-900 truncate max-w-[200px]">
+                          {typeof value === "boolean" ? (value ? "Yes" : "No") : value}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
             
             {/* Mobile-optimized field list */}
             <div className="space-y-4">
@@ -1070,7 +1129,12 @@ const SignDocument = () => {
                           // Check correct signature data based on owner
                           const isCompleted = completedFields.has(field.api_id) || 
                             (field.type === "signature" && (isOwner2 ? !!owner2SignatureData : !!signatureData));
-                          const isReadOnly = field.filled_by === "admin";
+                          // Field is read-only if:
+                          // 1. Guest signer viewing admin fields
+                          // 2. Admin signer viewing guest fields that already have saved values
+                          const isReadOnly = isAdminSigner 
+                            ? (field.filled_by === "guest" && data?.savedFieldValues?.[field.api_id] !== undefined)
+                            : (field.filled_by === "admin");
                           const isShowingSignature = showSignatureFor === field.api_id;
                           const value = fieldValues[field.api_id];
                           
