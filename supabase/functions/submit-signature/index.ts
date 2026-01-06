@@ -253,50 +253,66 @@ serve(async (req) => {
       );
     }
 
-    // Get property address - first try from the field values (what owner just entered)
+    // Get property address and owner name - first try from the field values (what owner just entered)
     // then fall back to lead, then to property
     let propertyAddress: string | null = null;
+    let ownerName: string | null = null;
     
-    // First: Check if owner just entered property address in the form
+    // First: Check if owner just entered property address and name in the form
     if (fieldValues) {
       propertyAddress = (fieldValues.property_address || fieldValues.PropertyAddress || 
                          fieldValues.property_street_address) as string | null;
+      ownerName = (fieldValues.owner_name || fieldValues.owner_print_name || 
+                   fieldValues.OwnerName || fieldValues.owner_1_name) as string | null;
     }
     
     // Second: Check saved field_configuration from document
-    if (!propertyAddress) {
+    if (!propertyAddress || !ownerName) {
       const savedConfig = signingToken.booking_documents?.field_configuration as Record<string, any> | null;
       if (savedConfig) {
-        propertyAddress = savedConfig.property_address || savedConfig.PropertyAddress || 
-                          savedConfig.property_street_address || null;
+        if (!propertyAddress) {
+          propertyAddress = savedConfig.property_address || savedConfig.PropertyAddress || 
+                            savedConfig.property_street_address || null;
+        }
+        if (!ownerName) {
+          ownerName = savedConfig.owner_name || savedConfig.owner_print_name || 
+                      savedConfig.OwnerName || savedConfig.owner_1_name || null;
+        }
       }
     }
     
     // Third: Fall back to lead data
     const { data: lead } = await supabase
       .from("leads")
-      .select("property_address, property_id")
+      .select("property_address, property_id, contact_name")
       .eq("signwell_document_id", signingToken.document_id)
       .maybeSingle();
     
-    if (!propertyAddress && lead) {
-      propertyAddress = lead.property_address;
-      
-      // If no property_address on lead, try to get from property
-      if (!propertyAddress && lead.property_id) {
-        const { data: property } = await supabase
-          .from("properties")
-          .select("address, name")
-          .eq("id", lead.property_id)
-          .single();
+    if (lead) {
+      if (!propertyAddress) {
+        propertyAddress = lead.property_address;
         
-        if (property) {
-          propertyAddress = property.address || property.name;
+        // If no property_address on lead, try to get from property
+        if (!propertyAddress && lead.property_id) {
+          const { data: property } = await supabase
+            .from("properties")
+            .select("address, name")
+            .eq("id", lead.property_id)
+            .single();
+          
+          if (property) {
+            propertyAddress = property.address || property.name;
+          }
         }
+      }
+      
+      if (!ownerName) {
+        ownerName = lead.contact_name;
       }
     }
 
     console.log("Property address for document (from field values, then lead):", propertyAddress);
+    console.log("Owner name for document:", ownerName);
 
     const now = new Date().toISOString();
     const documentName = signingToken.booking_documents?.document_name || 
@@ -451,13 +467,19 @@ serve(async (req) => {
       } : "None found");
 
       if (nextSigner) {
-        // Send email to next signer with property address in subject
+        // Send email to next signer with property address and owner name in subject
         const signingUrl = `${APP_URL}/sign/${nextSigner.token}`;
         
-        // Build subject with property address for admin
+        // Build subject with owner name and property address for admin
+        // Use the current signer's name (who just signed) as the owner name for the admin
+        const signerDisplayName = ownerName || signingToken.signer_name;
         let nextSignerSubject = `Your signature is needed - ${documentName}`;
-        if (propertyAddress) {
+        if (propertyAddress && signerDisplayName) {
+          nextSignerSubject = `Signature Needed: ${signerDisplayName} - ${propertyAddress}`;
+        } else if (propertyAddress) {
           nextSignerSubject = `Signature Needed: ${propertyAddress} - Management Agreement`;
+        } else if (signerDisplayName) {
+          nextSignerSubject = `Signature Needed: ${signerDisplayName} - ${documentName}`;
         }
         
         console.log("Sending signing request to:", nextSigner.signer_email, "Subject:", nextSignerSubject);
@@ -471,7 +493,7 @@ serve(async (req) => {
             documentDisplayName,
             propertyAddress,
             signingUrl,
-            signingToken.signer_name
+            signerDisplayName || signingToken.signer_name  // Use owner name if available
           ),
         });
 
