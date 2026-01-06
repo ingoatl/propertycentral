@@ -30,6 +30,27 @@ async function generateDocumentHash(pdfBytes: Uint8Array): Promise<string> {
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
+// Sanitize text for PDF rendering - remove/replace special characters
+function sanitizeTextForPdf(text: string): string {
+  if (!text) return '';
+  // Replace common special characters with safe alternatives
+  return text
+    .replace(/[""]/g, '"')  // Smart quotes to straight quotes
+    .replace(/['']/g, "'")  // Smart apostrophes to straight
+    .replace(/–/g, '-')     // En dash to hyphen
+    .replace(/—/g, '-')     // Em dash to hyphen
+    .replace(/…/g, '...')   // Ellipsis to periods
+    .replace(/•/g, '-')     // Bullet to hyphen
+    .replace(/©/g, '(c)')   // Copyright
+    .replace(/®/g, '(R)')   // Registered
+    .replace(/™/g, '(TM)')  // Trademark
+    .replace(/°/g, ' deg')  // Degree symbol
+    .replace(/½/g, '1/2')   // Fractions
+    .replace(/¼/g, '1/4')
+    .replace(/¾/g, '3/4')
+    .replace(/[^\x00-\x7F]/g, ''); // Remove any remaining non-ASCII
+}
+
 // Parse user agent to readable format
 function parseUserAgent(userAgent: string | null): string {
   if (!userAgent) return "Unknown Browser";
@@ -183,6 +204,156 @@ function extractContractData(fieldConfig: Record<string, any> | null): Extracted
   }
 
   return data;
+}
+
+// Fill PDF form fields with values
+async function fillPdfWithValues(
+  pdfDoc: PDFDocument,
+  fieldConfig: Record<string, any>,
+  fieldMappings: any[] | null,
+  signatures: any[] | null,
+  font: any
+): Promise<void> {
+  if (!fieldConfig || Object.keys(fieldConfig).length === 0) {
+    console.log("No field configuration to fill");
+    return;
+  }
+
+  const pages = pdfDoc.getPages();
+  console.log("Filling PDF with", Object.keys(fieldConfig).length, "field values across", pages.length, "pages");
+
+  // First, try to fill actual PDF form fields (AcroForm)
+  const form = pdfDoc.getForm();
+  const formFields = form.getFields();
+  
+  if (formFields.length > 0) {
+    console.log("Found", formFields.length, "AcroForm fields");
+    for (const field of formFields) {
+      const fieldName = field.getName();
+      const value = fieldConfig[fieldName];
+      if (value !== undefined && value !== null) {
+        try {
+          const textField = form.getTextField(fieldName);
+          textField.setText(sanitizeTextForPdf(String(value)));
+          console.log("Filled form field:", fieldName);
+        } catch (e) {
+          // Field might not be a text field
+        }
+      }
+    }
+    // Flatten form to make it non-editable
+    form.flatten();
+  }
+
+  // Now draw field values at their positions from field_mappings
+  if (fieldMappings && Array.isArray(fieldMappings)) {
+    for (const mapping of fieldMappings) {
+      const { api_id, x, y, page: pageNum, width, height } = mapping;
+      const value = fieldConfig[api_id];
+      
+      if (value !== undefined && value !== null && pageNum && pageNum <= pages.length) {
+        const page = pages[pageNum - 1]; // Pages are 0-indexed
+        const { width: pageWidth, height: pageHeight } = page.getSize();
+        
+        // Convert percentage positions to absolute coordinates
+        const absX = (x / 100) * pageWidth;
+        // PDF y-coordinates start from bottom, so convert from top-based percentage
+        const absY = pageHeight - ((y / 100) * pageHeight);
+        
+        const textValue = sanitizeTextForPdf(String(value));
+        const fontSize = Math.min(11, (height / 100) * pageHeight * 0.7);
+        
+        try {
+          // Handle signature fields differently - draw "Signed Electronically"
+          if (api_id.toLowerCase().includes('signature')) {
+            page.drawText('[Signed Electronically]', {
+              x: absX,
+              y: absY - 12,
+              size: 9,
+              font,
+              color: rgb(0.2, 0.2, 0.2),
+            });
+          } else if (typeof value === 'boolean') {
+            // Checkbox - draw X or checkmark
+            if (value === true) {
+              page.drawText('X', {
+                x: absX + 2,
+                y: absY - 10,
+                size: 12,
+                font,
+                color: rgb(0, 0, 0),
+              });
+            }
+          } else {
+            // Regular text field
+            page.drawText(textValue.substring(0, 100), {
+              x: absX,
+              y: absY - fontSize,
+              size: fontSize,
+              font,
+              color: rgb(0, 0, 0),
+            });
+          }
+        } catch (drawError) {
+          console.error("Error drawing field", api_id, ":", drawError);
+        }
+      }
+    }
+  }
+
+  // Also draw signature images if we have them
+  if (signatures && Array.isArray(signatures)) {
+    for (const sig of signatures) {
+      if (sig.signature_data && sig.field_values) {
+        // Find signature position from field_values or field_mappings
+        const sigFieldId = sig.signer_type === 'owner' ? 'owner_signature' : 
+                           sig.signer_type === 'second_owner' ? 'second_owner_signature' : 'manager_signature';
+        
+        const sigMapping = fieldMappings?.find(m => 
+          m.api_id.toLowerCase().includes('signature') && 
+          m.signer_type === sig.signer_type
+        );
+        
+        if (sigMapping) {
+          const { x, y, page: pageNum, width, height } = sigMapping;
+          if (pageNum && pageNum <= pages.length) {
+            const page = pages[pageNum - 1];
+            const { width: pageWidth, height: pageHeight } = page.getSize();
+            
+            const absX = (x / 100) * pageWidth;
+            const absY = pageHeight - ((y / 100) * pageHeight);
+            const absWidth = (width / 100) * pageWidth;
+            const absHeight = (height / 100) * pageHeight;
+            
+            try {
+              // Draw signature from base64 data
+              if (sig.signature_data.startsWith('data:image/png')) {
+                const base64Data = sig.signature_data.split(',')[1];
+                const sigImage = await pdfDoc.embedPng(Uint8Array.from(atob(base64Data), c => c.charCodeAt(0)));
+                page.drawImage(sigImage, {
+                  x: absX,
+                  y: absY - absHeight,
+                  width: absWidth,
+                  height: absHeight,
+                });
+                console.log("Drew signature for", sig.signer_type, "on page", pageNum);
+              }
+            } catch (sigError) {
+              console.error("Error drawing signature:", sigError);
+              // Fallback: draw text
+              page.drawText(`[Signed by ${sig.signer_name}]`, {
+                x: absX,
+                y: absY - 12,
+                size: 9,
+                font,
+                color: rgb(0.2, 0.2, 0.2),
+              });
+            }
+          }
+        }
+      }
+    }
+  }
 }
 
 const buildCompletionEmailHtml = (
@@ -366,7 +537,7 @@ serve(async (req) => {
 
     console.log("Finalizing signed document:", documentId);
 
-    // Get document details
+    // Get document details with template and field_mappings
     const { data: document, error: docError } = await supabase
       .from("booking_documents")
       .select(`
@@ -374,7 +545,9 @@ serve(async (req) => {
         document_templates (
           id,
           name,
-          file_path
+          file_path,
+          field_mappings,
+          contract_type
         )
       `)
       .eq("id", documentId)
@@ -638,13 +811,23 @@ serve(async (req) => {
     
     if (pdfBytes) {
       pdfDoc = await PDFDocument.load(pdfBytes);
+      
+      // Get field mappings from template
+      const fieldMappings = document.document_templates?.field_mappings as any[] | null;
+      
+      // Embed font for text drawing
+      const textFont = await pdfDoc.embedFont(StandardFonts.Helvetica);
+      
+      // FILL PDF WITH FIELD VALUES
+      await fillPdfWithValues(pdfDoc, fieldConfig || {}, fieldMappings, signatures, textFont);
+      console.log("Filled PDF with field values");
     } else {
       // Create a new PDF if no template found
       console.log("No template PDF found, creating certificate-only document");
       pdfDoc = await PDFDocument.create();
       const page = pdfDoc.addPage();
-      const font = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-      page.drawText(document.document_name || "Signed Agreement", { x: 50, y: 750, size: 24, font });
+      const createFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+      page.drawText(sanitizeTextForPdf(document.document_name || "Signed Agreement"), { x: 50, y: 750, size: 24, font: createFont });
     }
 
     // Generate certificate ID
@@ -1271,7 +1454,12 @@ serve(async (req) => {
       });
 
       // Save to management_agreements table (GREC compliance)
-      if (propertyId && document.contract_type === "management_agreement") {
+      // Check document or template contract_type - default to saving for any agreement type
+      const contractType = document.contract_type || document.document_templates?.contract_type || 'management_agreement';
+      const isManagementAgreement = contractType.toLowerCase().includes('management') || 
+                                     contractType.toLowerCase().includes('agreement');
+      
+      if (propertyId && isManagementAgreement) {
         // Get owner and manager signed timestamps
         const ownerSig = signatures?.find(s => s.signer_type === "owner");
         const managerSig = signatures?.find(s => s.signer_type === "manager");
