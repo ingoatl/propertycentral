@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Loader2, Download, ZoomIn, ZoomOut, ExternalLink, AlertCircle } from "lucide-react";
+import { Loader2, Download, ZoomIn, ZoomOut, ExternalLink, AlertCircle, RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -11,6 +11,9 @@ interface PDFViewerDialogProps {
   filePath: string;
   title?: string;
   bucketName?: string;
+  documentName?: string;
+  propertyAddress?: string;
+  recipientName?: string;
 }
 
 export function PDFViewerDialog({
@@ -19,25 +22,21 @@ export function PDFViewerDialog({
   filePath,
   title = "Document Viewer",
   bucketName = "signed-documents",
+  documentName,
+  propertyAddress,
+  recipientName,
 }: PDFViewerDialogProps) {
   const [loading, setLoading] = useState(true);
-  const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null);
+  const [signedUrl, setSignedUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [zoom, setZoom] = useState(100);
+  const [retryCount, setRetryCount] = useState(0);
   const { toast } = useToast();
 
   useEffect(() => {
     if (open && filePath) {
       loadPdf();
     }
-    
-    return () => {
-      // Cleanup blob URL on unmount
-      if (pdfBlobUrl) {
-        URL.revokeObjectURL(pdfBlobUrl);
-      }
-    };
-  }, [open, filePath]);
+  }, [open, filePath, retryCount]);
 
   const loadPdf = async () => {
     if (!filePath) return;
@@ -46,17 +45,14 @@ export function PDFViewerDialog({
     setError(null);
     
     try {
-      // Download the file as a blob instead of using signed URL
-      // This avoids browser ad blockers blocking Supabase URLs
-      const { data, error: downloadError } = await supabase.storage
+      // Get a signed URL for the PDF - Google Docs Viewer needs a public URL
+      const { data, error: urlError } = await supabase.storage
         .from(bucketName)
-        .download(filePath);
+        .createSignedUrl(filePath, 3600); // 1 hour expiry
 
-      if (downloadError) throw downloadError;
+      if (urlError) throw urlError;
       
-      // Create a blob URL from the downloaded file
-      const blobUrl = URL.createObjectURL(data);
-      setPdfBlobUrl(blobUrl);
+      setSignedUrl(data.signedUrl);
     } catch (err: any) {
       console.error("Error loading PDF:", err);
       setError(err.message || "Failed to load document");
@@ -70,6 +66,35 @@ export function PDFViewerDialog({
     }
   };
 
+  const generateDownloadFilename = (): string => {
+    const parts: string[] = [];
+    
+    // Add document/agreement type
+    if (documentName) {
+      parts.push(documentName.replace(/[^a-zA-Z0-9\s-]/g, '').trim());
+    } else if (title && title !== "Document Viewer") {
+      parts.push(title.replace(/[^a-zA-Z0-9\s-]/g, '').trim());
+    }
+    
+    // Add property address
+    if (propertyAddress) {
+      parts.push(propertyAddress.replace(/[^a-zA-Z0-9\s-]/g, '').trim());
+    }
+    
+    // Add recipient name
+    if (recipientName) {
+      parts.push(recipientName.replace(/[^a-zA-Z0-9\s-]/g, '').trim());
+    }
+    
+    // If we have parts, join them with underscores
+    if (parts.length > 0) {
+      return parts.join('_').replace(/\s+/g, '_').replace(/_+/g, '_') + '.pdf';
+    }
+    
+    // Fallback to file path name
+    return filePath.split('/').pop() || 'document.pdf';
+  };
+
   const handleDownload = async () => {
     if (!filePath) return;
     
@@ -81,11 +106,11 @@ export function PDFViewerDialog({
 
       if (downloadError) throw downloadError;
       
-      // Create download link
+      // Create download link with descriptive filename
       const blobUrl = URL.createObjectURL(data);
       const link = document.createElement('a');
       link.href = blobUrl;
-      link.download = filePath.split('/').pop() || 'document.pdf';
+      link.download = generateDownloadFilename();
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -107,15 +132,15 @@ export function PDFViewerDialog({
 
   const handleOpenChange = (newOpen: boolean) => {
     if (!newOpen) {
-      // Cleanup when closing
-      if (pdfBlobUrl) {
-        URL.revokeObjectURL(pdfBlobUrl);
-        setPdfBlobUrl(null);
-      }
-      setZoom(100);
+      setSignedUrl(null);
       setError(null);
+      setRetryCount(0);
     }
     onOpenChange(newOpen);
+  };
+
+  const handleRetry = () => {
+    setRetryCount(prev => prev + 1);
   };
 
   return (
@@ -125,32 +150,18 @@ export function PDFViewerDialog({
           <div className="flex items-center justify-between">
             <DialogTitle className="text-lg truncate pr-4">{title}</DialogTitle>
             <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setZoom(Math.max(50, zoom - 25))}
-                disabled={zoom <= 50}
-              >
-                <ZoomOut className="h-4 w-4" />
-              </Button>
-              <span className="text-sm text-muted-foreground w-12 text-center">{zoom}%</span>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setZoom(Math.min(200, zoom + 25))}
-                disabled={zoom >= 200}
-              >
-                <ZoomIn className="h-4 w-4" />
+              <Button variant="outline" size="sm" onClick={handleRetry} disabled={loading}>
+                <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
               </Button>
               <Button variant="outline" size="sm" onClick={handleDownload}>
                 <Download className="h-4 w-4 mr-1" />
                 Download
               </Button>
-              {pdfBlobUrl && (
+              {signedUrl && (
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => window.open(pdfBlobUrl, "_blank")}
+                  onClick={() => window.open(signedUrl, "_blank")}
                 >
                   <ExternalLink className="h-4 w-4 mr-1" />
                   Open
@@ -169,22 +180,23 @@ export function PDFViewerDialog({
             <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-4">
               <AlertCircle className="h-12 w-12 text-destructive" />
               <p>{error}</p>
-              <Button onClick={handleDownload} variant="outline">
-                <Download className="h-4 w-4 mr-2" />
-                Download Instead
-              </Button>
+              <div className="flex gap-2">
+                <Button onClick={handleRetry} variant="outline">
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Retry
+                </Button>
+                <Button onClick={handleDownload} variant="outline">
+                  <Download className="h-4 w-4 mr-2" />
+                  Download Instead
+                </Button>
+              </div>
             </div>
-          ) : pdfBlobUrl ? (
-            <div className="flex justify-center p-4">
+          ) : signedUrl ? (
+            <div className="flex flex-col items-center justify-center min-h-full gap-6 p-4">
+              {/* PDF: Use Google Docs Viewer - same as GREC audit (most reliable) */}
               <iframe
-                src={`${pdfBlobUrl}#toolbar=0&navpanes=0&scrollbar=1`}
-                className="bg-white shadow-lg rounded"
-                style={{
-                  width: `${zoom}%`,
-                  minWidth: "600px",
-                  height: "calc(90vh - 100px)",
-                  maxWidth: "100%",
-                }}
+                src={`https://docs.google.com/gview?url=${encodeURIComponent(signedUrl)}&embedded=true`}
+                className="w-full h-[calc(90vh-100px)] border rounded-lg bg-white"
                 title={title}
               />
             </div>

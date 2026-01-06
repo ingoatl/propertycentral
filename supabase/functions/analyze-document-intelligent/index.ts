@@ -365,12 +365,38 @@ SIGNATURE DETECTION - CRITICAL:
   * Multiple signature blocks for different parties
 - If you see "Owner" and "Co-Host/Manager" sections, create signatures for BOTH
 
+BLANK LINE DETECTION - VERY IMPORTANT:
+- ANY series of underscores (______) indicates a text input field
+- Common patterns to detect:
+  * "Effective Date: _______________" → date field
+  * "Owner(s): _______________" → text field for owner name
+  * "Residing at: _______________" → text field for address
+  * "Phone: _______________" → phone field
+  * "Email: _______________" → email field
+  * "Property Address: _______________" → text field
+- Look for lines like "Name: ________" or just standalone "________" after labels
+- Detect ALL blank lines, not just some - if there's an underline, there should be a field
+
+FIELD SIZE GUIDELINES - CRITICAL FOR PROPER DISPLAY:
+- Text fields: height should be 2.0-2.5 (fits single line of text)
+- Date fields: width 20-25, height 2.0-2.5
+- Signature fields: width 30-40, height 3.5-4.5 (needs space for signature)
+- Email fields: width 30-40, height 2.0-2.5
+- Phone fields: width 20-25, height 2.0-2.5
+- Address fields: width 50-60, height 2.0-2.5
+- Name fields: width 35-45, height 2.0-2.5
+- Fields should NOT overlap - space them properly on the Y axis
+- If multiple fields are on the same line, adjust X positions so they don't overlap
+
 FIELD DETECTION TIPS:
-- Blank lines (______) indicate text input fields
+- Blank lines (______) indicate text input fields - DETECT ALL OF THEM
 - "Date:" or date format patterns indicate date fields
 - Checkbox squares (□) indicate checkbox fields
 - Email patterns or "Email:" indicate email fields
-- Phone patterns or "Phone:" indicate phone fields`;
+- Phone patterns or "Phone:" indicate phone fields
+- Look at EVERY section of the document for potential fields
+- If you see "Owner(s):" followed by blank, that's an owner_name field
+- If you see "Residing at:" followed by blank, that's an owner_address field`;
 
       const userPrompt = `Analyze this document section and extract ALL fillable fields.
 
@@ -380,14 +406,25 @@ ${chunk}
 TOTAL PAGES: ${totalPages || 1}
 APPROXIMATE PAGE FOR THIS SECTION: ${chunkPages}
 
-Extract fields using the extract_document_fields function. Include:
+IMPORTANT: Look for EVERY blank line (______) in the document. Common fillable fields include:
+- Effective Date
+- Owner Name(s)
+- Owner Address (Residing at)
+- Owner Phone
+- Owner Email  
+- Property Address
+- Package Selection checkboxes
+- Signature lines
+- Date lines near signatures
+
+Extract fields using the extract_document_fields function. For EACH blank line or underline you see, create a corresponding field. Include:
 - All text blanks (name, address, phone, email fields)
 - All date fields
-- All signature lines
-- All checkboxes or radio buttons
-- Package selection options (if applicable)
+- All signature lines (owner signature, manager signature)
+- All checkboxes or radio buttons for package selection
+- Any other fillable areas
 
-Return accurate field positions relative to the page layout.`;
+Return accurate field positions relative to the page layout. Ensure field heights are appropriate (2.0-2.5 for text, 3.5-4.5 for signatures).`;
 
       let success = false;
       while (!success && retryCount < maxRetries) {
@@ -480,8 +517,18 @@ Return accurate field positions relative to the page layout.`;
           if (toolCall && toolCall.function?.arguments) {
             const args = JSON.parse(toolCall.function.arguments);
             if (args.fields && Array.isArray(args.fields)) {
-              // Add fields with proper defaults
+              // Add fields with proper defaults - adjusted heights for better line fitting
               for (const field of args.fields) {
+                // Determine appropriate height based on field type
+                let fieldHeight = 2.2; // Default for text fields
+                if (field.type === 'signature') {
+                  fieldHeight = Math.max(3.5, Math.min(4.5, Number(field.height) || 4));
+                } else if (field.type === 'textarea') {
+                  fieldHeight = Math.max(4, Math.min(8, Number(field.height) || 5));
+                } else {
+                  fieldHeight = Math.max(1.8, Math.min(2.8, Number(field.height) || 2.2));
+                }
+                
                 allFields.push({
                   api_id: String(field.api_id || 'field').replace(/[^a-z0-9_]/gi, '_').toLowerCase(),
                   label: String(field.label || field.api_id),
@@ -490,9 +537,7 @@ Return accurate field positions relative to the page layout.`;
                   x: Math.max(0, Math.min(95, Number(field.x) || 20)),
                   y: Math.max(0, Math.min(95, Number(field.y) || 50)),
                   width: Math.max(5, Math.min(60, Number(field.width) || 35)),
-                  height: field.type === 'signature' 
-                    ? Math.min(4, Number(field.height) || 4)
-                    : Math.min(3, Number(field.height) || 2.5),
+                  height: fieldHeight,
                   filled_by: field.filled_by === "admin" ? "admin" : "guest",
                   required: field.required !== false,
                   category: field.category || "other",
