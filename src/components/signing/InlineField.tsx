@@ -58,6 +58,7 @@ export function InlineField({
   }, [isActive, field.type]);
 
   const fontSize = Math.max(10, Math.min(12, 11 * scale));
+  const fontFamily = "'Lato', 'Open Sans', -apple-system, BlinkMacSystemFont, sans-serif";
 
   // Compact field heights based on type
   const getFieldHeight = () => {
@@ -109,7 +110,7 @@ export function InlineField({
           hasSignature ? completedClass : pendingClass,
           "w-full h-[50px] rounded flex items-center justify-center cursor-pointer"
         )}
-        style={{ fontSize }}
+        style={{ fontSize, fontFamily }}
       >
         {hasSignature ? (
           <div className="relative w-full h-full flex items-center justify-center p-1">
@@ -181,7 +182,7 @@ export function InlineField({
       return (
         <div 
           className={cn(baseFieldClass, readOnlyClass, "w-full h-[24px] flex items-center px-1.5 rounded text-[#666]")}
-          style={{ fontSize }}
+          style={{ fontSize, fontFamily }}
         >
           <Lock className="h-2.5 w-2.5 mr-1 flex-shrink-0 text-[#999]" />
           <span className="truncate">{dateValue ? format(dateValue, "MM/dd/yy") : "—"}</span>
@@ -199,7 +200,7 @@ export function InlineField({
               isCompleted ? completedClass : pendingClass,
               "w-full h-[24px] flex items-center justify-between px-1.5 rounded cursor-pointer"
             )}
-            style={{ fontSize }}
+            style={{ fontSize, fontFamily }}
           >
             <span className={cn(dateValue ? "text-[#333]" : "text-[#b8860b]", "text-xs")}>
               {dateValue ? format(dateValue, "MM/dd/yy") : "Date"}
@@ -234,7 +235,7 @@ export function InlineField({
     return (
       <div 
         className={cn(baseFieldClass, readOnlyClass, "w-full h-[24px] flex items-center px-1.5 rounded text-[#666]")}
-        style={{ fontSize }}
+        style={{ fontSize, fontFamily }}
       >
         <Lock className="h-2.5 w-2.5 mr-1 flex-shrink-0 text-[#999]" />
         <span className="truncate text-xs">{(value as string) || "—"}</span>
@@ -258,7 +259,7 @@ export function InlineField({
         }}
         placeholder={field.label}
         className={cn(baseFieldClass, activeClass, "w-full h-[24px] px-1.5 rounded text-xs")}
-        style={{ fontSize }}
+        style={{ fontSize, fontFamily }}
         autoFocus
       />
     );
@@ -273,7 +274,7 @@ export function InlineField({
         isCompleted ? completedClass : pendingClass,
         "w-full h-[24px] flex items-center px-1.5 rounded text-left cursor-pointer"
       )}
-      style={{ fontSize }}
+      style={{ fontSize, fontFamily }}
     >
       {value ? (
         <span className="truncate text-[#333] flex-1 text-xs">{value as string}</span>
