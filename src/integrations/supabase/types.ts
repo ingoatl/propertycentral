@@ -3046,14 +3046,14 @@ export type Database = {
           {
             foreignKeyName: "management_agreements_property_id_fkey"
             columns: ["property_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "comprehensive_property_data"
             referencedColumns: ["id"]
           },
           {
             foreignKeyName: "management_agreements_property_id_fkey"
             columns: ["property_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "properties"
             referencedColumns: ["id"]
           },

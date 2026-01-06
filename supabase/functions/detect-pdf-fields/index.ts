@@ -40,6 +40,7 @@ interface DetectedField {
   filled_by: "admin" | "guest";
   required: boolean;
   group_name?: string;
+  label_offset?: number; // X offset from label end to where value should start
 }
 
 serve(async (req) => {
@@ -185,7 +186,12 @@ FIELD DETECTION RULES:
    - "Second Owner" or "OWNER 2" → api_id: "second_owner_signature", filled_by: "guest"
    - "Manager" signature → api_id: "manager_signature", filled_by: "admin"
 
-POSITIONING: Use exact y% from labels, field x starts after label ends`;
+CRITICAL POSITIONING RULES:
+- x: The X% where the FILLABLE AREA STARTS (not where the label starts)
+- For "Name:_____", x should be AFTER the colon where the blank line starts
+- For "Signature:________", x should be where the signature line begins
+- Signatures and values must NOT overlap with label text
+- y: Use exact y% from the line position`;
 
           const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
             method: "POST",
@@ -216,13 +222,14 @@ POSITIONING: Use exact y% from labels, field x starts after label ends`;
                               label: { type: "string" },
                               type: { type: "string", enum: ["text", "date", "email", "phone", "signature", "checkbox", "radio"] },
                               page: { type: "number" },
-                              x: { type: "number" },
+                              x: { type: "number", description: "X position where the fillable area STARTS (after any label text)" },
                               y: { type: "number" },
                               width: { type: "number" },
                               height: { type: "number" },
                               filled_by: { type: "string", enum: ["admin", "guest"] },
                               required: { type: "boolean" },
-                              group_name: { type: "string" }
+                              group_name: { type: "string" },
+                              label_offset: { type: "number", description: "Offset in % from label start to where value should be written" }
                             },
                             required: ["api_id", "label", "type", "page", "x", "y", "filled_by"]
                           }
@@ -276,6 +283,7 @@ POSITIONING: Use exact y% from labels, field x starts after label ends`;
                   filled_by: field.filled_by === "admin" ? "admin" : "guest",
                   required: field.required !== false,
                   ...(field.group_name && { group_name: String(field.group_name) }),
+                  ...(field.label_offset && { label_offset: Number(field.label_offset) }),
                 });
               }
               console.log(`Extracted ${parsed.fields.length} fields from chunk ${chunkIndex + 1}`);
