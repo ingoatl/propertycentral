@@ -6,11 +6,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Copy, Eye, History, FileText, Search, CheckCircle, Clock, AlertCircle, Edit, Download, MapPin } from "lucide-react";
+import { Copy, Eye, History, FileText, Search, CheckCircle, Clock, AlertCircle, Edit, Download, MapPin, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { DocumentAuditTrail } from "./DocumentAuditTrail";
 import { PDFViewerDialog } from "./PDFViewerDialog";
+import { useAdminCheck } from "@/hooks/useAdminCheck";
 
 interface Document {
   id: string;
@@ -40,7 +41,9 @@ const DocumentList = () => {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [expandedAuditId, setExpandedAuditId] = useState<string | null>(null);
   const [viewingPdf, setViewingPdf] = useState<{ path: string; title: string; documentName?: string; propertyAddress?: string; recipientName?: string } | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
   const { toast } = useToast();
+  const { isAdmin } = useAdminCheck();
 
   useEffect(() => {
     loadDocuments();
@@ -100,6 +103,45 @@ const DocumentList = () => {
         description: "Failed to copy link",
         variant: "destructive",
       });
+    }
+  };
+
+  const handleDeleteDocument = async (doc: Document) => {
+    if (!confirm(`Are you sure you want to delete "${doc.document_name || 'this document'}"? This action cannot be undone.`)) {
+      return;
+    }
+    
+    try {
+      setDeleting(doc.id);
+      
+      // Delete signed document from storage if exists
+      if (doc.signed_pdf_path) {
+        await supabase.storage.from('signed-documents').remove([doc.signed_pdf_path]);
+      }
+      
+      // Delete audit log entries
+      await supabase.from('document_audit_log').delete().eq('document_id', doc.id);
+      
+      // Delete the document record
+      const { error } = await supabase.from('booking_documents').delete().eq('id', doc.id);
+      
+      if (error) throw error;
+      
+      toast({
+        title: "Document deleted",
+        description: "The document has been permanently removed.",
+      });
+      
+      loadDocuments();
+    } catch (error) {
+      console.error('Error deleting document:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete document",
+        variant: "destructive",
+      });
+    } finally {
+      setDeleting(null);
     }
   };
 
@@ -327,6 +369,18 @@ const DocumentList = () => {
                     <History className="h-4 w-4 mr-1" />
                     Audit Trail
                   </Button>
+                  {isAdmin && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="text-destructive hover:text-destructive"
+                      onClick={() => handleDeleteDocument(doc)}
+                      disabled={deleting === doc.id}
+                    >
+                      <Trash2 className="h-4 w-4 mr-1" />
+                      {deleting === doc.id ? "Deleting..." : "Delete"}
+                    </Button>
+                  )}
                 </div>
 
                 {/* Audit Trail */}
