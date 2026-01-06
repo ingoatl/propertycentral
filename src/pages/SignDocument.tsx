@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
-import { Loader2, CheckCircle, AlertCircle, ChevronDown, ChevronUp, ArrowRight, Check } from "lucide-react";
+import { Loader2, CheckCircle, AlertCircle, ChevronDown, ChevronUp, ArrowRight, Check, FileText, List, Eye } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Document, Page, pdfjs } from "react-pdf";
 import { InlineField, FieldData } from "@/components/signing/InlineField";
@@ -38,11 +38,28 @@ interface SigningData {
   savedFieldValues: Record<string, string | boolean>;
 }
 
+// Hook to detect mobile device
+const useIsMobile = () => {
+  const [isMobile, setIsMobile] = useState(false);
+  
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
+  
+  return isMobile;
+};
+
 const SignDocument = () => {
   const { token } = useParams<{ token: string }>();
   const navigate = useNavigate();
   const containerRef = useRef<HTMLDivElement>(null);
   const pageRefs = useRef<Map<number, HTMLDivElement>>(new Map());
+  const isMobile = useIsMobile();
   
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -64,6 +81,9 @@ const SignDocument = () => {
   const [showSignatureFor, setShowSignatureFor] = useState<string | null>(null);
   const [completedFields, setCompletedFields] = useState<Set<string>>(new Set());
   const [showFieldList, setShowFieldList] = useState(false);
+  
+  // Mobile-specific: Toggle between PDF view and Mobile Focus (field list) view
+  const [mobileViewMode, setMobileViewMode] = useState<"pdf" | "fields">("fields");
 
   // Filter fields for current signer
   // Owner 2 fields are NOT mandatory - they become active only when clicked
@@ -528,98 +548,130 @@ const SignDocument = () => {
 
   return (
     <div className="min-h-screen bg-[#e8e8e8] flex flex-col">
-      {/* DocuSign-style Header */}
-      <header className="bg-[#1a1a2e] text-white px-4 py-3 flex items-center justify-between sticky top-0 z-50 shadow-md">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="w-8 h-8 rounded bg-[#fae052] flex items-center justify-center flex-shrink-0">
-            <span className="text-[#1a1a2e] font-bold text-sm">P</span>
+      {/* Header - Mobile optimized with larger touch targets */}
+      <header className="bg-[#1a1a2e] text-white px-3 md:px-4 py-3 flex items-center justify-between sticky top-0 z-50 shadow-md">
+        <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1">
+          <div className="w-8 h-8 md:w-10 md:h-10 rounded bg-[#fae052] flex items-center justify-center flex-shrink-0">
+            <span className="text-[#1a1a2e] font-bold text-sm md:text-base">P</span>
           </div>
-          <div className="min-w-0">
-            <h1 className="font-medium text-sm truncate">{data?.documentName}</h1>
-            <p className="text-xs text-white/60">Please review and sign</p>
+          <div className="min-w-0 flex-1">
+            <h1 className="font-medium text-xs md:text-sm truncate max-w-[120px] md:max-w-none">{data?.documentName}</h1>
+            <p className="text-[10px] md:text-xs text-white/60 truncate">{data?.signerName}</p>
           </div>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="text-right hidden sm:block">
-            <p className="text-xs text-white/60">Signing as</p>
-            <p className="text-sm font-medium truncate max-w-[140px]">{data?.signerName}</p>
+        
+        {/* Mobile view toggle */}
+        {isMobile && (
+          <div className="flex items-center bg-[#2a2a3e] rounded-lg p-1 mr-2">
+            <button
+              onClick={() => setMobileViewMode("fields")}
+              className={cn(
+                "p-2 rounded-md transition-colors",
+                mobileViewMode === "fields" ? "bg-[#fae052] text-[#1a1a2e]" : "text-white/60"
+              )}
+              aria-label="Field view"
+            >
+              <List className="h-4 w-4" />
+            </button>
+            <button
+              onClick={() => setMobileViewMode("pdf")}
+              className={cn(
+                "p-2 rounded-md transition-colors",
+                mobileViewMode === "pdf" ? "bg-[#fae052] text-[#1a1a2e]" : "text-white/60"
+              )}
+              aria-label="PDF view"
+            >
+              <FileText className="h-4 w-4" />
+            </button>
           </div>
-          <Button
-            onClick={handleSubmitSignature}
-            disabled={!canFinish || submitting}
-            className={cn(
-              "font-semibold px-6 transition-all duration-300",
-              canFinish 
-                ? "bg-[#4caf50] text-white hover:bg-[#43a047] animate-pulse shadow-lg shadow-green-500/30" 
-                : "bg-[#fae052] text-[#1a1a2e] hover:bg-[#f5d93a] disabled:opacity-40"
-            )}
-          >
-            {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : canFinish ? "✓ FINISH" : "FINISH"}
-          </Button>
-        </div>
+        )}
+        
+        <Button
+          onClick={handleSubmitSignature}
+          disabled={!canFinish || submitting}
+          className={cn(
+            "font-semibold px-4 md:px-6 h-10 md:h-11 text-sm transition-all duration-300",
+            canFinish 
+              ? "bg-[#4caf50] text-white hover:bg-[#43a047] animate-pulse shadow-lg shadow-green-500/30" 
+              : "bg-[#fae052] text-[#1a1a2e] hover:bg-[#f5d93a] disabled:opacity-40"
+          )}
+        >
+          {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : canFinish ? "✓ FINISH" : "FINISH"}
+        </Button>
       </header>
 
-      {/* Progress Banner - DocuSign yellow style */}
-      <div className="bg-[#fae052] px-4 py-2 flex items-center justify-between shadow-sm">
-        <div className="flex items-center gap-4">
-          <span className="font-semibold text-[#1a1a2e] text-sm">
-            {totalCompleted} of {totalRequired} required fields complete
+      {/* Progress Banner - Touch-friendly on mobile */}
+      <div className="bg-[#fae052] px-3 md:px-4 py-2.5 md:py-2 flex items-center justify-between shadow-sm">
+        <div className="flex items-center gap-2 md:gap-4">
+          {/* Progress bar for mobile */}
+          {isMobile && (
+            <div className="w-16 h-2 bg-[#1a1a2e]/20 rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-[#1a1a2e] transition-all duration-300"
+                style={{ width: `${totalRequired > 0 ? (totalCompleted / totalRequired) * 100 : 0}%` }}
+              />
+            </div>
+          )}
+          <span className="font-semibold text-[#1a1a2e] text-xs md:text-sm">
+            {totalCompleted}/{totalRequired} complete
           </span>
-          {remainingCount > 0 && (
+          {remainingCount > 0 && !isMobile && (
             <span className="text-[#1a1a2e]/70 text-xs">
               ({remainingCount} remaining)
             </span>
           )}
         </div>
-        <div className="flex items-center gap-2">
+        {!isMobile && (
           <Button
             onClick={() => setShowFieldList(!showFieldList)}
             size="sm"
             variant="ghost"
-            className="text-[#1a1a2e] hover:bg-[#e8d044]"
+            className="text-[#1a1a2e] hover:bg-[#e8d044] h-8"
           >
             {showFieldList ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-          </Button>
-        </div>
-      </div>
-
-      {/* Floating NEXT/START Button - Positioned at the document edge */}
-      <div className="fixed z-40" style={{ right: `calc(50% - ${(pageWidth * scale) / 2 + 60}px)`, top: '40%' }}>
-        {remainingCount > 0 ? (
-          <Button
-            onClick={activeFieldId || showSignatureFor ? handleNext : handleStart}
-            size="lg"
-            className="bg-[#fae052] text-[#1a1a2e] hover:bg-[#f5d93a] font-bold shadow-2xl rounded-full px-6 py-6 gap-2 animate-pulse text-sm flex-col h-auto"
-          >
-            <span className="text-lg">{activeFieldId || showSignatureFor ? "NEXT" : "START"}</span>
-            <span className="text-xs font-normal opacity-80">{remainingCount} left</span>
-            <ArrowRight className="h-5 w-5" />
-          </Button>
-        ) : canFinish ? (
-          <Button
-            onClick={handleSubmitSignature}
-            disabled={submitting}
-            size="lg"
-            className="bg-[#4caf50] text-white hover:bg-[#43a047] font-bold shadow-2xl rounded-full px-6 py-6 gap-2 text-sm flex-col h-auto animate-pulse"
-          >
-            <Check className="h-6 w-6" />
-            <span className="text-lg">FINISH</span>
-            <span className="text-xs font-normal opacity-80">& Submit</span>
-          </Button>
-        ) : (
-          <Button
-            onClick={() => setAgreedToTerms(true)}
-            size="lg"
-            className="bg-[#fae052] text-[#1a1a2e] hover:bg-[#f5d93a] font-bold shadow-2xl rounded-full px-6 py-6 gap-2 animate-pulse text-sm flex-col h-auto"
-          >
-            <span className="text-lg">AGREE</span>
-            <span className="text-xs font-normal opacity-80">to continue</span>
           </Button>
         )}
       </div>
 
-      {/* Field List Dropdown */}
-      {showFieldList && (
+      {/* Floating NEXT/START Button - Desktop only, positioned at document edge */}
+      {!isMobile && (
+        <div className="fixed z-40 hidden md:block" style={{ right: `calc(50% - ${(pageWidth * scale) / 2 + 70}px)`, top: '40%' }}>
+          {remainingCount > 0 ? (
+            <Button
+              onClick={activeFieldId || showSignatureFor ? handleNext : handleStart}
+              size="lg"
+              className="bg-[#fae052] text-[#1a1a2e] hover:bg-[#f5d93a] font-bold shadow-2xl rounded-full px-6 py-6 gap-2 animate-pulse text-sm flex-col h-auto"
+            >
+              <span className="text-lg">{activeFieldId || showSignatureFor ? "NEXT" : "START"}</span>
+              <span className="text-xs font-normal opacity-80">{remainingCount} left</span>
+              <ArrowRight className="h-5 w-5" />
+            </Button>
+          ) : canFinish ? (
+            <Button
+              onClick={handleSubmitSignature}
+              disabled={submitting}
+              size="lg"
+              className="bg-[#4caf50] text-white hover:bg-[#43a047] font-bold shadow-2xl rounded-full px-6 py-6 gap-2 text-sm flex-col h-auto animate-pulse"
+            >
+              <Check className="h-6 w-6" />
+              <span className="text-lg">FINISH</span>
+              <span className="text-xs font-normal opacity-80">& Submit</span>
+            </Button>
+          ) : (
+            <Button
+              onClick={() => setAgreedToTerms(true)}
+              size="lg"
+              className="bg-[#fae052] text-[#1a1a2e] hover:bg-[#f5d93a] font-bold shadow-2xl rounded-full px-6 py-6 gap-2 animate-pulse text-sm flex-col h-auto"
+            >
+              <span className="text-lg">AGREE</span>
+              <span className="text-xs font-normal opacity-80">to continue</span>
+            </Button>
+          )}
+        </div>
+      )}
+
+      {/* Desktop Field List Dropdown */}
+      {showFieldList && !isMobile && (
         <div className="bg-white border-b shadow-sm px-4 py-3 max-h-48 overflow-y-auto">
           <div className="grid gap-1">
             {signerFields.map((field) => {
@@ -634,7 +686,6 @@ const SignDocument = () => {
                 isFieldComplete = completedFields.has(field.api_id);
               }
               
-              // Show Owner 2 fields as optional/muted
               const isOptional = isOwner2 || (!field.required && field.type !== "radio");
               
               return (
@@ -674,170 +725,395 @@ const SignDocument = () => {
         </div>
       )}
 
-      {/* Document Area */}
-      <main ref={containerRef} className="flex-1 overflow-auto py-4">
-        <div className="mx-auto" style={{ maxWidth: pageWidth + 32 }}>
-          {data?.pdfUrl ? (
-            <Document
-              file={data.pdfUrl}
-              onLoadSuccess={onDocumentLoadSuccess}
-              loading={
-                <div className="flex items-center justify-center h-96 bg-white rounded shadow">
-                  <Loader2 className="h-8 w-8 animate-spin text-[#666]" />
-                </div>
-              }
-              error={
-                <div className="bg-white rounded shadow p-8 text-center">
-                  <AlertCircle className="h-10 w-10 text-red-500 mx-auto mb-3" />
-                  <p className="text-[#666]">Could not load PDF</p>
-                </div>
-              }
+      {/* Mobile Focus View - Field List Mode (like DocuSign/Adobe Sign) */}
+      {isMobile && mobileViewMode === "fields" && (
+        <main className="flex-1 overflow-auto bg-white">
+          <div className="px-4 py-4 space-y-3">
+            {/* Section Header */}
+            <div className="border-b pb-3">
+              <h2 className="text-lg font-semibold text-[#1a1a2e]">Complete Your Information</h2>
+              <p className="text-sm text-gray-500 mt-1">Fill in each field below, then tap Finish</p>
+            </div>
+            
+            {/* Mobile-optimized field list */}
+            <div className="space-y-4">
+              {sortedSignerFields.map((field, index) => {
+                const isOwner2 = isOwner2Field(field);
+                let isFieldComplete = false;
+                
+                if (field.type === "signature") {
+                  isFieldComplete = !!signatureData;
+                } else if (field.type === "radio" && field.group_name) {
+                  isFieldComplete = isRadioGroupComplete(field.group_name);
+                } else {
+                  isFieldComplete = completedFields.has(field.api_id) || !!fieldValues[field.api_id];
+                }
+                
+                const isOptional = isOwner2 || (!field.required && field.type !== "radio");
+                const value = fieldValues[field.api_id];
+                
+                // Skip duplicate radio buttons in the same group (show group once)
+                if (field.type === "radio" && field.group_name) {
+                  const firstInGroup = sortedSignerFields.find(f => f.type === "radio" && f.group_name === field.group_name);
+                  if (firstInGroup && firstInGroup.api_id !== field.api_id) return null;
+                }
+                
+                return (
+                  <div
+                    key={field.api_id}
+                    className={cn(
+                      "rounded-xl border-2 p-4 transition-all",
+                      isFieldComplete 
+                        ? "border-green-300 bg-green-50/50" 
+                        : isOptional
+                          ? "border-gray-200 bg-gray-50/50"
+                          : "border-[#fae052] bg-[#fffef5]"
+                    )}
+                  >
+                    {/* Field Label */}
+                    <div className="flex items-center justify-between mb-3">
+                      <label className="text-sm font-medium text-[#1a1a2e] flex items-center gap-2">
+                        {isFieldComplete ? (
+                          <CheckCircle className="h-5 w-5 text-green-500" />
+                        ) : (
+                          <div className={cn(
+                            "w-5 h-5 rounded-full border-2 flex items-center justify-center text-xs font-bold",
+                            isOptional ? "border-gray-300 text-gray-400" : "border-[#fae052] text-[#1a1a2e]"
+                          )}>
+                            {index + 1}
+                          </div>
+                        )}
+                        {field.type === "radio" && field.group_name 
+                          ? field.group_name.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+                          : field.label
+                        }
+                      </label>
+                      {isOptional && (
+                        <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded">Optional</span>
+                      )}
+                      {!isOptional && !isFieldComplete && (
+                        <span className="text-xs text-orange-500 bg-orange-50 px-2 py-0.5 rounded">Required</span>
+                      )}
+                    </div>
+                    
+                    {/* Field Input - Mobile optimized with large touch targets */}
+                    <div className="relative">
+                      {field.type === "signature" ? (
+                        <button
+                          onClick={() => {
+                            if (isOwner2) {
+                              toast.info("This signature field is for Owner 2");
+                              return;
+                            }
+                            setShowSignatureFor(field.api_id);
+                          }}
+                          className={cn(
+                            "w-full h-20 rounded-lg border-2 border-dashed flex items-center justify-center transition-all",
+                            signatureData 
+                              ? "border-green-300 bg-white" 
+                              : "border-[#fae052] bg-[#fffef5] active:bg-[#fae052]/20"
+                          )}
+                        >
+                          {signatureData ? (
+                            <img src={signatureData} alt="Signature" className="max-h-16 max-w-full" />
+                          ) : (
+                            <span className="text-[#8b7355] font-medium">Tap to sign</span>
+                          )}
+                        </button>
+                      ) : field.type === "radio" && field.group_name ? (
+                        <div className="space-y-2">
+                          {signerFields
+                            .filter(f => f.type === "radio" && f.group_name === field.group_name)
+                            .map(radioField => (
+                              <button
+                                key={radioField.api_id}
+                                onClick={() => handleFieldChange(radioField.api_id, true, radioField)}
+                                className={cn(
+                                  "w-full p-4 rounded-lg border-2 text-left flex items-center gap-3 transition-all min-h-[56px]",
+                                  fieldValues[radioField.api_id] === true
+                                    ? "border-[#4caf50] bg-green-50 text-green-700"
+                                    : "border-gray-200 bg-white active:border-[#fae052]"
+                                )}
+                              >
+                                <div className={cn(
+                                  "w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0",
+                                  fieldValues[radioField.api_id] === true
+                                    ? "border-[#4caf50] bg-[#4caf50]"
+                                    : "border-gray-300"
+                                )}>
+                                  {fieldValues[radioField.api_id] === true && (
+                                    <Check className="h-4 w-4 text-white" />
+                                  )}
+                                </div>
+                                <span className="text-sm font-medium">{radioField.label}</span>
+                              </button>
+                            ))
+                          }
+                        </div>
+                      ) : field.type === "checkbox" ? (
+                        <button
+                          onClick={() => handleFieldChange(field.api_id, !fieldValues[field.api_id], field)}
+                          className={cn(
+                            "w-full p-4 rounded-lg border-2 flex items-center gap-3 transition-all min-h-[56px]",
+                            fieldValues[field.api_id] === true
+                              ? "border-[#4caf50] bg-green-50"
+                              : "border-gray-200 bg-white active:border-[#fae052]"
+                          )}
+                        >
+                          <div className={cn(
+                            "w-6 h-6 rounded border-2 flex items-center justify-center flex-shrink-0",
+                            fieldValues[field.api_id] === true
+                              ? "border-[#4caf50] bg-[#4caf50]"
+                              : "border-gray-300"
+                          )}>
+                            {fieldValues[field.api_id] === true && (
+                              <Check className="h-4 w-4 text-white" />
+                            )}
+                          </div>
+                          <span className="text-sm">{field.label}</span>
+                        </button>
+                      ) : field.type === "date" ? (
+                        <input
+                          type="date"
+                          value={typeof value === 'string' ? value : ''}
+                          onChange={(e) => handleFieldChange(field.api_id, e.target.value, field)}
+                          className="w-full h-14 px-4 rounded-lg border-2 border-gray-200 bg-white text-base focus:border-[#fae052] focus:outline-none focus:ring-2 focus:ring-[#fae052]/30"
+                        />
+                      ) : (
+                        <input
+                          type={field.type === "email" ? "email" : field.type === "phone" ? "tel" : "text"}
+                          placeholder={field.label}
+                          value={typeof value === 'string' ? value : ''}
+                          onChange={(e) => handleFieldChange(field.api_id, e.target.value, field)}
+                          className="w-full h-14 px-4 rounded-lg border-2 border-gray-200 bg-white text-base focus:border-[#fae052] focus:outline-none focus:ring-2 focus:ring-[#fae052]/30 placeholder:text-gray-400"
+                        />
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            
+            {/* View PDF button */}
+            <button
+              onClick={() => setMobileViewMode("pdf")}
+              className="w-full flex items-center justify-center gap-2 py-3 text-[#1a1a2e]/70 text-sm"
             >
-              <div className="space-y-2">
-                {Array.from({ length: numPages }, (_, index) => {
-                  const pageNum = index + 1;
-                  const fieldsOnPage = getFieldsForPage(pageNum);
-                  
-                  return (
-                    <div
-                      key={pageNum}
-                      ref={(el) => {
-                        if (el) pageRefs.current.set(pageNum, el);
-                      }}
-                      className="relative bg-white shadow-lg mx-auto"
-                      style={{ width: pageWidth * scale }}
-                    >
-                      <Page
-                        pageNumber={pageNum}
-                        width={pageWidth * scale}
-                        renderTextLayer={false}
-                        renderAnnotationLayer={false}
-                        onLoadSuccess={(page) => onPageLoadSuccess(pageNum, page)}
-                      />
-                      
-                      {/* Field Overlays */}
-                      {fieldsOnPage.map((field) => {
-                        const isActive = activeFieldId === field.api_id;
-                        const isCompleted = completedFields.has(field.api_id) || (field.type === "signature" && !!signatureData);
-                        const isReadOnly = field.filled_by === "admin";
-                        const isShowingSignature = showSignatureFor === field.api_id;
-                        const value = fieldValues[field.api_id];
+              <Eye className="h-4 w-4" />
+              View full document
+            </button>
+          </div>
+          
+          {/* Signature Modal for Mobile */}
+          {showSignatureFor && (
+            <div className="fixed inset-0 bg-black/50 z-50 flex items-end">
+              <div className="bg-white w-full rounded-t-2xl p-4 pb-8 animate-in slide-in-from-bottom duration-300">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-lg font-semibold">Add Your Signature</h3>
+                  <button 
+                    onClick={() => setShowSignatureFor(null)}
+                    className="p-2 hover:bg-gray-100 rounded-full"
+                  >
+                    ✕
+                  </button>
+                </div>
+                <InlineSignature
+                  onAdopt={handleSignatureAdopt}
+                  onCancel={() => setShowSignatureFor(null)}
+                />
+              </div>
+            </div>
+          )}
+        </main>
+      )}
+
+      {/* PDF View Mode (both mobile and desktop) */}
+      {(!isMobile || mobileViewMode === "pdf") && (
+        <main ref={containerRef} className="flex-1 overflow-auto py-4">
+          <div className="mx-auto" style={{ maxWidth: pageWidth + 32 }}>
+            {data?.pdfUrl ? (
+              <Document
+                file={data.pdfUrl}
+                onLoadSuccess={onDocumentLoadSuccess}
+                loading={
+                  <div className="flex items-center justify-center h-96 bg-white rounded shadow">
+                    <Loader2 className="h-8 w-8 animate-spin text-[#666]" />
+                  </div>
+                }
+                error={
+                  <div className="bg-white rounded shadow p-8 text-center">
+                    <AlertCircle className="h-10 w-10 text-red-500 mx-auto mb-3" />
+                    <p className="text-[#666]">Could not load PDF</p>
+                  </div>
+                }
+              >
+                <div className="space-y-2">
+                  {Array.from({ length: numPages }, (_, index) => {
+                    const pageNum = index + 1;
+                    const fieldsOnPage = getFieldsForPage(pageNum);
+                    
+                    return (
+                      <div
+                        key={pageNum}
+                        ref={(el) => {
+                          if (el) pageRefs.current.set(pageNum, el);
+                        }}
+                        className="relative bg-white shadow-lg mx-auto"
+                        style={{ width: pageWidth * scale }}
+                      >
+                        <Page
+                          pageNumber={pageNum}
+                          width={pageWidth * scale}
+                          renderTextLayer={false}
+                          renderAnnotationLayer={false}
+                          onLoadSuccess={(page) => onPageLoadSuccess(pageNum, page)}
+                        />
                         
-                        // Calculate compact heights based on field type
-                        const getFieldStyle = () => {
-                          if (field.type === "signature") {
-                            return { height: "50px", minHeight: "50px" };
-                          }
-                          if (field.type === "checkbox" || field.type === "radio") {
-                            return { height: "22px", width: "22px", minHeight: "22px" };
-                          }
-                          // Text, date, email, phone - compact to fit between lines
-                          return { height: "24px", minHeight: "24px" };
-                        };
-                        
-                        const fieldStyle = getFieldStyle();
-                        
-                        return (
-                          <div
-                            key={field.api_id}
-                            className="absolute"
-                            style={{
-                              left: `${field.x}%`,
-                              top: `${field.y}%`,
-                              width: field.type === "checkbox" || field.type === "radio" ? fieldStyle.width : `${field.width}%`,
-                              height: fieldStyle.height,
-                              minHeight: fieldStyle.minHeight,
-                              zIndex: isActive || isShowingSignature ? 100 : 10,
-                            }}
-                          >
-                            {isShowingSignature ? (
-                              <InlineSignature
-                                onAdopt={handleSignatureAdopt}
-                                onCancel={() => setShowSignatureFor(null)}
-                              />
-                            ) : (
-                              <InlineField
-                                field={field}
-                                value={value}
-                                onChange={(val) => handleFieldChange(field.api_id, val, field)}
-                                isActive={isActive}
-                                isCompleted={isCompleted}
-                                isReadOnly={isReadOnly}
-                                signatureData={isOwner2Field(field) ? owner2SignatureData : signatureData}
-                                onFocus={() => {
-                                  if (field.type === "signature" && !isReadOnly) {
-                                    // Block Owner 1 from opening Owner 2's signature field
+                        {/* Field Overlays */}
+                        {fieldsOnPage.map((field) => {
+                          const isActive = activeFieldId === field.api_id;
+                          const isCompleted = completedFields.has(field.api_id) || (field.type === "signature" && !!signatureData);
+                          const isReadOnly = field.filled_by === "admin";
+                          const isShowingSignature = showSignatureFor === field.api_id;
+                          const value = fieldValues[field.api_id];
+                          
+                          const getFieldStyle = () => {
+                            if (field.type === "signature") {
+                              return { height: "50px", minHeight: "50px" };
+                            }
+                            if (field.type === "checkbox" || field.type === "radio") {
+                              return { height: "22px", width: "22px", minHeight: "22px" };
+                            }
+                            return { height: "24px", minHeight: "24px" };
+                          };
+                          
+                          const fieldStyle = getFieldStyle();
+                          
+                          return (
+                            <div
+                              key={field.api_id}
+                              className="absolute"
+                              style={{
+                                left: `${field.x}%`,
+                                top: `${field.y}%`,
+                                width: field.type === "checkbox" || field.type === "radio" ? fieldStyle.width : `${field.width}%`,
+                                height: fieldStyle.height,
+                                minHeight: fieldStyle.minHeight,
+                                zIndex: isActive || isShowingSignature ? 100 : 10,
+                              }}
+                            >
+                              {isShowingSignature ? (
+                                <InlineSignature
+                                  onAdopt={handleSignatureAdopt}
+                                  onCancel={() => setShowSignatureFor(null)}
+                                />
+                              ) : (
+                                <InlineField
+                                  field={field}
+                                  value={value}
+                                  onChange={(val) => handleFieldChange(field.api_id, val, field)}
+                                  isActive={isActive}
+                                  isCompleted={isCompleted}
+                                  isReadOnly={isReadOnly}
+                                  signatureData={isOwner2Field(field) ? owner2SignatureData : signatureData}
+                                  onFocus={() => {
+                                    if (field.type === "signature" && !isReadOnly) {
+                                      if (isOwner2Field(field)) {
+                                        toast.info("This signature field is for Owner 2");
+                                        return;
+                                      }
+                                      setShowSignatureFor(field.api_id);
+                                    } else if (!isReadOnly) {
+                                      setActiveFieldId(field.api_id);
+                                    }
+                                  }}
+                                  onBlur={() => setActiveFieldId(null)}
+                                  onSignatureClick={() => {
+                                    if (isReadOnly) return;
                                     if (isOwner2Field(field)) {
                                       toast.info("This signature field is for Owner 2");
                                       return;
                                     }
                                     setShowSignatureFor(field.api_id);
-                                  } else if (!isReadOnly) {
-                                    setActiveFieldId(field.api_id);
-                                  }
-                                }}
-                                onBlur={() => setActiveFieldId(null)}
-                                onSignatureClick={() => {
-                                  if (isReadOnly) return;
-                                  // Block Owner 1 from opening Owner 2's signature field
-                                  if (isOwner2Field(field)) {
-                                    toast.info("This signature field is for Owner 2");
-                                    return;
-                                  }
-                                  setShowSignatureFor(field.api_id);
-                                }}
-                                scale={scale}
-                              />
-                            )}
-                          </div>
-                        );
-                      })}
-                      
-                      {/* Page indicator */}
-                      <div className="absolute bottom-2 right-2 text-xs text-[#999] bg-white/80 px-2 py-0.5 rounded">
-                        {pageNum} / {numPages}
+                                  }}
+                                  scale={scale}
+                                />
+                              )}
+                            </div>
+                          );
+                        })}
+                        
+                        {/* Page indicator */}
+                        <div className="absolute bottom-2 right-2 text-xs text-[#999] bg-white/80 px-2 py-0.5 rounded">
+                          {pageNum} / {numPages}
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
+              </Document>
+            ) : (
+              <div className="bg-white rounded shadow p-8 text-center">
+                <AlertCircle className="h-10 w-10 text-yellow-500 mx-auto mb-3" />
+                <p className="text-[#666]">No PDF available</p>
               </div>
-            </Document>
-          ) : (
-            <div className="bg-white rounded shadow p-8 text-center">
-              <AlertCircle className="h-10 w-10 text-yellow-500 mx-auto mb-3" />
-              <p className="text-[#666]">No PDF available</p>
-            </div>
-          )}
-        </div>
-      </main>
+            )}
+          </div>
+        </main>
+      )}
 
-      {/* Footer - Terms */}
-      <footer className="bg-white border-t px-4 py-3 flex items-center justify-between sticky bottom-0 z-50">
-        <div className="flex items-center gap-2">
+      {/* Footer - Terms (Mobile optimized) */}
+      <footer className="bg-white border-t px-3 md:px-4 py-3 flex items-center justify-between sticky bottom-0 z-50 safe-area-inset-bottom">
+        <div className="flex items-center gap-2 flex-1 min-w-0">
           <Checkbox
             id="terms"
             checked={agreedToTerms}
             onCheckedChange={(c) => setAgreedToTerms(c === true)}
+            className="h-5 w-5"
           />
-          <label htmlFor="terms" className="text-xs text-[#666] cursor-pointer">
-            I agree to use electronic records and signatures
+          <label htmlFor="terms" className="text-xs md:text-sm text-[#666] cursor-pointer truncate">
+            I agree to electronic signatures
           </label>
         </div>
-        <div className="flex items-center gap-2 text-xs text-[#999]">
-          <button
-            onClick={() => setScale(s => Math.max(0.5, s - 0.1))}
-            className="px-2 py-1 rounded hover:bg-[#f0f0f0]"
-          >
-            −
-          </button>
-          <span>{Math.round(scale * 100)}%</span>
-          <button
-            onClick={() => setScale(s => Math.min(1.5, s + 0.1))}
-            className="px-2 py-1 rounded hover:bg-[#f0f0f0]"
-          >
-            +
-          </button>
-        </div>
+        
+        {/* Mobile: Show Next/Finish button in footer */}
+        {isMobile && mobileViewMode === "fields" && (
+          remainingCount > 0 ? (
+            <Button
+              onClick={handleNext}
+              className="bg-[#fae052] text-[#1a1a2e] hover:bg-[#f5d93a] font-semibold h-10 px-4 ml-2"
+            >
+              Next <ArrowRight className="h-4 w-4 ml-1" />
+            </Button>
+          ) : canFinish ? (
+            <Button
+              onClick={handleSubmitSignature}
+              disabled={submitting}
+              className="bg-[#4caf50] text-white hover:bg-[#43a047] font-semibold h-10 px-4 ml-2"
+            >
+              {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : "✓ Finish"}
+            </Button>
+          ) : null
+        )}
+        
+        {/* Desktop: Zoom controls */}
+        {!isMobile && (
+          <div className="flex items-center gap-2 text-xs text-[#999]">
+            <button
+              onClick={() => setScale(s => Math.max(0.5, s - 0.1))}
+              className="px-2 py-1 rounded hover:bg-[#f0f0f0]"
+            >
+              −
+            </button>
+            <span>{Math.round(scale * 100)}%</span>
+            <button
+              onClick={() => setScale(s => Math.min(1.5, s + 0.1))}
+              className="px-2 py-1 rounded hover:bg-[#f0f0f0]"
+            >
+              +
+            </button>
+          </div>
+        )}
       </footer>
     </div>
   );
