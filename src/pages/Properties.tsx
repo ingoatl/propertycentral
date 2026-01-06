@@ -49,6 +49,8 @@ const Properties = () => {
   const [propertyTypeFilter, setPropertyTypeFilter] = useState<"All" | "Client-Managed" | "Company-Owned" | "Inactive">("All");
   const [offboardingProperty, setOffboardingProperty] = useState<{ id: string; name: string; address: string } | null>(null);
   const [selectedPropertyForSetupTasks, setSelectedPropertyForSetupTasks] = useState<{ id: string; name: string; ownerEmail?: string | null } | null>(null);
+  const [currentUserEmail, setCurrentUserEmail] = useState<string | null>(null);
+  const [deletingProperty, setDeletingProperty] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: "",
     address: "",
@@ -71,7 +73,54 @@ const Properties = () => {
     loadProperties();
     loadPropertyProjects();
     loadPropertySetupTaskCounts();
+    loadCurrentUserEmail();
   }, []);
+
+  const loadCurrentUserEmail = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    setCurrentUserEmail(user?.email || null);
+  };
+
+  const canDeleteProperties = currentUserEmail === "ingo@peachhausgroup.com";
+
+  const handleDeleteProperty = async (property: Property) => {
+    if (!confirm(`Are you sure you want to permanently delete "${property.name}"? This will also delete all associated data (expenses, visits, bookings, etc.). This action cannot be undone.`)) {
+      return;
+    }
+    
+    try {
+      setDeletingProperty(property.id);
+      
+      // Delete in order due to foreign key constraints
+      await supabase.from('expenses').delete().eq('property_id', property.id);
+      await supabase.from('visits').delete().eq('property_id', property.id);
+      await supabase.from('mid_term_bookings').delete().eq('property_id', property.id);
+      await supabase.from('inspection_issues').delete().eq('property_id', property.id);
+      await supabase.from('inspections').delete().eq('property_id', property.id);
+      await supabase.from('conversation_notes').delete().eq('property_id', property.id);
+      
+      // Delete onboarding project and tasks if exists
+      const projectId = propertyProjects[property.id];
+      if (projectId) {
+        await supabase.from('onboarding_tasks').delete().eq('project_id', projectId);
+        await supabase.from('onboarding_projects').delete().eq('id', projectId);
+      }
+      
+      // Finally delete the property
+      const { error } = await supabase.from('properties').delete().eq('id', property.id);
+      
+      if (error) throw error;
+      
+      toast.success(`Property "${property.name}" deleted successfully`);
+      loadProperties();
+      loadPropertyProjects();
+    } catch (error: any) {
+      console.error('Error deleting property:', error);
+      toast.error(`Failed to delete property: ${error.message}`);
+    } finally {
+      setDeletingProperty(null);
+    }
+  };
 
   useEffect(() => {
     const openWorkflowId = searchParams.get('openWorkflow');
@@ -593,6 +642,21 @@ const Properties = () => {
             >
               <PowerOff className="w-4 h-4 mr-1" />
               Offboard
+            </Button>
+          )}
+          {canDeleteProperties && (
+            <Button
+              size="sm"
+              variant="destructive"
+              className="shadow-lg bg-red-600 hover:bg-red-700"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleDeleteProperty(property);
+              }}
+              disabled={deletingProperty === property.id}
+            >
+              <Trash2 className="w-4 h-4 mr-1" />
+              {deletingProperty === property.id ? "Deleting..." : "Delete"}
             </Button>
           )}
         </div>
