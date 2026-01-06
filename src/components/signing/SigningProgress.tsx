@@ -58,15 +58,14 @@ export function SigningProgress({
       {/* Progress bar row */}
       <div className="px-4 py-2 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          {!allComplete && nextIncompleteField && (
-            <Button
-              onClick={completedCount === 0 ? onStart : onNext}
-              size="sm"
-              className="bg-[#fae052] text-black hover:bg-[#f5d93a] font-semibold h-7 text-xs"
-            >
-              {completedCount === 0 ? "START" : "NEXT"}
-            </Button>
-          )}
+          {/* Always show navigation button - START when 0 done, NEXT when incomplete, Back when all complete */}
+          <Button
+            onClick={completedCount === 0 ? onStart : onNext}
+            size="sm"
+            className="bg-[#fae052] text-black hover:bg-[#f5d93a] font-semibold h-7 text-xs"
+          >
+            {completedCount === 0 ? "START" : allComplete ? "REVIEW" : "NEXT"}
+          </Button>
           
           <div className="flex items-center gap-2">
             <div className="w-24 sm:w-32 h-1.5 bg-white/20 rounded-full overflow-hidden">
