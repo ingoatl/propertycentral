@@ -66,7 +66,7 @@ const SignDocument = () => {
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<SigningData | null>(null);
   const [signatureData, setSignatureData] = useState<string | null>(null);
-  const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const [agreedToTerms, setAgreedToTerms] = useState(true); // Signing is consent
   const [isComplete, setIsComplete] = useState(false);
   const [fieldValues, setFieldValues] = useState<Record<string, string | boolean>>({});
   
@@ -83,7 +83,7 @@ const SignDocument = () => {
   const [showFieldList, setShowFieldList] = useState(false);
   
   // Mobile-specific: Toggle between PDF view and Mobile Focus (field list) view
-  const [mobileViewMode, setMobileViewMode] = useState<"pdf" | "fields">("fields");
+  const [mobileViewMode, setMobileViewMode] = useState<"pdf" | "fields">("pdf"); // Default to PDF view
 
   // Filter fields for current signer
   // Owner 2 fields are NOT mandatory - they become active only when clicked
@@ -99,8 +99,12 @@ const SignDocument = () => {
            apiId.includes("owner2") || apiId.includes("owner_2") || apiId.includes("second_owner");
   };
   
+  // Determine if current signer is admin/manager
+  const isAdminSigner = data?.signerType === "manager" || data?.signerType === "host";
+  
   // Required fields are: Owner 1 fields that are marked required + radio groups (one selection per group)
-  const signerFields = allGuestFields;
+  // Admin signers see admin fields, guest signers see guest fields
+  const signerFields = isAdminSigner ? adminFields : allGuestFields;
   
   // Debug: Log field detection
   useEffect(() => {
@@ -122,10 +126,19 @@ const SignDocument = () => {
     return groupFields.some(f => fieldValues[f.api_id] === true);
   };
   
-  // Calculate required fields - Owner 2 fields are NOT required
+  // Helper to detect date fields
+  const isDateField = (f: FieldData) => {
+    return f.type === "date" || 
+           f.label.toLowerCase().includes("date") ||
+           f.api_id.toLowerCase().includes("date");
+  };
+  
+  // Calculate required fields - Owner 2 fields and date fields (auto-filled) are NOT required
   const requiredFields = signerFields.filter(f => {
+    if (isAdminSigner) return false; // Admin signer checks handled separately
     if (isOwner2Field(f)) return false; // Owner 2 fields are optional
     if (f.type === "radio") return false; // Radio handled separately by group
+    if (isDateField(f)) return false; // Date fields are auto-filled
     return f.required;
   });
   
@@ -186,6 +199,13 @@ const SignDocument = () => {
         const initialValues: Record<string, string | boolean> = {};
         const completed = new Set<string>();
         
+        // Get current EST date in YYYY-MM-DD format
+        const getESTDate = () => {
+          const now = new Date();
+          return now.toLocaleDateString('en-CA', { timeZone: 'America/New_York' }); // en-CA gives YYYY-MM-DD
+        };
+        const estDate = getESTDate();
+        
         result.fields?.forEach((field: FieldData) => {
           if (result.savedFieldValues?.[field.api_id] !== undefined) {
             initialValues[field.api_id] = result.savedFieldValues[field.api_id];
@@ -194,6 +214,12 @@ const SignDocument = () => {
             }
           } else if (field.type === "checkbox") {
             initialValues[field.api_id] = false;
+          } else if (field.type === "date" || 
+                     field.label.toLowerCase().includes("date") ||
+                     field.api_id.toLowerCase().includes("date")) {
+            // Auto-fill date fields with current EST date
+            initialValues[field.api_id] = estDate;
+            completed.add(field.api_id);
           } else {
             initialValues[field.api_id] = "";
           }
@@ -264,11 +290,19 @@ const SignDocument = () => {
   const handleSignatureAdopt = (sigData: string) => {
     const currentSignatureField = signerFields.find(f => f.api_id === showSignatureFor);
     
-    console.log("Adopting signature for field:", showSignatureFor);
+    console.log("Adopting signature for field:", showSignatureFor, "isAdminSigner:", isAdminSigner);
     console.log("Current signature field:", currentSignatureField);
-    console.log("Is Owner 2 field:", currentSignatureField ? isOwner2Field(currentSignatureField) : "N/A");
     
-    if (currentSignatureField && isOwner2Field(currentSignatureField)) {
+    if (isAdminSigner) {
+      // Admin is signing - apply to admin signature fields
+      console.log("Setting Admin signature data");
+      setSignatureData(sigData);
+      const adminSigFields = signerFields.filter(f => f.type === "signature");
+      adminSigFields.forEach(f => {
+        setCompletedFields(prev => new Set([...prev, f.api_id]));
+      });
+      toast.success("Signature adopted!");
+    } else if (currentSignatureField && isOwner2Field(currentSignatureField)) {
       // Owner 2 is signing - only apply to Owner 2 fields
       console.log("Setting Owner 2 signature data");
       setOwner2SignatureData(sigData);
@@ -298,10 +332,7 @@ const SignDocument = () => {
       return;
     }
 
-    if (!agreedToTerms) {
-      toast.error("Please agree to sign electronically");
-      return;
-    }
+    // Removed terms agreement check - signing IS consent
 
     // Check required non-Owner2 fields (Owner 2 fields are optional)
     const missingFields: FieldData[] = [];
@@ -415,10 +446,23 @@ const SignDocument = () => {
     return a.x - b.x;
   });
 
-  // Check if a field is incomplete - Owner 2 fields are considered complete (optional)
+  // Check if a field is incomplete - Owner 2 fields and date fields are considered complete
   const isFieldIncomplete = (f: FieldData) => {
+    // Admin signer - don't apply Owner 2 field logic
+    if (isAdminSigner) {
+      if (f.type === "signature") return !signatureData;
+      if (f.type === "radio" && f.group_name) return !isRadioGroupComplete(f.group_name);
+      if (f.type === "checkbox") return false;
+      if (isDateField(f)) return false; // Date fields auto-filled
+      const val = fieldValues[f.api_id];
+      return val === undefined || val === null || val === "" || val === false;
+    }
+    
     // Owner 2 fields are optional, never considered incomplete for navigation
     if (isOwner2Field(f)) return false;
+    
+    // Date fields are auto-filled, never incomplete
+    if (isDateField(f)) return false;
     
     if (f.type === "signature") {
       const incomplete = !signatureData;
@@ -431,7 +475,7 @@ const SignDocument = () => {
     }
     if (f.type === "checkbox") return false; // Checkboxes are never required for navigation
     
-    // For text, date, email, phone fields - check if value exists and is not empty
+    // For text, email, phone fields - check if value exists and is not empty
     const val = fieldValues[f.api_id];
     return val === undefined || val === null || val === "" || val === false;
   };
@@ -540,8 +584,9 @@ const SignDocument = () => {
   // Log overall completion status
   console.log(`Completion status: radioGroupsComplete=${radioGroupsComplete}, nonRadioFieldsComplete=${nonRadioFieldsComplete}, signatureData=${!!signatureData}, agreedToTerms=${agreedToTerms}`);
   
+  
   const allRequiredComplete = radioGroupsComplete && nonRadioFieldsComplete;
-  const canFinish = signatureData && agreedToTerms && allRequiredComplete;
+  const canFinish = signatureData && allRequiredComplete; // Removed agreedToTerms requirement
 
   const getFieldsForPage = (pageNum: number) => [...signerFields, ...adminFields].filter(f => f.page === pageNum);
 
@@ -705,16 +750,7 @@ const SignDocument = () => {
               <span className="text-lg">FINISH</span>
               <span className="text-xs font-normal opacity-80">& Submit</span>
             </Button>
-          ) : (
-            <Button
-              onClick={() => setAgreedToTerms(true)}
-              size="lg"
-              className="bg-[#fae052] text-[#1a1a2e] hover:bg-[#f5d93a] font-bold shadow-2xl rounded-full px-6 py-6 gap-2 animate-pulse text-sm flex-col h-auto"
-            >
-              <span className="text-lg">AGREE</span>
-              <span className="text-xs font-normal opacity-80">to continue</span>
-            </Button>
-          )}
+          ) : null}
         </div>
       )}
 
@@ -1123,18 +1159,12 @@ const SignDocument = () => {
         </main>
       )}
 
-      {/* Footer - Terms (Mobile optimized) */}
+      {/* Footer (Mobile optimized) */}
       <footer className="bg-white border-t px-3 md:px-4 py-3 flex items-center justify-between sticky bottom-0 z-50 safe-area-inset-bottom">
         <div className="flex items-center gap-2 flex-1 min-w-0">
-          <Checkbox
-            id="terms"
-            checked={agreedToTerms}
-            onCheckedChange={(c) => setAgreedToTerms(c === true)}
-            className="h-5 w-5"
-          />
-          <label htmlFor="terms" className="text-xs md:text-sm text-[#666] cursor-pointer truncate">
-            I agree to electronic signatures
-          </label>
+          <span className="text-xs md:text-sm text-[#666]">
+            {data?.signerType === "manager" ? "Signing as: Manager" : `Signing as: ${data?.signerName}`}
+          </span>
         </div>
         
         {/* Mobile: Show Next/Finish button in footer */}

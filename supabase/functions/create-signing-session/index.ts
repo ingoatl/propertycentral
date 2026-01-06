@@ -171,10 +171,10 @@ serve(async (req) => {
     if (secondOwnerName && secondOwnerEmail && secondOwnerEmail !== ownerEmail) {
       signers.push({ name: secondOwnerName, email: secondOwnerEmail, type: "second_owner", order: 2 });
       // Manager comes after second owner
-      signers.push({ name: "PeachHaus Group", email: "anja@peachhausgroup.com", type: "manager", order: 3 });
+      signers.push({ name: "PeachHaus Group", email: "info@peachhausgroup.com", type: "manager", order: 3 });
     } else {
       // No second owner, manager is order 2
-      signers.push({ name: "PeachHaus Group", email: "anja@peachhausgroup.com", type: "manager", order: 2 });
+      signers.push({ name: "PeachHaus Group", email: "info@peachhausgroup.com", type: "manager", order: 2 });
     }
 
     const expiresAt = new Date();
