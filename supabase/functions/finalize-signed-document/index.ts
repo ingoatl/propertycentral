@@ -10,11 +10,87 @@ const corsHeaders = {
 
 const LOGO_URL = "https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/peachhaus-logo.png";
 
+// Convert Uint8Array to base64 in chunks to avoid stack overflow
+function uint8ArrayToBase64(bytes: Uint8Array): string {
+  const chunkSize = 32768; // Process in 32KB chunks
+  let binary = '';
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    const chunk = bytes.subarray(i, Math.min(i + chunkSize, bytes.length));
+    binary += String.fromCharCode(...chunk);
+  }
+  return btoa(binary);
+}
+
+// Generate SHA-256 hash of document
+async function generateDocumentHash(pdfBytes: Uint8Array): Promise<string> {
+  const buffer = new ArrayBuffer(pdfBytes.length);
+  new Uint8Array(buffer).set(pdfBytes);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+// Parse user agent to readable format
+function parseUserAgent(userAgent: string | null): string {
+  if (!userAgent) return "Unknown Browser";
+  
+  // Extract browser info
+  let browser = "Unknown Browser";
+  let os = "Unknown OS";
+  
+  if (userAgent.includes("Chrome")) {
+    const match = userAgent.match(/Chrome\/(\d+)/);
+    browser = `Chrome ${match ? match[1] : ""}`;
+  } else if (userAgent.includes("Safari") && !userAgent.includes("Chrome")) {
+    const match = userAgent.match(/Version\/(\d+)/);
+    browser = `Safari ${match ? match[1] : ""}`;
+  } else if (userAgent.includes("Firefox")) {
+    const match = userAgent.match(/Firefox\/(\d+)/);
+    browser = `Firefox ${match ? match[1] : ""}`;
+  } else if (userAgent.includes("Edge")) {
+    const match = userAgent.match(/Edg\/(\d+)/);
+    browser = `Edge ${match ? match[1] : ""}`;
+  }
+  
+  // Extract OS info
+  if (userAgent.includes("Windows NT 10")) os = "Windows 10/11";
+  else if (userAgent.includes("Windows")) os = "Windows";
+  else if (userAgent.includes("Mac OS X")) os = "macOS";
+  else if (userAgent.includes("iPhone") || userAgent.includes("iPad")) os = "iOS";
+  else if (userAgent.includes("Android")) os = "Android";
+  else if (userAgent.includes("Linux")) os = "Linux";
+  
+  return `${browser} on ${os}`;
+}
+
+// Format date to EST timezone with full details
+function formatDateEST(date: string | Date): string {
+  const d = new Date(date);
+  return d.toLocaleString('en-US', {
+    timeZone: 'America/New_York',
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+    timeZoneName: 'short'
+  });
+}
+
+// Generate unique certificate ID
+function generateCertificateId(): string {
+  const timestamp = Date.now().toString(36).toUpperCase();
+  const random = Math.random().toString(36).substring(2, 8).toUpperCase();
+  return `PH-${timestamp}-${random}`;
+}
+
 const buildCompletionEmailHtml = (
   recipientName: string,
   documentName: string,
   signers: { name: string; email: string; signedAt: string; type: string }[],
-  downloadUrl: string
+  downloadUrl: string,
+  certificateId: string
 ): string => {
   const issueDate = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
   
@@ -75,6 +151,18 @@ const buildCompletionEmailHtml = (
       </table>
     </div>
 
+    <!-- Certificate ID -->
+    <div style="padding: 16px 32px; background: #f9fafb; border-bottom: 1px solid #e5e5e5;">
+      <table style="width: 100%;">
+        <tr>
+          <td>
+            <div style="font-size: 10px; color: #666666; text-transform: uppercase; letter-spacing: 0.5px;">Certificate ID</div>
+            <div style="font-size: 12px; font-family: 'SF Mono', Menlo, Consolas, 'Courier New', monospace; color: #111111;">${certificateId}</div>
+          </td>
+        </tr>
+      </table>
+    </div>
+
     <!-- Document Details -->
     <div style="padding: 24px 32px;">
       <div style="font-size: 10px; color: #666666; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">Document</div>
@@ -91,7 +179,7 @@ const buildCompletionEmailHtml = (
       <table style="width: 100%; border: 2px solid #10b981; border-radius: 8px; overflow: hidden;">
         <tr>
           <td style="padding: 20px; text-align: center; background: #ecfdf5;">
-            <div style="font-size: 12px; color: #065f46; margin-bottom: 12px;">Your signed copy is attached to this email</div>
+            <div style="font-size: 12px; color: #065f46; margin-bottom: 12px;">Your signed copy with Certificate of Completion is attached</div>
             <a href="${downloadUrl}" style="display: inline-block; background: #10b981; color: #ffffff; text-decoration: none; padding: 12px 32px; font-weight: 600; font-size: 14px; letter-spacing: 0.3px; border-radius: 6px;">
               📄 DOWNLOAD SIGNED DOCUMENT
             </a>
@@ -191,6 +279,39 @@ serve(async (req) => {
 
     console.log("Found", signatures?.length, "signatures for document");
 
+    // Get audit log entries for detailed timeline
+    const { data: auditLogs } = await supabase
+      .from("document_audit_log")
+      .select("*")
+      .eq("document_id", documentId)
+      .order("created_at", { ascending: true });
+
+    // Build signer timeline from audit logs
+    const signerTimelines: Record<string, { sent?: string; viewed?: string; signed?: string; userAgent?: string }> = {};
+    
+    for (const log of auditLogs || []) {
+      const email = (log.metadata as any)?.signer_email || (log.metadata as any)?.email;
+      if (email) {
+        if (!signerTimelines[email]) signerTimelines[email] = {};
+        
+        if (log.action === 'signing_session_created' || log.action === 'signing_email_sent') {
+          signerTimelines[email].sent = log.created_at;
+        } else if (log.action === 'document_viewed' || log.action === 'token_validated') {
+          if (!signerTimelines[email].viewed) {
+            signerTimelines[email].viewed = log.created_at;
+          }
+          if (log.user_agent) {
+            signerTimelines[email].userAgent = log.user_agent;
+          }
+        } else if (log.action === 'signature_submitted') {
+          signerTimelines[email].signed = log.created_at;
+          if (log.user_agent) {
+            signerTimelines[email].userAgent = log.user_agent;
+          }
+        }
+      }
+    }
+
     // Get the original PDF - try both storage buckets
     let pdfBytes: ArrayBuffer | null = null;
     const templatePath = document.document_templates?.file_path;
@@ -242,100 +363,293 @@ serve(async (req) => {
       page.drawText(document.document_name || "Signed Agreement", { x: 50, y: 750, size: 24, font });
     }
 
-    // Add signature certificate page
-    const certPage = pdfDoc.addPage();
+    // Generate certificate ID
+    const certificateId = generateCertificateId();
+
+    // Add enhanced signature certificate page (DocuSign-style)
+    const certPage = pdfDoc.addPage([612, 792]); // US Letter size
     const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
     const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
     
-    let yPos = 750;
+    const pageWidth = 612;
+    const margin = 50;
+    let yPos = 742;
     
-    // Header
-    certPage.drawText("CERTIFICATE OF COMPLETION", {
-      x: 150,
-      y: yPos,
-      size: 20,
-      font: boldFont,
-      color: rgb(0.1, 0.1, 0.1),
+    // Colors
+    const darkGray = rgb(0.2, 0.2, 0.2);
+    const mediumGray = rgb(0.4, 0.4, 0.4);
+    const lightGray = rgb(0.6, 0.6, 0.6);
+    const greenColor = rgb(0.063, 0.722, 0.525); // #10b981
+    const bgGray = rgb(0.96, 0.96, 0.96);
+    
+    // === HEADER ===
+    // Draw header background
+    certPage.drawRectangle({
+      x: 0,
+      y: 720,
+      width: pageWidth,
+      height: 72,
+      color: rgb(0.98, 0.98, 0.98),
     });
     
-    yPos -= 40;
-    certPage.drawText(`Document: ${document.document_name || document.document_templates?.name || "Agreement"}`, {
-      x: 50,
+    // Header line
+    certPage.drawRectangle({
+      x: 0,
+      y: 720,
+      width: pageWidth,
+      height: 2,
+      color: greenColor,
+    });
+    
+    // Title
+    certPage.drawText("CERTIFICATE OF COMPLETION", {
+      x: margin,
       y: yPos,
-      size: 12,
+      size: 18,
+      font: boldFont,
+      color: darkGray,
+    });
+    
+    yPos -= 22;
+    certPage.drawText(`Certificate ID: ${certificateId}`, {
+      x: margin,
+      y: yPos,
+      size: 9,
       font,
+      color: mediumGray,
+    });
+    
+    // Status badge (right side)
+    certPage.drawText("✓ COMPLETED", {
+      x: pageWidth - margin - 80,
+      y: 742,
+      size: 11,
+      font: boldFont,
+      color: greenColor,
+    });
+    
+    yPos = 690;
+    
+    // === DOCUMENT DETAILS SECTION ===
+    certPage.drawText("DOCUMENT DETAILS", {
+      x: margin,
+      y: yPos,
+      size: 10,
+      font: boldFont,
+      color: darkGray,
     });
     
     yPos -= 20;
-    certPage.drawText(`Document ID: ${documentId}`, {
-      x: 50,
+    certPage.drawText("Document Name:", {
+      x: margin,
       y: yPos,
-      size: 10,
+      size: 9,
       font,
-      color: rgb(0.4, 0.4, 0.4),
+      color: mediumGray,
+    });
+    certPage.drawText(document.document_name || document.document_templates?.name || "Agreement", {
+      x: margin + 100,
+      y: yPos,
+      size: 9,
+      font: boldFont,
+      color: darkGray,
     });
     
     yPos -= 15;
-    certPage.drawText(`Completed: ${new Date().toLocaleString()}`, {
-      x: 50,
+    certPage.drawText("Document ID:", {
+      x: margin,
       y: yPos,
-      size: 10,
+      size: 9,
       font,
-      color: rgb(0.4, 0.4, 0.4),
+      color: mediumGray,
+    });
+    certPage.drawText(documentId, {
+      x: margin + 100,
+      y: yPos,
+      size: 8,
+      font,
+      color: mediumGray,
     });
     
-    yPos -= 40;
-    certPage.drawText("SIGNATURE DETAILS", {
-      x: 50,
+    yPos -= 15;
+    certPage.drawText("Completed:", {
+      x: margin,
       y: yPos,
-      size: 14,
-      font: boldFont,
+      size: 9,
+      font,
+      color: mediumGray,
+    });
+    certPage.drawText(formatDateEST(new Date()), {
+      x: margin + 100,
+      y: yPos,
+      size: 9,
+      font,
+      color: darkGray,
+    });
+    
+    yPos -= 15;
+    certPage.drawText("Total Pages:", {
+      x: margin,
+      y: yPos,
+      size: 9,
+      font,
+      color: mediumGray,
+    });
+    certPage.drawText(`${pdfDoc.getPageCount()} (including this certificate)`, {
+      x: margin + 100,
+      y: yPos,
+      size: 9,
+      font,
+      color: darkGray,
+    });
+    
+    // Divider
+    yPos -= 25;
+    certPage.drawRectangle({
+      x: margin,
+      y: yPos,
+      width: pageWidth - (margin * 2),
+      height: 1,
+      color: rgb(0.9, 0.9, 0.9),
     });
     
     yPos -= 25;
     
-    for (const sig of signatures || []) {
-      certPage.drawText(`${sig.signer_name}`, {
-        x: 50,
+    // === SIGNING AUDIT TRAIL ===
+    certPage.drawText("SIGNING AUDIT TRAIL", {
+      x: margin,
+      y: yPos,
+      size: 10,
+      font: boldFont,
+      color: darkGray,
+    });
+    
+    yPos -= 5;
+    
+    // Process each signer
+    for (let i = 0; i < (signatures || []).length; i++) {
+      const sig = signatures![i];
+      const timeline = signerTimelines[sig.signer_email] || {};
+      
+      yPos -= 20;
+      
+      // Signer header background
+      certPage.drawRectangle({
+        x: margin,
+        y: yPos - 5,
+        width: pageWidth - (margin * 2),
+        height: 22,
+        color: bgGray,
+      });
+      
+      // Signer number and name
+      certPage.drawText(`SIGNER ${i + 1}:`, {
+        x: margin + 8,
         y: yPos,
-        size: 12,
+        size: 8,
         font: boldFont,
+        color: mediumGray,
       });
-      
-      yPos -= 18;
-      certPage.drawText(`Email: ${sig.signer_email}`, {
-        x: 70,
+      certPage.drawText(sig.signer_name, {
+        x: margin + 58,
         y: yPos,
         size: 10,
-        font,
+        font: boldFont,
+        color: darkGray,
       });
       
-      yPos -= 15;
-      certPage.drawText(`Role: ${sig.signer_type.replace("_", " ").toUpperCase()}`, {
-        x: 70,
+      // Role on the right
+      const roleText = sig.signer_type === 'owner' ? 'Property Owner' : 'Property Manager';
+      certPage.drawText(roleText, {
+        x: pageWidth - margin - 90,
         y: yPos,
-        size: 10,
+        size: 8,
         font,
+        color: mediumGray,
       });
       
-      yPos -= 15;
-      certPage.drawText(`Signed: ${sig.signed_at ? new Date(sig.signed_at).toLocaleString() : "N/A"}`, {
-        x: 70,
+      yPos -= 22;
+      
+      // Email
+      certPage.drawText("Email:", {
+        x: margin + 15,
         y: yPos,
-        size: 10,
+        size: 8,
         font,
+        color: mediumGray,
       });
-      
-      yPos -= 15;
-      certPage.drawText(`IP Address: ${sig.ip_address || "N/A"}`, {
-        x: 70,
+      certPage.drawText(sig.signer_email, {
+        x: margin + 55,
         y: yPos,
-        size: 10,
+        size: 8,
         font,
-        color: rgb(0.4, 0.4, 0.4),
+        color: darkGray,
       });
       
-      // Draw the signature image if available
+      yPos -= 14;
+      
+      // Timeline events
+      const events = [
+        { label: "Sent:", time: timeline.sent || document.created_at },
+        { label: "Viewed:", time: timeline.viewed },
+        { label: "Signed:", time: sig.signed_at },
+      ];
+      
+      for (const event of events) {
+        certPage.drawText(event.label, {
+          x: margin + 15,
+          y: yPos,
+          size: 8,
+          font,
+          color: mediumGray,
+        });
+        certPage.drawText(event.time ? formatDateEST(event.time) : "N/A", {
+          x: margin + 55,
+          y: yPos,
+          size: 8,
+          font,
+          color: event.time ? darkGray : lightGray,
+        });
+        yPos -= 12;
+      }
+      
+      // IP Address
+      certPage.drawText("IP Address:", {
+        x: margin + 15,
+        y: yPos,
+        size: 8,
+        font,
+        color: mediumGray,
+      });
+      certPage.drawText(sig.ip_address || "N/A", {
+        x: margin + 75,
+        y: yPos,
+        size: 8,
+        font,
+        color: darkGray,
+      });
+      
+      yPos -= 12;
+      
+      // Browser/Device
+      certPage.drawText("Browser:", {
+        x: margin + 15,
+        y: yPos,
+        size: 8,
+        font,
+        color: mediumGray,
+      });
+      certPage.drawText(parseUserAgent(timeline.userAgent || sig.user_agent || null), {
+        x: margin + 75,
+        y: yPos,
+        size: 8,
+        font,
+        color: darkGray,
+      });
+      
+      yPos -= 5;
+      
+      // Draw signature image if available
       if (sig.signature_data && sig.signature_data.startsWith("data:image/png;base64,")) {
         try {
           const signatureBase64 = sig.signature_data.split(",")[1];
@@ -343,39 +657,164 @@ serve(async (req) => {
           const signatureImage = await pdfDoc.embedPng(signatureBytes);
           
           yPos -= 5;
-          certPage.drawImage(signatureImage, {
-            x: 70,
-            y: yPos - 40,
-            width: 150,
-            height: 40,
+          
+          // Draw signature box
+          certPage.drawRectangle({
+            x: margin + 15,
+            y: yPos - 35,
+            width: 140,
+            height: 35,
+            borderColor: rgb(0.85, 0.85, 0.85),
+            borderWidth: 0.5,
           });
-          yPos -= 50;
+          
+          certPage.drawImage(signatureImage, {
+            x: margin + 20,
+            y: yPos - 32,
+            width: 130,
+            height: 30,
+          });
+          yPos -= 45;
         } catch (imgError) {
           console.error("Error embedding signature image:", imgError);
           yPos -= 10;
         }
       }
       
-      yPos -= 25;
+      yPos -= 10;
     }
     
-    // Footer
-    yPos = 100;
-    certPage.drawText("This document was signed electronically and is legally binding under the ESIGN Act.", {
-      x: 50,
+    // === SECURITY VERIFICATION SECTION ===
+    yPos -= 15;
+    certPage.drawRectangle({
+      x: margin,
       y: yPos,
-      size: 9,
-      font,
-      color: rgb(0.4, 0.4, 0.4),
+      width: pageWidth - (margin * 2),
+      height: 1,
+      color: rgb(0.9, 0.9, 0.9),
     });
     
-    yPos -= 15;
-    certPage.drawText("PeachHaus Group • Property Management Made Simple", {
-      x: 50,
+    yPos -= 25;
+    
+    certPage.drawText("SECURITY VERIFICATION", {
+      x: margin,
       y: yPos,
-      size: 9,
+      size: 10,
+      font: boldFont,
+      color: darkGray,
+    });
+    
+    yPos -= 20;
+    
+    // Generate document hash (before adding this certificate page content - use original PDF)
+    let documentHash = "Generating...";
+    if (pdfBytes) {
+      documentHash = await generateDocumentHash(new Uint8Array(pdfBytes));
+    } else {
+      // Generate hash from current PDF state
+      const tempBytes = await pdfDoc.save();
+      documentHash = await generateDocumentHash(tempBytes);
+    }
+    
+    certPage.drawText("Document Hash (SHA-256):", {
+      x: margin,
+      y: yPos,
+      size: 8,
       font,
-      color: rgb(0.4, 0.4, 0.4),
+      color: mediumGray,
+    });
+    
+    yPos -= 12;
+    certPage.drawText(documentHash, {
+      x: margin,
+      y: yPos,
+      size: 7,
+      font,
+      color: darkGray,
+    });
+    
+    yPos -= 20;
+    
+    // Tamper-evident statement
+    certPage.drawRectangle({
+      x: margin,
+      y: yPos - 35,
+      width: pageWidth - (margin * 2),
+      height: 45,
+      color: rgb(0.98, 0.98, 0.99),
+      borderColor: rgb(0.9, 0.9, 0.9),
+      borderWidth: 0.5,
+    });
+    
+    certPage.drawText("🔒 TAMPER-EVIDENT SEAL", {
+      x: margin + 10,
+      y: yPos - 8,
+      size: 8,
+      font: boldFont,
+      color: darkGray,
+    });
+    
+    certPage.drawText("This document is secured with a cryptographic hash. Any modification to the", {
+      x: margin + 10,
+      y: yPos - 20,
+      size: 7,
+      font,
+      color: mediumGray,
+    });
+    certPage.drawText("document content after signing will invalidate this certificate.", {
+      x: margin + 10,
+      y: yPos - 30,
+      size: 7,
+      font,
+      color: mediumGray,
+    });
+    
+    // === FOOTER ===
+    // Legal disclaimer
+    certPage.drawText("This document is legally binding under the Electronic Signatures in Global and National", {
+      x: margin,
+      y: 70,
+      size: 7,
+      font,
+      color: lightGray,
+    });
+    certPage.drawText("Commerce Act (ESIGN) and the Uniform Electronic Transactions Act (UETA).", {
+      x: margin,
+      y: 60,
+      size: 7,
+      font,
+      color: lightGray,
+    });
+    
+    // Footer branding
+    certPage.drawRectangle({
+      x: 0,
+      y: 0,
+      width: pageWidth,
+      height: 45,
+      color: rgb(0.07, 0.07, 0.07),
+    });
+    
+    certPage.drawText("PeachHaus Group", {
+      x: margin,
+      y: 25,
+      size: 10,
+      font: boldFont,
+      color: rgb(1, 1, 1),
+    });
+    certPage.drawText("Property Management Made Simple", {
+      x: margin,
+      y: 12,
+      size: 8,
+      font,
+      color: rgb(0.6, 0.6, 0.6),
+    });
+    certPage.drawText("info@peachhausgroup.com", {
+      x: pageWidth - margin - 120,
+      y: 18,
+      size: 8,
+      font,
+      color: rgb(0.6, 0.6, 0.6),
     });
 
     // Save the modified PDF
@@ -412,6 +851,8 @@ serve(async (req) => {
       action: "document_finalized",
       metadata: {
         signed_pdf_path: fileName,
+        certificate_id: certificateId,
+        document_hash: documentHash,
         all_signers: signatures?.map(s => ({
           name: s.signer_name,
           email: s.signer_email,
@@ -435,8 +876,8 @@ serve(async (req) => {
       type: s.signer_type,
     })) || [];
 
-    // Convert PDF bytes to base64 for attachment
-    const pdfBase64 = btoa(String.fromCharCode(...new Uint8Array(modifiedPdfBytes)));
+    // Convert PDF bytes to base64 for attachment (using chunked method to avoid stack overflow)
+    const pdfBase64 = uint8ArrayToBase64(modifiedPdfBytes);
     const documentDisplayName = document.document_name || document.document_templates?.name || "Agreement";
 
     console.log("Sending completion emails to", signerDetails.length, "signers with PDF attachment");
@@ -451,7 +892,8 @@ serve(async (req) => {
             signer.name,
             documentDisplayName,
             signerDetails,
-            downloadUrl
+            downloadUrl,
+            certificateId
           ),
           attachments: [
             {
@@ -489,6 +931,7 @@ serve(async (req) => {
         metadata: {
           document_id: documentId,
           signed_pdf_path: fileName,
+          certificate_id: certificateId,
           next_stage: "onboarding",
         },
       });
@@ -544,19 +987,22 @@ serve(async (req) => {
             metadata: {
               property_id: lead.property_id,
               management_fee: managementFee,
+              certificate_id: certificateId,
             },
           });
         }
       }
     }
 
-    console.log("Document finalized successfully:", fileName);
+    console.log("Document finalized successfully:", fileName, "Certificate ID:", certificateId);
 
     return new Response(
       JSON.stringify({
         success: true,
         signedPdfPath: fileName,
         signedUrl: downloadUrl,
+        certificateId,
+        documentHash,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
