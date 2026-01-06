@@ -218,9 +218,9 @@ serve(async (req) => {
     }
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-    const { templateId, fileUrl, textPositions, totalPages, forceReanalyze } = await req.json();
+    const { templateId, fileUrl, textPositions, totalPages, forceReanalyze, existingContractType, mergeWithExisting, existingFields } = await req.json();
 
-    console.log("Intelligent document analysis - templateId:", templateId, "totalPages:", totalPages);
+    console.log("Intelligent document analysis - templateId:", templateId, "totalPages:", totalPages, "mergeWithExisting:", mergeWithExisting);
 
     let documentText = "";
     let template = null;
@@ -252,6 +252,9 @@ serve(async (req) => {
         );
       }
     }
+    
+    // Use existing contract type if provided (for better context in re-analysis)
+    const knownContractType = existingContractType || template?.contract_type;
 
     // Build document text from text positions
     if (textPositions && Array.isArray(textPositions)) {

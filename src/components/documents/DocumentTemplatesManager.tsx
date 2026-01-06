@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { Plus, FileText, Trash2, Upload, CheckCircle, XCircle, ExternalLink, Link2, Edit2, Loader2, Sparkles, RefreshCw, Eye } from "lucide-react";
+import { Plus, FileText, Trash2, Upload, CheckCircle, XCircle, ExternalLink, Link2, Edit2, Loader2, Sparkles, RefreshCw, Eye, MoreVertical, Merge } from "lucide-react";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
@@ -185,14 +185,25 @@ export function DocumentTemplatesManager() {
       
       // Analyze document to detect type
       const result = await analyzeDocument(file);
+      
+      // Use the original filename (without extension) as the document name
+      const originalFileName = file.name.replace(/\.[^.]+$/, '');
+      
       if (result) {
         setDetectedType(result.contract_type);
         setFormData(prev => ({
           ...prev,
           contract_type: result.contract_type,
-          name: prev.name || result.name,
+          // Preserve user-entered name, fallback to original filename, then AI-suggested name
+          name: prev.name || originalFileName || result.name,
         }));
         toast.success(`Detected: ${CONTRACT_TYPE_OPTIONS.find(o => o.value === result.contract_type)?.label || result.contract_type}`);
+      } else {
+        // Even if analysis fails, use the original filename
+        setFormData(prev => ({
+          ...prev,
+          name: prev.name || originalFileName,
+        }));
       }
     }
   };
@@ -365,14 +376,20 @@ export function DocumentTemplatesManager() {
     }
   };
 
-  const handleReanalyze = async (template: DocumentTemplate) => {
+  const handleReanalyze = async (template: DocumentTemplate, mergeMode: boolean = false) => {
     try {
       setReanalyzing(template.id);
+      
+      // Get existing fields if in merge mode
+      const existingFields = mergeMode && template.field_mappings 
+        ? (Array.isArray(template.field_mappings) ? template.field_mappings : [])
+        : [];
       
       // Use hybrid extraction with getAnnotations()
       const { formFields, textPositions, totalPages, hasAcroForm } = await extractPdfFormFields(template.file_path);
       
       console.log(`Re-analyzing: extracted ${formFields.length} AcroForm fields, ${textPositions.length} text items from ${totalPages} pages`);
+      console.log(`Merge mode: ${mergeMode}, existing fields: ${existingFields.length}`);
       
       // First try the intelligent analyzer for better document type detection
       if (textPositions.length > 0 && !hasAcroForm) {
@@ -383,11 +400,15 @@ export function DocumentTemplatesManager() {
               textPositions,
               totalPages,
               forceReanalyze: true,
+              existingContractType: template.contract_type,
+              mergeWithExisting: mergeMode,
+              existingFields: mergeMode ? existingFields : undefined,
             },
           });
 
           if (!intelligentError && intelligentData?.success && intelligentData?.fields?.length > 0) {
-            toast.success(`Detected ${intelligentData.fields.length} fields as ${intelligentData.document_type_label || intelligentData.document_type}`);
+            const action = mergeMode ? 'Merged to' : 'Detected';
+            toast.success(`${action} ${intelligentData.fields.length} fields as ${intelligentData.document_type_label || intelligentData.document_type}`);
             loadTemplates();
             return;
           }
@@ -403,6 +424,9 @@ export function DocumentTemplatesManager() {
           textPositions,
           templateId: template.id,
           totalPages,
+          existingContractType: template.contract_type,
+          mergeWithExisting: mergeMode,
+          existingFields: mergeMode ? existingFields : undefined,
         },
       });
 
@@ -410,7 +434,8 @@ export function DocumentTemplatesManager() {
       
       if (data?.fields?.length > 0) {
         const source = data.source === 'acroform' ? 'exact form field positions' : 'AI analysis';
-        toast.success(`Re-detected ${data.fields.length} fillable fields using ${source}`);
+        const action = mergeMode ? 'Merged to' : 'Re-detected';
+        toast.success(`${action} ${data.fields.length} fillable fields using ${source}`);
         loadTemplates();
       } else {
         toast.warning('No fillable fields detected');
@@ -496,19 +521,47 @@ export function DocumentTemplatesManager() {
                     >
                       <Eye className="w-4 h-4" />
                     </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleReanalyze(template)}
-                      disabled={reanalyzing === template.id}
-                      title="Re-analyze document"
-                    >
-                      {reanalyzing === template.id ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <RefreshCw className="w-4 h-4" />
-                      )}
-                    </Button>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          disabled={reanalyzing === template.id}
+                          title="Re-analyze document"
+                        >
+                          {reanalyzing === template.id ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <RefreshCw className="w-4 h-4" />
+                          )}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-56 p-2" align="end">
+                        <div className="space-y-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="w-full justify-start gap-2"
+                            onClick={() => handleReanalyze(template, false)}
+                          >
+                            <RefreshCw className="w-4 h-4" />
+                            Full Re-analyze
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="w-full justify-start gap-2"
+                            onClick={() => handleReanalyze(template, true)}
+                          >
+                            <Merge className="w-4 h-4" />
+                            Add Missing Fields
+                          </Button>
+                          <p className="text-xs text-muted-foreground px-2 py-1">
+                            "Add Missing" keeps existing fields and only adds new ones
+                          </p>
+                        </div>
+                      </PopoverContent>
+                    </Popover>
                     <Badge 
                       variant={template.is_active ? "default" : "secondary"}
                       className="cursor-pointer"
