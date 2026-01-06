@@ -326,7 +326,12 @@ async function fillPdfWithValues(
         const absHeight = (height / 100) * pageHeight;
         
         const textValue = sanitizeTextForPdf(String(value));
-        const fontSize = Math.min(11, absHeight * 0.7);
+        const fontSize = Math.min(10, absHeight * 0.6);
+        
+        // Use the stored label_offset from field detection if available
+        // This offset tells us where AFTER the label text to place the value
+        const labelOffset = mapping.label_offset || 0;
+        const drawX = absX + (labelOffset / 100) * pageWidth;
         
         try {
           // Handle signature fields - determine which signer's signature to embed
@@ -346,48 +351,43 @@ async function fillPdfWithValues(
                 const sigBytes = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
                 const sigImage = await pdfDoc.embedPng(sigBytes);
                 
-                // Position signature image BELOW the field line/label
-                // The field y position marks WHERE the signature line IS
-                // So we draw the signature starting from that line, going down
-                const sigWidth = Math.min(absWidth * 0.8, 150);
-                const sigHeight = Math.min(35, absHeight * 2);
+                // Signature dimensions - keep compact
+                const sigWidth = Math.min(absWidth * 0.6, 120);
+                const sigHeight = Math.min(28, absHeight * 1.5);
                 
-                // Draw signature positioned so top of signature aligns with the line
-                // absY is where the line is, signature goes below that
+                // Draw signature ON THE LINE (not overlapping label)
+                // The mapping x,y is the START of the field area (after label)
+                // We position signature so its baseline sits on the line
                 page.drawImage(sigImage, {
-                  x: absX + 5,
-                  y: absY - sigHeight - 5, // Position below the label/line
+                  x: drawX,
+                  y: absY - sigHeight + 3, // Position so bottom of sig is near the baseline
                   width: sigWidth,
                   height: sigHeight,
                 });
-                console.log("Embedded signature for", signerType, "at", api_id, "position:", absX, absY - sigHeight - 5);
+                console.log("Embedded signature for", signerType, "at", api_id, "draw position:", drawX, absY);
               } catch (sigError) {
                 console.error("Error embedding signature for", signerType, ":", sigError);
-                // Fallback to text
                 page.drawText(`[Signed by ${sigData.name}]`, {
-                  x: absX,
-                  y: absY - fontSize - 8,
-                  size: 9,
+                  x: drawX,
+                  y: absY - fontSize,
+                  size: 8,
                   font,
-                  color: rgb(0.2, 0.2, 0.2),
+                  color: rgb(0.3, 0.3, 0.3),
                 });
               }
             } else if (sigData?.name) {
-              // No image but has signer name - show text representation
               page.drawText(`[Signed by ${sigData.name}]`, {
-                x: absX,
-                y: absY - fontSize - 8,
-                size: 9,
+                x: drawX,
+                y: absY - fontSize,
+                size: 8,
                 font,
-                color: rgb(0.2, 0.2, 0.2),
+                color: rgb(0.3, 0.3, 0.3),
               });
             }
-            // If no signature data at all, leave blank (don't write placeholder)
           } else if (typeof value === 'boolean') {
-            // Checkbox - draw X or checkmark
             if (value === true) {
               page.drawText('X', {
-                x: absX + 2,
+                x: drawX + 2,
                 y: absY - 10,
                 size: 12,
                 font,
@@ -395,12 +395,11 @@ async function fillPdfWithValues(
               });
             }
           } else if (value !== '') {
-            // Regular text/date field - position text on the field line
-            // For fields that come after a label (like "Name: _____"), 
-            // the y position is where we should write the value
-            page.drawText(textValue.substring(0, 100), {
-              x: absX,
-              y: absY - fontSize, // Text baseline at field position
+            // Regular text/date field - draw value AFTER the label
+            // absY is the baseline of the line, we draw text there
+            page.drawText(textValue.substring(0, 80), {
+              x: drawX,
+              y: absY - fontSize + 2, // Slight adjustment to sit on baseline
               size: fontSize,
               font,
               color: rgb(0, 0, 0),
@@ -1581,31 +1580,57 @@ serve(async (req) => {
       const ownerSig = signatures?.find(s => s.signer_type === "owner");
       const managerSig = signatures?.find(s => s.signer_type === "manager");
 
-      const { data: insertedAgreement, error: agreementError } = await supabase
+      // First check if an agreement already exists for this property
+      const { data: existingAgreement } = await supabase
         .from("management_agreements")
-        .upsert({
-          property_id: propertyId,
-          owner_id: ownerId,
-          agreement_date: new Date().toISOString().split('T')[0],
-          effective_date: contractData.effectiveDate || new Date().toISOString().split('T')[0],
-          document_path: fileName,
-          management_fee_percentage: contractData.managementFee,
-          order_minimum_fee: contractData.visitPrice,
-          signed_by_owner: true,
-          signed_by_owner_at: ownerSig?.signed_at || new Date().toISOString(),
-          signed_by_company: true,
-          signed_by_company_at: managerSig?.signed_at || new Date().toISOString(),
-          status: "active",
-        }, {
-          onConflict: 'property_id',
-        })
-        .select()
-        .single();
+        .select("id")
+        .eq("property_id", propertyId)
+        .maybeSingle();
 
-      if (agreementError) {
-        console.error("Error saving management agreement:", agreementError);
+      const agreementData = {
+        property_id: propertyId,
+        owner_id: ownerId,
+        agreement_date: new Date().toISOString().split('T')[0],
+        effective_date: contractData.effectiveDate || new Date().toISOString().split('T')[0],
+        document_path: fileName,
+        management_fee_percentage: contractData.managementFee,
+        order_minimum_fee: contractData.visitPrice,
+        signed_by_owner: true,
+        signed_by_owner_at: ownerSig?.signed_at || new Date().toISOString(),
+        signed_by_company: true,
+        signed_by_company_at: managerSig?.signed_at || new Date().toISOString(),
+        status: "active",
+        updated_at: new Date().toISOString(),
+      };
+
+      let agreementResult;
+      if (existingAgreement) {
+        // Update existing
+        agreementResult = await supabase
+          .from("management_agreements")
+          .update(agreementData)
+          .eq("id", existingAgreement.id)
+          .select()
+          .single();
+        
+        if (agreementResult.error) {
+          console.error("Error updating management agreement:", agreementResult.error);
+        } else {
+          console.log("Updated management agreement (GREC compliance) - id:", agreementResult.data?.id);
+        }
       } else {
-        console.log("Management agreement saved to database (GREC compliance) - id:", insertedAgreement?.id);
+        // Insert new
+        agreementResult = await supabase
+          .from("management_agreements")
+          .insert(agreementData)
+          .select()
+          .single();
+        
+        if (agreementResult.error) {
+          console.error("Error inserting management agreement:", agreementResult.error);
+        } else {
+          console.log("Created management agreement (GREC compliance) - id:", agreementResult.data?.id);
+        }
       }
     } else {
       console.log("Skipping management_agreements save - no propertyId available");
