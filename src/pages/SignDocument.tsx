@@ -230,14 +230,9 @@ const SignDocument = () => {
           } else if (field.type === "checkbox") {
             initialValues[field.api_id] = false;
           } else if (isDateFieldCheck(field)) {
-            // Date fields: EMPTY for owner (first signer), AUTO-FILL for admin (last signer)
-            if (isAdminSignerFromResult) {
-              initialValues[field.api_id] = estDate;
-              completed.add(field.api_id);
-            } else {
-              // Leave empty for owner - admin will fill the effective date
-              initialValues[field.api_id] = "";
-            }
+            // Date fields: AUTO-FILL with current EST date for ALL signers
+            initialValues[field.api_id] = estDate;
+            completed.add(field.api_id);
           } else {
             initialValues[field.api_id] = "";
           }
