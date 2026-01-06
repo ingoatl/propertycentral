@@ -314,3 +314,60 @@ All colors MUST be HSL.
 .phase-card-content {
   transform-origin: top center;
 }
+
+/* Fireworks animation for signature completion */
+@keyframes firework-particle {
+  0% {
+    transform: translate(0, 0) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(
+      calc(cos(var(--angle)) * var(--speed)),
+      calc(sin(var(--angle)) * var(--speed))
+    ) scale(0);
+    opacity: 0;
+  }
+}
+
+.animate-firework-particle {
+  animation: firework-explode 1s ease-out forwards;
+}
+
+@keyframes firework-explode {
+  0% {
+    transform: translate(0, 0) scale(1);
+    opacity: 1;
+  }
+  20% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(
+      calc(cos(var(--angle, 0deg)) * var(--speed, 60px)),
+      calc(sin(var(--angle, 0deg)) * var(--speed, 60px))
+    ) scale(0.3);
+    opacity: 0;
+  }
+}
+
+/* Confetti animation */
+@keyframes confetti-fall {
+  0% {
+    transform: translateY(0) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(100vh) rotate(720deg);
+    opacity: 0;
+  }
+}
+
+.animate-confetti {
+  animation: confetti-fall 3s ease-in forwards;
+}
+
+/* Signing page professional font */
+.font-signing {
+  font-family: 'Lato', 'Open Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+}

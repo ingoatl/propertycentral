@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { Document, Page, pdfjs } from "react-pdf";
 import { InlineField, FieldData } from "@/components/signing/InlineField";
 import { InlineSignature } from "@/components/signing/InlineSignature";
+import { FireworksEffect } from "@/components/signing/FireworksEffect";
 import "react-pdf/dist/esm/Page/AnnotationLayer.css";
 import "react-pdf/dist/esm/Page/TextLayer.css";
 
@@ -640,15 +641,26 @@ const SignDocument = () => {
   }
 
   if (isComplete) {
+    // Show fireworks only for owner signers
+    const isOwnerSigner = data?.signerType === 'owner' || data?.signerType === 'second_owner';
+    
     return (
-      <div className="min-h-screen bg-[#f5f5f5] flex items-center justify-center p-4">
-        <div className="bg-white rounded-lg shadow-lg p-8 max-w-md w-full text-center border">
+      <div className="min-h-screen bg-[#f5f5f5] flex items-center justify-center p-4 font-signing">
+        {/* Fireworks effect for owner signers */}
+        <FireworksEffect show={isOwnerSigner} />
+        
+        <div className="bg-white rounded-lg shadow-lg p-8 max-w-md w-full text-center border relative z-10">
           <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <CheckCircle className="h-10 w-10 text-green-500" />
           </div>
-          <h1 className="text-xl font-semibold text-[#333] mb-2">Signing Complete!</h1>
+          <h1 className="text-xl font-semibold text-[#333] mb-2">
+            {isOwnerSigner ? "🎉 Congratulations!" : "Signing Complete!"}
+          </h1>
           <p className="text-[#666] mb-6">
-            Thank you, {data?.signerName}. Your signature has been recorded.
+            {isOwnerSigner 
+              ? `Thank you, ${data?.signerName}! Welcome to the PeachHaus family. Your signature has been recorded.`
+              : `Thank you, ${data?.signerName}. Your signature has been recorded.`
+            }
           </p>
           <div className="bg-[#f8f8f8] rounded p-4 text-left mb-4 border">
             <p className="text-xs text-[#888] mb-1">Document</p>
@@ -657,6 +669,11 @@ const SignDocument = () => {
           <p className="text-sm text-[#888]">
             A confirmation will be sent to {data?.signerEmail}
           </p>
+          {isOwnerSigner && (
+            <p className="text-sm text-green-600 mt-4 font-medium">
+              Our team will begin your onboarding process shortly!
+            </p>
+          )}
         </div>
       </div>
     );

@@ -253,15 +253,33 @@ serve(async (req) => {
       );
     }
 
-    // Get property address from lead for this document
+    // Get property address - first try from the field values (what owner just entered)
+    // then fall back to lead, then to property
     let propertyAddress: string | null = null;
+    
+    // First: Check if owner just entered property address in the form
+    if (fieldValues) {
+      propertyAddress = (fieldValues.property_address || fieldValues.PropertyAddress || 
+                         fieldValues.property_street_address) as string | null;
+    }
+    
+    // Second: Check saved field_configuration from document
+    if (!propertyAddress) {
+      const savedConfig = signingToken.booking_documents?.field_configuration as Record<string, any> | null;
+      if (savedConfig) {
+        propertyAddress = savedConfig.property_address || savedConfig.PropertyAddress || 
+                          savedConfig.property_street_address || null;
+      }
+    }
+    
+    // Third: Fall back to lead data
     const { data: lead } = await supabase
       .from("leads")
       .select("property_address, property_id")
       .eq("signwell_document_id", signingToken.document_id)
       .maybeSingle();
     
-    if (lead) {
+    if (!propertyAddress && lead) {
       propertyAddress = lead.property_address;
       
       // If no property_address on lead, try to get from property
@@ -278,7 +296,7 @@ serve(async (req) => {
       }
     }
 
-    console.log("Property address for document:", propertyAddress);
+    console.log("Property address for document (from field values, then lead):", propertyAddress);
 
     const now = new Date().toISOString();
     const documentName = signingToken.booking_documents?.document_name || 

@@ -85,6 +85,106 @@ function generateCertificateId(): string {
   return `PH-${timestamp}-${random}`;
 }
 
+// Extract owner and property data from field configuration
+interface ExtractedContractData {
+  ownerName: string | null;
+  ownerEmail: string | null;
+  ownerPhone: string | null;
+  ownerAddress: string | null;
+  secondOwnerName: string | null;
+  secondOwnerEmail: string | null;
+  propertyAddress: string | null;
+  serviceType: 'cohosting' | 'mid_term';
+  managementFee: number;
+  visitPrice: number;
+  rentalType: 'hybrid' | 'mid_term';
+  effectiveDate: string | null;
+}
+
+function extractContractData(fieldConfig: Record<string, any> | null): ExtractedContractData {
+  const data: ExtractedContractData = {
+    ownerName: null,
+    ownerEmail: null,
+    ownerPhone: null,
+    ownerAddress: null,
+    secondOwnerName: null,
+    secondOwnerEmail: null,
+    propertyAddress: null,
+    serviceType: 'cohosting',
+    managementFee: 20,
+    visitPrice: 40,
+    rentalType: 'hybrid',
+    effectiveDate: null,
+  };
+
+  if (!fieldConfig) return data;
+
+  // Extract owner information - check various field name patterns
+  data.ownerName = fieldConfig.owner_name || fieldConfig.owner_print_name || 
+                   fieldConfig.OwnerName || fieldConfig.owner_1_name || null;
+  data.ownerEmail = fieldConfig.owner_email || fieldConfig.OwnerEmail || 
+                    fieldConfig.owner_1_email || null;
+  data.ownerPhone = fieldConfig.owner_phone || fieldConfig.OwnerPhone || 
+                    fieldConfig.owner_1_phone || null;
+  data.ownerAddress = fieldConfig.owner_address || fieldConfig.OwnerAddress || null;
+
+  // Extract second owner info
+  data.secondOwnerName = fieldConfig.second_owner_print_name || fieldConfig.owner2_print_name || 
+                         fieldConfig.owner_2_name || fieldConfig.SecondOwnerName || null;
+  data.secondOwnerEmail = fieldConfig.second_owner_email || fieldConfig.owner2_email || 
+                          fieldConfig.owner_2_email || fieldConfig.SecondOwnerEmail || null;
+
+  // Extract property address - this is the key field the owner fills in
+  data.propertyAddress = fieldConfig.property_address || fieldConfig.PropertyAddress || 
+                         fieldConfig.property_street_address || fieldConfig.address || null;
+
+  // Extract effective date
+  data.effectiveDate = fieldConfig.effective_date || fieldConfig.EffectiveDate || 
+                       fieldConfig.agreement_date || null;
+
+  // Determine service type and visit price from package selection
+  // Package naming patterns: package_18, package_20, package_25, etc.
+  const packageKeys = Object.keys(fieldConfig).filter(k => 
+    k.toLowerCase().includes('package') && fieldConfig[k] === true
+  );
+
+  if (packageKeys.length > 0) {
+    const selectedPackage = packageKeys[0].toLowerCase();
+    
+    if (selectedPackage.includes('18')) {
+      data.serviceType = 'cohosting';
+      data.managementFee = 18;
+      data.visitPrice = 35;
+      data.rentalType = 'hybrid';
+    } else if (selectedPackage.includes('20')) {
+      data.serviceType = 'cohosting';
+      data.managementFee = 20;
+      data.visitPrice = 40;
+      data.rentalType = 'hybrid';
+    } else if (selectedPackage.includes('25')) {
+      data.serviceType = 'mid_term';
+      data.managementFee = 25;
+      data.visitPrice = 50;
+      data.rentalType = 'mid_term';
+    } else if (selectedPackage.includes('30')) {
+      data.serviceType = 'mid_term';
+      data.managementFee = 30;
+      data.visitPrice = 60;
+      data.rentalType = 'mid_term';
+    }
+  }
+
+  // Also check for explicit service type fields
+  if (fieldConfig.service_type) {
+    if (fieldConfig.service_type === 'mid_term' || fieldConfig.service_type === 'full_service') {
+      data.serviceType = 'mid_term';
+      data.rentalType = 'mid_term';
+    }
+  }
+
+  return data;
+}
+
 const buildCompletionEmailHtml = (
   recipientName: string,
   documentName: string,
@@ -293,35 +393,32 @@ serve(async (req) => {
 
     console.log("Found", signatures?.length, "signatures for document");
 
-    // Get property address from lead
-    let propertyAddress: string | null = null;
+    // Extract contract data from field_configuration
+    const fieldConfig = document.field_configuration as Record<string, any> | null;
+    const contractData = extractContractData(fieldConfig);
+
+    console.log("Extracted contract data:", JSON.stringify(contractData, null, 2));
+
+    // Property address comes from the contract (what the owner entered)
+    let propertyAddress = contractData.propertyAddress;
+
+    // Get lead data
     let leadData: any = null;
-    
     const { data: lead } = await supabase
       .from("leads")
-      .select("id, property_id, owner_id, property_address")
+      .select("id, property_id, owner_id, property_address, contact_name, email, phone")
       .eq("signwell_document_id", documentId)
       .maybeSingle();
     
     if (lead) {
       leadData = lead;
-      propertyAddress = lead.property_address;
-      
-      // If no property_address on lead, try to get from property
-      if (!propertyAddress && lead.property_id) {
-        const { data: property } = await supabase
-          .from("properties")
-          .select("address, name")
-          .eq("id", lead.property_id)
-          .single();
-        
-        if (property) {
-          propertyAddress = property.address || property.name;
-        }
+      // If contract doesn't have property address, try lead (fallback)
+      if (!propertyAddress) {
+        propertyAddress = lead.property_address;
       }
     }
 
-    console.log("Property address:", propertyAddress);
+    console.log("Property address from contract:", propertyAddress);
 
     // Get audit log entries for detailed timeline
     const { data: auditLogs } = await supabase
@@ -354,6 +451,149 @@ serve(async (req) => {
           }
         }
       }
+    }
+
+    // ========================================
+    // CREATE/UPDATE OWNER AND PROPERTY RECORDS
+    // ========================================
+    
+    let ownerId: string | null = leadData?.owner_id || null;
+    let propertyId: string | null = leadData?.property_id || null;
+
+    // Only create owner/property if we have the necessary data from contract
+    if (contractData.ownerEmail || contractData.ownerName) {
+      const ownerEmail = contractData.ownerEmail || leadData?.email;
+      const ownerName = contractData.ownerName || leadData?.contact_name;
+      const ownerPhone = contractData.ownerPhone || leadData?.phone;
+
+      if (ownerEmail) {
+        // Check if owner already exists
+        const { data: existingOwner } = await supabase
+          .from("property_owners")
+          .select("id")
+          .eq("email", ownerEmail)
+          .maybeSingle();
+
+        if (existingOwner) {
+          ownerId = existingOwner.id;
+          
+          // Update existing owner with contract data
+          const { error: updateOwnerError } = await supabase
+            .from("property_owners")
+            .update({
+              name: ownerName || undefined,
+              phone: ownerPhone || undefined,
+              second_owner_name: contractData.secondOwnerName || undefined,
+              second_owner_email: contractData.secondOwnerEmail || undefined,
+              service_type: contractData.serviceType,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", existingOwner.id);
+
+          if (updateOwnerError) {
+            console.error("Error updating owner:", updateOwnerError);
+          } else {
+            console.log("Updated existing owner:", existingOwner.id);
+          }
+        } else {
+          // Create new owner
+          const { data: newOwner, error: createOwnerError } = await supabase
+            .from("property_owners")
+            .insert({
+              name: ownerName || "Property Owner",
+              email: ownerEmail,
+              phone: ownerPhone,
+              second_owner_name: contractData.secondOwnerName,
+              second_owner_email: contractData.secondOwnerEmail,
+              service_type: contractData.serviceType,
+              payment_method: 'ach',
+            })
+            .select()
+            .single();
+
+          if (createOwnerError) {
+            console.error("Error creating owner:", createOwnerError);
+          } else {
+            ownerId = newOwner?.id;
+            console.log("Created new owner:", ownerId);
+          }
+        }
+      }
+    }
+
+    // Create property record if we have an address
+    if (propertyAddress && ownerId && !propertyId) {
+      // Check if property already exists with this address
+      const { data: existingProperty } = await supabase
+        .from("properties")
+        .select("id")
+        .eq("address", propertyAddress)
+        .maybeSingle();
+
+      if (existingProperty) {
+        propertyId = existingProperty.id;
+        
+        // Update property with contract data
+        await supabase
+          .from("properties")
+          .update({
+            owner_id: ownerId,
+            visit_price: contractData.visitPrice,
+            management_fee_percentage: contractData.managementFee,
+            rental_type: contractData.rentalType,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", propertyId);
+        
+        console.log("Updated existing property:", propertyId);
+      } else {
+        // Create new property
+        const { data: newProperty, error: createPropertyError } = await supabase
+          .from("properties")
+          .insert({
+            name: propertyAddress,
+            address: propertyAddress,
+            owner_id: ownerId,
+            visit_price: contractData.visitPrice,
+            management_fee_percentage: contractData.managementFee,
+            rental_type: contractData.rentalType,
+            property_type: 'Client-Managed',
+          })
+          .select()
+          .single();
+
+        if (createPropertyError) {
+          console.error("Error creating property:", createPropertyError);
+        } else {
+          propertyId = newProperty?.id;
+          console.log("Created new property:", propertyId, "with visit_price:", contractData.visitPrice);
+        }
+      }
+    }
+
+    // Update lead with property address and IDs from contract
+    if (leadData && (propertyAddress || ownerId || propertyId)) {
+      const leadUpdateData: any = {
+        stage: "onboarding",
+        stage_changed_at: new Date().toISOString(),
+      };
+      
+      if (propertyAddress && !leadData.property_address) {
+        leadUpdateData.property_address = propertyAddress;
+      }
+      if (ownerId && !leadData.owner_id) {
+        leadUpdateData.owner_id = ownerId;
+      }
+      if (propertyId && !leadData.property_id) {
+        leadUpdateData.property_id = propertyId;
+      }
+
+      await supabase
+        .from("leads")
+        .update(leadUpdateData)
+        .eq("id", leadData.id);
+
+      console.log("Updated lead with contract data:", leadUpdateData);
     }
 
     // Get the original PDF - try both storage buckets
@@ -926,6 +1166,9 @@ serve(async (req) => {
         certificate_id: certificateId,
         document_hash: documentHash,
         property_address: propertyAddress,
+        owner_id: ownerId,
+        property_id: propertyId,
+        contract_data: contractData,
         all_signers: signatures?.map(s => ({
           name: s.signer_name,
           email: s.signer_email,
@@ -988,11 +1231,11 @@ serve(async (req) => {
     }
 
     // Store executed document in property_documents table for Document Hub
-    if (leadData?.property_id) {
+    if (propertyId) {
       const { error: docInsertError } = await supabase
         .from("property_documents")
         .insert({
-          property_id: leadData.property_id,
+          property_id: propertyId,
           file_name: `${(propertyAddress || documentDisplayName).replace(/[^a-zA-Z0-9\s]/g, '')}_Signed.pdf`,
           file_path: fileName,
           file_type: "application/pdf",
@@ -1003,52 +1246,32 @@ serve(async (req) => {
       if (docInsertError) {
         console.error("Error saving to property_documents:", docInsertError);
       } else {
-        console.log("Saved executed agreement to property_documents");
+        console.log("Saved executed agreement to property_documents (Document Hub)");
       }
     }
 
-    // Update lead stage if associated and save to management_agreements
+    // Update lead and save to management_agreements (GREC compliance)
     if (leadData) {
-      // Update lead to contract_signed stage, then to onboarding
-      await supabase
-        .from("leads")
-        .update({
-          stage: "onboarding",
-          stage_changed_at: new Date().toISOString(),
-        })
-        .eq("id", leadData.id);
-
+      // Add timeline entry
       await supabase.from("lead_timeline").insert({
         lead_id: leadData.id,
-        action: "Contract signed by all parties - Moving to onboarding",
+        action: "Contract signed by all parties - Owner & Property records created",
         metadata: {
           document_id: documentId,
           signed_pdf_path: fileName,
           certificate_id: certificateId,
           property_address: propertyAddress,
+          owner_id: ownerId,
+          property_id: propertyId,
+          service_type: contractData.serviceType,
+          management_fee: contractData.managementFee,
+          visit_price: contractData.visitPrice,
           next_stage: "onboarding",
         },
       });
 
-      // If this is a management agreement, save to management_agreements table (GREC compliance)
-      if (document.contract_type === "management_agreement" && leadData.property_id) {
-        // Extract management fee from field configuration if available
-        const fieldConfig = document.field_configuration as Record<string, any> | null;
-        let managementFee = 20; // Default 20%
-        
-        if (fieldConfig) {
-          // Try to find the selected package from field values
-          const packageField = Object.entries(fieldConfig).find(([key, val]) => 
-            key.toLowerCase().includes("package") && val === true
-          );
-          if (packageField) {
-            const packageName = packageField[0].toLowerCase();
-            if (packageName.includes("20")) managementFee = 20;
-            else if (packageName.includes("25")) managementFee = 25;
-            else if (packageName.includes("30")) managementFee = 30;
-          }
-        }
-
+      // Save to management_agreements table (GREC compliance)
+      if (propertyId && document.contract_type === "management_agreement") {
         // Get owner and manager signed timestamps
         const ownerSig = signatures?.find(s => s.signer_type === "owner");
         const managerSig = signatures?.find(s => s.signer_type === "manager");
@@ -1056,12 +1279,13 @@ serve(async (req) => {
         const { error: agreementError } = await supabase
           .from("management_agreements")
           .upsert({
-            property_id: leadData.property_id,
-            owner_id: leadData.owner_id,
+            property_id: propertyId,
+            owner_id: ownerId,
             agreement_date: new Date().toISOString().split('T')[0],
-            effective_date: new Date().toISOString().split('T')[0],
+            effective_date: contractData.effectiveDate || new Date().toISOString().split('T')[0],
             document_path: fileName,
-            management_fee_percentage: managementFee,
+            management_fee_percentage: contractData.managementFee,
+            order_minimum_fee: contractData.visitPrice,
             signed_by_owner: true,
             signed_by_owner_at: ownerSig?.signed_at || new Date().toISOString(),
             signed_by_company: true,
@@ -1081,8 +1305,9 @@ serve(async (req) => {
             lead_id: leadData.id,
             action: "Management agreement saved to GREC records",
             metadata: {
-              property_id: leadData.property_id,
-              management_fee: managementFee,
+              property_id: propertyId,
+              management_fee: contractData.managementFee,
+              visit_price: contractData.visitPrice,
               certificate_id: certificateId,
               property_address: propertyAddress,
             },
@@ -1092,6 +1317,7 @@ serve(async (req) => {
     }
 
     console.log("Document finalized successfully:", fileName, "Certificate ID:", certificateId);
+    console.log("Created/Updated - Owner:", ownerId, "Property:", propertyId, "Visit Price:", contractData.visitPrice);
 
     return new Response(
       JSON.stringify({
@@ -1101,6 +1327,9 @@ serve(async (req) => {
         certificateId,
         documentHash,
         propertyAddress,
+        ownerId,
+        propertyId,
+        contractData,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
