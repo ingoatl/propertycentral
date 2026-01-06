@@ -88,6 +88,7 @@ function generateCertificateId(): string {
 const buildCompletionEmailHtml = (
   recipientName: string,
   documentName: string,
+  propertyAddress: string | null,
   signers: { name: string; email: string; signedAt: string; type: string }[],
   downloadUrl: string,
   certificateId: string
@@ -102,10 +103,23 @@ const buildCompletionEmailHtml = (
       </td>
       <td style="padding: 12px 0; border-bottom: 1px solid #e5e5e5; text-align: right;">
         <div style="font-size: 11px; color: #666666; text-transform: uppercase;">${s.type.replace('_', ' ')}</div>
-        <div style="font-size: 11px; color: #10b981;">✓ ${new Date(s.signedAt).toLocaleDateString()}</div>
+        <div style="font-size: 11px; color: #10b981;">Signed ${new Date(s.signedAt).toLocaleDateString()}</div>
       </td>
     </tr>
   `).join('');
+
+  const propertySection = propertyAddress ? `
+    <div style="padding: 16px 32px; background: #f0fdf4; border-bottom: 1px solid #bbf7d0;">
+      <table style="width: 100%;">
+        <tr>
+          <td>
+            <div style="font-size: 10px; color: #166534; text-transform: uppercase; letter-spacing: 0.5px;">Property</div>
+            <div style="font-size: 14px; font-weight: 600; color: #111111;">${propertyAddress}</div>
+          </td>
+        </tr>
+      </table>
+    </div>
+  ` : '';
 
   return `
 <!DOCTYPE html>
@@ -127,7 +141,7 @@ const buildCompletionEmailHtml = (
             <div style="display: none; font-size: 20px; font-weight: 700; color: #111111; letter-spacing: -0.3px;">PeachHaus</div>
           </td>
           <td style="text-align: right; vertical-align: middle;">
-            <div style="font-size: 16px; font-weight: 600; color: #10b981; margin-bottom: 4px;">✓ DOCUMENT COMPLETE</div>
+            <div style="font-size: 16px; font-weight: 600; color: #10b981; margin-bottom: 4px;">DOCUMENT COMPLETE</div>
             <div style="font-size: 10px; color: #666666; font-family: 'SF Mono', Menlo, Consolas, 'Courier New', monospace;">
               ${issueDate}
             </div>
@@ -140,9 +154,6 @@ const buildCompletionEmailHtml = (
     <div style="padding: 24px 32px; background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%); border-bottom: 1px solid #a7f3d0;">
       <table style="width: 100%;">
         <tr>
-          <td style="vertical-align: middle;">
-            <div style="font-size: 32px; margin-right: 16px;">🎉</div>
-          </td>
           <td style="vertical-align: middle; width: 100%;">
             <div style="font-size: 18px; font-weight: 700; color: #065f46; margin-bottom: 4px;">Agreement Fully Executed</div>
             <div style="font-size: 13px; color: #047857;">All parties have signed. The document is now legally binding.</div>
@@ -150,6 +161,9 @@ const buildCompletionEmailHtml = (
         </tr>
       </table>
     </div>
+
+    <!-- Property Section -->
+    ${propertySection}
 
     <!-- Certificate ID -->
     <div style="padding: 16px 32px; background: #f9fafb; border-bottom: 1px solid #e5e5e5;">
@@ -181,7 +195,7 @@ const buildCompletionEmailHtml = (
           <td style="padding: 20px; text-align: center; background: #ecfdf5;">
             <div style="font-size: 12px; color: #065f46; margin-bottom: 12px;">Your signed copy with Certificate of Completion is attached</div>
             <a href="${downloadUrl}" style="display: inline-block; background: #10b981; color: #ffffff; text-decoration: none; padding: 12px 32px; font-weight: 600; font-size: 14px; letter-spacing: 0.3px; border-radius: 6px;">
-              📄 DOWNLOAD SIGNED DOCUMENT
+              DOWNLOAD SIGNED DOCUMENT
             </a>
           </td>
         </tr>
@@ -222,7 +236,7 @@ const buildCompletionEmailHtml = (
               This document is legally binding under the Electronic Signatures in Global and National Commerce Act (ESIGN).
             </p>
             <p style="margin: 0; color: #737373; font-size: 11px;">
-              🍑 PeachHaus Group • info@peachhausgroup.com
+              PeachHaus Group - info@peachhausgroup.com
             </p>
           </td>
         </tr>
@@ -279,6 +293,36 @@ serve(async (req) => {
 
     console.log("Found", signatures?.length, "signatures for document");
 
+    // Get property address from lead
+    let propertyAddress: string | null = null;
+    let leadData: any = null;
+    
+    const { data: lead } = await supabase
+      .from("leads")
+      .select("id, property_id, owner_id, property_address")
+      .eq("signwell_document_id", documentId)
+      .maybeSingle();
+    
+    if (lead) {
+      leadData = lead;
+      propertyAddress = lead.property_address;
+      
+      // If no property_address on lead, try to get from property
+      if (!propertyAddress && lead.property_id) {
+        const { data: property } = await supabase
+          .from("properties")
+          .select("address, name")
+          .eq("id", lead.property_id)
+          .single();
+        
+        if (property) {
+          propertyAddress = property.address || property.name;
+        }
+      }
+    }
+
+    console.log("Property address:", propertyAddress);
+
     // Get audit log entries for detailed timeline
     const { data: auditLogs } = await supabase
       .from("document_audit_log")
@@ -303,7 +347,7 @@ serve(async (req) => {
           if (log.user_agent) {
             signerTimelines[email].userAgent = log.user_agent;
           }
-        } else if (log.action === 'signature_submitted') {
+        } else if (log.action === 'signature_submitted' || log.action === 'signature_captured') {
           signerTimelines[email].signed = log.created_at;
           if (log.user_agent) {
             signerTimelines[email].userAgent = log.user_agent;
@@ -419,9 +463,9 @@ serve(async (req) => {
       color: mediumGray,
     });
     
-    // Status badge (right side)
-    certPage.drawText("✓ COMPLETED", {
-      x: pageWidth - margin - 80,
+    // Status badge (right side) - Use ASCII text instead of Unicode
+    certPage.drawText("COMPLETED", {
+      x: pageWidth - margin - 70,
       y: 742,
       size: 11,
       font: boldFont,
@@ -447,7 +491,14 @@ serve(async (req) => {
       font,
       color: mediumGray,
     });
-    certPage.drawText(document.document_name || document.document_templates?.name || "Agreement", {
+    
+    // Build document display name with property address
+    let documentDisplayName = document.document_name || document.document_templates?.name || "Agreement";
+    if (propertyAddress && !documentDisplayName.includes(propertyAddress)) {
+      documentDisplayName = `${documentDisplayName} - ${propertyAddress}`;
+    }
+    
+    certPage.drawText(documentDisplayName.substring(0, 60) + (documentDisplayName.length > 60 ? "..." : ""), {
       x: margin + 100,
       y: yPos,
       size: 9,
@@ -470,6 +521,25 @@ serve(async (req) => {
       font,
       color: mediumGray,
     });
+    
+    // Add property address if available
+    if (propertyAddress) {
+      yPos -= 15;
+      certPage.drawText("Property:", {
+        x: margin,
+        y: yPos,
+        size: 9,
+        font,
+        color: mediumGray,
+      });
+      certPage.drawText(propertyAddress.substring(0, 50) + (propertyAddress.length > 50 ? "..." : ""), {
+        x: margin + 100,
+        y: yPos,
+        size: 9,
+        font,
+        color: darkGray,
+      });
+    }
     
     yPos -= 15;
     certPage.drawText("Completed:", {
@@ -559,7 +629,8 @@ serve(async (req) => {
       });
       
       // Role on the right
-      const roleText = sig.signer_type === 'owner' ? 'Property Owner' : 'Property Manager';
+      const roleText = sig.signer_type === 'owner' ? 'Property Owner' : 
+                       sig.signer_type === 'second_owner' ? 'Co-Owner' : 'Property Manager';
       certPage.drawText(roleText, {
         x: pageWidth - margin - 90,
         y: yPos,
@@ -746,7 +817,8 @@ serve(async (req) => {
       borderWidth: 0.5,
     });
     
-    certPage.drawText("🔒 TAMPER-EVIDENT SEAL", {
+    // Use ASCII text instead of emoji
+    certPage.drawText("TAMPER-EVIDENT SEAL", {
       x: margin + 10,
       y: yPos - 8,
       size: 8,
@@ -853,6 +925,7 @@ serve(async (req) => {
         signed_pdf_path: fileName,
         certificate_id: certificateId,
         document_hash: documentHash,
+        property_address: propertyAddress,
         all_signers: signatures?.map(s => ({
           name: s.signer_name,
           email: s.signer_email,
@@ -878,44 +951,64 @@ serve(async (req) => {
 
     // Convert PDF bytes to base64 for attachment (using chunked method to avoid stack overflow)
     const pdfBase64 = uint8ArrayToBase64(modifiedPdfBytes);
-    const documentDisplayName = document.document_name || document.document_templates?.name || "Agreement";
 
     console.log("Sending completion emails to", signerDetails.length, "signers with PDF attachment");
 
+    // Build email subject with property address
+    let emailSubject = `Agreement Complete: ${documentDisplayName}`;
+    if (propertyAddress) {
+      emailSubject = `Agreement Complete - ${propertyAddress}`;
+    }
+
     for (const signer of signerDetails) {
       try {
-        await resend.emails.send({
+        const emailResult = await resend.emails.send({
           from: "PeachHaus Group <info@peachhausgroup.com>",
           to: [signer.email],
-          subject: `🎉 Agreement Complete: ${documentDisplayName}`,
+          subject: emailSubject,
           html: buildCompletionEmailHtml(
             signer.name,
             documentDisplayName,
+            propertyAddress,
             signerDetails,
             downloadUrl,
             certificateId
           ),
           attachments: [
             {
-              filename: `${documentDisplayName.replace(/[^a-zA-Z0-9]/g, '_')}_Signed.pdf`,
+              filename: `${(propertyAddress || documentDisplayName).replace(/[^a-zA-Z0-9]/g, '_')}_Signed.pdf`,
               content: pdfBase64,
             },
           ],
         });
-        console.log("Sent completion email with attachment to:", signer.email);
+        console.log("Sent completion email with attachment to:", signer.email, "Result:", emailResult);
       } catch (emailError) {
         console.error("Error sending email to", signer.email, ":", emailError);
       }
     }
 
-    // Update lead stage if associated and save to management_agreements
-    const { data: lead } = await supabase
-      .from("leads")
-      .select("id, property_id, owner_id")
-      .eq("signwell_document_id", documentId)
-      .maybeSingle();
+    // Store executed document in property_documents table for Document Hub
+    if (leadData?.property_id) {
+      const { error: docInsertError } = await supabase
+        .from("property_documents")
+        .insert({
+          property_id: leadData.property_id,
+          file_name: `${(propertyAddress || documentDisplayName).replace(/[^a-zA-Z0-9\s]/g, '')}_Signed.pdf`,
+          file_path: fileName,
+          file_type: "application/pdf",
+          document_type: "management_agreement",
+          description: `Executed management agreement - ${propertyAddress || documentDisplayName}`,
+        });
+      
+      if (docInsertError) {
+        console.error("Error saving to property_documents:", docInsertError);
+      } else {
+        console.log("Saved executed agreement to property_documents");
+      }
+    }
 
-    if (lead) {
+    // Update lead stage if associated and save to management_agreements
+    if (leadData) {
       // Update lead to contract_signed stage, then to onboarding
       await supabase
         .from("leads")
@@ -923,21 +1016,22 @@ serve(async (req) => {
           stage: "onboarding",
           stage_changed_at: new Date().toISOString(),
         })
-        .eq("id", lead.id);
+        .eq("id", leadData.id);
 
       await supabase.from("lead_timeline").insert({
-        lead_id: lead.id,
+        lead_id: leadData.id,
         action: "Contract signed by all parties - Moving to onboarding",
         metadata: {
           document_id: documentId,
           signed_pdf_path: fileName,
           certificate_id: certificateId,
+          property_address: propertyAddress,
           next_stage: "onboarding",
         },
       });
 
-      // If this is a management agreement, save to management_agreements table
-      if (document.contract_type === "management_agreement" && lead.property_id) {
+      // If this is a management agreement, save to management_agreements table (GREC compliance)
+      if (document.contract_type === "management_agreement" && leadData.property_id) {
         // Extract management fee from field configuration if available
         const fieldConfig = document.field_configuration as Record<string, any> | null;
         let managementFee = 20; // Default 20%
@@ -961,9 +1055,9 @@ serve(async (req) => {
 
         const { error: agreementError } = await supabase
           .from("management_agreements")
-          .insert({
-            property_id: lead.property_id,
-            owner_id: lead.owner_id,
+          .upsert({
+            property_id: leadData.property_id,
+            owner_id: leadData.owner_id,
             agreement_date: new Date().toISOString().split('T')[0],
             effective_date: new Date().toISOString().split('T')[0],
             document_path: fileName,
@@ -973,21 +1067,24 @@ serve(async (req) => {
             signed_by_company: true,
             signed_by_company_at: managerSig?.signed_at || new Date().toISOString(),
             status: "active",
+          }, {
+            onConflict: 'property_id',
           });
 
         if (agreementError) {
           console.error("Error saving management agreement:", agreementError);
         } else {
-          console.log("Management agreement saved to database");
+          console.log("Management agreement saved to database (GREC compliance)");
           
           // Add timeline entry for agreement creation
           await supabase.from("lead_timeline").insert({
-            lead_id: lead.id,
-            action: "Management agreement saved to database",
+            lead_id: leadData.id,
+            action: "Management agreement saved to GREC records",
             metadata: {
-              property_id: lead.property_id,
+              property_id: leadData.property_id,
               management_fee: managementFee,
               certificate_id: certificateId,
+              property_address: propertyAddress,
             },
           });
         }
@@ -1003,6 +1100,7 @@ serve(async (req) => {
         signedUrl: downloadUrl,
         certificateId,
         documentHash,
+        propertyAddress,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
