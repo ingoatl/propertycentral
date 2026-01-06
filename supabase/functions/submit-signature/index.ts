@@ -19,8 +19,16 @@ interface SubmitSignatureRequest {
 
 const buildConfirmationEmailHtml = (
   recipientName: string,
-  documentName: string
+  documentName: string,
+  propertyAddress: string | null
 ): string => {
+  const propertySection = propertyAddress ? `
+    <div style="background-color: #f0fdf4; border-radius: 8px; padding: 16px; margin-bottom: 16px; border-left: 4px solid #22c55e;">
+      <p style="margin: 0 0 4px; color: #166534; font-weight: 600; font-size: 12px;">PROPERTY</p>
+      <p style="margin: 0; color: #1f2937; font-size: 14px; font-weight: 600;">${propertyAddress}</p>
+    </div>
+  ` : '';
+
   return `
 <!DOCTYPE html>
 <html>
@@ -35,7 +43,6 @@ const buildConfirmationEmailHtml = (
         <table role="presentation" style="width: 100%; max-width: 600px; border-collapse: collapse; background-color: #ffffff; border-radius: 16px; box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);">
           <tr>
             <td style="padding: 40px 40px 20px; text-align: center; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-radius: 16px 16px 0 0;">
-              <div style="font-size: 48px; margin-bottom: 16px;">✅</div>
               <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: 700;">Signature Complete!</h1>
             </td>
           </tr>
@@ -47,6 +54,7 @@ const buildConfirmationEmailHtml = (
               <p style="margin: 0 0 24px; color: #4b5563; font-size: 16px; line-height: 1.6;">
                 Thank you for signing. Your signature has been recorded successfully.
               </p>
+              ${propertySection}
               <div style="background-color: #ecfdf5; border-radius: 12px; padding: 24px; margin-bottom: 24px; border-left: 4px solid #10b981;">
                 <p style="margin: 0 0 8px; color: #065f46; font-weight: 600; font-size: 14px;">DOCUMENT SIGNED</p>
                 <p style="margin: 0; color: #1f2937; font-size: 18px; font-weight: 600;">${documentName}</p>
@@ -59,7 +67,7 @@ const buildConfirmationEmailHtml = (
           <tr>
             <td style="padding: 24px 40px; background-color: #f9fafb; border-radius: 0 0 16px 16px; border-top: 1px solid #e5e7eb;">
               <p style="margin: 0; color: #9ca3af; font-size: 12px; text-align: center;">
-                🍑 PeachHaus Group • Property Management Made Simple
+                PeachHaus Group - Property Management Made Simple
               </p>
             </td>
           </tr>
@@ -75,10 +83,25 @@ const buildConfirmationEmailHtml = (
 const buildNextSignerEmailHtml = (
   recipientName: string,
   documentName: string,
+  propertyAddress: string | null,
   signingUrl: string,
   previousSignerName: string
 ): string => {
   const issueDate = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+  
+  const propertySection = propertyAddress ? `
+    <!-- Property Info -->
+    <div style="padding: 16px 32px; background: #f0fdf4; border-bottom: 1px solid #bbf7d0;">
+      <table style="width: 100%;">
+        <tr>
+          <td style="vertical-align: top;">
+            <div style="font-size: 10px; color: #166534; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Property</div>
+            <div style="font-size: 14px; font-weight: 600; color: #111111;">${propertyAddress}</div>
+          </td>
+        </tr>
+      </table>
+    </div>
+  ` : '';
   
   return `
 <!DOCTYPE html>
@@ -108,6 +131,8 @@ const buildNextSignerEmailHtml = (
         </tr>
       </table>
     </div>
+
+    ${propertySection}
 
     <!-- Document Info -->
     <div style="padding: 20px 32px; background: #fef3c7; border-bottom: 1px solid #fcd34d;">
@@ -228,10 +253,43 @@ serve(async (req) => {
       );
     }
 
+    // Get property address from lead for this document
+    let propertyAddress: string | null = null;
+    const { data: lead } = await supabase
+      .from("leads")
+      .select("property_address, property_id")
+      .eq("signwell_document_id", signingToken.document_id)
+      .maybeSingle();
+    
+    if (lead) {
+      propertyAddress = lead.property_address;
+      
+      // If no property_address on lead, try to get from property
+      if (!propertyAddress && lead.property_id) {
+        const { data: property } = await supabase
+          .from("properties")
+          .select("address, name")
+          .eq("id", lead.property_id)
+          .single();
+        
+        if (property) {
+          propertyAddress = property.address || property.name;
+        }
+      }
+    }
+
+    console.log("Property address for document:", propertyAddress);
+
     const now = new Date().toISOString();
     const documentName = signingToken.booking_documents?.document_name || 
                          signingToken.booking_documents?.document_templates?.name || 
                          "Agreement";
+
+    // Build document display name with property address
+    let documentDisplayName = documentName;
+    if (propertyAddress && !documentDisplayName.includes(propertyAddress)) {
+      documentDisplayName = `${documentName} - ${propertyAddress}`;
+    }
 
     // Update the signing token with signature and field values
     await supabase
@@ -266,6 +324,7 @@ serve(async (req) => {
         signer_type: signingToken.signer_type,
         consent_given: true,
         field_values: fieldValues,
+        property_address: propertyAddress,
       },
       ip_address: ipAddress,
       user_agent: userAgent,
@@ -284,12 +343,18 @@ serve(async (req) => {
       .update(updateFields)
       .eq("id", signingToken.document_id);
 
+    // Build email subject with property address
+    let confirmationSubject = `You've signed: ${documentName}`;
+    if (propertyAddress) {
+      confirmationSubject = `Signed: ${propertyAddress} - ${documentName}`;
+    }
+
     // Send confirmation email to the signer
     await resend.emails.send({
       from: "PeachHaus Group <info@peachhausgroup.com>",
       to: [signingToken.signer_email],
-      subject: `✅ You've signed: ${documentName}`,
-      html: buildConfirmationEmailHtml(signingToken.signer_name, documentName),
+      subject: confirmationSubject,
+      html: buildConfirmationEmailHtml(signingToken.signer_name, documentName, propertyAddress),
     });
 
     console.log("Sent confirmation email to:", signingToken.signer_email);
@@ -334,14 +399,16 @@ serve(async (req) => {
             email: t.signer_email,
             signed_at: t.signed_at,
           })),
+          property_address: propertyAddress,
         },
       });
 
       // Trigger document finalization (generate signed PDF)
       try {
-        await supabase.functions.invoke("finalize-signed-document", {
+        const finalizeResult = await supabase.functions.invoke("finalize-signed-document", {
           body: { documentId: signingToken.document_id },
         });
+        console.log("Finalize result:", finalizeResult);
       } catch (finalizeError) {
         console.error("Error invoking finalize-signed-document:", finalizeError);
       }
@@ -366,18 +433,25 @@ serve(async (req) => {
       } : "None found");
 
       if (nextSigner) {
-        // Send email to next signer
+        // Send email to next signer with property address in subject
         const signingUrl = `${APP_URL}/sign/${nextSigner.token}`;
         
-        console.log("Sending signing request to:", nextSigner.signer_email, "URL:", signingUrl.substring(0, 50) + "...");
+        // Build subject with property address for admin
+        let nextSignerSubject = `Your signature is needed - ${documentName}`;
+        if (propertyAddress) {
+          nextSignerSubject = `Signature Needed: ${propertyAddress} - Management Agreement`;
+        }
+        
+        console.log("Sending signing request to:", nextSigner.signer_email, "Subject:", nextSignerSubject);
         
         const emailResult = await resend.emails.send({
           from: "PeachHaus Group <info@peachhausgroup.com>",
           to: [nextSigner.signer_email],
-          subject: `📝 Your signature is needed - ${documentName}`,
+          subject: nextSignerSubject,
           html: buildNextSignerEmailHtml(
             nextSigner.signer_name,
-            documentName,
+            documentDisplayName,
+            propertyAddress,
             signingUrl,
             signingToken.signer_name
           ),
