@@ -328,10 +328,13 @@ async function fillPdfWithValues(
         const textValue = sanitizeTextForPdf(String(value));
         const fontSize = Math.min(10, absHeight * 0.6);
         
-        // Use the stored label_offset from field detection if available
-        // This offset tells us where AFTER the label text to place the value
-        const labelOffset = mapping.label_offset || 0;
-        const drawX = absX + (labelOffset / 100) * pageWidth;
+        // The field x,y represents where the fillable area starts (after label colon)
+        // For proper alignment, draw text/signatures starting from this x position
+        // And on the SAME vertical line (not above or below)
+        const drawX = absX;
+        // Y should be adjusted so text sits ON the baseline of the line
+        // The y% points to where the label text is - we need to draw at same baseline
+        const drawY = absY;
         
         try {
           // Handle signature fields - determine which signer's signature to embed
@@ -351,25 +354,24 @@ async function fillPdfWithValues(
                 const sigBytes = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
                 const sigImage = await pdfDoc.embedPng(sigBytes);
                 
-                // Signature dimensions - keep compact
-                const sigWidth = Math.min(absWidth * 0.6, 120);
-                const sigHeight = Math.min(28, absHeight * 1.5);
+                // Signature dimensions - keep compact but readable
+                const sigWidth = Math.min(absWidth * 0.5, 100);
+                const sigHeight = Math.min(22, absHeight * 1.2);
                 
-                // Draw signature ON THE LINE (not overlapping label)
-                // The mapping x,y is the START of the field area (after label)
-                // We position signature so its baseline sits on the line
+                // Draw signature so its BOTTOM sits on the line (baseline)
+                // The line is at drawY, signature should sit on top of it
                 page.drawImage(sigImage, {
                   x: drawX,
-                  y: absY - sigHeight + 3, // Position so bottom of sig is near the baseline
+                  y: drawY - 2, // Bottom of signature at the line
                   width: sigWidth,
                   height: sigHeight,
                 });
-                console.log("Embedded signature for", signerType, "at", api_id, "draw position:", drawX, absY);
+                console.log("Embedded signature for", signerType, "at", api_id, "position:", drawX, drawY);
               } catch (sigError) {
                 console.error("Error embedding signature for", signerType, ":", sigError);
                 page.drawText(`[Signed by ${sigData.name}]`, {
                   x: drawX,
-                  y: absY - fontSize,
+                  y: drawY,
                   size: 8,
                   font,
                   color: rgb(0.3, 0.3, 0.3),
@@ -378,7 +380,7 @@ async function fillPdfWithValues(
             } else if (sigData?.name) {
               page.drawText(`[Signed by ${sigData.name}]`, {
                 x: drawX,
-                y: absY - fontSize,
+                y: drawY,
                 size: 8,
                 font,
                 color: rgb(0.3, 0.3, 0.3),
@@ -388,18 +390,18 @@ async function fillPdfWithValues(
             if (value === true) {
               page.drawText('X', {
                 x: drawX + 2,
-                y: absY - 10,
+                y: drawY,
                 size: 12,
                 font,
                 color: rgb(0, 0, 0),
               });
             }
           } else if (value !== '') {
-            // Regular text/date field - draw value AFTER the label
-            // absY is the baseline of the line, we draw text there
+            // Regular text/date field - draw value on the SAME LINE as label
+            // PDF text baseline: y is where the bottom of text sits
             page.drawText(textValue.substring(0, 80), {
               x: drawX,
-              y: absY - fontSize + 2, // Slight adjustment to sit on baseline
+              y: drawY, // Same baseline as the label
               size: fontSize,
               font,
               color: rgb(0, 0, 0),
