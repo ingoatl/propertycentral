@@ -39,7 +39,7 @@ const DocumentList = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [expandedAuditId, setExpandedAuditId] = useState<string | null>(null);
-  const [viewingPdf, setViewingPdf] = useState<{ path: string; title: string } | null>(null);
+  const [viewingPdf, setViewingPdf] = useState<{ path: string; title: string; documentName?: string; propertyAddress?: string; recipientName?: string } | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -237,7 +237,10 @@ const DocumentList = () => {
                         variant="outline"
                         onClick={() => setViewingPdf({
                           path: doc.signed_pdf_path!,
-                          title: doc.document_name || doc.property?.address || "Document"
+                          title: doc.document_name || doc.property?.address || "Document",
+                          documentName: doc.template?.name || doc.document_name || undefined,
+                          propertyAddress: doc.property?.address || doc.property?.name || undefined,
+                          recipientName: doc.recipient_name || undefined
                         })}
                       >
                         <Eye className="h-4 w-4 mr-1" />
@@ -254,14 +257,34 @@ const DocumentList = () => {
                             
                             if (error) throw error;
                             
+                            // Generate descriptive filename
+                            const parts: string[] = [];
+                            if (doc.template?.name || doc.document_name) {
+                              parts.push((doc.template?.name || doc.document_name || '').replace(/[^a-zA-Z0-9\s-]/g, '').trim());
+                            }
+                            if (doc.property?.address || doc.property?.name) {
+                              parts.push((doc.property?.address || doc.property?.name || '').replace(/[^a-zA-Z0-9\s-]/g, '').trim());
+                            }
+                            if (doc.recipient_name) {
+                              parts.push(doc.recipient_name.replace(/[^a-zA-Z0-9\s-]/g, '').trim());
+                            }
+                            const filename = parts.length > 0 
+                              ? parts.join('_').replace(/\s+/g, '_').replace(/_+/g, '_') + '.pdf'
+                              : doc.signed_pdf_path!.split('/').pop() || 'document.pdf';
+                            
                             const blobUrl = URL.createObjectURL(data);
                             const link = document.createElement('a');
                             link.href = blobUrl;
-                            link.download = doc.signed_pdf_path!.split('/').pop() || 'document.pdf';
+                            link.download = filename;
                             document.body.appendChild(link);
                             link.click();
                             document.body.removeChild(link);
                             URL.revokeObjectURL(blobUrl);
+                            
+                            toast({
+                              title: "Success",
+                              description: "Document downloaded successfully",
+                            });
                           } catch (err) {
                             toast({
                               title: "Error",
@@ -324,6 +347,9 @@ const DocumentList = () => {
         onOpenChange={(open) => !open && setViewingPdf(null)}
         filePath={viewingPdf?.path || ""}
         title={viewingPdf?.title || "Document"}
+        documentName={viewingPdf?.documentName}
+        propertyAddress={viewingPdf?.propertyAddress}
+        recipientName={viewingPdf?.recipientName}
       />
     </div>
   );
