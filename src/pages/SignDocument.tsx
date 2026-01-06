@@ -725,7 +725,7 @@ const SignDocument = () => {
           className={cn(
             "font-semibold px-4 md:px-6 h-10 md:h-11 text-sm transition-all duration-300",
             canFinish 
-              ? "bg-[#4caf50] text-white hover:bg-[#43a047] animate-pulse shadow-lg shadow-green-500/30" 
+              ? "bg-[#4caf50] text-white hover:bg-[#43a047] shadow-lg shadow-green-500/30" 
               : "bg-[#fae052] text-[#1a1a2e] hover:bg-[#f5d93a] disabled:opacity-40"
           )}
         >
@@ -773,7 +773,7 @@ const SignDocument = () => {
             <Button
               onClick={activeFieldId || showSignatureFor ? handleNext : handleStart}
               size="lg"
-              className="bg-[#fae052] text-[#1a1a2e] hover:bg-[#f5d93a] font-bold shadow-2xl rounded-full px-6 py-6 gap-2 animate-pulse text-sm flex-col h-auto"
+              className="bg-[#fae052] text-[#1a1a2e] hover:bg-[#f5d93a] font-bold shadow-2xl rounded-full px-6 py-6 gap-2 text-sm flex-col h-auto"
             >
               <span className="text-lg">{activeFieldId || showSignatureFor ? "NEXT" : "START"}</span>
               <span className="text-xs font-normal opacity-80">{remainingCount} left</span>
