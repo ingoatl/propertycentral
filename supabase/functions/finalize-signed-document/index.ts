@@ -346,24 +346,27 @@ async function fillPdfWithValues(
                 const sigBytes = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
                 const sigImage = await pdfDoc.embedPng(sigBytes);
                 
-                // Position signature image properly within the field bounds
-                // Draw at the field position, not overlapping with text above
-                const sigWidth = Math.min(absWidth, 150);
-                const sigHeight = Math.min(absHeight, 35);
+                // Position signature image BELOW the field line/label
+                // The field y position marks WHERE the signature line IS
+                // So we draw the signature starting from that line, going down
+                const sigWidth = Math.min(absWidth * 0.8, 150);
+                const sigHeight = Math.min(35, absHeight * 2);
                 
+                // Draw signature positioned so top of signature aligns with the line
+                // absY is where the line is, signature goes below that
                 page.drawImage(sigImage, {
-                  x: absX,
-                  y: absY - sigHeight, // Position from top of field area
+                  x: absX + 5,
+                  y: absY - sigHeight - 5, // Position below the label/line
                   width: sigWidth,
                   height: sigHeight,
                 });
-                console.log("Embedded signature image for", signerType, "at", api_id, "y:", absY - sigHeight);
+                console.log("Embedded signature for", signerType, "at", api_id, "position:", absX, absY - sigHeight - 5);
               } catch (sigError) {
                 console.error("Error embedding signature for", signerType, ":", sigError);
                 // Fallback to text
                 page.drawText(`[Signed by ${sigData.name}]`, {
                   x: absX,
-                  y: absY - fontSize - 2,
+                  y: absY - fontSize - 8,
                   size: 9,
                   font,
                   color: rgb(0.2, 0.2, 0.2),
@@ -373,7 +376,7 @@ async function fillPdfWithValues(
               // No image but has signer name - show text representation
               page.drawText(`[Signed by ${sigData.name}]`, {
                 x: absX,
-                y: absY - fontSize - 2,
+                y: absY - fontSize - 8,
                 size: 9,
                 font,
                 color: rgb(0.2, 0.2, 0.2),
@@ -392,10 +395,12 @@ async function fillPdfWithValues(
               });
             }
           } else if (value !== '') {
-            // Regular text field - only draw if has content
+            // Regular text/date field - position text on the field line
+            // For fields that come after a label (like "Name: _____"), 
+            // the y position is where we should write the value
             page.drawText(textValue.substring(0, 100), {
               x: absX,
-              y: absY - fontSize - 2, // Position text below the field line
+              y: absY - fontSize, // Text baseline at field position
               size: fontSize,
               font,
               color: rgb(0, 0, 0),
@@ -1503,19 +1508,26 @@ serve(async (req) => {
     }
 
     // Store executed document in property_documents table for Document Hub
+    // ALWAYS try to save if we have propertyId
+    console.log("Attempting to save to Document Hub - propertyId:", propertyId, "documentId:", documentId);
+    
     if (propertyId) {
       // Create unique filename with timestamp to avoid duplicates
       const timestamp = new Date().toISOString().split('T')[0];
       const safePropertyName = sanitizeTextForPdf(propertyAddress || documentDisplayName).replace(/[^a-zA-Z0-9\s]/g, '').substring(0, 50);
-      const uniqueFileName = `${safePropertyName}_Management_Agreement_${timestamp}.pdf`;
+      const uniqueFileName = `${safePropertyName}_Agreement_${timestamp}.pdf`;
       
       // Check if document already exists for this property
-      const { data: existingDoc } = await supabase
+      const { data: existingDoc, error: existingDocError } = await supabase
         .from("property_documents")
         .select("id")
         .eq("property_id", propertyId)
         .eq("document_type", "management_agreement")
         .maybeSingle();
+      
+      if (existingDocError) {
+        console.error("Error checking existing property_documents:", existingDocError);
+      }
       
       if (existingDoc) {
         // Update existing document
@@ -1524,7 +1536,7 @@ serve(async (req) => {
           .update({
             file_path: fileName,
             file_name: uniqueFileName,
-            description: `Executed management agreement - ${propertyAddress || documentDisplayName}`,
+            description: `Executed agreement - ${propertyAddress || documentDisplayName}`,
             updated_at: new Date().toISOString(),
           })
           .eq("id", existingDoc.id);
@@ -1532,11 +1544,11 @@ serve(async (req) => {
         if (docUpdateError) {
           console.error("Error updating property_documents:", docUpdateError);
         } else {
-          console.log("Updated existing agreement in property_documents (Document Hub)");
+          console.log("Updated existing agreement in property_documents (Document Hub) - id:", existingDoc.id);
         }
       } else {
         // Insert new document
-        const { error: docInsertError } = await supabase
+        const { data: insertedDoc, error: docInsertError } = await supabase
           .from("property_documents")
           .insert({
             property_id: propertyId,
@@ -1544,34 +1556,32 @@ serve(async (req) => {
             file_path: fileName,
             file_type: "application/pdf",
             document_type: "management_agreement",
-            description: `Executed management agreement - ${propertyAddress || documentDisplayName}`,
-          });
+            description: `Executed agreement - ${propertyAddress || documentDisplayName}`,
+          })
+          .select()
+          .single();
         
         if (docInsertError) {
           console.error("Error saving to property_documents:", docInsertError);
         } else {
-          console.log("Saved executed agreement to property_documents (Document Hub)");
+          console.log("Saved executed agreement to property_documents (Document Hub) - id:", insertedDoc?.id);
         }
       }
+    } else {
+      console.log("Skipping Document Hub save - no propertyId available");
     }
 
-    // Save to management_agreements table (GREC compliance) - ALWAYS save if we have propertyId
-    // Include co_hosting, full_service, and any agreement type
+    // Save to management_agreements table (GREC compliance)
+    // Include all agreement types
     const contractType = document.contract_type || document.document_templates?.contract_type || 'management_agreement';
-    const isManagementAgreement = contractType.toLowerCase().includes('management') || 
-                                   contractType.toLowerCase().includes('agreement') ||
-                                   contractType.toLowerCase().includes('hosting') ||
-                                   contractType.toLowerCase().includes('co_hosting') ||
-                                   contractType.toLowerCase().includes('full_service');
+    console.log("Attempting to save to management_agreements - propertyId:", propertyId, "contractType:", contractType);
     
-    if (propertyId && isManagementAgreement) {
+    if (propertyId) {
       // Get owner and manager signed timestamps
       const ownerSig = signatures?.find(s => s.signer_type === "owner");
       const managerSig = signatures?.find(s => s.signer_type === "manager");
 
-      console.log("Saving to management_agreements - propertyId:", propertyId, "ownerId:", ownerId, "contractType:", contractType);
-
-      const { error: agreementError } = await supabase
+      const { data: insertedAgreement, error: agreementError } = await supabase
         .from("management_agreements")
         .upsert({
           property_id: propertyId,
@@ -1588,15 +1598,17 @@ serve(async (req) => {
           status: "active",
         }, {
           onConflict: 'property_id',
-        });
+        })
+        .select()
+        .single();
 
       if (agreementError) {
         console.error("Error saving management agreement:", agreementError);
       } else {
-        console.log("Management agreement saved to database (GREC compliance)");
+        console.log("Management agreement saved to database (GREC compliance) - id:", insertedAgreement?.id);
       }
     } else {
-      console.log("Skipping management_agreements - propertyId:", propertyId, "contractType:", contractType, "isManagementAgreement:", isManagementAgreement);
+      console.log("Skipping management_agreements save - no propertyId available");
     }
 
     // Update lead stage and timeline if we have a lead
