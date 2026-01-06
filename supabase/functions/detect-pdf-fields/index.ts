@@ -58,18 +58,28 @@ serve(async (req) => {
     }
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
-    const { textPositions, formFields, templateId, totalPages } = await req.json();
+    const { textPositions, formFields, templateId, totalPages, existingContractType, mergeWithExisting, existingFields } = await req.json();
+
+    console.log(`Processing - templateId: ${templateId}, mergeWithExisting: ${mergeWithExisting}, existingFields: ${existingFields?.length || 0}`);
 
     // If we have AcroForm fields from getAnnotations(), use them directly
     if (formFields && Array.isArray(formFields) && formFields.length > 0) {
       console.log(`Using ${formFields.length} pre-extracted AcroForm fields`);
       
-      const detectedFields = await mapFormFieldsToSemanticFields(
+      let detectedFields = await mapFormFieldsToSemanticFields(
         formFields as FormField[],
         textPositions as TextPosition[],
         lovableApiKey,
         totalPages
       );
+      
+      // Merge with existing fields if requested
+      if (mergeWithExisting && existingFields && Array.isArray(existingFields)) {
+        const existingApiIds = new Set(existingFields.map((f: any) => f.api_id));
+        const newFields = detectedFields.filter(f => !existingApiIds.has(f.api_id));
+        detectedFields = [...existingFields, ...newFields];
+        console.log(`Merged: ${existingFields.length} existing + ${newFields.length} new = ${detectedFields.length} total`);
+      }
       
       // Save to template
       if (templateId && detectedFields.length > 0) {
@@ -336,9 +346,17 @@ CRITICAL POSITIONING RULES:
         uniqueFields.set(field.api_id, field);
       }
     }
-    const validatedFields = Array.from(uniqueFields.values());
+    let validatedFields = Array.from(uniqueFields.values());
 
-    console.log(`Detected ${validatedFields.length} unique fields via AI`);
+    // Merge with existing fields if requested
+    if (mergeWithExisting && existingFields && Array.isArray(existingFields)) {
+      const existingApiIds = new Set(existingFields.map((f: any) => f.api_id));
+      const newFields = validatedFields.filter(f => !existingApiIds.has(f.api_id));
+      validatedFields = [...existingFields, ...newFields];
+      console.log(`Merged: ${existingFields.length} existing + ${newFields.length} new = ${validatedFields.length} total`);
+    }
+
+    console.log(`Final ${validatedFields.length} unique fields via AI`);
 
     // Save to template
     if (templateId && validatedFields.length > 0) {

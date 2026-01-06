@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Loader2, CheckCircle, AlertTriangle, Eye, EyeOff, ChevronLeft, ChevronRight, Move, Grid3X3, Plus, Trash2, Save } from "lucide-react";
 import { cn } from "@/lib/utils";
 import "react-pdf/dist/esm/Page/AnnotationLayer.css";
@@ -25,6 +26,12 @@ interface FieldData {
   filled_by: "admin" | "guest";
   required: boolean;
   group_name?: string;
+}
+
+interface NewFieldFormData {
+  label: string;
+  type: FieldData["type"];
+  filled_by: "admin" | "guest";
 }
 
 interface TemplateFieldPreviewProps {
@@ -58,6 +65,12 @@ export function TemplateFieldPreview({
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [saving, setSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
+  const [showAddFieldDialog, setShowAddFieldDialog] = useState(false);
+  const [newFieldData, setNewFieldData] = useState<NewFieldFormData>({
+    label: "",
+    type: "text",
+    filled_by: "guest",
+  });
   const containerRef = useRef<HTMLDivElement>(null);
   const pageRef = useRef<HTMLDivElement>(null);
 
@@ -161,22 +174,31 @@ export function TemplateFieldPreview({
     setHasChanges(true);
   };
 
-  const addNewField = () => {
+  const openAddFieldDialog = () => {
+    setNewFieldData({ label: "", type: "text", filled_by: "guest" });
+    setShowAddFieldDialog(true);
+  };
+
+  const confirmAddField = () => {
+    if (!newFieldData.label.trim()) return;
+    
+    const apiId = newFieldData.label.toLowerCase().replace(/[^a-z0-9]/g, '_').replace(/_+/g, '_');
     const newField: FieldData = {
-      api_id: `field_${Date.now()}`,
-      label: "New Field",
-      type: "text",
+      api_id: `${apiId}_${Date.now()}`,
+      label: newFieldData.label,
+      type: newFieldData.type,
       page: currentPage,
       x: 10,
       y: 10,
-      width: 25,
-      height: 2.5,
-      filled_by: "guest",
+      width: newFieldData.type === "checkbox" || newFieldData.type === "radio" ? 3 : 25,
+      height: newFieldData.type === "signature" ? 4 : 2.5,
+      filled_by: newFieldData.filled_by,
       required: false,
     };
     setLocalFields(prev => [...prev, newField]);
     setSelectedField(newField.api_id);
     setHasChanges(true);
+    setShowAddFieldDialog(false);
   };
 
   const deleteField = (fieldId: string) => {
@@ -208,7 +230,7 @@ export function TemplateFieldPreview({
               <Button
                 variant="outline"
                 size="sm"
-                onClick={addNewField}
+                onClick={openAddFieldDialog}
                 className="gap-1"
               >
                 <Plus className="h-4 w-4" />
@@ -475,6 +497,85 @@ export function TemplateFieldPreview({
           )}
         </DialogFooter>
       </DialogContent>
+
+      {/* Add Field Dialog */}
+      <Dialog open={showAddFieldDialog} onOpenChange={setShowAddFieldDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add New Field</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="field-label">Field Label</Label>
+              <Input
+                id="field-label"
+                placeholder="e.g., Owner Name, Signature Date"
+                value={newFieldData.label}
+                onChange={(e) => setNewFieldData(prev => ({ ...prev, label: e.target.value }))}
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label>Field Type</Label>
+              <Select 
+                value={newFieldData.type} 
+                onValueChange={(v) => setNewFieldData(prev => ({ ...prev, type: v as FieldData['type'] }))}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="text">Text</SelectItem>
+                  <SelectItem value="date">Date</SelectItem>
+                  <SelectItem value="signature">Signature</SelectItem>
+                  <SelectItem value="checkbox">Checkbox</SelectItem>
+                  <SelectItem value="radio">Radio</SelectItem>
+                  <SelectItem value="email">Email</SelectItem>
+                  <SelectItem value="phone">Phone</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="space-y-2">
+              <Label>Who fills this field?</Label>
+              <Select 
+                value={newFieldData.filled_by} 
+                onValueChange={(v) => setNewFieldData(prev => ({ ...prev, filled_by: v as "admin" | "guest" }))}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="guest">
+                    <div className="flex flex-col">
+                      <span>Owner / Guest</span>
+                      <span className="text-xs text-muted-foreground">The person signing the document</span>
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="admin">
+                    <div className="flex flex-col">
+                      <span>Admin / Manager</span>
+                      <span className="text-xs text-muted-foreground">Your team pre-fills this</span>
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAddFieldDialog(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={confirmAddField}
+              disabled={!newFieldData.label.trim()}
+              className="bg-[#fae052] text-black hover:bg-[#f5d93a]"
+            >
+              Add Field
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   );
 }
