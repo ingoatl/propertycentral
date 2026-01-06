@@ -284,7 +284,7 @@ serve(async (req) => {
     // Third: Fall back to lead data
     const { data: lead } = await supabase
       .from("leads")
-      .select("property_address, property_id, contact_name")
+      .select("id, property_address, property_id, name, stage")
       .eq("signwell_document_id", signingToken.document_id)
       .maybeSingle();
     
@@ -307,7 +307,7 @@ serve(async (req) => {
       }
       
       if (!ownerName) {
-        ownerName = lead.contact_name;
+        ownerName = lead.name;
       }
     }
 
@@ -461,6 +461,41 @@ serve(async (req) => {
           property_address: propertyAddress,
         },
       });
+
+      // Update lead stage to "contract_signed" if this document is linked to a lead
+      if (lead) {
+        console.log("Document is linked to lead, updating stage to contract_signed");
+        
+        const { error: leadUpdateError } = await supabase
+          .from("leads")
+          .update({ 
+            stage: "contract_signed",
+            stage_changed_at: now,
+            auto_stage_reason: "Contract fully signed",
+            last_stage_auto_update_at: now,
+          })
+          .eq("signwell_document_id", signingToken.document_id);
+        
+        if (leadUpdateError) {
+          console.error("Error updating lead stage:", leadUpdateError);
+        } else {
+          console.log("Lead stage updated to contract_signed");
+          
+          // Log the stage change in lead timeline
+          await supabase.from("lead_timeline").insert({
+            lead_id: lead.id,
+            action: "stage_changed",
+            previous_stage: lead.stage || "contract_out",
+            new_stage: "contract_signed",
+            performed_by_name: "System",
+            metadata: {
+              reason: "Document fully signed by all parties",
+              document_id: signingToken.document_id,
+              property_address: propertyAddress,
+            },
+          });
+        }
+      }
 
       // Trigger document finalization (generate signed PDF)
       try {
