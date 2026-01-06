@@ -90,14 +90,27 @@ const SignDocument = () => {
   const allGuestFields = (data?.fields || []).filter(f => f.filled_by === "guest");
   const adminFields = (data?.fields || []).filter(f => f.filled_by === "admin");
   
-  // Determine if a field belongs to Owner 2 (secondary signer) based on label/group
+  // Determine if a field belongs to Owner 2 (secondary signer) based on label, api_id, or group
   const isOwner2Field = (f: FieldData) => {
     const label = f.label.toLowerCase();
-    return label.includes("owner 2") || label.includes("owner2") || label.includes("second owner");
+    const apiId = f.api_id.toLowerCase();
+    // Check both label and api_id for owner 2 patterns
+    return label.includes("owner 2") || label.includes("owner2") || label.includes("second owner") ||
+           apiId.includes("owner2") || apiId.includes("owner_2") || apiId.includes("second_owner");
   };
   
   // Required fields are: Owner 1 fields that are marked required + radio groups (one selection per group)
   const signerFields = allGuestFields;
+  
+  // Debug: Log field detection
+  useEffect(() => {
+    if (signerFields.length > 0) {
+      const signatureFields = signerFields.filter(f => f.type === "signature");
+      console.log("All signature fields:", signatureFields.map(f => ({ api_id: f.api_id, label: f.label })));
+      console.log("Owner 1 signature fields:", signatureFields.filter(f => !isOwner2Field(f)).map(f => f.api_id));
+      console.log("Owner 2 signature fields:", signatureFields.filter(f => isOwner2Field(f)).map(f => f.api_id));
+    }
+  }, [signerFields.length]);
   
   // Get all unique radio groups
   const radioGroups = new Set<string>();
@@ -251,19 +264,25 @@ const SignDocument = () => {
   const handleSignatureAdopt = (sigData: string) => {
     const currentSignatureField = signerFields.find(f => f.api_id === showSignatureFor);
     
+    console.log("Adopting signature for field:", showSignatureFor);
+    console.log("Current signature field:", currentSignatureField);
+    console.log("Is Owner 2 field:", currentSignatureField ? isOwner2Field(currentSignatureField) : "N/A");
+    
     if (currentSignatureField && isOwner2Field(currentSignatureField)) {
       // Owner 2 is signing - only apply to Owner 2 fields
+      console.log("Setting Owner 2 signature data");
       setOwner2SignatureData(sigData);
       setCompletedFields(prev => new Set([...prev, currentSignatureField.api_id]));
       toast.success("Owner 2 signature adopted!");
     } else {
       // Owner 1 is signing - only apply to Owner 1 signature fields
+      console.log("Setting Owner 1 signature data");
       setSignatureData(sigData);
-      signerFields
-        .filter(f => f.type === "signature" && !isOwner2Field(f))
-        .forEach(f => {
-          setCompletedFields(prev => new Set([...prev, f.api_id]));
-        });
+      const owner1SigFields = signerFields.filter(f => f.type === "signature" && !isOwner2Field(f));
+      console.log("Owner 1 signature fields to mark complete:", owner1SigFields.map(f => f.api_id));
+      owner1SigFields.forEach(f => {
+        setCompletedFields(prev => new Set([...prev, f.api_id]));
+      });
       toast.success("Signature adopted!");
     }
     
