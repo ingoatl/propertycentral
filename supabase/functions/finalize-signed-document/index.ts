@@ -245,14 +245,15 @@ async function fillPdfWithValues(
     form.flatten();
   }
 
-  // Build a map of signature data by signer type
-  const signatureByType: Record<string, { data: string; name: string }> = {};
+  // Build a map of signature data by signer type with signed_at timestamp
+  const signatureByType: Record<string, { data: string; name: string; signedAt: string | null }> = {};
   if (signatures && Array.isArray(signatures)) {
     for (const sig of signatures) {
       if (sig.signature_data && sig.signer_type) {
         signatureByType[sig.signer_type] = {
           data: sig.signature_data,
           name: sig.signer_name || 'Signer',
+          signedAt: sig.signed_at || null,
         };
       }
     }
@@ -273,6 +274,11 @@ async function fillPdfWithValues(
     for (const mapping of fieldMappings) {
       const { api_id, x, y, page: pageNum, width, height } = mapping;
       
+      // Skip if no position data
+      if (x === undefined || x === null || y === undefined || y === null) {
+        continue;
+      }
+      
       // Skip second owner fields if there's no second owner
       if (!hasSecondOwner && api_id.toLowerCase().includes('second_owner')) {
         console.log("Skipping second owner field (no second owner):", api_id);
@@ -283,7 +289,30 @@ async function fillPdfWithValues(
         continue;
       }
       
-      const value = fieldConfig[api_id];
+      let value = fieldConfig[api_id];
+      
+      // For date fields, use the actual signed_at timestamp from the signer
+      if (api_id.toLowerCase().includes('date') && api_id.toLowerCase().includes('signature')) {
+        let signerType = 'owner';
+        if (api_id.toLowerCase().includes('manager')) {
+          signerType = 'manager';
+        } else if (api_id.toLowerCase().includes('second_owner') || api_id.toLowerCase().includes('owner2')) {
+          signerType = 'second_owner';
+        }
+        
+        const sigData = signatureByType[signerType];
+        if (sigData?.signedAt) {
+          // Use the actual signing timestamp, formatted in EST
+          const signedDate = new Date(sigData.signedAt);
+          value = signedDate.toLocaleDateString('en-US', { 
+            timeZone: 'America/New_York',
+            year: 'numeric', 
+            month: '2-digit', 
+            day: '2-digit' 
+          });
+          console.log("Using actual signed_at for", api_id, ":", value);
+        }
+      }
       
       if (value !== undefined && value !== null && pageNum && pageNum <= pages.length) {
         const page = pages[pageNum - 1]; // Pages are 0-indexed
@@ -293,9 +322,11 @@ async function fillPdfWithValues(
         const absX = (x / 100) * pageWidth;
         // PDF y-coordinates start from bottom, so convert from top-based percentage
         const absY = pageHeight - ((y / 100) * pageHeight);
+        const absWidth = (width / 100) * pageWidth;
+        const absHeight = (height / 100) * pageHeight;
         
         const textValue = sanitizeTextForPdf(String(value));
-        const fontSize = Math.min(11, (height / 100) * pageHeight * 0.7);
+        const fontSize = Math.min(11, absHeight * 0.7);
         
         try {
           // Handle signature fields - determine which signer's signature to embed
@@ -308,8 +339,6 @@ async function fillPdfWithValues(
             }
             
             const sigData = signatureByType[signerType];
-            const absWidth = (width / 100) * pageWidth;
-            const absHeight = (height / 100) * pageHeight;
             
             if (sigData?.data && sigData.data.startsWith('data:image/png')) {
               try {
@@ -317,19 +346,24 @@ async function fillPdfWithValues(
                 const sigBytes = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
                 const sigImage = await pdfDoc.embedPng(sigBytes);
                 
+                // Position signature image properly within the field bounds
+                // Draw at the field position, not overlapping with text above
+                const sigWidth = Math.min(absWidth, 150);
+                const sigHeight = Math.min(absHeight, 35);
+                
                 page.drawImage(sigImage, {
                   x: absX,
-                  y: absY - absHeight - 5,
-                  width: Math.min(absWidth, 150),
-                  height: Math.min(absHeight, 40),
+                  y: absY - sigHeight, // Position from top of field area
+                  width: sigWidth,
+                  height: sigHeight,
                 });
-                console.log("Embedded signature image for", signerType, "at", api_id);
+                console.log("Embedded signature image for", signerType, "at", api_id, "y:", absY - sigHeight);
               } catch (sigError) {
                 console.error("Error embedding signature for", signerType, ":", sigError);
                 // Fallback to text
                 page.drawText(`[Signed by ${sigData.name}]`, {
                   x: absX,
-                  y: absY - 12,
+                  y: absY - fontSize - 2,
                   size: 9,
                   font,
                   color: rgb(0.2, 0.2, 0.2),
@@ -339,7 +373,7 @@ async function fillPdfWithValues(
               // No image but has signer name - show text representation
               page.drawText(`[Signed by ${sigData.name}]`, {
                 x: absX,
-                y: absY - 12,
+                y: absY - fontSize - 2,
                 size: 9,
                 font,
                 color: rgb(0.2, 0.2, 0.2),
@@ -361,7 +395,7 @@ async function fillPdfWithValues(
             // Regular text field - only draw if has content
             page.drawText(textValue.substring(0, 100), {
               x: absX,
-              y: absY - fontSize,
+              y: absY - fontSize - 2, // Position text below the field line
               size: fontSize,
               font,
               color: rgb(0, 0, 0),

@@ -338,14 +338,39 @@ serve(async (req) => {
       .eq("id", signingToken.id);
 
     // Merge field values into booking_documents.field_configuration
+    // Also update signature date fields with actual signing timestamp
     if (fieldValues && Object.keys(fieldValues).length > 0) {
       const existingFieldConfig = signingToken.booking_documents?.field_configuration || {};
-      const mergedFieldConfig = { ...existingFieldConfig, ...fieldValues };
+      
+      // Format the actual signing date in EST timezone
+      const signingDate = new Date();
+      const estDateStr = signingDate.toLocaleDateString('en-US', {
+        timeZone: 'America/New_York',
+        year: 'numeric',
+        month: '2-digit', 
+        day: '2-digit'
+      });
+      
+      // Create updated field values with correct dates based on signer type
+      const updatedFieldValues = { ...fieldValues };
+      
+      // Update date fields based on signer type to use actual signing timestamp
+      if (signingToken.signer_type === 'owner') {
+        updatedFieldValues.owner_signature_date = estDateStr;
+      } else if (signingToken.signer_type === 'second_owner') {
+        updatedFieldValues.second_owner_signature_date = estDateStr;
+      } else if (signingToken.signer_type === 'manager') {
+        updatedFieldValues.manager_signature_date = estDateStr;
+      }
+      
+      const mergedFieldConfig = { ...existingFieldConfig, ...updatedFieldValues };
       
       await supabase
         .from("booking_documents")
         .update({ field_configuration: mergedFieldConfig })
         .eq("id", signingToken.document_id);
+        
+      console.log("Updated signature date to actual signing time:", estDateStr, "for", signingToken.signer_type);
     }
 
     // Log audit entry
