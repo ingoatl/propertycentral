@@ -1487,7 +1487,47 @@ serve(async (req) => {
       }
     }
 
-    // Update lead and save to management_agreements (GREC compliance)
+    // Save to management_agreements table (GREC compliance) - ALWAYS save if we have propertyId
+    const contractType = document.contract_type || document.document_templates?.contract_type || 'management_agreement';
+    const isManagementAgreement = contractType.toLowerCase().includes('management') || 
+                                   contractType.toLowerCase().includes('agreement');
+    
+    if (propertyId && isManagementAgreement) {
+      // Get owner and manager signed timestamps
+      const ownerSig = signatures?.find(s => s.signer_type === "owner");
+      const managerSig = signatures?.find(s => s.signer_type === "manager");
+
+      console.log("Saving to management_agreements - propertyId:", propertyId, "ownerId:", ownerId);
+
+      const { error: agreementError } = await supabase
+        .from("management_agreements")
+        .upsert({
+          property_id: propertyId,
+          owner_id: ownerId,
+          agreement_date: new Date().toISOString().split('T')[0],
+          effective_date: contractData.effectiveDate || new Date().toISOString().split('T')[0],
+          document_path: fileName,
+          management_fee_percentage: contractData.managementFee,
+          order_minimum_fee: contractData.visitPrice,
+          signed_by_owner: true,
+          signed_by_owner_at: ownerSig?.signed_at || new Date().toISOString(),
+          signed_by_company: true,
+          signed_by_company_at: managerSig?.signed_at || new Date().toISOString(),
+          status: "active",
+        }, {
+          onConflict: 'property_id',
+        });
+
+      if (agreementError) {
+        console.error("Error saving management agreement:", agreementError);
+      } else {
+        console.log("Management agreement saved to database (GREC compliance)");
+      }
+    } else {
+      console.log("Skipping management_agreements - propertyId:", propertyId, "isManagementAgreement:", isManagementAgreement);
+    }
+
+    // Update lead timeline if we have a lead
     if (leadData) {
       // Add timeline entry
       await supabase.from("lead_timeline").insert({
@@ -1506,56 +1546,6 @@ serve(async (req) => {
           next_stage: "onboarding",
         },
       });
-
-      // Save to management_agreements table (GREC compliance)
-      // Check document or template contract_type - default to saving for any agreement type
-      const contractType = document.contract_type || document.document_templates?.contract_type || 'management_agreement';
-      const isManagementAgreement = contractType.toLowerCase().includes('management') || 
-                                     contractType.toLowerCase().includes('agreement');
-      
-      if (propertyId && isManagementAgreement) {
-        // Get owner and manager signed timestamps
-        const ownerSig = signatures?.find(s => s.signer_type === "owner");
-        const managerSig = signatures?.find(s => s.signer_type === "manager");
-
-        const { error: agreementError } = await supabase
-          .from("management_agreements")
-          .upsert({
-            property_id: propertyId,
-            owner_id: ownerId,
-            agreement_date: new Date().toISOString().split('T')[0],
-            effective_date: contractData.effectiveDate || new Date().toISOString().split('T')[0],
-            document_path: fileName,
-            management_fee_percentage: contractData.managementFee,
-            order_minimum_fee: contractData.visitPrice,
-            signed_by_owner: true,
-            signed_by_owner_at: ownerSig?.signed_at || new Date().toISOString(),
-            signed_by_company: true,
-            signed_by_company_at: managerSig?.signed_at || new Date().toISOString(),
-            status: "active",
-          }, {
-            onConflict: 'property_id',
-          });
-
-        if (agreementError) {
-          console.error("Error saving management agreement:", agreementError);
-        } else {
-          console.log("Management agreement saved to database (GREC compliance)");
-          
-          // Add timeline entry for agreement creation
-          await supabase.from("lead_timeline").insert({
-            lead_id: leadData.id,
-            action: "Management agreement saved to GREC records",
-            metadata: {
-              property_id: propertyId,
-              management_fee: contractData.managementFee,
-              visit_price: contractData.visitPrice,
-              certificate_id: certificateId,
-              property_address: propertyAddress,
-            },
-          });
-        }
-      }
     }
 
     console.log("Document finalized successfully:", fileName, "Certificate ID:", certificateId);
