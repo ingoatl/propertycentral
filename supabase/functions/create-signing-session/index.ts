@@ -165,12 +165,16 @@ serve(async (req) => {
     // Create signing tokens for each signer
     const signers = [
       { name: ownerName, email: ownerEmail, type: "owner", order: 1 },
-      { name: "PeachHaus Group", email: "anja@peachhausgroup.com", type: "manager", order: 2 },
     ];
 
-    // Add second owner if provided
-    if (secondOwnerName && secondOwnerEmail) {
-      signers.splice(1, 0, { name: secondOwnerName, email: secondOwnerEmail, type: "second_owner", order: 1 });
+    // Add second owner if provided with a DIFFERENT email
+    if (secondOwnerName && secondOwnerEmail && secondOwnerEmail !== ownerEmail) {
+      signers.push({ name: secondOwnerName, email: secondOwnerEmail, type: "second_owner", order: 2 });
+      // Manager comes after second owner
+      signers.push({ name: "PeachHaus Group", email: "anja@peachhausgroup.com", type: "manager", order: 3 });
+    } else {
+      // No second owner, manager is order 2
+      signers.push({ name: "PeachHaus Group", email: "anja@peachhausgroup.com", type: "manager", order: 2 });
     }
 
     const expiresAt = new Date();

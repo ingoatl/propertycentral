@@ -370,7 +370,11 @@ const SignDocument = () => {
       // For radio groups, check if ANY field in the group is selected
       return !isRadioGroupComplete(f.group_name);
     }
-    return !completedFields.has(f.api_id);
+    if (f.type === "checkbox") return false; // Checkboxes are never required for navigation
+    
+    // For text, date, email, phone fields - check if value exists and is not empty
+    const val = fieldValues[f.api_id];
+    return val === undefined || val === null || val === "" || val === false;
   };
 
   // Get fields that need to be completed in document order
@@ -762,13 +766,26 @@ const SignDocument = () => {
                                 signatureData={isOwner2Field(field) ? owner2SignatureData : signatureData}
                                 onFocus={() => {
                                   if (field.type === "signature" && !isReadOnly) {
+                                    // Block Owner 1 from opening Owner 2's signature field
+                                    if (isOwner2Field(field)) {
+                                      toast.info("This signature field is for Owner 2");
+                                      return;
+                                    }
                                     setShowSignatureFor(field.api_id);
                                   } else if (!isReadOnly) {
                                     setActiveFieldId(field.api_id);
                                   }
                                 }}
                                 onBlur={() => setActiveFieldId(null)}
-                                onSignatureClick={() => !isReadOnly && setShowSignatureFor(field.api_id)}
+                                onSignatureClick={() => {
+                                  if (isReadOnly) return;
+                                  // Block Owner 1 from opening Owner 2's signature field
+                                  if (isOwner2Field(field)) {
+                                    toast.info("This signature field is for Owner 2");
+                                    return;
+                                  }
+                                  setShowSignatureFor(field.api_id);
+                                }}
                                 scale={scale}
                               />
                             )}
