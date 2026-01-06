@@ -306,13 +306,16 @@ const SignDocument = () => {
     }, 300);
   };
 
-  // Sort fields in document reading order: page, then Y (top to bottom), then X (left to right)
+  // Sort fields STRICTLY by page, then Y (top to bottom), then X (left to right)
+  // Using a smaller threshold to ensure proper ordering
   const sortedSignerFields = [...signerFields].sort((a, b) => {
     if (a.page !== b.page) return a.page - b.page;
-    // Sort by Y first (top to bottom), then by X for same line
-    const yDiff = a.y - b.y;
-    if (Math.abs(yDiff) > 2) return yDiff; // Different lines
-    return a.x - b.x; // Same line, sort by X
+    // Primary sort by Y - round to nearest integer for comparison
+    const yA = Math.round(a.y);
+    const yB = Math.round(b.y);
+    if (yA !== yB) return yA - yB;
+    // Same Y level, sort by X
+    return a.x - b.x;
   });
 
   // Check if a field is incomplete - Owner 2 fields are considered complete (optional)
@@ -394,21 +397,17 @@ const SignDocument = () => {
       return;
     }
     
-    // Find the next incomplete field that comes after current position in document
-    const currentPage = currentField.page;
-    const currentY = currentField.y;
+    // Find current field index in the sorted incomplete list
+    const currentIdx = sortedSignerFields.findIndex(f => f.api_id === currentId);
     
-    for (const f of incompleteFields) {
-      // Field is "after" if: later page, OR same page and lower Y, OR same page/Y and higher X
-      if (f.page > currentPage) {
-        navigateToField(f);
-        return;
-      }
-      if (f.page === currentPage && f.y > currentY + 2) {
-        navigateToField(f);
-        return;
-      }
-      if (f.page === currentPage && Math.abs(f.y - currentY) <= 2 && f.x > currentField.x) {
+    // Find the next incomplete field after current position in sorted order
+    for (let i = currentIdx + 1; i < sortedSignerFields.length; i++) {
+      const f = sortedSignerFields[i];
+      if (isOwner2Field(f)) continue;
+      
+      // Check if this field is in our incomplete list
+      const isIncomplete = incompleteFields.some(inc => inc.api_id === f.api_id);
+      if (isIncomplete) {
         navigateToField(f);
         return;
       }
@@ -538,8 +537,8 @@ const SignDocument = () => {
         </div>
       </div>
 
-      {/* Floating NEXT/START Button - Right side of document, closer to content */}
-      <div className="fixed right-4 top-1/3 z-40">
+      {/* Floating NEXT/START Button - At the edge of the document */}
+      <div className="fixed right-0 top-1/3 z-40">
         {remainingCount > 0 ? (
           <Button
             onClick={activeFieldId || showSignatureFor ? handleNext : handleStart}
