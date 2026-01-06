@@ -281,9 +281,7 @@ export function DocumentTemplatesManager() {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this template?')) return;
-
+  const handleDelete = async (id: string, forceDelete: boolean = false) => {
     try {
       // Check if template is in use by any documents
       const { data: usedDocs, error: checkError } = await supabase
@@ -294,17 +292,34 @@ export function DocumentTemplatesManager() {
 
       if (checkError) throw checkError;
 
-      if (usedDocs && usedDocs.length > 0) {
-        // Template is in use - just deactivate it instead
-        const { error: deactivateError } = await supabase
-          .from('document_templates')
-          .update({ is_active: false })
-          .eq('id', id);
+      if (usedDocs && usedDocs.length > 0 && !forceDelete) {
+        // Template is in use - ask if they want to force delete
+        const confirmForce = confirm(
+          'This template is used by existing documents.\n\n' +
+          'Click OK to permanently delete it anyway (documents will keep their data).\n' +
+          'Click Cancel to just deactivate it instead.'
+        );
+        
+        if (confirmForce) {
+          // Force delete - clear template_id from documents first
+          await supabase
+            .from('booking_documents')
+            .update({ template_id: null })
+            .eq('template_id', id);
+        } else {
+          // Just deactivate
+          const { error: deactivateError } = await supabase
+            .from('document_templates')
+            .update({ is_active: false })
+            .eq('id', id);
 
-        if (deactivateError) throw deactivateError;
-        toast.success('Template deactivated (in use by existing documents)');
-        loadTemplates();
-        return;
+          if (deactivateError) throw deactivateError;
+          toast.success('Template deactivated');
+          loadTemplates();
+          return;
+        }
+      } else if (!forceDelete) {
+        if (!confirm('Are you sure you want to delete this template?')) return;
       }
 
       const { error } = await supabase
