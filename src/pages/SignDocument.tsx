@@ -221,18 +221,29 @@ const SignDocument = () => {
     }
   };
 
+  // Track separate signatures for Owner 1 and Owner 2
+  const [owner2SignatureData, setOwner2SignatureData] = useState<string | null>(null);
+  
   const handleSignatureAdopt = (sigData: string) => {
-    setSignatureData(sigData);
+    const currentSignatureField = signerFields.find(f => f.api_id === showSignatureFor);
+    
+    if (currentSignatureField && isOwner2Field(currentSignatureField)) {
+      // Owner 2 is signing - only apply to Owner 2 fields
+      setOwner2SignatureData(sigData);
+      setCompletedFields(prev => new Set([...prev, currentSignatureField.api_id]));
+      toast.success("Owner 2 signature adopted!");
+    } else {
+      // Owner 1 is signing - only apply to Owner 1 signature fields
+      setSignatureData(sigData);
+      signerFields
+        .filter(f => f.type === "signature" && !isOwner2Field(f))
+        .forEach(f => {
+          setCompletedFields(prev => new Set([...prev, f.api_id]));
+        });
+      toast.success("Signature adopted!");
+    }
+    
     setShowSignatureFor(null);
-    
-    // Only mark Owner 1 signature fields as complete - NOT Owner 2
-    signerFields
-      .filter(f => f.type === "signature" && !isOwner2Field(f))
-      .forEach(f => {
-        setCompletedFields(prev => new Set([...prev, f.api_id]));
-      });
-    
-    toast.success("Signature adopted!");
   };
 
   const handleSubmitSignature = async () => {
@@ -246,17 +257,48 @@ const SignDocument = () => {
       return;
     }
 
-    // Check required fields
-    const missingFields = signerFields.filter(f => {
-      if (!f.required) return false;
-      if (f.type === "signature") return !signatureData;
-      if (f.type === "checkbox") return false;
-      return !fieldValues[f.api_id];
-    });
+    // Check required non-Owner2 fields (Owner 2 fields are optional)
+    const missingFields: FieldData[] = [];
+    const checkedRadioGroups = new Set<string>();
+    
+    for (const f of signerFields) {
+      // Skip Owner 2 fields - they're optional
+      if (isOwner2Field(f)) continue;
+      
+      // Handle radio groups - only check once per group
+      if (f.type === "radio" && f.group_name) {
+        if (checkedRadioGroups.has(f.group_name)) continue;
+        checkedRadioGroups.add(f.group_name);
+        
+        if (!isRadioGroupComplete(f.group_name)) {
+          missingFields.push(f);
+        }
+        continue;
+      }
+      
+      // Skip non-required and checkboxes
+      if (!f.required) continue;
+      if (f.type === "checkbox") continue;
+      
+      // Check signature
+      if (f.type === "signature" && !signatureData) {
+        missingFields.push(f);
+        continue;
+      }
+      
+      // Check other fields
+      if (!fieldValues[f.api_id]) {
+        missingFields.push(f);
+      }
+    }
 
     if (missingFields.length > 0) {
-      toast.error(`Please complete: ${missingFields.map(f => f.label).join(", ")}`);
-      navigateToField(missingFields[0]);
+      const firstMissing = missingFields[0];
+      const label = firstMissing.type === "radio" && firstMissing.group_name 
+        ? `Select a ${firstMissing.group_name.replace(/_/g, ' ')}`
+        : firstMissing.label;
+      toast.error(`Please complete: ${label}`);
+      navigateToField(firstMissing);
       return;
     }
 
@@ -537,8 +579,8 @@ const SignDocument = () => {
         </div>
       </div>
 
-      {/* Floating NEXT/START Button - At the edge of the document */}
-      <div className="fixed right-0 top-1/3 z-40">
+      {/* Floating NEXT/START Button - Positioned at the document edge */}
+      <div className="fixed z-40" style={{ right: `calc(50% - ${(pageWidth * scale) / 2 + 60}px)`, top: '40%' }}>
         {remainingCount > 0 ? (
           <Button
             onClick={activeFieldId || showSignatureFor ? handleNext : handleStart}
@@ -717,7 +759,7 @@ const SignDocument = () => {
                                 isActive={isActive}
                                 isCompleted={isCompleted}
                                 isReadOnly={isReadOnly}
-                                signatureData={signatureData}
+                                signatureData={isOwner2Field(field) ? owner2SignatureData : signatureData}
                                 onFocus={() => {
                                   if (field.type === "signature" && !isReadOnly) {
                                     setShowSignatureFor(field.api_id);
