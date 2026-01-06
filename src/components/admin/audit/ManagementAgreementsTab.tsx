@@ -25,9 +25,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, FileText, CheckCircle, XCircle, RefreshCw, Download } from "lucide-react";
+import { Plus, FileText, CheckCircle, XCircle, RefreshCw, Download, Eye } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
+import { PDFViewerDialog } from "@/components/documents/PDFViewerDialog";
 
 interface ManagementAgreement {
   id: string;
@@ -49,9 +50,10 @@ interface ManagementAgreement {
 export function ManagementAgreementsTab() {
   const [agreements, setAgreements] = useState<ManagementAgreement[]>([]);
   const [loading, setLoading] = useState(true);
-  const [properties, setProperties] = useState<{ id: string; name: string; owner_id: string }[]>([]);
+  const [properties, setProperties] = useState<{ id: string; name: string; address: string; owner_id: string }[]>([]);
   const [owners, setOwners] = useState<{ id: string; name: string }[]>([]);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [viewingPdf, setViewingPdf] = useState<{ path: string; title: string } | null>(null);
   const [newAgreement, setNewAgreement] = useState({
     property_id: "",
     owner_id: "",
@@ -69,13 +71,11 @@ export function ManagementAgreementsTab() {
   const loadData = async () => {
     setLoading(true);
     try {
-      // Load properties
+      // Load properties with address
       const { data: propsData } = await supabase
         .from("properties")
-        .select("id, name, owner_id")
-        .not("offboarded_at", "is", null)
-        .or("offboarded_at.is.null")
-        .order("name");
+        .select("id, name, address, owner_id")
+        .order("address");
       
       if (propsData) setProperties(propsData);
 
@@ -95,16 +95,16 @@ export function ManagementAgreementsTab() {
 
       if (error) throw error;
 
-      // Enrich with names
-      const enriched = await Promise.all((agreementsData || []).map(async (a) => {
+      // Enrich with names - use address as primary, fallback to name
+      const enriched = (agreementsData || []).map((a) => {
         const prop = propsData?.find(p => p.id === a.property_id);
         const owner = ownersData?.find(o => o.id === a.owner_id);
         return {
           ...a,
-          property_name: prop?.name || "Unknown",
+          property_name: prop?.address || prop?.name || "Unknown",
           owner_name: owner?.name || "Unknown",
         };
-      }));
+      });
 
       setAgreements(enriched);
     } catch (error) {
@@ -144,6 +144,25 @@ export function ManagementAgreementsTab() {
       toast({
         title: "Error",
         description: "Failed to add agreement",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDownload = async (filePath: string, propertyName: string) => {
+    try {
+      const { data, error } = await supabase.storage
+        .from("signed-documents")
+        .createSignedUrl(filePath, 60);
+
+      if (error) throw error;
+      
+      window.open(data.signedUrl, "_blank");
+    } catch (error) {
+      console.error("Error downloading document:", error);
+      toast({
+        title: "Error",
+        description: "Failed to download document",
         variant: "destructive",
       });
     }
@@ -348,9 +367,25 @@ export function ManagementAgreementsTab() {
                   <TableCell>{getStatusBadge(agreement.status)}</TableCell>
                   <TableCell className="text-center">
                     {agreement.document_path ? (
-                      <Button size="sm" variant="ghost">
-                        <Download className="h-4 w-4" />
-                      </Button>
+                      <div className="flex items-center justify-center gap-1">
+                        <Button 
+                          size="sm" 
+                          variant="ghost"
+                          onClick={() => setViewingPdf({
+                            path: agreement.document_path!,
+                            title: `Agreement - ${agreement.property_name}`
+                          })}
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          variant="ghost"
+                          onClick={() => handleDownload(agreement.document_path!, agreement.property_name || "Agreement")}
+                        >
+                          <Download className="h-4 w-4" />
+                        </Button>
+                      </div>
                     ) : (
                       <span className="text-muted-foreground text-sm">-</span>
                     )}
@@ -361,6 +396,14 @@ export function ManagementAgreementsTab() {
           </Table>
         </div>
       )}
+
+      {/* PDF Viewer Dialog */}
+      <PDFViewerDialog
+        open={!!viewingPdf}
+        onOpenChange={(open) => !open && setViewingPdf(null)}
+        filePath={viewingPdf?.path || ""}
+        title={viewingPdf?.title || "Document"}
+      />
     </div>
   );
 }

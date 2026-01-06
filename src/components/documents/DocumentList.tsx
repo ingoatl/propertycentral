@@ -6,10 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Copy, Eye, History, Send, FileText, Search, CheckCircle, Clock, AlertCircle, Edit } from "lucide-react";
+import { Copy, Eye, History, FileText, Search, CheckCircle, Clock, AlertCircle, Edit, Download, MapPin } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { DocumentAuditTrail } from "./DocumentAuditTrail";
+import { PDFViewerDialog } from "./PDFViewerDialog";
 
 interface Document {
   id: string;
@@ -27,6 +28,7 @@ interface Document {
   property_id: string | null;
   booking_id: string | null;
   template_id: string | null;
+  signed_pdf_path: string | null;
   template?: { name: string } | null;
   property?: { name: string; address: string } | null;
 }
@@ -37,6 +39,7 @@ const DocumentList = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [expandedAuditId, setExpandedAuditId] = useState<string | null>(null);
+  const [viewingPdf, setViewingPdf] = useState<{ path: string; title: string } | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -196,7 +199,10 @@ const DocumentList = () => {
                 {/* Meta Info */}
                 <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
                   {doc.property && (
-                    <span>Property: {doc.property.name}</span>
+                    <span className="flex items-center gap-1">
+                      <MapPin className="h-3 w-3" />
+                      {doc.property.address || doc.property.name}
+                    </span>
                   )}
                   {doc.created_at && (
                     <span>Created: {format(new Date(doc.created_at), "MMM d, yyyy")}</span>
@@ -224,6 +230,32 @@ const DocumentList = () => {
 
                 {/* Actions */}
                 <div className="flex flex-wrap gap-2 pt-2 border-t">
+                  {doc.signed_pdf_path && (
+                    <>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setViewingPdf({
+                          path: doc.signed_pdf_path!,
+                          title: doc.document_name || doc.property?.address || "Document"
+                        })}
+                      >
+                        <Eye className="h-4 w-4 mr-1" />
+                        View
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={async () => {
+                          const { data } = await supabase.storage.from("signed-documents").createSignedUrl(doc.signed_pdf_path!, 60);
+                          if (data?.signedUrl) window.open(data.signedUrl, "_blank");
+                        }}
+                      >
+                        <Download className="h-4 w-4 mr-1" />
+                        Download
+                      </Button>
+                    </>
+                  )}
                   {doc.guest_signing_url && !doc.guest_signed_at && (
                     <Button
                       size="sm"
@@ -265,6 +297,14 @@ const DocumentList = () => {
           ))}
         </div>
       )}
+
+      {/* PDF Viewer Dialog */}
+      <PDFViewerDialog
+        open={!!viewingPdf}
+        onOpenChange={(open) => !open && setViewingPdf(null)}
+        filePath={viewingPdf?.path || ""}
+        title={viewingPdf?.title || "Document"}
+      />
     </div>
   );
 };
