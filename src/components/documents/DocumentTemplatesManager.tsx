@@ -92,7 +92,7 @@ export function DocumentTemplatesManager() {
     }
   };
 
-  const analyzeDocument = async (file: File): Promise<{ contract_type: string; name: string } | null> => {
+  const analyzeDocument = async (file: File): Promise<{ contract_type: string; name: string; signing_parties?: any[] } | null> => {
     try {
       setAnalyzing(true);
       
@@ -114,7 +114,36 @@ export function DocumentTemplatesManager() {
         .from('signed-documents')
         .getPublicUrl(tempPath);
 
-      // Call analyze function
+      // First try the intelligent analyzer with text extraction
+      try {
+        const { textPositions, totalPages } = await extractPdfTextWithPositions(urlData.publicUrl);
+        
+        if (textPositions && textPositions.length > 0) {
+          const { data, error } = await supabase.functions.invoke('analyze-document-intelligent', {
+            body: { 
+              fileUrl: urlData.publicUrl,
+              textPositions,
+              totalPages,
+            },
+          });
+
+          // Clean up temp file
+          await supabase.storage.from('signed-documents').remove([tempPath]);
+
+          if (!error && data?.success) {
+            console.log('Intelligent analysis result:', data.document_type, data.signing_parties);
+            return {
+              contract_type: data.document_type || 'other',
+              name: data.document_type_label || '',
+              signing_parties: data.signing_parties,
+            };
+          }
+        }
+      } catch (intelligentError) {
+        console.log('Intelligent analyzer not available, falling back:', intelligentError);
+      }
+
+      // Fallback to original analyzer
       const { data, error } = await supabase.functions.invoke('analyze-document-fields', {
         body: { 
           fileUrl: urlData.publicUrl,
@@ -345,7 +374,29 @@ export function DocumentTemplatesManager() {
       
       console.log(`Re-analyzing: extracted ${formFields.length} AcroForm fields, ${textPositions.length} text items from ${totalPages} pages`);
       
-      // Send to edge function
+      // First try the intelligent analyzer for better document type detection
+      if (textPositions.length > 0 && !hasAcroForm) {
+        try {
+          const { data: intelligentData, error: intelligentError } = await supabase.functions.invoke('analyze-document-intelligent', {
+            body: { 
+              templateId: template.id,
+              textPositions,
+              totalPages,
+              forceReanalyze: true,
+            },
+          });
+
+          if (!intelligentError && intelligentData?.success && intelligentData?.fields?.length > 0) {
+            toast.success(`Detected ${intelligentData.fields.length} fields as ${intelligentData.document_type_label || intelligentData.document_type}`);
+            loadTemplates();
+            return;
+          }
+        } catch (intelligentErr) {
+          console.log('Intelligent analyzer failed, falling back:', intelligentErr);
+        }
+      }
+      
+      // Fallback to standard detection
       const { data, error } = await supabase.functions.invoke('detect-pdf-fields', {
         body: { 
           formFields: hasAcroForm ? formFields : undefined,
