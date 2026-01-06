@@ -630,20 +630,54 @@ serve(async (req) => {
     // Property address comes from the contract (what the owner entered)
     let propertyAddress = contractData.propertyAddress;
 
-    // Get lead data
+    // Get lead data - try multiple lookups
     let leadData: any = null;
+    
+    // First try: lookup by signwell_document_id
     const { data: lead } = await supabase
       .from("leads")
-      .select("id, property_id, owner_id, property_address, contact_name, email, phone")
+      .select("id, property_id, owner_id, property_address, contact_name, email, phone, stage")
       .eq("signwell_document_id", documentId)
       .maybeSingle();
     
     if (lead) {
       leadData = lead;
+    } else {
+      // Second try: lookup by booking_document_id if stored in leads
+      const { data: leadByDocId } = await supabase
+        .from("leads")
+        .select("id, property_id, owner_id, property_address, contact_name, email, phone, stage")
+        .eq("booking_document_id", documentId)
+        .maybeSingle();
+      
+      if (leadByDocId) {
+        leadData = leadByDocId;
+      } else {
+        // Third try: find lead by matching owner email from contract
+        if (contractData.ownerEmail) {
+          const { data: leadByEmail } = await supabase
+            .from("leads")
+            .select("id, property_id, owner_id, property_address, contact_name, email, phone, stage")
+            .eq("email", contractData.ownerEmail)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          
+          if (leadByEmail) {
+            leadData = leadByEmail;
+          }
+        }
+      }
+    }
+    
+    if (leadData) {
+      console.log("Found lead:", leadData.id, "stage:", leadData.stage);
       // If contract doesn't have property address, try lead (fallback)
       if (!propertyAddress) {
-        propertyAddress = lead.property_address;
+        propertyAddress = leadData.property_address;
       }
+    } else {
+      console.log("No lead found for document");
     }
 
     console.log("Property address from contract:", propertyAddress);
@@ -908,16 +942,16 @@ serve(async (req) => {
     // Draw header background
     certPage.drawRectangle({
       x: 0,
-      y: 720,
+      y: 718,
       width: pageWidth,
-      height: 72,
+      height: 74,
       color: rgb(0.98, 0.98, 0.98),
     });
     
-    // Header line
+    // Header accent line at top of header section
     certPage.drawRectangle({
       x: 0,
-      y: 720,
+      y: 790,
       width: pageWidth,
       height: 2,
       color: greenColor,
@@ -1522,16 +1556,20 @@ serve(async (req) => {
     }
 
     // Save to management_agreements table (GREC compliance) - ALWAYS save if we have propertyId
+    // Include co_hosting, full_service, and any agreement type
     const contractType = document.contract_type || document.document_templates?.contract_type || 'management_agreement';
     const isManagementAgreement = contractType.toLowerCase().includes('management') || 
-                                   contractType.toLowerCase().includes('agreement');
+                                   contractType.toLowerCase().includes('agreement') ||
+                                   contractType.toLowerCase().includes('hosting') ||
+                                   contractType.toLowerCase().includes('co_hosting') ||
+                                   contractType.toLowerCase().includes('full_service');
     
     if (propertyId && isManagementAgreement) {
       // Get owner and manager signed timestamps
       const ownerSig = signatures?.find(s => s.signer_type === "owner");
       const managerSig = signatures?.find(s => s.signer_type === "manager");
 
-      console.log("Saving to management_agreements - propertyId:", propertyId, "ownerId:", ownerId);
+      console.log("Saving to management_agreements - propertyId:", propertyId, "ownerId:", ownerId, "contractType:", contractType);
 
       const { error: agreementError } = await supabase
         .from("management_agreements")
@@ -1558,15 +1596,33 @@ serve(async (req) => {
         console.log("Management agreement saved to database (GREC compliance)");
       }
     } else {
-      console.log("Skipping management_agreements - propertyId:", propertyId, "isManagementAgreement:", isManagementAgreement);
+      console.log("Skipping management_agreements - propertyId:", propertyId, "contractType:", contractType, "isManagementAgreement:", isManagementAgreement);
     }
 
-    // Update lead timeline if we have a lead
+    // Update lead stage and timeline if we have a lead
     if (leadData) {
+      // Update lead stage to contract_signed
+      const { error: leadUpdateError } = await supabase
+        .from("leads")
+        .update({
+          stage: "contract_signed",
+          stage_changed_at: new Date().toISOString(),
+          property_id: propertyId || leadData.property_id,
+          owner_id: ownerId || leadData.owner_id,
+          property_address: propertyAddress || leadData.property_address,
+        })
+        .eq("id", leadData.id);
+      
+      if (leadUpdateError) {
+        console.error("Error updating lead stage:", leadUpdateError);
+      } else {
+        console.log("Updated lead stage to contract_signed");
+      }
+      
       // Add timeline entry
       await supabase.from("lead_timeline").insert({
         lead_id: leadData.id,
-        action: "Contract signed by all parties - Owner & Property records created",
+        action: "Contract signed by all parties - moved to contract_signed stage",
         metadata: {
           document_id: documentId,
           signed_pdf_path: fileName,
@@ -1577,7 +1633,8 @@ serve(async (req) => {
           service_type: contractData.serviceType,
           management_fee: contractData.managementFee,
           visit_price: contractData.visitPrice,
-          next_stage: "onboarding",
+          previous_stage: leadData.stage,
+          new_stage: "contract_signed",
         },
       });
     }
