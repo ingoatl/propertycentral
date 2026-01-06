@@ -290,7 +290,10 @@ const SignDocument = () => {
   };
 
   const handleSubmitSignature = async () => {
+    console.log("handleSubmitSignature called - signatureData:", !!signatureData, "agreedToTerms:", agreedToTerms);
+    
     if (!signatureData) {
+      console.log("ERROR: No signature data found!");
       toast.error("Please add your signature");
       return;
     }
@@ -306,7 +309,10 @@ const SignDocument = () => {
     
     for (const f of signerFields) {
       // Skip Owner 2 fields - they're optional
-      if (isOwner2Field(f)) continue;
+      if (isOwner2Field(f)) {
+        console.log(`Skipping Owner 2 field: ${f.api_id}`);
+        continue;
+      }
       
       // Handle radio groups - only check once per group
       if (f.type === "radio" && f.group_name) {
@@ -314,6 +320,7 @@ const SignDocument = () => {
         checkedRadioGroups.add(f.group_name);
         
         if (!isRadioGroupComplete(f.group_name)) {
+          console.log(`Missing radio group: ${f.group_name}`);
           missingFields.push(f);
         }
         continue;
@@ -323,17 +330,22 @@ const SignDocument = () => {
       if (!f.required) continue;
       if (f.type === "checkbox") continue;
       
-      // Check signature
-      if (f.type === "signature" && !signatureData) {
-        missingFields.push(f);
+      // Check signature - but we already verified signatureData exists above
+      if (f.type === "signature") {
+        console.log(`Checking signature field ${f.api_id}: signatureData=${!!signatureData}`);
+        // Skip - signature is already verified at the top
         continue;
       }
       
       // Check other fields
       if (!fieldValues[f.api_id]) {
+        console.log(`Missing field: ${f.api_id} (${f.label}), value:`, fieldValues[f.api_id]);
         missingFields.push(f);
       }
     }
+    
+    console.log("Missing fields count:", missingFields.length);
+    console.log("Missing fields:", missingFields.map(f => ({ api_id: f.api_id, label: f.label, type: f.type })));
 
     if (missingFields.length > 0) {
       const firstMissing = missingFields[0];
@@ -408,7 +420,11 @@ const SignDocument = () => {
     // Owner 2 fields are optional, never considered incomplete for navigation
     if (isOwner2Field(f)) return false;
     
-    if (f.type === "signature") return !signatureData;
+    if (f.type === "signature") {
+      const incomplete = !signatureData;
+      console.log(`Checking signature field ${f.api_id}: signatureData=${!!signatureData}, incomplete=${incomplete}`);
+      return incomplete;
+    }
     if (f.type === "radio" && f.group_name) {
       // For radio groups, check if ANY field in the group is selected
       return !isRadioGroupComplete(f.group_name);
@@ -513,11 +529,16 @@ const SignDocument = () => {
     if (f.type === "signature") {
       // Owner 2 signature fields should not block Owner 1 from completing
       if (isOwner2Field(f)) return true;
-      return !!signatureData;
+      const complete = !!signatureData;
+      console.log(`Validation - signature field ${f.api_id}: signatureData=${!!signatureData}, complete=${complete}`);
+      return complete;
     }
     if (f.type === "checkbox") return true;
     return !!fieldValues[f.api_id];
   });
+  
+  // Log overall completion status
+  console.log(`Completion status: radioGroupsComplete=${radioGroupsComplete}, nonRadioFieldsComplete=${nonRadioFieldsComplete}, signatureData=${!!signatureData}, agreedToTerms=${agreedToTerms}`);
   
   const allRequiredComplete = radioGroupsComplete && nonRadioFieldsComplete;
   const canFinish = signatureData && agreedToTerms && allRequiredComplete;
