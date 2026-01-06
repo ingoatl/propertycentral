@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Loader2, Download, X, ZoomIn, ZoomOut, ExternalLink } from "lucide-react";
+import { Loader2, Download, ZoomIn, ZoomOut, ExternalLink, AlertCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -21,26 +21,48 @@ export function PDFViewerDialog({
   bucketName = "signed-documents",
 }: PDFViewerDialogProps) {
   const [loading, setLoading] = useState(true);
-  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [zoom, setZoom] = useState(100);
   const { toast } = useToast();
+
+  useEffect(() => {
+    if (open && filePath) {
+      loadPdf();
+    }
+    
+    return () => {
+      // Cleanup blob URL on unmount
+      if (pdfBlobUrl) {
+        URL.revokeObjectURL(pdfBlobUrl);
+      }
+    };
+  }, [open, filePath]);
 
   const loadPdf = async () => {
     if (!filePath) return;
     
     setLoading(true);
+    setError(null);
+    
     try {
-      const { data, error } = await supabase.storage
+      // Download the file as a blob instead of using signed URL
+      // This avoids browser ad blockers blocking Supabase URLs
+      const { data, error: downloadError } = await supabase.storage
         .from(bucketName)
-        .createSignedUrl(filePath, 3600); // 1 hour
+        .download(filePath);
 
-      if (error) throw error;
-      setPdfUrl(data.signedUrl);
-    } catch (error) {
-      console.error("Error loading PDF:", error);
+      if (downloadError) throw downloadError;
+      
+      // Create a blob URL from the downloaded file
+      const blobUrl = URL.createObjectURL(data);
+      setPdfBlobUrl(blobUrl);
+    } catch (err: any) {
+      console.error("Error loading PDF:", err);
+      setError(err.message || "Failed to load document");
       toast({
         title: "Error",
-        description: "Failed to load document",
+        description: "Failed to load document. Please try downloading instead.",
         variant: "destructive",
       });
     } finally {
@@ -52,16 +74,29 @@ export function PDFViewerDialog({
     if (!filePath) return;
     
     try {
-      const { data, error } = await supabase.storage
+      // Download as blob to avoid ad blockers
+      const { data, error: downloadError } = await supabase.storage
         .from(bucketName)
-        .createSignedUrl(filePath, 60); // 1 minute for download
+        .download(filePath);
 
-      if (error) throw error;
+      if (downloadError) throw downloadError;
       
-      // Open in new tab for download
-      window.open(data.signedUrl, "_blank");
-    } catch (error) {
-      console.error("Error downloading PDF:", error);
+      // Create download link
+      const blobUrl = URL.createObjectURL(data);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = filePath.split('/').pop() || 'document.pdf';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(blobUrl);
+      
+      toast({
+        title: "Success",
+        description: "Document downloaded successfully",
+      });
+    } catch (err: any) {
+      console.error("Error downloading PDF:", err);
       toast({
         title: "Error",
         description: "Failed to download document",
@@ -71,11 +106,14 @@ export function PDFViewerDialog({
   };
 
   const handleOpenChange = (newOpen: boolean) => {
-    if (newOpen && filePath) {
-      loadPdf();
-    } else {
-      setPdfUrl(null);
+    if (!newOpen) {
+      // Cleanup when closing
+      if (pdfBlobUrl) {
+        URL.revokeObjectURL(pdfBlobUrl);
+        setPdfBlobUrl(null);
+      }
       setZoom(100);
+      setError(null);
     }
     onOpenChange(newOpen);
   };
@@ -108,11 +146,11 @@ export function PDFViewerDialog({
                 <Download className="h-4 w-4 mr-1" />
                 Download
               </Button>
-              {pdfUrl && (
+              {pdfBlobUrl && (
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => window.open(pdfUrl, "_blank")}
+                  onClick={() => window.open(pdfBlobUrl, "_blank")}
                 >
                   <ExternalLink className="h-4 w-4 mr-1" />
                   Open
@@ -127,10 +165,19 @@ export function PDFViewerDialog({
             <div className="flex items-center justify-center h-full">
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
-          ) : pdfUrl ? (
+          ) : error ? (
+            <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-4">
+              <AlertCircle className="h-12 w-12 text-destructive" />
+              <p>{error}</p>
+              <Button onClick={handleDownload} variant="outline">
+                <Download className="h-4 w-4 mr-2" />
+                Download Instead
+              </Button>
+            </div>
+          ) : pdfBlobUrl ? (
             <div className="flex justify-center p-4">
               <iframe
-                src={`${pdfUrl}#toolbar=0&navpanes=0&scrollbar=1`}
+                src={`${pdfBlobUrl}#toolbar=0&navpanes=0&scrollbar=1`}
                 className="bg-white shadow-lg rounded"
                 style={{
                   width: `${zoom}%`,
@@ -143,7 +190,7 @@ export function PDFViewerDialog({
             </div>
           ) : (
             <div className="flex items-center justify-center h-full text-muted-foreground">
-              Failed to load document
+              No document to display
             </div>
           )}
         </div>

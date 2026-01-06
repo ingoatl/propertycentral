@@ -247,8 +247,28 @@ const DocumentList = () => {
                         size="sm"
                         variant="outline"
                         onClick={async () => {
-                          const { data } = await supabase.storage.from("signed-documents").createSignedUrl(doc.signed_pdf_path!, 60);
-                          if (data?.signedUrl) window.open(data.signedUrl, "_blank");
+                          try {
+                            const { data, error } = await supabase.storage
+                              .from("signed-documents")
+                              .download(doc.signed_pdf_path!);
+                            
+                            if (error) throw error;
+                            
+                            const blobUrl = URL.createObjectURL(data);
+                            const link = document.createElement('a');
+                            link.href = blobUrl;
+                            link.download = doc.signed_pdf_path!.split('/').pop() || 'document.pdf';
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                            URL.revokeObjectURL(blobUrl);
+                          } catch (err) {
+                            toast({
+                              title: "Error",
+                              description: "Failed to download document",
+                              variant: "destructive",
+                            });
+                          }
                         }}
                       >
                         <Download className="h-4 w-4 mr-1" />
