@@ -466,30 +466,88 @@ serve(async (req) => {
       }
     }
 
-    // Update lead stage if associated
+    // Update lead stage if associated and save to management_agreements
     const { data: lead } = await supabase
       .from("leads")
-      .select("id")
+      .select("id, property_id, owner_id")
       .eq("signwell_document_id", documentId)
       .maybeSingle();
 
     if (lead) {
+      // Update lead to contract_signed stage, then to onboarding
       await supabase
         .from("leads")
         .update({
-          stage: "contract_signed",
+          stage: "onboarding",
           stage_changed_at: new Date().toISOString(),
         })
         .eq("id", lead.id);
 
       await supabase.from("lead_timeline").insert({
         lead_id: lead.id,
-        action: "Contract signed by all parties",
+        action: "Contract signed by all parties - Moving to onboarding",
         metadata: {
           document_id: documentId,
           signed_pdf_path: fileName,
+          next_stage: "onboarding",
         },
       });
+
+      // If this is a management agreement, save to management_agreements table
+      if (document.contract_type === "management_agreement" && lead.property_id) {
+        // Extract management fee from field configuration if available
+        const fieldConfig = document.field_configuration as Record<string, any> | null;
+        let managementFee = 20; // Default 20%
+        
+        if (fieldConfig) {
+          // Try to find the selected package from field values
+          const packageField = Object.entries(fieldConfig).find(([key, val]) => 
+            key.toLowerCase().includes("package") && val === true
+          );
+          if (packageField) {
+            const packageName = packageField[0].toLowerCase();
+            if (packageName.includes("20")) managementFee = 20;
+            else if (packageName.includes("25")) managementFee = 25;
+            else if (packageName.includes("30")) managementFee = 30;
+          }
+        }
+
+        // Get owner and manager signed timestamps
+        const ownerSig = signatures?.find(s => s.signer_type === "owner");
+        const managerSig = signatures?.find(s => s.signer_type === "manager");
+
+        const { error: agreementError } = await supabase
+          .from("management_agreements")
+          .insert({
+            property_id: lead.property_id,
+            owner_id: lead.owner_id,
+            agreement_date: new Date().toISOString().split('T')[0],
+            effective_date: new Date().toISOString().split('T')[0],
+            document_path: fileName,
+            management_fee_percentage: managementFee,
+            signed_by_owner: true,
+            signed_by_owner_at: ownerSig?.signed_at || new Date().toISOString(),
+            signed_by_company: true,
+            signed_by_company_at: managerSig?.signed_at || new Date().toISOString(),
+            status: "active",
+          });
+
+        if (agreementError) {
+          console.error("Error saving management agreement:", agreementError);
+        } else {
+          console.log("Management agreement saved to database");
+          
+          // Add timeline entry for agreement creation
+          await supabase.from("lead_timeline").insert({
+            lead_id: lead.id,
+            action: "Management agreement saved to database",
+            metadata: {
+              property_id: lead.property_id,
+              management_fee: managementFee,
+            },
+          });
+        }
+      }
     }
 
     console.log("Document finalized successfully:", fileName);
