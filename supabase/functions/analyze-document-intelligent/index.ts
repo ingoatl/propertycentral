@@ -114,34 +114,57 @@ const DOCUMENT_TYPE_CONFIG: Record<string, {
 };
 
 // Research document type using Firecrawl
-async function researchDocumentType(documentText: string, firecrawlApiKey: string): Promise<{
+async function researchDocumentType(documentText: string, firecrawlApiKey: string, fileName?: string): Promise<{
   documentType: string;
   context: string;
   signingParties: string[];
   commonFieldsContext: string;
 }> {
   // First, identify what type of document this might be
+  // Include filename in detection as it's often the most accurate indicator
   const docTypeKeywords = [
     { type: "innkeeper_agreement", keywords: ["innkeeper", "transient occupancy", "hotel", "lodging", "guest registration", "room rental"] },
-    { type: "management_agreement", keywords: ["property management", "management fee", "owner agrees", "manager shall", "exclusive right to manage"] },
-    { type: "co_hosting", keywords: ["co-host", "cohost", "airbnb management", "vacation rental management", "host services"] },
-    { type: "rental_agreement", keywords: ["lease agreement", "tenant", "landlord", "monthly rent", "security deposit", "rental period"] },
+    { type: "management_agreement", keywords: ["property management", "management fee", "owner agrees", "manager shall", "exclusive right to manage", "management agreement"] },
+    { type: "co_hosting", keywords: ["co-host", "cohost", "co hosting", "cohosting", "airbnb management", "vacation rental management", "host services", "co-hosting agreement"] },
+    { type: "rental_agreement", keywords: ["lease agreement", "tenant", "landlord", "monthly rent", "security deposit", "rental period", "rental agreement"] },
     { type: "pet_policy", keywords: ["pet policy", "pet agreement", "pet deposit", "pet weight", "animal policy"] },
     { type: "early_termination", keywords: ["early termination", "terminate agreement", "cancellation", "early end"] },
     { type: "addendum", keywords: ["addendum", "amendment", "supplement to", "in addition to"] },
   ];
 
-  const lowerText = documentText.toLowerCase();
+  // Check filename FIRST with high priority - filename often indicates exact document type
+  const lowerFileName = (fileName || "").toLowerCase().replace(/[_-]/g, ' ').replace(/\.(pdf|doc|docx)$/i, '');
   let detectedType = "other";
   let maxScore = 0;
-
+  
+  // Give filename keywords extra weight (x3)
   for (const { type, keywords } of docTypeKeywords) {
-    const score = keywords.filter(kw => lowerText.includes(kw)).length;
+    let score = 0;
+    for (const kw of keywords) {
+      if (lowerFileName.includes(kw)) {
+        score += 3; // Filename match is worth 3 points
+        console.log(`Filename "${lowerFileName}" matches keyword "${kw}" for type ${type}`);
+      }
+    }
     if (score > maxScore) {
       maxScore = score;
       detectedType = type;
     }
   }
+  
+  // If filename didn't give us a confident match, check document text
+  const lowerText = documentText.toLowerCase();
+  if (maxScore < 3) {
+    for (const { type, keywords } of docTypeKeywords) {
+      const textScore = keywords.filter(kw => lowerText.includes(kw)).length;
+      if (textScore > maxScore) {
+        maxScore = textScore;
+        detectedType = type;
+      }
+    }
+  }
+  
+  console.log(`Document type detection: filename="${fileName}", detected="${detectedType}", score=${maxScore}`);
 
   // If we couldn't confidently detect the type, use web research
   let context = "";
@@ -218,7 +241,7 @@ serve(async (req) => {
     }
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-    const { templateId, fileUrl, textPositions, totalPages, forceReanalyze, existingContractType, mergeWithExisting, existingFields } = await req.json();
+    const { templateId, fileUrl, textPositions, totalPages, forceReanalyze, existingContractType, mergeWithExisting, existingFields, fileName } = await req.json();
 
     console.log("Intelligent document analysis - templateId:", templateId, "totalPages:", totalPages, "mergeWithExisting:", mergeWithExisting);
 
@@ -264,11 +287,13 @@ serve(async (req) => {
     console.log("Document text length:", documentText.length);
     console.log("Document preview:", documentText.substring(0, 500));
 
-    // Step 1: Research document type with web search if needed
-    const research = await researchDocumentType(documentText, FIRECRAWL_API_KEY || "");
+    // Step 1: Research document type with web search if needed - pass filename for better detection
+    const templateName = template?.name || fileName || "";
+    const research = await researchDocumentType(documentText, FIRECRAWL_API_KEY || "", templateName);
     console.log("Research result:", {
       documentType: research.documentType,
       signingParties: research.signingParties,
+      templateName: templateName,
     });
 
     // Get document config or use defaults
@@ -312,6 +337,7 @@ serve(async (req) => {
       const systemPrompt = `You are an expert document analyzer specializing in property management, rental, and hospitality agreements.
 
 DOCUMENT TYPE DETECTED: ${research.documentType} (${docConfig.label})
+DOCUMENT NAME: ${templateName || 'Unknown'}
 ${research.context ? `\nWEB RESEARCH CONTEXT:\n${research.context}` : ''}
 
 SIGNING PARTIES FOR THIS DOCUMENT TYPE:
@@ -327,7 +353,24 @@ CRITICAL RULES:
    - "admin" = the property manager/host (you, the company)
 3. Ensure signatures and dates are paired correctly
 4. Use standardized api_id names (snake_case)
-5. The page number should be within the document's actual page count`;
+5. The page number should be within the document's actual page count
+
+SIGNATURE DETECTION - CRITICAL:
+- Look for "Signature:", "Sign:", "X______", "__________" lines near party names
+- Every signature MUST have a corresponding date field
+- Common signature patterns:
+  * "Owner Signature" with "Date" nearby
+  * "Manager/Co-Host Signature" with "Date" nearby  
+  * Signature lines at the end of the document
+  * Multiple signature blocks for different parties
+- If you see "Owner" and "Co-Host/Manager" sections, create signatures for BOTH
+
+FIELD DETECTION TIPS:
+- Blank lines (______) indicate text input fields
+- "Date:" or date format patterns indicate date fields
+- Checkbox squares (□) indicate checkbox fields
+- Email patterns or "Email:" indicate email fields
+- Phone patterns or "Phone:" indicate phone fields`;
 
       const userPrompt = `Analyze this document section and extract ALL fillable fields.
 
