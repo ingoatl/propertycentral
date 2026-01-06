@@ -50,7 +50,7 @@ const DocumentList = () => {
         .select(`
           *,
           template:document_templates(name),
-          property:properties(name, address)
+          property:properties!booking_documents_property_id_fkey(name, address)
         `)
         .order("created_at", { ascending: false });
 
