@@ -115,7 +115,7 @@ interface ExtractedContractData {
   secondOwnerName: string | null;
   secondOwnerEmail: string | null;
   propertyAddress: string | null;
-  serviceType: 'cohosting' | 'mid_term';
+  serviceType: 'cohosting' | 'full_service' | 'mid_term';
   managementFee: number;
   visitPrice: number;
   rentalType: 'hybrid' | 'mid_term';
@@ -183,12 +183,12 @@ function extractContractData(fieldConfig: Record<string, any> | null): Extracted
       data.visitPrice = 40;
       data.rentalType = 'hybrid';
     } else if (selectedPackage.includes('25')) {
-      data.serviceType = 'mid_term';
+      data.serviceType = 'full_service'; // Use full_service for 25% package
       data.managementFee = 25;
       data.visitPrice = 50;
       data.rentalType = 'mid_term';
     } else if (selectedPackage.includes('30')) {
-      data.serviceType = 'mid_term';
+      data.serviceType = 'full_service';
       data.managementFee = 30;
       data.visitPrice = 60;
       data.rentalType = 'mid_term';
@@ -198,7 +198,7 @@ function extractContractData(fieldConfig: Record<string, any> | null): Extracted
   // Also check for explicit service type fields
   if (fieldConfig.service_type) {
     if (fieldConfig.service_type === 'mid_term' || fieldConfig.service_type === 'full_service') {
-      data.serviceType = 'mid_term';
+      data.serviceType = 'full_service';
       data.rentalType = 'mid_term';
     }
   }
@@ -206,7 +206,7 @@ function extractContractData(fieldConfig: Record<string, any> | null): Extracted
   return data;
 }
 
-// Fill PDF form fields with values
+// Fill PDF form fields with values and embed signatures
 async function fillPdfWithValues(
   pdfDoc: PDFDocument,
   fieldConfig: Record<string, any>,
@@ -245,10 +245,44 @@ async function fillPdfWithValues(
     form.flatten();
   }
 
+  // Build a map of signature data by signer type
+  const signatureByType: Record<string, { data: string; name: string }> = {};
+  if (signatures && Array.isArray(signatures)) {
+    for (const sig of signatures) {
+      if (sig.signature_data && sig.signer_type) {
+        signatureByType[sig.signer_type] = {
+          data: sig.signature_data,
+          name: sig.signer_name || 'Signer',
+        };
+      }
+    }
+  }
+  console.log("Signature types available:", Object.keys(signatureByType));
+
+  // Check if there's a second owner (by checking if they have data filled in)
+  const hasSecondOwner = Boolean(
+    fieldConfig.second_owner_signature_print_name || 
+    fieldConfig.owner2_print_name ||
+    fieldConfig.second_owner_name ||
+    (signatureByType['second_owner']?.data)
+  );
+  console.log("Has second owner:", hasSecondOwner);
+
   // Now draw field values at their positions from field_mappings
   if (fieldMappings && Array.isArray(fieldMappings)) {
     for (const mapping of fieldMappings) {
       const { api_id, x, y, page: pageNum, width, height } = mapping;
+      
+      // Skip second owner fields if there's no second owner
+      if (!hasSecondOwner && api_id.toLowerCase().includes('second_owner')) {
+        console.log("Skipping second owner field (no second owner):", api_id);
+        continue;
+      }
+      if (!hasSecondOwner && api_id.toLowerCase().includes('owner2')) {
+        console.log("Skipping owner2 field (no second owner):", api_id);
+        continue;
+      }
+      
       const value = fieldConfig[api_id];
       
       if (value !== undefined && value !== null && pageNum && pageNum <= pages.length) {
@@ -264,15 +298,54 @@ async function fillPdfWithValues(
         const fontSize = Math.min(11, (height / 100) * pageHeight * 0.7);
         
         try {
-          // Handle signature fields differently - draw "Signed Electronically"
-          if (api_id.toLowerCase().includes('signature')) {
-            page.drawText('[Signed Electronically]', {
-              x: absX,
-              y: absY - 12,
-              size: 9,
-              font,
-              color: rgb(0.2, 0.2, 0.2),
-            });
+          // Handle signature fields - determine which signer's signature to embed
+          if (api_id.toLowerCase().includes('signature') && !api_id.toLowerCase().includes('print') && !api_id.toLowerCase().includes('date')) {
+            let signerType = 'owner';
+            if (api_id.toLowerCase().includes('manager')) {
+              signerType = 'manager';
+            } else if (api_id.toLowerCase().includes('second_owner') || api_id.toLowerCase().includes('owner2')) {
+              signerType = 'second_owner';
+            }
+            
+            const sigData = signatureByType[signerType];
+            const absWidth = (width / 100) * pageWidth;
+            const absHeight = (height / 100) * pageHeight;
+            
+            if (sigData?.data && sigData.data.startsWith('data:image/png')) {
+              try {
+                const base64Data = sigData.data.split(',')[1];
+                const sigBytes = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
+                const sigImage = await pdfDoc.embedPng(sigBytes);
+                
+                page.drawImage(sigImage, {
+                  x: absX,
+                  y: absY - absHeight - 5,
+                  width: Math.min(absWidth, 150),
+                  height: Math.min(absHeight, 40),
+                });
+                console.log("Embedded signature image for", signerType, "at", api_id);
+              } catch (sigError) {
+                console.error("Error embedding signature for", signerType, ":", sigError);
+                // Fallback to text
+                page.drawText(`[Signed by ${sigData.name}]`, {
+                  x: absX,
+                  y: absY - 12,
+                  size: 9,
+                  font,
+                  color: rgb(0.2, 0.2, 0.2),
+                });
+              }
+            } else if (sigData?.name) {
+              // No image but has signer name - show text representation
+              page.drawText(`[Signed by ${sigData.name}]`, {
+                x: absX,
+                y: absY - 12,
+                size: 9,
+                font,
+                color: rgb(0.2, 0.2, 0.2),
+              });
+            }
+            // If no signature data at all, leave blank (don't write placeholder)
           } else if (typeof value === 'boolean') {
             // Checkbox - draw X or checkmark
             if (value === true) {
@@ -284,8 +357,8 @@ async function fillPdfWithValues(
                 color: rgb(0, 0, 0),
               });
             }
-          } else {
-            // Regular text field
+          } else if (value !== '') {
+            // Regular text field - only draw if has content
             page.drawText(textValue.substring(0, 100), {
               x: absX,
               y: absY - fontSize,
@@ -300,60 +373,8 @@ async function fillPdfWithValues(
       }
     }
   }
-
-  // Also draw signature images if we have them
-  if (signatures && Array.isArray(signatures)) {
-    for (const sig of signatures) {
-      if (sig.signature_data && sig.field_values) {
-        // Find signature position from field_values or field_mappings
-        const sigFieldId = sig.signer_type === 'owner' ? 'owner_signature' : 
-                           sig.signer_type === 'second_owner' ? 'second_owner_signature' : 'manager_signature';
-        
-        const sigMapping = fieldMappings?.find(m => 
-          m.api_id.toLowerCase().includes('signature') && 
-          m.signer_type === sig.signer_type
-        );
-        
-        if (sigMapping) {
-          const { x, y, page: pageNum, width, height } = sigMapping;
-          if (pageNum && pageNum <= pages.length) {
-            const page = pages[pageNum - 1];
-            const { width: pageWidth, height: pageHeight } = page.getSize();
-            
-            const absX = (x / 100) * pageWidth;
-            const absY = pageHeight - ((y / 100) * pageHeight);
-            const absWidth = (width / 100) * pageWidth;
-            const absHeight = (height / 100) * pageHeight;
-            
-            try {
-              // Draw signature from base64 data
-              if (sig.signature_data.startsWith('data:image/png')) {
-                const base64Data = sig.signature_data.split(',')[1];
-                const sigImage = await pdfDoc.embedPng(Uint8Array.from(atob(base64Data), c => c.charCodeAt(0)));
-                page.drawImage(sigImage, {
-                  x: absX,
-                  y: absY - absHeight,
-                  width: absWidth,
-                  height: absHeight,
-                });
-                console.log("Drew signature for", sig.signer_type, "on page", pageNum);
-              }
-            } catch (sigError) {
-              console.error("Error drawing signature:", sigError);
-              // Fallback: draw text
-              page.drawText(`[Signed by ${sig.signer_name}]`, {
-                x: absX,
-                y: absY - 12,
-                size: 9,
-                font,
-                color: rgb(0.2, 0.2, 0.2),
-              });
-            }
-          }
-        }
-      }
-    }
-  }
+  
+  console.log("Finished filling PDF fields");
 }
 
 const buildCompletionEmailHtml = (
@@ -1415,21 +1436,54 @@ serve(async (req) => {
 
     // Store executed document in property_documents table for Document Hub
     if (propertyId) {
-      const { error: docInsertError } = await supabase
-        .from("property_documents")
-        .insert({
-          property_id: propertyId,
-          file_name: `${(propertyAddress || documentDisplayName).replace(/[^a-zA-Z0-9\s]/g, '')}_Signed.pdf`,
-          file_path: fileName,
-          file_type: "application/pdf",
-          document_type: "management_agreement",
-          description: `Executed management agreement - ${propertyAddress || documentDisplayName}`,
-        });
+      // Create unique filename with timestamp to avoid duplicates
+      const timestamp = new Date().toISOString().split('T')[0];
+      const safePropertyName = sanitizeTextForPdf(propertyAddress || documentDisplayName).replace(/[^a-zA-Z0-9\s]/g, '').substring(0, 50);
+      const uniqueFileName = `${safePropertyName}_Management_Agreement_${timestamp}.pdf`;
       
-      if (docInsertError) {
-        console.error("Error saving to property_documents:", docInsertError);
+      // Check if document already exists for this property
+      const { data: existingDoc } = await supabase
+        .from("property_documents")
+        .select("id")
+        .eq("property_id", propertyId)
+        .eq("document_type", "management_agreement")
+        .maybeSingle();
+      
+      if (existingDoc) {
+        // Update existing document
+        const { error: docUpdateError } = await supabase
+          .from("property_documents")
+          .update({
+            file_path: fileName,
+            file_name: uniqueFileName,
+            description: `Executed management agreement - ${propertyAddress || documentDisplayName}`,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", existingDoc.id);
+        
+        if (docUpdateError) {
+          console.error("Error updating property_documents:", docUpdateError);
+        } else {
+          console.log("Updated existing agreement in property_documents (Document Hub)");
+        }
       } else {
-        console.log("Saved executed agreement to property_documents (Document Hub)");
+        // Insert new document
+        const { error: docInsertError } = await supabase
+          .from("property_documents")
+          .insert({
+            property_id: propertyId,
+            file_name: uniqueFileName,
+            file_path: fileName,
+            file_type: "application/pdf",
+            document_type: "management_agreement",
+            description: `Executed management agreement - ${propertyAddress || documentDisplayName}`,
+          });
+        
+        if (docInsertError) {
+          console.error("Error saving to property_documents:", docInsertError);
+        } else {
+          console.log("Saved executed agreement to property_documents (Document Hub)");
+        }
       }
     }
 
