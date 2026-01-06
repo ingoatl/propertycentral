@@ -118,7 +118,11 @@ const SignDocument = () => {
   
   // Count completed required fields
   const completedRequired = requiredFields.filter(f => {
-    if (f.type === "signature") return !!signatureData;
+    if (f.type === "signature") {
+      // Owner 2 signature fields don't count against Owner 1's progress
+      if (isOwner2Field(f)) return true;
+      return !!signatureData;
+    }
     return completedFields.has(f.api_id);
   }).length;
   
@@ -487,7 +491,11 @@ const SignDocument = () => {
   const radioGroupsComplete = Array.from(radioGroups).every(groupName => isRadioGroupComplete(groupName));
   
   const nonRadioFieldsComplete = requiredFields.every(f => {
-    if (f.type === "signature") return !!signatureData;
+    if (f.type === "signature") {
+      // Owner 2 signature fields should not block Owner 1 from completing
+      if (isOwner2Field(f)) return true;
+      return !!signatureData;
+    }
     if (f.type === "checkbox") return true;
     return !!fieldValues[f.api_id];
   });
@@ -679,7 +687,8 @@ const SignDocument = () => {
               let isFieldComplete = false;
               
               if (field.type === "signature") {
-                isFieldComplete = !!signatureData;
+                // Check correct signature data based on owner
+                isFieldComplete = isOwner2 ? !!owner2SignatureData : !!signatureData;
               } else if (field.type === "radio" && field.group_name) {
                 isFieldComplete = isRadioGroupComplete(field.group_name);
               } else {
@@ -742,7 +751,8 @@ const SignDocument = () => {
                 let isFieldComplete = false;
                 
                 if (field.type === "signature") {
-                  isFieldComplete = !!signatureData;
+                  // Check correct signature data based on owner
+                  isFieldComplete = isOwner2 ? !!owner2SignatureData : !!signatureData;
                 } else if (field.type === "radio" && field.group_name) {
                   isFieldComplete = isRadioGroupComplete(field.group_name);
                 } else {
@@ -798,29 +808,37 @@ const SignDocument = () => {
                     
                     {/* Field Input - Mobile optimized with large touch targets */}
                     <div className="relative">
-                      {field.type === "signature" ? (
-                        <button
-                          onClick={() => {
-                            if (isOwner2) {
-                              toast.info("This signature field is for Owner 2");
-                              return;
-                            }
-                            setShowSignatureFor(field.api_id);
-                          }}
-                          className={cn(
-                            "w-full h-20 rounded-lg border-2 border-dashed flex items-center justify-center transition-all",
-                            signatureData 
-                              ? "border-green-300 bg-white" 
-                              : "border-[#fae052] bg-[#fffef5] active:bg-[#fae052]/20"
-                          )}
-                        >
-                          {signatureData ? (
-                            <img src={signatureData} alt="Signature" className="max-h-16 max-w-full" />
-                          ) : (
-                            <span className="text-[#8b7355] font-medium">Tap to sign</span>
-                          )}
-                        </button>
-                      ) : field.type === "radio" && field.group_name ? (
+                      {field.type === "signature" ? (() => {
+                        // Use correct signature data based on owner
+                        const sigData = isOwner2 ? owner2SignatureData : signatureData;
+                        return (
+                          <button
+                            onClick={() => {
+                              if (isOwner2) {
+                                toast.info("This signature field is for Owner 2");
+                                return;
+                              }
+                              setShowSignatureFor(field.api_id);
+                            }}
+                            className={cn(
+                              "w-full h-20 rounded-lg border-2 border-dashed flex items-center justify-center transition-all",
+                              sigData 
+                                ? "border-green-300 bg-white" 
+                                : isOwner2
+                                  ? "border-gray-200 bg-gray-50"
+                                  : "border-[#fae052] bg-[#fffef5] active:bg-[#fae052]/20"
+                            )}
+                          >
+                            {sigData ? (
+                              <img src={sigData} alt="Signature" className="max-h-16 max-w-full" />
+                            ) : isOwner2 ? (
+                              <span className="text-gray-400 text-sm">For Owner 2</span>
+                            ) : (
+                              <span className="text-[#8b7355] font-medium">Tap to sign</span>
+                            )}
+                          </button>
+                        );
+                      })() : field.type === "radio" && field.group_name ? (
                         <div className="space-y-2">
                           {signerFields
                             .filter(f => f.type === "radio" && f.group_name === field.group_name)
@@ -972,7 +990,10 @@ const SignDocument = () => {
                         {/* Field Overlays */}
                         {fieldsOnPage.map((field) => {
                           const isActive = activeFieldId === field.api_id;
-                          const isCompleted = completedFields.has(field.api_id) || (field.type === "signature" && !!signatureData);
+                          const isOwner2 = isOwner2Field(field);
+                          // Check correct signature data based on owner
+                          const isCompleted = completedFields.has(field.api_id) || 
+                            (field.type === "signature" && (isOwner2 ? !!owner2SignatureData : !!signatureData));
                           const isReadOnly = field.filled_by === "admin";
                           const isShowingSignature = showSignatureFor === field.api_id;
                           const value = fieldValues[field.api_id];
