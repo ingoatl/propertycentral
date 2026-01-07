@@ -2,9 +2,10 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Bug, Loader2, ExternalLink, Calendar } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Bug, Loader2, ExternalLink, Calendar, Plus } from "lucide-react";
 import { format } from "date-fns";
-
+import { SubmitBugDialog } from "@/components/bugs/SubmitBugDialog";
 interface BugReport {
   id: string;
   title: string;
@@ -24,7 +25,7 @@ interface BugReport {
 export function MyBugReportsCard() {
   const [myBugs, setMyBugs] = useState<BugReport[]>([]);
   const [loading, setLoading] = useState(true);
-
+  const [showBugDialog, setShowBugDialog] = useState(false);
   useEffect(() => {
     loadMyBugs();
   }, []);
@@ -182,7 +183,19 @@ export function MyBugReportsCard() {
             ))}
           </div>
         )}
+
+        <div className="mt-4 pt-4 border-t">
+          <Button onClick={() => setShowBugDialog(true)} className="w-full">
+            <Plus className="h-4 w-4 mr-2" />
+            Report Bug
+          </Button>
+        </div>
       </CardContent>
+
+      <SubmitBugDialog
+        open={showBugDialog}
+        onOpenChange={setShowBugDialog}
+      />
     </Card>
   );
 }
