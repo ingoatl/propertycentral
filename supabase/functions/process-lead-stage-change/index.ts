@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import Stripe from "https://esm.sh/stripe@18.5.0";
 
 // Format phone number to E.164 format (e.g., +17709065022)
 function formatPhoneE164(phone: string): string {
@@ -246,6 +247,53 @@ function buildOnboardingEmailHtml(recipientName: string): string {
   ]);
 }
 
+// Build payment setup email HTML with dynamic Stripe URL
+function buildPaymentEmailHtml(recipientName: string, stripeUrl: string, propertyAddress: string): string {
+  return buildBrandedEmailHtml(recipientName, "Set Up Your Payment Method", [
+    {
+      content: "Congratulations on signing your management agreement with PeachHaus Group LLC! 🎉"
+    },
+    {
+      title: "💳 Next Step: Payment Setup",
+      content: `To start receiving your rental income${propertyAddress ? ` for <strong>${propertyAddress}</strong>` : ''}, we need to set up your payment method.`
+    },
+    {
+      title: "Payment Options",
+      content: `
+        <table style="width: 100%;">
+          <tr>
+            <td style="padding: 12px 16px; background: #f0fdf4; border-radius: 8px; margin-bottom: 8px;">
+              <div style="font-weight: 700; color: #166534;">✓ Bank Account (ACH)</div>
+              <div style="font-size: 13px; color: #374151;">No processing fees — <strong>Recommended</strong></div>
+            </td>
+          </tr>
+          <tr><td style="height: 8px;"></td></tr>
+          <tr>
+            <td style="padding: 12px 16px; background: #f9fafb; border-radius: 8px;">
+              <div style="font-weight: 600; color: #374151;">Credit/Debit Card</div>
+              <div style="font-size: 13px; color: #6b7280;">3% processing fee applies</div>
+            </td>
+          </tr>
+        </table>
+      `
+    },
+    {
+      cta: { text: "Set Up Payment Method →", url: stripeUrl }
+    },
+    {
+      highlight: true,
+      content: "Both methods are secure and processed through Stripe. We recommend ACH for the best experience and no processing fees."
+    },
+    {
+      warning: true,
+      content: "This secure link expires in 24 hours. If it expires, contact us and we'll send a new one."
+    },
+    {
+      content: "If you have any questions, just reply to this email.<br><br>Thank you for choosing PeachHaus!"
+    }
+  ]);
+}
+
 // Psychology-driven message templates by stage (Cialdini principles + SPIN)
 const STAGE_PSYCHOLOGY_TEMPLATES: Record<string, { sms?: string; email_subject?: string; email_body?: string; principle: string }> = {
   new_lead: {
@@ -331,21 +379,9 @@ Ready when you are!`,
     principle: "Clarity + Momentum"
   },
   contract_signed: {
-    sms: "Welcome to PeachHaus, {{name}}! 🎉 Your agreement is signed. Next up: setting up your payment method for rental income. Check your email!",
-    email_subject: "Welcome to the PeachHaus Family! 🎉",
-    email_body: `Congratulations {{name}}!
-
-Welcome to PeachHaus! Your management agreement is now complete, and we're thrilled to have you on board.
-
-**Immediate Next Step:**
-Please set up your payment method so we can deposit your rental income directly: {{stripe_link}}
-
-**Coming Soon:**
-- Your onboarding coordinator will reach out within 24 hours
-- We'll schedule property access and photo shoot
-- Your property will be live within 2-3 weeks
-
-Thank you for trusting us with your property!`,
+    sms: "Welcome to PeachHaus, {{name}}! 🎉 Your agreement is signed. Check your email for a secure link to set up your payment method for rental income deposits.",
+    email_subject: "Set Up Your Payment Method - PeachHaus",
+    email_body: `PAYMENT_HTML_TEMPLATE`,
     principle: "Celebration + Momentum"
   },
   ach_form_signed: {
@@ -784,7 +820,87 @@ serve(async (req) => {
             
             // Use branded HTML templates for specific stages
             let finalHtmlBody: string;
-            if (newStage === 'insurance_requested') {
+            
+            // Special handling for contract_signed - create Stripe checkout session
+            if (newStage === 'contract_signed') {
+              const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
+              if (stripeKey) {
+                try {
+                  console.log(`Creating Stripe checkout session for lead ${leadId}`);
+                  const stripe = new Stripe(stripeKey, { apiVersion: "2025-08-27.basil" });
+                  
+                  // Find or create Stripe customer
+                  const customers = await stripe.customers.list({ email: lead.email, limit: 1 });
+                  let customerId = customers.data[0]?.id;
+                  
+                  if (!customerId) {
+                    console.log(`Creating new Stripe customer for ${lead.email}`);
+                    const customer = await stripe.customers.create({
+                      email: lead.email,
+                      name: lead.name || undefined,
+                      metadata: { lead_id: leadId }
+                    });
+                    customerId = customer.id;
+                  }
+                  console.log(`Using Stripe customer: ${customerId}`);
+                  
+                  // Create checkout session for payment method setup
+                  const siteUrl = "https://propertycentral.lovable.app";
+                  const session = await stripe.checkout.sessions.create({
+                    customer: customerId,
+                    mode: "setup",
+                    currency: "usd",
+                    payment_method_types: ["us_bank_account", "card"],
+                    payment_method_options: {
+                      us_bank_account: {
+                        financial_connections: { permissions: ["payment_method"] }
+                      }
+                    },
+                    success_url: `${siteUrl}/payment-success?lead=${leadId}&session_id={CHECKOUT_SESSION_ID}`,
+                    cancel_url: `${siteUrl}/payment-setup?lead=${leadId}&canceled=true`,
+                    metadata: { lead_id: leadId, type: "lead_payment_setup" }
+                  });
+                  console.log(`Stripe checkout session created: ${session.id}, URL: ${session.url}`);
+                  
+                  // Update lead with Stripe info
+                  await supabase.from("leads").update({
+                    stripe_customer_id: customerId,
+                    stripe_setup_intent_id: session.id,
+                    last_contacted_at: new Date().toISOString()
+                  }).eq("id", leadId);
+                  
+                  // Build branded payment email with real Stripe URL
+                  finalHtmlBody = buildPaymentEmailHtml(
+                    recipientFirstName,
+                    session.url!,
+                    lead.property_address || ""
+                  );
+                  emailSubject = "Set Up Your Payment Method - PeachHaus";
+                  
+                  // Add timeline entry for Stripe session
+                  await supabase.from("lead_timeline").insert({
+                    lead_id: leadId,
+                    action: "Stripe payment setup session created",
+                    metadata: { 
+                      stripe_session_id: session.id,
+                      stripe_customer_id: customerId
+                    }
+                  });
+                  
+                } catch (stripeError) {
+                  console.error("Stripe session creation failed:", stripeError);
+                  // Fallback to static link if Stripe fails
+                  const fallbackUrl = `https://propertycentral.lovable.app/payment-setup?lead=${leadId}`;
+                  finalHtmlBody = buildPaymentEmailHtml(recipientFirstName, fallbackUrl, lead.property_address || "");
+                  emailSubject = "Set Up Your Payment Method - PeachHaus";
+                }
+              } else {
+                console.log("STRIPE_SECRET_KEY not configured, using fallback URL");
+                const fallbackUrl = `https://propertycentral.lovable.app/payment-setup?lead=${leadId}`;
+                finalHtmlBody = buildPaymentEmailHtml(recipientFirstName, fallbackUrl, lead.property_address || "");
+                emailSubject = "Set Up Your Payment Method - PeachHaus";
+              }
+            } else if (newStage === 'insurance_requested') {
               finalHtmlBody = buildInsuranceEmailHtml(recipientFirstName);
             } else if (newStage === 'ach_form_signed') {
               finalHtmlBody = buildOnboardingEmailHtml(recipientFirstName);
