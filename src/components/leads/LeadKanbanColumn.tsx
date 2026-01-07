@@ -19,16 +19,6 @@ const LeadKanbanColumn = ({ stage, leads, onSelectLead }: LeadKanbanColumnProps)
   const stageConfig = STAGE_CONFIG[stage];
   const stageInfo = LEAD_STAGES.find((s) => s.stage === stage);
 
-  const totalValue = leads.reduce((sum, lead) => sum + (lead.opportunity_value || 0), 0);
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
-  };
-
   return (
     <div
       className={cn(
@@ -66,13 +56,6 @@ const LeadKanbanColumn = ({ stage, leads, onSelectLead }: LeadKanbanColumnProps)
           <p className="text-xs text-muted-foreground mt-2 ml-6">
             {stageInfo.description}
           </p>
-        )}
-
-        {/* Total value */}
-        {!isCollapsed && totalValue > 0 && (
-          <div className="mt-2 ml-6 text-xs font-medium" style={{ color: stageConfig.accentColor }}>
-            {formatCurrency(totalValue)} pipeline
-          </div>
         )}
       </div>
 

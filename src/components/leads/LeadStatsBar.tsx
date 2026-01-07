@@ -1,28 +1,15 @@
 import { Lead, LeadStage, STAGE_CONFIG, LEAD_STAGES } from "@/types/leads";
-import { Users, DollarSign, TrendingUp, Clock } from "lucide-react";
+import { Users, TrendingUp, FileText } from "lucide-react";
 
 interface LeadStatsBarProps {
   leads: Lead[];
 }
 
 const LeadStatsBar = ({ leads }: LeadStatsBarProps) => {
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
-  };
-
   const stats = {
     totalLeads: leads.length,
-    totalValue: leads.reduce((sum, lead) => sum + (lead.opportunity_value || 0), 0),
     newLeads: leads.filter((l) => l.stage === "new_lead").length,
-    contractsSent: leads.filter((l) =>
-      ["contract_out", "contract_signed"].includes(l.stage)
-    ).length,
-    hotLeads: leads.filter((l) => (l.ai_qualification_score || 0) >= 70).length,
+    contractsOut: leads.filter((l) => l.stage === "contract_out").length,
   };
 
   // Calculate stage distribution for mini chart
@@ -47,21 +34,6 @@ const LeadStatsBar = ({ leads }: LeadStatsBarProps) => {
 
       <div className="h-10 w-px bg-border" />
 
-      {/* Pipeline Value */}
-      <div className="flex items-center gap-3 min-w-fit">
-        <div className="p-2 rounded-lg bg-green-500/10">
-          <DollarSign className="h-5 w-5 text-green-600" />
-        </div>
-        <div>
-          <p className="text-2xl font-bold text-foreground">
-            {formatCurrency(stats.totalValue)}
-          </p>
-          <p className="text-xs text-muted-foreground">Pipeline Value</p>
-        </div>
-      </div>
-
-      <div className="h-10 w-px bg-border" />
-
       {/* New Leads */}
       <div className="flex items-center gap-3 min-w-fit">
         <div className="p-2 rounded-lg bg-blue-500/10">
@@ -75,13 +47,13 @@ const LeadStatsBar = ({ leads }: LeadStatsBarProps) => {
 
       <div className="h-10 w-px bg-border" />
 
-      {/* Contracts */}
+      {/* Contracts Out */}
       <div className="flex items-center gap-3 min-w-fit">
         <div className="p-2 rounded-lg bg-amber-500/10">
-          <Clock className="h-5 w-5 text-amber-600" />
+          <FileText className="h-5 w-5 text-amber-600" />
         </div>
         <div>
-          <p className="text-2xl font-bold text-foreground">{stats.contractsSent}</p>
+          <p className="text-2xl font-bold text-foreground">{stats.contractsOut}</p>
           <p className="text-xs text-muted-foreground">Contracts Out</p>
         </div>
       </div>

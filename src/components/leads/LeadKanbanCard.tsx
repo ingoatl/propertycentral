@@ -1,7 +1,7 @@
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Lead, STAGE_CONFIG } from "@/types/leads";
-import { Phone, Mail, MapPin, DollarSign, Calendar } from "lucide-react";
+import { Phone, Mail, MapPin, Calendar } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 
@@ -26,15 +26,6 @@ const LeadKanbanCard = ({ lead, onClick }: LeadKanbanCardProps) => {
   };
 
   const stageConfig = STAGE_CONFIG[lead.stage];
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: "USD",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
-  };
 
   return (
     <div
@@ -93,11 +84,7 @@ const LeadKanbanCard = ({ lead, onClick }: LeadKanbanCardProps) => {
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between pt-2 border-t border-border/50">
-          <div className="flex items-center gap-1 text-xs font-medium" style={{ color: stageConfig.accentColor }}>
-            <DollarSign className="h-3 w-3" />
-            {formatCurrency(lead.opportunity_value || 0)}
-          </div>
+        <div className="flex items-center justify-end pt-2 border-t border-border/50">
           <div className="flex items-center gap-1 text-xs text-muted-foreground">
             <Calendar className="h-3 w-3" />
             {format(new Date(lead.created_at), "MMM d")}
