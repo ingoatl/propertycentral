@@ -9,6 +9,7 @@ export type LeadStage =
   | 'ach_form_signed'
   | 'onboarding_form_requested'
   | 'insurance_requested'
+  | 'inspection_scheduled'
   | 'ops_handoff';
 
 export type LeadSource =
@@ -147,6 +148,7 @@ export const LEAD_STAGES: { stage: LeadStage; title: string; description: string
   { stage: 'ach_form_signed', title: 'Send Onboarding Form', description: '→ Sends property details form email' },
   { stage: 'onboarding_form_requested', title: 'Awaiting Onboarding', description: 'Waiting for owner to submit form (no email)' },
   { stage: 'insurance_requested', title: 'Send Insurance Request', description: '→ Sends insurance verification email' },
+  { stage: 'inspection_scheduled', title: 'Schedule Inspection', description: '→ Sends inspection scheduling email' },
   { stage: 'ops_handoff', title: 'Ops Handoff', description: 'Handed off to operations team' },
 ];
 
@@ -227,6 +229,13 @@ export const STAGE_CONFIG: Record<LeadStage, {
     bgColor: 'bg-[hsl(322,100%,95%)]',
     accentColor: 'hsl(322, 100%, 67%)',
     borderColor: 'border-[hsl(322,100%,67%)]'
+  },
+  inspection_scheduled: { 
+    label: 'Inspection', 
+    color: 'text-[hsl(280,70%,55%)]', 
+    bgColor: 'bg-[hsl(280,70%,95%)]',
+    accentColor: 'hsl(280, 70%, 55%)',
+    borderColor: 'border-[hsl(280,70%,55%)]'
   },
   ops_handoff: { 
     label: 'Ops Handoff', 

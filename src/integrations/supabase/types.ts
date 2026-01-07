@@ -2595,6 +2595,8 @@ export type Database = {
           follow_up_paused: boolean | null
           has_unread_messages: boolean | null
           id: string
+          inspection_calendar_event_id: string | null
+          inspection_date: string | null
           last_contacted_at: string | null
           last_response_at: string | null
           last_stage_auto_update_at: string | null
@@ -2630,6 +2632,8 @@ export type Database = {
           follow_up_paused?: boolean | null
           has_unread_messages?: boolean | null
           id?: string
+          inspection_calendar_event_id?: string | null
+          inspection_date?: string | null
           last_contacted_at?: string | null
           last_response_at?: string | null
           last_stage_auto_update_at?: string | null
@@ -2665,6 +2669,8 @@ export type Database = {
           follow_up_paused?: boolean | null
           has_unread_messages?: boolean | null
           id?: string
+          inspection_calendar_event_id?: string | null
+          inspection_date?: string | null
           last_contacted_at?: string | null
           last_response_at?: string | null
           last_stage_auto_update_at?: string | null
@@ -7888,6 +7894,7 @@ export type Database = {
         | "ach_form_signed"
         | "onboarding_form_requested"
         | "insurance_requested"
+        | "inspection_scheduled"
         | "ops_handoff"
       message_sender_type: "owner" | "pm" | "vendor" | "guest" | "ai" | "system"
       property_type: "Client-Managed" | "Company-Owned" | "Inactive"
@@ -8060,6 +8067,7 @@ export const Constants = {
         "ach_form_signed",
         "onboarding_form_requested",
         "insurance_requested",
+        "inspection_scheduled",
         "ops_handoff",
       ],
       message_sender_type: ["owner", "pm", "vendor", "guest", "ai", "system"],

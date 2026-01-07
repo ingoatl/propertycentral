@@ -33,11 +33,111 @@ const corsHeaders = {
 
 const LOGO_URL = "https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/peachhaus-logo.png";
 
+// Owner-facing onboarding timeline steps
+const OWNER_TIMELINE_STEPS = [
+  { key: 'onboarding_form', label: 'Complete Onboarding Form', icon: '📋' },
+  { key: 'insurance', label: 'Submit Insurance', icon: '🛡️' },
+  { key: 'inspection', label: 'Schedule Inspection', icon: '🏠' },
+  { key: 'onboarded', label: 'Onboarded', icon: '🎉' },
+];
+
+// Map lead stages to timeline step index
+function getTimelineStep(stage: string): number {
+  switch(stage) {
+    case 'contract_signed': 
+    case 'ach_form_signed': 
+      return 0; // About to start onboarding form
+    case 'onboarding_form_requested': 
+      return 1; // Completed form, now insurance
+    case 'insurance_requested': 
+      return 2; // Completed insurance, now inspection
+    case 'inspection_scheduled': 
+      return 3; // Completed inspection scheduling, now onboarded
+    case 'ops_handoff': 
+      return 4; // All done!
+    default: 
+      return -1; // Pre-onboarding stages (don't show timeline)
+  }
+}
+
+// Build visual timeline HTML for emails
+function buildTimelineHtml(currentStage: string): string {
+  const currentStep = getTimelineStep(currentStage);
+  if (currentStep < 0) return ''; // Don't show for pre-onboarding stages
+  
+  const stepsHtml = OWNER_TIMELINE_STEPS.map((step, i) => {
+    const isCompleted = i < currentStep;
+    const isCurrent = i === currentStep;
+    const isUpcoming = i > currentStep;
+    
+    let bgColor = '#e5e7eb'; // gray for upcoming
+    let textColor = '#9ca3af';
+    let labelColor = '#6b7280';
+    let labelWeight = '500';
+    let statusText = '';
+    
+    if (isCompleted) {
+      bgColor = '#10b981'; // green
+      textColor = '#ffffff';
+      labelColor = '#10b981';
+      statusText = '✓';
+    } else if (isCurrent) {
+      bgColor = '#f59e0b'; // amber/orange
+      textColor = '#ffffff';
+      labelColor = '#111827';
+      labelWeight = '700';
+      statusText = (i + 1).toString();
+    } else {
+      statusText = (i + 1).toString();
+    }
+    
+    return `
+      <td style="text-align: center; width: 25%; padding: 0 4px;">
+        <div style="width: 36px; height: 36px; border-radius: 50%; background: ${bgColor}; color: ${textColor}; display: inline-flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; margin: 0 auto;">
+          ${statusText}
+        </div>
+        <div style="font-size: 11px; color: ${labelColor}; margin-top: 8px; font-weight: ${labelWeight}; line-height: 1.3;">
+          ${step.label}
+        </div>
+      </td>
+    `;
+  }).join('');
+  
+  // Build the connecting line
+  const progressPercent = Math.min(100, (currentStep / (OWNER_TIMELINE_STEPS.length - 1)) * 100);
+  
+  return `
+    <div style="margin: 24px 0; padding: 24px 20px; background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); border-radius: 12px; border: 1px solid #e2e8f0;">
+      <div style="text-transform: uppercase; font-size: 11px; font-weight: 700; color: #64748b; letter-spacing: 1.2px; margin-bottom: 20px; text-align: center;">
+        📍 Your Onboarding Progress
+      </div>
+      
+      <!-- Progress bar background -->
+      <div style="position: relative; margin: 0 40px 16px 40px; height: 4px; background: #e2e8f0; border-radius: 2px;">
+        <div style="position: absolute; top: 0; left: 0; height: 4px; background: linear-gradient(90deg, #10b981 0%, #10b981 ${progressPercent}%, #e2e8f0 ${progressPercent}%); border-radius: 2px; width: 100%;"></div>
+      </div>
+      
+      <table width="100%" cellpadding="0" cellspacing="0" style="table-layout: fixed;">
+        <tr>
+          ${stepsHtml}
+        </tr>
+      </table>
+      
+      <div style="margin-top: 16px; text-align: center; font-size: 10px; color: #94a3b8;">
+        <span style="color: #10b981;">✓ Completed</span> &nbsp;•&nbsp; 
+        <span style="color: #f59e0b;">● Current Step</span> &nbsp;•&nbsp; 
+        <span style="color: #9ca3af;">○ Upcoming</span>
+      </div>
+    </div>
+  `;
+}
+
 // Beautiful HTML email template builder (styled like owner statement emails)
 function buildBrandedEmailHtml(
   recipientName: string,
   subject: string,
-  sections: Array<{ title?: string; content?: string; highlight?: boolean; warning?: boolean; cta?: { text: string; url: string } }>
+  sections: Array<{ title?: string; content?: string; highlight?: boolean; warning?: boolean; cta?: { text: string; url: string } }>,
+  currentStage?: string
 ): string {
   const sectionHtml = sections.map(section => {
     if (section.cta) {
@@ -79,6 +179,9 @@ function buildBrandedEmailHtml(
     `;
   }).join('');
 
+  // Generate timeline HTML if stage is provided and relevant
+  const timelineHtml = currentStage ? buildTimelineHtml(currentStage) : '';
+
   return `
     <!DOCTYPE html>
     <html>
@@ -105,6 +208,15 @@ function buildBrandedEmailHtml(
                   <div style="font-size: 16px; color: #111827;">Hi <strong>${recipientName}</strong>,</div>
                 </td>
               </tr>
+
+              <!-- Timeline (if applicable) -->
+              ${timelineHtml ? `
+              <tr>
+                <td style="padding: 0 32px;">
+                  ${timelineHtml}
+                </td>
+              </tr>
+              ` : ''}
               
               <!-- Content Sections -->
               <tr>
