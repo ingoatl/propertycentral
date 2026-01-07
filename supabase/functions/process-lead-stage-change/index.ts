@@ -33,8 +33,9 @@ const corsHeaders = {
 
 const LOGO_URL = "https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/peachhaus-logo.png";
 
-// Owner-facing onboarding timeline steps
+// Owner-facing onboarding timeline steps (5 steps including payment)
 const OWNER_TIMELINE_STEPS = [
+  { key: 'payment', label: 'Setup Payment', icon: '💳' },
   { key: 'onboarding_form', label: 'Complete Onboarding Form', icon: '📋' },
   { key: 'insurance', label: 'Submit Insurance', icon: '🛡️' },
   { key: 'inspection', label: 'Schedule Inspection', icon: '🏠' },
@@ -45,16 +46,17 @@ const OWNER_TIMELINE_STEPS = [
 function getTimelineStep(stage: string): number {
   switch(stage) {
     case 'contract_signed': 
+      return 0; // Current step: Setup Payment
     case 'ach_form_signed': 
-      return 0; // About to start onboarding form
+      return 1; // Current step: Complete Onboarding Form
     case 'onboarding_form_requested': 
-      return 1; // Completed form, now insurance
+      return 2; // Current step: Submit Insurance
     case 'insurance_requested': 
-      return 2; // Completed insurance, now inspection
+      return 3; // Current step: Schedule Inspection
     case 'inspection_scheduled': 
-      return 3; // Completed inspection scheduling, now onboarded
+      return 4; // Current step: Onboarded (final step)
     case 'ops_handoff': 
-      return 4; // All done!
+      return 5; // All done (beyond timeline - all checkmarks)
     default: 
       return -1; // Pre-onboarding stages (don't show timeline)
   }
@@ -92,7 +94,7 @@ function buildTimelineHtml(currentStage: string): string {
     }
     
     return `
-      <td style="text-align: center; width: 25%; padding: 0 4px;">
+      <td style="text-align: center; width: 20%; padding: 0 4px;">
         <div style="width: 36px; height: 36px; border-radius: 50%; background: ${bgColor}; color: ${textColor}; display: inline-flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; margin: 0 auto;">
           ${statusText}
         </div>
@@ -265,7 +267,7 @@ function buildBrandedEmailHtml(
 }
 
 // Build insurance verification email HTML
-function buildInsuranceEmailHtml(recipientName: string): string {
+function buildInsuranceEmailHtml(recipientName: string, currentStage: string): string {
   return buildBrandedEmailHtml(recipientName, "Insurance Verification Required", [
     {
       content: "As part of onboarding, we need to confirm that your property has the correct insurance in place."
@@ -308,11 +310,11 @@ function buildInsuranceEmailHtml(recipientName: string): string {
     {
       content: "Please reply to this email with your insurance documents attached.<br><br>Thank you for your attention to this matter."
     }
-  ]);
+  ], currentStage);
 }
 
 // Build onboarding form email HTML
-function buildOnboardingEmailHtml(recipientName: string): string {
+function buildOnboardingEmailHtml(recipientName: string, currentStage: string): string {
   return buildBrandedEmailHtml(recipientName, "Complete Your Property Onboarding", [
     {
       content: "We're ready to capture your property details and lock in the next steps. Please complete the onboarding form below."
@@ -356,11 +358,11 @@ function buildOnboardingEmailHtml(recipientName: string): string {
     {
       content: "Once submitted, we'll update your opportunity checklist and move to the next onboarding phase.<br><br>Thanks for partnering with PeachHaus — together, we'll make this property perform at its best."
     }
-  ]);
+  ], currentStage);
 }
 
 // Build CO-HOSTING payment email - We CHARGE them (ACH 1% or Card 3%)
-function buildCoHostingPaymentEmailHtml(recipientName: string, stripeUrl: string, propertyAddress: string): string {
+function buildCoHostingPaymentEmailHtml(recipientName: string, stripeUrl: string, propertyAddress: string, currentStage: string): string {
   return buildBrandedEmailHtml(recipientName, "Set Up Your Payment Method", [
     {
       content: "Congratulations on signing your co-hosting agreement with PeachHaus Group LLC! 🎉"
@@ -404,11 +406,11 @@ function buildCoHostingPaymentEmailHtml(recipientName: string, stripeUrl: string
     {
       content: "If you have any questions, just reply to this email.<br><br>Thank you for choosing PeachHaus!"
     }
-  ]);
+  ], currentStage);
 }
 
 // Build FULL-SERVICE payment email - We PAY them (ACH only, no fees)
-function buildFullServicePaymentEmailHtml(recipientName: string, stripeUrl: string, propertyAddress: string): string {
+function buildFullServicePaymentEmailHtml(recipientName: string, stripeUrl: string, propertyAddress: string, currentStage: string): string {
   return buildBrandedEmailHtml(recipientName, "Set Up Your Payout Account", [
     {
       content: "Congratulations on signing your property management agreement with PeachHaus Group LLC! 🎉"
@@ -446,7 +448,38 @@ function buildFullServicePaymentEmailHtml(recipientName: string, stripeUrl: stri
     {
       content: "If you have any questions, just reply to this email.<br><br>Thank you for choosing PeachHaus!"
     }
-  ]);
+  ], currentStage);
+}
+
+// Build inspection scheduling email HTML
+function buildInspectionSchedulingEmailHtml(recipientName: string, bookingUrl: string, currentStage: string): string {
+  return buildBrandedEmailHtml(recipientName, "Schedule Your Onboarding Inspection", [
+    {
+      content: "You're almost there! The final step before going live is to schedule your onboarding inspection."
+    },
+    {
+      title: "🏠 What Happens During the Inspection",
+      content: `
+        <ul style="margin: 0; padding-left: 20px; color: #374151;">
+          <li style="margin-bottom: 8px;">Walk through the property together (in-person or virtual)</li>
+          <li style="margin-bottom: 8px;">Review amenities, access codes, and special features</li>
+          <li style="margin-bottom: 8px;">Take professional photos if needed</li>
+          <li>Ensure everything is ready for your first guests</li>
+        </ul>
+      `
+    },
+    {
+      title: "📅 Available Times",
+      content: "Inspections are available <strong>Tuesdays & Thursdays</strong> between <strong>11 AM - 3 PM EST</strong>.",
+      highlight: true
+    },
+    {
+      cta: { text: "Schedule Your Inspection →", url: bookingUrl }
+    },
+    {
+      content: "Once your inspection is complete, we'll finalize your listing and you'll be ready to welcome guests!"
+    }
+  ], currentStage);
 }
 
 // Build welcome email for new leads
@@ -646,6 +679,12 @@ const STAGE_PSYCHOLOGY_TEMPLATES: Record<string, { sms?: string; email_subject?:
     email_subject: "Insurance Verification Required - PeachHaus",
     email_body: `INSURANCE_HTML_TEMPLATE`,
     principle: "Compliance + Partnership"
+  },
+  inspection_scheduled: {
+    sms: "Hi {{name}}! 🏠 Almost there! Your final step is to schedule your onboarding inspection. Check your email for available times (Tues/Thurs, 11am-3pm EST). Can't wait to get you live!",
+    email_subject: "Schedule Your Onboarding Inspection - PeachHaus",
+    email_body: `INSPECTION_HTML_TEMPLATE`,
+    principle: "Progress + Anticipation"
   },
   ops_handoff: {
     sms: "{{name}}, your property is now with our operations team! They'll reach out shortly to schedule access and photos. Exciting times ahead!",
@@ -1116,14 +1155,16 @@ serve(async (req) => {
                     finalHtmlBody = buildFullServicePaymentEmailHtml(
                       recipientFirstName,
                       session.url!,
-                      lead.property_address || ""
+                      lead.property_address || "",
+                      newStage
                     );
                     emailSubject = "Set Up Your Payout Account - PeachHaus";
                   } else {
                     finalHtmlBody = buildCoHostingPaymentEmailHtml(
                       recipientFirstName,
                       session.url!,
-                      lead.property_address || ""
+                      lead.property_address || "",
+                      newStage
                     );
                     emailSubject = "Set Up Your Payment Method - PeachHaus";
                   }
@@ -1145,23 +1186,28 @@ serve(async (req) => {
                   // Fallback to static link if Stripe fails
                   const fallbackUrl = `https://propertycentral.lovable.app/payment-setup?lead=${leadId}`;
                   if (serviceType === 'full_service') {
-                    finalHtmlBody = buildFullServicePaymentEmailHtml(recipientFirstName, fallbackUrl, lead.property_address || "");
+                    finalHtmlBody = buildFullServicePaymentEmailHtml(recipientFirstName, fallbackUrl, lead.property_address || "", newStage);
                     emailSubject = "Set Up Your Payout Account - PeachHaus";
                   } else {
-                    finalHtmlBody = buildCoHostingPaymentEmailHtml(recipientFirstName, fallbackUrl, lead.property_address || "");
+                    finalHtmlBody = buildCoHostingPaymentEmailHtml(recipientFirstName, fallbackUrl, lead.property_address || "", newStage);
                     emailSubject = "Set Up Your Payment Method - PeachHaus";
                   }
                 }
               } else {
                 console.log("STRIPE_SECRET_KEY not configured, using fallback URL");
                 const fallbackUrl = `https://propertycentral.lovable.app/payment-setup?lead=${leadId}`;
-                finalHtmlBody = buildCoHostingPaymentEmailHtml(recipientFirstName, fallbackUrl, lead.property_address || "");
+                finalHtmlBody = buildCoHostingPaymentEmailHtml(recipientFirstName, fallbackUrl, lead.property_address || "", newStage);
                 emailSubject = "Set Up Your Payment Method - PeachHaus";
               }
             } else if (newStage === 'insurance_requested') {
-              finalHtmlBody = buildInsuranceEmailHtml(recipientFirstName);
+              finalHtmlBody = buildInsuranceEmailHtml(recipientFirstName, newStage);
+            } else if (newStage === 'inspection_scheduled') {
+              // Get calendar booking URL from admin settings
+              const bookingUrl = "https://cal.com/peachhausgroup/onboarding-inspection";
+              finalHtmlBody = buildInspectionSchedulingEmailHtml(recipientFirstName, bookingUrl, newStage);
+              emailSubject = "Schedule Your Onboarding Inspection - PeachHaus";
             } else if (newStage === 'ach_form_signed') {
-              finalHtmlBody = buildOnboardingEmailHtml(recipientFirstName);
+              finalHtmlBody = buildOnboardingEmailHtml(recipientFirstName, newStage);
             } else if (newStage === 'new_lead') {
               finalHtmlBody = buildWelcomeEmailHtml(recipientFirstName, lead.property_address || "");
               emailSubject = emailSubject || "Welcome to PeachHaus - Your Property Management Partner";
