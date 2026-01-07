@@ -30,6 +30,222 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+const LOGO_URL = "https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/peachhaus-logo.png";
+
+// Beautiful HTML email template builder (styled like owner statement emails)
+function buildBrandedEmailHtml(
+  recipientName: string,
+  subject: string,
+  sections: Array<{ title?: string; content?: string; highlight?: boolean; warning?: boolean; cta?: { text: string; url: string } }>
+): string {
+  const sectionHtml = sections.map(section => {
+    if (section.cta) {
+      return `
+        <div style="padding: 24px 0; text-align: center;">
+          <a href="${section.cta.url}" style="display: inline-block; padding: 14px 32px; background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: #ffffff; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 15px; box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);">
+            ${section.cta.text}
+          </a>
+        </div>
+      `;
+    }
+    
+    if (section.warning) {
+      return `
+        <div style="margin: 20px 0; padding: 16px 20px; background: #fef3c7; border-left: 4px solid #f59e0b; border-radius: 0 8px 8px 0;">
+          <div style="font-size: 14px; color: #92400e; font-weight: 600;">⚠️ ${section.content}</div>
+        </div>
+      `;
+    }
+    
+    if (section.highlight) {
+      return `
+        <div style="margin: 20px 0; padding: 20px 24px; background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border: 1px solid #86efac; border-radius: 12px;">
+          ${section.title ? `<div style="font-size: 12px; color: #166534; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; font-weight: 600;">${section.title}</div>` : ''}
+          <div style="font-size: 14px; color: #166534; line-height: 1.6;">${section.content}</div>
+        </div>
+      `;
+    }
+    
+    return `
+      <div style="margin: 20px 0;">
+        ${section.title ? `
+          <div style="padding: 12px 0; border-bottom: 2px solid #f59e0b; margin-bottom: 16px;">
+            <span style="font-size: 14px; font-weight: 700; color: #111827; text-transform: uppercase; letter-spacing: 0.5px;">${section.title}</span>
+          </div>
+        ` : ''}
+        <div style="font-size: 14px; color: #374151; line-height: 1.7;">${section.content}</div>
+      </div>
+    `;
+  }).join('');
+
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    </head>
+    <body style="margin: 0; padding: 0; background-color: #f3f4f6; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
+      <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f3f4f6; padding: 40px 20px;">
+        <tr>
+          <td align="center">
+            <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);">
+              <!-- Header -->
+              <tr>
+                <td style="background: linear-gradient(135deg, #111827 0%, #1f2937 100%); padding: 32px; text-align: center;">
+                  <img src="${LOGO_URL}" alt="PeachHaus" style="height: 48px; margin-bottom: 16px;" />
+                  <div style="font-size: 20px; font-weight: 700; color: #ffffff; letter-spacing: -0.5px;">${subject}</div>
+                </td>
+              </tr>
+              
+              <!-- Greeting -->
+              <tr>
+                <td style="padding: 32px 32px 16px 32px;">
+                  <div style="font-size: 16px; color: #111827;">Hi <strong>${recipientName}</strong>,</div>
+                </td>
+              </tr>
+              
+              <!-- Content Sections -->
+              <tr>
+                <td style="padding: 0 32px 24px 32px;">
+                  ${sectionHtml}
+                </td>
+              </tr>
+              
+              <!-- Signature -->
+              <tr>
+                <td style="padding: 24px 32px; border-top: 1px solid #e5e7eb;">
+                  <table cellpadding="0" cellspacing="0">
+                    <tr>
+                      <td style="vertical-align: top; padding-right: 16px;">
+                        <img src="https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/ingo-headshot.png" alt="Ingo" style="width: 56px; height: 56px; border-radius: 50%; object-fit: cover;" />
+                      </td>
+                      <td style="vertical-align: top; border-left: 3px solid #f59e0b; padding-left: 12px;">
+                        <div style="font-weight: 700; font-size: 14px; color: #111827;">Ingo Schaer</div>
+                        <div style="font-size: 12px; color: #6b7280;">Co-Founder, Operations Manager</div>
+                        <div style="font-size: 12px; color: #111827; margin-top: 4px;">PeachHaus Group LLC</div>
+                        <div style="font-size: 12px; margin-top: 4px;">
+                          <a href="tel:+14048005932" style="color: #111827; text-decoration: none;">(404) 800-5932</a> · 
+                          <a href="mailto:ingo@peachhausgroup.com" style="color: #2563eb; text-decoration: none;">ingo@peachhausgroup.com</a>
+                        </div>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+              
+              <!-- Footer -->
+              <tr>
+                <td style="background: #f9fafb; padding: 20px 32px; text-align: center; border-top: 1px solid #e5e7eb;">
+                  <div style="font-size: 11px; color: #9ca3af;">
+                    © ${new Date().getFullYear()} PeachHaus Group LLC · Atlanta, GA
+                  </div>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+    </body>
+    </html>
+  `;
+}
+
+// Build insurance verification email HTML
+function buildInsuranceEmailHtml(recipientName: string): string {
+  return buildBrandedEmailHtml(recipientName, "Insurance Verification Required", [
+    {
+      content: "As part of onboarding, we need to confirm that your property has the correct insurance in place."
+    },
+    {
+      title: "⚠️ Why This Matters",
+      content: `
+        <p style="margin: 0 0 12px 0;">Standard homeowner's insurance <strong>does not cover</strong> short-term or mid-term rentals. Once paying guests are involved (even stays longer than 30 days), claims for damage or liability are often denied.</p>
+        <p style="margin: 0 0 12px 0;">STR/MTR-specific insurance protects both you and PeachHaus Group from risks like property damage, liability claims, and guest-related incidents.</p>
+        <p style="margin: 0;">Listing <strong>PeachHaus Group LLC as an Additional Insured</strong> extends coverage to us as your management partner, protecting both parties if a claim arises from guest activity.</p>
+      `
+    },
+    {
+      title: "💡 Already Have Coverage?",
+      content: "Some insurance providers like <strong>State Farm</strong> may already cover stays of 30+ days under your existing policy. Check with your provider first!",
+      highlight: true
+    },
+    {
+      title: "📋 Here's What We Need",
+      content: `
+        <table style="width: 100%;">
+          <tr><td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;">✓ A copy of your current insurance policy for our records</td></tr>
+          <tr><td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;">✓ Proof of STR/MTR-specific coverage (if you already have it, great — if not, see below)</td></tr>
+          <tr><td style="padding: 8px 0;">✓ Confirmation that <strong>PeachHaus Group LLC</strong> has been added as an Additional Insured</td></tr>
+        </table>
+      `
+    },
+    {
+      title: "🏠 Need STR Insurance?",
+      content: "We've negotiated <strong>special rates</strong> with Steadily, a leading provider of short/mid-term rental insurance.",
+      highlight: true
+    },
+    {
+      cta: { text: "Get Your Steadily Quote →", url: "https://phg.steadilypartner.com/" }
+    },
+    {
+      warning: true,
+      content: "Your property cannot go live until insurance verification is completed."
+    },
+    {
+      content: "Please reply to this email with your insurance documents attached.<br><br>Thank you for your attention to this matter."
+    }
+  ]);
+}
+
+// Build onboarding form email HTML
+function buildOnboardingEmailHtml(recipientName: string): string {
+  return buildBrandedEmailHtml(recipientName, "Complete Your Property Onboarding", [
+    {
+      content: "We're ready to capture your property details and lock in the next steps. Please complete the onboarding form below."
+    },
+    {
+      title: "📋 Choose Your Form",
+      content: `
+        <table style="width: 100%;">
+          <tr>
+            <td style="padding: 16px; background: #f0fdf4; border-radius: 8px; margin-bottom: 12px;">
+              <div style="font-weight: 700; color: #166534; margin-bottom: 4px;">Existing STR Properties</div>
+              <div style="font-size: 13px; color: #374151; margin-bottom: 8px;">Already furnished and listed on Airbnb/VRBO</div>
+              <a href="https://propertycentral.lovable.app/onboard/existing-str" style="display: inline-block; padding: 10px 20px; background: #166534; color: #ffffff; text-decoration: none; border-radius: 6px; font-size: 13px; font-weight: 600;">Complete Existing STR Form →</a>
+            </td>
+          </tr>
+          <tr><td style="height: 12px;"></td></tr>
+          <tr>
+            <td style="padding: 16px; background: #eff6ff; border-radius: 8px;">
+              <div style="font-weight: 700; color: #1e40af; margin-bottom: 4px;">New STR Properties</div>
+              <div style="font-size: 13px; color: #374151; margin-bottom: 8px;">New setup, not yet listed or fully furnished</div>
+              <a href="https://propertycentral.lovable.app/onboard/new-str" style="display: inline-block; padding: 10px 20px; background: #1e40af; color: #ffffff; text-decoration: none; border-radius: 6px; font-size: 13px; font-weight: 600;">Complete New STR Form →</a>
+            </td>
+          </tr>
+        </table>
+      `
+    },
+    {
+      warning: true,
+      content: "Please fill out every field precisely. Accurate data ensures smooth setup."
+    },
+    {
+      title: "Why Accuracy Matters",
+      content: `
+        <ul style="margin: 0; padding-left: 20px; color: #374151;">
+          <li style="margin-bottom: 8px;">Ensures smooth PMS setup, pricing automation, and guest-ready configuration</li>
+          <li style="margin-bottom: 8px;">Prevents delays with utilities, smart locks, cleaner assignments, etc.</li>
+          <li>Taking time now prevents headaches later — for both you and our operations team</li>
+        </ul>
+      `
+    },
+    {
+      content: "Once submitted, we'll update your opportunity checklist and move to the next onboarding phase.<br><br>Thanks for partnering with PeachHaus — together, we'll make this property perform at its best."
+    }
+  ]);
+}
+
 // Psychology-driven message templates by stage (Cialdini principles + SPIN)
 const STAGE_PSYCHOLOGY_TEMPLATES: Record<string, { sms?: string; email_subject?: string; email_body?: string; principle: string }> = {
   new_lead: {
@@ -155,6 +371,12 @@ Once submitted, we'll update your opportunity checklist and move to the next onb
 
 Thanks for partnering with PeachHaus — together, we'll make this property perform at its best.`,
     principle: "Progress + Clear Instructions"
+  },
+  insurance_requested: {
+    sms: "Hi {{name}}! Important: We need your STR insurance info before your property can go live. Check your email for details. Questions? Just reply!",
+    email_subject: "Insurance Verification Required - PeachHaus",
+    email_body: `INSURANCE_HTML_TEMPLATE`,
+    principle: "Compliance + Partnership"
   },
   ops_handoff: {
     sms: "{{name}}, your property is now with our operations team! They'll reach out shortly to schedule access and photos. Exciting times ahead!",
@@ -558,46 +780,54 @@ serve(async (req) => {
           const resendApiKey = Deno.env.get("RESEND_API_KEY");
           
           if (resendApiKey) {
-            // Convert plain text to HTML with Gmail-style left-aligned formatting
-            // Split by double newlines for paragraphs, single newlines for line breaks
-            const paragraphs = messageBody.split('\n\n');
-            const htmlBody = paragraphs.map(para => {
-              const formatted = para
-                .replace(/\n/g, '<br>')
-                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                .replace(/✓/g, '✅')
-                .replace(/•/g, '&bull;');
-              return `<p style="margin: 0 0 16px 0; text-align: left;">${formatted}</p>`;
-            }).join('');
+            const recipientFirstName = lead.name?.split(' ')[0] || lead.name || "there";
+            
+            // Use branded HTML templates for specific stages
+            let finalHtmlBody: string;
+            if (newStage === 'insurance_requested') {
+              finalHtmlBody = buildInsuranceEmailHtml(recipientFirstName);
+            } else if (newStage === 'ach_form_signed') {
+              finalHtmlBody = buildOnboardingEmailHtml(recipientFirstName);
+            } else {
+              // Default: Convert plain text to HTML with Gmail-style formatting
+              const paragraphs = messageBody.split('\n\n');
+              const htmlBody = paragraphs.map(para => {
+                const formatted = para
+                  .replace(/\n/g, '<br>')
+                  .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                  .replace(/✓/g, '✅')
+                  .replace(/•/g, '&bull;');
+                return `<p style="margin: 0 0 16px 0; text-align: left;">${formatted}</p>`;
+              }).join('');
 
-            // Gmail-style email signature with headshot above signature image (vertically stacked) - left aligned
-            const signature = `
-              <table cellpadding="0" cellspacing="0" style="font-family: Arial, sans-serif; margin-top: 24px; border-collapse: collapse;">
-                <tr>
-                  <td style="vertical-align: top; padding-right: 16px;">
-                    <!-- Headshot with signature underneath -->
-                    <div style="display: block;">
-                      <img src="https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/ingo-headshot.png" alt="Ingo Schaer" style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover; display: block;" />
-                      <img src="https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/ingo-signature.png" alt="Signature" style="width: 100px; height: auto; display: block; margin-top: 8px;" />
-                    </div>
-                  </td>
-                  <td style="vertical-align: top; border-left: 2px solid #f59e0b; padding-left: 12px;">
-                    <p style="margin: 0 0 2px 0; font-weight: bold; font-size: 14px; color: #1a1a1a; text-align: left;">Ingo Schaer</p>
-                    <p style="margin: 0 0 4px 0; font-size: 12px; color: #666; text-align: left;">Co-Founder, Operations Manager</p>
-                    <p style="margin: 0 0 2px 0; font-size: 12px; color: #1a1a1a; font-weight: 500; text-align: left;">PeachHaus Group LLC</p>
-                    <p style="margin: 4px 0 2px 0; font-size: 11px; color: #555; text-align: left;">
-                      <a href="tel:+14048005932" style="color: #1a1a1a; text-decoration: none;">(404) 800-5932</a>
-                    </p>
-                    <p style="margin: 2px 0; font-size: 11px; color: #555; text-align: left;">
-                      <a href="mailto:ingo@peachhausgroup.com" style="color: #1a73e8; text-decoration: none;">ingo@peachhausgroup.com</a>
-                    </p>
-                    <p style="margin: 2px 0; font-size: 11px; color: #555; text-align: left;">
-                      <a href="https://propertycentral.lovable.app" style="color: #1a73e8; text-decoration: none;">propertycentral.lovable.app</a>
-                    </p>
-                  </td>
-                </tr>
-              </table>
-            `;
+              const signature = `
+                <table cellpadding="0" cellspacing="0" style="font-family: Arial, sans-serif; margin-top: 24px; border-collapse: collapse;">
+                  <tr>
+                    <td style="vertical-align: top; padding-right: 16px;">
+                      <div style="display: block;">
+                        <img src="https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/ingo-headshot.png" alt="Ingo Schaer" style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover; display: block;" />
+                        <img src="https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/ingo-signature.png" alt="Signature" style="width: 100px; height: auto; display: block; margin-top: 8px;" />
+                      </div>
+                    </td>
+                    <td style="vertical-align: top; border-left: 2px solid #f59e0b; padding-left: 12px;">
+                      <p style="margin: 0 0 2px 0; font-weight: bold; font-size: 14px; color: #1a1a1a; text-align: left;">Ingo Schaer</p>
+                      <p style="margin: 0 0 4px 0; font-size: 12px; color: #666; text-align: left;">Co-Founder, Operations Manager</p>
+                      <p style="margin: 0 0 2px 0; font-size: 12px; color: #1a1a1a; font-weight: 500; text-align: left;">PeachHaus Group LLC</p>
+                      <p style="margin: 4px 0 2px 0; font-size: 11px; color: #555; text-align: left;">
+                        <a href="tel:+14048005932" style="color: #1a1a1a; text-decoration: none;">(404) 800-5932</a>
+                      </p>
+                      <p style="margin: 2px 0; font-size: 11px; color: #555; text-align: left;">
+                        <a href="mailto:ingo@peachhausgroup.com" style="color: #1a73e8; text-decoration: none;">ingo@peachhausgroup.com</a>
+                      </p>
+                      <p style="margin: 2px 0; font-size: 11px; color: #555; text-align: left;">
+                        <a href="https://propertycentral.lovable.app" style="color: #1a73e8; text-decoration: none;">propertycentral.lovable.app</a>
+                      </p>
+                    </td>
+                  </tr>
+                </table>
+              `;
+              finalHtmlBody = `<div style="font-family: Arial, sans-serif; max-width: 600px; padding: 0; text-align: left;">${htmlBody}${signature}</div>`;
+            }
 
             const emailResponse = await fetch("https://api.resend.com/emails", {
               method: "POST",
@@ -610,7 +840,7 @@ serve(async (req) => {
                 to: [lead.email],
                 subject: emailSubject || "Message from PeachHaus",
                 text: messageBody + "\n\n--\nIngo Schaer\nCo-Founder, Operations Manager\nPeachHaus Group LLC\n(404) 800-5932\ningo@peachhausgroup.com",
-                html: `<div style="font-family: Arial, sans-serif; max-width: 600px; padding: 0; text-align: left;">${htmlBody}${signature}</div>`,
+                html: finalHtmlBody,
               }),
             });
 
