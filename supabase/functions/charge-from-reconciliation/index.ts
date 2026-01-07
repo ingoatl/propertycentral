@@ -145,15 +145,17 @@ serve(async (req) => {
       );
     }
 
-    // Add CC processing fee if applicable (3% for credit card payments)
+    // Add processing fee based on payment method (3% for card, 1% for ACH)
     let processingFee = 0;
     const paymentMethod = owner.payment_method || 'card';
     if (paymentMethod === 'card' || paymentMethod === 'credit_card') {
-      processingFee = dueFromOwner * 0.03;
+      processingFee = dueFromOwner * 0.03;  // 3% for credit card
+    } else if (paymentMethod === 'ach') {
+      processingFee = dueFromOwner * 0.01;  // 1% for ACH
     }
     const totalChargeAmount = dueFromOwner + processingFee;
 
-    console.log(`Total charge: $${totalChargeAmount.toFixed(2)} (includes $${processingFee.toFixed(2)} CC fee)`);
+    console.log(`Total charge: $${totalChargeAmount.toFixed(2)} (includes $${processingFee.toFixed(2)} ${paymentMethod === 'ach' ? 'ACH' : 'CC'} fee)`);
 
     if (test_mode) {
       // Return calculation results without charging
@@ -239,6 +241,25 @@ serve(async (req) => {
 
     if (chargeError) {
       console.error("Error creating charge record:", chargeError);
+    }
+
+    // Store processing fee as separate line item for QuickBooks tracking
+    if (processingFee > 0 && charge?.id) {
+      const { error: feeLineItemError } = await supabase
+        .from("charge_line_items")
+        .insert({
+          charge_id: charge.id,
+          category: "processing_fee",
+          description: `${paymentMethod === 'ach' ? 'ACH' : 'Credit Card'} Processing Fee (${paymentMethod === 'ach' ? '1%' : '3%'})`,
+          amount: processingFee,
+          qbo_account_code: "Payment Processing Expense"
+        });
+      
+      if (feeLineItemError) {
+        console.error("Error creating processing fee line item:", feeLineItemError);
+      } else {
+        console.log(`Processing fee line item created: $${processingFee.toFixed(2)}`);
+      }
     }
 
     // Update reconciliation with charge info
