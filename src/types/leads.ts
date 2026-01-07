@@ -143,10 +143,10 @@ export const LEAD_STAGES: { stage: LeadStage; title: string; description: string
   { stage: 'call_attended', title: 'Call Attended', description: 'Call completed, ready for review' },
   { stage: 'send_contract', title: 'Send Contract', description: 'Ready to send management agreement' },
   { stage: 'contract_out', title: 'Contract Out', description: 'Contract sent, awaiting signature' },
-  { stage: 'contract_signed', title: 'Contract Signed', description: 'Payment setup email sent automatically' },
-  { stage: 'ach_form_signed', title: 'Payment Authorized', description: 'Onboarding form email sent automatically' },
-  { stage: 'onboarding_form_requested', title: 'Awaiting Onboarding Form', description: 'Waiting for property details submission' },
-  { stage: 'insurance_requested', title: 'Insurance Requested', description: 'Waiting for STR insurance verification' },
+  { stage: 'contract_signed', title: 'Send Payment Link', description: '→ Sends ACH/Stripe payment setup email' },
+  { stage: 'ach_form_signed', title: 'Send Onboarding Form', description: '→ Sends property details form email' },
+  { stage: 'onboarding_form_requested', title: 'Awaiting Onboarding', description: 'Waiting for owner to submit form (no email)' },
+  { stage: 'insurance_requested', title: 'Send Insurance Request', description: '→ Sends insurance verification email' },
   { stage: 'ops_handoff', title: 'Ops Handoff', description: 'Handed off to operations team' },
 ];
 
@@ -201,28 +201,28 @@ export const STAGE_CONFIG: Record<LeadStage, {
     borderColor: 'border-[hsl(45,100%,50%)]'
   },
   contract_signed: { 
-    label: 'Contract Signed', 
+    label: 'Payment Link', 
     color: 'text-[hsl(152,100%,39%)]', 
     bgColor: 'bg-[hsl(152,100%,94%)]',
     accentColor: 'hsl(152, 100%, 39%)',
     borderColor: 'border-[hsl(152,100%,39%)]'
   },
   ach_form_signed: { 
-    label: 'Payment Auth', 
+    label: 'Onboarding Form', 
     color: 'text-[hsl(187,100%,45%)]', 
     bgColor: 'bg-[hsl(187,100%,94%)]',
     accentColor: 'hsl(187, 100%, 45%)',
     borderColor: 'border-[hsl(187,100%,45%)]'
   },
   onboarding_form_requested: { 
-    label: 'Awaiting Form', 
+    label: 'Awaiting', 
     color: 'text-[hsl(79,67%,49%)]', 
     bgColor: 'bg-[hsl(79,67%,94%)]',
     accentColor: 'hsl(79, 67%, 49%)',
     borderColor: 'border-[hsl(79,67%,49%)]'
   },
   insurance_requested: { 
-    label: 'Insurance', 
+    label: 'Insurance Req', 
     color: 'text-[hsl(322,100%,67%)]', 
     bgColor: 'bg-[hsl(322,100%,95%)]',
     accentColor: 'hsl(322, 100%, 67%)',
