@@ -45,6 +45,7 @@ import { LeadConversationThread } from "./LeadConversationThread";
 import { SendEmailDialog } from "@/components/communications/SendEmailDialog";
 import { SendSMSDialog } from "@/components/communications/SendSMSDialog";
 import DirectCallButton from "./DirectCallButton";
+import { SendStripeAuthButton } from "./SendStripeAuthButton";
 
 interface LeadDetailModalProps {
   lead: Lead | null;
@@ -352,6 +353,14 @@ const LeadDetailModal = ({ lead, open, onOpenChange, onRefresh }: LeadDetailModa
           </Button>
 
           <SendContractButton lead={lead} onContractSent={onRefresh} />
+
+          <SendStripeAuthButton
+            leadId={lead.id}
+            email={lead.email}
+            name={lead.name}
+            propertyAddress={lead.property_address}
+            stage={lead.stage}
+          />
         </div>
 
         {/* Dialogs */}
