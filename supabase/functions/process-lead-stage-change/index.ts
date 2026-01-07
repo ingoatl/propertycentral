@@ -247,31 +247,32 @@ function buildOnboardingEmailHtml(recipientName: string): string {
   ]);
 }
 
-// Build payment setup email HTML with dynamic Stripe URL
-function buildPaymentEmailHtml(recipientName: string, stripeUrl: string, propertyAddress: string): string {
+// Build CO-HOSTING payment email - We CHARGE them (ACH 1% or Card 3%)
+function buildCoHostingPaymentEmailHtml(recipientName: string, stripeUrl: string, propertyAddress: string): string {
   return buildBrandedEmailHtml(recipientName, "Set Up Your Payment Method", [
     {
-      content: "Congratulations on signing your management agreement with PeachHaus Group LLC! 🎉"
+      content: "Congratulations on signing your co-hosting agreement with PeachHaus Group LLC! 🎉"
     },
     {
-      title: "💳 Next Step: Payment Setup",
-      content: `To start receiving your rental income${propertyAddress ? ` for <strong>${propertyAddress}</strong>` : ''}, we need to set up your payment method.`
+      title: "📋 This Will Be Used For",
+      highlight: true,
+      content: `<strong>Property Expenses & Management Fees</strong><br>For any management fees or property expenses when needed${propertyAddress ? ` for <strong>${propertyAddress}</strong>` : ''}.`
     },
     {
-      title: "Payment Options",
+      title: "💳 Choose Your Payment Method",
       content: `
         <table style="width: 100%;">
           <tr>
-            <td style="padding: 12px 16px; background: #f0fdf4; border-radius: 8px; margin-bottom: 8px;">
-              <div style="font-weight: 700; color: #166534;">✓ Bank Account (ACH)</div>
-              <div style="font-size: 13px; color: #374151;">No processing fees — <strong>Recommended</strong></div>
+            <td style="padding: 16px; background: #f0fdf4; border: 2px solid #86efac; border-radius: 8px; margin-bottom: 8px;">
+              <div style="font-weight: 700; color: #166534; font-size: 15px;">🏦 US Bank Account (ACH)</div>
+              <div style="font-size: 13px; color: #374151; margin-top: 4px;"><strong>1% processing fee</strong> — Recommended</div>
             </td>
           </tr>
           <tr><td style="height: 8px;"></td></tr>
           <tr>
-            <td style="padding: 12px 16px; background: #f9fafb; border-radius: 8px;">
-              <div style="font-weight: 600; color: #374151;">Credit/Debit Card</div>
-              <div style="font-size: 13px; color: #6b7280;">3% processing fee applies</div>
+            <td style="padding: 16px; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px;">
+              <div style="font-weight: 600; color: #374151;">💳 Credit/Debit Card</div>
+              <div style="font-size: 13px; color: #6b7280; margin-top: 4px;">3% processing fee</div>
             </td>
           </tr>
         </table>
@@ -282,7 +283,7 @@ function buildPaymentEmailHtml(recipientName: string, stripeUrl: string, propert
     },
     {
       highlight: true,
-      content: "Both methods are secure and processed through Stripe. We recommend ACH for the best experience and no processing fees."
+      content: "🔒 <strong>Secure & Encrypted</strong><br>We use Stripe, the industry leader in payment security. Your information is never stored on our servers."
     },
     {
       warning: true,
@@ -294,92 +295,230 @@ function buildPaymentEmailHtml(recipientName: string, stripeUrl: string, propert
   ]);
 }
 
+// Build FULL-SERVICE payment email - We PAY them (ACH only, no fees)
+function buildFullServicePaymentEmailHtml(recipientName: string, stripeUrl: string, propertyAddress: string): string {
+  return buildBrandedEmailHtml(recipientName, "Set Up Your Payout Account", [
+    {
+      content: "Congratulations on signing your property management agreement with PeachHaus Group LLC! 🎉"
+    },
+    {
+      title: "📋 This Will Be Used For",
+      highlight: true,
+      content: `<strong>✓ Receiving Rental Income</strong><br>We'll deposit your rental earnings directly to your account${propertyAddress ? ` from <strong>${propertyAddress}</strong>` : ''}.`
+    },
+    {
+      title: "🏦 Payout Method",
+      content: `
+        <table style="width: 100%;">
+          <tr>
+            <td style="padding: 16px; background: #f0fdf4; border: 2px solid #86efac; border-radius: 8px;">
+              <div style="font-weight: 700; color: #166534; font-size: 15px;">🏦 US Bank Account (ACH)</div>
+              <div style="font-size: 13px; color: #166534; margin-top: 4px;"><strong>No processing fees</strong></div>
+            </td>
+          </tr>
+        </table>
+        <p style="font-size: 12px; color: #6b7280; margin-top: 12px; font-style: italic;">Note: Only bank accounts are supported for receiving rental income deposits.</p>
+      `
+    },
+    {
+      cta: { text: "Set Up Payout Account →", url: stripeUrl }
+    },
+    {
+      highlight: true,
+      content: "🔒 <strong>Secure & Encrypted</strong><br>We use Stripe, the industry leader in payment security. Your information is never stored on our servers."
+    },
+    {
+      warning: true,
+      content: "This secure link expires in 24 hours. If it expires, contact us and we'll send a new one."
+    },
+    {
+      content: "If you have any questions, just reply to this email.<br><br>Thank you for choosing PeachHaus!"
+    }
+  ]);
+}
+
+// Build welcome email for new leads
+function buildWelcomeEmailHtml(recipientName: string, propertyAddress: string): string {
+  return buildBrandedEmailHtml(recipientName, "Welcome to PeachHaus", [
+    {
+      content: `Thank you for your interest in PeachHaus property management! We're excited to learn more about your property${propertyAddress ? ` at <strong>${propertyAddress}</strong>` : ''}.`
+    },
+    {
+      title: "🏆 Why Owners Choose Us",
+      content: `
+        <table style="width: 100%;">
+          <tr><td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;">✓ Average <strong>23% higher</strong> rental income vs. self-managed</td></tr>
+          <tr><td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;">✓ <strong>4.9★ rating</strong> from property owners</td></tr>
+          <tr><td style="padding: 8px 0;">✓ Full-service management with <strong>transparent reporting</strong></td></tr>
+        </table>
+      `
+    },
+    {
+      highlight: true,
+      content: "I'd love to schedule a quick discovery call to discuss your goals and how we can maximize your rental income. What time works best for you?"
+    },
+    {
+      content: "Looking forward to connecting!"
+    }
+  ]);
+}
+
+// Build follow-up email for unreached leads
+function buildFollowUpEmailHtml(recipientName: string): string {
+  return buildBrandedEmailHtml(recipientName, "Quick Follow-Up", [
+    {
+      content: "I wanted to follow up on your property management inquiry."
+    },
+    {
+      warning: true,
+      content: "We currently have <strong>limited availability</strong> for new properties this month."
+    },
+    {
+      content: "Would you like to schedule a quick call to discuss how we can help maximize your rental income?"
+    },
+    {
+      cta: { text: "Schedule a Call →", url: "https://peachhausgroup.com/discovery-call" }
+    }
+  ]);
+}
+
+// Build call scheduled confirmation email
+function buildCallScheduledEmailHtml(recipientName: string, propertyAddress: string): string {
+  return buildBrandedEmailHtml(recipientName, "Your Discovery Call is Confirmed", [
+    {
+      content: `I'm looking forward to our upcoming conversation about your property${propertyAddress ? ` at <strong>${propertyAddress}</strong>` : ''}.`
+    },
+    {
+      title: "📝 To Prepare, It Would Be Helpful To Know",
+      content: `
+        <ul style="margin: 0; padding-left: 20px; color: #374151;">
+          <li style="margin-bottom: 8px;">Your current rental situation (if any)</li>
+          <li style="margin-bottom: 8px;">Your goals for the property</li>
+          <li>Any specific concerns or questions</li>
+        </ul>
+      `
+    },
+    {
+      highlight: true,
+      content: "This helps me provide the most relevant information for your situation."
+    },
+    {
+      content: "Talk soon!"
+    }
+  ]);
+}
+
+// Build post-call email
+function buildCallAttendedEmailHtml(recipientName: string, propertyAddress: string, aiSummary: string): string {
+  return buildBrandedEmailHtml(recipientName, "Next Steps After Our Conversation", [
+    {
+      content: `Thank you for the great conversation today! Based on what we discussed, I'm confident PeachHaus is the right partner for your property${propertyAddress ? ` at <strong>${propertyAddress}</strong>` : ''}.`
+    },
+    {
+      title: "📋 Key Points We Covered",
+      content: aiSummary || "We discussed your property management needs and goals."
+    },
+    {
+      title: "🚀 Next Steps",
+      content: `
+        <table style="width: 100%;">
+          <tr><td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;">1️⃣ Review the management agreement (coming shortly)</td></tr>
+          <tr><td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;">2️⃣ Sign when ready</td></tr>
+          <tr><td style="padding: 8px 0;">3️⃣ We'll begin our onboarding process</td></tr>
+        </table>
+      `
+    },
+    {
+      content: "Let me know if you have any questions!"
+    }
+  ]);
+}
+
+// Build contract out email
+function buildContractOutEmailHtml(recipientName: string, propertyAddress: string): string {
+  return buildBrandedEmailHtml(recipientName, "Your Management Agreement is Ready", [
+    {
+      content: `Your management agreement${propertyAddress ? ` for <strong>${propertyAddress}</strong>` : ''} is ready for review and signature.`
+    },
+    {
+      title: "🚀 What Happens After Signing",
+      content: `
+        <table style="width: 100%;">
+          <tr><td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;">1️⃣ You'll set up ACH for easy revenue deposits</td></tr>
+          <tr><td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;">2️⃣ We'll collect property details and access info</td></tr>
+          <tr><td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;">3️⃣ Professional photos and listing optimization</td></tr>
+          <tr><td style="padding: 8px 0;">4️⃣ You start earning within 2-3 weeks</td></tr>
+        </table>
+      `
+    },
+    {
+      highlight: true,
+      content: "The agreement is straightforward — let me know if anything needs clarification."
+    },
+    {
+      content: "Ready when you are!"
+    }
+  ]);
+}
+
+// Build ops handoff email
+function buildOpsHandoffEmailHtml(recipientName: string): string {
+  return buildBrandedEmailHtml(recipientName, "Your Property is in Good Hands", [
+    {
+      content: "Great news — your onboarding is complete and your property is now with our operations team!"
+    },
+    {
+      title: "🚀 What's Happening Next",
+      content: `
+        <table style="width: 100%;">
+          <tr><td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;">1️⃣ Our ops coordinator will contact you within 24-48 hours</td></tr>
+          <tr><td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;">2️⃣ We'll schedule property access and professional photography</td></tr>
+          <tr><td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;">3️⃣ Listing optimization and publishing</td></tr>
+          <tr><td style="padding: 8px 0;">4️⃣ You'll start receiving booking notifications!</td></tr>
+        </table>
+      `
+    },
+    {
+      highlight: true,
+      content: "Thank you for completing everything so quickly. We can't wait to get you earning!"
+    }
+  ]);
+}
+
 // Psychology-driven message templates by stage (Cialdini principles + SPIN)
 const STAGE_PSYCHOLOGY_TEMPLATES: Record<string, { sms?: string; email_subject?: string; email_body?: string; principle: string }> = {
   new_lead: {
     sms: "Hi {{name}}! This is {{sender}} from PeachHaus. Thanks for reaching out about property management. I've got some market insights for {{property_address}} I'd love to share. What time works for a quick call?",
     email_subject: "Welcome to PeachHaus - Your Property Management Partner",
-    email_body: `Hi {{name}},
-
-Thank you for your interest in PeachHaus property management! We're excited to learn more about your property at {{property_address}}.
-
-**Why owners choose us:**
-✓ Average 23% higher rental income vs. self-managed
-✓ 4.9★ rating from property owners
-✓ Full-service management with transparent reporting
-
-I'd love to schedule a quick discovery call to discuss your goals. What time works best for you?
-
-Looking forward to connecting!`,
+    email_body: `WELCOME_HTML_TEMPLATE`,
     principle: "Reciprocity + Social Proof"
   },
   unreached: {
     sms: "Hi {{name}}, just following up on property management for your rental. We have 2 onboarding spots open this month - still interested? Reply YES and I'll share next steps.",
     email_subject: "Quick follow-up on your property",
-    email_body: `Hi {{name}},
-
-I wanted to follow up on your property management inquiry. We currently have limited availability for new properties this month.
-
-Would you like to schedule a quick call to discuss how we can help maximize your rental income?
-
-Best regards`,
+    email_body: `FOLLOW_UP_HTML_TEMPLATE`,
     principle: "Scarcity + Urgency"
   },
   call_scheduled: {
     sms: "Looking forward to our call, {{name}}! I'll be calling you at the scheduled time. Feel free to text if anything changes.",
     email_subject: "Confirming Our Discovery Call",
-    email_body: `Hi {{name}},
-
-I'm looking forward to our upcoming conversation about your property at {{property_address}}.
-
-**To prepare, it would be helpful to know:**
-- Your current rental situation (if any)
-- Your goals for the property
-- Any specific concerns or questions
-
-This helps me provide the most relevant information for your situation.
-
-Talk soon!`,
+    email_body: `CALL_SCHEDULED_HTML_TEMPLATE`,
     principle: "Commitment + Preparation"
   },
   call_attended: {
     sms: "Great speaking with you, {{name}}! As discussed, I'm preparing a management proposal for {{property_address}}. You'll receive it shortly.",
     email_subject: "Next Steps After Our Conversation",
-    email_body: `Hi {{name}},
-
-Thank you for the great conversation today! Based on what we discussed, I'm confident PeachHaus is the right partner for your property at {{property_address}}.
-
-**Key points we covered:**
-{{ai_call_summary}}
-
-**Next Steps:**
-1. Review the management agreement (coming shortly)
-2. Sign when ready
-3. We'll begin our onboarding process
-
-Let me know if you have any questions!`,
+    email_body: `CALL_ATTENDED_HTML_TEMPLATE`,
     principle: "Commitment + Consistency"
   },
   contract_out: {
     sms: "Hi {{name}}, your PeachHaus management agreement is ready for signature. Let me know if you have any questions!",
     email_subject: "Your Management Agreement is Ready",
-    email_body: `Hi {{name}},
-
-Your management agreement for {{property_address}} is ready for review and signature.
-
-**What happens after signing:**
-1. You'll set up ACH for easy revenue deposits
-2. We'll collect property details and access info
-3. Professional photos and listing optimization
-4. You start earning within 2-3 weeks
-
-The agreement is straightforward - let me know if anything needs clarification.
-
-Ready when you are!`,
+    email_body: `CONTRACT_OUT_HTML_TEMPLATE`,
     principle: "Clarity + Momentum"
   },
   contract_signed: {
-    sms: "Welcome to PeachHaus, {{name}}! 🎉 Your agreement is signed. Check your email for a secure link to set up your payment method for rental income deposits.",
+    sms: "Welcome to PeachHaus, {{name}}! 🎉 Your agreement is signed. Check your email for a secure link to set up your payment details.",
     email_subject: "Set Up Your Payment Method - PeachHaus",
     email_body: `PAYMENT_HTML_TEMPLATE`,
     principle: "Celebration + Momentum"
@@ -387,25 +526,7 @@ Ready when you are!`,
   ach_form_signed: {
     sms: "Hi {{name}}! Your payment is set up. Please complete your property onboarding form - check your email for the link. This is the final step before we can start marketing your property!",
     email_subject: "Complete Your Property Onboarding - PeachHaus",
-    email_body: `Hi {{name}},
-
-We're ready to capture your property details for your property and lock in the next steps. Please complete the onboarding form below.
-
-👉 For existing STR properties (already furnished and listed), use:
-https://propertycentral.lovable.app/onboard/existing-str
-
-👉 For new STR properties (new setup, not yet listed), use:
-https://propertycentral.lovable.app/onboard/new-str
-
-⚠️ Important: Please fill out every field precisely.
-
-- Accurate data ensures smooth PMS setup, pricing automation, and guest-ready configuration.
-- Missing or incorrect details often cause delays and issues down the road (utilities, smart locks, cleaner assignments, etc.).
-- Taking the time now prevents headaches later — for both you and our operations team.
-
-Once submitted, we'll update your opportunity checklist and move to the next onboarding phase.
-
-Thanks for partnering with PeachHaus — together, we'll make this property perform at its best.`,
+    email_body: `ONBOARDING_HTML_TEMPLATE`,
     principle: "Progress + Clear Instructions"
   },
   insurance_requested: {
@@ -417,19 +538,7 @@ Thanks for partnering with PeachHaus — together, we'll make this property perf
   ops_handoff: {
     sms: "{{name}}, your property is now with our operations team! They'll reach out shortly to schedule access and photos. Exciting times ahead!",
     email_subject: "Your Property is in Good Hands",
-    email_body: `Hi {{name}},
-
-Great news - your onboarding is complete and your property is now with our operations team!
-
-**What's Happening Next:**
-1. Our ops coordinator will contact you within 24-48 hours
-2. We'll schedule property access and professional photography
-3. Listing optimization and publishing
-4. You'll start receiving booking notifications!
-
-Thank you for completing everything so quickly. We can't wait to get you earning!
-
-The PeachHaus Team`,
+    email_body: `OPS_HANDOFF_HTML_TEMPLATE`,
     principle: "Trust + Handoff"
   }
 };
@@ -818,15 +927,29 @@ serve(async (req) => {
           if (resendApiKey) {
             const recipientFirstName = lead.name?.split(' ')[0] || lead.name || "there";
             
-            // Use branded HTML templates for specific stages
+            // Use branded HTML templates for ALL stages
             let finalHtmlBody: string;
             
-            // Special handling for contract_signed - create Stripe checkout session
+            // Special handling for contract_signed - create Stripe checkout session based on service type
             if (newStage === 'contract_signed') {
+              // Fetch owner service type to determine if co-hosting or full-service
+              let serviceType = 'cohosting'; // Default to co-hosting
+              if (lead.owner_id) {
+                const { data: owner } = await supabase
+                  .from("property_owners")
+                  .select("service_type")
+                  .eq("id", lead.owner_id)
+                  .single();
+                if (owner?.service_type) {
+                  serviceType = owner.service_type;
+                }
+              }
+              console.log(`Lead ${leadId} service type: ${serviceType}`);
+              
               const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
               if (stripeKey) {
                 try {
-                  console.log(`Creating Stripe checkout session for lead ${leadId}`);
+                  console.log(`Creating Stripe checkout session for lead ${leadId} (${serviceType})`);
                   const stripe = new Stripe(stripeKey, { apiVersion: "2025-08-27.basil" });
                   
                   // Find or create Stripe customer
@@ -838,19 +961,26 @@ serve(async (req) => {
                     const customer = await stripe.customers.create({
                       email: lead.email,
                       name: lead.name || undefined,
-                      metadata: { lead_id: leadId }
+                      metadata: { lead_id: leadId, service_type: serviceType }
                     });
                     customerId = customer.id;
                   }
                   console.log(`Using Stripe customer: ${customerId}`);
                   
-                  // Create checkout session for payment method setup
+                  // Create checkout session based on service type
                   const siteUrl = "https://propertycentral.lovable.app";
+                  
+                  // Co-hosting: Allow both ACH (1%) and Card (3%) for charging owner
+                  // Full-service: Only ACH (no fees) for paying owner rental income
+                  const paymentMethodTypes = serviceType === 'full_service' 
+                    ? ["us_bank_account" as const]  // Only ACH for receiving payouts
+                    : ["us_bank_account" as const, "card" as const];  // Both for being charged
+                  
                   const session = await stripe.checkout.sessions.create({
                     customer: customerId,
                     mode: "setup",
                     currency: "usd",
-                    payment_method_types: ["us_bank_account", "card"],
+                    payment_method_types: paymentMethodTypes,
                     payment_method_options: {
                       us_bank_account: {
                         financial_connections: { permissions: ["payment_method"] }
@@ -858,7 +988,7 @@ serve(async (req) => {
                     },
                     success_url: `${siteUrl}/payment-success?lead=${leadId}&session_id={CHECKOUT_SESSION_ID}`,
                     cancel_url: `${siteUrl}/payment-setup?lead=${leadId}&canceled=true`,
-                    metadata: { lead_id: leadId, type: "lead_payment_setup" }
+                    metadata: { lead_id: leadId, type: "lead_payment_setup", service_type: serviceType }
                   });
                   console.log(`Stripe checkout session created: ${session.id}, URL: ${session.url}`);
                   
@@ -869,21 +999,32 @@ serve(async (req) => {
                     last_contacted_at: new Date().toISOString()
                   }).eq("id", leadId);
                   
-                  // Build branded payment email with real Stripe URL
-                  finalHtmlBody = buildPaymentEmailHtml(
-                    recipientFirstName,
-                    session.url!,
-                    lead.property_address || ""
-                  );
-                  emailSubject = "Set Up Your Payment Method - PeachHaus";
+                  // Build appropriate branded payment email based on service type
+                  if (serviceType === 'full_service') {
+                    finalHtmlBody = buildFullServicePaymentEmailHtml(
+                      recipientFirstName,
+                      session.url!,
+                      lead.property_address || ""
+                    );
+                    emailSubject = "Set Up Your Payout Account - PeachHaus";
+                  } else {
+                    finalHtmlBody = buildCoHostingPaymentEmailHtml(
+                      recipientFirstName,
+                      session.url!,
+                      lead.property_address || ""
+                    );
+                    emailSubject = "Set Up Your Payment Method - PeachHaus";
+                  }
                   
                   // Add timeline entry for Stripe session
                   await supabase.from("lead_timeline").insert({
                     lead_id: leadId,
-                    action: "Stripe payment setup session created",
+                    action: `Stripe payment setup session created (${serviceType})`,
                     metadata: { 
                       stripe_session_id: session.id,
-                      stripe_customer_id: customerId
+                      stripe_customer_id: customerId,
+                      service_type: serviceType,
+                      payment_methods: paymentMethodTypes
                     }
                   });
                   
@@ -891,58 +1032,47 @@ serve(async (req) => {
                   console.error("Stripe session creation failed:", stripeError);
                   // Fallback to static link if Stripe fails
                   const fallbackUrl = `https://propertycentral.lovable.app/payment-setup?lead=${leadId}`;
-                  finalHtmlBody = buildPaymentEmailHtml(recipientFirstName, fallbackUrl, lead.property_address || "");
-                  emailSubject = "Set Up Your Payment Method - PeachHaus";
+                  if (serviceType === 'full_service') {
+                    finalHtmlBody = buildFullServicePaymentEmailHtml(recipientFirstName, fallbackUrl, lead.property_address || "");
+                    emailSubject = "Set Up Your Payout Account - PeachHaus";
+                  } else {
+                    finalHtmlBody = buildCoHostingPaymentEmailHtml(recipientFirstName, fallbackUrl, lead.property_address || "");
+                    emailSubject = "Set Up Your Payment Method - PeachHaus";
+                  }
                 }
               } else {
                 console.log("STRIPE_SECRET_KEY not configured, using fallback URL");
                 const fallbackUrl = `https://propertycentral.lovable.app/payment-setup?lead=${leadId}`;
-                finalHtmlBody = buildPaymentEmailHtml(recipientFirstName, fallbackUrl, lead.property_address || "");
+                finalHtmlBody = buildCoHostingPaymentEmailHtml(recipientFirstName, fallbackUrl, lead.property_address || "");
                 emailSubject = "Set Up Your Payment Method - PeachHaus";
               }
             } else if (newStage === 'insurance_requested') {
               finalHtmlBody = buildInsuranceEmailHtml(recipientFirstName);
             } else if (newStage === 'ach_form_signed') {
               finalHtmlBody = buildOnboardingEmailHtml(recipientFirstName);
+            } else if (newStage === 'new_lead') {
+              finalHtmlBody = buildWelcomeEmailHtml(recipientFirstName, lead.property_address || "");
+              emailSubject = emailSubject || "Welcome to PeachHaus - Your Property Management Partner";
+            } else if (newStage === 'unreached') {
+              finalHtmlBody = buildFollowUpEmailHtml(recipientFirstName);
+              emailSubject = emailSubject || "Quick follow-up on your property";
+            } else if (newStage === 'call_scheduled') {
+              finalHtmlBody = buildCallScheduledEmailHtml(recipientFirstName, lead.property_address || "");
+              emailSubject = emailSubject || "Confirming Our Discovery Call";
+            } else if (newStage === 'call_attended') {
+              finalHtmlBody = buildCallAttendedEmailHtml(recipientFirstName, lead.property_address || "", lead.ai_summary || "");
+              emailSubject = emailSubject || "Next Steps After Our Conversation";
+            } else if (newStage === 'contract_out') {
+              finalHtmlBody = buildContractOutEmailHtml(recipientFirstName, lead.property_address || "");
+              emailSubject = emailSubject || "Your Management Agreement is Ready";
+            } else if (newStage === 'ops_handoff') {
+              finalHtmlBody = buildOpsHandoffEmailHtml(recipientFirstName);
+              emailSubject = emailSubject || "Your Property is in Good Hands";
             } else {
-              // Default: Convert plain text to HTML with Gmail-style formatting
-              const paragraphs = messageBody.split('\n\n');
-              const htmlBody = paragraphs.map(para => {
-                const formatted = para
-                  .replace(/\n/g, '<br>')
-                  .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                  .replace(/✓/g, '✅')
-                  .replace(/•/g, '&bull;');
-                return `<p style="margin: 0 0 16px 0; text-align: left;">${formatted}</p>`;
-              }).join('');
-
-              const signature = `
-                <table cellpadding="0" cellspacing="0" style="font-family: Arial, sans-serif; margin-top: 24px; border-collapse: collapse;">
-                  <tr>
-                    <td style="vertical-align: top; padding-right: 16px;">
-                      <div style="display: block;">
-                        <img src="https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/ingo-headshot.png" alt="Ingo Schaer" style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover; display: block;" />
-                        <img src="https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/ingo-signature.png" alt="Signature" style="width: 100px; height: auto; display: block; margin-top: 8px;" />
-                      </div>
-                    </td>
-                    <td style="vertical-align: top; border-left: 2px solid #f59e0b; padding-left: 12px;">
-                      <p style="margin: 0 0 2px 0; font-weight: bold; font-size: 14px; color: #1a1a1a; text-align: left;">Ingo Schaer</p>
-                      <p style="margin: 0 0 4px 0; font-size: 12px; color: #666; text-align: left;">Co-Founder, Operations Manager</p>
-                      <p style="margin: 0 0 2px 0; font-size: 12px; color: #1a1a1a; font-weight: 500; text-align: left;">PeachHaus Group LLC</p>
-                      <p style="margin: 4px 0 2px 0; font-size: 11px; color: #555; text-align: left;">
-                        <a href="tel:+14048005932" style="color: #1a1a1a; text-decoration: none;">(404) 800-5932</a>
-                      </p>
-                      <p style="margin: 2px 0; font-size: 11px; color: #555; text-align: left;">
-                        <a href="mailto:ingo@peachhausgroup.com" style="color: #1a73e8; text-decoration: none;">ingo@peachhausgroup.com</a>
-                      </p>
-                      <p style="margin: 2px 0; font-size: 11px; color: #555; text-align: left;">
-                        <a href="https://propertycentral.lovable.app" style="color: #1a73e8; text-decoration: none;">propertycentral.lovable.app</a>
-                      </p>
-                    </td>
-                  </tr>
-                </table>
-              `;
-              finalHtmlBody = `<div style="font-family: Arial, sans-serif; max-width: 600px; padding: 0; text-align: left;">${htmlBody}${signature}</div>`;
+              // Fallback: Convert plain text to branded HTML
+              finalHtmlBody = buildBrandedEmailHtml(recipientFirstName, emailSubject || "Update from PeachHaus", [
+                { content: messageBody.replace(/\n/g, '<br>') }
+              ]);
             }
 
             const emailResponse = await fetch("https://api.resend.com/emails", {
