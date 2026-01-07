@@ -173,7 +173,7 @@ serve(async (req) => {
     `;
 
     const emailResponse = await resend.emails.send({
-      from: "PeachHaus <onboarding@resend.dev>",
+      from: "PeachHaus <info@peachhausgroup.com>",
       to: [email],
       subject: "Complete Your Payment Setup - PeachHaus",
       html: emailHtml,
