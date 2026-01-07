@@ -15,7 +15,7 @@ import { format, startOfMonth, endOfMonth, parseISO } from "date-fns";
 import { Check, Home, DollarSign, Eye, RotateCcw, AlertTriangle, RefreshCw, CreditCard, Loader2, Banknote, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { MonthlyEmailPreviewModal } from "./MonthlyEmailPreviewModal";
-import { calculateDueFromOwnerFromLineItems, ServiceType, getSettlementAmount, getSettlementLabel, formatCurrency } from "@/lib/reconciliationCalculations";
+import { calculateDueFromOwnerFromLineItems, ServiceType, getSettlementAmount, getSettlementLabel, formatCurrency, calculateProcessingFee, getProcessingFeeLabel } from "@/lib/reconciliationCalculations";
 import { VisitValidationPreview } from "./VisitValidationPreview";
 import { TenantPaymentReview } from "./TenantPaymentReview";
 import { DeleteExpenseDialog } from "@/components/expenses/DeleteExpenseDialog";
@@ -1215,19 +1215,21 @@ export const ReconciliationReviewModal = ({
                                   <span className="font-medium">{formatCurrency(calculated.cleaningFees + calculated.petFees)}</span>
                                 </div>
                               )}
-                              {reconciliation.property_owners?.payment_method === "credit_card" && (
+                              {(reconciliation.property_owners?.payment_method === "credit_card" || 
+                                reconciliation.property_owners?.payment_method === "card" ||
+                                reconciliation.property_owners?.payment_method === "ach") && (
                                 <div className="flex justify-between text-amber-600">
-                                  <span>CC Processing Fee (3%):</span>
-                                  <span className="font-medium">{formatCurrency(calculated.dueFromOwner * 0.03)}</span>
+                                  <span>{getProcessingFeeLabel(reconciliation.property_owners?.payment_method || '')}:</span>
+                                  <span className="font-medium">
+                                    {formatCurrency(calculateProcessingFee(calculated.dueFromOwner, reconciliation.property_owners?.payment_method || ''))}
+                                  </span>
                                 </div>
                               )}
                               <div className="flex justify-between border-t pt-2 font-bold">
                                 <span>Total Charge:</span>
                                 <span className="text-primary">
                                   {formatCurrency(
-                                    reconciliation.property_owners?.payment_method === "credit_card"
-                                      ? calculated.dueFromOwner * 1.03
-                                      : calculated.dueFromOwner
+                                    calculated.dueFromOwner + calculateProcessingFee(calculated.dueFromOwner, reconciliation.property_owners?.payment_method || '')
                                   )}
                                 </span>
                               </div>

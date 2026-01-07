@@ -186,3 +186,29 @@ export function getSettlementLabel(serviceType: ServiceType): string {
 export function getSettlementAmount(result: CalculationResult, serviceType: ServiceType): number {
   return serviceType === 'cohosting' ? result.dueFromOwner : result.payoutToOwner;
 }
+
+/**
+ * Calculate processing fee based on payment method
+ * - Credit Card: 3%
+ * - ACH: 1%
+ */
+export function calculateProcessingFee(amount: number, paymentMethod: string): number {
+  if (paymentMethod === 'card' || paymentMethod === 'credit_card') {
+    return amount * 0.03;  // 3% for credit card
+  } else if (paymentMethod === 'ach') {
+    return amount * 0.01;  // 1% for ACH
+  }
+  return 0;
+}
+
+/**
+ * Get processing fee percentage label based on payment method
+ */
+export function getProcessingFeeLabel(paymentMethod: string): string {
+  if (paymentMethod === 'card' || paymentMethod === 'credit_card') {
+    return 'CC Processing Fee (3%)';
+  } else if (paymentMethod === 'ach') {
+    return 'ACH Processing Fee (1%)';
+  }
+  return 'Processing Fee';
+}

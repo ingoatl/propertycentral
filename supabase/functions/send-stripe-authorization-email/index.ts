@@ -143,19 +143,26 @@ serve(async (req) => {
         To complete the onboarding process${propertyAddress ? ` for <strong>${propertyAddress}</strong>` : ''}, we need to set up your payment method for recurring management fees and property expenses.
       </p>
       
-      <p style="color: #4a5568; line-height: 1.6; margin-bottom: 30px;">
+      <p style="color: #4a5568; line-height: 1.6; margin-bottom: 20px;">
         You can securely connect your bank account (ACH) or credit/debit card through our trusted payment partner, Stripe.
       </p>
+      
+      <div style="background: #f7fafc; border-radius: 8px; padding: 16px; margin-bottom: 20px;">
+        <p style="color: #1a1a2e; font-weight: 600; margin: 0 0 10px 0; font-size: 14px;">Payment Method Options:</p>
+        <ul style="color: #4a5568; margin: 0; padding: 0 0 0 20px; font-size: 14px; line-height: 1.8;">
+          <li><strong>Bank Account (ACH):</strong> 1% processing fee</li>
+          <li><strong>Credit/Debit Card:</strong> 3% processing fee</li>
+        </ul>
+        <p style="color: #718096; font-size: 12px; margin: 10px 0 0 0;">
+          Choose the option that works best for you — both methods are secure and processed through Stripe.
+        </p>
+      </div>
       
       <div style="text-align: center; margin: 30px 0;">
         <a href="${session.url}" style="display: inline-block; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; text-decoration: none; padding: 16px 40px; border-radius: 8px; font-weight: 600; font-size: 16px;">
           Set Up Payment Method →
         </a>
       </div>
-      
-      <p style="color: #718096; font-size: 14px; line-height: 1.6; margin-top: 30px;">
-        <strong>Why ACH?</strong> Bank transfers have lower fees than credit cards, which means more savings for you. However, you can also use a credit or debit card if preferred.
-      </p>
       
       <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 30px 0;">
       
