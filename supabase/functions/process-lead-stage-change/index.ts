@@ -133,23 +133,28 @@ Thank you for trusting us with your property!`,
     principle: "Celebration + Momentum"
   },
   ach_form_signed: {
-    sms: "Perfect, {{name}}! Payment method is set up. Last step: complete your property info so we can start marketing. Link in your email!",
-    email_subject: "Payment Complete - One More Step!",
-    email_body: `Great news {{name}}!
+    sms: "Hi {{name}}! Your payment is set up. Please complete your property onboarding form - check your email for the link. This is the final step before we can start marketing your property!",
+    email_subject: "Complete Your Property Onboarding - PeachHaus",
+    email_body: `Hi {{name}},
 
-Your payment method is all set up. You're almost ready to start earning.
+We're ready to capture your property details for your property and lock in the next steps. Please complete the onboarding form below.
 
-**Final Step:**
-Complete your property information form so we can begin marketing.
+👉 For existing STR properties (already furnished and listed), use:
+https://propertycentral.lovable.app/onboard/existing-str
 
-**Choose the form that fits your property:**
-- Already renting on Airbnb/VRBO? Use this form: {{existing_str_onboarding}}
-- New to short-term rentals? Use this form: {{new_str_onboarding}}
+👉 For new STR properties (new setup, not yet listed), use:
+https://propertycentral.lovable.app/onboard/new-str
 
-This takes about 10-15 minutes and helps us create the best listing for your property.
+⚠️ Important: Please fill out every field precisely.
 
-Almost there!`,
-    principle: "Progress + Near-completion"
+- Accurate data ensures smooth PMS setup, pricing automation, and guest-ready configuration.
+- Missing or incorrect details often cause delays and issues down the road (utilities, smart locks, cleaner assignments, etc.).
+- Taking the time now prevents headaches later — for both you and our operations team.
+
+Once submitted, we'll update your opportunity checklist and move to the next onboarding phase.
+
+Thanks for partnering with PeachHaus — together, we'll make this property perform at its best.`,
+    principle: "Progress + Clear Instructions"
   },
   ops_handoff: {
     sms: "{{name}}, your property is now with our operations team! They'll reach out shortly to schedule access and photos. Exciting times ahead!",

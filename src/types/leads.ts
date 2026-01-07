@@ -143,10 +143,10 @@ export const LEAD_STAGES: { stage: LeadStage; title: string; description: string
   { stage: 'call_attended', title: 'Call Attended', description: 'Call completed, ready for review' },
   { stage: 'send_contract', title: 'Send Contract', description: 'Ready to send management agreement' },
   { stage: 'contract_out', title: 'Contract Out', description: 'Contract sent, awaiting signature' },
-  { stage: 'contract_signed', title: 'Contract Signed', description: 'Agreement signed, need ACH form' },
-  { stage: 'ach_form_signed', title: 'ACH Form Signed', description: 'Payment method confirmed' },
-  { stage: 'onboarding_form_requested', title: 'Onboarding Requested', description: 'Waiting for property details' },
-  { stage: 'insurance_requested', title: 'Insurance Requested', description: 'Waiting for STR insurance' },
+  { stage: 'contract_signed', title: 'Contract Signed', description: 'Payment setup email sent automatically' },
+  { stage: 'ach_form_signed', title: 'Payment Authorized', description: 'Onboarding form email sent automatically' },
+  { stage: 'onboarding_form_requested', title: 'Awaiting Onboarding Form', description: 'Waiting for property details submission' },
+  { stage: 'insurance_requested', title: 'Insurance Requested', description: 'Waiting for STR insurance verification' },
   { stage: 'ops_handoff', title: 'Ops Handoff', description: 'Handed off to operations team' },
 ];
 
@@ -208,14 +208,14 @@ export const STAGE_CONFIG: Record<LeadStage, {
     borderColor: 'border-[hsl(152,100%,39%)]'
   },
   ach_form_signed: { 
-    label: 'ACH Signed', 
+    label: 'Payment Auth', 
     color: 'text-[hsl(187,100%,45%)]', 
     bgColor: 'bg-[hsl(187,100%,94%)]',
     accentColor: 'hsl(187, 100%, 45%)',
     borderColor: 'border-[hsl(187,100%,45%)]'
   },
   onboarding_form_requested: { 
-    label: 'Onboarding', 
+    label: 'Awaiting Form', 
     color: 'text-[hsl(79,67%,49%)]', 
     bgColor: 'bg-[hsl(79,67%,94%)]',
     accentColor: 'hsl(79, 67%, 49%)',
