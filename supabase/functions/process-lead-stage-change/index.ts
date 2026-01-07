@@ -823,6 +823,81 @@ serve(async (req) => {
       console.log(`Using psychology principle: ${psychologyTemplate.principle}`);
     }
 
+    // ========== DIRECT STAGE-BASED EMAIL SENDING ==========
+    // Send branded emails directly for specific stages (independent of automations)
+    // This ensures emails are sent even if no automation is configured for that stage
+    const directResendApiKey = Deno.env.get("RESEND_API_KEY");
+    
+    if (directResendApiKey && lead.email) {
+      const recipientFirstName = lead.name?.split(' ')[0] || lead.name || "there";
+      let directEmailHtml: string | null = null;
+      let directEmailSubject: string = "";
+      
+      // Handle each stage that needs a direct email
+      if (newStage === 'onboarding_form_requested') {
+        // This stage needs the onboarding form email
+        directEmailHtml = buildOnboardingEmailHtml(recipientFirstName, newStage);
+        directEmailSubject = "Complete Your Property Onboarding - PeachHaus";
+        console.log(`Sending direct onboarding form email for stage ${newStage}`);
+      } else if (newStage === 'insurance_requested') {
+        directEmailHtml = buildInsuranceEmailHtml(recipientFirstName, newStage);
+        directEmailSubject = "Insurance Verification Required - PeachHaus";
+        console.log(`Sending direct insurance email for stage ${newStage}`);
+      } else if (newStage === 'inspection_scheduled') {
+        const bookingUrl = "https://cal.com/peachhausgroup/onboarding-inspection";
+        directEmailHtml = buildInspectionSchedulingEmailHtml(recipientFirstName, bookingUrl, newStage);
+        directEmailSubject = "Schedule Your Onboarding Inspection - PeachHaus";
+        console.log(`Sending direct inspection scheduling email for stage ${newStage}`);
+      }
+      
+      // Send the direct email if we have HTML content
+      if (directEmailHtml) {
+        try {
+          const emailResponse = await fetch("https://api.resend.com/emails", {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${directResendApiKey}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              from: "PeachHaus Group LLC - Ingo Schaer <ingo@peachhausgroup.com>",
+              to: [lead.email],
+              subject: directEmailSubject,
+              html: directEmailHtml,
+            }),
+          });
+
+          const emailResult = await emailResponse.json();
+          console.log(`Direct stage email sent for ${newStage}: ${emailResponse.ok ? 'success' : 'failed'}`, emailResult);
+
+          // Record communication
+          await supabase.from("lead_communications").insert({
+            lead_id: leadId,
+            communication_type: "email",
+            direction: "outbound",
+            subject: directEmailSubject,
+            body: `Direct stage email for ${newStage}`,
+            status: emailResponse.ok ? "sent" : "failed",
+            external_id: emailResult.id,
+            error_message: emailResult.message,
+          });
+
+          // Add timeline entry
+          await supabase.from("lead_timeline").insert({
+            lead_id: leadId,
+            action: `Stage email sent: "${directEmailSubject}"`,
+            metadata: { 
+              stage: newStage,
+              email_id: emailResult.id,
+              email_type: "direct_stage_email"
+            },
+          });
+        } catch (emailError) {
+          console.error(`Error sending direct stage email for ${newStage}:`, emailError);
+        }
+      }
+    }
+
     // Process each automation
     for (const automation of automations || []) {
       try {
