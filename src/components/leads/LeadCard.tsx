@@ -2,7 +2,7 @@ import { Lead, STAGE_CONFIG } from "@/types/leads";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Phone, Mail, MapPin, DollarSign, MessageSquare, Sparkles, Clock, PhoneCall, Volume2 } from "lucide-react";
+import { Phone, Mail, MapPin, MessageSquare, Sparkles, Clock, Volume2 } from "lucide-react";
 import { format, formatDistanceToNow } from "date-fns";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -22,15 +22,6 @@ interface LeadCardProps {
 
 const LeadCard = ({ lead, onClick, compact = false }: LeadCardProps) => {
   const stageConfig = STAGE_CONFIG[lead.stage];
-  
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
-  };
 
   // Fetch communication counts including voice calls
   const { data: commCounts } = useQuery({
@@ -107,12 +98,6 @@ const LeadCard = ({ lead, onClick, compact = false }: LeadCardProps) => {
           </div>
           
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            {lead.opportunity_value > 0 && (
-              <span className="flex items-center gap-1 font-medium text-green-600">
-                <DollarSign className="h-3 w-3" />
-                {formatCurrency(lead.opportunity_value)}
-              </span>
-            )}
             {lead.property_address && (
               <span className="flex items-center gap-1 truncate">
                 <MapPin className="h-3 w-3 shrink-0" />
@@ -232,11 +217,6 @@ const LeadCard = ({ lead, onClick, compact = false }: LeadCardProps) => {
         
         <div className="flex items-center justify-between pt-2 border-t">
           <div className="flex items-center gap-2">
-            {lead.opportunity_value > 0 && (
-              <span className="text-sm font-medium text-green-600">
-                {formatCurrency(lead.opportunity_value)}
-              </span>
-            )}
             {lead.ai_qualification_score && (
               <Badge variant="outline" className="text-xs">
                 <Sparkles className="h-3 w-3 mr-1" />
