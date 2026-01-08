@@ -10,6 +10,9 @@ const corsHeaders = {
 };
 
 const GOOGLE_MEET_LINK = "https://meet.google.com/jww-deey-iaa";
+const HOSTS_PHOTO_URL = "https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/anja-ingo-hosts.jpg";
+const SIGNATURE_URL = "https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/anja-signature.png";
+const FRONTEND_URL = "https://preview--peachhaus-property-central.lovable.app";
 
 interface DiscoveryCallNotificationRequest {
   discoveryCallId: string;
@@ -130,42 +133,77 @@ const handler = async (req: Request): Promise<Response> => {
           to: [lead.email],
           subject: `Your Discovery Call is Confirmed - ${formattedDate}`,
           html: `
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-              <div style="background: linear-gradient(135deg, #f97316, #ea580c); padding: 30px; text-align: center;">
-                <h1 style="color: white; margin: 0;">🎉 Your Call is Confirmed!</h1>
+            <div style="font-family: Georgia, 'Times New Roman', serif; max-width: 600px; margin: 0 auto; background: #fdfcfb;">
+              <!-- Header with warm gradient -->
+              <div style="background: linear-gradient(135deg, #b8956a 0%, #c9a87a 50%, #d4b896 100%); padding: 40px 30px; text-align: center;">
+                <h1 style="color: white; margin: 0; font-size: 28px; font-weight: 400; letter-spacing: 1px;">Your Call is Confirmed</h1>
               </div>
               
-              <div style="padding: 30px; background: #fff;">
-                <p>Hi ${lead.name},</p>
+              <div style="padding: 40px 35px; background: #fff;">
+                <p style="font-size: 16px; line-height: 1.8; color: #4a4a4a; margin: 0 0 20px 0;">
+                  Hi ${lead.name},
+                </p>
                 
-                <p>Great news! Your discovery call with PeachHaus is confirmed:</p>
+                <p style="font-size: 16px; line-height: 1.8; color: #4a4a4a; margin: 0 0 25px 0;">
+                  We're looking forward to speaking with you! Here are the details of your upcoming discovery call:
+                </p>
                 
-                <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
-                  <p><strong>📅 Date:</strong> ${formattedDate}</p>
-                  <p><strong>🕐 Time:</strong> ${formattedTime}</p>
+                <div style="background: #faf9f7; padding: 25px; border-radius: 12px; margin: 25px 0; border: 1px solid #e8e4de;">
+                  <p style="margin: 0 0 12px 0; font-size: 15px; color: #333;"><strong>📅 Date:</strong> ${formattedDate}</p>
+                  <p style="margin: 0 0 12px 0; font-size: 15px; color: #333;"><strong>🕐 Time:</strong> ${formattedTime}</p>
                   ${meetingDetails}
-                  <p><strong>🏠 Property:</strong> ${lead.property_address || "To be discussed"}</p>
-                  <p><strong>📋 Interest:</strong> ${serviceInterestText}</p>
+                  <p style="margin: 0 0 12px 0; font-size: 15px; color: #333;"><strong>🏠 Property:</strong> ${lead.property_address || "To be discussed"}</p>
+                  <p style="margin: 0; font-size: 15px; color: #333;"><strong>📋 Interest:</strong> ${serviceInterestText}</p>
                 </div>
                 
                 ${isVideoCall ? `
-                <div style="background: #e8f5e9; padding: 15px; border-radius: 8px; margin: 20px 0;">
-                  <p style="margin: 0;"><strong>📹 Join Video Call:</strong></p>
-                  <a href="${GOOGLE_MEET_LINK}" style="display: inline-block; background: #4CAF50; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin-top: 10px; font-weight: bold;">Join Google Meet</a>
+                <div style="background: #e8f5e9; padding: 20px; border-radius: 12px; margin: 25px 0; text-align: center;">
+                  <p style="margin: 0 0 15px 0; font-size: 15px; color: #2e7d32;"><strong>📹 Join Video Call:</strong></p>
+                  <a href="${GOOGLE_MEET_LINK}" style="display: inline-block; background: #4CAF50; color: white; padding: 14px 30px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 15px;">Join Google Meet</a>
+                  <p style="margin: 12px 0 0 0; font-size: 12px; color: #666;">${GOOGLE_MEET_LINK}</p>
                 </div>
                 ` : ""}
                 
-                <p><strong>What to expect:</strong></p>
-                <ul>
+                <p style="font-size: 15px; color: #4a4a4a; font-weight: 600; margin: 25px 0 10px 0;">What to expect:</p>
+                <ul style="margin: 0; padding-left: 20px; color: #4a4a4a; font-size: 15px; line-height: 1.8;">
                   <li>We'll discuss your property's potential</li>
                   <li>Review our management approach</li>
                   <li>Answer all your questions</li>
                   <li>Provide a custom revenue estimate</li>
                 </ul>
                 
-                <p>We're excited to learn about your property and show you how we can help maximize your investment!</p>
-                
-                <p>Best regards,<br>The PeachHaus Team</p>
+                <p style="font-size: 16px; line-height: 1.8; color: #4a4a4a; margin: 30px 0 0 0;">
+                  We're excited to learn about your property and show you how we can help maximize your investment!
+                </p>
+              </div>
+              
+              <!-- Signature Section -->
+              <div style="padding: 30px 35px; text-align: center; border-top: 1px solid #e8e4de;">
+                <p style="margin: 0 0 15px 0; font-family: Georgia, serif; font-size: 14px; color: #8a8a8a; text-transform: uppercase; letter-spacing: 2px;">
+                  WARMEST REGARDS
+                </p>
+                <img src="${SIGNATURE_URL}" 
+                     alt="Anja & Ingo Schaer" 
+                     style="height: 50px; width: auto; margin-bottom: 12px;">
+                <p style="margin: 0 0 4px 0; font-family: Georgia, serif; font-size: 13px; color: #8a8a8a; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;">
+                  PEACHHAUS GROUP
+                </p>
+                <p style="margin: 16px 0 0 0; font-family: Georgia, serif; font-size: 12px; color: #8a8a8a;">
+                  (404) 800-5932 | info@peachhausgroup.com
+                </p>
+                <div style="margin-top: 15px;">
+                  <img src="${HOSTS_PHOTO_URL}" 
+                       alt="Anja & Ingo" 
+                       width="80" 
+                       style="width: 80px; height: 80px; border-radius: 50%; border: 2px solid #e8e4de; object-fit: cover;">
+                </div>
+              </div>
+              
+              <!-- Footer -->
+              <div style="padding: 20px 35px; background-color: #faf9f7; border-top: 1px solid #e8e4de; text-align: center;">
+                <p style="margin: 0; font-size: 12px; color: #8a8a8a;">
+                  PeachHaus Group · Atlanta, Georgia
+                </p>
               </div>
             </div>
           `,
@@ -274,35 +312,53 @@ const handler = async (req: Request): Promise<Response> => {
           to: [lead.email],
           subject: `${urgencyEmoji} Reminder: Discovery Call ${reminderText} - ${formattedTime}`,
           html: `
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-              <div style="background: linear-gradient(135deg, #f97316, #ea580c); padding: 25px; text-align: center;">
-                <h1 style="color: white; margin: 0;">${urgencyEmoji} Call Reminder</h1>
+            <div style="font-family: Georgia, 'Times New Roman', serif; max-width: 600px; margin: 0 auto; background: #fdfcfb;">
+              <div style="background: linear-gradient(135deg, #b8956a 0%, #c9a87a 50%, #d4b896 100%); padding: 35px 30px; text-align: center;">
+                <h1 style="color: white; margin: 0; font-size: 26px; font-weight: 400; letter-spacing: 1px;">${urgencyEmoji} Call Reminder</h1>
               </div>
               
-              <div style="padding: 30px; background: #fff;">
-                <p>Hi ${lead.name},</p>
+              <div style="padding: 35px; background: #fff;">
+                <p style="font-size: 16px; line-height: 1.8; color: #4a4a4a; margin: 0 0 20px 0;">
+                  Hi ${lead.name},
+                </p>
                 
-                <p>Just a friendly reminder that your discovery call is ${reminderText}!</p>
+                <p style="font-size: 16px; line-height: 1.8; color: #4a4a4a; margin: 0 0 25px 0;">
+                  Just a friendly reminder that your discovery call is <strong>${reminderText}</strong>!
+                </p>
                 
-                <div style="background: #fff3e0; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #f97316;">
-                  <p><strong>📅 Date:</strong> ${formattedDate}</p>
-                  <p><strong>🕐 Time:</strong> ${formattedTime}</p>
+                <div style="background: #fff8f0; padding: 20px; border-radius: 12px; margin: 20px 0; border-left: 4px solid #b8956a;">
+                  <p style="margin: 0 0 10px 0; font-size: 15px; color: #333;"><strong>📅 Date:</strong> ${formattedDate}</p>
+                  <p style="margin: 0 0 10px 0; font-size: 15px; color: #333;"><strong>🕐 Time:</strong> ${formattedTime}</p>
                   ${meetingDetails}
                 </div>
                 
                 ${isVideoCall ? `
                 <div style="text-align: center; margin: 25px 0;">
-                  <a href="${GOOGLE_MEET_LINK}" style="display: inline-block; background: #4CAF50; color: white; padding: 15px 40px; text-decoration: none; border-radius: 8px; font-size: 18px; font-weight: bold;">📹 Join Video Call</a>
+                  <a href="${GOOGLE_MEET_LINK}" style="display: inline-block; background: #4CAF50; color: white; padding: 15px 40px; text-decoration: none; border-radius: 8px; font-size: 16px; font-weight: bold;">📹 Join Video Call</a>
+                  <p style="margin: 10px 0 0 0; font-size: 12px; color: #666;">${GOOGLE_MEET_LINK}</p>
                 </div>
                 ` : `
-                <p style="text-align: center; font-size: 16px; color: #666;">
+                <p style="text-align: center; font-size: 16px; color: #666; margin: 25px 0;">
                   📞 We will call you at <strong>${lead.phone}</strong>
                 </p>
                 `}
                 
-                <p>We're looking forward to discussing how we can help you with your property!</p>
-                
-                <p>See you soon,<br>The PeachHaus Team</p>
+                <p style="font-size: 16px; line-height: 1.8; color: #4a4a4a; margin: 25px 0 0 0;">
+                  We're looking forward to discussing how we can help you with your property!
+                </p>
+              </div>
+              
+              <!-- Signature Section -->
+              <div style="padding: 25px 35px; text-align: center; border-top: 1px solid #e8e4de;">
+                <p style="margin: 0 0 12px 0; font-family: Georgia, serif; font-size: 13px; color: #8a8a8a; text-transform: uppercase; letter-spacing: 2px;">
+                  SEE YOU SOON
+                </p>
+                <img src="${SIGNATURE_URL}" 
+                     alt="Anja & Ingo Schaer" 
+                     style="height: 45px; width: auto; margin-bottom: 10px;">
+                <p style="margin: 0; font-family: Georgia, serif; font-size: 12px; color: #8a8a8a;">
+                  (404) 800-5932 | info@peachhausgroup.com
+                </p>
               </div>
             </div>
           `,
