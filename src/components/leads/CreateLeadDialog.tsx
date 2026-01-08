@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { LeadStage, LEAD_STAGES } from "@/types/leads";
-import { GooglePlacesAutocomplete } from "@/components/ui/google-places-autocomplete";
+import { AddressAutocomplete } from "@/components/ui/address-autocomplete";
 import { 
   createLeadSchema, 
   emailSchema, 
@@ -271,7 +271,7 @@ const CreateLeadDialog = ({ open, onOpenChange }: CreateLeadDialogProps) => {
             
             <div className="col-span-2">
               <Label htmlFor="address">Property Address *</Label>
-              <GooglePlacesAutocomplete
+              <AddressAutocomplete
                 id="address"
                 value={formData.property_address}
                 onChange={(value) => handleFieldChange("property_address", value)}

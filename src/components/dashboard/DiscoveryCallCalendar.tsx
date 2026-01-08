@@ -39,6 +39,7 @@ import {
   endOfWeek,
 } from "date-fns";
 import { cn } from "@/lib/utils";
+import { OSMMap } from "@/components/ui/osm-map";
 
 interface DiscoveryCall {
   id: string;
@@ -359,12 +360,9 @@ function DiscoveryCallDetailModal({ call, onClose }: DiscoveryCallDetailModalPro
   );
   const scheduledAt = new Date(call.scheduled_at);
 
-  const mapUrl = call.leads?.property_address
-    ? `https://www.google.com/maps/embed/v1/place?key=${import.meta.env.VITE_GOOGLE_MAPS_EMBED_KEY || ""}&q=${encodeURIComponent(call.leads.property_address)}&zoom=15`
-    : null;
-
+  // Use OpenStreetMap link instead of Google Maps
   const mapsLink = call.leads?.property_address
-    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(call.leads.property_address)}`
+    ? `https://www.openstreetmap.org/search?query=${encodeURIComponent(call.leads.property_address)}`
     : null;
 
   return (
@@ -404,33 +402,17 @@ function DiscoveryCallDetailModal({ call, onClose }: DiscoveryCallDetailModalPro
             </h3>
             {call.leads?.property_address ? (
               <>
-                <div className="rounded-lg overflow-hidden border h-[300px]">
-                  {mapUrl ? (
-                    <iframe
-                      src={mapUrl}
-                      width="100%"
-                      height="100%"
-                      style={{ border: 0 }}
-                      allowFullScreen
-                      loading="lazy"
-                      referrerPolicy="no-referrer-when-downgrade"
-                    />
-                  ) : (
-                    <div className="w-full h-full bg-muted flex items-center justify-center">
-                      <img
-                        src={`https://maps.googleapis.com/maps/api/staticmap?center=${encodeURIComponent(call.leads.property_address)}&zoom=15&size=400x300&maptype=roadmap&markers=color:red%7C${encodeURIComponent(call.leads.property_address)}`}
-                        alt="Property location"
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                  )}
-                </div>
+                <OSMMap 
+                  address={call.leads.property_address} 
+                  height="300px"
+                  className="rounded-lg overflow-hidden border"
+                />
                 <p className="text-sm text-muted-foreground">{call.leads.property_address}</p>
                 {mapsLink && (
                   <Button variant="outline" size="sm" asChild>
                     <a href={mapsLink} target="_blank" rel="noopener noreferrer">
                       <ExternalLink className="h-4 w-4 mr-2" />
-                      Open in Google Maps
+                      View on OpenStreetMap
                     </a>
                   </Button>
                 )}
