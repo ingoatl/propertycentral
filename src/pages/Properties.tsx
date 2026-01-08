@@ -100,17 +100,39 @@ const Properties = () => {
       await supabase.from('inspections').delete().eq('property_id', property.id);
       await supabase.from('conversation_notes').delete().eq('property_id', property.id);
       
+      // Get all owner_onboarding_submissions for this property to delete their child records first
+      const { data: submissions } = await supabase
+        .from('owner_onboarding_submissions')
+        .select('id')
+        .eq('property_id', property.id);
+      
+      if (submissions && submissions.length > 0) {
+        const submissionIds = submissions.map(s => s.id);
+        // Delete property_financial_data first (references owner_onboarding_submissions)
+        await supabase.from('property_financial_data').delete().in('submission_id', submissionIds);
+      }
+      
+      // Delete owner_onboarding_submissions that reference this property
+      await supabase.from('owner_onboarding_submissions').delete().eq('property_id', property.id);
+      
       // Delete onboarding project and tasks if exists
       const projectId = propertyProjects[property.id];
       if (projectId) {
-        // Delete owner_onboarding_submissions first (references both project and property)
+        // Get submissions by project_id too
+        const { data: projectSubmissions } = await supabase
+          .from('owner_onboarding_submissions')
+          .select('id')
+          .eq('project_id', projectId);
+        
+        if (projectSubmissions && projectSubmissions.length > 0) {
+          const submissionIds = projectSubmissions.map(s => s.id);
+          await supabase.from('property_financial_data').delete().in('submission_id', submissionIds);
+        }
+        
         await supabase.from('owner_onboarding_submissions').delete().eq('project_id', projectId);
         await supabase.from('onboarding_tasks').delete().eq('project_id', projectId);
         await supabase.from('onboarding_projects').delete().eq('id', projectId);
       }
-      
-      // Also delete any owner_onboarding_submissions that reference this property directly
-      await supabase.from('owner_onboarding_submissions').delete().eq('property_id', property.id);
       
       // Finally delete the property
       const { error } = await supabase.from('properties').delete().eq('id', property.id);
