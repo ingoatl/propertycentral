@@ -54,25 +54,53 @@ export function AddressAutocomplete({
 
     setIsLoading(true);
     try {
+      // First try with the query as-is
+      let data: NominatimResult[] = [];
+      
       const response = await fetch(
         `https://nominatim.openstreetmap.org/search?` +
         new URLSearchParams({
           q: query,
           format: "json",
           addressdetails: "1",
-          limit: "5",
-          countrycodes: "us", // Restrict to US addresses
+          limit: "8",
+          countrycodes: "us",
         }),
         {
           headers: {
             "Accept-Language": "en",
+            "User-Agent": "PropertyManagementApp/1.0",
           },
         }
       );
       
-      if (!response.ok) throw new Error("Search failed");
+      if (response.ok) {
+        data = await response.json();
+      }
       
-      const data: NominatimResult[] = await response.json();
+      // If no results, try adding "USA" to help with partial addresses
+      if (data.length === 0 && !query.toLowerCase().includes("usa") && !query.toLowerCase().includes("united states")) {
+        const fallbackResponse = await fetch(
+          `https://nominatim.openstreetmap.org/search?` +
+          new URLSearchParams({
+            q: `${query}, USA`,
+            format: "json",
+            addressdetails: "1",
+            limit: "8",
+          }),
+          {
+            headers: {
+              "Accept-Language": "en",
+              "User-Agent": "PropertyManagementApp/1.0",
+            },
+          }
+        );
+        
+        if (fallbackResponse.ok) {
+          data = await fallbackResponse.json();
+        }
+      }
+      
       setSuggestions(data);
       setShowSuggestions(data.length > 0);
       setHighlightedIndex(-1);
