@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { GooglePlacesAutocomplete } from "@/components/ui/google-places-autocomplete";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -276,7 +277,7 @@ export default function BookDiscoveryCall() {
           </div>
           <CardTitle className="text-2xl">Book Your Discovery Call</CardTitle>
           <CardDescription className="text-base">
-            A free 15-minute call to explore how we can help with your property
+            A free 30-minute call to explore how we can help with your property
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -357,11 +358,11 @@ export default function BookDiscoveryCall() {
               <div className="space-y-4">
                 <div>
                   <Label htmlFor="address">Property Address *</Label>
-                  <Input
+                  <GooglePlacesAutocomplete
                     id="address"
-                    placeholder="123 Peachtree St, Atlanta, GA 30309"
+                    placeholder="Start typing your property address..."
                     value={formData.propertyAddress}
-                    onChange={(e) => setFormData({ ...formData, propertyAddress: e.target.value })}
+                    onChange={(value) => setFormData({ ...formData, propertyAddress: value })}
                   />
                   <p className="text-xs text-muted-foreground mt-1">
                     This helps us research your area and provide relevant market insights
