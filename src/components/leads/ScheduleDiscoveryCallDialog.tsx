@@ -35,12 +35,13 @@ interface ScheduleDiscoveryCallDialogProps {
 }
 
 const GOOGLE_MEET_LINK = "https://meet.google.com/jww-deey-iaa";
+const CALL_DURATION = 30; // 30 minute discovery calls
 
-// Generate time slots from 9 AM to 5 PM in 15-minute increments
+// Generate time slots from 9 AM to 5 PM in 30-minute increments
 const generateTimeSlots = () => {
   const slots: string[] = [];
   for (let hour = 9; hour < 17; hour++) {
-    for (let minute = 0; minute < 60; minute += 15) {
+    for (let minute = 0; minute < 60; minute += 30) {
       const time = `${hour.toString().padStart(2, "0")}:${minute.toString().padStart(2, "0")}`;
       slots.push(time);
     }
@@ -129,7 +130,7 @@ export function ScheduleDiscoveryCallDialog({
         lead_id: leadId,
         scheduled_by: user.user?.id,
         scheduled_at: scheduledAt.toISOString(),
-        duration_minutes: 15,
+        duration_minutes: CALL_DURATION,
         meeting_notes: notes || null,
         meeting_type: meetingType,
         service_interest: serviceInterest || null,
@@ -225,7 +226,7 @@ export function ScheduleDiscoveryCallDialog({
                 <p className="text-sm text-muted-foreground">{leadPhone}</p>
               )}
             </div>
-            <Badge className="ml-auto">15 min</Badge>
+            <Badge className="ml-auto">30 min</Badge>
           </div>
 
           {/* Meeting Type Selection */}

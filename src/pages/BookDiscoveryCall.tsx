@@ -200,7 +200,7 @@ export default function BookDiscoveryCall() {
       const { error: callError } = await supabase.from("discovery_calls").insert({
         lead_id: lead.id,
         scheduled_at: scheduledAt.toISOString(),
-        duration_minutes: 15,
+        duration_minutes: 30,
         status: "scheduled",
         meeting_notes: notes,
       });
