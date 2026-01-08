@@ -58,33 +58,85 @@ export function OSMMap({
       setError(null);
       
       try {
-        const response = await fetch(
+        // Try Nominatim first with US country bias
+        let data: GeocodingResult[] = [];
+        
+        // First attempt: with country restriction
+        const response1 = await fetch(
           `https://nominatim.openstreetmap.org/search?` +
           new URLSearchParams({
             q: address,
             format: "json",
-            limit: "1",
+            limit: "5",
             addressdetails: "1",
+            countrycodes: "us",
           }),
           {
             headers: {
               "Accept-Language": "en",
+              "User-Agent": "LovablePropertyManager/1.0",
             },
           }
         );
 
-        if (!response.ok) throw new Error("Geocoding failed");
+        if (response1.ok) {
+          data = await response1.json();
+        }
 
-        const data: GeocodingResult[] = await response.json();
+        // If no results, try without country restriction
+        if (data.length === 0) {
+          console.log("[OSMMap] No US results, trying global search");
+          const response2 = await fetch(
+            `https://nominatim.openstreetmap.org/search?` +
+            new URLSearchParams({
+              q: address,
+              format: "json",
+              limit: "5",
+              addressdetails: "1",
+            }),
+            {
+              headers: {
+                "Accept-Language": "en",
+                "User-Agent": "LovablePropertyManager/1.0",
+              },
+            }
+          );
+
+          if (response2.ok) {
+            data = await response2.json();
+          }
+        }
+
+        // If still no results, try Photon API as fallback
+        if (data.length === 0) {
+          console.log("[OSMMap] Trying Photon API fallback");
+          const photonResponse = await fetch(
+            `https://photon.komoot.io/api/?q=${encodeURIComponent(address)}&limit=5`
+          );
+          
+          if (photonResponse.ok) {
+            const photonData = await photonResponse.json();
+            if (photonData.features?.length > 0) {
+              const feature = photonData.features[0];
+              data = [{
+                lat: feature.geometry.coordinates[1].toString(),
+                lon: feature.geometry.coordinates[0].toString(),
+                display_name: feature.properties.name || address,
+              }];
+            }
+          }
+        }
         
         if (data.length > 0) {
           const lat = parseFloat(data[0].lat);
           const lon = parseFloat(data[0].lon);
+          console.log("[OSMMap] Found coordinates:", lat, lon);
           setCoordinates({ lat, lon });
           
           // Fetch nearby places for context
           fetchNearbyPlaces(lat, lon);
         } else {
+          console.log("[OSMMap] No results found for:", address);
           setError("Address not found");
         }
       } catch (err) {
