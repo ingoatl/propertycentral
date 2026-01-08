@@ -2,6 +2,12 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { Resend } from "https://esm.sh/resend@2.0.0";
 import { PDFDocument, rgb, StandardFonts } from "https://esm.sh/pdf-lib@1.17.1";
+import { uploadToGoogleDrive } from "../_shared/google-drive.ts";
+import { refreshGoogleToken } from "../_shared/google-oauth.ts";
+
+// Google Drive folder IDs for agreement backup
+const COHOSTING_FOLDER_ID = "1gFES5ILUV_SMdjugluwZdm4Q_1OoJh2q";
+const FULL_SERVICE_FOLDER_ID = "1zsQtJHcEsk0ls_UJnhEsGCdrGlRUDg20";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -1426,12 +1432,78 @@ serve(async (req) => {
 
     console.log("Uploaded signed PDF to:", fileName);
 
-    // Update document with signed PDF path
+    // Upload to Google Drive as backup
+    let googleDriveUrl: string | null = null;
+    try {
+      // Get Gmail OAuth token for Drive access
+      const { data: tokenData, error: tokenError } = await supabase
+        .from("gmail_oauth_tokens")
+        .select("*")
+        .order("updated_at", { ascending: false })
+        .limit(1)
+        .single();
+
+      if (tokenData && !tokenError) {
+        // Check if token is expired
+        const expiresAt = new Date(tokenData.expires_at);
+        let accessToken = tokenData.access_token;
+
+        if (expiresAt <= new Date()) {
+          console.log("Google token expired, refreshing...");
+          try {
+            const refreshResult = await refreshGoogleToken(tokenData.refresh_token);
+            accessToken = refreshResult.accessToken;
+
+            // Update token in database
+            await supabase
+              .from("gmail_oauth_tokens")
+              .update({
+                access_token: accessToken,
+                expires_at: new Date(Date.now() + refreshResult.expiresIn * 1000).toISOString(),
+                updated_at: new Date().toISOString(),
+              })
+              .eq("id", tokenData.id);
+          } catch (refreshError) {
+            console.error("Failed to refresh Google token:", refreshError);
+          }
+        }
+
+        if (accessToken) {
+          // Determine folder based on service type
+          const folderId = contractData.serviceType === "full_service" 
+            ? FULL_SERVICE_FOLDER_ID 
+            : COHOSTING_FOLDER_ID;
+
+          const driveFileName = `${(propertyAddress || documentDisplayName).replace(/[^a-zA-Z0-9\s]/g, "_")}_Agreement_${new Date().toISOString().split("T")[0]}.pdf`;
+
+          console.log(`Uploading to Google Drive folder ${contractData.serviceType === "full_service" ? "Full Service" : "Co-Hosting"}: ${driveFileName}`);
+
+          const driveResult = await uploadToGoogleDrive(
+            accessToken,
+            driveFileName,
+            modifiedPdfBytes,
+            "application/pdf",
+            folderId
+          );
+
+          googleDriveUrl = driveResult.webViewLink;
+          console.log("Google Drive upload successful:", googleDriveUrl);
+        }
+      } else {
+        console.log("No Gmail OAuth tokens found, skipping Google Drive backup");
+      }
+    } catch (driveError) {
+      console.error("Google Drive upload failed (non-fatal):", driveError);
+      // Continue without Drive backup - this is non-fatal
+    }
+
+    // Update document with signed PDF path and Google Drive URL
     await supabase
       .from("booking_documents")
       .update({
         signed_pdf_path: fileName,
         status: "completed",
+        google_drive_url: googleDriveUrl,
       })
       .eq("id", documentId);
 
@@ -1441,6 +1513,7 @@ serve(async (req) => {
       action: "document_finalized",
       metadata: {
         signed_pdf_path: fileName,
+        google_drive_url: googleDriveUrl,
         certificate_id: certificateId,
         document_hash: documentHash,
         property_address: propertyAddress,
