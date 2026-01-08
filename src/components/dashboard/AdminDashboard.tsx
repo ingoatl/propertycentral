@@ -8,6 +8,7 @@ import { EnhancedTeamPerformance } from "./EnhancedTeamPerformance";
 import { OwnedPropertiesPerformance } from "./OwnedPropertiesPerformance";
 import { DailyPerformanceEntriesList } from "./DailyPerformanceEntriesList";
 import { SendTestTeamDigestButton } from "./SendTestTeamDigestButton";
+import { DiscoveryCallCalendar } from "./DiscoveryCallCalendar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Download, RefreshCw, Building2, DollarSign, TrendingUp, AlertCircle, MessageCircleQuestion, Bug } from "lucide-react";
@@ -352,6 +353,10 @@ export const AdminDashboard = ({ summaries, onExport, onSync, syncing, onSendOve
 
         <TabsContent value="overview" className="mt-0">
         <div className="container mx-auto px-6 max-md:px-3 py-8 max-md:py-4 space-y-8 max-md:space-y-6">
+        
+        {/* Discovery Call Calendar - Top Priority */}
+        <DiscoveryCallCalendar />
+        
         {/* Alert Section */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 max-md:gap-4">
           <div className="lg:col-span-2">

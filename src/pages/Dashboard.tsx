@@ -8,6 +8,7 @@ import { UserTasksDashboard } from "@/components/dashboard/UserTasksDashboard";
 import { DashboardFAQTab } from "@/components/dashboard/DashboardFAQTab";
 import { MyBugReportsCard } from "@/components/dashboard/MyBugReportsCard";
 import { DailyPerformanceEntry } from "@/components/dashboard/DailyPerformanceEntry";
+import { DiscoveryCallCalendar } from "@/components/dashboard/DiscoveryCallCalendar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 
@@ -478,10 +479,13 @@ const Dashboard = () => {
     );
   }
 
-  // Non-admin users get simplified view
+  // Non-admin users get simplified view with calendar at top
   return (
     <div className="p-8 space-y-6">
-      {/* Daily Performance Entry - Prominent at top */}
+      {/* Discovery Call Calendar - Prominent at top */}
+      <DiscoveryCallCalendar />
+      
+      {/* Daily Performance Entry */}
       <DailyPerformanceEntry />
       
       <Card>
