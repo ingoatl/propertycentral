@@ -103,9 +103,14 @@ const Properties = () => {
       // Delete onboarding project and tasks if exists
       const projectId = propertyProjects[property.id];
       if (projectId) {
+        // Delete owner_onboarding_submissions first (references both project and property)
+        await supabase.from('owner_onboarding_submissions').delete().eq('project_id', projectId);
         await supabase.from('onboarding_tasks').delete().eq('project_id', projectId);
         await supabase.from('onboarding_projects').delete().eq('id', projectId);
       }
+      
+      // Also delete any owner_onboarding_submissions that reference this property directly
+      await supabase.from('owner_onboarding_submissions').delete().eq('property_id', property.id);
       
       // Finally delete the property
       const { error } = await supabase.from('properties').delete().eq('id', property.id);
