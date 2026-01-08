@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { MapPin, Building2, Store } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 interface OSMMapProps {
   address: string;
@@ -15,21 +16,6 @@ interface GeocodingResult {
   display_name: string;
 }
 
-// Different map tile providers for variety
-const MAP_STYLES = {
-  // Standard OSM - good general purpose
-  standard: (lat: number, lon: number) => 
-    `https://www.openstreetmap.org/export/embed.html?bbox=${lon - 0.008}%2C${lat - 0.006}%2C${lon + 0.008}%2C${lat + 0.006}&layer=mapnik&marker=${lat}%2C${lon}`,
-  
-  // CyclOSM - shows more POIs, bike lanes, detailed streets
-  detailed: (lat: number, lon: number) =>
-    `https://www.openstreetmap.org/export/embed.html?bbox=${lon - 0.008}%2C${lat - 0.006}%2C${lon + 0.008}%2C${lat + 0.006}&layer=cyclemap&marker=${lat}%2C${lon}`,
-  
-  // Hot/Humanitarian - very clean, shows buildings clearly
-  satellite: (lat: number, lon: number) =>
-    `https://www.openstreetmap.org/export/embed.html?bbox=${lon - 0.008}%2C${lat - 0.006}%2C${lon + 0.008}%2C${lat + 0.006}&layer=hot&marker=${lat}%2C${lon}`,
-};
-
 export function OSMMap({ 
   address, 
   className = "", 
@@ -41,6 +27,24 @@ export function OSMMap({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [nearbyPlaces, setNearbyPlaces] = useState<string[]>([]);
+  const [apiKey, setApiKey] = useState<string | null>(null);
+
+  // Fetch API key
+  const fetchApiKey = useCallback(async () => {
+    try {
+      const { data, error } = await supabase.functions.invoke("get-google-places-key");
+      if (error) throw error;
+      if (data?.apiKey) {
+        setApiKey(data.apiKey);
+      }
+    } catch (err) {
+      console.log("[OSMMap] Could not fetch Google API key, using OSM fallback");
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchApiKey();
+  }, [fetchApiKey]);
 
   useEffect(() => {
     if (!address) {
@@ -149,7 +153,16 @@ export function OSMMap({
     );
   }
 
-  const mapUrl = MAP_STYLES[mapStyle](coordinates.lat, coordinates.lon);
+  // Use Google Maps Embed API with roadmap (streets + POI only) if API key available
+  // Style parameter: roadmap shows streets and POIs, no satellite/terrain
+  const googleMapUrl = apiKey 
+    ? `https://www.google.com/maps/embed/v1/place?key=${apiKey}&q=${encodeURIComponent(address)}&zoom=${zoom}&maptype=roadmap`
+    : null;
+  
+  // Fallback to OSM
+  const osmMapUrl = `https://www.openstreetmap.org/export/embed.html?bbox=${coordinates.lon - 0.008}%2C${coordinates.lat - 0.006}%2C${coordinates.lon + 0.008}%2C${coordinates.lat + 0.006}&layer=mapnik&marker=${coordinates.lat}%2C${coordinates.lon}`;
+  
+  const mapUrl = googleMapUrl || osmMapUrl;
 
   return (
     <div className="space-y-2">
