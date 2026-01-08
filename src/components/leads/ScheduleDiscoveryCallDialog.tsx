@@ -89,6 +89,33 @@ export function ScheduleDiscoveryCallDialog({
     return isBefore(slotTime, new Date());
   };
 
+  // Self-healing retry logic for calendar booking
+  const retryWithFix = async (fn: () => Promise<any>, maxRetries = 3): Promise<any> => {
+    let lastError: any;
+    for (let i = 0; i < maxRetries; i++) {
+      try {
+        return await fn();
+      } catch (error: any) {
+        lastError = error;
+        console.log(`Calendar booking attempt ${i + 1} failed:`, error.message);
+        
+        // Self-healing: check if it's an auth issue
+        if (error.message?.includes('row-level security') || error.message?.includes('not authenticated')) {
+          console.log('Detected auth/RLS issue, refreshing session...');
+          await supabase.auth.refreshSession();
+          await new Promise(resolve => setTimeout(resolve, 500)); // Brief delay
+          continue;
+        }
+        
+        // For other errors, wait a bit before retry
+        if (i < maxRetries - 1) {
+          await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1)));
+        }
+      }
+    }
+    throw lastError;
+  };
+
   const scheduleMutation = useMutation({
     mutationFn: async () => {
       if (!selectedDate || !selectedTime) throw new Error("Select date and time");
@@ -97,26 +124,37 @@ export function ScheduleDiscoveryCallDialog({
       const scheduledAt = setMinutes(setHours(selectedDate, hours), minutes);
 
       const { data: user } = await supabase.auth.getUser();
+      
+      if (!user.user) {
+        throw new Error("Please log in to schedule a call");
+      }
 
-      const { error } = await supabase.from("discovery_calls").insert({
-        lead_id: leadId,
-        scheduled_by: user.user?.id,
-        scheduled_at: scheduledAt.toISOString(),
-        duration_minutes: 15,
-        meeting_notes: notes || null,
-      });
-
-      if (error) throw error;
-
-      // Add to lead timeline
-      await supabase.from("lead_timeline").insert({
-        lead_id: leadId,
-        action: "discovery_call_scheduled",
-        metadata: {
+      // Use self-healing retry for the main booking
+      await retryWithFix(async () => {
+        const { error } = await supabase.from("discovery_calls").insert({
+          lead_id: leadId,
+          scheduled_by: user.user?.id,
           scheduled_at: scheduledAt.toISOString(),
-          duration: 15,
-        },
+          duration_minutes: 15,
+          meeting_notes: notes || null,
+        });
+
+        if (error) throw error;
       });
+
+      // Timeline entry is non-critical - don't fail the booking if this fails
+      try {
+        await supabase.from("lead_timeline").insert({
+          lead_id: leadId,
+          action: "discovery_call_scheduled",
+          metadata: {
+            scheduled_at: scheduledAt.toISOString(),
+            duration: 15,
+          },
+        });
+      } catch (timelineError) {
+        console.warn("Timeline entry failed but booking succeeded:", timelineError);
+      }
 
       return scheduledAt;
     },
@@ -131,7 +169,8 @@ export function ScheduleDiscoveryCallDialog({
       setNotes("");
     },
     onError: (error: any) => {
-      toast.error(`Failed to schedule: ${error.message}`);
+      console.error("Calendar booking final error:", error);
+      toast.error(`Failed to book: ${error.message}`);
     },
   });
 
