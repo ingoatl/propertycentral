@@ -355,11 +355,11 @@ export const AdminDashboard = ({ summaries, onExport, onSync, syncing, onSendOve
         <TabsContent value="overview" className="mt-0">
         <div className="container mx-auto px-6 max-md:px-3 py-8 max-md:py-4 space-y-8 max-md:space-y-6">
         
-        {/* Discovery Call Calendar - Top Priority */}
-        <DiscoveryCallCalendar />
-        
-        {/* Onboarding Properties Timeline */}
+        {/* Onboarding Properties Timeline - First Position */}
         <OnboardingPropertiesTimeline />
+        
+        {/* Discovery Call Calendar */}
+        <DiscoveryCallCalendar />
         
         {/* Alert Section */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 max-md:gap-4">

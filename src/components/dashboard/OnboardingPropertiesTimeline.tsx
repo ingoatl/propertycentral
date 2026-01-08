@@ -2,17 +2,17 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Loader2, MapPin, ChevronRight, CheckCircle2 } from "lucide-react";
+import { MapPin, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Skeleton } from "@/components/ui/skeleton";
 
 // Owner-facing onboarding timeline steps (5 steps including payment)
 const ONBOARDING_STEPS = [
-  { key: 'payment', label: 'Payment Setup', shortLabel: 'Payment', icon: '💳' },
-  { key: 'onboarding_form', label: 'Onboarding Form', shortLabel: 'Form', icon: '📋' },
-  { key: 'insurance', label: 'Insurance', shortLabel: 'Insurance', icon: '🛡️' },
-  { key: 'inspection', label: 'Inspection', shortLabel: 'Inspect', icon: '🏠' },
-  { key: 'onboarded', label: 'Go Live', shortLabel: 'Live', icon: '🎉' },
+  { key: 'payment', label: 'Payment Setup', shortLabel: 'Payment' },
+  { key: 'onboarding_form', label: 'Onboarding Form', shortLabel: 'Form' },
+  { key: 'insurance', label: 'Insurance', shortLabel: 'Insurance' },
+  { key: 'inspection', label: 'Inspection', shortLabel: 'Inspect' },
+  { key: 'onboarded', label: 'Go Live', shortLabel: 'Live' },
 ];
 
 // Map lead stages to timeline step index
@@ -27,11 +27,11 @@ function getTimelineStep(stage: string | null): number {
     case 'insurance_requested': 
       return 3; // Current step: Schedule Inspection
     case 'inspection_scheduled': 
-      return 4; // Current step: Onboarded (final step)
+      return 4; // Current step: Go Live
     case 'ops_handoff': 
-      return 5; // All done (beyond timeline - all checkmarks)
+      return 5; // All done
     default: 
-      return -1; // Pre-onboarding stages (don't show timeline)
+      return 0; // Default to first step for properties without a lead stage
   }
 }
 
@@ -43,7 +43,7 @@ function getStageLabel(stage: string | null): string {
     case 'insurance_requested': return 'Inspection';
     case 'inspection_scheduled': return 'Go Live';
     case 'ops_handoff': return 'Onboarded';
-    default: return 'Pre-Contract';
+    default: return 'Starting';
   }
 }
 
@@ -61,8 +61,7 @@ export function OnboardingPropertiesTimeline() {
   const { data: properties, isLoading } = useQuery({
     queryKey: ["onboarding-properties-timeline"],
     queryFn: async () => {
-      // Get properties that are not yet listed (no first_listing_live_at)
-      // and have a linked lead in onboarding stages
+      // Get ALL properties that are not yet listed (no first_listing_live_at)
       const { data, error } = await supabase
         .from("properties")
         .select(`
@@ -77,33 +76,38 @@ export function OnboardingPropertiesTimeline() {
           )
         `)
         .is("first_listing_live_at", null)
-        .order("created_at", { ascending: false });
+        .order("name", { ascending: true });
 
       if (error) throw error;
 
-      // Filter to only properties with leads in onboarding stages
+      // Stages that indicate active onboarding
       const onboardingStages = ['contract_signed', 'ach_form_signed', 'onboarding_form_requested', 'insurance_requested', 'inspection_scheduled'];
       
+      // Filter out properties that have completed onboarding (ops_handoff)
       const onboardingProperties: OnboardingProperty[] = (data || [])
         .filter(p => {
           const leads = p.leads as any[];
-          if (!leads || leads.length === 0) return false;
-          return leads.some(l => onboardingStages.includes(l.stage));
+          // Exclude properties where lead stage is ops_handoff (completed)
+          if (leads && leads.length > 0) {
+            const hasOpsHandoff = leads.some(l => l.stage === 'ops_handoff');
+            if (hasOpsHandoff) return false;
+          }
+          return true;
         })
         .map(p => {
           const leads = p.leads as any[];
-          const lead = leads.find(l => onboardingStages.includes(l.stage)) || leads[0];
+          // Find the lead with an onboarding stage, or use the first lead
+          const lead = leads?.find(l => onboardingStages.includes(l.stage)) || leads?.[0];
           return {
             id: p.id,
             name: p.name,
-            address: p.address,
+            address: p.address || 'Address pending',
             leadId: lead?.id || null,
             leadName: lead?.name || null,
             stage: lead?.stage || null,
             currentStep: getTimelineStep(lead?.stage),
           };
-        })
-        .filter(p => p.currentStep >= 0); // Only show those with valid timeline position
+        });
 
       return onboardingProperties;
     },
@@ -111,16 +115,24 @@ export function OnboardingPropertiesTimeline() {
 
   if (isLoading) {
     return (
-      <Card>
-        <CardContent className="py-8 flex items-center justify-center">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      <Card className="border-primary/20 bg-gradient-to-br from-primary/5 via-background to-accent/5">
+        <CardHeader className="pb-3">
+          <Skeleton className="h-7 w-48" />
+          <Skeleton className="h-4 w-64 mt-1" />
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {[1, 2, 3].map((i) => (
+              <Skeleton key={i} className="h-28 w-full" />
+            ))}
+          </div>
         </CardContent>
       </Card>
     );
   }
 
   if (!properties || properties.length === 0) {
-    return null; // Don't show the card if no properties are onboarding
+    return null;
   }
 
   return (
@@ -141,102 +153,92 @@ export function OnboardingPropertiesTimeline() {
           </Badge>
         </div>
       </CardHeader>
-      <CardContent className="space-y-4">
-        {properties.map((property) => (
-          <div 
-            key={property.id}
-            className="bg-background rounded-lg border p-4 space-y-3"
-          >
-            {/* Property Header */}
-            <div className="flex items-start justify-between">
-              <div>
-                <h4 className="font-semibold text-base">{property.name}</h4>
-                <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
-                  <MapPin className="h-3 w-3" />
-                  {property.address}
-                </p>
-                {property.leadName && (
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Owner: {property.leadName}
+      <CardContent>
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          {properties.map((property) => (
+            <div 
+              key={property.id}
+              className="bg-background rounded-xl border shadow-sm p-4 space-y-4 hover:shadow-md transition-shadow"
+            >
+              {/* Property Header */}
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <h4 className="font-semibold text-base truncate">{property.name}</h4>
+                  <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5 truncate">
+                    <MapPin className="h-3 w-3 flex-shrink-0" />
+                    <span className="truncate">{property.address}</span>
                   </p>
-                )}
+                  {property.leadName && (
+                    <p className="text-xs text-muted-foreground mt-1 truncate">
+                      Owner: {property.leadName}
+                    </p>
+                  )}
+                </div>
+                <Badge 
+                  variant="outline" 
+                  className="bg-primary/10 text-primary border-primary/30 flex-shrink-0 text-xs"
+                >
+                  {getStageLabel(property.stage)}
+                </Badge>
               </div>
-              <Badge 
-                variant="outline" 
-                className="bg-primary/10 text-primary border-primary/30"
-              >
-                {getStageLabel(property.stage)}
-              </Badge>
-            </div>
 
-            {/* Timeline */}
-            <div className="flex items-center gap-1 pt-2">
-              {ONBOARDING_STEPS.map((step, index) => {
-                const isCompleted = index < property.currentStep;
-                const isCurrent = index === property.currentStep;
-                
-                return (
-                  <div key={step.key} className="flex items-center flex-1 last:flex-none">
-                    {/* Step Circle */}
-                    <div 
-                      className={cn(
-                        "relative flex items-center justify-center rounded-full transition-all",
-                        "w-8 h-8 text-xs font-bold",
-                        isCompleted && "bg-green-500 text-white",
-                        isCurrent && "bg-primary text-primary-foreground ring-2 ring-primary/30 ring-offset-2",
-                        !isCompleted && !isCurrent && "bg-muted text-muted-foreground"
-                      )}
-                      title={step.label}
-                    >
-                      {isCompleted ? (
-                        <CheckCircle2 className="h-4 w-4" />
-                      ) : (
-                        <span>{index + 1}</span>
-                      )}
-                    </div>
+              {/* Beautiful Timeline */}
+              <div className="relative">
+                {/* Timeline Track */}
+                <div className="flex items-center justify-between">
+                  {ONBOARDING_STEPS.map((step, index) => {
+                    const isCompleted = index < property.currentStep;
+                    const isCurrent = index === property.currentStep;
                     
-                    {/* Connector Line */}
-                    {index < ONBOARDING_STEPS.length - 1 && (
-                      <div 
-                        className={cn(
-                          "flex-1 h-0.5 mx-1",
-                          index < property.currentStep ? "bg-green-500" : "bg-muted"
-                        )}
-                      />
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Step Labels */}
-            <div className="flex items-start pt-1">
-              {ONBOARDING_STEPS.map((step, index) => {
-                const isCompleted = index < property.currentStep;
-                const isCurrent = index === property.currentStep;
+                    return (
+                      <div key={step.key} className="flex flex-col items-center relative z-10">
+                        {/* Step Circle with Number */}
+                        <div 
+                          className={cn(
+                            "flex items-center justify-center rounded-full transition-all duration-300 shadow-sm",
+                            "w-9 h-9 text-sm font-bold",
+                            isCompleted && "bg-green-500 text-white shadow-green-500/30",
+                            isCurrent && "bg-primary text-primary-foreground ring-4 ring-primary/20 shadow-primary/30",
+                            !isCompleted && !isCurrent && "bg-muted text-muted-foreground"
+                          )}
+                        >
+                          {isCompleted ? (
+                            <CheckCircle2 className="h-5 w-5" />
+                          ) : (
+                            <span>{index + 1}</span>
+                          )}
+                        </div>
+                        
+                        {/* Step Label */}
+                        <span className={cn(
+                          "text-[10px] mt-1.5 text-center leading-tight font-medium",
+                          isCompleted && "text-green-600",
+                          isCurrent && "text-primary",
+                          !isCompleted && !isCurrent && "text-muted-foreground"
+                        )}>
+                          {step.shortLabel}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
                 
-                return (
-                  <div 
-                    key={step.key} 
-                    className={cn(
-                      "flex-1 text-center last:flex-none",
-                      index === ONBOARDING_STEPS.length - 1 && "w-8"
-                    )}
-                  >
-                    <span className={cn(
-                      "text-[10px] leading-tight",
-                      isCompleted && "text-green-600 font-medium",
-                      isCurrent && "text-primary font-semibold",
-                      !isCompleted && !isCurrent && "text-muted-foreground"
-                    )}>
-                      {step.shortLabel}
-                    </span>
-                  </div>
-                );
-              })}
+                {/* Connector Lines - positioned behind circles */}
+                <div className="absolute top-[18px] left-[18px] right-[18px] flex -z-0">
+                  {ONBOARDING_STEPS.slice(0, -1).map((_, index) => (
+                    <div 
+                      key={index}
+                      className={cn(
+                        "flex-1 h-0.5 transition-colors duration-300",
+                        index < property.currentStep ? "bg-green-500" : "bg-muted"
+                      )}
+                    />
+                  ))}
+                </div>
+              </div>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </CardContent>
     </Card>
   );
