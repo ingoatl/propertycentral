@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Calendar, Clock, User, Mail, Phone, Check, ArrowRight, ArrowLeft, MapPin, Target, Sparkles } from "lucide-react";
+import { useState, useCallback } from "react";
+import { Calendar, Clock, User, Mail, Phone, Check, ArrowRight, ArrowLeft, MapPin, Target, Sparkles, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
@@ -15,6 +15,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format, addDays, setHours, setMinutes, isBefore, addMinutes, getDay } from "date-fns";
 import { cn } from "@/lib/utils";
+import { emailSchema, phoneSchema, formatPhoneNumber, validateField } from "@/lib/validation";
 
 // Generate time slots dynamically based on availability
 const generateTimeSlots = (startHour: number, endHour: number) => {
@@ -58,6 +59,8 @@ export default function BookDiscoveryCall() {
     goals: [] as string[],
     additionalNotes: "",
   });
+  const [errors, setErrors] = useState<{ email?: string; phone?: string }>({});
+  const [touched, setTouched] = useState<{ email?: boolean; phone?: boolean }>({});
   const [isBooked, setIsBooked] = useState(false);
 
   // Fetch availability slots
@@ -159,6 +162,58 @@ export default function BookDiscoveryCall() {
     }));
   };
 
+  // Validation handlers
+  const validateEmail = useCallback((email: string) => {
+    const error = validateField(emailSchema, email);
+    setErrors((prev) => ({ ...prev, email: error || undefined }));
+    return !error;
+  }, []);
+
+  const validatePhone = useCallback((phone: string) => {
+    const error = validateField(phoneSchema, phone);
+    setErrors((prev) => ({ ...prev, phone: error || undefined }));
+    return !error;
+  }, []);
+
+  const handleEmailChange = (email: string) => {
+    setFormData({ ...formData, email });
+    if (touched.email) {
+      validateEmail(email);
+    }
+  };
+
+  const handlePhoneChange = (rawPhone: string) => {
+    // Format as user types
+    const digitsOnly = rawPhone.replace(/\D/g, "");
+    let formatted = rawPhone;
+    
+    // Auto-format if the user is typing digits
+    if (digitsOnly.length <= 10) {
+      if (digitsOnly.length >= 6) {
+        formatted = `(${digitsOnly.slice(0, 3)}) ${digitsOnly.slice(3, 6)}-${digitsOnly.slice(6)}`;
+      } else if (digitsOnly.length >= 3) {
+        formatted = `(${digitsOnly.slice(0, 3)}) ${digitsOnly.slice(3)}`;
+      } else {
+        formatted = digitsOnly;
+      }
+    }
+    
+    setFormData({ ...formData, phone: formatted });
+    if (touched.phone) {
+      validatePhone(formatted);
+    }
+  };
+
+  const handleEmailBlur = () => {
+    setTouched((prev) => ({ ...prev, email: true }));
+    validateEmail(formData.email);
+  };
+
+  const handlePhoneBlur = () => {
+    setTouched((prev) => ({ ...prev, phone: true }));
+    validatePhone(formData.phone);
+  };
+
   // Book mutation
   const bookMutation = useMutation({
     mutationFn: async () => {
@@ -219,7 +274,11 @@ export default function BookDiscoveryCall() {
     },
   });
 
-  const canProceedStep2 = formData.name && formData.email && formData.phone;
+  // Enhanced validation for step 1
+  const isStep1Valid = formData.name.trim().length >= 2 && 
+    !errors.email && formData.email.trim() && 
+    !errors.phone && formData.phone.trim();
+  const canProceedStep2 = isStep1Valid;
   const canProceedStep3 = formData.propertyAddress;
   const canProceedStep4 = selectedDate;
   const canProceedStep5 = selectedTime;
@@ -304,7 +363,7 @@ export default function BookDiscoveryCall() {
             ))}
           </div>
 
-          {/* Step 1: Contact Info */}
+{/* Step 1: Contact Info */}
           {step === 1 && (
             <div className="space-y-4">
               <h3 className="font-semibold text-lg flex items-center gap-2">
@@ -323,26 +382,61 @@ export default function BookDiscoveryCall() {
                 </div>
                 <div>
                   <Label htmlFor="email">Email Address *</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="john@example.com"
-                    value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  />
+                  <div className="relative">
+                    <Input
+                      id="email"
+                      type="email"
+                      placeholder="john@example.com"
+                      value={formData.email}
+                      onChange={(e) => handleEmailChange(e.target.value)}
+                      onBlur={handleEmailBlur}
+                      className={cn(errors.email && touched.email && "border-destructive focus-visible:ring-destructive")}
+                    />
+                  </div>
+                  {errors.email && touched.email && (
+                    <p className="text-xs text-destructive mt-1 flex items-center gap-1">
+                      <AlertCircle className="h-3 w-3" />
+                      {errors.email}
+                    </p>
+                  )}
                 </div>
                 <div>
                   <Label htmlFor="phone">Phone Number *</Label>
-                  <Input
-                    id="phone"
-                    type="tel"
-                    placeholder="(404) 555-1234"
-                    value={formData.phone}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  />
+                  <div className="relative">
+                    <Input
+                      id="phone"
+                      type="tel"
+                      placeholder="(404) 555-1234"
+                      value={formData.phone}
+                      onChange={(e) => handlePhoneChange(e.target.value)}
+                      onBlur={handlePhoneBlur}
+                      className={cn(errors.phone && touched.phone && "border-destructive focus-visible:ring-destructive")}
+                    />
+                  </div>
+                  {errors.phone && touched.phone && (
+                    <p className="text-xs text-destructive mt-1 flex items-center gap-1">
+                      <AlertCircle className="h-3 w-3" />
+                      {errors.phone}
+                    </p>
+                  )}
+                  <p className="text-xs text-muted-foreground mt-1">
+                    We'll send appointment reminders to this number
+                  </p>
                 </div>
               </div>
-              <Button className="w-full" disabled={!canProceedStep2} onClick={() => setStep(2)}>
+              <Button 
+                className="w-full" 
+                disabled={!canProceedStep2} 
+                onClick={() => {
+                  // Validate all before proceeding
+                  const emailValid = validateEmail(formData.email);
+                  const phoneValid = validatePhone(formData.phone);
+                  setTouched({ email: true, phone: true });
+                  if (emailValid && phoneValid && formData.name.trim().length >= 2) {
+                    setStep(2);
+                  }
+                }}
+              >
                 Continue <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </div>

@@ -6,27 +6,41 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
+  console.log("[get-google-places-key] Request received");
+  
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    // Only return the API key for authenticated requests or specific domains
     const apiKey = Deno.env.get("GOOGLE_PLACES_API_KEY");
     
+    console.log("[get-google-places-key] API key exists:", !!apiKey);
+    
     if (!apiKey) {
+      console.error("[get-google-places-key] GOOGLE_PLACES_API_KEY not configured");
       return new Response(
         JSON.stringify({ error: "Google Places API key not configured" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
+    // Validate the key format (should be a non-empty string)
+    if (typeof apiKey !== "string" || apiKey.trim().length < 10) {
+      console.error("[get-google-places-key] Invalid API key format");
+      return new Response(
+        JSON.stringify({ error: "Invalid API key configuration" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    console.log("[get-google-places-key] Returning API key successfully");
     return new Response(
       JSON.stringify({ apiKey }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
-    console.error("Error:", error);
+    console.error("[get-google-places-key] Error:", error);
     return new Response(
       JSON.stringify({ error: error.message }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
