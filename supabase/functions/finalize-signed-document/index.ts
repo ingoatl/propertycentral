@@ -1757,6 +1757,31 @@ serve(async (req) => {
       });
     }
 
+    // Fetch property image from RapidAPI if we have property ID and address
+    if (propertyId && propertyAddress) {
+      try {
+        console.log("Fetching property image from RapidAPI for:", propertyAddress);
+        const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+        const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+        
+        const imageResponse = await fetch(`${supabaseUrl}/functions/v1/fetch-property-image`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${supabaseServiceKey}`,
+          },
+          body: JSON.stringify({ address: propertyAddress, propertyId }),
+        });
+        
+        if (imageResponse.ok) {
+          const imageResult = await imageResponse.json();
+          console.log("Property image fetch result:", imageResult.success ? "success" : "failed");
+        }
+      } catch (imgError) {
+        console.error("Failed to fetch property image (non-blocking):", imgError);
+      }
+    }
+
     console.log("Document finalized successfully:", fileName, "Certificate ID:", certificateId);
     console.log("Created/Updated - Owner:", ownerId, "Property:", propertyId, "Visit Price:", contractData.visitPrice);
 
