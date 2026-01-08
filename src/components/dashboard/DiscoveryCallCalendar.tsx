@@ -398,7 +398,7 @@ function DiscoveryCallDetailModal({ call, onClose }: DiscoveryCallDetailModalPro
           <div className="space-y-3">
             <h3 className="font-semibold flex items-center gap-2">
               <MapPin className="h-4 w-4" />
-              Property Location
+              Property Location & Neighborhood
             </h3>
             {call.leads?.property_address ? (
               <>
@@ -406,16 +406,29 @@ function DiscoveryCallDetailModal({ call, onClose }: DiscoveryCallDetailModalPro
                   address={call.leads.property_address} 
                   height="300px"
                   className="rounded-lg overflow-hidden border"
+                  mapStyle="standard"
                 />
                 <p className="text-sm text-muted-foreground">{call.leads.property_address}</p>
-                {mapsLink && (
+                <div className="flex gap-2">
+                  {mapsLink && (
+                    <Button variant="outline" size="sm" asChild>
+                      <a href={mapsLink} target="_blank" rel="noopener noreferrer">
+                        <ExternalLink className="h-4 w-4 mr-2" />
+                        View Map
+                      </a>
+                    </Button>
+                  )}
                   <Button variant="outline" size="sm" asChild>
-                    <a href={mapsLink} target="_blank" rel="noopener noreferrer">
-                      <ExternalLink className="h-4 w-4 mr-2" />
-                      View on OpenStreetMap
+                    <a 
+                      href={`https://www.zillow.com/homes/${encodeURIComponent(call.leads.property_address)}_rb/`} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                    >
+                      <Home className="h-4 w-4 mr-2" />
+                      Check Zillow
                     </a>
                   </Button>
-                )}
+                </div>
               </>
             ) : (
               <div className="h-[300px] bg-muted rounded-lg flex items-center justify-center">
