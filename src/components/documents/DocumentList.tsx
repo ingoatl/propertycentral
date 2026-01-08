@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Copy, Eye, History, FileText, Search, CheckCircle, Clock, AlertCircle, Edit, Download, MapPin, Trash2 } from "lucide-react";
+import { Copy, Eye, History, FileText, CheckCircle, Clock, AlertCircle, Edit, Download, MapPin, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { DocumentAuditTrail } from "./DocumentAuditTrail";
@@ -187,9 +187,7 @@ const DocumentList = () => {
             placeholder="Search by name, recipient, or property..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
           />
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
         </div>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
           <SelectTrigger className="w-full sm:w-48">

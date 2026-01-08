@@ -9,7 +9,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { ONBOARDING_PHASES } from "@/context/onboardingPhases";
 import { InspectionCard } from "./InspectionCard";
 import { Input } from "@/components/ui/input";
-import { Search, Building2, DollarSign, User, Users } from "lucide-react";
+import { Building2, DollarSign, User, Users } from "lucide-react";
 import { useAdminCheck } from "@/hooks/useAdminCheck";
 
 interface WorkflowDialogProps {
@@ -461,9 +461,8 @@ export const WorkflowDialog = ({ open, onOpenChange, project: initialProject, pr
                   placeholder="Search tasks, phases, values, notes..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 max-md:h-12 max-md:text-base max-md:pl-12"
+                  className="max-md:h-12 max-md:text-base"
                 />
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none max-md:h-5 max-md:w-5 max-md:left-4" />
               </div>
               <Button
                 variant={showMyTasksOnly ? "default" : "outline"}

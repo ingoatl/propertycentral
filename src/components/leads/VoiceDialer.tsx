@@ -16,7 +16,7 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import { Phone, Delete, Loader2, PhoneOff, PhoneCall, MessageSquare, Search, User, Home } from "lucide-react";
+import { Phone, Delete, Loader2, PhoneOff, PhoneCall, MessageSquare, User, Home } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Device, Call } from "@twilio/voice-sdk";
@@ -499,7 +499,7 @@ const VoiceDialer = ({ defaultMessage }: VoiceDialerProps) => {
                       disabled={isConnecting}
                       className={isMobile ? "h-14 w-14" : "h-12 w-12"}
                     >
-                      <Search className="h-5 w-5" />
+                      <User className="h-5 w-5" />
                     </Button>
                     <Button
                       variant="outline"

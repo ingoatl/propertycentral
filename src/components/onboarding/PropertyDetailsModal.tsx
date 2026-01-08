@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { OnboardingTask } from "@/types/onboarding";
-import { Loader2, MapPin, User, Lock, Phone, Link as LinkIcon, Mail, Home, Search, DollarSign, AlertCircle, Clock, Heart, Frown, Meh, Zap, Lightbulb, Copy, Check, TrendingUp, FileText, ExternalLink, ClipboardCheck, Key, Settings, Car, Bed, ChevronDown, ChevronUp, Download, MessageSquare, Plus, ArrowRight, ListTodo, Info, AlertTriangle, FolderOpen, Eye, FileSpreadsheet, X } from "lucide-react";
+import { Loader2, MapPin, User, Lock, Phone, Link as LinkIcon, Mail, Home, DollarSign, AlertCircle, Clock, Heart, Frown, Meh, Zap, Lightbulb, Copy, Check, TrendingUp, FileText, ExternalLink, ClipboardCheck, Key, Settings, Car, Bed, ChevronDown, ChevronUp, Download, MessageSquare, Plus, ArrowRight, ListTodo, Info, AlertTriangle, FolderOpen, Eye, FileSpreadsheet, X } from "lucide-react";
 import { toast } from "sonner";
 import { InspectionDataSection } from "@/components/properties/InspectionDataSection";
 import { ONBOARDING_PHASES } from "@/context/onboardingPhases";
@@ -723,12 +723,11 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
         
         <div className="space-y-4 flex-1 min-h-0 flex flex-col max-md:space-y-3">
           <div className="relative flex-shrink-0">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none z-10" />
             <Input
               placeholder="Search property information..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 pr-24"
+              className="pr-24"
             />
             {searchQuery && (
               <div className="absolute right-2 top-1/2 transform -translate-y-1/2 flex items-center gap-1">
@@ -780,7 +779,6 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
                       <Card className="border-2 border-yellow-500 bg-yellow-50/50 dark:bg-yellow-900/20">
                         <CardHeader className="pb-2">
                           <CardTitle className="text-sm font-semibold flex items-center gap-2 text-yellow-800 dark:text-yellow-200">
-                            <Search className="h-4 w-4" />
                             Search Results ({aggregatedSearchResults.length})
                           </CardTitle>
                         </CardHeader>
@@ -831,7 +829,6 @@ export function PropertyDetailsModal({ open, onOpenChange, projectId, propertyNa
                     {searchQuery && aggregatedSearchResults.length === 0 && (
                       <Card className="border-2 border-muted">
                         <CardContent className="py-8 text-center">
-                          <Search className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
                           <p className="text-muted-foreground">No results found for "{searchQuery}"</p>
                           <Button 
                             variant="link" 

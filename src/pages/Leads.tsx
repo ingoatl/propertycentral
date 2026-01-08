@@ -3,20 +3,25 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Search, LayoutGrid, List } from "lucide-react";
-import { Lead } from "@/types/leads";
+import { Plus, LayoutGrid, List } from "lucide-react";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { Lead, LeadStage } from "@/types/leads";
 import LeadKanbanBoard from "@/components/leads/LeadKanbanBoard";
 import LeadTableView from "@/components/leads/LeadTableView";
+import LeadMobileView from "@/components/leads/LeadMobileView";
 import LeadStatsBar from "@/components/leads/LeadStatsBar";
 import LeadQuickFilters from "@/components/leads/LeadQuickFilters";
 import LeadDetailModal from "@/components/leads/LeadDetailModal";
 import CreateLeadDialog from "@/components/leads/CreateLeadDialog";
 import VoiceDialer from "@/components/leads/VoiceDialer";
 import { cn } from "@/lib/utils";
+import { useMutation } from "@tanstack/react-query";
+import { toast } from "sonner";
 
 type FilterType = "stage" | "source";
 
 const Leads = () => {
+  const isMobile = useIsMobile();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
@@ -76,6 +81,45 @@ const Leads = () => {
     setIsDetailOpen(true);
   };
 
+  const updateStageMutation = useMutation({
+    mutationFn: async ({ leadId, newStage, previousStage }: { leadId: string; newStage: LeadStage; previousStage: LeadStage }) => {
+      const { error } = await supabase
+        .from("leads")
+        .update({ stage: newStage, stage_changed_at: new Date().toISOString() })
+        .eq("id", leadId);
+      if (error) throw error;
+      
+      // Background tasks
+      const bgTasks = async () => {
+        const { data: userData } = await supabase.auth.getUser();
+        await supabase.from("lead_timeline").insert({
+          lead_id: leadId,
+          action: "stage_changed",
+          performed_by_user_id: userData?.user?.id,
+          performed_by_name: userData?.user?.email,
+          previous_stage: previousStage,
+          new_stage: newStage,
+          metadata: { source: "mobile_view" },
+        });
+        await supabase.functions.invoke("process-lead-stage-change", {
+          body: { leadId, newStage, previousStage },
+        });
+      };
+      bgTasks().catch(console.error);
+    },
+    onSuccess: () => {
+      toast.success("Lead moved");
+      refetch();
+    },
+    onError: () => {
+      toast.error("Failed to move lead");
+    },
+  });
+
+  const handleStageChange = (leadId: string, newStage: LeadStage, previousStage: LeadStage) => {
+    updateStageMutation.mutate({ leadId, newStage, previousStage });
+  };
+
   return (
     <div className="space-y-4">
       {/* Header */}
@@ -102,42 +146,42 @@ const Leads = () => {
       <div className="flex flex-col gap-3">
         <div className="flex items-center gap-4">
           <div className="relative flex-1 max-w-sm">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search leads..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
             />
           </div>
 
-          {/* View Toggle */}
-          <div className="flex items-center bg-muted rounded-lg p-1">
-            <button
-              onClick={() => setViewMode("kanban")}
-              className={cn(
-                "flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all",
-                viewMode === "kanban"
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              <LayoutGrid className="h-4 w-4" />
-              Board
-            </button>
-            <button
-              onClick={() => setViewMode("list")}
-              className={cn(
-                "flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all",
-                viewMode === "list"
-                  ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              <List className="h-4 w-4" />
-              Table
-            </button>
-          </div>
+          {/* View Toggle - hide on mobile */}
+          {!isMobile && (
+            <div className="flex items-center bg-muted rounded-lg p-1">
+              <button
+                onClick={() => setViewMode("kanban")}
+                className={cn(
+                  "flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all",
+                  viewMode === "kanban"
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                <LayoutGrid className="h-4 w-4" />
+                Board
+              </button>
+              <button
+                onClick={() => setViewMode("list")}
+                className={cn(
+                  "flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all",
+                  viewMode === "list"
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                <List className="h-4 w-4" />
+                Table
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Quick Filters */}
@@ -151,6 +195,12 @@ const Leads = () => {
       {/* Content */}
       {isLoading ? (
         <div className="text-center py-12 text-muted-foreground">Loading leads...</div>
+      ) : isMobile ? (
+        <LeadMobileView
+          leads={filteredLeads}
+          onSelectLead={handleSelectLead}
+          onStageChange={handleStageChange}
+        />
       ) : viewMode === "kanban" ? (
         <LeadKanbanBoard
           leads={filteredLeads}

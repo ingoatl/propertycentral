@@ -24,7 +24,6 @@ import {
   Send,
   CheckCircle,
   Clock,
-  Search,
 } from "lucide-react";
 
 interface OwnerProperty {
@@ -299,12 +298,10 @@ export function OwnerPortalAdmin() {
       {/* Search and Actions */}
       <div className="flex flex-col sm:flex-row gap-4 justify-between">
         <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search owners..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-9"
           />
         </div>
         <Button variant="outline" onClick={loadOwners}>
