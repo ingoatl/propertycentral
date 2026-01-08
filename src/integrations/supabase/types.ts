@@ -808,7 +808,9 @@ export type Database = {
           confirmation_email_sent: boolean | null
           confirmation_sent: boolean | null
           created_at: string | null
+          current_situation: string | null
           duration_minutes: number | null
+          existing_listing_url: string | null
           google_calendar_event_id: string | null
           google_meet_link: string | null
           id: string
@@ -818,6 +820,7 @@ export type Database = {
           reminder_1h_sent: boolean | null
           reminder_24h_sent: boolean | null
           reminder_sent: boolean | null
+          rental_strategy: string | null
           scheduled_at: string
           scheduled_by: string | null
           service_interest: string | null
@@ -829,7 +832,9 @@ export type Database = {
           confirmation_email_sent?: boolean | null
           confirmation_sent?: boolean | null
           created_at?: string | null
+          current_situation?: string | null
           duration_minutes?: number | null
+          existing_listing_url?: string | null
           google_calendar_event_id?: string | null
           google_meet_link?: string | null
           id?: string
@@ -839,6 +844,7 @@ export type Database = {
           reminder_1h_sent?: boolean | null
           reminder_24h_sent?: boolean | null
           reminder_sent?: boolean | null
+          rental_strategy?: string | null
           scheduled_at: string
           scheduled_by?: string | null
           service_interest?: string | null
@@ -850,7 +856,9 @@ export type Database = {
           confirmation_email_sent?: boolean | null
           confirmation_sent?: boolean | null
           created_at?: string | null
+          current_situation?: string | null
           duration_minutes?: number | null
+          existing_listing_url?: string | null
           google_calendar_event_id?: string | null
           google_meet_link?: string | null
           id?: string
@@ -860,6 +868,7 @@ export type Database = {
           reminder_1h_sent?: boolean | null
           reminder_24h_sent?: boolean | null
           reminder_sent?: boolean | null
+          rental_strategy?: string | null
           scheduled_at?: string
           scheduled_by?: string | null
           service_interest?: string | null

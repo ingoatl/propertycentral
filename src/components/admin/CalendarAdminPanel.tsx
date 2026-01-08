@@ -560,13 +560,20 @@ export function CalendarAdminPanel() {
                             <span className="font-medium">{call.leads.property_address.substring(0, 30)}...</span>
                           </div>
                         )}
-                        {call.service_interest && (
+                        {call.rental_strategy && (
                           <div>
-                            <span className="text-muted-foreground">📋 Interest:</span>{" "}
+                            <span className="text-muted-foreground">🏠 Strategy:</span>{" "}
                             <span className="font-medium">
-                              {call.service_interest === "property_management" ? "Full PM" : 
-                               call.service_interest === "cohosting" ? "Co-hosting" : call.service_interest}
+                              {call.rental_strategy === "str" ? "Short-Term (STR)" : 
+                               call.rental_strategy === "mtr" ? "Mid-Term (MTR)" : 
+                               call.rental_strategy === "ltr" ? "Long-Term (LTR)" : call.rental_strategy}
                             </span>
+                          </div>
+                        )}
+                        {call.current_situation && (
+                          <div>
+                            <span className="text-muted-foreground">📋 Situation:</span>{" "}
+                            <span className="font-medium">{call.current_situation.replace(/_/g, " ")}</span>
                           </div>
                         )}
                         {call.start_timeline && (

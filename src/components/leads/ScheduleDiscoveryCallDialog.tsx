@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Calendar, Clock, Phone, Video, MapPin, HelpCircle, Check } from "lucide-react";
+import { Calendar, Clock, Phone, Video, HelpCircle, Check, Home, Briefcase, Building, Target, Link } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
@@ -59,6 +60,20 @@ const START_TIMELINE_OPTIONS = [
   { value: "just_exploring", label: "Just exploring options" },
 ];
 
+const RENTAL_STRATEGIES = [
+  { value: "str", label: "Short-Term Rental (STR)", description: "Nightly stays on Airbnb, VRBO", icon: Home },
+  { value: "mtr", label: "Mid-Term Rental (MTR)", description: "30+ day furnished stays", icon: Briefcase },
+  { value: "ltr", label: "Long-Term Rental (LTR)", description: "Traditional 12-month leases", icon: Building },
+  { value: "not_sure", label: "Not sure yet", description: "Let's discuss options", icon: Target },
+];
+
+const CURRENT_SITUATIONS = [
+  { value: "self_managing", label: "Currently self-managing" },
+  { value: "existing_pm", label: "Have a PM but looking to switch" },
+  { value: "new_property", label: "New property - not listed yet" },
+  { value: "exploring", label: "Just exploring options" },
+];
+
 export function ScheduleDiscoveryCallDialog({
   open,
   onOpenChange,
@@ -70,7 +85,9 @@ export function ScheduleDiscoveryCallDialog({
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [meetingType, setMeetingType] = useState<"phone" | "video">("phone");
-  const [serviceInterest, setServiceInterest] = useState<string>("");
+  const [rentalStrategy, setRentalStrategy] = useState<string>("");
+  const [currentSituation, setCurrentSituation] = useState<string>("");
+  const [existingListingUrl, setExistingListingUrl] = useState<string>("");
   const [startTimeline, setStartTimeline] = useState<string>("");
   const [notes, setNotes] = useState("");
   const queryClient = useQueryClient();
@@ -133,7 +150,9 @@ export function ScheduleDiscoveryCallDialog({
         duration_minutes: CALL_DURATION,
         meeting_notes: notes || null,
         meeting_type: meetingType,
-        service_interest: serviceInterest || null,
+        rental_strategy: rentalStrategy || null,
+        current_situation: currentSituation || null,
+        existing_listing_url: existingListingUrl || null,
         start_timeline: startTimeline || null,
         google_meet_link: meetingType === "video" ? GOOGLE_MEET_LINK : null,
       }).select().single();
@@ -147,9 +166,10 @@ export function ScheduleDiscoveryCallDialog({
           action: "discovery_call_scheduled",
           metadata: {
             scheduled_at: scheduledAt.toISOString(),
-            duration: 15,
+            duration: 30,
             meeting_type: meetingType,
-            service_interest: serviceInterest,
+            rental_strategy: rentalStrategy,
+            current_situation: currentSituation,
           },
         });
       } catch (timelineError) {
@@ -191,7 +211,9 @@ export function ScheduleDiscoveryCallDialog({
     setSelectedDate(undefined);
     setSelectedTime(null);
     setMeetingType("phone");
-    setServiceInterest("");
+    setRentalStrategy("");
+    setCurrentSituation("");
+    setExistingListingUrl("");
     setStartTimeline("");
     setNotes("");
   };
@@ -281,61 +303,69 @@ export function ScheduleDiscoveryCallDialog({
             )}
           </div>
 
-          {/* Service Interest */}
+          {/* Rental Strategy */}
           <div className="space-y-2">
             <Label className="text-sm font-medium flex items-center gap-2">
               <HelpCircle className="h-4 w-4" />
-              What are you looking for?
+              What type of rental?
             </Label>
             <RadioGroup
-              value={serviceInterest}
-              onValueChange={setServiceInterest}
-              className="space-y-2"
+              value={rentalStrategy}
+              onValueChange={setRentalStrategy}
+              className="grid grid-cols-2 gap-2"
             >
-              <Label
-                htmlFor="property_management"
-                className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all ${
-                  serviceInterest === "property_management"
-                    ? "border-primary bg-primary/5"
-                    : "border-muted hover:border-muted-foreground/30"
-                }`}
-              >
-                <RadioGroupItem value="property_management" id="property_management" />
-                <div>
-                  <p className="font-medium">Full Property Management</p>
-                  <p className="text-xs text-muted-foreground">Complete hands-off management of your property</p>
-                </div>
-              </Label>
-              <Label
-                htmlFor="cohosting"
-                className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all ${
-                  serviceInterest === "cohosting"
-                    ? "border-primary bg-primary/5"
-                    : "border-muted hover:border-muted-foreground/30"
-                }`}
-              >
-                <RadioGroupItem value="cohosting" id="cohosting" />
-                <div>
-                  <p className="font-medium">Co-hosting Partnership</p>
-                  <p className="text-xs text-muted-foreground">We handle guests while you stay involved</p>
-                </div>
-              </Label>
-              <Label
-                htmlFor="undecided"
-                className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all ${
-                  serviceInterest === "undecided"
-                    ? "border-primary bg-primary/5"
-                    : "border-muted hover:border-muted-foreground/30"
-                }`}
-              >
-                <RadioGroupItem value="undecided" id="undecided" />
-                <div>
-                  <p className="font-medium">Not sure yet</p>
-                  <p className="text-xs text-muted-foreground">Let's discuss what's best for you</p>
-                </div>
-              </Label>
+              {RENTAL_STRATEGIES.map(strategy => (
+                <Label
+                  key={strategy.value}
+                  htmlFor={`strategy-${strategy.value}`}
+                  className={`flex items-center gap-2 p-3 rounded-lg border cursor-pointer transition-all ${
+                    rentalStrategy === strategy.value
+                      ? "border-primary bg-primary/5"
+                      : "border-muted hover:border-muted-foreground/30"
+                  }`}
+                >
+                  <RadioGroupItem value={strategy.value} id={`strategy-${strategy.value}`} />
+                  <strategy.icon className="h-4 w-4 text-muted-foreground" />
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-sm truncate">{strategy.label}</p>
+                  </div>
+                </Label>
+              ))}
             </RadioGroup>
           </div>
+          
+          {/* Current Situation */}
+          <div className="space-y-2">
+            <Label className="text-sm font-medium">Current situation</Label>
+            <Select value={currentSituation} onValueChange={setCurrentSituation}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select current situation" />
+              </SelectTrigger>
+              <SelectContent>
+                {CURRENT_SITUATIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          
+          {/* Existing Listing URL - show for STR/MTR */}
+          {(rentalStrategy === "str" || rentalStrategy === "mtr") && (
+            <div className="space-y-2">
+              <Label className="text-sm font-medium flex items-center gap-2">
+                <Link className="h-4 w-4" />
+                Existing Airbnb/VRBO listing (optional)
+              </Label>
+              <Input
+                placeholder="https://airbnb.com/rooms/..."
+                value={existingListingUrl}
+                onChange={(e) => setExistingListingUrl(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">Share the listing so we can prepare insights</p>
+            </div>
+          )}
 
           {/* Start Timeline */}
           <div className="space-y-2">
