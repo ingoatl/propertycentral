@@ -328,55 +328,131 @@ serve(async (req) => {
       .update({ progress })
       .eq("id", project.id);
 
-    // 8. Send notification emails
+    // 8. Link existing lead if one exists with this email
+    const { data: existingLead } = await supabase
+      .from("leads")
+      .select("id")
+      .eq("email", formData.owner_email)
+      .maybeSingle();
+
+    if (existingLead) {
+      await supabase
+        .from("leads")
+        .update({
+          owner_id: ownerId,
+          property_id: property.id,
+          property_address: formData.property_address,
+        })
+        .eq("id", existingLead.id);
+      
+      console.log("Linked existing lead to owner/property:", existingLead.id);
+    }
+
+    // 9. Send notification emails
     const resendApiKey = Deno.env.get("RESEND_API_KEY");
     if (resendApiKey) {
       const resend = new Resend(resendApiKey);
 
       // Admin notification
-      await resend.emails.send({
-        from: "PeachHaus <notifications@peachhausgroup.com>",
-        to: ["info@peachhausgroup.com"],
-        subject: `New Property Onboarding: ${formData.property_address}`,
-        html: `
-          <h2>New Property Onboarding Submission</h2>
-          <p><strong>Owner:</strong> ${formData.owner_name}</p>
-          <p><strong>Email:</strong> ${formData.owner_email}</p>
-          <p><strong>Phone:</strong> ${formData.owner_phone}</p>
-          <p><strong>Property:</strong> ${formData.property_address}</p>
-          <p><strong>Property Type:</strong> ${formData.property_type}</p>
-          <p><strong>Rental Strategy:</strong> ${formData.rental_strategy}</p>
-          <p><strong>Photography Needs:</strong> ${formData.photography_needs || 'Not specified'}</p>
-          <p><strong>Needs Cleaner Referral:</strong> ${formData.needs_cleaner_referral ? 'Yes' : 'No'}</p>
-          <p><strong>Needs Design Consultation:</strong> ${formData.needs_design_consultation ? 'Yes' : 'No'}</p>
-          <p><strong>Has Septic Tank:</strong> ${formData.has_septic_tank ? 'Yes' : 'No'}</p>
-          <hr>
-          <p>View the full onboarding project in Property Central.</p>
-        `,
-      });
+      try {
+        const adminEmailResult = await resend.emails.send({
+          from: "PeachHaus <notifications@peachhausgroup.com>",
+          to: ["info@peachhausgroup.com"],
+          subject: `New Property Onboarding: ${formData.property_address}`,
+          html: `
+            <h2>New Property Onboarding Submission</h2>
+            <p><strong>Owner:</strong> ${formData.owner_name}</p>
+            <p><strong>Email:</strong> ${formData.owner_email}</p>
+            <p><strong>Phone:</strong> ${formData.owner_phone}</p>
+            <p><strong>Property:</strong> ${formData.property_address}</p>
+            <p><strong>Property Type:</strong> ${formData.property_type}</p>
+            <p><strong>Rental Strategy:</strong> ${formData.rental_strategy}</p>
+            <p><strong>Photography Needs:</strong> ${formData.photography_needs || 'Not specified'}</p>
+            <p><strong>Needs Cleaner Referral:</strong> ${formData.needs_cleaner_referral ? 'Yes' : 'No'}</p>
+            <p><strong>Needs Design Consultation:</strong> ${formData.needs_design_consultation ? 'Yes' : 'No'}</p>
+            <p><strong>Has Septic Tank:</strong> ${formData.has_septic_tank ? 'Yes' : 'No'}</p>
+            <hr>
+            <p>View the full onboarding project in Property Central.</p>
+          `,
+        });
+
+        // Log admin email to email_drafts
+        await supabase.from("email_drafts").insert({
+          to_email: "info@peachhausgroup.com",
+          to_name: "PeachHaus Admin",
+          subject: `New Property Onboarding: ${formData.property_address}`,
+          body: `New onboarding submission from ${formData.owner_name} for ${formData.property_address}`,
+          property_id: property.id,
+          status: "sent",
+          sent_at: new Date().toISOString(),
+          contact_type: "admin_notification",
+        });
+        console.log("Admin notification email sent:", adminEmailResult);
+      } catch (adminEmailError: any) {
+        console.error("Failed to send admin notification email:", adminEmailError.message);
+        // Log the failed email attempt
+        await supabase.from("email_drafts").insert({
+          to_email: "info@peachhausgroup.com",
+          to_name: "PeachHaus Admin",
+          subject: `New Property Onboarding: ${formData.property_address}`,
+          body: `Failed to send: ${adminEmailError.message}`,
+          property_id: property.id,
+          status: "failed",
+          contact_type: "admin_notification",
+        });
+      }
 
       // Owner confirmation
-      await resend.emails.send({
-        from: "PeachHaus <info@peachhausgroup.com>",
-        to: [formData.owner_email],
-        subject: "Welcome to PeachHaus - We've Received Your Information!",
-        html: `
-          <h2>Thank You for Choosing PeachHaus!</h2>
-          <p>Hi ${formData.owner_name.split(' ')[0]},</p>
-          <p>We've received your property onboarding information for <strong>${formData.property_address}</strong>.</p>
-          <h3>What's Next?</h3>
-          <ul>
-            <li>Our team will review your submission within 24-48 hours</li>
-            <li>We'll schedule an onboarding call to discuss your property and answer any questions</li>
-            <li>Based on your setup status, we'll create a customized launch timeline</li>
-          </ul>
-          <p>If you have any questions in the meantime, feel free to reach out to us at info@peachhausgroup.com or call (770) 906-5022.</p>
-          <p>We're excited to help you launch your rental property!</p>
-          <p>Best regards,<br>The PeachHaus Team</p>
-        `,
-      });
+      try {
+        const ownerEmailResult = await resend.emails.send({
+          from: "PeachHaus <info@peachhausgroup.com>",
+          to: [formData.owner_email],
+          subject: "Welcome to PeachHaus - We've Received Your Information!",
+          html: `
+            <h2>Thank You for Choosing PeachHaus!</h2>
+            <p>Hi ${formData.owner_name.split(' ')[0]},</p>
+            <p>We've received your property onboarding information for <strong>${formData.property_address}</strong>.</p>
+            <h3>What's Next?</h3>
+            <ul>
+              <li>Our team will review your submission within 24-48 hours</li>
+              <li>We'll schedule an onboarding call to discuss your property and answer any questions</li>
+              <li>Based on your setup status, we'll create a customized launch timeline</li>
+            </ul>
+            <p>If you have any questions in the meantime, feel free to reach out to us at info@peachhausgroup.com or call (770) 906-5022.</p>
+            <p>We're excited to help you launch your rental property!</p>
+            <p>Best regards,<br>The PeachHaus Team</p>
+          `,
+        });
 
-      console.log("Notification emails sent");
+        // Log owner email to email_drafts
+        await supabase.from("email_drafts").insert({
+          to_email: formData.owner_email,
+          to_name: formData.owner_name,
+          subject: "Welcome to PeachHaus - We've Received Your Information!",
+          body: `Confirmation email sent for property ${formData.property_address}`,
+          property_id: property.id,
+          status: "sent",
+          sent_at: new Date().toISOString(),
+          contact_type: "owner_confirmation",
+        });
+        console.log("Owner confirmation email sent:", ownerEmailResult);
+      } catch (ownerEmailError: any) {
+        console.error("Failed to send owner confirmation email:", ownerEmailError.message);
+        // Log the failed email attempt
+        await supabase.from("email_drafts").insert({
+          to_email: formData.owner_email,
+          to_name: formData.owner_name,
+          subject: "Welcome to PeachHaus - We've Received Your Information!",
+          body: `Failed to send: ${ownerEmailError.message}`,
+          property_id: property.id,
+          status: "failed",
+          contact_type: "owner_confirmation",
+        });
+      }
+
+      console.log("Notification emails processed");
+    } else {
+      console.error("RESEND_API_KEY not configured - emails not sent");
     }
 
     return new Response(
