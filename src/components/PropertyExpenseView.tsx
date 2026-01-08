@@ -3,7 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Expense } from "@/types";
-import { ChevronLeft, Search } from "lucide-react";
+import { ChevronLeft } from "lucide-react";
 import { ExpenseDetailModal } from "@/components/ExpenseDetailModal";
 import { DeleteExpenseDialog } from "@/components/expenses/DeleteExpenseDialog";
 import { ExpenseSummaryCard } from "@/components/expenses/ExpenseSummaryCard";
@@ -166,9 +166,8 @@ export const PropertyExpenseView = ({
                 placeholder="Search by vendor, items, amount..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-9 text-sm"
+                className="text-sm"
               />
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
             </div>
           </div>
         </CardContent>

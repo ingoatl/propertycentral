@@ -5,7 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { OnboardingTask, FAQ } from "@/types/onboarding";
-import { Loader2, Search, MapPin, User, Lock, Phone, Link as LinkIcon, Mail, Home, Copy, Check } from "lucide-react";
+import { Loader2, MapPin, User, Lock, Phone, Link as LinkIcon, Mail, Home, Copy, Check } from "lucide-react";
 import { toast } from "sonner";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
@@ -193,9 +193,8 @@ export function PropertyMasterModal({
             placeholder="Search all property information..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 max-md:h-14 max-md:text-lg max-md:pl-12"
+            className="max-md:h-14 max-md:text-lg"
           />
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none max-md:h-6 max-md:w-6 max-md:left-4" />
         </div>
 
         <Separator className="flex-shrink-0" />

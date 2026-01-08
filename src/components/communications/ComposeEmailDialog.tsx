@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Send, Mail, Loader2, Search, User } from "lucide-react";
+import { Send, Mail, Loader2, User } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -196,12 +196,10 @@ export function ComposeEmailDialog({
           {!selectedContact ? (
             <div className="space-y-3">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="Search for a lead or owner..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-9"
                 />
               </div>
               

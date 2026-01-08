@@ -173,7 +173,7 @@ serve(async (req) => {
       .from("leads")
       .select(`
         *,
-        property_owners (id, name, email, phone, address),
+        property_owners (id, name, email, phone),
         properties (id, name, address, city, state, zip_code)
       `)
       .eq("id", leadId)

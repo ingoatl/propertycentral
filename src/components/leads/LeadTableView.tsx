@@ -35,7 +35,6 @@ const LeadTableView = ({ leads, onSelectLead }: LeadTableViewProps) => {
             <TableHead className="font-semibold">Stage</TableHead>
             <TableHead className="font-semibold">Contact</TableHead>
             <TableHead className="font-semibold">Property</TableHead>
-            <TableHead className="font-semibold text-right">Value</TableHead>
             <TableHead className="font-semibold">Source</TableHead>
             <TableHead className="font-semibold">Created</TableHead>
             <TableHead className="font-semibold text-center">Score</TableHead>
@@ -44,7 +43,7 @@ const LeadTableView = ({ leads, onSelectLead }: LeadTableViewProps) => {
         <TableBody>
           {leads.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={8} className="text-center py-12 text-muted-foreground">
+              <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">
                 No leads found
               </TableCell>
             </TableRow>
@@ -128,16 +127,6 @@ const LeadTableView = ({ leads, onSelectLead }: LeadTableViewProps) => {
                     ) : (
                       <span className="text-xs text-muted-foreground">—</span>
                     )}
-                  </TableCell>
-
-                  {/* Value */}
-                  <TableCell className="text-right">
-                    <span
-                      className="font-semibold"
-                      style={{ color: stageConfig.accentColor }}
-                    >
-                      {formatCurrency(lead.opportunity_value || 0)}
-                    </span>
                   </TableCell>
 
                   {/* Source */}

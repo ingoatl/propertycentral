@@ -7,7 +7,7 @@ import {
 } from "@/components/ui/responsive-modal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Copy, Check, Loader2, Search } from "lucide-react";
+import { Copy, Check, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -284,9 +284,8 @@ export const DataForListingPlatforms = ({
             placeholder="Search listing data..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 max-md:h-12 max-md:text-base max-md:pl-12"
+            className="max-md:h-12 max-md:text-base"
           />
-          <Search className="absolute left-7 md:left-9 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none max-md:h-5 max-md:w-5" />
         </div>
 
         {loading ? (
