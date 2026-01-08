@@ -6,23 +6,21 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Map lead stages to GHL-friendly tags
+// Map lead stages to GHL-friendly tags - matching your actual lead stages
 function getStageTag(stage: string): string {
   const tagMap: Record<string, string> = {
     new_lead: "New Lead",
-    contacted: "Contacted",
-    discovery_scheduled: "Discovery Scheduled",
-    qualified: "Qualified",
-    proposal_sent: "Proposal Sent",
-    contract_sent: "Contract Sent",
+    unreached: "Unreached",
+    call_scheduled: "Call Scheduled",
+    call_attended: "Call Attended",
+    send_contract: "Send Contract",
+    contract_out: "Contract Out",
     contract_signed: "Contract Signed",
     ach_form_signed: "ACH Form Signed",
-    onboarding_form_requested: "Onboarding In Progress",
+    onboarding_form_requested: "Onboarding Requested",
     insurance_requested: "Insurance Requested",
     inspection_scheduled: "Inspection Scheduled",
     ops_handoff: "Ops Handoff",
-    lost: "Lost",
-    not_qualified: "Not Qualified",
   };
   return tagMap[stage] || stage.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
@@ -88,55 +86,60 @@ async function fetchPipelineStages(ghlApiKey: string, locationId: string): Promi
   return pipelineStagesCache;
 }
 
-// Map our lead stages to GHL pipeline stage names
-function mapToGhlStageName(stage: string): string {
-  // Common mappings - adjust based on your actual GHL stage names
+// Map our lead stages to GHL pipeline stage names - matching your actual stages
+function mapToGhlStageName(stage: string): string[] {
+  // Return array of possible GHL stage name matches for each lead stage
   const stageMap: Record<string, string[]> = {
-    new_lead: ["new_lead", "new lead", "new", "incoming"],
-    contacted: ["contacted", "contact made", "reached out"],
-    discovery_scheduled: ["discovery_scheduled", "discovery scheduled", "discovery", "call scheduled", "meeting scheduled"],
-    qualified: ["qualified", "qualification", "interested"],
-    proposal_sent: ["proposal_sent", "proposal sent", "proposal", "quote sent"],
-    contract_sent: ["contract_sent", "contract sent", "agreement sent"],
-    contract_signed: ["contract_signed", "contract signed", "signed", "won", "closed won"],
-    ach_form_signed: ["ach_form_signed", "ach signed", "payment setup"],
-    onboarding_form_requested: ["onboarding_form_requested", "onboarding", "onboarding in progress"],
-    insurance_requested: ["insurance_requested", "insurance", "insurance pending"],
-    inspection_scheduled: ["inspection_scheduled", "inspection", "inspection scheduled"],
-    ops_handoff: ["ops_handoff", "ops handoff", "handoff", "completed", "active"],
-    lost: ["lost", "closed lost", "dead"],
-    not_qualified: ["not_qualified", "not qualified", "disqualified"],
+    new_lead: ["new lead", "new_lead", "new", "incoming", "lead"],
+    unreached: ["unreached", "no contact", "no answer", "not reached"],
+    call_scheduled: ["call scheduled", "call_scheduled", "scheduled", "discovery scheduled", "meeting scheduled"],
+    call_attended: ["call attended", "call_attended", "call completed", "attended", "discovery completed"],
+    send_contract: ["send contract", "send_contract", "ready for contract", "contract ready"],
+    contract_out: ["contract out", "contract_out", "contract sent", "awaiting signature"],
+    contract_signed: ["contract signed", "contract_signed", "signed", "won", "closed won"],
+    ach_form_signed: ["ach form signed", "ach_form_signed", "ach signed", "payment setup", "payment form signed"],
+    onboarding_form_requested: ["onboarding form requested", "onboarding_form_requested", "onboarding", "onboarding requested"],
+    insurance_requested: ["insurance requested", "insurance_requested", "insurance", "awaiting insurance"],
+    inspection_scheduled: ["inspection scheduled", "inspection_scheduled", "inspection", "move in inspection"],
+    ops_handoff: ["ops handoff", "ops_handoff", "handoff", "completed", "active", "onboarded"],
   };
 
-  return stageMap[stage]?.[0] || stage;
+  return stageMap[stage] || [stage, stage.replace(/_/g, " ")];
 }
 
 // Find the best matching stage ID
 function findStageId(stages: Record<string, string>, leadStage: string): string | null {
-  const targetNames = [
-    leadStage,
-    leadStage.replace(/_/g, " "),
-    leadStage.replace(/_/g, ""),
-    mapToGhlStageName(leadStage),
-  ];
+  const targetNames = mapToGhlStageName(leadStage);
+  
+  console.log(`Finding GHL stage for "${leadStage}", checking against:`, targetNames);
 
+  // First try exact matches
   for (const name of targetNames) {
     const normalized = name.toLowerCase().replace(/[^a-z0-9]/g, "_");
-    if (stages[normalized]) return stages[normalized];
-    if (stages[name]) return stages[name];
+    if (stages[normalized]) {
+      console.log(`Found exact match: ${normalized} -> ${stages[normalized]}`);
+      return stages[normalized];
+    }
+    if (stages[name]) {
+      console.log(`Found exact match: ${name} -> ${stages[name]}`);
+      return stages[name];
+    }
   }
 
-  // Try partial matches
+  // Try partial matches against all GHL stage names
   for (const [stageName, stageId] of Object.entries(stages)) {
     const normalizedStageName = stageName.toLowerCase();
     for (const target of targetNames) {
-      if (normalizedStageName.includes(target.toLowerCase()) || 
-          target.toLowerCase().includes(normalizedStageName)) {
+      const normalizedTarget = target.toLowerCase();
+      if (normalizedStageName.includes(normalizedTarget) || 
+          normalizedTarget.includes(normalizedStageName)) {
+        console.log(`Found partial match: "${stageName}" matches "${target}" -> ${stageId}`);
         return stageId;
       }
     }
   }
 
+  console.log(`No matching GHL stage found for: ${leadStage}`);
   return null;
 }
 
@@ -174,7 +177,7 @@ serve(async (req) => {
       .select(`
         *,
         property_owners (id, name, email, phone),
-        properties (id, name, address, city, state, zip_code)
+        properties (id, name, address)
       `)
       .eq("id", leadId)
       .single();
@@ -202,25 +205,15 @@ serve(async (req) => {
       lastName: lead.name?.split(" ").slice(1).join(" ") || "",
       phone: lead.phone || "",
       address1: lead.property_address || lead.properties?.address || "",
-      city: lead.properties?.city || "",
-      state: lead.properties?.state || "",
-      postalCode: lead.properties?.zip_code || "",
-      source: `Lovable - ${lead.source || "Unknown"}`,
+      source: `Lovable - ${lead.opportunity_source || "Unknown"}`,
       tags: [getStageTag(lead.stage)],
       customFields: [
         { key: "lead_stage", value: lead.stage },
-        { key: "service_type", value: lead.service_type || "" },
         { key: "property_address", value: lead.property_address || "" },
         { key: "supabase_lead_id", value: lead.id },
       ],
     };
 
-    // Add additional tags based on lead data
-    if (lead.service_type) {
-      contactData.tags.push(
-        lead.service_type === "full_service" ? "Full Service" : "Co-Hosting"
-      );
-    }
 
     let ghlContactId = lead.ghl_contact_id;
     let response;
