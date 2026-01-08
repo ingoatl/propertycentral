@@ -20,6 +20,16 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { LeadStage, LEAD_STAGES } from "@/types/leads";
+import { GooglePlacesAutocomplete } from "@/components/ui/google-places-autocomplete";
+import { 
+  createLeadSchema, 
+  emailSchema, 
+  phoneSchema, 
+  nameSchema, 
+  addressSchema,
+  formatPhoneNumber,
+  validateField 
+} from "@/lib/validation";
 
 interface CreateLeadDialogProps {
   open: boolean;
@@ -51,6 +61,28 @@ const CreateLeadDialog = ({ open, onOpenChange }: CreateLeadDialogProps) => {
     notes: "",
   });
 
+  const [errors, setErrors] = useState<Record<string, string | null>>({});
+
+  const validateForm = (): boolean => {
+    const newErrors: Record<string, string | null> = {};
+    
+    newErrors.name = validateField(nameSchema, formData.name);
+    newErrors.email = validateField(emailSchema, formData.email);
+    newErrors.phone = validateField(phoneSchema, formData.phone);
+    newErrors.property_address = validateField(addressSchema, formData.property_address);
+    
+    if (!formData.opportunity_source) {
+      newErrors.opportunity_source = "Please select an opportunity source";
+    }
+    if (!formData.property_type) {
+      newErrors.property_type = "Please select a property type";
+    }
+
+    setErrors(newErrors);
+    
+    return !Object.values(newErrors).some(error => error !== null);
+  };
+
   const createLead = useMutation({
     mutationFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
@@ -58,15 +90,15 @@ const CreateLeadDialog = ({ open, onOpenChange }: CreateLeadDialogProps) => {
       const { data, error } = await supabase
         .from("leads")
         .insert({
-          name: formData.name,
-          email: formData.email || null,
-          phone: formData.phone || null,
+          name: formData.name.trim(),
+          email: formData.email.trim().toLowerCase(),
+          phone: formData.phone.replace(/\D/g, ""), // Store digits only
           opportunity_source: formData.opportunity_source || null,
           opportunity_value: formData.opportunity_value ? parseFloat(formData.opportunity_value) : 0,
-          property_address: formData.property_address || null,
+          property_address: formData.property_address.trim() || null,
           property_type: formData.property_type || null,
           stage: formData.stage,
-          notes: formData.notes || null,
+          notes: formData.notes?.trim() || null,
         })
         .select()
         .single();
@@ -110,6 +142,7 @@ const CreateLeadDialog = ({ open, onOpenChange }: CreateLeadDialogProps) => {
         stage: "new_lead",
         notes: "",
       });
+      setErrors({});
     },
     onError: (error) => {
       toast.error("Failed to create lead: " + error.message);
@@ -118,11 +151,33 @@ const CreateLeadDialog = ({ open, onOpenChange }: CreateLeadDialogProps) => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name.trim()) {
-      toast.error("Name is required");
+    
+    if (!validateForm()) {
+      toast.error("Please fix the errors before submitting");
       return;
     }
+    
     createLead.mutate();
+  };
+
+  const handlePhoneChange = (value: string) => {
+    // Format as user types
+    const formatted = formatPhoneNumber(value);
+    setFormData({ ...formData, phone: formatted });
+    
+    // Clear error on change
+    if (errors.phone) {
+      setErrors({ ...errors, phone: null });
+    }
+  };
+
+  const handleFieldChange = (field: string, value: string) => {
+    setFormData({ ...formData, [field]: value });
+    
+    // Clear error on change
+    if (errors[field]) {
+      setErrors({ ...errors, [field]: null });
+    }
   };
 
   return (
@@ -139,41 +194,55 @@ const CreateLeadDialog = ({ open, onOpenChange }: CreateLeadDialogProps) => {
               <Input
                 id="name"
                 value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                onChange={(e) => handleFieldChange("name", e.target.value)}
                 placeholder="John Smith"
                 required
+                className={errors.name ? "border-destructive" : ""}
               />
+              {errors.name && (
+                <p className="text-xs text-destructive mt-1">{errors.name}</p>
+              )}
             </div>
             
             <div>
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email">Email *</Label>
               <Input
                 id="email"
                 type="email"
                 value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                onChange={(e) => handleFieldChange("email", e.target.value)}
                 placeholder="john@example.com"
+                required
+                className={errors.email ? "border-destructive" : ""}
               />
+              {errors.email && (
+                <p className="text-xs text-destructive mt-1">{errors.email}</p>
+              )}
             </div>
             
             <div>
-              <Label htmlFor="phone">Phone</Label>
+              <Label htmlFor="phone">Phone *</Label>
               <Input
                 id="phone"
                 type="tel"
                 value={formData.phone}
-                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                onChange={(e) => handlePhoneChange(e.target.value)}
                 placeholder="(555) 123-4567"
+                required
+                className={errors.phone ? "border-destructive" : ""}
               />
+              {errors.phone && (
+                <p className="text-xs text-destructive mt-1">{errors.phone}</p>
+              )}
             </div>
             
             <div>
-              <Label htmlFor="source">Opportunity Source</Label>
+              <Label htmlFor="source">Opportunity Source *</Label>
               <Select
                 value={formData.opportunity_source}
-                onValueChange={(value) => setFormData({ ...formData, opportunity_source: value })}
+                onValueChange={(value) => handleFieldChange("opportunity_source", value)}
               >
-                <SelectTrigger>
+                <SelectTrigger className={errors.opportunity_source ? "border-destructive" : ""}>
                   <SelectValue placeholder="Select source" />
                 </SelectTrigger>
                 <SelectContent>
@@ -184,6 +253,9 @@ const CreateLeadDialog = ({ open, onOpenChange }: CreateLeadDialogProps) => {
                   ))}
                 </SelectContent>
               </Select>
+              {errors.opportunity_source && (
+                <p className="text-xs text-destructive mt-1">{errors.opportunity_source}</p>
+              )}
             </div>
             
             <div>
@@ -192,28 +264,33 @@ const CreateLeadDialog = ({ open, onOpenChange }: CreateLeadDialogProps) => {
                 id="value"
                 type="number"
                 value={formData.opportunity_value}
-                onChange={(e) => setFormData({ ...formData, opportunity_value: e.target.value })}
+                onChange={(e) => handleFieldChange("opportunity_value", e.target.value)}
                 placeholder="0"
               />
             </div>
             
             <div className="col-span-2">
-              <Label htmlFor="address">Property Address</Label>
-              <Input
+              <Label htmlFor="address">Property Address *</Label>
+              <GooglePlacesAutocomplete
                 id="address"
                 value={formData.property_address}
-                onChange={(e) => setFormData({ ...formData, property_address: e.target.value })}
-                placeholder="123 Main St, Atlanta, GA"
+                onChange={(value) => handleFieldChange("property_address", value)}
+                placeholder="Start typing an address..."
+                required
+                className={errors.property_address ? "border-destructive" : ""}
               />
+              {errors.property_address && (
+                <p className="text-xs text-destructive mt-1">{errors.property_address}</p>
+              )}
             </div>
             
             <div>
-              <Label htmlFor="type">Property Type</Label>
+              <Label htmlFor="type">Property Type *</Label>
               <Select
                 value={formData.property_type}
-                onValueChange={(value) => setFormData({ ...formData, property_type: value })}
+                onValueChange={(value) => handleFieldChange("property_type", value)}
               >
-                <SelectTrigger>
+                <SelectTrigger className={errors.property_type ? "border-destructive" : ""}>
                   <SelectValue placeholder="Select type" />
                 </SelectTrigger>
                 <SelectContent>
@@ -224,13 +301,16 @@ const CreateLeadDialog = ({ open, onOpenChange }: CreateLeadDialogProps) => {
                   <SelectItem value="apartment">Apartment</SelectItem>
                 </SelectContent>
               </Select>
+              {errors.property_type && (
+                <p className="text-xs text-destructive mt-1">{errors.property_type}</p>
+              )}
             </div>
             
             <div>
               <Label htmlFor="stage">Initial Stage</Label>
               <Select
                 value={formData.stage}
-                onValueChange={(value) => setFormData({ ...formData, stage: value as LeadStage })}
+                onValueChange={(value) => handleFieldChange("stage", value)}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -250,7 +330,7 @@ const CreateLeadDialog = ({ open, onOpenChange }: CreateLeadDialogProps) => {
               <Textarea
                 id="notes"
                 value={formData.notes}
-                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                onChange={(e) => handleFieldChange("notes", e.target.value)}
                 placeholder="Any additional notes about this lead..."
                 rows={3}
               />
