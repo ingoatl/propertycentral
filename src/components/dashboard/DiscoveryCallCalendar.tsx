@@ -40,6 +40,7 @@ import {
 } from "date-fns";
 import { cn } from "@/lib/utils";
 import { OSMMap } from "@/components/ui/osm-map";
+import { PropertyPhotos } from "@/components/ui/property-photos";
 
 interface DiscoveryCall {
   id: string;
@@ -394,47 +395,65 @@ function DiscoveryCallDetailModal({ call, onClose }: DiscoveryCallDetailModalPro
         </DialogHeader>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-4">
-          {/* Map Section */}
+          {/* Property Photos & Map Section */}
           <div className="space-y-3">
-            <h3 className="font-semibold flex items-center gap-2">
-              <MapPin className="h-4 w-4" />
-              Property Location & Neighborhood
-            </h3>
-            {call.leads?.property_address ? (
-              <>
-                <OSMMap 
+            {/* Property Photos */}
+            {call.leads?.property_address && (
+              <div>
+                <h3 className="font-semibold flex items-center gap-2 mb-2">
+                  <Home className="h-4 w-4" />
+                  Property Photos
+                </h3>
+                <PropertyPhotos 
                   address={call.leads.property_address} 
-                  height="300px"
+                  height="180px"
                   className="rounded-lg overflow-hidden border"
-                  mapStyle="standard"
                 />
-                <p className="text-sm text-muted-foreground">{call.leads.property_address}</p>
-                <div className="flex gap-2">
-                  {mapsLink && (
-                    <Button variant="outline" size="sm" asChild>
-                      <a href={mapsLink} target="_blank" rel="noopener noreferrer">
-                        <ExternalLink className="h-4 w-4 mr-2" />
-                        View Map
-                      </a>
-                    </Button>
-                  )}
-                  <Button variant="outline" size="sm" asChild>
-                    <a 
-                      href={`https://www.zillow.com/homes/${encodeURIComponent(call.leads.property_address)}_rb/`} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                    >
-                      <Home className="h-4 w-4 mr-2" />
-                      Check Zillow
-                    </a>
-                  </Button>
-                </div>
-              </>
-            ) : (
-              <div className="h-[300px] bg-muted rounded-lg flex items-center justify-center">
-                <p className="text-muted-foreground">No address provided</p>
               </div>
             )}
+            
+            {/* Map */}
+            <div>
+              <h3 className="font-semibold flex items-center gap-2 mb-2">
+                <MapPin className="h-4 w-4" />
+                Location & Neighborhood
+              </h3>
+              {call.leads?.property_address ? (
+                <>
+                  <OSMMap 
+                    address={call.leads.property_address} 
+                    height="200px"
+                    className="rounded-lg overflow-hidden border"
+                    mapStyle="standard"
+                  />
+                  <p className="text-sm text-muted-foreground mt-2">{call.leads.property_address}</p>
+                  <div className="flex gap-2 mt-2">
+                    {mapsLink && (
+                      <Button variant="outline" size="sm" asChild>
+                        <a href={mapsLink} target="_blank" rel="noopener noreferrer">
+                          <ExternalLink className="h-4 w-4 mr-2" />
+                          Map
+                        </a>
+                      </Button>
+                    )}
+                    <Button variant="outline" size="sm" asChild>
+                      <a 
+                        href={`https://www.zillow.com/homes/${encodeURIComponent(call.leads.property_address)}_rb/`} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                      >
+                        <Home className="h-4 w-4 mr-2" />
+                        Zillow
+                      </a>
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <div className="h-[200px] bg-muted rounded-lg flex items-center justify-center">
+                  <p className="text-muted-foreground">No address provided</p>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Call Details Section */}
