@@ -424,7 +424,7 @@ function DiscoveryCallDetailModal({ call, onClose }: DiscoveryCallDetailModalPro
                     address={call.leads.property_address} 
                     height="200px"
                     className="rounded-lg overflow-hidden border"
-                    mapStyle="standard"
+                    mapStyle="detailed"
                   />
                   <p className="text-sm text-muted-foreground mt-2">{call.leads.property_address}</p>
                   <div className="flex gap-2 mt-2">
