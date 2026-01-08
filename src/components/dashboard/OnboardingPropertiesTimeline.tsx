@@ -18,6 +18,13 @@ const ONBOARDING_STEPS = [
 // Map lead stages to timeline step index
 function getTimelineStep(stage: string | null): number {
   switch(stage) {
+    case 'new_lead':
+    case 'contacted':
+    case 'discovery_call_scheduled':
+    case 'discovery_call_completed':
+    case 'proposal_sent':
+    case 'contract_out':
+      return 0; // Pre-payment stages - at step 0
     case 'contract_signed': 
       return 0; // Current step: Setup Payment
     case 'ach_form_signed': 
@@ -37,13 +44,19 @@ function getTimelineStep(stage: string | null): number {
 
 function getStageLabel(stage: string | null): string {
   switch(stage) {
+    case 'new_lead': return 'New Lead';
+    case 'contacted': return 'Contacted';
+    case 'discovery_call_scheduled': return 'Call Scheduled';
+    case 'discovery_call_completed': return 'Call Completed';
+    case 'proposal_sent': return 'Proposal Sent';
+    case 'contract_out': return 'Contract Out';
     case 'contract_signed': return 'Payment Setup';
     case 'ach_form_signed': return 'Onboarding Form';
     case 'onboarding_form_requested': return 'Insurance';
     case 'insurance_requested': return 'Inspection';
     case 'inspection_scheduled': return 'Go Live';
     case 'ops_handoff': return 'Onboarded';
-    default: return 'Starting';
+    default: return 'Not Started';
   }
 }
 
