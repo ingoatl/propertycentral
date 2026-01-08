@@ -86,22 +86,31 @@ async function fetchPipelineStages(ghlApiKey: string, locationId: string): Promi
   return pipelineStagesCache;
 }
 
-// Map our lead stages to GHL pipeline stage names - matching your actual stages
+// Map our lead stages to actual GHL pipeline stage names from Owner Leads pipeline
 function mapToGhlStageName(stage: string): string[] {
-  // Return array of possible GHL stage name matches for each lead stage
+  // Based on actual GHL stages from the Owner Leads pipeline:
+  // - "Unreached"
+  // - "Send Contract"
+  // - "Contract Out "
+  // - "Call Attended  - Ready Review"
+  // - "ACH / CC Form Signed"
+  // - "Contract + CC Form Signed - Welcome Email"
+  // - "Request onboarding form completion"
+  // - "Request STR Property Insurance"
+  // - "Data Entered (Ops Handoff)"
   const stageMap: Record<string, string[]> = {
-    new_lead: ["new lead", "new_lead", "new", "incoming", "lead"],
-    unreached: ["unreached", "no contact", "no answer", "not reached"],
-    call_scheduled: ["call scheduled", "call_scheduled", "scheduled", "discovery scheduled", "meeting scheduled"],
-    call_attended: ["call attended", "call_attended", "call completed", "attended", "discovery completed"],
-    send_contract: ["send contract", "send_contract", "ready for contract", "contract ready"],
-    contract_out: ["contract out", "contract_out", "contract sent", "awaiting signature"],
-    contract_signed: ["contract signed", "contract_signed", "signed", "won", "closed won"],
-    ach_form_signed: ["ach form signed", "ach_form_signed", "ach signed", "payment setup", "payment form signed"],
-    onboarding_form_requested: ["onboarding form requested", "onboarding_form_requested", "onboarding", "onboarding requested"],
-    insurance_requested: ["insurance requested", "insurance_requested", "insurance", "awaiting insurance"],
-    inspection_scheduled: ["inspection scheduled", "inspection_scheduled", "inspection", "move in inspection"],
-    ops_handoff: ["ops handoff", "ops_handoff", "handoff", "completed", "active", "onboarded"],
+    new_lead: ["unreached"], // New leads start as Unreached in GHL
+    unreached: ["unreached"],
+    call_scheduled: ["unreached"], // No exact match, keep in unreached
+    call_attended: ["call attended", "call attended  - ready review", "ready review"],
+    send_contract: ["send contract"],
+    contract_out: ["contract out"],
+    contract_signed: ["contract + cc form signed", "cc form signed", "welcome email"],
+    ach_form_signed: ["ach / cc form signed", "ach form signed", "cc form signed"],
+    onboarding_form_requested: ["request onboarding form completion", "onboarding form", "request onboarding"],
+    insurance_requested: ["request str property insurance", "str property insurance", "insurance"],
+    inspection_scheduled: ["request str property insurance"], // Use insurance stage as closest match
+    ops_handoff: ["data entered", "ops handoff", "data entered (ops handoff)"],
   };
 
   return stageMap[stage] || [stage, stage.replace(/_/g, " ")];
@@ -339,13 +348,13 @@ serve(async (req) => {
           }
         }
 
+        // Note: Don't include locationId in opportunity data - it's inferred from the pipeline
         const opportunityData = {
           pipelineId: pipelineInfo.pipelineId,
-          locationId: ghlLocationId,
           contactId: newGhlContactId,
           stageId: stageId,
           name: `${lead.name} - ${lead.property_address || "Property"}`,
-          status: lead.stage === "lost" || lead.stage === "not_qualified" ? "lost" : "open",
+          status: "open",
         };
 
         if (existingOpportunityId) {
