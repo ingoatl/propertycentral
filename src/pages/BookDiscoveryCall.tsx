@@ -15,8 +15,71 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { format, addDays, setHours, setMinutes, isBefore, addMinutes, getDay } from "date-fns";
+import { format, addDays, setHours, setMinutes, isBefore, addMinutes, getDay, getMonth, getDate, getYear } from "date-fns";
 import { cn } from "@/lib/utils";
+
+// US General Holidays (not bank holidays) - returns true if date is a holiday
+const isUSHoliday = (date: Date): boolean => {
+  const month = getMonth(date); // 0-indexed
+  const day = getDate(date);
+  const year = getYear(date);
+  
+  // Fixed-date holidays
+  // New Year's Day - January 1
+  if (month === 0 && day === 1) return true;
+  
+  // Independence Day - July 4
+  if (month === 6 && day === 4) return true;
+  
+  // Veterans Day - November 11
+  if (month === 10 && day === 11) return true;
+  
+  // Christmas Day - December 25
+  if (month === 11 && day === 25) return true;
+  
+  // Floating holidays - need to calculate
+  const dayOfWeek = getDay(date); // 0 = Sunday, 1 = Monday, etc.
+  
+  // MLK Day - Third Monday of January
+  if (month === 0 && dayOfWeek === 1) {
+    const firstOfMonth = new Date(year, 0, 1);
+    const firstMonday = (8 - getDay(firstOfMonth)) % 7 || 7;
+    const thirdMonday = firstMonday + 14;
+    if (day === thirdMonday) return true;
+  }
+  
+  // Presidents Day - Third Monday of February
+  if (month === 1 && dayOfWeek === 1) {
+    const firstOfMonth = new Date(year, 1, 1);
+    const firstMonday = (8 - getDay(firstOfMonth)) % 7 || 7;
+    const thirdMonday = firstMonday + 14;
+    if (day === thirdMonday) return true;
+  }
+  
+  // Memorial Day - Last Monday of May
+  if (month === 4 && dayOfWeek === 1) {
+    const lastDayOfMay = new Date(year, 5, 0).getDate();
+    const lastMonday = lastDayOfMay - ((getDay(new Date(year, 4, lastDayOfMay)) + 6) % 7);
+    if (day === lastMonday) return true;
+  }
+  
+  // Labor Day - First Monday of September
+  if (month === 8 && dayOfWeek === 1) {
+    const firstOfMonth = new Date(year, 8, 1);
+    const firstMonday = (8 - getDay(firstOfMonth)) % 7 || 7;
+    if (day === firstMonday) return true;
+  }
+  
+  // Thanksgiving - Fourth Thursday of November
+  if (month === 10 && dayOfWeek === 4) {
+    const firstOfMonth = new Date(year, 10, 1);
+    const firstThursday = (11 - getDay(firstOfMonth)) % 7 || 7;
+    const fourthThursday = firstThursday + 21;
+    if (day === fourthThursday) return true;
+  }
+  
+  return false;
+};
 import { GooglePlacesAutocomplete } from "@/components/ui/google-places-autocomplete";
 import anjaSignature from "@/assets/anja-signature.png";
 import anjaIngoHosts from "@/assets/anja-ingo-hosts.jpg";
@@ -203,7 +266,8 @@ export default function BookDiscoveryCall() {
     );
     const isPast = isBefore(date, addDays(new Date(), -1));
     const isAvailable = availableDays.length === 0 || availableDays.includes(dayOfWeek);
-    return isPast || isBlocked || !isAvailable;
+    const isHoliday = isUSHoliday(date);
+    return isPast || isBlocked || !isAvailable || isHoliday;
   };
 
   const getTimeSlotsForDate = (date: Date) => {
