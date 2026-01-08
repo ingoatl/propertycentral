@@ -174,6 +174,7 @@ async function handleSetupComplete(
   }
 
   // Update lead and advance stage if we have a lead ID
+  // Move to ach_form_signed which triggers onboarding form email
   if (leadId) {
     // Update lead
     await supabase

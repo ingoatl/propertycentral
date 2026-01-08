@@ -70,34 +70,37 @@ function buildTimelineHtml(currentStage: string): string {
   const stepsHtml = OWNER_TIMELINE_STEPS.map((step, i) => {
     const isCompleted = i < currentStep;
     const isCurrent = i === currentStep;
-    const isUpcoming = i > currentStep;
     
     let bgColor = '#e5e7eb'; // gray for upcoming
     let textColor = '#9ca3af';
     let labelColor = '#6b7280';
     let labelWeight = '500';
-    let statusText = '';
+    let statusContent = '';
     
     if (isCompleted) {
       bgColor = '#10b981'; // green
       textColor = '#ffffff';
       labelColor = '#10b981';
-      statusText = '✓';
+      statusContent = '✓';
     } else if (isCurrent) {
       bgColor = '#f59e0b'; // amber/orange
       textColor = '#ffffff';
       labelColor = '#111827';
       labelWeight = '700';
-      statusText = (i + 1).toString();
+      statusContent = `${i + 1}`;
     } else {
-      statusText = (i + 1).toString();
+      statusContent = `${i + 1}`;
     }
     
     return `
-      <td style="text-align: center; width: 20%; padding: 0 4px;">
-        <div style="width: 36px; height: 36px; border-radius: 50%; background: ${bgColor}; color: ${textColor}; display: inline-flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; margin: 0 auto;">
-          ${statusText}
-        </div>
+      <td style="text-align: center; width: 20%; padding: 0 4px; vertical-align: top;">
+        <table cellpadding="0" cellspacing="0" style="margin: 0 auto;">
+          <tr>
+            <td style="width: 36px; height: 36px; background: ${bgColor}; border-radius: 50%; text-align: center; vertical-align: middle;">
+              <span style="color: ${textColor}; font-size: 14px; font-weight: 700; line-height: 36px; display: block;">${statusContent}</span>
+            </td>
+          </tr>
+        </table>
         <div style="font-size: 11px; color: ${labelColor}; margin-top: 8px; font-weight: ${labelWeight}; line-height: 1.3;">
           ${step.label}
         </div>
@@ -135,13 +138,18 @@ function buildTimelineHtml(currentStage: string): string {
 }
 
 // Beautiful HTML email template builder (styled like owner statement emails)
+// Structure: Greeting → Intro Text → Timeline → Content Sections → Signature
 function buildBrandedEmailHtml(
   recipientName: string,
   subject: string,
-  sections: Array<{ title?: string; content?: string; highlight?: boolean; warning?: boolean; cta?: { text: string; url: string } }>,
+  sections: Array<{ title?: string; content?: string; highlight?: boolean; warning?: boolean; cta?: { text: string; url: string }; isIntro?: boolean }>,
   currentStage?: string
 ): string {
-  const sectionHtml = sections.map(section => {
+  // Separate intro sections from other sections
+  const introSections = sections.filter(s => s.isIntro);
+  const contentSections = sections.filter(s => !s.isIntro);
+  
+  const buildSectionHtml = (section: typeof sections[0]) => {
     if (section.cta) {
       return `
         <div style="padding: 24px 0; text-align: center;">
@@ -179,10 +187,22 @@ function buildBrandedEmailHtml(
         <div style="font-size: 14px; color: #374151; line-height: 1.7;">${section.content}</div>
       </div>
     `;
-  }).join('');
+  };
+
+  const introHtml = introSections.map(buildSectionHtml).join('');
+  const contentHtml = contentSections.map(buildSectionHtml).join('');
 
   // Generate timeline HTML if stage is provided and relevant
   const timelineHtml = currentStage ? buildTimelineHtml(currentStage) : '';
+  
+  // Timeline explanation text
+  const timelineExplanation = timelineHtml ? `
+    <div style="margin: 0 0 20px 0; padding: 16px 20px; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0;">
+      <div style="font-size: 13px; color: #475569; line-height: 1.6;">
+        <strong>📊 Track Your Progress:</strong> The timeline above shows where you are in the onboarding process. Green checkmarks indicate completed steps, the orange circle shows your current step, and gray circles are upcoming steps.
+      </div>
+    </div>
+  ` : '';
 
   return `
     <!DOCTYPE html>
@@ -211,6 +231,15 @@ function buildBrandedEmailHtml(
                 </td>
               </tr>
 
+              <!-- Intro Text (before timeline) -->
+              ${introHtml ? `
+              <tr>
+                <td style="padding: 0 32px 16px 32px;">
+                  ${introHtml}
+                </td>
+              </tr>
+              ` : ''}
+
               <!-- Timeline (if applicable) -->
               ${timelineHtml ? `
               <tr>
@@ -218,12 +247,17 @@ function buildBrandedEmailHtml(
                   ${timelineHtml}
                 </td>
               </tr>
+              <tr>
+                <td style="padding: 0 32px;">
+                  ${timelineExplanation}
+                </td>
+              </tr>
               ` : ''}
               
-              <!-- Content Sections -->
+              <!-- Content Sections (after timeline) -->
               <tr>
                 <td style="padding: 0 32px 24px 32px;">
-                  ${sectionHtml}
+                  ${contentHtml}
                 </td>
               </tr>
               
@@ -270,6 +304,7 @@ function buildBrandedEmailHtml(
 function buildInsuranceEmailHtml(recipientName: string, currentStage: string): string {
   return buildBrandedEmailHtml(recipientName, "Insurance Verification Required", [
     {
+      isIntro: true,
       content: "As part of onboarding, we need to confirm that your property has the correct insurance in place."
     },
     {
@@ -317,7 +352,8 @@ function buildInsuranceEmailHtml(recipientName: string, currentStage: string): s
 function buildOnboardingEmailHtml(recipientName: string, currentStage: string): string {
   return buildBrandedEmailHtml(recipientName, "Complete Your Property Onboarding", [
     {
-      content: "We're ready to capture your property details and lock in the next steps. Please complete the onboarding form below."
+      isIntro: true,
+      content: "Your payment method has been set up successfully! 🎉 We're ready to capture your property details and lock in the next steps."
     },
     {
       title: "📋 Choose Your Form",
@@ -365,6 +401,7 @@ function buildOnboardingEmailHtml(recipientName: string, currentStage: string): 
 function buildCoHostingPaymentEmailHtml(recipientName: string, stripeUrl: string, propertyAddress: string, currentStage: string): string {
   return buildBrandedEmailHtml(recipientName, "Set Up Your Payment Method", [
     {
+      isIntro: true,
       content: "Congratulations on signing your co-hosting agreement with PeachHaus Group LLC! 🎉"
     },
     {
