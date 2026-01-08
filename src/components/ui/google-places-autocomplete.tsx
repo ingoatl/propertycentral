@@ -58,7 +58,7 @@ export function GooglePlacesAutocomplete({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Fetch predictions from edge function
+  // Fetch predictions from edge function (silent fallback on error)
   const fetchPredictions = useCallback(async (query: string) => {
     if (query.length < 3) {
       setPredictions([]);
@@ -71,18 +71,16 @@ export function GooglePlacesAutocomplete({
         body: { query, country: "us" }
       });
 
-      if (error) {
-        console.error("[GooglePlaces] Error:", error);
+      if (error || !data?.predictions) {
+        // Silent fallback - just don't show predictions
         setPredictions([]);
         return;
       }
 
-      if (data?.predictions) {
-        setPredictions(data.predictions);
-        setShowDropdown(data.predictions.length > 0);
-      }
+      setPredictions(data.predictions);
+      setShowDropdown(data.predictions.length > 0);
     } catch (err) {
-      console.error("[GooglePlaces] Fetch error:", err);
+      // Silent fallback - allow manual entry
       setPredictions([]);
     } finally {
       setIsLoading(false);
