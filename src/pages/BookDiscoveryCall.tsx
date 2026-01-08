@@ -47,20 +47,32 @@ const CURRENT_MANAGEMENT = [
   { value: "exploring", label: "Just exploring options", description: "Researching before making any decisions" },
 ];
 
-// Service interest
-const SERVICE_INTERESTS = [
+// Rental strategy - key qualifying question
+const RENTAL_STRATEGIES = [
   { 
-    value: "property_management", 
-    label: "Full Property Management", 
-    icon: Briefcase, 
-    description: "We handle everything: guests, maintenance, cleaning, and more",
+    value: "str", 
+    label: "Short-Term Rental (STR)", 
+    icon: Home, 
+    description: "Nightly stays on Airbnb, VRBO - highest revenue potential",
     recommended: true
   },
   { 
-    value: "cohosting", 
-    label: "Co-hosting Partnership", 
-    icon: Users, 
-    description: "We assist while you stay involved in key decisions" 
+    value: "mtr", 
+    label: "Mid-Term Rental (MTR)", 
+    icon: Briefcase, 
+    description: "30+ day furnished stays - less turnover, steady income" 
+  },
+  { 
+    value: "ltr", 
+    label: "Long-Term Rental (LTR)", 
+    icon: Building, 
+    description: "Traditional 12-month leases - lowest management needs" 
+  },
+  { 
+    value: "not_sure", 
+    label: "Not sure yet", 
+    icon: Target, 
+    description: "Let's discuss which strategy is best for your property" 
   },
 ];
 
@@ -132,7 +144,8 @@ export default function BookDiscoveryCall() {
     propertyAddress: "",
     propertyType: "",
     currentManagement: "",
-    serviceInterest: "",
+    rentalStrategy: "",
+    existingListingUrl: "",
     startTimeline: "",
     meetingType: "video",
     goals: [] as string[],
@@ -377,11 +390,12 @@ export default function BookDiscoveryCall() {
 
       const notes = [
         `Current Situation: ${CURRENT_MANAGEMENT.find(c => c.value === formData.currentManagement)?.label || "Not specified"}`,
-        `Service Interest: ${SERVICE_INTERESTS.find(s => s.value === formData.serviceInterest)?.label || "Not specified"}`,
+        `Rental Strategy: ${RENTAL_STRATEGIES.find(s => s.value === formData.rentalStrategy)?.label || "Not specified"}`,
         `Timeline: ${START_TIMELINES.find(t => t.value === formData.startTimeline)?.label || "Not specified"}`,
         `Meeting Type: ${formData.meetingType === "video" ? "Video Call (Google Meet)" : "Phone Call"}`,
         `Property Type: ${PROPERTY_TYPES.find(t => t.value === formData.propertyType)?.label || "Not specified"}`,
         `Goals: ${formData.goals.map(g => PROPERTY_GOALS.find(pg => pg.id === g)?.label).filter(Boolean).join(", ") || "Not specified"}`,
+        formData.existingListingUrl ? `Existing Listing: ${formData.existingListingUrl}` : "",
         formData.additionalNotes ? `Notes: ${formData.additionalNotes}` : "",
       ].filter(Boolean).join("\n");
 
@@ -412,7 +426,9 @@ export default function BookDiscoveryCall() {
           duration_minutes: 30,
           status: "scheduled",
           meeting_type: formData.meetingType,
-          service_interest: formData.serviceInterest,
+          rental_strategy: formData.rentalStrategy || null,
+          existing_listing_url: formData.existingListingUrl || null,
+          current_situation: formData.currentManagement || null,
           start_timeline: formData.startTimeline,
           meeting_notes: notes,
           google_meet_link: formData.meetingType === "video" ? GOOGLE_MEET_LINK : null,
@@ -744,44 +760,66 @@ export default function BookDiscoveryCall() {
             </div>
           )}
 
-          {/* Step 4: Service Interest */}
+          {/* Step 4: Rental Strategy */}
           {step === 4 && (
             <div className="space-y-4">
               <h3 className="font-semibold text-lg flex items-center gap-2">
                 <Briefcase className="h-5 w-5 text-primary" />
-                What service are you interested in?
+                What type of rental are you interested in?
               </h3>
+              <p className="text-sm text-muted-foreground">
+                This helps us prepare the right information for your call
+              </p>
               
               <div className="space-y-3">
-                {SERVICE_INTERESTS.map(service => (
+                {RENTAL_STRATEGIES.map(strategy => (
                   <div
-                    key={service.value}
-                    onClick={() => setFormData(prev => ({ ...prev, serviceInterest: service.value }))}
+                    key={strategy.value}
+                    onClick={() => setFormData(prev => ({ ...prev, rentalStrategy: strategy.value }))}
                     className={cn(
                       "p-4 rounded-lg border cursor-pointer transition-all relative",
-                      formData.serviceInterest === service.value
+                      formData.rentalStrategy === strategy.value
                         ? "bg-primary/10 border-primary"
                         : "bg-muted/30 border-transparent hover:border-primary/30"
                     )}
                   >
-                    {service.recommended && (
+                    {strategy.recommended && (
                       <span className="absolute -top-2 right-3 bg-primary text-primary-foreground text-xs px-2 py-0.5 rounded-full">
-                        Recommended
+                        Most Popular
                       </span>
                     )}
                     <div className="flex items-start gap-3">
-                      <service.icon className={cn(
+                      <strategy.icon className={cn(
                         "h-5 w-5 mt-0.5",
-                        formData.serviceInterest === service.value ? "text-primary" : "text-muted-foreground"
+                        formData.rentalStrategy === strategy.value ? "text-primary" : "text-muted-foreground"
                       )} />
                       <div>
-                        <p className="font-medium">{service.label}</p>
-                        <p className="text-sm text-muted-foreground">{service.description}</p>
+                        <p className="font-medium">{strategy.label}</p>
+                        <p className="text-sm text-muted-foreground">{strategy.description}</p>
                       </div>
                     </div>
                   </div>
                 ))}
               </div>
+              
+              {/* Existing Listing URL - show for STR/MTR */}
+              {(formData.rentalStrategy === "str" || formData.rentalStrategy === "mtr") && (
+                <div className="mt-4 p-4 bg-muted/50 rounded-lg">
+                  <Label htmlFor="listingUrl" className="text-sm font-medium">
+                    Have an existing Airbnb or VRBO listing? (Optional)
+                  </Label>
+                  <Input
+                    id="listingUrl"
+                    placeholder="https://airbnb.com/rooms/..."
+                    value={formData.existingListingUrl}
+                    onChange={e => setFormData(prev => ({ ...prev, existingListingUrl: e.target.value }))}
+                    className="mt-2"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    If you share your listing, we can prepare a personalized revenue analysis
+                  </p>
+                </div>
+              )}
               
               <div className="flex gap-2">
                 <Button variant="outline" className="flex-1" onClick={() => setStep(3)}>
@@ -789,7 +827,7 @@ export default function BookDiscoveryCall() {
                 </Button>
                 <Button 
                   className="flex-1"
-                  disabled={!formData.serviceInterest}
+                  disabled={!formData.rentalStrategy}
                   onClick={() => setStep(5)}
                 >
                   Continue <ArrowRight className="ml-2 h-4 w-4" />
