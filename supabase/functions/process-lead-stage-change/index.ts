@@ -1386,6 +1386,22 @@ serve(async (req) => {
       console.error("Error scheduling follow-up sequences:", seqError);
     }
 
+    // Sync lead to GHL as backup
+    try {
+      console.log(`Syncing lead ${leadId} to GHL`);
+      await fetch(`${supabaseUrl}/functions/v1/ghl-sync-lead`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${supabaseServiceKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ leadId, syncReason: "stage_change", newStage }),
+      });
+      console.log(`GHL sync triggered for lead ${leadId}`);
+    } catch (ghlError) {
+      console.error("Error syncing to GHL:", ghlError);
+    }
+
     return new Response(
       JSON.stringify({ success: true, automationsProcessed: automations?.length || 0 }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }

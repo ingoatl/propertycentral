@@ -50,11 +50,19 @@ serve(async (req) => {
 
     const REDIRECT_URI = `${Deno.env.get('SUPABASE_URL')}/functions/v1/gmail-oauth`;
 
+    // Include drive.file scope for uploading signed agreements to Google Drive
+    const scopes = [
+      'https://www.googleapis.com/auth/gmail.readonly',
+      'https://www.googleapis.com/auth/userinfo.email',
+      'https://www.googleapis.com/auth/drive.file',
+      'openid'
+    ].join(' ');
+
     const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
       `client_id=${encodeURIComponent(credentials.clientId)}` +
       `&redirect_uri=${encodeURIComponent(REDIRECT_URI)}` +
       `&response_type=code` +
-      `&scope=${encodeURIComponent('https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/userinfo.email openid')}` +
+      `&scope=${encodeURIComponent(scopes)}` +
       `&access_type=offline` +
       `&prompt=consent` +
       `&state=${encodeURIComponent(user.id)}`;

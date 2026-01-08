@@ -347,6 +347,7 @@ export type Database = {
           document_type: string | null
           embedded_edit_url: string | null
           field_configuration: Json | null
+          google_drive_url: string | null
           guest_signed_at: string | null
           guest_signing_url: string | null
           host_signed_at: string | null
@@ -377,6 +378,7 @@ export type Database = {
           document_type?: string | null
           embedded_edit_url?: string | null
           field_configuration?: Json | null
+          google_drive_url?: string | null
           guest_signed_at?: string | null
           guest_signing_url?: string | null
           host_signed_at?: string | null
@@ -407,6 +409,7 @@ export type Database = {
           document_type?: string | null
           embedded_edit_url?: string | null
           field_configuration?: Json | null
+          google_drive_url?: string | null
           guest_signed_at?: string | null
           guest_signing_url?: string | null
           host_signed_at?: string | null
@@ -2593,6 +2596,7 @@ export type Database = {
           created_at: string
           email: string | null
           follow_up_paused: boolean | null
+          ghl_contact_id: string | null
           has_unread_messages: boolean | null
           id: string
           inspection_calendar_event_id: string | null
@@ -2630,6 +2634,7 @@ export type Database = {
           created_at?: string
           email?: string | null
           follow_up_paused?: boolean | null
+          ghl_contact_id?: string | null
           has_unread_messages?: boolean | null
           id?: string
           inspection_calendar_event_id?: string | null
@@ -2667,6 +2672,7 @@ export type Database = {
           created_at?: string
           email?: string | null
           follow_up_paused?: boolean | null
+          ghl_contact_id?: string | null
           has_unread_messages?: boolean | null
           id?: string
           inspection_calendar_event_id?: string | null
@@ -2984,6 +2990,7 @@ export type Database = {
           created_at: string | null
           document_path: string | null
           effective_date: string
+          google_drive_url: string | null
           id: string
           management_fee_percentage: number | null
           notes: string | null
@@ -3005,6 +3012,7 @@ export type Database = {
           created_at?: string | null
           document_path?: string | null
           effective_date: string
+          google_drive_url?: string | null
           id?: string
           management_fee_percentage?: number | null
           notes?: string | null
@@ -3026,6 +3034,7 @@ export type Database = {
           created_at?: string | null
           document_path?: string | null
           effective_date?: string
+          google_drive_url?: string | null
           id?: string
           management_fee_percentage?: number | null
           notes?: string | null
