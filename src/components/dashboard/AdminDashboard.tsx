@@ -9,6 +9,7 @@ import { OwnedPropertiesPerformance } from "./OwnedPropertiesPerformance";
 import { DailyPerformanceEntriesList } from "./DailyPerformanceEntriesList";
 import { SendTestTeamDigestButton } from "./SendTestTeamDigestButton";
 import { DiscoveryCallCalendar } from "./DiscoveryCallCalendar";
+import { OnboardingPropertiesTimeline } from "./OnboardingPropertiesTimeline";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Download, RefreshCw, Building2, DollarSign, TrendingUp, AlertCircle, MessageCircleQuestion, Bug } from "lucide-react";
@@ -356,6 +357,9 @@ export const AdminDashboard = ({ summaries, onExport, onSync, syncing, onSendOve
         
         {/* Discovery Call Calendar - Top Priority */}
         <DiscoveryCallCalendar />
+        
+        {/* Onboarding Properties Timeline */}
+        <OnboardingPropertiesTimeline />
         
         {/* Alert Section */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 max-md:gap-4">
