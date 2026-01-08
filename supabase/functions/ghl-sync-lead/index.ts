@@ -27,6 +27,119 @@ function getStageTag(stage: string): string {
   return tagMap[stage] || stage.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+// Cache for pipeline stages
+let pipelineStagesCache: { pipelineId: string; stages: Record<string, string> } | null = null;
+
+// Fetch pipelines and stages from GHL
+async function fetchPipelineStages(ghlApiKey: string, locationId: string): Promise<{ pipelineId: string; stages: Record<string, string> }> {
+  if (pipelineStagesCache) {
+    return pipelineStagesCache;
+  }
+
+  console.log("Fetching GHL pipelines...");
+  const response = await fetch(
+    `https://services.leadconnectorhq.com/opportunities/pipelines?locationId=${locationId}`,
+    {
+      headers: {
+        Authorization: `Bearer ${ghlApiKey}`,
+        Version: "2021-07-28",
+      },
+    }
+  );
+
+  if (!response.ok) {
+    console.error("Failed to fetch pipelines:", response.status);
+    throw new Error("Failed to fetch GHL pipelines");
+  }
+
+  const data = await response.json();
+  console.log("GHL pipelines response:", JSON.stringify(data));
+
+  // Get the first pipeline (or the one named "Owner Acquisition" or similar)
+  const pipelines = data.pipelines || [];
+  let selectedPipeline = pipelines[0];
+
+  // Try to find a more relevant pipeline
+  for (const pipeline of pipelines) {
+    const name = (pipeline.name || "").toLowerCase();
+    if (name.includes("owner") || name.includes("lead") || name.includes("acquisition")) {
+      selectedPipeline = pipeline;
+      break;
+    }
+  }
+
+  if (!selectedPipeline) {
+    throw new Error("No pipelines found in GHL");
+  }
+
+  console.log("Using pipeline:", selectedPipeline.name, selectedPipeline.id);
+
+  // Build stage name -> ID mapping
+  const stages: Record<string, string> = {};
+  for (const stage of selectedPipeline.stages || []) {
+    // Normalize stage name for matching
+    const normalizedName = (stage.name || "").toLowerCase().replace(/[^a-z0-9]/g, "_");
+    stages[normalizedName] = stage.id;
+    stages[stage.name] = stage.id; // Also keep original name
+    console.log(`Stage: "${stage.name}" -> ${stage.id}`);
+  }
+
+  pipelineStagesCache = { pipelineId: selectedPipeline.id, stages };
+  return pipelineStagesCache;
+}
+
+// Map our lead stages to GHL pipeline stage names
+function mapToGhlStageName(stage: string): string {
+  // Common mappings - adjust based on your actual GHL stage names
+  const stageMap: Record<string, string[]> = {
+    new_lead: ["new_lead", "new lead", "new", "incoming"],
+    contacted: ["contacted", "contact made", "reached out"],
+    discovery_scheduled: ["discovery_scheduled", "discovery scheduled", "discovery", "call scheduled", "meeting scheduled"],
+    qualified: ["qualified", "qualification", "interested"],
+    proposal_sent: ["proposal_sent", "proposal sent", "proposal", "quote sent"],
+    contract_sent: ["contract_sent", "contract sent", "agreement sent"],
+    contract_signed: ["contract_signed", "contract signed", "signed", "won", "closed won"],
+    ach_form_signed: ["ach_form_signed", "ach signed", "payment setup"],
+    onboarding_form_requested: ["onboarding_form_requested", "onboarding", "onboarding in progress"],
+    insurance_requested: ["insurance_requested", "insurance", "insurance pending"],
+    inspection_scheduled: ["inspection_scheduled", "inspection", "inspection scheduled"],
+    ops_handoff: ["ops_handoff", "ops handoff", "handoff", "completed", "active"],
+    lost: ["lost", "closed lost", "dead"],
+    not_qualified: ["not_qualified", "not qualified", "disqualified"],
+  };
+
+  return stageMap[stage]?.[0] || stage;
+}
+
+// Find the best matching stage ID
+function findStageId(stages: Record<string, string>, leadStage: string): string | null {
+  const targetNames = [
+    leadStage,
+    leadStage.replace(/_/g, " "),
+    leadStage.replace(/_/g, ""),
+    mapToGhlStageName(leadStage),
+  ];
+
+  for (const name of targetNames) {
+    const normalized = name.toLowerCase().replace(/[^a-z0-9]/g, "_");
+    if (stages[normalized]) return stages[normalized];
+    if (stages[name]) return stages[name];
+  }
+
+  // Try partial matches
+  for (const [stageName, stageId] of Object.entries(stages)) {
+    const normalizedStageName = stageName.toLowerCase();
+    for (const target of targetNames) {
+      if (normalizedStageName.includes(target.toLowerCase()) || 
+          target.toLowerCase().includes(normalizedStageName)) {
+        return stageId;
+      }
+    }
+  }
+
+  return null;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -71,6 +184,14 @@ serve(async (req) => {
     }
 
     console.log("Lead data:", lead.name, lead.email, "Stage:", lead.stage);
+
+    // Get pipeline stages
+    let pipelineInfo: { pipelineId: string; stages: Record<string, string> } | null = null;
+    try {
+      pipelineInfo = await fetchPipelineStages(ghlApiKey, ghlLocationId);
+    } catch (pipelineError) {
+      console.error("Error fetching pipelines:", pipelineError);
+    }
 
     // Build contact data for GHL
     const contactData: Record<string, any> = {
@@ -197,6 +318,95 @@ serve(async (req) => {
       console.log("Updated lead with GHL contact ID:", newGhlContactId);
     }
 
+    // Create or update opportunity in pipeline
+    let opportunityResult = null;
+    if (pipelineInfo && newGhlContactId) {
+      const stageId = findStageId(pipelineInfo.stages, lead.stage);
+      
+      if (stageId) {
+        console.log(`Syncing opportunity for stage "${lead.stage}" -> stageId: ${stageId}`);
+
+        // First check if opportunity already exists for this contact
+        const oppSearchResponse = await fetch(
+          `https://services.leadconnectorhq.com/opportunities/search?locationId=${ghlLocationId}&contactId=${newGhlContactId}&pipelineId=${pipelineInfo.pipelineId}`,
+          {
+            headers: {
+              Authorization: `Bearer ${ghlApiKey}`,
+              Version: "2021-07-28",
+            },
+          }
+        );
+
+        let existingOpportunityId: string | null = null;
+        if (oppSearchResponse.ok) {
+          const oppSearchData = await oppSearchResponse.json();
+          if (oppSearchData.opportunities && oppSearchData.opportunities.length > 0) {
+            existingOpportunityId = oppSearchData.opportunities[0].id;
+            console.log("Found existing opportunity:", existingOpportunityId);
+          }
+        }
+
+        const opportunityData = {
+          pipelineId: pipelineInfo.pipelineId,
+          locationId: ghlLocationId,
+          contactId: newGhlContactId,
+          stageId: stageId,
+          name: `${lead.name} - ${lead.property_address || "Property"}`,
+          status: lead.stage === "lost" || lead.stage === "not_qualified" ? "lost" : "open",
+        };
+
+        if (existingOpportunityId) {
+          // Update existing opportunity
+          const updateOppResponse = await fetch(
+            `https://services.leadconnectorhq.com/opportunities/${existingOpportunityId}`,
+            {
+              method: "PUT",
+              headers: {
+                Authorization: `Bearer ${ghlApiKey}`,
+                "Content-Type": "application/json",
+                Version: "2021-07-28",
+              },
+              body: JSON.stringify({
+                stageId: stageId,
+                status: opportunityData.status,
+              }),
+            }
+          );
+          
+          if (updateOppResponse.ok) {
+            opportunityResult = await updateOppResponse.json();
+            console.log("Updated opportunity to stage:", stageId);
+          } else {
+            console.error("Failed to update opportunity:", await updateOppResponse.text());
+          }
+        } else {
+          // Create new opportunity
+          const createOppResponse = await fetch(
+            "https://services.leadconnectorhq.com/opportunities/",
+            {
+              method: "POST",
+              headers: {
+                Authorization: `Bearer ${ghlApiKey}`,
+                "Content-Type": "application/json",
+                Version: "2021-07-28",
+              },
+              body: JSON.stringify(opportunityData),
+            }
+          );
+          
+          if (createOppResponse.ok) {
+            opportunityResult = await createOppResponse.json();
+            console.log("Created new opportunity:", opportunityResult.opportunity?.id);
+          } else {
+            console.error("Failed to create opportunity:", await createOppResponse.text());
+          }
+        }
+      } else {
+        console.log(`No matching GHL stage found for lead stage: ${lead.stage}`);
+        console.log("Available stages:", Object.keys(pipelineInfo.stages));
+      }
+    }
+
     // Add a note if stage changed
     if (syncReason === "stage_change" && newStage && newGhlContactId) {
       const noteBody = `Stage changed to: ${getStageTag(newStage)}\n\nSynced from PeachHaus CRM at ${new Date().toLocaleString()}`;
@@ -224,6 +434,8 @@ serve(async (req) => {
         success: true,
         ghlContactId: newGhlContactId,
         action: ghlContactId ? "updated" : "created",
+        opportunityUpdated: !!opportunityResult,
+        pipelineId: pipelineInfo?.pipelineId,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

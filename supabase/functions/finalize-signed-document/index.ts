@@ -1474,16 +1474,22 @@ serve(async (req) => {
             ? FULL_SERVICE_FOLDER_ID 
             : COHOSTING_FOLDER_ID;
 
+          // Create subfolder name: "FirstName - PropertyAddress"
+          const ownerFirstName = contractData.ownerName?.split(" ")[0] || "Owner";
+          const propertyShort = (propertyAddress || "Property").replace(/[^a-zA-Z0-9\s]/g, "").substring(0, 50).trim();
+          const subfolderName = `${ownerFirstName} - ${propertyShort}`;
+
           const driveFileName = `${(propertyAddress || documentDisplayName).replace(/[^a-zA-Z0-9\s]/g, "_")}_Agreement_${new Date().toISOString().split("T")[0]}.pdf`;
 
-          console.log(`Uploading to Google Drive folder ${contractData.serviceType === "full_service" ? "Full Service" : "Co-Hosting"}: ${driveFileName}`);
+          console.log(`Uploading to Google Drive folder ${contractData.serviceType === "full_service" ? "Full Service" : "Co-Hosting"}/${subfolderName}: ${driveFileName}`);
 
           const driveResult = await uploadToGoogleDrive(
             accessToken,
             driveFileName,
             modifiedPdfBytes,
             "application/pdf",
-            folderId
+            folderId,
+            subfolderName
           );
 
           googleDriveUrl = driveResult.webViewLink;

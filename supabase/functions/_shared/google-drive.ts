@@ -4,18 +4,33 @@ export interface DriveUploadResult {
   fileId: string;
   webViewLink: string;
   webContentLink: string;
+  folderId?: string;
 }
 
 /**
- * Upload a file to Google Drive
+ * Upload a file to Google Drive, optionally creating a subfolder first
  */
 export async function uploadToGoogleDrive(
   accessToken: string,
   fileName: string,
   fileContent: Uint8Array,
   mimeType: string,
-  folderId?: string
+  parentFolderId?: string,
+  subfolderName?: string
 ): Promise<DriveUploadResult> {
+  let targetFolderId = parentFolderId;
+
+  // If subfolder name is provided, create it first
+  if (subfolderName && parentFolderId) {
+    try {
+      targetFolderId = await getOrCreateFolder(accessToken, subfolderName, parentFolderId);
+      console.log(`Using subfolder "${subfolderName}" with ID: ${targetFolderId}`);
+    } catch (folderError) {
+      console.error("Failed to create subfolder, using parent folder:", folderError);
+      targetFolderId = parentFolderId;
+    }
+  }
+
   // Create file metadata
   const metadata: Record<string, any> = {
     name: fileName,
@@ -23,8 +38,8 @@ export async function uploadToGoogleDrive(
   };
 
   // Add to specific folder if provided
-  if (folderId) {
-    metadata.parents = [folderId];
+  if (targetFolderId) {
+    metadata.parents = [targetFolderId];
   }
 
   // Create multipart upload body
@@ -84,19 +99,23 @@ export async function uploadToGoogleDrive(
     fileId: result.id,
     webViewLink: result.webViewLink || `https://drive.google.com/file/d/${result.id}/view`,
     webContentLink: result.webContentLink || "",
+    folderId: targetFolderId,
   };
 }
 
 /**
- * Get folder ID by name (creates if doesn't exist)
+ * Get folder ID by name within a parent, or create it if it doesn't exist
  */
 export async function getOrCreateFolder(
   accessToken: string,
   folderName: string,
   parentFolderId?: string
 ): Promise<string> {
+  // Sanitize folder name
+  const sanitizedName = folderName.replace(/[<>:"/\\|?*]/g, "_").trim();
+
   // Search for existing folder
-  let query = `name='${folderName}' and mimeType='application/vnd.google-apps.folder' and trashed=false`;
+  let query = `name='${sanitizedName}' and mimeType='application/vnd.google-apps.folder' and trashed=false`;
   if (parentFolderId) {
     query += ` and '${parentFolderId}' in parents`;
   }
@@ -113,13 +132,14 @@ export async function getOrCreateFolder(
   if (searchResponse.ok) {
     const searchResult = await searchResponse.json();
     if (searchResult.files && searchResult.files.length > 0) {
+      console.log(`Found existing folder "${sanitizedName}":`, searchResult.files[0].id);
       return searchResult.files[0].id;
     }
   }
 
   // Create new folder
   const metadata: Record<string, any> = {
-    name: folderName,
+    name: sanitizedName,
     mimeType: "application/vnd.google-apps.folder",
   };
 
@@ -140,9 +160,11 @@ export async function getOrCreateFolder(
   );
 
   if (!createResponse.ok) {
-    throw new Error(`Failed to create folder: ${createResponse.statusText}`);
+    const errorData = await createResponse.json();
+    throw new Error(`Failed to create folder: ${errorData.error?.message || createResponse.statusText}`);
   }
 
   const createResult = await createResponse.json();
+  console.log(`Created new folder "${sanitizedName}":`, createResult.id);
   return createResult.id;
 }
