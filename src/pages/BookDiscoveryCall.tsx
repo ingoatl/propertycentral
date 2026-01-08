@@ -17,7 +17,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format, addDays, setHours, setMinutes, isBefore, addMinutes, getDay } from "date-fns";
 import { cn } from "@/lib/utils";
-import { AddressAutocomplete } from "@/components/ui/address-autocomplete";
+import { GooglePlacesAutocomplete } from "@/components/ui/google-places-autocomplete";
+import anjaSignature from "@/assets/anja-signature.png";
+import anjaIngoHosts from "@/assets/anja-ingo-hosts.jpg";
 
 const GOOGLE_MEET_LINK = "https://meet.google.com/jww-deey-iaa";
 
@@ -385,28 +387,21 @@ export default function BookDiscoveryCall() {
               </strong>
             </p>
             
-            {formData.meetingType === "video" ? (
-              <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
-                <p className="font-medium text-green-800 mb-2 flex items-center gap-2 justify-center">
-                  <Video className="h-5 w-5" /> Video Call via Google Meet
-                </p>
-                <a 
-                  href={GOOGLE_MEET_LINK}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-block bg-green-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-green-700 transition-colors"
-                >
-                  Join Meeting
-                </a>
-                <p className="text-sm text-green-700 mt-2">{GOOGLE_MEET_LINK}</p>
-              </div>
-            ) : (
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-                <p className="font-medium text-blue-800 flex items-center gap-2 justify-center">
-                  <PhoneCall className="h-5 w-5" /> We'll call you at: {formData.phone}
-                </p>
-              </div>
-            )}
+            <div className="bg-primary/10 border border-primary/20 rounded-lg p-4 mb-4">
+              <p className="font-medium text-foreground flex items-center gap-2 justify-center">
+                {formData.meetingType === "video" ? (
+                  <>
+                    <Video className="h-5 w-5 text-primary" />
+                    Video Call - link will be in your confirmation email
+                  </>
+                ) : (
+                  <>
+                    <PhoneCall className="h-5 w-5 text-primary" />
+                    We'll call you at: {formData.phone}
+                  </>
+                )}
+              </p>
+            </div>
             
             <div className="bg-primary/5 rounded-lg p-4 mb-6 text-left">
               <h4 className="font-medium mb-2 flex items-center gap-2">
@@ -424,14 +419,14 @@ export default function BookDiscoveryCall() {
             <div className="border-t pt-6 mt-4">
               <p className="text-xs text-muted-foreground uppercase tracking-wider mb-3">Looking forward to speaking with you</p>
               <img 
-                src="https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/anja-signature.png" 
+                src={anjaSignature} 
                 alt="Anja & Ingo Schaer" 
                 className="h-10 mx-auto mb-2"
               />
               <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium">PeachHaus Group</p>
               <div className="mt-3">
                 <img 
-                  src="https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/anja-ingo-hosts.jpg" 
+                  src={anjaIngoHosts} 
                   alt="Anja & Ingo" 
                   className="w-16 h-16 rounded-full mx-auto border-2 border-muted object-cover"
                 />
@@ -560,7 +555,7 @@ export default function BookDiscoveryCall() {
               
               <div>
                 <Label htmlFor="address">Property Address *</Label>
-                <AddressAutocomplete
+                <GooglePlacesAutocomplete
                   id="address"
                   placeholder="Start typing your property address..."
                   value={formData.propertyAddress}
