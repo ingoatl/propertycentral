@@ -143,6 +143,7 @@ export default function BookDiscoveryCall() {
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [isBooked, setIsBooked] = useState(false);
   const [mapsLoaded, setMapsLoaded] = useState(false);
+  const [mapsError, setMapsError] = useState(false);
 
   // Load Google Maps API
   useEffect(() => {
@@ -150,25 +151,41 @@ export default function BookDiscoveryCall() {
       try {
         // Check if already loaded
         if (window.google?.maps?.places) {
+          console.log("[BookDiscoveryCall] Google Maps already loaded");
           setMapsLoaded(true);
           return;
         }
 
-        // Fetch API key
+        // Fetch API key from edge function
+        console.log("[BookDiscoveryCall] Fetching Google Places API key...");
         const { data, error } = await supabase.functions.invoke("get-google-places-key");
-        if (error || !data?.apiKey) {
-          console.error("Failed to get Google Places API key:", error);
+        
+        if (error) {
+          console.error("[BookDiscoveryCall] Error fetching API key:", error);
+          setMapsError(true);
           return;
         }
+        
+        if (!data?.apiKey) {
+          console.error("[BookDiscoveryCall] No API key returned");
+          setMapsError(true);
+          return;
+        }
+
+        console.log("[BookDiscoveryCall] Got API key, loading script...");
 
         // Check if script already exists
         const existingScript = document.querySelector('script[src*="maps.googleapis.com"]');
         if (existingScript) {
-          if (window.google?.maps?.places) {
-            setMapsLoaded(true);
-          } else {
-            existingScript.addEventListener("load", () => setMapsLoaded(true));
-          }
+          console.log("[BookDiscoveryCall] Script already exists, waiting for load...");
+          const checkLoaded = () => {
+            if (window.google?.maps?.places) {
+              setMapsLoaded(true);
+            } else {
+              setTimeout(checkLoaded, 100);
+            }
+          };
+          checkLoaded();
           return;
         }
 
@@ -177,21 +194,33 @@ export default function BookDiscoveryCall() {
         script.src = `https://maps.googleapis.com/maps/api/js?key=${data.apiKey}&libraries=places`;
         script.async = true;
         script.defer = true;
-        script.onload = () => setMapsLoaded(true);
-        script.onerror = () => console.error("Failed to load Google Maps");
+        script.onload = () => {
+          console.log("[BookDiscoveryCall] Google Maps script loaded");
+          setMapsLoaded(true);
+        };
+        script.onerror = () => {
+          console.error("[BookDiscoveryCall] Failed to load Google Maps script");
+          setMapsError(true);
+        };
         document.head.appendChild(script);
       } catch (err) {
-        console.error("Error loading Google Maps:", err);
+        console.error("[BookDiscoveryCall] Error loading Google Maps:", err);
+        setMapsError(true);
       }
     };
 
     loadGoogleMaps();
   }, []);
 
-  // Initialize autocomplete when maps loaded and input exists
+  // Initialize autocomplete when maps loaded and on step 2
   useEffect(() => {
-    if (!mapsLoaded || !addressInputRef.current || autocompleteRef.current) return;
+    if (!mapsLoaded || !addressInputRef.current || step !== 2) return;
+    
+    // Don't reinitialize if already set up
+    if (autocompleteRef.current) return;
 
+    console.log("[BookDiscoveryCall] Initializing autocomplete...");
+    
     try {
       autocompleteRef.current = new google.maps.places.Autocomplete(addressInputRef.current, {
         types: ["address"],
@@ -201,13 +230,16 @@ export default function BookDiscoveryCall() {
 
       autocompleteRef.current.addListener("place_changed", () => {
         const place = autocompleteRef.current?.getPlace();
+        console.log("[BookDiscoveryCall] Place selected:", place?.formatted_address);
         if (place?.formatted_address) {
           setFormData(prev => ({ ...prev, propertyAddress: place.formatted_address! }));
           setErrors(prev => ({ ...prev, propertyAddress: "" }));
         }
       });
+      
+      console.log("[BookDiscoveryCall] Autocomplete initialized successfully");
     } catch (err) {
-      console.error("Error initializing autocomplete:", err);
+      console.error("[BookDiscoveryCall] Error initializing autocomplete:", err);
     }
   }, [mapsLoaded, step]);
 
@@ -461,7 +493,7 @@ export default function BookDiscoveryCall() {
               </div>
             )}
             
-            <div className="bg-primary/5 rounded-lg p-4 mb-4 text-left">
+            <div className="bg-primary/5 rounded-lg p-4 mb-6 text-left">
               <h4 className="font-medium mb-2 flex items-center gap-2">
                 <Sparkles className="h-4 w-4 text-primary" /> What happens next?
               </h4>
@@ -471,6 +503,24 @@ export default function BookDiscoveryCall() {
                 <li>✓ Our team will research your property</li>
                 <li>✓ We'll prepare a revenue estimate</li>
               </ul>
+            </div>
+            
+            {/* Signature */}
+            <div className="border-t pt-6 mt-4">
+              <p className="text-xs text-muted-foreground uppercase tracking-wider mb-3">Looking forward to speaking with you</p>
+              <img 
+                src="https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/anja-signature.png" 
+                alt="Anja & Ingo Schaer" 
+                className="h-10 mx-auto mb-2"
+              />
+              <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium">PeachHaus Group</p>
+              <div className="mt-3">
+                <img 
+                  src="https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/anja-ingo-hosts.jpg" 
+                  alt="Anja & Ingo" 
+                  className="w-16 h-16 rounded-full mx-auto border-2 border-muted object-cover"
+                />
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -610,9 +660,14 @@ export default function BookDiscoveryCall() {
                     <AlertCircle className="h-3 w-3" /> {errors.propertyAddress}
                   </p>
                 )}
-                {mapsLoaded && (
+                {mapsLoaded && !mapsError && (
+                  <p className="text-xs text-green-600 mt-1">
+                    ✓ Address autocomplete enabled - start typing to see suggestions
+                  </p>
+                )}
+                {mapsError && (
                   <p className="text-xs text-muted-foreground mt-1">
-                    💡 Start typing and select from the suggestions
+                    Enter your full property address manually
                   </p>
                 )}
               </div>
