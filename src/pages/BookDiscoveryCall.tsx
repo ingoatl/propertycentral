@@ -660,16 +660,9 @@ export default function BookDiscoveryCall() {
                     <AlertCircle className="h-3 w-3" /> {errors.propertyAddress}
                   </p>
                 )}
-                {mapsLoaded && !mapsError && (
-                  <p className="text-xs text-green-600 mt-1">
-                    ✓ Address autocomplete enabled - start typing to see suggestions
-                  </p>
-                )}
-                {mapsError && (
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Enter your full property address manually
-                  </p>
-                )}
+                <p className="text-xs text-muted-foreground mt-1">
+                  Enter your full property address (e.g., 123 Main St, Atlanta, GA 30301)
+                </p>
               </div>
               
               <div>

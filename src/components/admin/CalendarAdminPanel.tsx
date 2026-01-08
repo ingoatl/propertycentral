@@ -83,13 +83,13 @@ export function CalendarAdminPanel() {
     },
   });
 
-  // Fetch upcoming discovery calls
+  // Fetch upcoming discovery calls with all details
   const { data: upcomingCalls = [] } = useQuery({
     queryKey: ["upcoming-discovery-calls"],
     queryFn: async () => {
       const { data } = await supabase
         .from("discovery_calls")
-        .select("*, leads(name, email, phone)")
+        .select("*, leads(name, email, phone, property_address, property_type)")
         .eq("status", "scheduled")
         .gte("scheduled_at", new Date().toISOString())
         .order("scheduled_at")
@@ -522,17 +522,20 @@ export function CalendarAdminPanel() {
                   No upcoming discovery calls
                 </p>
               ) : (
-                <div className="space-y-2">
+                <div className="space-y-3">
                   {upcomingCalls.map((call: any) => (
-                    <div key={call.id} className="p-3 border rounded-lg">
+                    <div key={call.id} className="p-4 border rounded-lg space-y-3">
                       <div className="flex justify-between items-start gap-4">
                         <div className="flex-1">
-                          <p className="font-medium">{call.leads?.name || "Unknown"}</p>
+                          <p className="font-semibold text-lg">{call.leads?.name || "Unknown"}</p>
                           <p className="text-sm text-muted-foreground">
                             {call.leads?.email} • {call.leads?.phone}
                           </p>
                         </div>
                         <div className="flex items-center gap-2">
+                          <Badge variant={call.meeting_type === "video" ? "default" : "secondary"}>
+                            {call.meeting_type === "video" ? "📹 Video" : "📞 Phone"}
+                          </Badge>
                           {call.google_calendar_event_id ? (
                             <Badge className="bg-green-100 text-green-800 hover:bg-green-100">
                               <CheckCircle2 className="h-3 w-3 mr-1" />
@@ -544,11 +547,47 @@ export function CalendarAdminPanel() {
                               Pending Sync
                             </Badge>
                           )}
-                          <Badge>
-                            {format(new Date(call.scheduled_at), "MMM d 'at' h:mm a")} EST
-                          </Badge>
                         </div>
                       </div>
+                      
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        <div>
+                          <span className="text-muted-foreground">📅 When:</span>{" "}
+                          <span className="font-medium">{format(new Date(call.scheduled_at), "MMM d 'at' h:mm a")} EST</span>
+                        </div>
+                        {call.leads?.property_address && (
+                          <div>
+                            <span className="text-muted-foreground">🏠 Property:</span>{" "}
+                            <span className="font-medium">{call.leads.property_address.substring(0, 30)}...</span>
+                          </div>
+                        )}
+                        {call.service_interest && (
+                          <div>
+                            <span className="text-muted-foreground">📋 Interest:</span>{" "}
+                            <span className="font-medium">
+                              {call.service_interest === "property_management" ? "Full PM" : 
+                               call.service_interest === "cohosting" ? "Co-hosting" : call.service_interest}
+                            </span>
+                          </div>
+                        )}
+                        {call.start_timeline && (
+                          <div>
+                            <span className="text-muted-foreground">⏰ Timeline:</span>{" "}
+                            <span className="font-medium">{call.start_timeline.replace(/_/g, " ")}</span>
+                          </div>
+                        )}
+                      </div>
+                      
+                      {call.meeting_type === "video" && call.google_meet_link && (
+                        <a 
+                          href={call.google_meet_link} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-sm text-green-600 hover:underline"
+                        >
+                          <ExternalLink className="h-3 w-3" /> Join Google Meet
+                        </a>
+                      )}
                     </div>
                   ))}
                 </div>
