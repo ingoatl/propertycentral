@@ -54,10 +54,9 @@ export function CalendarAdminPanel() {
   const [isConnecting, setIsConnecting] = useState(false);
   const queryClient = useQueryClient();
 
-  // Use the actual frontend URL, not the Supabase URL
-  const frontendUrl = window.location.origin;
-  const embedUrl = `${frontendUrl}/book-discovery-call`;
-  const iframeCode = `<iframe src="${embedUrl}" width="100%" height="800" frameborder="0" style="border-radius: 12px;"></iframe>`;
+  // Use the production domain for embed links
+  const publicUrl = "https://propertycentral.lovable.app/book-discovery-call";
+  const iframeCode = `<iframe src="${publicUrl}" width="100%" height="800" frameborder="0" style="border-radius: 12px;"></iframe>`;
 
   // Fetch availability slots
   const { data: availabilitySlots = [], isLoading: slotsLoading } = useQuery({
@@ -688,18 +687,18 @@ export function CalendarAdminPanel() {
               <div>
                 <Label className="mb-2 block">Direct Link</Label>
                 <div className="flex gap-2">
-                  <Input value={embedUrl} readOnly className="font-mono text-sm" />
+                  <Input value={publicUrl} readOnly className="font-mono text-sm" />
                   <Button
                     variant="outline"
                     size="icon"
-                    onClick={() => copyToClipboard(embedUrl)}
+                    onClick={() => copyToClipboard(publicUrl)}
                   >
                     {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                   </Button>
                   <Button
                     variant="outline"
                     size="icon"
-                    onClick={() => window.open(embedUrl, "_blank")}
+                    onClick={() => window.open(publicUrl, "_blank")}
                   >
                     <ExternalLink className="h-4 w-4" />
                   </Button>
