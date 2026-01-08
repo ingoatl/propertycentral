@@ -762,6 +762,47 @@ export type Database = {
         }
         Relationships: []
       }
+      discovery_call_reminders: {
+        Row: {
+          channel: string
+          created_at: string | null
+          discovery_call_id: string | null
+          error_message: string | null
+          id: string
+          reminder_type: string
+          sent_at: string | null
+          status: string | null
+        }
+        Insert: {
+          channel: string
+          created_at?: string | null
+          discovery_call_id?: string | null
+          error_message?: string | null
+          id?: string
+          reminder_type: string
+          sent_at?: string | null
+          status?: string | null
+        }
+        Update: {
+          channel?: string
+          created_at?: string | null
+          discovery_call_id?: string | null
+          error_message?: string | null
+          id?: string
+          reminder_type?: string
+          sent_at?: string | null
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "discovery_call_reminders_discovery_call_id_fkey"
+            columns: ["discovery_call_id"]
+            isOneToOne: false
+            referencedRelation: "discovery_calls"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       discovery_calls: {
         Row: {
           confirmation_email_sent: boolean | null
@@ -769,14 +810,18 @@ export type Database = {
           created_at: string | null
           duration_minutes: number | null
           google_calendar_event_id: string | null
+          google_meet_link: string | null
           id: string
           lead_id: string | null
           meeting_notes: string | null
+          meeting_type: string | null
           reminder_1h_sent: boolean | null
           reminder_24h_sent: boolean | null
           reminder_sent: boolean | null
           scheduled_at: string
           scheduled_by: string | null
+          service_interest: string | null
+          start_timeline: string | null
           status: string | null
           updated_at: string | null
         }
@@ -786,14 +831,18 @@ export type Database = {
           created_at?: string | null
           duration_minutes?: number | null
           google_calendar_event_id?: string | null
+          google_meet_link?: string | null
           id?: string
           lead_id?: string | null
           meeting_notes?: string | null
+          meeting_type?: string | null
           reminder_1h_sent?: boolean | null
           reminder_24h_sent?: boolean | null
           reminder_sent?: boolean | null
           scheduled_at: string
           scheduled_by?: string | null
+          service_interest?: string | null
+          start_timeline?: string | null
           status?: string | null
           updated_at?: string | null
         }
@@ -803,14 +852,18 @@ export type Database = {
           created_at?: string | null
           duration_minutes?: number | null
           google_calendar_event_id?: string | null
+          google_meet_link?: string | null
           id?: string
           lead_id?: string | null
           meeting_notes?: string | null
+          meeting_type?: string | null
           reminder_1h_sent?: boolean | null
           reminder_24h_sent?: boolean | null
           reminder_sent?: boolean | null
           scheduled_at?: string
           scheduled_by?: string | null
+          service_interest?: string | null
+          start_timeline?: string | null
           status?: string | null
           updated_at?: string | null
         }
