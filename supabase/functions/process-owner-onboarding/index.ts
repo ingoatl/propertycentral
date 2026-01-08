@@ -754,6 +754,32 @@ const handler = async (req: Request): Promise<Response> => {
       sendOwnerEmail(formData),
     ]);
 
+    // 12. Fetch property image from RapidAPI
+    if (property.id && formData.property_address) {
+      try {
+        console.log("Fetching property image from RapidAPI for:", formData.property_address);
+        
+        const imageResponse = await fetch(`${SUPABASE_URL}/functions/v1/fetch-property-image`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+          },
+          body: JSON.stringify({ 
+            address: formData.property_address, 
+            propertyId: property.id 
+          }),
+        });
+        
+        if (imageResponse.ok) {
+          const imageResult = await imageResponse.json();
+          console.log("Property image fetch result:", imageResult.success ? "success" : "failed");
+        }
+      } catch (imgError) {
+        console.error("Failed to fetch property image (non-blocking):", imgError);
+      }
+    }
+
     console.log("Onboarding processing complete");
 
     return new Response(

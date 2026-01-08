@@ -23,54 +23,72 @@ serve(async (req) => {
       );
     }
 
-    const apiKey = Deno.env.get("GOOGLE_PLACES_API_KEY");
+    const apiKey = Deno.env.get("RAPIDAPI_KEY");
     if (!apiKey) {
-      console.error("[fetch-property-image] GOOGLE_PLACES_API_KEY not configured");
+      console.error("[fetch-property-image] RAPIDAPI_KEY not configured");
       return new Response(
-        JSON.stringify({ error: "Google Places API key not configured" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ error: "RapidAPI key not configured", imageUrl: null }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Step 1: Find place from address
-    const findPlaceUrl = `https://maps.googleapis.com/maps/api/place/findplacefromtext/json?input=${encodeURIComponent(address)}&inputtype=textquery&fields=place_id,photos,name&key=${apiKey}`;
-    
-    console.log("[fetch-property-image] Finding place for address:", address);
-    const findPlaceRes = await fetch(findPlaceUrl);
-    const findPlaceData = await findPlaceRes.json();
+    console.log("[fetch-property-image] Fetching image for:", address);
 
-    if (findPlaceData.status !== "OK" || !findPlaceData.candidates?.length) {
-      console.log("[fetch-property-image] No place found for address");
+    // Step 1: Get photos from RapidAPI (Realtor API)
+    const response = await fetch(
+      `https://realtor-data3.p.rapidapi.com/detail/photos?query=${encodeURIComponent(address)}`,
+      {
+        method: "GET",
+        headers: {
+          "x-rapidapi-host": "realtor-data3.p.rapidapi.com",
+          "x-rapidapi-key": apiKey,
+        },
+      }
+    );
+
+    if (!response.ok) {
+      console.error("[fetch-property-image] API error:", response.status);
       return new Response(
-        JSON.stringify({ error: "No place found for this address", imageUrl: null }),
+        JSON.stringify({ error: "Failed to fetch photos", imageUrl: null }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const data = await response.json();
+    console.log("[fetch-property-image] Response:", JSON.stringify(data).slice(0, 300));
+
+    // Extract first photo URL
+    let firstPhotoUrl: string | null = null;
+
+    if (Array.isArray(data) && data.length > 0) {
+      firstPhotoUrl = typeof data[0] === 'string' ? data[0] : (data[0].url || data[0].href || data[0].photo_url);
+    } else if (data.photos && Array.isArray(data.photos) && data.photos.length > 0) {
+      const p = data.photos[0];
+      firstPhotoUrl = typeof p === 'string' ? p : (p.url || p.href || p.photo_url);
+    } else if (data.data && Array.isArray(data.data) && data.data.length > 0) {
+      const p = data.data[0];
+      firstPhotoUrl = typeof p === 'string' ? p : (p.url || p.href || p.photo_url);
+    } else if (data.result?.photos && data.result.photos.length > 0) {
+      const p = data.result.photos[0];
+      firstPhotoUrl = typeof p === 'string' ? p : (p.url || p.href);
+    }
+
+    if (!firstPhotoUrl) {
+      console.log("[fetch-property-image] No photos found for this address");
+      return new Response(
+        JSON.stringify({ error: "No photos found", imageUrl: null }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const place = findPlaceData.candidates[0];
-    console.log("[fetch-property-image] Found place:", place.name);
+    console.log("[fetch-property-image] Found photo:", firstPhotoUrl);
 
-    // Check if place has photos
-    if (!place.photos || place.photos.length === 0) {
-      console.log("[fetch-property-image] No photos available for this place");
-      return new Response(
-        JSON.stringify({ error: "No photos available", imageUrl: null }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    // Step 2: Get the first photo reference
-    const photoReference = place.photos[0].photo_reference;
-    const photoUrl = `https://maps.googleapis.com/maps/api/place/photo?maxwidth=800&photo_reference=${photoReference}&key=${apiKey}`;
-
-    console.log("[fetch-property-image] Fetching photo...");
-    
-    // Step 3: Fetch the actual image
-    const photoRes = await fetch(photoUrl);
+    // Step 2: Download the image
+    const photoRes = await fetch(firstPhotoUrl);
     if (!photoRes.ok) {
-      console.error("[fetch-property-image] Failed to fetch photo");
+      console.error("[fetch-property-image] Failed to download photo");
       return new Response(
-        JSON.stringify({ error: "Failed to fetch photo", imageUrl: null }),
+        JSON.stringify({ error: "Failed to download photo", imageUrl: firstPhotoUrl }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -78,13 +96,13 @@ serve(async (req) => {
     const imageBlob = await photoRes.blob();
     const imageBuffer = await imageBlob.arrayBuffer();
 
-    // Step 4: Upload to Supabase Storage
+    // Step 3: Upload to Supabase Storage
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const fileName = `${propertyId || Date.now()}-google-places.jpg`;
-    
+    const fileName = `${propertyId || Date.now()}-realtor.jpg`;
+
     const { error: uploadError } = await supabase.storage
       .from("property-images")
       .upload(fileName, imageBuffer, {
@@ -95,7 +113,7 @@ serve(async (req) => {
     if (uploadError) {
       console.error("[fetch-property-image] Upload error:", uploadError);
       return new Response(
-        JSON.stringify({ error: "Failed to upload image", imageUrl: null }),
+        JSON.stringify({ error: "Failed to upload image", imageUrl: firstPhotoUrl }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -106,7 +124,7 @@ serve(async (req) => {
 
     console.log("[fetch-property-image] Image uploaded successfully:", publicUrl);
 
-    // Step 5: Update property if propertyId provided
+    // Step 4: Update property if propertyId provided
     if (propertyId) {
       const { error: updateError } = await supabase
         .from("properties")
@@ -115,6 +133,8 @@ serve(async (req) => {
 
       if (updateError) {
         console.error("[fetch-property-image] Failed to update property:", updateError);
+      } else {
+        console.log("[fetch-property-image] Property image_path updated");
       }
     }
 
@@ -126,7 +146,7 @@ serve(async (req) => {
     console.error("[fetch-property-image] Error:", error);
     return new Response(
       JSON.stringify({ error: error.message, imageUrl: null }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });
