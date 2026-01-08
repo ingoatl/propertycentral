@@ -45,7 +45,7 @@ export function AddressAutocomplete({
   const inputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Search Nominatim API - try multiple query strategies for better results
+  // Search Nominatim API with better street address handling
   const searchAddress = useCallback(async (query: string) => {
     if (query.length < 3) {
       setSuggestions([]);
@@ -54,64 +54,87 @@ export function AddressAutocomplete({
 
     setIsLoading(true);
     try {
-      let allResults: NominatimResult[] = [];
+      // Clean and prepare query
+      const cleanQuery = query.trim();
       
-      // Strategy 1: Direct search with street type hints
-      const searchQueries = [
-        query,
-        `${query}, USA`,
-        // Add common street suffixes if user typed partial
-        ...(query.match(/\d+/) && !query.match(/(st|street|rd|road|ave|avenue|dr|drive|ln|lane|ct|court|way|blvd|cir|circle)/i) 
-          ? [`${query} road`, `${query} drive`, `${query} street`] 
-          : [])
-      ];
+      // Use Photon API (based on Nominatim but better for autocomplete)
+      // Falls back to Nominatim if needed
+      const photonResponse = await fetch(
+        `https://photon.komoot.io/api/?` +
+        new URLSearchParams({
+          q: cleanQuery,
+          limit: "8",
+          lang: "en",
+          layer: "house,street",
+        })
+      );
       
-      for (const searchQuery of searchQueries) {
-        if (allResults.length >= 5) break;
-        
-        const response = await fetch(
-          `https://nominatim.openstreetmap.org/search?` +
-          new URLSearchParams({
-            q: searchQuery,
-            format: "json",
-            addressdetails: "1",
-            limit: "5",
-            countrycodes: "us",
-          }),
-          {
-            headers: {
-              "Accept-Language": "en",
-              "User-Agent": "PropertyManagementApp/1.0",
-            },
+      if (photonResponse.ok) {
+        const photonData = await photonResponse.json();
+        if (photonData.features && photonData.features.length > 0) {
+          // Filter to US addresses and convert to our format
+          const results: NominatimResult[] = photonData.features
+            .filter((f: any) => f.properties?.country === "United States")
+            .map((f: any) => {
+              const props = f.properties;
+              const parts = [
+                props.housenumber,
+                props.street,
+                props.city,
+                props.state,
+                props.postcode,
+                props.country
+              ].filter(Boolean);
+              
+              return {
+                place_id: f.properties.osm_id || Math.random(),
+                display_name: parts.join(", "),
+                lat: String(f.geometry.coordinates[1]),
+                lon: String(f.geometry.coordinates[0]),
+                address: {
+                  house_number: props.housenumber,
+                  road: props.street,
+                  city: props.city,
+                  state: props.state,
+                  postcode: props.postcode,
+                  country: props.country,
+                },
+              };
+            });
+          
+          if (results.length > 0) {
+            setSuggestions(results);
+            setShowSuggestions(true);
+            setHighlightedIndex(-1);
+            setIsLoading(false);
+            return;
           }
-        );
-        
-        if (response.ok) {
-          const data: NominatimResult[] = await response.json();
-          // Deduplicate by place_id
-          data.forEach(item => {
-            if (!allResults.find(r => r.place_id === item.place_id)) {
-              allResults.push(item);
-            }
-          });
-        }
-        
-        // Small delay to respect Nominatim rate limits
-        if (allResults.length === 0) {
-          await new Promise(r => setTimeout(r, 100));
         }
       }
       
-      // Sort results to prioritize those with house numbers (actual addresses)
-      allResults.sort((a, b) => {
-        const aHasNumber = a.address?.house_number ? 1 : 0;
-        const bHasNumber = b.address?.house_number ? 1 : 0;
-        return bHasNumber - aHasNumber;
-      });
+      // Fallback to Nominatim
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?` +
+        new URLSearchParams({
+          q: `${cleanQuery}, USA`,
+          format: "json",
+          addressdetails: "1",
+          limit: "8",
+        }),
+        {
+          headers: {
+            "Accept-Language": "en",
+            "User-Agent": "PropertyManagementApp/1.0",
+          },
+        }
+      );
       
-      setSuggestions(allResults.slice(0, 8));
-      setShowSuggestions(allResults.length > 0);
-      setHighlightedIndex(-1);
+      if (response.ok) {
+        const data: NominatimResult[] = await response.json();
+        setSuggestions(data);
+        setShowSuggestions(data.length > 0);
+        setHighlightedIndex(-1);
+      }
     } catch (error) {
       console.error("[AddressAutocomplete] Search error:", error);
       setSuggestions([]);
