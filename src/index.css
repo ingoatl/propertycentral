@@ -372,7 +372,60 @@ All colors MUST be HSL.
   font-family: 'Lato', 'Open Sans', -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
-/* Google Places Autocomplete dropdown - ensure high z-index */
+/* Google Places Autocomplete - New PlaceAutocompleteElement styling */
+.google-places-container {
+  width: 100%;
+}
+
+.google-places-container gmp-place-autocomplete {
+  width: 100% !important;
+  font-family: inherit !important;
+}
+
+/* Style the internal input of PlaceAutocompleteElement */
+.google-places-container gmp-place-autocomplete::part(input) {
+  height: 40px !important;
+  padding: 8px 12px !important;
+  font-size: 14px !important;
+  border: 1px solid hsl(var(--border)) !important;
+  border-radius: 6px !important;
+  background-color: hsl(var(--background)) !important;
+  color: hsl(var(--foreground)) !important;
+  width: 100% !important;
+  outline: none !important;
+}
+
+.google-places-container gmp-place-autocomplete::part(input):focus {
+  border-color: hsl(var(--ring)) !important;
+  box-shadow: 0 0 0 2px hsl(var(--ring) / 0.2) !important;
+}
+
+.google-places-container gmp-place-autocomplete::part(input)::placeholder {
+  color: hsl(var(--muted-foreground)) !important;
+}
+
+/* Style the suggestions dropdown */
+.google-places-container gmp-place-autocomplete::part(list) {
+  border: 1px solid hsl(var(--border)) !important;
+  border-radius: 8px !important;
+  background-color: hsl(var(--background)) !important;
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1) !important;
+  margin-top: 4px !important;
+  z-index: 9999 !important;
+}
+
+.google-places-container gmp-place-autocomplete::part(list-item) {
+  padding: 10px 12px !important;
+  color: hsl(var(--foreground)) !important;
+  cursor: pointer !important;
+}
+
+.google-places-container gmp-place-autocomplete::part(list-item):hover,
+.google-places-container gmp-place-autocomplete::part(list-item-selected) {
+  background-color: hsl(var(--accent)) !important;
+}
+
+/* Legacy pac-container for backwards compatibility */
 .pac-container {
   z-index: 9999 !important;
   background-color: hsl(var(--background)) !important;
