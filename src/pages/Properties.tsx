@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Plus, Trash2, MapPin, Building2, Edit, ClipboardList, FileText, Upload, Image as ImageIcon, Search, Database, PowerOff, Archive, ListChecks } from "lucide-react";
 import villa14Image from "@/assets/villa14.jpg";
+import { GooglePlacesAutocomplete } from "@/components/ui/google-places-autocomplete";
 import { WorkflowDialog } from "@/components/onboarding/WorkflowDialog";
 import { PropertyDetailsModal } from "@/components/onboarding/PropertyDetailsModal";
 import { DataForListingPlatforms } from "@/components/onboarding/DataForListingPlatforms";
@@ -389,7 +390,7 @@ const Properties = () => {
         }
       }
 
-      const { error } = await supabase
+      const { data: newProperty, error } = await supabase
         .from("properties")
         .insert({
           name: formData.name.trim(),
@@ -399,9 +400,22 @@ const Properties = () => {
           management_fee_percentage: managementFeePercentage,
           user_id: user.id,
           owner_id: ownerId,
-        });
+        })
+        .select()
+        .single();
 
       if (error) throw error;
+
+      // Auto-fetch property image from Google Places
+      if (newProperty && formData.address.trim()) {
+        try {
+          await supabase.functions.invoke("fetch-property-image", {
+            body: { address: formData.address.trim(), propertyId: newProperty.id },
+          });
+        } catch (imgError) {
+          console.log("Auto-image fetch failed, property still created:", imgError);
+        }
+      }
 
       setFormData({ name: "", address: "", visitPrice: "", rentalType: "", managementFeePercentage: "", ownerName: "", ownerEmail: "", ownerPhone: "" });
       setShowForm(false);
@@ -856,13 +870,12 @@ const Properties = () => {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="address">Address</Label>
-                <Input
+                <GooglePlacesAutocomplete
                   id="address"
                   placeholder="123 Peach St, Atlanta, GA"
                   value={formData.address}
-                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                  onChange={(value) => setFormData({ ...formData, address: value })}
                   className="text-base"
-                  maxLength={500}
                   required
                 />
               </div>
