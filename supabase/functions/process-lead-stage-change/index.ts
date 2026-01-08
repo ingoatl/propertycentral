@@ -450,6 +450,7 @@ function buildCoHostingPaymentEmailHtml(recipientName: string, stripeUrl: string
 function buildFullServicePaymentEmailHtml(recipientName: string, stripeUrl: string, propertyAddress: string, currentStage: string): string {
   return buildBrandedEmailHtml(recipientName, "Set Up Your Payout Account", [
     {
+      isIntro: true,
       content: "Congratulations on signing your property management agreement with PeachHaus Group LLC! 🎉"
     },
     {
@@ -492,6 +493,7 @@ function buildFullServicePaymentEmailHtml(recipientName: string, stripeUrl: stri
 function buildInspectionSchedulingEmailHtml(recipientName: string, bookingUrl: string, currentStage: string): string {
   return buildBrandedEmailHtml(recipientName, "Schedule Your Onboarding Inspection", [
     {
+      isIntro: true,
       content: "You're almost there! The final step before going live is to schedule your onboarding inspection."
     },
     {
@@ -523,6 +525,7 @@ function buildInspectionSchedulingEmailHtml(recipientName: string, bookingUrl: s
 function buildWelcomeEmailHtml(recipientName: string, propertyAddress: string): string {
   return buildBrandedEmailHtml(recipientName, "Welcome to PeachHaus", [
     {
+      isIntro: true,
       content: `Thank you for your interest in PeachHaus property management! We're excited to learn more about your property${propertyAddress ? ` at <strong>${propertyAddress}</strong>` : ''}.`
     },
     {
@@ -549,6 +552,7 @@ function buildWelcomeEmailHtml(recipientName: string, propertyAddress: string): 
 function buildFollowUpEmailHtml(recipientName: string): string {
   return buildBrandedEmailHtml(recipientName, "Quick Follow-Up", [
     {
+      isIntro: true,
       content: "I wanted to follow up on your property management inquiry."
     },
     {
@@ -568,6 +572,7 @@ function buildFollowUpEmailHtml(recipientName: string): string {
 function buildCallScheduledEmailHtml(recipientName: string, propertyAddress: string): string {
   return buildBrandedEmailHtml(recipientName, "Your Discovery Call is Confirmed", [
     {
+      isIntro: true,
       content: `I'm looking forward to our upcoming conversation about your property${propertyAddress ? ` at <strong>${propertyAddress}</strong>` : ''}.`
     },
     {
@@ -594,6 +599,7 @@ function buildCallScheduledEmailHtml(recipientName: string, propertyAddress: str
 function buildCallAttendedEmailHtml(recipientName: string, propertyAddress: string, aiSummary: string): string {
   return buildBrandedEmailHtml(recipientName, "Next Steps After Our Conversation", [
     {
+      isIntro: true,
       content: `Thank you for the great conversation today! Based on what we discussed, I'm confident PeachHaus is the right partner for your property${propertyAddress ? ` at <strong>${propertyAddress}</strong>` : ''}.`
     },
     {
@@ -620,6 +626,7 @@ function buildCallAttendedEmailHtml(recipientName: string, propertyAddress: stri
 function buildContractOutEmailHtml(recipientName: string, propertyAddress: string): string {
   return buildBrandedEmailHtml(recipientName, "Your Management Agreement is Ready", [
     {
+      isIntro: true,
       content: `Your management agreement${propertyAddress ? ` for <strong>${propertyAddress}</strong>` : ''} is ready for review and signature.`
     },
     {
@@ -647,6 +654,7 @@ function buildContractOutEmailHtml(recipientName: string, propertyAddress: strin
 function buildOpsHandoffEmailHtml(recipientName: string): string {
   return buildBrandedEmailHtml(recipientName, "Your Property is in Good Hands", [
     {
+      isIntro: true,
       content: "Great news — your onboarding is complete and your property is now with our operations team!"
     },
     {
@@ -869,21 +877,36 @@ serve(async (req) => {
       const recipientFirstName = lead.name?.split(' ')[0] || lead.name || "there";
       let directEmailHtml: string | null = null;
       let directEmailSubject: string = "";
+      let sendAdminCopy = false;
+      let adminEmailSubject = "";
       
       // Handle each stage that needs a direct email
-      if (newStage === 'onboarding_form_requested') {
+      if (newStage === 'ach_form_signed') {
+        // Payment method saved - send onboarding form email
+        directEmailHtml = buildOnboardingEmailHtml(recipientFirstName, newStage);
+        directEmailSubject = "Complete Your Property Onboarding - PeachHaus";
+        sendAdminCopy = true;
+        adminEmailSubject = `📋 Onboarding Form Email Sent: ${lead.name}`;
+        console.log(`Sending onboarding form email for stage ${newStage}`);
+      } else if (newStage === 'onboarding_form_requested') {
         // This stage needs the onboarding form email
         directEmailHtml = buildOnboardingEmailHtml(recipientFirstName, newStage);
         directEmailSubject = "Complete Your Property Onboarding - PeachHaus";
+        sendAdminCopy = true;
+        adminEmailSubject = `📋 Onboarding Form Email Sent: ${lead.name}`;
         console.log(`Sending direct onboarding form email for stage ${newStage}`);
       } else if (newStage === 'insurance_requested') {
         directEmailHtml = buildInsuranceEmailHtml(recipientFirstName, newStage);
         directEmailSubject = "Insurance Verification Required - PeachHaus";
+        sendAdminCopy = true;
+        adminEmailSubject = `🛡️ Insurance Email Sent: ${lead.name}`;
         console.log(`Sending direct insurance email for stage ${newStage}`);
       } else if (newStage === 'inspection_scheduled') {
         const bookingUrl = "https://cal.com/peachhausgroup/onboarding-inspection";
         directEmailHtml = buildInspectionSchedulingEmailHtml(recipientFirstName, bookingUrl, newStage);
         directEmailSubject = "Schedule Your Onboarding Inspection - PeachHaus";
+        sendAdminCopy = true;
+        adminEmailSubject = `🏠 Inspection Email Sent: ${lead.name}`;
         console.log(`Sending direct inspection scheduling email for stage ${newStage}`);
       }
       
@@ -929,6 +952,40 @@ serve(async (req) => {
               email_type: "direct_stage_email"
             },
           });
+
+          // Send admin notification copy
+          if (sendAdminCopy) {
+            try {
+              await fetch("https://api.resend.com/emails", {
+                method: "POST",
+                headers: {
+                  "Authorization": `Bearer ${directResendApiKey}`,
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  from: "PeachHaus Notifications <notifications@peachhausgroup.com>",
+                  to: ["info@peachhausgroup.com"],
+                  subject: adminEmailSubject,
+                  html: `
+                    <h2>${adminEmailSubject}</h2>
+                    <p><strong>Lead:</strong> ${lead.name}</p>
+                    <p><strong>Email:</strong> ${lead.email}</p>
+                    <p><strong>Phone:</strong> ${lead.phone || 'N/A'}</p>
+                    <p><strong>Property:</strong> ${lead.property_address || 'Not specified'}</p>
+                    <p><strong>Stage:</strong> ${newStage}</p>
+                    <hr>
+                    <p>The following email was sent to the lead:</p>
+                    <div style="border: 1px solid #e5e7eb; padding: 16px; margin-top: 16px; border-radius: 8px;">
+                      <p><strong>Subject:</strong> ${directEmailSubject}</p>
+                    </div>
+                  `,
+                }),
+              });
+              console.log(`Admin notification sent for ${newStage}`);
+            } catch (adminEmailError) {
+              console.error("Failed to send admin notification:", adminEmailError);
+            }
+          }
         } catch (emailError) {
           console.error(`Error sending direct stage email for ${newStage}:`, emailError);
         }
