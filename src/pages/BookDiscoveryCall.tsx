@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState } from "react";
 import { 
   Calendar, Clock, User, Check, ArrowRight, ArrowLeft, MapPin, Target, 
   Sparkles, Video, PhoneCall, Home, Briefcase, Building, AlertCircle, Users
@@ -17,6 +17,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format, addDays, setHours, setMinutes, isBefore, addMinutes, getDay } from "date-fns";
 import { cn } from "@/lib/utils";
+import { AddressAutocomplete } from "@/components/ui/address-autocomplete";
 
 const GOOGLE_MEET_LINK = "https://meet.google.com/jww-deey-iaa";
 
@@ -134,8 +135,6 @@ export default function BookDiscoveryCall() {
   const [step, setStep] = useState(1);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
-  const addressInputRef = useRef<HTMLInputElement>(null);
-  const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
   
   const [formData, setFormData] = useState({
     name: "",
@@ -155,106 +154,6 @@ export default function BookDiscoveryCall() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [isBooked, setIsBooked] = useState(false);
-  const [mapsLoaded, setMapsLoaded] = useState(false);
-  const [mapsError, setMapsError] = useState(false);
-
-  // Load Google Maps API
-  useEffect(() => {
-    const loadGoogleMaps = async () => {
-      try {
-        // Check if already loaded
-        if (window.google?.maps?.places) {
-          console.log("[BookDiscoveryCall] Google Maps already loaded");
-          setMapsLoaded(true);
-          return;
-        }
-
-        // Fetch API key from edge function
-        console.log("[BookDiscoveryCall] Fetching Google Places API key...");
-        const { data, error } = await supabase.functions.invoke("get-google-places-key");
-        
-        if (error) {
-          console.error("[BookDiscoveryCall] Error fetching API key:", error);
-          setMapsError(true);
-          return;
-        }
-        
-        if (!data?.apiKey) {
-          console.error("[BookDiscoveryCall] No API key returned");
-          setMapsError(true);
-          return;
-        }
-
-        console.log("[BookDiscoveryCall] Got API key, loading script...");
-
-        // Check if script already exists
-        const existingScript = document.querySelector('script[src*="maps.googleapis.com"]');
-        if (existingScript) {
-          console.log("[BookDiscoveryCall] Script already exists, waiting for load...");
-          const checkLoaded = () => {
-            if (window.google?.maps?.places) {
-              setMapsLoaded(true);
-            } else {
-              setTimeout(checkLoaded, 100);
-            }
-          };
-          checkLoaded();
-          return;
-        }
-
-        // Load script
-        const script = document.createElement("script");
-        script.src = `https://maps.googleapis.com/maps/api/js?key=${data.apiKey}&libraries=places`;
-        script.async = true;
-        script.defer = true;
-        script.onload = () => {
-          console.log("[BookDiscoveryCall] Google Maps script loaded");
-          setMapsLoaded(true);
-        };
-        script.onerror = () => {
-          console.error("[BookDiscoveryCall] Failed to load Google Maps script");
-          setMapsError(true);
-        };
-        document.head.appendChild(script);
-      } catch (err) {
-        console.error("[BookDiscoveryCall] Error loading Google Maps:", err);
-        setMapsError(true);
-      }
-    };
-
-    loadGoogleMaps();
-  }, []);
-
-  // Initialize autocomplete when maps loaded and on step 2
-  useEffect(() => {
-    if (!mapsLoaded || !addressInputRef.current || step !== 2) return;
-    
-    // Don't reinitialize if already set up
-    if (autocompleteRef.current) return;
-
-    console.log("[BookDiscoveryCall] Initializing autocomplete...");
-    
-    try {
-      autocompleteRef.current = new google.maps.places.Autocomplete(addressInputRef.current, {
-        types: ["address"],
-        componentRestrictions: { country: "us" },
-        fields: ["formatted_address", "geometry"],
-      });
-
-      autocompleteRef.current.addListener("place_changed", () => {
-        const place = autocompleteRef.current?.getPlace();
-        console.log("[BookDiscoveryCall] Place selected:", place?.formatted_address);
-        if (place?.formatted_address) {
-          setFormData(prev => ({ ...prev, propertyAddress: place.formatted_address! }));
-          setErrors(prev => ({ ...prev, propertyAddress: "" }));
-        }
-      });
-      
-      console.log("[BookDiscoveryCall] Autocomplete initialized successfully");
-    } catch (err) {
-      console.error("[BookDiscoveryCall] Error initializing autocomplete:", err);
-    }
-  }, [mapsLoaded, step]);
 
   // Fetch availability slots
   const { data: availabilitySlots = [] } = useQuery({
@@ -661,15 +560,15 @@ export default function BookDiscoveryCall() {
               
               <div>
                 <Label htmlFor="address">Property Address *</Label>
-                <Input
-                  ref={addressInputRef}
+                <AddressAutocomplete
                   id="address"
                   placeholder="Start typing your property address..."
                   value={formData.propertyAddress}
-                  onChange={e => setFormData(prev => ({ ...prev, propertyAddress: e.target.value }))}
-                  onBlur={() => setTouched(prev => ({ ...prev, propertyAddress: true }))}
+                  onChange={(value) => {
+                    setFormData(prev => ({ ...prev, propertyAddress: value }));
+                    setErrors(prev => ({ ...prev, propertyAddress: "" }));
+                  }}
                   className={cn(touched.propertyAddress && errors.propertyAddress && "border-destructive")}
-                  autoComplete="off"
                 />
                 {touched.propertyAddress && errors.propertyAddress && (
                   <p className="text-xs text-destructive mt-1 flex items-center gap-1">
