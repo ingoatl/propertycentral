@@ -45,7 +45,7 @@ export function AddressAutocomplete({
   const inputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Search Nominatim API
+  // Search Nominatim API - try multiple query strategies for better results
   const searchAddress = useCallback(async (query: string) => {
     if (query.length < 3) {
       setSuggestions([]);
@@ -54,39 +54,29 @@ export function AddressAutocomplete({
 
     setIsLoading(true);
     try {
-      // First try with the query as-is
-      let data: NominatimResult[] = [];
+      let allResults: NominatimResult[] = [];
       
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?` +
-        new URLSearchParams({
-          q: query,
-          format: "json",
-          addressdetails: "1",
-          limit: "8",
-          countrycodes: "us",
-        }),
-        {
-          headers: {
-            "Accept-Language": "en",
-            "User-Agent": "PropertyManagementApp/1.0",
-          },
-        }
-      );
+      // Strategy 1: Direct search with street type hints
+      const searchQueries = [
+        query,
+        `${query}, USA`,
+        // Add common street suffixes if user typed partial
+        ...(query.match(/\d+/) && !query.match(/(st|street|rd|road|ave|avenue|dr|drive|ln|lane|ct|court|way|blvd|cir|circle)/i) 
+          ? [`${query} road`, `${query} drive`, `${query} street`] 
+          : [])
+      ];
       
-      if (response.ok) {
-        data = await response.json();
-      }
-      
-      // If no results, try adding "USA" to help with partial addresses
-      if (data.length === 0 && !query.toLowerCase().includes("usa") && !query.toLowerCase().includes("united states")) {
-        const fallbackResponse = await fetch(
+      for (const searchQuery of searchQueries) {
+        if (allResults.length >= 5) break;
+        
+        const response = await fetch(
           `https://nominatim.openstreetmap.org/search?` +
           new URLSearchParams({
-            q: `${query}, USA`,
+            q: searchQuery,
             format: "json",
             addressdetails: "1",
-            limit: "8",
+            limit: "5",
+            countrycodes: "us",
           }),
           {
             headers: {
@@ -96,13 +86,31 @@ export function AddressAutocomplete({
           }
         );
         
-        if (fallbackResponse.ok) {
-          data = await fallbackResponse.json();
+        if (response.ok) {
+          const data: NominatimResult[] = await response.json();
+          // Deduplicate by place_id
+          data.forEach(item => {
+            if (!allResults.find(r => r.place_id === item.place_id)) {
+              allResults.push(item);
+            }
+          });
+        }
+        
+        // Small delay to respect Nominatim rate limits
+        if (allResults.length === 0) {
+          await new Promise(r => setTimeout(r, 100));
         }
       }
       
-      setSuggestions(data);
-      setShowSuggestions(data.length > 0);
+      // Sort results to prioritize those with house numbers (actual addresses)
+      allResults.sort((a, b) => {
+        const aHasNumber = a.address?.house_number ? 1 : 0;
+        const bHasNumber = b.address?.house_number ? 1 : 0;
+        return bHasNumber - aHasNumber;
+      });
+      
+      setSuggestions(allResults.slice(0, 8));
+      setShowSuggestions(allResults.length > 0);
       setHighlightedIndex(-1);
     } catch (error) {
       console.error("[AddressAutocomplete] Search error:", error);
