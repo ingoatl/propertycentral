@@ -272,7 +272,6 @@ export function GooglePlacesAutocomplete({
         placeholder={isLoading ? "Loading address search..." : placeholder}
         className={cn(className, "pr-10")}
         disabled={disabled || isLoading}
-        required={required}
         autoComplete="off"
       />
       <div className="absolute right-3 top-1/2 -translate-y-1/2">
