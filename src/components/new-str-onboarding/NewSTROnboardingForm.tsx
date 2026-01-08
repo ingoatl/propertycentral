@@ -56,6 +56,16 @@ export const NewSTROnboardingForm = () => {
           toast.error("Please select a rental strategy");
           return false;
         }
+        if (formData.hasExistingListing && !formData.existingListingUrl) {
+          toast.error("Please provide your existing listing URL");
+          return false;
+        }
+        return true;
+      case 8:
+        if (formData.hasExistingListing && !formData.existingPhotosLink) {
+          toast.error("Please provide a link to your existing photos");
+          return false;
+        }
         return true;
       case 6:
         if (!formData.strPermitStatus) {

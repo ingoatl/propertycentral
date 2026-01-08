@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Plus, Trash2, MapPin, Building2, Edit, ClipboardList, FileText, Upload, Image as ImageIcon, Search, Database, PowerOff, Archive, ListChecks } from "lucide-react";
+import { Plus, Trash2, MapPin, Building2, Edit, ClipboardList, FileText, Upload, Image as ImageIcon, Search, Database, PowerOff, Archive, ListChecks, Download, Loader2 } from "lucide-react";
 import villa14Image from "@/assets/villa14.jpg";
 import { WorkflowDialog } from "@/components/onboarding/WorkflowDialog";
 import { PropertyDetailsModal } from "@/components/onboarding/PropertyDetailsModal";
@@ -45,6 +45,7 @@ const Properties = () => {
   const [propertyProjectsProgress, setPropertyProjectsProgress] = useState<Record<string, number>>({});
   const [propertySetupTaskCounts, setPropertySetupTaskCounts] = useState<Record<string, number>>({});
   const [uploadingImage, setUploadingImage] = useState<string | null>(null);
+  const [fetchingImage, setFetchingImage] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [propertyTypeFilter, setPropertyTypeFilter] = useState<"All" | "Client-Managed" | "Company-Owned" | "Inactive">("All");
   const [offboardingProperty, setOffboardingProperty] = useState<{ id: string; name: string; address: string } | null>(null);
@@ -314,6 +315,30 @@ const Properties = () => {
       toast.error("Failed to upload image");
     } finally {
       setUploadingImage(null);
+    }
+  };
+
+  const handleFetchPropertyImage = async (propertyId: string, address: string) => {
+    try {
+      setFetchingImage(propertyId);
+      
+      const { data, error } = await supabase.functions.invoke('fetch-property-image', {
+        body: { address, propertyId }
+      });
+
+      if (error) throw error;
+
+      if (data?.imageUrl) {
+        toast.success("Property image fetched successfully");
+        await loadProperties();
+      } else {
+        toast.info("No photos found for this address. Try uploading an image manually.");
+      }
+    } catch (error: any) {
+      console.error("Error fetching property image:", error);
+      toast.error("Failed to fetch property image");
+    } finally {
+      setFetchingImage(null);
     }
   };
 
@@ -594,9 +619,23 @@ const Properties = () => {
               const input = document.getElementById(`property-image-${property.id}`) as HTMLInputElement;
               if (input) input.click();
             }}
+            disabled={uploadingImage === property.id}
           >
-            <Upload className="w-4 h-4 mr-1" />
+            {uploadingImage === property.id ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Upload className="w-4 h-4 mr-1" />}
             Upload
+          </Button>
+          <Button
+            size="sm"
+            variant="secondary"
+            className="shadow-lg"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleFetchPropertyImage(property.id, property.address);
+            }}
+            disabled={fetchingImage === property.id}
+          >
+            {fetchingImage === property.id ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Download className="w-4 h-4 mr-1" />}
+            Fetch
           </Button>
           <Button
             size="sm"

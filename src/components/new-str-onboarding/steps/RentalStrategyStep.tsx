@@ -3,7 +3,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Target, DollarSign, Users } from "lucide-react";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Target, DollarSign, Users, Home } from "lucide-react";
 
 interface RentalStrategyStepProps {
   formData: NewSTROnboardingFormData;
@@ -83,6 +84,53 @@ export const RentalStrategyStep = ({ formData, updateFormData }: RentalStrategyS
               </SelectContent>
             </Select>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Existing Listing */}
+      <Card className="rounded-2xl border-[hsl(25,30%,90%)] shadow-sm">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg text-[hsl(25,40%,25%)]">
+            <Home className="w-5 h-5 text-[hsl(25,95%,50%)]" />
+            Existing Listing
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-3">
+            <Label className="text-[hsl(25,30%,30%)]">Do you currently have an Airbnb or VRBO listing for this property? *</Label>
+            <RadioGroup
+              value={formData.hasExistingListing ? "yes" : "no"}
+              onValueChange={(value) => updateFormData({ hasExistingListing: value === "yes" })}
+              className="flex gap-4"
+            >
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="yes" id="existing-yes" />
+                <Label htmlFor="existing-yes" className="cursor-pointer">Yes</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="no" id="existing-no" />
+                <Label htmlFor="existing-no" className="cursor-pointer">No</Label>
+              </div>
+            </RadioGroup>
+          </div>
+
+          {formData.hasExistingListing && (
+            <div className="space-y-2">
+              <Label htmlFor="existingListingUrl" className="text-[hsl(25,30%,30%)]">
+                Existing Listing URL <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="existingListingUrl"
+                value={formData.existingListingUrl}
+                onChange={(e) => updateFormData({ existingListingUrl: e.target.value })}
+                placeholder="e.g., https://www.airbnb.com/rooms/123456"
+                className="h-12 rounded-xl border-[hsl(25,30%,85%)]"
+              />
+              <p className="text-xs text-[hsl(25,20%,55%)]">
+                Paste the URL of your existing Airbnb, VRBO, or other listing
+              </p>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

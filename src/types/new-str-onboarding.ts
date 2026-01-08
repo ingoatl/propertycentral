@@ -16,6 +16,8 @@ export interface NewSTROnboardingFormData {
   expectedAdr: number | null;
   minimumStay: number | null;
   maxGuests: number | null;
+  hasExistingListing: boolean;
+  existingListingUrl: string;
 
   // Step 3: Infrastructure & Utilities
   wifiReady: boolean;
@@ -165,6 +167,8 @@ export const initialNewSTRFormData: NewSTROnboardingFormData = {
   expectedAdr: null,
   minimumStay: null,
   maxGuests: null,
+  hasExistingListing: false,
+  existingListingUrl: '',
 
   // Step 3
   wifiReady: false,
