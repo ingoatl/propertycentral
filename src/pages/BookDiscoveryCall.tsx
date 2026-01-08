@@ -1,67 +1,215 @@
-import { useState, useCallback } from "react";
-import { Calendar, Clock, User, Mail, Phone, Check, ArrowRight, ArrowLeft, MapPin, Target, Sparkles, AlertCircle } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { 
+  Calendar, Clock, User, Check, ArrowRight, ArrowLeft, MapPin, Target, 
+  Sparkles, Video, PhoneCall, Home, Briefcase, Building, AlertCircle, Users
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { GooglePlacesAutocomplete } from "@/components/ui/google-places-autocomplete";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format, addDays, setHours, setMinutes, isBefore, addMinutes, getDay } from "date-fns";
 import { cn } from "@/lib/utils";
-import { emailSchema, phoneSchema, formatPhoneNumber, validateField } from "@/lib/validation";
 
-// Generate time slots dynamically based on availability
+const GOOGLE_MEET_LINK = "https://meet.google.com/jww-deey-iaa";
+
+// Generate 30-minute time slots
 const generateTimeSlots = (startHour: number, endHour: number) => {
   const slots: string[] = [];
   for (let hour = startHour; hour < endHour; hour++) {
-    for (let minute = 0; minute < 60; minute += 15) {
-      const time = `${hour.toString().padStart(2, "0")}:${minute.toString().padStart(2, "0")}`;
-      slots.push(time);
-    }
+    slots.push(`${hour.toString().padStart(2, "0")}:00`);
+    slots.push(`${hour.toString().padStart(2, "0")}:30`);
   }
   return slots;
 };
 
+// Property types
+const PROPERTY_TYPES = [
+  { value: "single_family", label: "Single Family Home", icon: Home },
+  { value: "condo", label: "Condo / Townhouse", icon: Building },
+  { value: "vacation_home", label: "Vacation Home", icon: Home },
+  { value: "investment", label: "Investment Property", icon: Briefcase },
+];
+
+// Current management situation - key qualifying question
+const CURRENT_MANAGEMENT = [
+  { value: "self_managing", label: "I'm currently self-managing", description: "Handling everything myself but looking for help" },
+  { value: "unhappy_pm", label: "Unhappy with current PM", description: "Have a property manager but not satisfied" },
+  { value: "new_property", label: "New property / Just purchased", description: "Getting started with a new investment" },
+  { value: "switching_use", label: "Switching rental strategy", description: "Moving from long-term to short-term or vice versa" },
+  { value: "exploring", label: "Just exploring options", description: "Researching before making any decisions" },
+];
+
+// Service interest
+const SERVICE_INTERESTS = [
+  { 
+    value: "property_management", 
+    label: "Full Property Management", 
+    icon: Briefcase, 
+    description: "We handle everything: guests, maintenance, cleaning, and more",
+    recommended: true
+  },
+  { 
+    value: "cohosting", 
+    label: "Co-hosting Partnership", 
+    icon: Users, 
+    description: "We assist while you stay involved in key decisions" 
+  },
+];
+
+// Timeline - when do they want to start
+const START_TIMELINES = [
+  { value: "asap", label: "As soon as possible", urgency: "high" },
+  { value: "within_2_weeks", label: "Within 2 weeks", urgency: "high" },
+  { value: "within_month", label: "Within the next month", urgency: "medium" },
+  { value: "1_3_months", label: "1-3 months from now", urgency: "low" },
+  { value: "exploring", label: "Just exploring options", urgency: "low" },
+];
+
+// Meeting types
+const MEETING_TYPES = [
+  { 
+    value: "video", 
+    label: "Video Call", 
+    icon: Video, 
+    description: "Better presentation with screen sharing via Google Meet",
+    recommended: true
+  },
+  { 
+    value: "phone", 
+    label: "Phone Call", 
+    icon: PhoneCall, 
+    description: "Quick and convenient - we'll call you" 
+  },
+];
+
+// Goals
 const PROPERTY_GOALS = [
   { id: "maximize_revenue", label: "Maximize rental revenue" },
   { id: "minimize_hassle", label: "Minimize day-to-day hassle" },
   { id: "maintain_property", label: "Keep property well-maintained" },
   { id: "flexible_use", label: "Balance personal use with rentals" },
-  { id: "long_term_tenant", label: "Find a reliable long-term tenant" },
   { id: "not_sure", label: "Not sure yet, need guidance" },
 ];
 
-const PROPERTY_TYPES = [
-  { value: "single_family", label: "Single Family Home" },
-  { value: "condo", label: "Condo / Townhouse" },
-  { value: "multi_unit", label: "Multi-Unit Property" },
-  { value: "vacation_home", label: "Vacation / Second Home" },
-  { value: "investment", label: "Investment Property" },
-];
+// Email validation regex
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// Phone validation - at least 10 digits
+const validatePhone = (phone: string): boolean => {
+  const digits = phone.replace(/\D/g, "");
+  return digits.length >= 10 && digits.length <= 11;
+};
+
+// Format phone as user types
+const formatPhone = (value: string): string => {
+  const digits = value.replace(/\D/g, "");
+  if (digits.length <= 3) return digits;
+  if (digits.length <= 6) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
+  if (digits.length <= 10) return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6, 10)}`;
+};
 
 export default function BookDiscoveryCall() {
+  const queryClient = useQueryClient();
   const [step, setStep] = useState(1);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
+  const addressInputRef = useRef<HTMLInputElement>(null);
+  const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
+  
   const [formData, setFormData] = useState({
     name: "",
     email: "",
     phone: "",
     propertyAddress: "",
     propertyType: "",
+    currentManagement: "",
+    serviceInterest: "",
+    startTimeline: "",
+    meetingType: "video",
     goals: [] as string[],
     additionalNotes: "",
   });
-  const [errors, setErrors] = useState<{ email?: string; phone?: string }>({});
-  const [touched, setTouched] = useState<{ email?: boolean; phone?: boolean }>({});
+  
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [isBooked, setIsBooked] = useState(false);
+  const [mapsLoaded, setMapsLoaded] = useState(false);
+
+  // Load Google Maps API
+  useEffect(() => {
+    const loadGoogleMaps = async () => {
+      try {
+        // Check if already loaded
+        if (window.google?.maps?.places) {
+          setMapsLoaded(true);
+          return;
+        }
+
+        // Fetch API key
+        const { data, error } = await supabase.functions.invoke("get-google-places-key");
+        if (error || !data?.apiKey) {
+          console.error("Failed to get Google Places API key:", error);
+          return;
+        }
+
+        // Check if script already exists
+        const existingScript = document.querySelector('script[src*="maps.googleapis.com"]');
+        if (existingScript) {
+          if (window.google?.maps?.places) {
+            setMapsLoaded(true);
+          } else {
+            existingScript.addEventListener("load", () => setMapsLoaded(true));
+          }
+          return;
+        }
+
+        // Load script
+        const script = document.createElement("script");
+        script.src = `https://maps.googleapis.com/maps/api/js?key=${data.apiKey}&libraries=places`;
+        script.async = true;
+        script.defer = true;
+        script.onload = () => setMapsLoaded(true);
+        script.onerror = () => console.error("Failed to load Google Maps");
+        document.head.appendChild(script);
+      } catch (err) {
+        console.error("Error loading Google Maps:", err);
+      }
+    };
+
+    loadGoogleMaps();
+  }, []);
+
+  // Initialize autocomplete when maps loaded and input exists
+  useEffect(() => {
+    if (!mapsLoaded || !addressInputRef.current || autocompleteRef.current) return;
+
+    try {
+      autocompleteRef.current = new google.maps.places.Autocomplete(addressInputRef.current, {
+        types: ["address"],
+        componentRestrictions: { country: "us" },
+        fields: ["formatted_address", "geometry"],
+      });
+
+      autocompleteRef.current.addListener("place_changed", () => {
+        const place = autocompleteRef.current?.getPlace();
+        if (place?.formatted_address) {
+          setFormData(prev => ({ ...prev, propertyAddress: place.formatted_address! }));
+          setErrors(prev => ({ ...prev, propertyAddress: "" }));
+        }
+      });
+    } catch (err) {
+      console.error("Error initializing autocomplete:", err);
+    }
+  }, [mapsLoaded, step]);
 
   // Fetch availability slots
   const { data: availabilitySlots = [] } = useQuery({
@@ -83,11 +231,11 @@ export default function BookDiscoveryCall() {
         .from("blocked_dates")
         .select("date")
         .gte("date", new Date().toISOString().split("T")[0]);
-      return data?.map((d) => new Date(d.date)) || [];
+      return data?.map(d => new Date(d.date)) || [];
     },
   });
 
-  // Fetch existing scheduled calls
+  // Fetch existing calls
   const { data: existingCalls = [] } = useQuery({
     queryKey: ["public-discovery-calls"],
     queryFn: async () => {
@@ -100,45 +248,39 @@ export default function BookDiscoveryCall() {
     },
   });
 
-  // Get available days based on availability slots
-  const availableDays = availabilitySlots.map((slot) => slot.day_of_week);
+  const availableDays = availabilitySlots.map(slot => slot.day_of_week);
 
-  // Check if a date is disabled
   const isDateDisabled = (date: Date) => {
     const dayOfWeek = getDay(date);
-    const isBlocked = blockedDates.some(
-      (blocked) => format(blocked, "yyyy-MM-dd") === format(date, "yyyy-MM-dd")
+    const isBlocked = blockedDates.some(blocked => 
+      format(blocked, "yyyy-MM-dd") === format(date, "yyyy-MM-dd")
     );
     const isPast = isBefore(date, addDays(new Date(), -1));
     const isAvailable = availableDays.length === 0 || availableDays.includes(dayOfWeek);
     return isPast || isBlocked || !isAvailable;
   };
 
-  // Get time slots for selected date
   const getTimeSlotsForDate = (date: Date) => {
     const dayOfWeek = getDay(date);
-    const slot = availabilitySlots.find((s) => s.day_of_week === dayOfWeek);
-    if (!slot) return generateTimeSlots(9, 17); // Default 9am-5pm
-
+    const slot = availabilitySlots.find(s => s.day_of_week === dayOfWeek);
+    if (!slot) return generateTimeSlots(9, 17);
     const startHour = parseInt(slot.start_time.split(":")[0]);
     const endHour = parseInt(slot.end_time.split(":")[0]);
     return generateTimeSlots(startHour, endHour);
   };
 
-  // Check if time is booked
   const isTimeSlotBooked = (date: Date, time: string) => {
     const [hours, minutes] = time.split(":").map(Number);
     const slotStart = setMinutes(setHours(date, hours), minutes);
-    const slotEnd = addMinutes(slotStart, 15);
+    const slotEnd = addMinutes(slotStart, 30);
 
-    return existingCalls.some((call) => {
+    return existingCalls.some(call => {
       const callStart = new Date(call.scheduled_at);
-      const callEnd = addMinutes(callStart, call.duration_minutes || 15);
-      return slotStart >= callStart && slotStart < callEnd;
+      const callEnd = addMinutes(callStart, call.duration_minutes || 30);
+      return slotStart < callEnd && slotEnd > callStart;
     });
   };
 
-  // Check if time is past
   const isTimeSlotPast = (date: Date, time: string) => {
     const [hours, minutes] = time.split(":").map(Number);
     const slotTime = setMinutes(setHours(date, hours), minutes);
@@ -146,72 +288,51 @@ export default function BookDiscoveryCall() {
   };
 
   const availableTimeSlots = selectedDate
-    ? getTimeSlotsForDate(selectedDate).filter(
-        (time) =>
-          !isTimeSlotBooked(selectedDate, time) &&
-          !isTimeSlotPast(selectedDate, time)
+    ? getTimeSlotsForDate(selectedDate).filter(time => 
+        !isTimeSlotBooked(selectedDate, time) && !isTimeSlotPast(selectedDate, time)
       )
     : [];
 
+  // Validation
+  const validateStep1 = () => {
+    const newErrors: Record<string, string> = {};
+    
+    if (!formData.name.trim() || formData.name.trim().length < 2) {
+      newErrors.name = "Please enter your full name";
+    }
+    if (!formData.email.trim()) {
+      newErrors.email = "Email is required";
+    } else if (!EMAIL_REGEX.test(formData.email)) {
+      newErrors.email = "Please enter a valid email address";
+    }
+    if (!formData.phone.trim()) {
+      newErrors.phone = "Phone number is required";
+    } else if (!validatePhone(formData.phone)) {
+      newErrors.phone = "Please enter a valid 10-digit phone number";
+    }
+    
+    setErrors(newErrors);
+    setTouched({ name: true, email: true, phone: true });
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const validateStep2 = () => {
+    const newErrors: Record<string, string> = {};
+    if (!formData.propertyAddress.trim() || formData.propertyAddress.length < 10) {
+      newErrors.propertyAddress = "Please enter a complete property address";
+    }
+    setErrors(prev => ({ ...prev, ...newErrors }));
+    setTouched(prev => ({ ...prev, propertyAddress: true }));
+    return !newErrors.propertyAddress;
+  };
+
   const toggleGoal = (goalId: string) => {
-    setFormData((prev) => ({
+    setFormData(prev => ({
       ...prev,
       goals: prev.goals.includes(goalId)
-        ? prev.goals.filter((g) => g !== goalId)
+        ? prev.goals.filter(g => g !== goalId)
         : [...prev.goals, goalId],
     }));
-  };
-
-  // Validation handlers
-  const validateEmail = useCallback((email: string) => {
-    const error = validateField(emailSchema, email);
-    setErrors((prev) => ({ ...prev, email: error || undefined }));
-    return !error;
-  }, []);
-
-  const validatePhone = useCallback((phone: string) => {
-    const error = validateField(phoneSchema, phone);
-    setErrors((prev) => ({ ...prev, phone: error || undefined }));
-    return !error;
-  }, []);
-
-  const handleEmailChange = (email: string) => {
-    setFormData({ ...formData, email });
-    if (touched.email) {
-      validateEmail(email);
-    }
-  };
-
-  const handlePhoneChange = (rawPhone: string) => {
-    // Format as user types
-    const digitsOnly = rawPhone.replace(/\D/g, "");
-    let formatted = rawPhone;
-    
-    // Auto-format if the user is typing digits
-    if (digitsOnly.length <= 10) {
-      if (digitsOnly.length >= 6) {
-        formatted = `(${digitsOnly.slice(0, 3)}) ${digitsOnly.slice(3, 6)}-${digitsOnly.slice(6)}`;
-      } else if (digitsOnly.length >= 3) {
-        formatted = `(${digitsOnly.slice(0, 3)}) ${digitsOnly.slice(3)}`;
-      } else {
-        formatted = digitsOnly;
-      }
-    }
-    
-    setFormData({ ...formData, phone: formatted });
-    if (touched.phone) {
-      validatePhone(formatted);
-    }
-  };
-
-  const handleEmailBlur = () => {
-    setTouched((prev) => ({ ...prev, email: true }));
-    validateEmail(formData.email);
-  };
-
-  const handlePhoneBlur = () => {
-    setTouched((prev) => ({ ...prev, phone: true }));
-    validatePhone(formData.phone);
   };
 
   // Book mutation
@@ -222,71 +343,85 @@ export default function BookDiscoveryCall() {
       const [hours, minutes] = selectedTime.split(":").map(Number);
       const scheduledAt = setMinutes(setHours(selectedDate, hours), minutes);
 
-      const goalsLabels = formData.goals
-        .map((g) => PROPERTY_GOALS.find((pg) => pg.id === g)?.label)
-        .filter(Boolean)
-        .join(", ");
-
       const notes = [
-        `Property Type: ${PROPERTY_TYPES.find((t) => t.value === formData.propertyType)?.label || "Not specified"}`,
-        `Goals: ${goalsLabels || "Not specified"}`,
-        formData.additionalNotes ? `Additional Notes: ${formData.additionalNotes}` : "",
-      ]
-        .filter(Boolean)
-        .join("\n");
+        `Current Situation: ${CURRENT_MANAGEMENT.find(c => c.value === formData.currentManagement)?.label || "Not specified"}`,
+        `Service Interest: ${SERVICE_INTERESTS.find(s => s.value === formData.serviceInterest)?.label || "Not specified"}`,
+        `Timeline: ${START_TIMELINES.find(t => t.value === formData.startTimeline)?.label || "Not specified"}`,
+        `Meeting Type: ${formData.meetingType === "video" ? "Video Call (Google Meet)" : "Phone Call"}`,
+        `Property Type: ${PROPERTY_TYPES.find(t => t.value === formData.propertyType)?.label || "Not specified"}`,
+        `Goals: ${formData.goals.map(g => PROPERTY_GOALS.find(pg => pg.id === g)?.label).filter(Boolean).join(", ") || "Not specified"}`,
+        formData.additionalNotes ? `Notes: ${formData.additionalNotes}` : "",
+      ].filter(Boolean).join("\n");
 
-      // Create a lead and discovery call
+      // Create lead first
       const { data: lead, error: leadError } = await supabase
         .from("leads")
-        .insert([{
-          name: formData.name,
-          email: formData.email,
+        .insert({
+          name: formData.name.trim(),
+          email: formData.email.trim().toLowerCase(),
           phone: formData.phone,
           property_address: formData.propertyAddress,
-          property_type: formData.propertyType,
-          stage: "call_scheduled" as const,
+          property_type: formData.propertyType || null,
+          stage: "call_scheduled",
           opportunity_source: "website_booking",
           notes: notes,
-        }])
+        })
         .select()
         .single();
 
-      if (leadError) throw leadError;
+      if (leadError) throw new Error(leadError.message);
 
-      const { error: callError } = await supabase.from("discovery_calls").insert({
-        lead_id: lead.id,
-        scheduled_at: scheduledAt.toISOString(),
-        duration_minutes: 30,
-        status: "scheduled",
-        meeting_notes: notes,
-      });
+      // Create discovery call
+      const { data: call, error: callError } = await supabase
+        .from("discovery_calls")
+        .insert({
+          lead_id: lead.id,
+          scheduled_at: scheduledAt.toISOString(),
+          duration_minutes: 30,
+          status: "scheduled",
+          meeting_type: formData.meetingType,
+          service_interest: formData.serviceInterest,
+          start_timeline: formData.startTimeline,
+          meeting_notes: notes,
+          google_meet_link: formData.meetingType === "video" ? GOOGLE_MEET_LINK : null,
+        })
+        .select()
+        .single();
 
-      if (callError) throw callError;
+      if (callError) throw new Error(callError.message);
 
-      return scheduledAt;
+      // Send notifications (don't fail if this errors)
+      try {
+        await Promise.all([
+          supabase.functions.invoke("discovery-call-notifications", {
+            body: { discoveryCallId: call.id, notificationType: "confirmation" },
+          }),
+          supabase.functions.invoke("discovery-call-notifications", {
+            body: { discoveryCallId: call.id, notificationType: "admin_notification" },
+          }),
+        ]);
+      } catch (notifError) {
+        console.error("Notification error:", notifError);
+      }
+
+      return { scheduledAt, meetingType: formData.meetingType };
     },
     onSuccess: () => {
       setIsBooked(true);
+      queryClient.invalidateQueries({ queryKey: ["public-discovery-calls"] });
       toast.success("Your discovery call has been booked!");
     },
-    onError: (error: any) => {
-      toast.error(`Failed to book: ${error.message}`);
+    onError: (error: Error) => {
+      console.error("Booking error:", error);
+      toast.error(`Booking failed: ${error.message}`);
     },
   });
 
-  // Enhanced validation for step 1
-  const isStep1Valid = formData.name.trim().length >= 2 && 
-    !errors.email && formData.email.trim() && 
-    !errors.phone && formData.phone.trim();
-  const canProceedStep2 = isStep1Valid;
-  const canProceedStep3 = formData.propertyAddress;
-  const canProceedStep4 = selectedDate;
-  const canProceedStep5 = selectedTime;
-
+  // Success screen
   if (isBooked) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5 flex items-center justify-center p-4">
-        <Card className="max-w-md w-full text-center shadow-xl border-primary/20">
+        <Card className="max-w-lg w-full text-center shadow-xl border-primary/20">
           <CardContent className="pt-8 pb-8">
             <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
               <Check className="h-10 w-10 text-green-600" />
@@ -296,36 +431,54 @@ export default function BookDiscoveryCall() {
               Your discovery call is scheduled for{" "}
               <strong className="text-foreground">
                 {selectedDate && format(selectedDate, "EEEE, MMMM d, yyyy")} at{" "}
-                {selectedTime &&
-                  format(
-                    setMinutes(
-                      setHours(new Date(), parseInt(selectedTime.split(":")[0])),
-                      parseInt(selectedTime.split(":")[1])
-                    ),
-                    "h:mm a"
-                  )}
+                {selectedTime && format(
+                  setMinutes(setHours(new Date(), parseInt(selectedTime.split(":")[0])), parseInt(selectedTime.split(":")[1])),
+                  "h:mm a"
+                )}
               </strong>
             </p>
+            
+            {formData.meetingType === "video" ? (
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
+                <p className="font-medium text-green-800 mb-2 flex items-center gap-2 justify-center">
+                  <Video className="h-5 w-5" /> Video Call via Google Meet
+                </p>
+                <a 
+                  href={GOOGLE_MEET_LINK}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-block bg-green-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-green-700 transition-colors"
+                >
+                  Join Meeting
+                </a>
+                <p className="text-sm text-green-700 mt-2">{GOOGLE_MEET_LINK}</p>
+              </div>
+            ) : (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                <p className="font-medium text-blue-800 flex items-center gap-2 justify-center">
+                  <PhoneCall className="h-5 w-5" /> We'll call you at: {formData.phone}
+                </p>
+              </div>
+            )}
+            
             <div className="bg-primary/5 rounded-lg p-4 mb-4 text-left">
               <h4 className="font-medium mb-2 flex items-center gap-2">
-                <Sparkles className="h-4 w-4 text-primary" />
-                What happens next?
+                <Sparkles className="h-4 w-4 text-primary" /> What happens next?
               </h4>
               <ul className="text-sm text-muted-foreground space-y-1">
-                <li>• We'll send a confirmation email to {formData.email}</li>
-                <li>• Our team will research your property and market</li>
-                <li>• We'll prepare a personalized revenue analysis</li>
-                <li>• You'll receive a calendar invite with call details</li>
+                <li>✓ Confirmation email sent to {formData.email}</li>
+                <li>✓ Reminders 24 hours and 1 hour before</li>
+                <li>✓ Our team will research your property</li>
+                <li>✓ We'll prepare a revenue estimate</li>
               </ul>
             </div>
-            <p className="text-xs text-muted-foreground">
-              Questions? Reply to our confirmation email anytime.
-            </p>
           </CardContent>
         </Card>
       </div>
     );
   }
+
+  const totalSteps = 7;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5 flex items-center justify-center p-4">
@@ -336,40 +489,35 @@ export default function BookDiscoveryCall() {
           </div>
           <CardTitle className="text-2xl">Book Your Discovery Call</CardTitle>
           <CardDescription className="text-base">
-            A free 30-minute call to explore how we can help with your property
+            A free 30-minute call to explore how we can help maximize your property's potential
           </CardDescription>
         </CardHeader>
+        
         <CardContent>
-          {/* Why we ask info box */}
-          <div className="bg-accent/10 rounded-lg p-3 mb-6 border border-accent/20">
-            <p className="text-sm text-muted-foreground flex items-start gap-2">
-              <Sparkles className="h-4 w-4 text-accent mt-0.5 shrink-0" />
-              <span>
-                <strong className="text-foreground">We prepare for every call.</strong> The information you share helps us research your property and market so we can provide specific insights during our conversation.
-              </span>
-            </p>
-          </div>
-
-          {/* Progress */}
+          {/* Progress bar */}
           <div className="flex items-center justify-center gap-1 mb-6">
-            {[1, 2, 3, 4, 5].map((s) => (
+            {Array.from({ length: totalSteps }, (_, i) => i + 1).map(s => (
               <div
                 key={s}
                 className={cn(
                   "h-2 rounded-full transition-all duration-300",
-                  step >= s ? "bg-primary w-8" : "bg-muted w-4"
+                  step >= s ? "bg-primary w-6" : "bg-muted w-3"
                 )}
               />
             ))}
           </div>
 
-{/* Step 1: Contact Info */}
+          {/* Step 1: Contact Info */}
           {step === 1 && (
             <div className="space-y-4">
               <h3 className="font-semibold text-lg flex items-center gap-2">
                 <User className="h-5 w-5 text-primary" />
-                Your Contact Information
+                Let's start with your contact info
               </h3>
+              <p className="text-sm text-muted-foreground">
+                We'll send confirmations and reminders here
+              </p>
+              
               <div className="space-y-3">
                 <div>
                   <Label htmlFor="name">Full Name *</Label>
@@ -377,271 +525,446 @@ export default function BookDiscoveryCall() {
                     id="name"
                     placeholder="John Smith"
                     value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    onChange={e => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                    onBlur={() => setTouched(prev => ({ ...prev, name: true }))}
+                    className={cn(touched.name && errors.name && "border-destructive")}
                   />
-                </div>
-                <div>
-                  <Label htmlFor="email">Email Address *</Label>
-                  <div className="relative">
-                    <Input
-                      id="email"
-                      type="email"
-                      placeholder="john@example.com"
-                      value={formData.email}
-                      onChange={(e) => handleEmailChange(e.target.value)}
-                      onBlur={handleEmailBlur}
-                      className={cn(errors.email && touched.email && "border-destructive focus-visible:ring-destructive")}
-                    />
-                  </div>
-                  {errors.email && touched.email && (
+                  {touched.name && errors.name && (
                     <p className="text-xs text-destructive mt-1 flex items-center gap-1">
-                      <AlertCircle className="h-3 w-3" />
-                      {errors.email}
+                      <AlertCircle className="h-3 w-3" /> {errors.name}
                     </p>
                   )}
                 </div>
+                
+                <div>
+                  <Label htmlFor="email">Email Address *</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="john@example.com"
+                    value={formData.email}
+                    onChange={e => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                    onBlur={() => setTouched(prev => ({ ...prev, email: true }))}
+                    className={cn(touched.email && errors.email && "border-destructive")}
+                  />
+                  {touched.email && errors.email && (
+                    <p className="text-xs text-destructive mt-1 flex items-center gap-1">
+                      <AlertCircle className="h-3 w-3" /> {errors.email}
+                    </p>
+                  )}
+                </div>
+                
                 <div>
                   <Label htmlFor="phone">Phone Number *</Label>
-                  <div className="relative">
-                    <Input
-                      id="phone"
-                      type="tel"
-                      placeholder="(404) 555-1234"
-                      value={formData.phone}
-                      onChange={(e) => handlePhoneChange(e.target.value)}
-                      onBlur={handlePhoneBlur}
-                      className={cn(errors.phone && touched.phone && "border-destructive focus-visible:ring-destructive")}
-                    />
-                  </div>
-                  {errors.phone && touched.phone && (
+                  <Input
+                    id="phone"
+                    type="tel"
+                    placeholder="(404) 555-1234"
+                    value={formData.phone}
+                    onChange={e => setFormData(prev => ({ ...prev, phone: formatPhone(e.target.value) }))}
+                    onBlur={() => setTouched(prev => ({ ...prev, phone: true }))}
+                    className={cn(touched.phone && errors.phone && "border-destructive")}
+                  />
+                  {touched.phone && errors.phone && (
                     <p className="text-xs text-destructive mt-1 flex items-center gap-1">
-                      <AlertCircle className="h-3 w-3" />
-                      {errors.phone}
+                      <AlertCircle className="h-3 w-3" /> {errors.phone}
                     </p>
                   )}
                   <p className="text-xs text-muted-foreground mt-1">
-                    We'll send appointment reminders to this number
+                    For reminders and if you choose a phone call
                   </p>
                 </div>
               </div>
-              <Button 
-                className="w-full" 
-                disabled={!canProceedStep2} 
-                onClick={() => {
-                  // Validate all before proceeding
-                  const emailValid = validateEmail(formData.email);
-                  const phoneValid = validatePhone(formData.phone);
-                  setTouched({ email: true, phone: true });
-                  if (emailValid && phoneValid && formData.name.trim().length >= 2) {
-                    setStep(2);
-                  }
-                }}
-              >
+              
+              <Button className="w-full" onClick={() => validateStep1() && setStep(2)}>
                 Continue <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </div>
           )}
 
-          {/* Step 2: Property Info */}
+          {/* Step 2: Property Address */}
           {step === 2 && (
             <div className="space-y-4">
               <h3 className="font-semibold text-lg flex items-center gap-2">
                 <MapPin className="h-5 w-5 text-primary" />
-                Tell Us About Your Property
+                Where is your property?
               </h3>
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="address">Property Address *</Label>
-                  <GooglePlacesAutocomplete
-                    id="address"
-                    placeholder="Start typing your property address..."
-                    value={formData.propertyAddress}
-                    onChange={(value) => setFormData({ ...formData, propertyAddress: value })}
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    This helps us research your area and provide relevant market insights
+              <p className="text-sm text-muted-foreground">
+                This helps us research your market and prepare insights
+              </p>
+              
+              <div>
+                <Label htmlFor="address">Property Address *</Label>
+                <Input
+                  ref={addressInputRef}
+                  id="address"
+                  placeholder="Start typing your property address..."
+                  value={formData.propertyAddress}
+                  onChange={e => setFormData(prev => ({ ...prev, propertyAddress: e.target.value }))}
+                  onBlur={() => setTouched(prev => ({ ...prev, propertyAddress: true }))}
+                  className={cn(touched.propertyAddress && errors.propertyAddress && "border-destructive")}
+                  autoComplete="off"
+                />
+                {touched.propertyAddress && errors.propertyAddress && (
+                  <p className="text-xs text-destructive mt-1 flex items-center gap-1">
+                    <AlertCircle className="h-3 w-3" /> {errors.propertyAddress}
                   </p>
-                </div>
-                <div>
-                  <Label>Property Type</Label>
-                  <RadioGroup
-                    value={formData.propertyType}
-                    onValueChange={(value) => setFormData({ ...formData, propertyType: value })}
-                    className="grid grid-cols-2 gap-2 mt-2"
-                  >
-                    {PROPERTY_TYPES.map((type) => (
-                      <div key={type.value} className="flex items-center space-x-2">
-                        <RadioGroupItem value={type.value} id={type.value} />
-                        <Label htmlFor={type.value} className="text-sm cursor-pointer">
-                          {type.label}
-                        </Label>
-                      </div>
-                    ))}
-                  </RadioGroup>
+                )}
+                {mapsLoaded && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    💡 Start typing and select from the suggestions
+                  </p>
+                )}
+              </div>
+              
+              <div>
+                <Label className="mb-2 block">Property Type (optional)</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  {PROPERTY_TYPES.map(type => (
+                    <div
+                      key={type.value}
+                      onClick={() => setFormData(prev => ({ ...prev, propertyType: type.value }))}
+                      className={cn(
+                        "flex items-center gap-2 p-3 rounded-lg border cursor-pointer transition-all",
+                        formData.propertyType === type.value
+                          ? "bg-primary/10 border-primary"
+                          : "bg-muted/30 border-transparent hover:border-primary/30"
+                      )}
+                    >
+                      <type.icon className={cn(
+                        "h-4 w-4",
+                        formData.propertyType === type.value ? "text-primary" : "text-muted-foreground"
+                      )} />
+                      <span className="text-sm">{type.label}</span>
+                    </div>
+                  ))}
                 </div>
               </div>
+              
               <div className="flex gap-2">
                 <Button variant="outline" className="flex-1" onClick={() => setStep(1)}>
                   <ArrowLeft className="mr-2 h-4 w-4" /> Back
                 </Button>
-                <Button className="flex-1" disabled={!canProceedStep3} onClick={() => setStep(3)}>
+                <Button className="flex-1" onClick={() => validateStep2() && setStep(3)}>
                   Continue <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               </div>
             </div>
           )}
 
-          {/* Step 3: Goals */}
+          {/* Step 3: Current Situation */}
           {step === 3 && (
             <div className="space-y-4">
               <h3 className="font-semibold text-lg flex items-center gap-2">
                 <Target className="h-5 w-5 text-primary" />
-                What Are Your Goals?
+                What's your current situation?
               </h3>
               <p className="text-sm text-muted-foreground">
-                Select all that apply so we can tailor our conversation
+                This helps us understand how we can best help you
               </p>
+              
               <div className="space-y-2">
-                {PROPERTY_GOALS.map((goal) => (
+                {CURRENT_MANAGEMENT.map(option => (
                   <div
-                    key={goal.id}
+                    key={option.value}
+                    onClick={() => setFormData(prev => ({ ...prev, currentManagement: option.value }))}
                     className={cn(
-                      "flex items-center space-x-3 p-3 rounded-lg border cursor-pointer transition-colors",
-                      formData.goals.includes(goal.id)
+                      "p-4 rounded-lg border cursor-pointer transition-all",
+                      formData.currentManagement === option.value
                         ? "bg-primary/10 border-primary"
-                        : "bg-muted/50 border-transparent hover:border-primary/30"
+                        : "bg-muted/30 border-transparent hover:border-primary/30"
                     )}
-                    onClick={() => toggleGoal(goal.id)}
                   >
-                    <Checkbox
-                      checked={formData.goals.includes(goal.id)}
-                      onCheckedChange={() => toggleGoal(goal.id)}
-                    />
-                    <Label className="cursor-pointer flex-1">{goal.label}</Label>
+                    <p className="font-medium">{option.label}</p>
+                    <p className="text-sm text-muted-foreground">{option.description}</p>
                   </div>
                 ))}
               </div>
-              <div>
-                <Label htmlFor="notes">Anything else we should know? (optional)</Label>
-                <Textarea
-                  id="notes"
-                  placeholder="E.g., timeline, specific concerns, current situation..."
-                  value={formData.additionalNotes}
-                  onChange={(e) => setFormData({ ...formData, additionalNotes: e.target.value })}
-                  rows={2}
-                />
-              </div>
+              
               <div className="flex gap-2">
                 <Button variant="outline" className="flex-1" onClick={() => setStep(2)}>
                   <ArrowLeft className="mr-2 h-4 w-4" /> Back
                 </Button>
-                <Button className="flex-1" onClick={() => setStep(4)}>
+                <Button 
+                  className="flex-1" 
+                  disabled={!formData.currentManagement}
+                  onClick={() => setStep(4)}
+                >
                   Continue <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               </div>
             </div>
           )}
 
-          {/* Step 4: Date Selection */}
+          {/* Step 4: Service Interest */}
           {step === 4 && (
             <div className="space-y-4">
               <h3 className="font-semibold text-lg flex items-center gap-2">
-                <Calendar className="h-5 w-5 text-primary" />
-                Pick a Date
+                <Briefcase className="h-5 w-5 text-primary" />
+                What service are you interested in?
               </h3>
-              <div className="flex justify-center">
-                <CalendarComponent
-                  mode="single"
-                  selected={selectedDate}
-                  onSelect={(date) => {
-                    setSelectedDate(date);
-                    setSelectedTime(null);
-                  }}
-                  disabled={isDateDisabled}
-                  className={cn("rounded-md border pointer-events-auto")}
-                />
+              
+              <div className="space-y-3">
+                {SERVICE_INTERESTS.map(service => (
+                  <div
+                    key={service.value}
+                    onClick={() => setFormData(prev => ({ ...prev, serviceInterest: service.value }))}
+                    className={cn(
+                      "p-4 rounded-lg border cursor-pointer transition-all relative",
+                      formData.serviceInterest === service.value
+                        ? "bg-primary/10 border-primary"
+                        : "bg-muted/30 border-transparent hover:border-primary/30"
+                    )}
+                  >
+                    {service.recommended && (
+                      <span className="absolute -top-2 right-3 bg-primary text-primary-foreground text-xs px-2 py-0.5 rounded-full">
+                        Recommended
+                      </span>
+                    )}
+                    <div className="flex items-start gap-3">
+                      <service.icon className={cn(
+                        "h-5 w-5 mt-0.5",
+                        formData.serviceInterest === service.value ? "text-primary" : "text-muted-foreground"
+                      )} />
+                      <div>
+                        <p className="font-medium">{service.label}</p>
+                        <p className="text-sm text-muted-foreground">{service.description}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
+              
               <div className="flex gap-2">
                 <Button variant="outline" className="flex-1" onClick={() => setStep(3)}>
                   <ArrowLeft className="mr-2 h-4 w-4" /> Back
                 </Button>
-                <Button className="flex-1" disabled={!canProceedStep4} onClick={() => setStep(5)}>
+                <Button 
+                  className="flex-1"
+                  disabled={!formData.serviceInterest}
+                  onClick={() => setStep(5)}
+                >
                   Continue <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               </div>
             </div>
           )}
 
-          {/* Step 5: Time Selection & Confirm */}
-          {step === 5 && selectedDate && (
+          {/* Step 5: Timeline */}
+          {step === 5 && (
             <div className="space-y-4">
               <h3 className="font-semibold text-lg flex items-center gap-2">
                 <Clock className="h-5 w-5 text-primary" />
-                Select a Time for {format(selectedDate, "MMMM d")}
+                When do you need this in place?
               </h3>
-              {availableTimeSlots.length === 0 ? (
-                <p className="text-center text-muted-foreground py-6">
-                  No available slots for this date. Please select another day.
-                </p>
-              ) : (
-                <ScrollArea className="h-40">
-                  <div className="grid grid-cols-3 gap-2">
-                    {availableTimeSlots.map((time) => (
-                      <Button
-                        key={time}
-                        variant={selectedTime === time ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => setSelectedTime(time)}
-                        className="text-sm"
-                      >
-                        {format(
-                          setMinutes(
-                            setHours(new Date(), parseInt(time.split(":")[0])),
-                            parseInt(time.split(":")[1])
-                          ),
-                          "h:mm a"
-                        )}
-                      </Button>
-                    ))}
+              
+              <RadioGroup
+                value={formData.startTimeline}
+                onValueChange={value => setFormData(prev => ({ ...prev, startTimeline: value }))}
+                className="space-y-2"
+              >
+                {START_TIMELINES.map(timeline => (
+                  <div
+                    key={timeline.value}
+                    onClick={() => setFormData(prev => ({ ...prev, startTimeline: timeline.value }))}
+                    className={cn(
+                      "flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all",
+                      formData.startTimeline === timeline.value
+                        ? "bg-primary/10 border-primary"
+                        : "bg-muted/30 border-transparent hover:border-primary/30"
+                    )}
+                  >
+                    <RadioGroupItem value={timeline.value} id={timeline.value} />
+                    <Label htmlFor={timeline.value} className="cursor-pointer flex-1">
+                      {timeline.label}
+                    </Label>
+                    {timeline.urgency === "high" && (
+                      <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded">
+                        Priority
+                      </span>
+                    )}
                   </div>
-                </ScrollArea>
-              )}
-
-              {/* Booking Summary */}
-              {selectedTime && (
-                <div className="bg-muted rounded-lg p-4 space-y-2">
-                  <h4 className="font-medium">Booking Summary</h4>
-                  <div className="text-sm text-muted-foreground space-y-1">
-                    <p><strong>Date:</strong> {format(selectedDate, "EEEE, MMMM d, yyyy")}</p>
-                    <p>
-                      <strong>Time:</strong>{" "}
-                      {format(
-                        setMinutes(
-                          setHours(new Date(), parseInt(selectedTime.split(":")[0])),
-                          parseInt(selectedTime.split(":")[1])
-                        ),
-                        "h:mm a"
-                      )}{" "}
-                      (15 minutes)
-                    </p>
-                    <p><strong>Property:</strong> {formData.propertyAddress}</p>
-                    <p><strong>Contact:</strong> {formData.name} ({formData.email})</p>
-                  </div>
-                </div>
-              )}
-
+                ))}
+              </RadioGroup>
+              
               <div className="flex gap-2">
                 <Button variant="outline" className="flex-1" onClick={() => setStep(4)}>
                   <ArrowLeft className="mr-2 h-4 w-4" /> Back
                 </Button>
                 <Button
                   className="flex-1"
-                  disabled={!canProceedStep5 || bookMutation.isPending}
-                  onClick={() => bookMutation.mutate()}
+                  disabled={!formData.startTimeline}
+                  onClick={() => setStep(6)}
                 >
-                  {bookMutation.isPending ? "Booking..." : "Confirm Booking"}
+                  Continue <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               </div>
+            </div>
+          )}
+
+          {/* Step 6: Meeting Type */}
+          {step === 6 && (
+            <div className="space-y-4">
+              <h3 className="font-semibold text-lg flex items-center gap-2">
+                <Video className="h-5 w-5 text-primary" />
+                How would you like to meet?
+              </h3>
+              
+              <div className="space-y-3">
+                {MEETING_TYPES.map(type => (
+                  <div
+                    key={type.value}
+                    onClick={() => setFormData(prev => ({ ...prev, meetingType: type.value }))}
+                    className={cn(
+                      "p-4 rounded-lg border cursor-pointer transition-all relative",
+                      formData.meetingType === type.value
+                        ? "bg-primary/10 border-primary"
+                        : "bg-muted/30 border-transparent hover:border-primary/30"
+                    )}
+                  >
+                    {type.recommended && (
+                      <span className="absolute -top-2 right-3 bg-green-500 text-white text-xs px-2 py-0.5 rounded-full">
+                        Better Experience
+                      </span>
+                    )}
+                    <div className="flex items-center gap-3">
+                      <type.icon className={cn(
+                        "h-6 w-6",
+                        formData.meetingType === type.value ? "text-primary" : "text-muted-foreground"
+                      )} />
+                      <div className="flex-1">
+                        <p className="font-medium">{type.label}</p>
+                        <p className="text-sm text-muted-foreground">{type.description}</p>
+                      </div>
+                      <div className={cn(
+                        "w-5 h-5 rounded-full border-2 flex items-center justify-center",
+                        formData.meetingType === type.value ? "border-primary bg-primary" : "border-muted-foreground"
+                      )}>
+                        {formData.meetingType === type.value && (
+                          <Check className="h-3 w-3 text-primary-foreground" />
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              
+              {formData.meetingType === "video" && (
+                <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-sm text-green-800">
+                  📹 Video calls allow us to share screen and show you market data, property comparisons, and revenue projections.
+                </div>
+              )}
+              
+              <div>
+                <Label htmlFor="notes">Anything specific you'd like to discuss? (optional)</Label>
+                <Textarea
+                  id="notes"
+                  placeholder="E.g., specific concerns, questions about our services..."
+                  value={formData.additionalNotes}
+                  onChange={e => setFormData(prev => ({ ...prev, additionalNotes: e.target.value }))}
+                  rows={2}
+                />
+              </div>
+              
+              <div className="flex gap-2">
+                <Button variant="outline" className="flex-1" onClick={() => setStep(5)}>
+                  <ArrowLeft className="mr-2 h-4 w-4" /> Back
+                </Button>
+                <Button className="flex-1" onClick={() => setStep(7)}>
+                  Pick a Time <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Step 7: Date & Time Selection */}
+          {step === 7 && (
+            <div className="space-y-4">
+              {!selectedDate ? (
+                <>
+                  <h3 className="font-semibold text-lg flex items-center gap-2">
+                    <Calendar className="h-5 w-5 text-primary" />
+                    Pick a date
+                  </h3>
+                  <div className="flex justify-center">
+                    <CalendarComponent
+                      mode="single"
+                      selected={selectedDate}
+                      onSelect={date => {
+                        setSelectedDate(date);
+                        setSelectedTime(null);
+                      }}
+                      disabled={isDateDisabled}
+                      className="rounded-md border"
+                    />
+                  </div>
+                  <Button variant="outline" className="w-full" onClick={() => setStep(6)}>
+                    <ArrowLeft className="mr-2 h-4 w-4" /> Back
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <h3 className="font-semibold text-lg flex items-center gap-2">
+                    <Clock className="h-5 w-5 text-primary" />
+                    Select a time for {format(selectedDate, "MMMM d")}
+                  </h3>
+                  
+                  {availableTimeSlots.length === 0 ? (
+                    <div className="text-center py-6">
+                      <p className="text-muted-foreground mb-3">No available slots for this date.</p>
+                      <Button variant="outline" onClick={() => setSelectedDate(undefined)}>
+                        Choose Different Date
+                      </Button>
+                    </div>
+                  ) : (
+                    <ScrollArea className="h-48">
+                      <div className="grid grid-cols-3 gap-2 pr-4">
+                        {availableTimeSlots.map(time => (
+                          <Button
+                            key={time}
+                            variant={selectedTime === time ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => setSelectedTime(time)}
+                          >
+                            {format(
+                              setMinutes(setHours(new Date(), parseInt(time.split(":")[0])), parseInt(time.split(":")[1])),
+                              "h:mm a"
+                            )}
+                          </Button>
+                        ))}
+                      </div>
+                    </ScrollArea>
+                  )}
+                  
+                  {selectedTime && (
+                    <div className="bg-muted rounded-lg p-4 space-y-2">
+                      <h4 className="font-medium">Booking Summary</h4>
+                      <div className="text-sm text-muted-foreground space-y-1">
+                        <p><strong>Date:</strong> {format(selectedDate, "EEEE, MMMM d, yyyy")}</p>
+                        <p><strong>Time:</strong> {format(
+                          setMinutes(setHours(new Date(), parseInt(selectedTime.split(":")[0])), parseInt(selectedTime.split(":")[1])),
+                          "h:mm a"
+                        )} (30 min)</p>
+                        <p><strong>Meeting:</strong> {formData.meetingType === "video" ? "Video Call" : "Phone Call"}</p>
+                        <p><strong>Property:</strong> {formData.propertyAddress}</p>
+                      </div>
+                    </div>
+                  )}
+                  
+                  <div className="flex gap-2">
+                    <Button variant="outline" className="flex-1" onClick={() => selectedTime ? setSelectedTime(null) : setSelectedDate(undefined)}>
+                      <ArrowLeft className="mr-2 h-4 w-4" /> Back
+                    </Button>
+                    <Button
+                      className="flex-1"
+                      disabled={!selectedTime || bookMutation.isPending}
+                      onClick={() => bookMutation.mutate()}
+                    >
+                      {bookMutation.isPending ? "Booking..." : "Confirm Booking"}
+                    </Button>
+                  </div>
+                </>
+              )}
             </div>
           )}
         </CardContent>
