@@ -8,7 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { Camera, Sparkles, Palette, Link } from "lucide-react";
 
 interface ListingPreferencesStepProps {
-  formData: NewSTROnboardingFormData;
+  formData: NewSTROnboardingFormData & { hasExistingListing?: boolean };
   updateFormData: (updates: Partial<NewSTROnboardingFormData>) => void;
 }
 
@@ -61,26 +61,31 @@ export const ListingPreferencesStep = ({ formData, updateFormData }: ListingPref
         </CardContent>
       </Card>
 
-      {/* Existing Photos Link */}
-      <Card className="rounded-2xl border-[hsl(25,30%,90%)] shadow-sm">
+      {/* Existing Photos Link - Required if has existing listing */}
+      <Card className={`rounded-2xl shadow-sm ${formData.hasExistingListing ? 'border-[hsl(25,80%,70%)] border-2' : 'border-[hsl(25,30%,90%)]'}`}>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-lg text-[hsl(25,40%,25%)]">
             <Link className="w-5 h-5 text-[hsl(25,95%,50%)]" />
             Existing Photos
+            {formData.hasExistingListing && <span className="text-red-500 text-sm font-normal">(Required)</span>}
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-2">
-            <Label htmlFor="existingPhotosLink" className="text-[hsl(25,30%,30%)]">Link to Existing Photos</Label>
+            <Label htmlFor="existingPhotosLink" className="text-[hsl(25,30%,30%)]">
+              Link to Existing Photos {formData.hasExistingListing && <span className="text-red-500">*</span>}
+            </Label>
             <Input
               id="existingPhotosLink"
               value={formData.existingPhotosLink || ''}
               onChange={(e) => updateFormData({ existingPhotosLink: e.target.value })}
               placeholder="e.g., Google Drive, Dropbox, or other link"
-              className="h-12 rounded-xl border-[hsl(25,30%,85%)]"
+              className={`h-12 rounded-xl ${formData.hasExistingListing ? 'border-[hsl(25,80%,70%)]' : 'border-[hsl(25,30%,85%)]'}`}
             />
             <p className="text-xs text-[hsl(25,20%,55%)]">
-              If you have existing property photos, share a link to where they're stored
+              {formData.hasExistingListing 
+                ? "Since you have an existing listing, please provide a link to your property photos"
+                : "If you have existing property photos, share a link to where they're stored"}
             </p>
           </div>
         </CardContent>
