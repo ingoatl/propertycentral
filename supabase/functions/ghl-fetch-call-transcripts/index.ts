@@ -185,13 +185,17 @@ serve(async (req) => {
       // Use the original call date from GHL, not current timestamp
       const callDate = call.createdAt ? new Date(call.createdAt).toISOString() : new Date().toISOString();
       
+      // Provide default body for calls without transcript to avoid null constraint violation
+      const callBody = call.transcript || 
+        `Voice AI call with ${matchedName || call.fromNumber || 'Unknown Caller'}. Duration: ${call.duration ? Math.round(call.duration / 60) + ' min' : 'Unknown'}. ${call.summary || ''}`.trim();
+      
       const communicationData: Record<string, unknown> = {
         lead_id: leadId,
         owner_id: ownerId,
         communication_type: "call",
         direction: call.direction || "inbound",
-        body: call.transcript || null,
-        subject: call.summary || `Call from ${matchedName || call.fromNumber || 'Unknown'}`,
+        body: callBody, // Use default body if no transcript
+        subject: call.summary || `Voice AI Call - ${matchedName || call.fromNumber || 'Unknown'}`,
         status: call.status || "completed",
         ghl_call_id: call.id,
         call_duration: call.duration || null,
@@ -208,6 +212,7 @@ serve(async (req) => {
             createdAt: call.createdAt,
             matchedName,
             matchedEmail,
+            callType: "voice_ai", // Mark as AI bot call
           }
         },
         external_id: call.id,

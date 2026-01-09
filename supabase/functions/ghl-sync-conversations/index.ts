@@ -237,12 +237,18 @@ serve(async (req) => {
         const direction = message.direction === "outbound" ? "outbound" : "inbound";
 
         // Build communication record - prioritize owner_id over lead_id
+        // Provide default body for calls without content to avoid null constraint violation
+        const messageBody = message.body || message.text || 
+          (commType === "call" 
+            ? `Phone call ${direction === "inbound" ? "from" : "to"} ${conversation.contactName || "Contact"}. Duration: ${message.duration ? Math.round((message.duration as number) / 60) + ' min' : 'Unknown'}.`
+            : `${commType.toUpperCase()} message`);
+        
         const communicationData: Record<string, unknown> = {
           lead_id: matchedOwnerId ? null : matchedLeadId,
           owner_id: matchedOwnerId,
           communication_type: commType,
           direction: direction,
-          body: message.body || message.text || null,
+          body: messageBody, // Use default body if empty
           subject: commType === "call" 
             ? `Call ${direction === "inbound" ? "from" : "to"} ${conversation.contactName || "Contact"}`
             : null,
@@ -259,6 +265,7 @@ serve(async (req) => {
               messageType: message.type || message.messageType,
               attachments: message.attachments,
               contentType: message.contentType,
+              callType: commType === "call" ? "human" : undefined, // Mark as human call
             }
           },
         };
