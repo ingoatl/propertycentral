@@ -74,53 +74,45 @@ export function OnboardingPropertiesTimeline() {
   const { data: properties, isLoading } = useQuery({
     queryKey: ["onboarding-properties-timeline"],
     queryFn: async () => {
-      // Get ALL properties that are not yet listed (no first_listing_live_at)
-      const { data, error } = await supabase
-        .from("properties")
+      // Active onboarding stages - properties we want to show
+      const onboardingStages = ['contract_signed', 'ach_form_signed', 'onboarding_form_requested', 'insurance_requested', 'inspection_scheduled'] as const;
+      
+      // Get leads that are in active onboarding stages and have linked properties
+      const { data: leads, error } = await supabase
+        .from("leads")
         .select(`
           id,
           name,
-          address,
-          first_listing_live_at,
-          leads!leads_property_id_fkey (
+          stage,
+          property_id,
+          properties!leads_property_id_fkey (
             id,
             name,
-            stage
+            address,
+            first_listing_live_at
           )
         `)
-        .is("first_listing_live_at", null)
-        .order("name", { ascending: true });
+        .in("stage", onboardingStages)
+        .not("property_id", "is", null);
 
       if (error) throw error;
 
-      // Stages that indicate active onboarding
-      const onboardingStages = ['contract_signed', 'ach_form_signed', 'onboarding_form_requested', 'insurance_requested', 'inspection_scheduled'];
-      
-      // Filter out properties that have completed onboarding (ops_handoff)
-      const onboardingProperties: OnboardingProperty[] = (data || [])
-        .filter(p => {
-          const leads = p.leads as any[];
-          // Exclude properties where lead stage is ops_handoff (completed)
-          if (leads && leads.length > 0) {
-            const hasOpsHandoff = leads.some(l => l.stage === 'ops_handoff');
-            if (hasOpsHandoff) return false;
-          }
-          return true;
-        })
-        .map(p => {
-          const leads = p.leads as any[];
-          // Find the lead with an onboarding stage, or use the first lead
-          const lead = leads?.find(l => onboardingStages.includes(l.stage)) || leads?.[0];
+      // Map leads with properties to our format
+      const onboardingProperties: OnboardingProperty[] = (leads || [])
+        .filter(l => l.properties && !(l.properties as any).first_listing_live_at)
+        .map(l => {
+          const property = l.properties as any;
           return {
-            id: p.id,
-            name: p.name,
-            address: p.address || 'Address pending',
-            leadId: lead?.id || null,
-            leadName: lead?.name || null,
-            stage: lead?.stage || null,
-            currentStep: getTimelineStep(lead?.stage),
+            id: property.id,
+            name: property.name,
+            address: property.address || 'Address pending',
+            leadId: l.id,
+            leadName: l.name,
+            stage: l.stage,
+            currentStep: getTimelineStep(l.stage),
           };
-        });
+        })
+        .sort((a, b) => a.name.localeCompare(b.name));
 
       return onboardingProperties;
     },
