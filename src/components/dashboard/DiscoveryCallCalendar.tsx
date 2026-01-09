@@ -384,9 +384,9 @@ function DiscoveryCallDetailModal({ call, onClose }: DiscoveryCallDetailModalPro
     ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(call.leads.property_address)}`
     : null;
 
-  // Google Maps embed URL for iframe - z=10 for zoomed out view
+  // Google Maps embed URL - iwloc=B hides the info window
   const googleMapsEmbedUrl = call.leads?.property_address
-    ? `https://maps.google.com/maps?q=${encodeURIComponent(call.leads.property_address)}&t=&z=10&ie=UTF8&iwloc=&output=embed`
+    ? `https://maps.google.com/maps?q=${encodeURIComponent(call.leads.property_address)}&z=10&ie=UTF8&iwloc=B&output=embed`
     : null;
 
   // Combine all notes
@@ -498,11 +498,11 @@ function DiscoveryCallDetailModal({ call, onClose }: DiscoveryCallDetailModalPro
                 </div>
               )}
 
-              {/* Property Photos - Compact */}
+              {/* Property Photos */}
               {call.leads?.property_address && (
                 <PropertyPhotos 
                   address={call.leads.property_address} 
-                  height="120px"
+                  height="180px"
                   className="rounded-lg overflow-hidden border"
                 />
               )}
