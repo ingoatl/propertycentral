@@ -6,6 +6,38 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Extract caller name from transcript
+function extractCallerNameFromTranscript(transcript: string): string | null {
+  if (!transcript) return null;
+  
+  // Common name introduction patterns
+  const patterns = [
+    /(?:this is|my name is|i'm|i am)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/gi,
+    /(?:hi,? this is|hey,? it's)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/gi,
+    /(?:can i get your name|may i have your name).*?\n.*?(?:human:|caller:)?\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/gi,
+    /human:\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\s*\./gi,
+  ];
+  
+  // Known team members to exclude
+  const teamMembers = ['ingo', 'tom', 'anja', 'jason', 'peachhaus', 'peach', 'haus'];
+  
+  for (const pattern of patterns) {
+    const matches = [...transcript.matchAll(pattern)];
+    for (const match of matches) {
+      const name = match[1]?.trim();
+      if (name && name.length >= 2 && name.length <= 30) {
+        const nameLower = name.toLowerCase();
+        // Skip if it's a team member name
+        if (!teamMembers.some(tm => nameLower.includes(tm))) {
+          return name;
+        }
+      }
+    }
+  }
+  
+  return null;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -154,10 +186,21 @@ serve(async (req) => {
           } else {
             // Create a new lead for unknown callers to ensure all calls are captured
             console.log(`No match found for phone: ${phoneNumber} - creating new lead`);
+            
+            // Extract name from transcript if available
+            let callerName = `Unknown Caller (${phoneNumber})`;
+            if (call.transcript) {
+              const extractedName = extractCallerNameFromTranscript(call.transcript);
+              if (extractedName) {
+                callerName = extractedName;
+                console.log(`Extracted caller name from transcript: ${extractedName}`);
+              }
+            }
+            
             const { data: newLead, error: leadError } = await supabase
               .from("leads")
               .insert({
-                name: `Unknown Caller (${phoneNumber})`,
+                name: callerName,
                 phone: phoneNumber,
                 opportunity_source: "ghl_call_sync",
                 stage: "new_lead",
