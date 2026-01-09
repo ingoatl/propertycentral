@@ -52,10 +52,10 @@ serve(async (req) => {
       const data = await response.json();
       callLogs = [data];
     } else if (syncAll) {
-      // Fetch all call logs
+      // Fetch all call logs - Voice AI endpoint doesn't accept limit param
       console.log(`Fetching call logs from HighLevel for location: ${ghlLocationId}`);
       const response = await fetch(
-        `https://services.leadconnectorhq.com/voice-ai/dashboard/call-logs?locationId=${ghlLocationId}&limit=${limit}`,
+        `https://services.leadconnectorhq.com/voice-ai/dashboard/call-logs?locationId=${ghlLocationId}`,
         {
           method: "GET",
           headers: {
