@@ -66,6 +66,8 @@ interface CommunicationItem {
   is_draft?: boolean;
   draft_id?: string;
   is_resolved?: boolean;
+  owner_id?: string;
+  property_name?: string;
 }
 
 interface PhoneAssignment {
@@ -376,17 +378,18 @@ export function InboxView() {
       const targetUserId = viewAllInboxes ? null : (selectedInboxUserId || currentUserId);
 
       if (fetchMessages) {
-        // Fetch lead communications
+        // Fetch lead communications (with leads)
         const { data: leadComms } = await supabase
           .from("lead_communications")
-          .select(`id, communication_type, direction, body, subject, created_at, status, lead_id, leads!inner(id, name, phone, email)`)
+          .select(`id, communication_type, direction, body, subject, created_at, status, lead_id, owner_id, leads(id, name, phone, email)`)
           .in("communication_type", ["sms", "email"])
+          .not("lead_id", "is", null)
           .order("created_at", { ascending: false })
           .limit(50);
 
         if (leadComms) {
           for (const comm of leadComms) {
-            const lead = comm.leads as { id: string; name: string; phone: string | null; email: string | null };
+            const lead = comm.leads as { id: string; name: string; phone: string | null; email: string | null } | null;
             const item: CommunicationItem = {
               id: comm.id,
               type: comm.communication_type as "sms" | "email",
@@ -398,8 +401,44 @@ export function InboxView() {
               contact_phone: lead?.phone || undefined,
               contact_email: lead?.email || undefined,
               contact_type: "lead",
-              contact_id: comm.lead_id,
+              contact_id: comm.lead_id || "",
               status: comm.status || undefined,
+            };
+
+            if (search) {
+              const searchLower = search.toLowerCase();
+              if (!item.contact_name.toLowerCase().includes(searchLower) && !item.body.toLowerCase().includes(searchLower)) continue;
+            }
+            results.push(item);
+          }
+        }
+
+        // Fetch owner communications
+        const { data: ownerComms } = await supabase
+          .from("lead_communications")
+          .select(`id, communication_type, direction, body, subject, created_at, status, owner_id, property_owners(id, name, email, phone)`)
+          .in("communication_type", ["sms", "email"])
+          .not("owner_id", "is", null)
+          .order("created_at", { ascending: false })
+          .limit(50);
+
+        if (ownerComms) {
+          for (const comm of ownerComms) {
+            const owner = comm.property_owners as { id: string; name: string; email: string | null; phone: string | null } | null;
+            const item: CommunicationItem = {
+              id: comm.id,
+              type: comm.communication_type as "sms" | "email",
+              direction: comm.direction as "inbound" | "outbound",
+              body: comm.body,
+              subject: comm.subject || undefined,
+              created_at: comm.created_at,
+              contact_name: owner?.name || "Unknown Owner",
+              contact_phone: owner?.phone || undefined,
+              contact_email: owner?.email || undefined,
+              contact_type: "owner",
+              contact_id: comm.owner_id || "",
+              status: comm.status || undefined,
+              owner_id: comm.owner_id || undefined,
             };
 
             if (search) {
@@ -452,21 +491,45 @@ export function InboxView() {
       }
 
       if (fetchCalls) {
+        // Fetch lead call communications
         const { data: callComms } = await supabase
           .from("lead_communications")
-          .select(`id, communication_type, direction, body, subject, created_at, status, lead_id, leads!inner(id, name, phone, email)`)
+          .select(`id, communication_type, direction, body, subject, created_at, status, lead_id, owner_id, leads(id, name, phone, email)`)
           .eq("communication_type", "call")
+          .not("lead_id", "is", null)
           .order("created_at", { ascending: false })
           .limit(50);
 
         if (callComms) {
           for (const comm of callComms) {
-            const lead = comm.leads as { id: string; name: string; phone: string | null; email: string | null };
+            const lead = comm.leads as { id: string; name: string; phone: string | null; email: string | null } | null;
             results.push({
               id: comm.id, type: "call", direction: comm.direction as "inbound" | "outbound",
               body: comm.body || "Call", created_at: comm.created_at, contact_name: lead?.name || "Unknown",
               contact_phone: lead?.phone || undefined, contact_email: lead?.email || undefined,
-              contact_type: "lead", contact_id: comm.lead_id, status: comm.status || undefined,
+              contact_type: "lead", contact_id: comm.lead_id || "", status: comm.status || undefined,
+            });
+          }
+        }
+
+        // Fetch owner call communications
+        const { data: ownerCallComms } = await supabase
+          .from("lead_communications")
+          .select(`id, communication_type, direction, body, subject, created_at, status, owner_id, property_owners(id, name, email, phone)`)
+          .eq("communication_type", "call")
+          .not("owner_id", "is", null)
+          .order("created_at", { ascending: false })
+          .limit(50);
+
+        if (ownerCallComms) {
+          for (const comm of ownerCallComms) {
+            const owner = comm.property_owners as { id: string; name: string; email: string | null; phone: string | null } | null;
+            results.push({
+              id: comm.id, type: "call", direction: comm.direction as "inbound" | "outbound",
+              body: comm.body || "Call", created_at: comm.created_at, contact_name: owner?.name || "Unknown Owner",
+              contact_phone: owner?.phone || undefined, contact_email: owner?.email || undefined,
+              contact_type: "owner", contact_id: comm.owner_id || "", status: comm.status || undefined,
+              owner_id: comm.owner_id || undefined,
             });
           }
         }
@@ -678,9 +741,11 @@ export function InboxView() {
                     </div>
                     <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{getMessagePreview(comm)}</p>
                     {/* Type indicator */}
-                    <div className="flex items-center gap-2 mt-1.5">
+                    <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                       {comm.type === "draft" && <Badge variant="outline" className="text-xs h-5 px-1.5 bg-amber-500/10 text-amber-600 border-amber-500/30">Draft</Badge>}
                       {comm.type === "personal_sms" && <Badge variant="outline" className="text-xs h-5 px-1.5">SMS</Badge>}
+                      {comm.contact_type === "owner" && <Badge variant="outline" className="text-xs h-5 px-1.5 bg-purple-500/10 text-purple-600 border-purple-500/30">Owner</Badge>}
+                      {comm.contact_type === "lead" && comm.type !== "draft" && <Badge variant="outline" className="text-xs h-5 px-1.5 bg-emerald-500/10 text-emerald-600 border-emerald-500/30">Lead</Badge>}
                       {comm.direction === "inbound" && !comm.is_resolved && <Badge variant="outline" className="text-xs h-5 px-1.5 bg-blue-500/10 text-blue-600 border-blue-500/30">New</Badge>}
                     </div>
                   </div>

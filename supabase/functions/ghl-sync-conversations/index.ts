@@ -99,7 +99,21 @@ serve(async (req) => {
       }
 
       const messagesData = await messagesResponse.json();
-      const messages = messagesData.messages || [];
+      
+      // Handle different GHL API response structures
+      let messages: Array<Record<string, unknown>> = [];
+      if (Array.isArray(messagesData)) {
+        messages = messagesData;
+      } else if (messagesData.messages && Array.isArray(messagesData.messages)) {
+        messages = messagesData.messages;
+      } else if (messagesData.data?.messages && Array.isArray(messagesData.data.messages)) {
+        messages = messagesData.data.messages;
+      } else {
+        console.log(`Unexpected messages response structure for conversation ${conversation.id}:`, JSON.stringify(messagesData).slice(0, 200));
+        continue;
+      }
+      
+      console.log(`Processing ${messages.length} messages for conversation ${conversation.id}`);
 
       // Try to find matching lead by contact phone or email
       let matchedLeadId = leadId;
