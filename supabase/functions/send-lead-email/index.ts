@@ -97,12 +97,19 @@ serve(async (req) => {
       throw new Error("Missing required fields: to, subject, body");
     }
 
-    // Determine sender - use provided email or fallback to noreply
+    // Determine sender - use provided email or fallback to ingo
     const fromEmail = senderEmail && senderEmail.endsWith("@peachhausgroup.com") 
       ? senderEmail 
-      : "noreply@peachhausgroup.com";
+      : "ingo@peachhausgroup.com";
     
-    const fromName = senderName || (senderEmail ? senderEmail.split('@')[0] : "PeachHaus");
+    // Format display name with crown emoji for brand recognition
+    const getDisplayName = (email: string, name?: string) => {
+      if (email === "ingo@peachhausgroup.com") return "♚ PeachHausGroup | Ingo Schaer";
+      if (email === "anja@peachhausgroup.com") return "♚ PeachHausGroup | Anja Schaer";
+      return name ? `♚ PeachHausGroup | ${name}` : "♚ PeachHausGroup";
+    };
+    
+    const fromName = getDisplayName(fromEmail, senderName);
     
     console.log(`Sending email from ${fromEmail} (${fromName}) to ${to} (${toName}) - Subject: ${subject}`);
 
