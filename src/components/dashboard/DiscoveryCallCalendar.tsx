@@ -449,196 +449,157 @@ function DiscoveryCallDetailModal({ call, onClose }: DiscoveryCallDetailModalPro
             </DialogTitle>
           </DialogHeader>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-3">
-            {/* Left Column - Property & Map */}
-            <div className="space-y-3">
-              {/* Property Address - Prominent */}
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-3 mt-2">
+            {/* Left Column - Map & Photos (takes more space) */}
+            <div className="lg:col-span-3 space-y-2">
+              {/* Property Address - Compact */}
               {call.leads?.property_address && (
-                <div className="p-3 rounded-lg bg-primary/5 border border-primary/20">
-                  <div className="flex items-start gap-2">
-                    <MapPin className="h-4 w-4 text-primary shrink-0 mt-0.5" />
-                    <div className="flex-1">
-                      <p className="font-semibold">{call.leads.property_address}</p>
-                      <div className="flex gap-2 mt-2">
-                        {googleMapsLink && (
-                          <Button variant="outline" size="sm" asChild>
-                            <a href={googleMapsLink} target="_blank" rel="noopener noreferrer">
-                              <ExternalLink className="h-4 w-4 mr-2" />
-                              View on Map
-                            </a>
-                          </Button>
-                        )}
-                        <Button variant="outline" size="sm" asChild>
-                          <a 
-                            href={`https://www.zillow.com/homes/${encodeURIComponent(call.leads.property_address)}_rb/`} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                          >
-                            <Home className="h-4 w-4 mr-2" />
-                            Zillow
-                          </a>
-                        </Button>
-                      </div>
-                    </div>
+                <div className="p-2 rounded-lg bg-primary/5 border border-primary/20 flex items-center gap-2">
+                  <MapPin className="h-4 w-4 text-primary shrink-0" />
+                  <p className="font-semibold text-sm flex-1 truncate">{call.leads.property_address}</p>
+                  <div className="flex gap-1">
+                    {googleMapsLink && (
+                      <Button variant="ghost" size="sm" className="h-7 px-2" asChild>
+                        <a href={googleMapsLink} target="_blank" rel="noopener noreferrer">
+                          <ExternalLink className="h-3 w-3" />
+                        </a>
+                      </Button>
+                    )}
+                    <Button variant="ghost" size="sm" className="h-7 px-2" asChild>
+                      <a 
+                        href={`https://www.zillow.com/homes/${encodeURIComponent(call.leads.property_address)}_rb/`} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                      >
+                        <Home className="h-3 w-3" />
+                      </a>
+                    </Button>
                   </div>
-                </div>
-              )}
-
-              {/* Property Photos */}
-              {call.leads?.property_address && (
-                <div>
-                  <h3 className="font-semibold flex items-center gap-2 mb-2">
-                    <Home className="h-4 w-4" />
-                    Property Photos
-                  </h3>
-                  <PropertyPhotos 
-                    address={call.leads.property_address} 
-                    height="140px"
-                    className="rounded-lg overflow-hidden border"
-                  />
                 </div>
               )}
               
-              {/* Map - Google Maps Embed */}
-              <div>
-                <h3 className="font-semibold flex items-center gap-2 mb-2">
-                  <MapPin className="h-4 w-4" />
-                  Location
-                </h3>
-                {googleMapsEmbedUrl ? (
-                  <div className="rounded-lg overflow-hidden border h-[220px]">
-                    <iframe
-                      width="100%"
-                      height="100%"
-                      style={{ border: 0 }}
-                      loading="lazy"
-                      allowFullScreen
-                      referrerPolicy="no-referrer-when-downgrade"
-                      src={googleMapsEmbedUrl}
-                      title="Property Location"
-                    />
-                  </div>
-                ) : (
-                  <div className="h-[280px] bg-muted rounded-lg flex items-center justify-center">
-                    <p className="text-muted-foreground">No address provided</p>
-                  </div>
-                )}
-              </div>
+              {/* Map - Google Maps Embed - Bigger */}
+              {googleMapsEmbedUrl ? (
+                <div className="rounded-lg overflow-hidden border h-[260px]">
+                  <iframe
+                    width="100%"
+                    height="100%"
+                    style={{ border: 0 }}
+                    loading="lazy"
+                    allowFullScreen
+                    referrerPolicy="no-referrer-when-downgrade"
+                    src={googleMapsEmbedUrl}
+                    title="Property Location"
+                  />
+                </div>
+              ) : (
+                <div className="h-[200px] bg-muted rounded-lg flex items-center justify-center">
+                  <p className="text-muted-foreground text-sm">No address provided</p>
+                </div>
+              )}
+
+              {/* Property Photos - Compact */}
+              {call.leads?.property_address && (
+                <PropertyPhotos 
+                  address={call.leads.property_address} 
+                  height="120px"
+                  className="rounded-lg overflow-hidden border"
+                />
+              )}
             </div>
 
-            {/* Right Column - Contact & Details */}
-            <div className="space-y-4">
-              {/* Score Card */}
+            {/* Right Column - Contact & Details (compact) */}
+            <div className="lg:col-span-2 space-y-2">
+              {/* Score Card - Compact */}
               <div
                 className={cn(
-                  "p-4 rounded-lg border-2",
+                  "p-3 rounded-lg border",
                   getScoreColor(score)
                 )}
               >
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium opacity-80">Revenue Potential Score</p>
-                    <p className="text-3xl font-bold">{score}/100</p>
+                    <p className="text-xs font-medium opacity-80">Revenue Score</p>
+                    <p className="text-2xl font-bold">{score}/100</p>
                   </div>
-                  <div className="text-right">
-                    <Star className="h-10 w-10 opacity-50" />
-                  </div>
+                  <Star className="h-8 w-8 opacity-40" />
                 </div>
-                <div className="mt-2 h-2 bg-black/10 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-current transition-all"
-                    style={{ width: `${score}%` }}
-                  />
+                <div className="mt-1 h-1.5 bg-black/10 rounded-full overflow-hidden">
+                  <div className="h-full bg-current" style={{ width: `${score}%` }} />
                 </div>
               </div>
 
-              {/* Contact Info with Action Buttons */}
-              <div className="p-4 rounded-lg border space-y-4">
-                <h4 className="font-semibold flex items-center gap-2">
-                  <User className="h-4 w-4" />
-                  Contact Information
+              {/* Contact Info - Compact */}
+              <div className="p-3 rounded-lg border space-y-2">
+                <h4 className="font-semibold text-sm flex items-center gap-2">
+                  <User className="h-3 w-3" />
+                  {call.leads?.name || "N/A"}
                 </h4>
                 
-                {/* Name */}
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Name</p>
-                    <p className="font-semibold text-lg">{call.leads?.name || "N/A"}</p>
-                  </div>
-                </div>
-
-                {/* Email with button */}
-                <div className="space-y-2">
-                  <p className="text-sm text-muted-foreground">Email</p>
-                  <div className="flex items-center gap-2">
-                    <p className="font-medium flex-1">{call.leads?.email || "N/A"}</p>
-                  </div>
+                {/* Email */}
+                <div className="flex items-center gap-2">
+                  <Mail className="h-3 w-3 text-muted-foreground" />
+                  <span className="text-sm flex-1 truncate">{call.leads?.email || "N/A"}</span>
                   {call.leads?.email && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="w-full"
-                      onClick={() => setShowEmailDialog(true)}
-                    >
-                      <Mail className="h-4 w-4 mr-2" />
-                      Send Email
+                    <Button variant="ghost" size="sm" className="h-6 px-2" onClick={() => setShowEmailDialog(true)}>
+                      <Mail className="h-3 w-3" />
                     </Button>
                   )}
                 </div>
 
-                {/* Phone with button */}
-                <div className="space-y-2">
-                  <p className="text-sm text-muted-foreground">Phone</p>
-                  <div className="flex items-center gap-2">
-                    <p className="font-medium flex-1">{call.leads?.phone || "N/A"}</p>
-                  </div>
+                {/* Phone */}
+                <div className="flex items-center gap-2">
+                  <Phone className="h-3 w-3 text-muted-foreground" />
+                  <span className="text-sm flex-1">{call.leads?.phone || "N/A"}</span>
                   {call.leads?.phone && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="w-full"
-                      onClick={() => setShowCallConfirm(true)}
-                    >
-                      <Phone className="h-4 w-4 mr-2" />
-                      Call Lead
+                    <Button variant="ghost" size="sm" className="h-6 px-2" onClick={() => setShowCallConfirm(true)}>
+                      <Phone className="h-3 w-3" />
                     </Button>
                   )}
                 </div>
 
-                {/* Duration */}
-                <div>
-                  <p className="text-sm text-muted-foreground">Duration</p>
-                  <p className="font-medium">{call.duration_minutes} minutes</p>
+                {/* Action Buttons - Full width */}
+                <div className="flex gap-2 pt-1">
+                  {call.leads?.email && (
+                    <Button variant="outline" size="sm" className="flex-1 h-7 text-xs" onClick={() => setShowEmailDialog(true)}>
+                      <Mail className="h-3 w-3 mr-1" /> Email
+                    </Button>
+                  )}
+                  {call.leads?.phone && (
+                    <Button variant="outline" size="sm" className="flex-1 h-7 text-xs" onClick={() => setShowCallConfirm(true)}>
+                      <Phone className="h-3 w-3 mr-1" /> Call
+                    </Button>
+                  )}
                 </div>
               </div>
 
-              {/* Service Details */}
-              <div className="p-4 rounded-lg border space-y-3">
-                <h4 className="font-semibold flex items-center gap-2">
-                  <Home className="h-4 w-4" />
-                  Service Details
-                </h4>
-                <div className="grid grid-cols-2 gap-3 text-sm">
+              {/* Service Details - Compact */}
+              <div className="p-3 rounded-lg border">
+                <div className="grid grid-cols-2 gap-2 text-xs">
                   <div>
                     <p className="text-muted-foreground">Interest</p>
-                    <Badge variant="secondary">
+                    <Badge variant="secondary" className="text-xs px-1.5 py-0">
                       {getServiceLabel(call.service_interest)}
                     </Badge>
                   </div>
                   <div>
                     <p className="text-muted-foreground">Timeline</p>
-                    <Badge variant="secondary">
+                    <Badge variant="secondary" className="text-xs px-1.5 py-0">
                       {getTimelineLabel(call.start_timeline)}
                     </Badge>
                   </div>
                   <div>
-                    <p className="text-muted-foreground">Property Type</p>
+                    <p className="text-muted-foreground">Type</p>
                     <p className="font-medium capitalize">
                       {call.leads?.property_type?.replace("_", " ") || "N/A"}
                     </p>
                   </div>
+                  <div>
+                    <p className="text-muted-foreground">Duration</p>
+                    <p className="font-medium">{call.duration_minutes} min</p>
+                  </div>
                   {call.leads?.opportunity_value && (
-                    <div>
+                    <div className="col-span-2">
                       <p className="text-muted-foreground">Est. Value</p>
                       <p className="font-medium flex items-center gap-1">
                         <DollarSign className="h-3 w-3" />
@@ -651,28 +612,20 @@ function DiscoveryCallDetailModal({ call, onClose }: DiscoveryCallDetailModalPro
 
               {/* Meeting Link for Video Calls */}
               {call.meeting_type === "video" && call.google_meet_link && (
-                <div className="p-4 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800">
-                  <h4 className="font-semibold flex items-center gap-2 text-green-800 dark:text-green-200">
-                    <Video className="h-4 w-4" />
-                    Video Meeting
-                  </h4>
-                  <Button className="w-full mt-2 bg-green-600 hover:bg-green-700" asChild>
-                    <a href={call.google_meet_link} target="_blank" rel="noopener noreferrer">
-                      <Video className="h-4 w-4 mr-2" />
-                      Join Google Meet
-                    </a>
-                  </Button>
-                </div>
+                <Button className="w-full h-8 text-xs bg-green-600 hover:bg-green-700" asChild>
+                  <a href={call.google_meet_link} target="_blank" rel="noopener noreferrer">
+                    <Video className="h-3 w-3 mr-1" /> Join Google Meet
+                  </a>
+                </Button>
               )}
 
-              {/* Combined Notes - More Visible */}
+              {/* Combined Notes - Compact */}
               {allNotes && (
-                <div className="p-4 rounded-lg bg-amber-50 dark:bg-amber-900/20 border-2 border-amber-200 dark:border-amber-800">
-                  <h4 className="font-semibold flex items-center gap-2 text-amber-800 dark:text-amber-200 mb-2">
-                    <FileText className="h-4 w-4" />
-                    Notes & Context
+                <div className="p-2 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
+                  <h4 className="font-semibold text-xs flex items-center gap-1 text-amber-800 dark:text-amber-200 mb-1">
+                    <FileText className="h-3 w-3" /> Notes
                   </h4>
-                  <div className="text-sm text-amber-900 dark:text-amber-100 whitespace-pre-wrap">
+                  <div className="text-xs text-amber-900 dark:text-amber-100 whitespace-pre-wrap max-h-[100px] overflow-y-auto">
                     {allNotes}
                   </div>
                 </div>
