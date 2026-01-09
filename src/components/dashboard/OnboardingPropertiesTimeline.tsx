@@ -16,6 +16,7 @@ const ONBOARDING_STEPS = [
 ];
 
 // Map lead stages to timeline step index
+// The step index represents the CURRENT step we're working on (not completed)
 function getTimelineStep(stage: string | null): number {
   switch(stage) {
     case 'new_lead':
@@ -24,21 +25,19 @@ function getTimelineStep(stage: string | null): number {
     case 'discovery_call_completed':
     case 'proposal_sent':
     case 'contract_out':
-      return 0; // Pre-payment stages - at step 0
     case 'contract_signed': 
-      return 0; // Current step: Setup Payment
+      return 0; // Current step: Payment Setup
     case 'ach_form_signed': 
-      return 1; // Current step: Complete Onboarding Form
     case 'onboarding_form_requested': 
-      return 2; // Current step: Submit Insurance
+      return 1; // Current step: Onboarding Form (requested = waiting for it)
     case 'insurance_requested': 
-      return 3; // Current step: Schedule Inspection
+      return 2; // Current step: Insurance (requested = waiting for it)
     case 'inspection_scheduled': 
-      return 4; // Current step: Go Live
+      return 3; // Current step: Inspection
     case 'ops_handoff': 
       return 5; // All done
     default: 
-      return 0; // Default to first step for properties without a lead stage
+      return 0; // Default to first step
   }
 }
 
@@ -51,10 +50,10 @@ function getStageLabel(stage: string | null): string {
     case 'proposal_sent': return 'Proposal Sent';
     case 'contract_out': return 'Contract Out';
     case 'contract_signed': return 'Payment Setup';
-    case 'ach_form_signed': return 'Onboarding Form';
-    case 'onboarding_form_requested': return 'Insurance';
-    case 'insurance_requested': return 'Inspection';
-    case 'inspection_scheduled': return 'Go Live';
+    case 'ach_form_signed': 
+    case 'onboarding_form_requested': return 'Onboarding Form';
+    case 'insurance_requested': return 'Insurance';
+    case 'inspection_scheduled': return 'Inspection';
     case 'ops_handoff': return 'Onboarded';
     default: return 'Not Started';
   }
