@@ -41,6 +41,7 @@ import LeadDetailModal from "@/components/leads/LeadDetailModal";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useAdminCheck } from "@/hooks/useAdminCheck";
+import { useGhlAutoSync } from "@/hooks/useGhlAutoSync";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -122,6 +123,9 @@ export function InboxView() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { isAdmin } = useAdminCheck();
+  
+  // Auto-sync GHL data in background
+  useGhlAutoSync();
 
   // Get current user and their phone assignment
   useEffect(() => {

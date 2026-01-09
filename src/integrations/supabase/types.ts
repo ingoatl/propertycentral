@@ -2261,6 +2261,7 @@ export type Database = {
           ghl_call_id: string | null
           ghl_contact_id: string | null
           ghl_conversation_id: string | null
+          ghl_message_id: string | null
           id: string
           is_read: boolean | null
           lead_id: string
@@ -2288,6 +2289,7 @@ export type Database = {
           ghl_call_id?: string | null
           ghl_contact_id?: string | null
           ghl_conversation_id?: string | null
+          ghl_message_id?: string | null
           id?: string
           is_read?: boolean | null
           lead_id: string
@@ -2315,6 +2317,7 @@ export type Database = {
           ghl_call_id?: string | null
           ghl_contact_id?: string | null
           ghl_conversation_id?: string | null
+          ghl_message_id?: string | null
           id?: string
           is_read?: boolean | null
           lead_id?: string
