@@ -42,6 +42,7 @@ import { OwnerPropertyTab } from "./components/OwnerPropertyTab";
 import { OwnerRevenueForecast } from "./components/OwnerRevenueForecast";
 import { UpcomingEventsTimeline } from "./components/UpcomingEventsTimeline";
 import { StatementViewer } from "./components/StatementViewer";
+import { OwnerOnboardingTimeline } from "./components/OwnerOnboardingTimeline";
 
 interface OwnerSession {
   ownerId: string;
@@ -840,6 +841,9 @@ export default function OwnerDashboard() {
               <span className="hidden sm:inline">Property</span>
             </TabsTrigger>
           </TabsList>
+
+          {/* Show onboarding timeline if property is in onboarding */}
+          {property?.id && <OwnerOnboardingTimeline propertyId={property.id} />}
 
           <TabsContent value="overview">
             <div className="space-y-8">
