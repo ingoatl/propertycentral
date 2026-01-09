@@ -10,6 +10,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -22,6 +29,11 @@ interface SendEmailDialogProps {
   contactType: "lead" | "owner";
   contactId: string;
 }
+
+const SENDERS = [
+  { email: "ingo@peachhausgroup.com", name: "Ingo Schaer", label: "Ingo" },
+  { email: "anja@peachhausgroup.com", name: "Anja Schaer", label: "Anja" },
+];
 
 const EMAIL_TEMPLATES = [
   {
@@ -71,27 +83,18 @@ export function SendEmailDialog({
 }: SendEmailDialogProps) {
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
-  const [currentUserEmail, setCurrentUserEmail] = useState<string | null>(null);
-  const [currentUserName, setCurrentUserName] = useState<string | null>(null);
+  const [selectedSender, setSelectedSender] = useState(SENDERS[0].email);
   const queryClient = useQueryClient();
 
-  // Get current user's email for the from field
+  // Reset form when dialog opens
   useEffect(() => {
-    const fetchUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user?.email) {
-        setCurrentUserEmail(user.email);
-        // Get profile name
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("first_name")
-          .eq("id", user.id)
-          .single();
-        setCurrentUserName(profile?.first_name || user.email.split("@")[0]);
-      }
-    };
-    if (open) fetchUser();
+    if (open) {
+      setSubject("");
+      setBody("");
+    }
   }, [open]);
+
+  const selectedSenderInfo = SENDERS.find((s) => s.email === selectedSender);
 
   const sendEmail = useMutation({
     mutationFn: async () => {
@@ -103,8 +106,8 @@ export function SendEmailDialog({
           body,
           contactType,
           contactId,
-          senderEmail: currentUserEmail,
-          senderName: currentUserName,
+          senderEmail: selectedSender,
+          senderName: selectedSenderInfo?.name,
         },
       });
 
@@ -117,6 +120,7 @@ export function SendEmailDialog({
       setSubject("");
       setBody("");
       queryClient.invalidateQueries({ queryKey: ["all-communications"] });
+      queryClient.invalidateQueries({ queryKey: ["lead-communications"] });
       onOpenChange(false);
     },
     onError: (error: any) => {
@@ -141,6 +145,28 @@ export function SendEmailDialog({
         </DialogHeader>
 
         <div className="space-y-4">
+          {/* Sender selection */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Send as</label>
+            <Select value={selectedSender} onValueChange={setSelectedSender}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {SENDERS.map((sender) => (
+                  <SelectItem key={sender.email} value={sender.email}>
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium">{sender.label}</span>
+                      <span className="text-muted-foreground text-xs">
+                        ({sender.email})
+                      </span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           {/* Email display */}
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <span>To:</span>
