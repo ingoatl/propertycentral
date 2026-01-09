@@ -61,10 +61,15 @@ serve(async (req) => {
       .limit(1)
       .maybeSingle();
 
-    // Fetch lead info
+    // Fetch lead info with discovery calls
     const { data: leadData } = await supabase
       .from("leads")
-      .select("id, name, email, phone, status, property_address, notes, property_type")
+      .select(`
+        id, name, email, phone, status, property_address, notes, property_type,
+        discovery_calls (
+          id, scheduled_at, status, google_meet_link, meeting_type
+        )
+      `)
       .ilike("email", `%${contactEmail?.split('@')[0]}%`)
       .limit(1)
       .maybeSingle();
@@ -76,57 +81,86 @@ serve(async (req) => {
         ).join('\n\n---\n\n')
       : '';
 
-    // Build property/owner context
+    // Build property/owner context with actionable info
     let propertyContext = '';
     let isOwner = false;
+    let meetingLink = '';
+    let upcomingCall = null;
     
     if (ownerData) {
       isOwner = true;
-      propertyContext = `\n\nCONTACT STATUS: This is an existing property owner.`;
+      propertyContext = `\n\nCONTACT STATUS: PROPERTY OWNER (VIP - prioritize their needs)`;
+      
+      if (ownerData.phone) {
+        propertyContext += `\nOwner Phone: ${ownerData.phone}`;
+      }
       
       if (ownerData.properties && ownerData.properties.length > 0) {
         const props = ownerData.properties as any[];
-        propertyContext += `\n\nPROPERTIES THEY OWN:`;
+        propertyContext += `\n\nPROPERTIES:`;
         for (const prop of props) {
-          propertyContext += `\n- ${prop.name || prop.address} (Status: ${prop.status || 'Active'})`;
-          if (prop.onboarding_projects && prop.onboarding_projects.length > 0) {
+          propertyContext += `\n- ${prop.name || prop.address} (${prop.status || 'Active'})`;
+          if (prop.onboarding_projects?.[0]) {
             const project = prop.onboarding_projects[0];
-            propertyContext += `\n  Onboarding: ${project.status} - ${project.progress_percentage || 0}% complete, Phase: ${project.current_phase || 'Unknown'}`;
-            
-            // Determine what they need to do next based on onboarding status
             if (project.status === 'in_progress') {
-              propertyContext += `\n  IMPORTANT: They are actively onboarding. Check what documents/items are still pending before suggesting they complete onboarding.`;
-            } else if (project.status === 'completed') {
-              propertyContext += `\n  Their onboarding is COMPLETE - do NOT suggest completing onboarding forms.`;
+              propertyContext += ` - Onboarding ${project.progress_percentage}% complete`;
             }
           }
         }
       }
     } else if (leadData) {
-      propertyContext = `\n\nCONTACT STATUS: This is a lead (potential client).`;
-      propertyContext += `\nLead Status: ${leadData.status || 'New'}`;
+      propertyContext = `\n\nCONTACT STATUS: Lead (${leadData.status || 'New'})`;
       if (leadData.property_address) {
-        propertyContext += `\nProperty of Interest: ${leadData.property_address}`;
+        propertyContext += `\nProperty: ${leadData.property_address}`;
       }
-      if (leadData.notes) {
-        propertyContext += `\nNotes: ${leadData.notes}`;
+      if (leadData.phone) {
+        propertyContext += `\nPhone: ${leadData.phone}`;
+      }
+      
+      // Check for scheduled discovery calls
+      if (leadData.discovery_calls && leadData.discovery_calls.length > 0) {
+        const calls = leadData.discovery_calls as any[];
+        const upcoming = calls.find((c: any) => 
+          c.status === 'scheduled' && new Date(c.scheduled_at) > new Date()
+        );
+        if (upcoming) {
+          upcomingCall = upcoming;
+          meetingLink = upcoming.google_meet_link || '';
+          const callDate = new Date(upcoming.scheduled_at);
+          propertyContext += `\n\nSCHEDULED CALL: ${callDate.toLocaleDateString()} at ${callDate.toLocaleTimeString()}`;
+          if (meetingLink) {
+            propertyContext += `\nMeeting Link: ${meetingLink}`;
+          }
+        }
       }
     }
 
-    const systemPrompt = `You are a professional email assistant for PeachHaus Group, a premium property management company in Atlanta, Georgia.
+    // Detect if email mentions meetings/calls
+    const emailLower = (incomingEmailBody || '').toLowerCase();
+    const mentionsMeeting = emailLower.includes('call') || emailLower.includes('meet') || 
+      emailLower.includes('schedule') || emailLower.includes('zoom') || 
+      emailLower.includes('link') || emailLower.includes('join');
 
-CRITICAL GUIDELINES:
-- Write concise, professional replies - 2-3 short paragraphs MAX
-- Get straight to the point - directly address their question or request
-- Respond specifically to their MOST RECENT message first
-- Be warm but efficient - no unnecessary filler or pleasantries
-- Include one clear next step or action item when appropriate
-- Don't include a signature (added automatically)
-- Start with "Hi [FirstName]," and end with "Best regards"
+    let actionContext = '';
+    if (mentionsMeeting && meetingLink) {
+      actionContext = `\n\nACTION REQUIRED: They're asking about a meeting. Include this meeting link: ${meetingLink}`;
+    } else if (mentionsMeeting && !meetingLink) {
+      actionContext = `\n\nACTION: They mention a meeting but no link is scheduled. Suggest scheduling a call.`;
+    }
 
-${isOwner ? `This is a PROPERTY OWNER - be service-oriented and reference their property when relevant.` : `This is a LEAD - be welcoming and encourage next steps.`}
+    const systemPrompt = `You are a professional email assistant for PeachHaus Group, a premium property management company in Atlanta.
 
-ABOUT PEACHHAUS: Premium property management for short/mid-term rentals in Atlanta. White-glove service.`;
+RULES:
+- 2-3 short paragraphs MAX - be direct
+- Address their MOST RECENT message first
+- If they ask about a meeting/call and you have a link, INCLUDE IT
+- If meeting info is provided, share date/time and link clearly
+- Include clear next step
+- Start with "Hi [FirstName]," end with "Best regards"
+- No signature needed
+
+${isOwner ? `VIP OWNER - prioritize their needs, be proactive.` : `LEAD - be welcoming, guide toward next step.`}
+${actionContext}`;
 
     const userPrompt = `Contact: ${contactName} (${contactEmail})
 ${currentSubject ? `Subject: ${currentSubject}` : ''}
