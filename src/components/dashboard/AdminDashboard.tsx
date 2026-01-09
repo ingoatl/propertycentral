@@ -419,43 +419,55 @@ export const AdminDashboard = ({ summaries, onExport, onSync, syncing, onSendOve
         {/* Gmail Integration - Prominent Position */}
         <EmailInsightsCard />
 
-        {/* KPI Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6 max-md:gap-4">
-          <KPICard
-            title="Total Properties"
-            value={totalProperties}
-            icon={Building2}
-            subtitle="Under management"
-          />
-          <KPICard
-            title="Owned Properties"
-            value={ownedProperties.length}
-            icon={Building2}
-            subtitle={`$${ownedRevenue.toLocaleString()} revenue`}
-            className="bg-gradient-to-br from-primary/5 to-primary/10"
-          />
-          <KPICard
-            title="Total Revenue"
-            value={`$${totalRevenue.toLocaleString()}`}
-            icon={DollarSign}
-            trend={{
-              value: Math.abs(revenueTrend),
-              isPositive: revenueTrend >= 0,
-            }}
-            subtitle="All properties"
-          />
-          <KPICard
-            title="Management Fees"
-            value={`$${totalManagementFees.toLocaleString()}`}
-            icon={TrendingUp}
-            subtitle="From managed properties"
-          />
-          <KPICard
-            title="Avg Occupancy"
-            value={`${avgOccupancy.toFixed(1)}%`}
-            icon={Building2}
-            subtitle="All properties"
-          />
+        {/* KPI Cards - Horizontal scroll on mobile */}
+        <div className="overflow-x-auto scrollbar-hide -mx-3 px-3 md:mx-0 md:px-0">
+          <div className="flex md:grid md:grid-cols-5 gap-3 md:gap-6 min-w-max md:min-w-0">
+            <div className="w-[160px] md:w-auto flex-shrink-0 md:flex-shrink">
+              <KPICard
+                title="Total Properties"
+                value={totalProperties}
+                icon={Building2}
+                subtitle="Under management"
+              />
+            </div>
+            <div className="w-[160px] md:w-auto flex-shrink-0 md:flex-shrink">
+              <KPICard
+                title="Owned Properties"
+                value={ownedProperties.length}
+                icon={Building2}
+                subtitle={`$${ownedRevenue.toLocaleString()} revenue`}
+                className="bg-gradient-to-br from-primary/5 to-primary/10"
+              />
+            </div>
+            <div className="w-[160px] md:w-auto flex-shrink-0 md:flex-shrink">
+              <KPICard
+                title="Total Revenue"
+                value={`$${totalRevenue.toLocaleString()}`}
+                icon={DollarSign}
+                trend={{
+                  value: Math.abs(revenueTrend),
+                  isPositive: revenueTrend >= 0,
+                }}
+                subtitle="All properties"
+              />
+            </div>
+            <div className="w-[160px] md:w-auto flex-shrink-0 md:flex-shrink">
+              <KPICard
+                title="Management Fees"
+                value={`$${totalManagementFees.toLocaleString()}`}
+                icon={TrendingUp}
+                subtitle="From managed properties"
+              />
+            </div>
+            <div className="w-[160px] md:w-auto flex-shrink-0 md:flex-shrink">
+              <KPICard
+                title="Avg Occupancy"
+                value={`${avgOccupancy.toFixed(1)}%`}
+                icon={Building2}
+                subtitle="All properties"
+              />
+            </div>
+          </div>
         </div>
 
         {/* OWNED PROPERTIES PERFORMANCE - Prominent Section */}
