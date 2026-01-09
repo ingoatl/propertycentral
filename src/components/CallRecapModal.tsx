@@ -16,6 +16,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Phone,
   Mail,
   Send,
@@ -36,12 +43,15 @@ import {
   SkipForward,
   ChevronLeft,
   ChevronRight,
+  UserPlus,
+  Trash2,
 } from "lucide-react";
 import { usePendingCallRecaps, PendingCallRecap } from "@/hooks/usePendingCallRecaps";
 import {
   usePendingTaskConfirmations,
   PendingTaskConfirmation,
 } from "@/hooks/usePendingTaskConfirmations";
+import { useQuery } from "@tanstack/react-query";
 import { formatDistanceToNow, format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -112,6 +122,11 @@ function CallTaskCard({ task, onApprove, onReject, isApproving, isRejecting }: C
   );
 }
 
+interface TeamMember {
+  id: string;
+  first_name: string | null;
+}
+
 interface RecapEditorProps {
   recap: PendingCallRecap;
   onSend: (subject: string, body: string) => void;
@@ -119,12 +134,32 @@ interface RecapEditorProps {
   onCallback: () => void;
   onSendSMS: (message: string) => void;
   onSkipToNext: () => void;
+  onAssignTo: (userId: string) => void;
+  teamMembers: TeamMember[];
+  currentUserId: string | null;
   isSending: boolean;
   isDismissing: boolean;
   hasNext: boolean;
+  hasPrevious: boolean;
+  onPrevious: () => void;
 }
 
-function RecapEditor({ recap, onSend, onDismiss, onCallback, onSendSMS, onSkipToNext, isSending, isDismissing, hasNext }: RecapEditorProps) {
+function RecapEditor({ 
+  recap, 
+  onSend, 
+  onDismiss, 
+  onCallback, 
+  onSendSMS, 
+  onSkipToNext, 
+  onAssignTo,
+  teamMembers,
+  currentUserId,
+  isSending, 
+  isDismissing, 
+  hasNext,
+  hasPrevious,
+  onPrevious,
+}: RecapEditorProps) {
   const [subject, setSubject] = useState(recap.subject);
   const [emailBody, setEmailBody] = useState(recap.email_body);
   const [isPreview, setIsPreview] = useState(false);
@@ -176,8 +211,19 @@ function RecapEditor({ recap, onSend, onDismiss, onCallback, onSendSMS, onSkipTo
         </div>
       </div>
 
-      {/* Quick Action Buttons */}
+      {/* Quick Action Buttons - Row 1 */}
       <div className="flex items-center gap-2 p-3 bg-muted/30 rounded-lg">
+        {hasPrevious && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onPrevious}
+            className="text-muted-foreground"
+          >
+            <ChevronLeft className="h-4 w-4 mr-1" />
+            Back
+          </Button>
+        )}
         <Button
           variant="outline"
           size="sm"
@@ -194,7 +240,17 @@ function RecapEditor({ recap, onSend, onDismiss, onCallback, onSendSMS, onSkipTo
           className="flex-1 text-green-600 border-green-200 hover:bg-green-50"
         >
           <MessageSquare className="h-4 w-4 mr-2" />
-          Send SMS Recap
+          SMS Recap
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onDismiss}
+          disabled={isDismissing}
+          className="text-destructive border-destructive/30 hover:bg-destructive/10"
+        >
+          <Trash2 className="h-4 w-4 mr-1" />
+          Dismiss
         </Button>
         {hasNext && (
           <Button
@@ -203,10 +259,37 @@ function RecapEditor({ recap, onSend, onDismiss, onCallback, onSendSMS, onSkipTo
             onClick={onSkipToNext}
             className="text-muted-foreground"
           >
-            <SkipForward className="h-4 w-4 mr-1" />
             Next
+            <ChevronRight className="h-4 w-4 ml-1" />
           </Button>
         )}
+      </div>
+
+      {/* Assign to Team Member */}
+      <div className="flex items-center gap-2">
+        <UserPlus className="h-4 w-4 text-muted-foreground" />
+        <span className="text-sm text-muted-foreground">Assign to:</span>
+        <Select
+          value={recap.assigned_to_user_id || ""}
+          onValueChange={(value) => {
+            if (value && value !== recap.assigned_to_user_id) {
+              onAssignTo(value);
+            }
+          }}
+        >
+          <SelectTrigger className="w-40 h-8 text-sm">
+            <SelectValue placeholder="Select team member" />
+          </SelectTrigger>
+          <SelectContent>
+            {teamMembers
+              .filter(m => m.id !== currentUserId)
+              .map((member) => (
+                <SelectItem key={member.id} value={member.id}>
+                  {member.first_name || 'Unknown'}
+                </SelectItem>
+              ))}
+          </SelectContent>
+        </Select>
       </div>
 
       {/* SMS Input */}
@@ -392,6 +475,19 @@ export function CallRecapModal() {
     isApprovingAll,
   } = usePendingTaskConfirmations();
 
+  // Fetch team members for assignment dropdown
+  const { data: teamMembers = [] } = useQuery({
+    queryKey: ["team-members-for-assignment"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id, first_name")
+        .order("first_name");
+      if (error) throw error;
+      return data as TeamMember[];
+    },
+  });
+
   // Show user's recaps first, then team recaps if toggled
   const displayedRecaps = showAllRecaps ? pendingRecaps : userRecaps.length > 0 ? userRecaps : pendingRecaps;
 
@@ -455,6 +551,30 @@ export function CallRecapModal() {
   const handleApproveAllTasks = useCallback(() => {
     approveAllTasks();
   }, [approveAllTasks]);
+
+  // Handle assigning recap to another team member
+  const handleAssignTo = useCallback(async (userId: string) => {
+    if (!currentRecap) return;
+    
+    try {
+      const { error } = await supabase
+        .from("pending_call_recaps")
+        .update({ assigned_to_user_id: userId })
+        .eq("id", currentRecap.id);
+      
+      if (error) throw error;
+      
+      const assignedMember = teamMembers.find(m => m.id === userId);
+      toast.success(`Assigned to ${assignedMember?.first_name || 'team member'}`);
+      
+      // Move to next recap after assigning
+      if (activeRecapIndex < displayedRecaps.length - 1) {
+        setActiveRecapIndex(prev => prev + 1);
+      }
+    } catch (e: any) {
+      toast.error(e.message || "Failed to assign recap");
+    }
+  }, [currentRecap, teamMembers, activeRecapIndex, displayedRecaps.length]);
 
   // Handle callback using integrated Twilio calling
   const handleCallback = useCallback(async () => {
@@ -642,7 +762,12 @@ export function CallRecapModal() {
                           setActiveRecapIndex(prev => prev + 1);
                         }
                       }}
+                      onAssignTo={handleAssignTo}
+                      teamMembers={teamMembers}
+                      currentUserId={currentUserId}
                       hasNext={activeRecapIndex < displayedRecaps.length - 1}
+                      hasPrevious={activeRecapIndex > 0}
+                      onPrevious={() => setActiveRecapIndex(prev => Math.max(0, prev - 1))}
                       isSending={isSending}
                       isDismissing={isDismissing}
                     />
