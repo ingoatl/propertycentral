@@ -618,9 +618,19 @@ export function InboxView() {
 
   const getInitials = (name: string) => name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2);
   const getMessagePreview = (comm: CommunicationItem) => {
-    if (comm.type === "call") return comm.direction === "inbound" ? "Incoming call" : "Outgoing call";
+    if (comm.type === "call") {
+      // Show transcript preview if available, otherwise show call direction
+      if (comm.body && comm.body.length > 10 && comm.body !== "Call" && !comm.body.startsWith("Phone call")) {
+        return comm.body.slice(0, 60) + (comm.body.length > 60 ? "..." : "");
+      }
+      return comm.direction === "inbound" ? "Incoming call" : "Outgoing call";
+    }
     if (comm.type === "draft") return `Draft: ${comm.subject || "No subject"}`;
-    return comm.body?.slice(0, 50) + (comm.body?.length > 50 ? "..." : "");
+    // Handle empty or placeholder SMS bodies
+    if (!comm.body || comm.body === "SMS message" || comm.body.trim().length === 0) {
+      return comm.direction === "inbound" ? "Received message" : "Sent message";
+    }
+    return comm.body.slice(0, 80) + (comm.body.length > 80 ? "..." : "");
   };
 
   // Mobile: show list or detail based on selection
