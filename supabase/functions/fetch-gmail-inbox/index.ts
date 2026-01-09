@@ -7,6 +7,18 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Proper UTF-8 decoding for base64 email content
+const decodeBase64Utf8 = (base64: string): string => {
+  try {
+    const binary = atob(base64.replace(/-/g, '+').replace(/_/g, '/'));
+    const bytes = Uint8Array.from(binary, c => c.charCodeAt(0));
+    return new TextDecoder('utf-8').decode(bytes);
+  } catch (e) {
+    console.error('Error decoding base64:', e);
+    return '';
+  }
+};
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -115,35 +127,27 @@ serve(async (req) => {
           let html = '';
           
           if (payload.body?.data) {
-            try {
-              const decoded = atob(payload.body.data.replace(/-/g, '+').replace(/_/g, '/'));
-              if (payload.mimeType === 'text/html') {
-                html = decoded;
-              } else {
-                text = decoded;
-              }
-            } catch (e) {
-              console.error('Error decoding body:', e);
+            const decoded = decodeBase64Utf8(payload.body.data);
+            if (payload.mimeType === 'text/html') {
+              html = decoded;
+            } else {
+              text = decoded;
             }
           }
           
           if (payload.parts) {
             for (const part of payload.parts) {
-              try {
-                if (part.mimeType === 'text/plain' && part.body?.data) {
-                  text = atob(part.body.data.replace(/-/g, '+').replace(/_/g, '/'));
-                }
-                if (part.mimeType === 'text/html' && part.body?.data) {
-                  html = atob(part.body.data.replace(/-/g, '+').replace(/_/g, '/'));
-                }
-                // Handle multipart/alternative
-                if (part.parts) {
-                  const nested = extractBody(part);
-                  if (nested.text) text = nested.text;
-                  if (nested.html) html = nested.html;
-                }
-              } catch (e) {
-                console.error('Error decoding part:', e);
+              if (part.mimeType === 'text/plain' && part.body?.data) {
+                text = decodeBase64Utf8(part.body.data);
+              }
+              if (part.mimeType === 'text/html' && part.body?.data) {
+                html = decodeBase64Utf8(part.body.data);
+              }
+              // Handle multipart/alternative
+              if (part.parts) {
+                const nested = extractBody(part);
+                if (nested.text) text = nested.text;
+                if (nested.html) html = nested.html;
               }
             }
           }

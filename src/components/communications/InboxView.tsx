@@ -511,17 +511,12 @@ export function InboxView() {
             <button onClick={() => { setActiveTab("emails"); setSelectedMessage(null); }} className={`flex items-center gap-2 pb-2 border-b-2 transition-colors ${activeTab === "emails" ? "border-primary text-foreground font-medium" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
               <Mail className="h-4 w-4" /><span>Emails</span>
             </button>
-            <div className="flex-1" />
-            {isAdmin && <AdminInboxSelector selectedUserId={selectedInboxUserId} onUserChange={handleInboxChange} currentUserId={currentUserId} />}
           </div>
 
-          {/* Only show phone number on Chats/Calls tabs */}
-          {activeTab !== "emails" && userPhoneAssignment && (
-            <div className="mb-3 px-3 py-2 bg-emerald-50 dark:bg-emerald-950/30 rounded-lg border border-emerald-200 dark:border-emerald-900">
-              <div className="flex items-center gap-2">
-                <Phone className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-                <span className="text-xs font-medium text-emerald-700 dark:text-emerald-300">My Number: {userPhoneAssignment.phone_number}</span>
-              </div>
+          {/* My Inbox selector - own row for Chats/Calls tabs */}
+          {activeTab !== "emails" && isAdmin && (
+            <div className="mb-2">
+              <AdminInboxSelector selectedUserId={selectedInboxUserId} onUserChange={handleInboxChange} currentUserId={currentUserId} />
             </div>
           )}
 
@@ -556,10 +551,7 @@ export function InboxView() {
         </div>
 
         <div className="p-3 border-b">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Search conversations..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9 h-9 bg-muted/50 border-0" />
-          </div>
+          <Input placeholder="Search..." value={search} onChange={(e) => setSearch(e.target.value)} className="h-9 bg-muted/50 border-0" />
         </div>
 
         <ScrollArea className="flex-1">
@@ -571,21 +563,24 @@ export function InboxView() {
               <div className="p-8 text-center text-muted-foreground"><Mail className="h-10 w-10 mx-auto mb-3 opacity-40" /><p className="text-sm">No emails in {selectedEmailInbox === "ingo" ? "Ingo's" : "Anja's"} inbox</p></div>
             ) : (
               <div>
-                {filteredGmailEmails.filter(email => !search || email.subject.toLowerCase().includes(search.toLowerCase()) || email.fromName.toLowerCase().includes(search.toLowerCase())).map((email) => (
-                  <div key={email.id} onClick={() => setSelectedGmailEmail(email)} className={`flex items-start gap-3 p-3 cursor-pointer transition-colors border-l-2 ${selectedGmailEmail?.id === email.id ? "bg-muted/70 border-l-primary" : "hover:bg-muted/30 border-l-transparent"}`}>
-                    <div className="h-10 w-10 rounded-full bg-blue-500 flex items-center justify-center flex-shrink-0">
-                      <span className="text-sm font-medium text-white">{getInitials(email.fromName)}</span>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="font-medium text-sm truncate">{email.fromName}</span>
-                        <span className="text-xs text-muted-foreground whitespace-nowrap">{format(new Date(email.date), "MMM d")}</span>
+                {filteredGmailEmails.filter(email => !search || email.subject.toLowerCase().includes(search.toLowerCase()) || email.fromName.toLowerCase().includes(search.toLowerCase())).map((email) => {
+                  const isUnread = email.labelIds?.includes('UNREAD');
+                  return (
+                    <div key={email.id} onClick={() => setSelectedGmailEmail(email)} className={`flex items-start gap-3 p-3 cursor-pointer transition-colors border-l-2 ${selectedGmailEmail?.id === email.id ? "bg-muted/70 border-l-primary" : "hover:bg-muted/30 border-l-transparent"}`}>
+                      <div className="h-10 w-10 rounded-full bg-blue-500 flex items-center justify-center flex-shrink-0">
+                        <span className="text-sm font-medium text-white">{getInitials(email.fromName)}</span>
                       </div>
-                      <p className="text-xs font-medium truncate">{email.subject}</p>
-                      <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{email.snippet}</p>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className={`text-sm truncate ${isUnread ? 'font-bold' : 'font-medium'}`}>{email.fromName}</span>
+                          <span className="text-xs text-muted-foreground whitespace-nowrap">{format(new Date(email.date), "MMM d")}</span>
+                        </div>
+                        <p className={`text-xs truncate ${isUnread ? 'font-bold' : 'font-medium'}`}>{email.subject}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{email.snippet}</p>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )
           ) : isLoading ? (
