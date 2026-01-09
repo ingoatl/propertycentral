@@ -25,48 +25,38 @@ interface EmailRequest {
 // Team signatures based on email
 const SIGNATURES: Record<string, string> = {
   "ingo@peachhausgroup.com": `
-<table cellpadding="0" cellspacing="0" style="font-family: Arial, sans-serif; font-size: 14px; color: #333;">
+<br/><br/>
+<table cellpadding="0" cellspacing="0" style="font-family: Arial, sans-serif; font-size: 14px; color: #333; border-collapse: collapse;">
   <tr>
-    <td style="padding: 20px 0; vertical-align: top;">
-      <table cellpadding="0" cellspacing="0">
-        <tr>
-          <td style="padding-right: 15px; border-right: 2px solid #e5a653; vertical-align: top;">
-            <img src="https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/assets/ingo-signature-photo.png" alt="Ingo Schaer" width="100" style="border-radius: 50%; display: block;" />
-            <img src="https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/assets/ingo-signature.png" alt="Signature" width="100" style="display: block; margin-top: 10px;" />
-          </td>
-          <td style="padding-left: 15px; vertical-align: top;">
-            <p style="margin: 0; font-size: 18px; font-weight: bold; color: #333;">Ingo Schaer</p>
-            <p style="margin: 4px 0 0; font-size: 13px; color: #666;">Co-Founder, Operations Manager</p>
-            <p style="margin: 4px 0 0; font-size: 13px; font-weight: 600; color: #333;">PeachHaus Group LLC</p>
-            <p style="margin: 10px 0 0; font-size: 13px; color: #666;">(404) 800-5932</p>
-            <p style="margin: 4px 0 0;"><a href="mailto:ingo@peachhausgroup.com" style="font-size: 13px; color: #1a73e8; text-decoration: none;">ingo@peachhausgroup.com</a></p>
-            <p style="margin: 4px 0 0;"><a href="https://propertycentral.lovable.app" style="font-size: 13px; color: #1a73e8; text-decoration: none;">propertycentral.lovable.app</a></p>
-          </td>
-        </tr>
-      </table>
+    <td style="padding-right: 12px; border-right: 3px solid #e5a653; vertical-align: top; width: 110px;">
+      <img src="https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/assets/ingo-photo.png" alt="Ingo Schaer" width="90" height="90" style="border-radius: 50%; display: block;" />
+      <img src="https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/assets/ingo-sig.png" alt="" width="90" style="display: block; margin-top: 8px; font-style: italic;" />
+    </td>
+    <td style="padding-left: 12px; vertical-align: top;">
+      <p style="margin: 0; font-size: 16px; font-weight: bold; color: #1a1a1a;">Ingo Schaer</p>
+      <p style="margin: 2px 0 0; font-size: 12px; color: #555;">Co-Founder, Operations Manager</p>
+      <p style="margin: 2px 0 0; font-size: 12px; font-weight: 600; color: #1a1a1a;">PeachHaus Group LLC</p>
+      <p style="margin: 8px 0 0; font-size: 12px; color: #555;">(404) 800-5932</p>
+      <p style="margin: 2px 0 0;"><a href="mailto:ingo@peachhausgroup.com" style="font-size: 12px; color: #1a73e8; text-decoration: none;">ingo@peachhausgroup.com</a></p>
+      <p style="margin: 2px 0 0;"><a href="https://propertycentral.lovable.app" style="font-size: 12px; color: #1a73e8; text-decoration: none;">propertycentral.lovable.app</a></p>
     </td>
   </tr>
 </table>`,
   "anja@peachhausgroup.com": `
-<table cellpadding="0" cellspacing="0" style="font-family: Arial, sans-serif; font-size: 14px; color: #333;">
+<br/><br/>
+<table cellpadding="0" cellspacing="0" style="font-family: Arial, sans-serif; font-size: 14px; color: #333; border-collapse: collapse;">
   <tr>
-    <td style="padding: 20px 0; vertical-align: top;">
-      <table cellpadding="0" cellspacing="0">
-        <tr>
-          <td style="padding-right: 15px; border-right: 2px solid #e5a653; vertical-align: top;">
-            <img src="https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/assets/anja-signature-photo.png" alt="Anja Schaer" width="100" style="border-radius: 50%; display: block;" />
-            <img src="https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/assets/anja-signature.png" alt="Signature" width="100" style="display: block; margin-top: 10px;" />
-          </td>
-          <td style="padding-left: 15px; vertical-align: top;">
-            <p style="margin: 0; font-size: 18px; font-weight: bold; color: #333;">Anja Schaer</p>
-            <p style="margin: 4px 0 0; font-size: 13px; color: #666;">Co-Founder, GA Real Estate Broker</p>
-            <p style="margin: 4px 0 0; font-size: 13px; font-weight: 600; color: #333;">PeachHaus Group LLC</p>
-            <p style="margin: 10px 0 0; font-size: 13px; color: #666;">(404) 800-5932</p>
-            <p style="margin: 4px 0 0;"><a href="mailto:anja@peachhausgroup.com" style="font-size: 13px; color: #1a73e8; text-decoration: none;">anja@peachhausgroup.com</a></p>
-            <p style="margin: 4px 0 0;"><a href="https://propertycentral.lovable.app" style="font-size: 13px; color: #1a73e8; text-decoration: none;">propertycentral.lovable.app</a></p>
-          </td>
-        </tr>
-      </table>
+    <td style="padding-right: 12px; border-right: 3px solid #e5a653; vertical-align: top; width: 110px;">
+      <img src="https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/assets/anja-photo.png" alt="Anja Schaer" width="90" height="90" style="border-radius: 50%; display: block;" />
+      <img src="https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/assets/anja-sig.png" alt="" width="90" style="display: block; margin-top: 8px; font-style: italic;" />
+    </td>
+    <td style="padding-left: 12px; vertical-align: top;">
+      <p style="margin: 0; font-size: 16px; font-weight: bold; color: #1a1a1a;">Anja Schaer</p>
+      <p style="margin: 2px 0 0; font-size: 12px; color: #555;">Co-Founder, GA Real Estate Broker</p>
+      <p style="margin: 2px 0 0; font-size: 12px; font-weight: 600; color: #1a1a1a;">PeachHaus Group LLC</p>
+      <p style="margin: 8px 0 0; font-size: 12px; color: #555;">(404) 800-5932</p>
+      <p style="margin: 2px 0 0;"><a href="mailto:anja@peachhausgroup.com" style="font-size: 12px; color: #1a73e8; text-decoration: none;">anja@peachhausgroup.com</a></p>
+      <p style="margin: 2px 0 0;"><a href="https://propertycentral.lovable.app" style="font-size: 12px; color: #1a73e8; text-decoration: none;">propertycentral.lovable.app</a></p>
     </td>
   </tr>
 </table>`,
@@ -118,10 +108,10 @@ serve(async (req) => {
     const signature = SIGNATURES[fromEmail.toLowerCase()] || 
       (senderEmail ? getDefaultSignature(senderName || "", senderEmail) : "");
 
-    // Convert plain text body to HTML
+    // Convert plain text body to HTML - left-aligned like Gmail
     const htmlBody = body
       .split("\n")
-      .map((line: string) => (line.trim() ? `<p style="margin: 0 0 10px 0;">${line}</p>` : "<br/>"))
+      .map((line: string) => (line.trim() ? `<p style="margin: 0 0 8px 0; text-align: left;">${line}</p>` : "<br/>"))
       .join("");
 
     const emailResponse = await resend.emails.send({
@@ -135,9 +125,11 @@ serve(async (req) => {
           <meta charset="utf-8">
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
         </head>
-        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-          ${htmlBody}
-          ${signature}
+        <body style="font-family: Arial, Helvetica, sans-serif; line-height: 1.5; color: #1a1a1a; max-width: 600px; margin: 0; padding: 0; text-align: left;">
+          <div style="padding: 0;">
+            ${htmlBody}
+            ${signature}
+          </div>
         </body>
         </html>
       `,
