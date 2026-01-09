@@ -10,6 +10,8 @@ import { DailyPerformanceEntriesList } from "./DailyPerformanceEntriesList";
 import { SendTestTeamDigestButton } from "./SendTestTeamDigestButton";
 import { DiscoveryCallCalendar } from "./DiscoveryCallCalendar";
 import { OnboardingPropertiesTimeline } from "./OnboardingPropertiesTimeline";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { ChevronDown } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Download, RefreshCw, Building2, DollarSign, TrendingUp, AlertCircle, MessageCircleQuestion, Bug } from "lucide-react";
@@ -311,6 +313,31 @@ export const AdminDashboard = ({ summaries, onExport, onSync, syncing, onSendOve
     }
   };
 
+  // Collapsible wrapper for onboarding timeline
+  const [onboardingOpen, setOnboardingOpen] = useState(false);
+
+  const OnboardingTimelineCollapsible = () => (
+    <Collapsible open={onboardingOpen} onOpenChange={setOnboardingOpen}>
+      <div className="rounded-xl border border-primary/20 bg-gradient-to-br from-primary/5 via-background to-accent/5 overflow-hidden">
+        <CollapsibleTrigger className="w-full p-4 flex items-center justify-between hover:bg-muted/30 transition-colors">
+          <div className="flex items-center gap-3">
+            <span className="text-2xl">🏗️</span>
+            <div className="text-left">
+              <h3 className="font-semibold text-lg">Properties Onboarding</h3>
+              <p className="text-sm text-muted-foreground">Track onboarding progress for new properties</p>
+            </div>
+          </div>
+          <ChevronDown className={`h-5 w-5 text-muted-foreground transition-transform duration-200 ${onboardingOpen ? 'rotate-180' : ''}`} />
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <div className="border-t border-primary/10">
+            <OnboardingPropertiesTimeline />
+          </div>
+        </CollapsibleContent>
+      </div>
+    </Collapsible>
+  );
+
   return (
     <div className="min-h-screen bg-gradient-subtle">
       {/* Header */}
@@ -355,11 +382,11 @@ export const AdminDashboard = ({ summaries, onExport, onSync, syncing, onSendOve
         <TabsContent value="overview" className="mt-0">
         <div className="container mx-auto px-6 max-md:px-3 py-8 max-md:py-4 space-y-8 max-md:space-y-6">
         
-        {/* Onboarding Properties Timeline - First Position */}
-        <OnboardingPropertiesTimeline />
-        
-        {/* Discovery Call Calendar */}
+        {/* Discovery Call Calendar - Prominent at top */}
         <DiscoveryCallCalendar />
+        
+        {/* Onboarding Properties Timeline - Collapsible */}
+        <OnboardingTimelineCollapsible />
         
         {/* Alert Section */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 max-md:gap-4">
