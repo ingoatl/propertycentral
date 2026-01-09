@@ -1,5 +1,3 @@
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -51,36 +49,16 @@ function getStepDescription(step: number): string {
 }
 
 interface OwnerOnboardingTimelineProps {
-  propertyId: string;
+  onboardingStage: string | null;
 }
 
-export function OwnerOnboardingTimeline({ propertyId }: OwnerOnboardingTimelineProps) {
-  const { data: leadInfo, isLoading } = useQuery({
-    queryKey: ["owner-onboarding-status", propertyId],
-    queryFn: async () => {
-      // Active onboarding stages
-      const onboardingStages = ['contract_signed', 'ach_form_signed', 'onboarding_form_requested', 'insurance_requested', 'inspection_scheduled'] as const;
-      
-      // Check if this property has a lead in an onboarding stage
-      const { data, error } = await supabase
-        .from("leads")
-        .select("id, stage")
-        .eq("property_id", propertyId)
-        .in("stage", onboardingStages)
-        .maybeSingle();
-
-      if (error) throw error;
-      return data;
-    },
-    staleTime: 30000, // Cache for 30 seconds
-  });
-
-  // Don't show if loading or no onboarding lead
-  if (isLoading || !leadInfo) {
+export function OwnerOnboardingTimeline({ onboardingStage }: OwnerOnboardingTimelineProps) {
+  // Don't show if no onboarding stage
+  if (!onboardingStage) {
     return null;
   }
 
-  const currentStep = getTimelineStep(leadInfo.stage);
+  const currentStep = getTimelineStep(onboardingStage);
 
   return (
     <Card className="border-primary/30 bg-gradient-to-br from-primary/5 via-background to-accent/5 shadow-lg mb-6">

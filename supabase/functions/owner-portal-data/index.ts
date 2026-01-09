@@ -137,6 +137,7 @@ serve(async (req: Request): Promise<Response> => {
       reviewsByListingResult,
       emailInsightsResult,
       propertyDetailsResult,
+      leadOnboardingResult,
     ] = await Promise.all([
       // Monthly reconciliations (statements) - fetch all historical data (24 months)
       supabase
@@ -218,6 +219,14 @@ serve(async (req: Request): Promise<Response> => {
         .select("bedrooms, bathrooms, square_feet, max_guests, amenities")
         .eq("id", property.id)
         .maybeSingle(),
+      
+      // Lead onboarding status for this property
+      supabase
+        .from("leads")
+        .select("id, stage")
+        .eq("property_id", property.id)
+        .in("stage", ['contract_signed', 'ach_form_signed', 'onboarding_form_requested', 'insurance_requested', 'inspection_scheduled'])
+        .maybeSingle(),
     ]);
 
     const rawStatements = statementsResult.data || [];
@@ -227,6 +236,7 @@ serve(async (req: Request): Promise<Response> => {
     const mtrBookings = mtrBookingsResult.data || [];
     const emailInsights = emailInsightsResult.data || [];
     const propertyDetails = propertyDetailsResult.data;
+    const leadOnboarding = leadOnboardingResult.data;
     
     // Process statements to calculate correct net owner earnings based on service type
     // For co-hosting: owner keeps revenue, net_to_owner = what they owe us, so actual_net = revenue - net_to_owner
@@ -719,6 +729,7 @@ serve(async (req: Request): Promise<Response> => {
         square_feet: propertyDetails?.square_feet,
         max_guests: propertyDetails?.max_guests,
         amenities: propertyDetails?.amenities,
+        onboarding_stage: leadOnboarding?.stage || null,
       },
       statements,
       expenses,
