@@ -1,7 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { format } from "date-fns";
+import { format, isToday, isYesterday, parseISO } from "date-fns";
 import {
   MessageSquare,
   Phone,
@@ -602,7 +602,7 @@ export function InboxView() {
   
   // Fetch conversation thread for selected contact (all SMS messages from same contact)
   const { data: conversationThread = [] } = useQuery({
-    queryKey: ["conversation-thread", selectedMessage?.contact_id, selectedMessage?.contact_phone, selectedMessage?.contact_type],
+    queryKey: ["conversation-thread", selectedMessage?.contact_id, selectedMessage?.contact_phone, selectedMessage?.contact_type, selectedMessage?.owner_id],
     queryFn: async () => {
       if (!selectedMessage) return [];
       
@@ -620,7 +620,26 @@ export function InboxView() {
           id: comm.id,
           type: comm.communication_type,
           direction: comm.direction,
-          body: comm.body,
+          body: comm.body || "(No content)",
+          created_at: comm.created_at,
+        }));
+      }
+      
+      // For owners, fetch all communications for the same owner_id
+      if (selectedMessage.contact_type === "owner" && selectedMessage.owner_id) {
+        const { data, error } = await supabase
+          .from("lead_communications")
+          .select("id, communication_type, direction, body, subject, created_at, status")
+          .eq("owner_id", selectedMessage.owner_id)
+          .in("communication_type", ["sms", "call", "email"])
+          .order("created_at", { ascending: true });
+        
+        if (error) throw error;
+        return (data || []).map(comm => ({
+          id: comm.id,
+          type: comm.communication_type,
+          direction: comm.direction,
+          body: comm.body || "(No content)",
           created_at: comm.created_at,
         }));
       }
@@ -638,7 +657,7 @@ export function InboxView() {
           id: msg.id,
           type: "sms",
           direction: msg.direction,
-          body: msg.body,
+          body: msg.body || "(No content)",
           created_at: msg.created_at,
         }));
       }
@@ -648,12 +667,36 @@ export function InboxView() {
         id: selectedMessage.id,
         type: selectedMessage.type,
         direction: selectedMessage.direction,
-        body: selectedMessage.body,
+        body: selectedMessage.body || "(No content)",
         created_at: selectedMessage.created_at,
       }];
     },
-    enabled: !!selectedMessage && selectedMessage.contact_type !== "owner", // Owners use OwnerCommunicationDetail
+    enabled: !!selectedMessage,
   });
+
+  // Group communications by date for the inbox list
+  const groupedCommunications = useMemo(() => {
+    const groups: Record<string, CommunicationItem[]> = {};
+    const filteredComms = communications.filter(c => activeFilter !== "owners" || c.contact_type === "owner");
+    
+    for (const comm of filteredComms) {
+      const dateKey = format(parseISO(comm.created_at), "yyyy-MM-dd");
+      if (!groups[dateKey]) groups[dateKey] = [];
+      groups[dateKey].push(comm);
+    }
+    
+    // Sort by date descending (newest first)
+    const sortedEntries = Object.entries(groups).sort((a, b) => b[0].localeCompare(a[0]));
+    return sortedEntries;
+  }, [communications, activeFilter]);
+
+  // Helper function to format date headers
+  const formatDateHeader = (dateKey: string): string => {
+    const date = parseISO(dateKey);
+    if (isToday(date)) return "Today";
+    if (isYesterday(date)) return "Yesterday";
+    return format(date, "EEEE, MMM d");
+  };
   
   const handleSelectMessage = (comm: CommunicationItem) => {
     setSelectedMessage(comm);
@@ -792,74 +835,80 @@ export function InboxView() {
             )
           ) : isLoading ? (
             <div className="p-4 text-center text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin mx-auto mb-2" /><p className="text-sm">Loading...</p></div>
-          ) : communications.filter(c => activeFilter !== "owners" || c.contact_type === "owner").length === 0 ? (
+          ) : groupedCommunications.length === 0 ? (
             <div className="p-8 text-center text-muted-foreground"><MessageSquare className="h-10 w-10 mx-auto mb-3 opacity-40" /><p className="text-sm">{activeFilter === "owners" ? "No owner conversations" : "No conversations"}</p></div>
           ) : (
-            <div className="divide-y divide-border/50">
-              {communications
-                .filter(c => activeFilter !== "owners" || c.contact_type === "owner")
-                .map((comm) => (
-                <div 
-                  key={comm.id} 
-                  onClick={() => {
-                    if (comm.contact_type === "owner" && comm.owner_id) {
-                      setSelectedOwnerForDetail({
-                        id: comm.owner_id,
-                        name: comm.contact_name,
-                        email: comm.contact_email,
-                        phone: comm.contact_phone,
-                      });
-                    } else {
-                      handleSelectMessage(comm);
-                    }
-                  }}
-                  className={`flex items-start gap-3 p-4 cursor-pointer transition-colors active:bg-muted/70 ${selectedMessage?.id === comm.id ? "bg-muted/70" : "hover:bg-muted/30"}`}
-                >
-                  {/* Avatar with status indicator */}
-                  <div className="relative">
-                    <div className={`h-12 w-12 rounded-full flex items-center justify-center flex-shrink-0 shadow-sm ${
-                      comm.contact_type === "owner" 
-                        ? "bg-gradient-to-br from-purple-500 to-purple-600" 
-                        : "bg-gradient-to-br from-emerald-500 to-emerald-600"
-                    }`}>
-                      <span className="text-sm font-semibold text-white">{getInitials(comm.contact_name)}</span>
-                    </div>
-                    {comm.is_resolved && (
-                      <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-green-500 border-2 border-background flex items-center justify-center">
-                        <CheckCircle className="h-2.5 w-2.5 text-white" />
-                      </div>
-                    )}
+            <div>
+              {groupedCommunications.map(([dateKey, comms]) => (
+                <div key={dateKey}>
+                  {/* Date separator header */}
+                  <div className="sticky top-0 bg-background/95 backdrop-blur-sm px-3 py-2 border-b border-border/50 z-10">
+                    <span className="text-xs font-medium text-muted-foreground">{formatDateHeader(dateKey)}</span>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-2 mb-1">
-                      <span className="font-semibold text-sm truncate">{comm.contact_name}</span>
-                      <span className="text-xs text-muted-foreground whitespace-nowrap flex-shrink-0">
-                        {comm.type === "call" 
-                          ? format(new Date(comm.created_at), "MMM d, h:mm a")
-                          : format(new Date(comm.created_at), "MMM d")
-                        }
-                      </span>
-                    </div>
-                    {/* Type badges - only show Draft and New */}
-                    <div className="flex items-center gap-1.5 mb-1.5 flex-wrap">
-                      {comm.type === "draft" && (
-                        <Badge className="text-xs h-5 px-2 bg-amber-500 text-white border-0">Draft</Badge>
-                      )}
-                      {comm.type === "personal_sms" && (
-                        <Badge variant="outline" className="text-xs h-5 px-2">SMS</Badge>
-                      )}
-                      {comm.type === "call" && (
-                        <div className="flex items-center gap-1">
-                          <Badge variant="outline" className="text-xs h-5 px-2">
-                            <Phone className="h-3 w-3 mr-1" />Call
-                          </Badge>
+                  {/* Messages for this date */}
+                  <div className="divide-y divide-border/50">
+                    {comms.map((comm) => (
+                      <div 
+                        key={comm.id} 
+                        onClick={() => {
+                          if (comm.contact_type === "owner" && comm.owner_id) {
+                            setSelectedOwnerForDetail({
+                              id: comm.owner_id,
+                              name: comm.contact_name,
+                              email: comm.contact_email,
+                              phone: comm.contact_phone,
+                            });
+                          } else {
+                            handleSelectMessage(comm);
+                          }
+                        }}
+                        className={`flex items-start gap-3 p-4 cursor-pointer transition-colors active:bg-muted/70 ${selectedMessage?.id === comm.id ? "bg-muted/70" : "hover:bg-muted/30"}`}
+                      >
+                        {/* Avatar with status indicator */}
+                        <div className="relative">
+                          <div className={`h-12 w-12 rounded-full flex items-center justify-center flex-shrink-0 shadow-sm ${
+                            comm.contact_type === "owner" 
+                              ? "bg-gradient-to-br from-purple-500 to-purple-600" 
+                              : "bg-gradient-to-br from-emerald-500 to-emerald-600"
+                          }`}>
+                            <span className="text-sm font-semibold text-white">{getInitials(comm.contact_name)}</span>
+                          </div>
+                          {comm.is_resolved && (
+                            <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-green-500 border-2 border-background flex items-center justify-center">
+                              <CheckCircle className="h-2.5 w-2.5 text-white" />
+                            </div>
+                          )}
                         </div>
-                      )}
-                      {comm.direction === "inbound" && !comm.is_resolved && (
-                        <Badge className="text-xs h-5 px-2 bg-blue-500 text-white border-0">New</Badge>
-                      )}
-                    </div>
-                    <p className="text-sm text-muted-foreground line-clamp-2">{getMessagePreview(comm)}</p>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2 mb-1">
+                            <span className="font-semibold text-sm truncate">{comm.contact_name}</span>
+                            <span className="text-xs text-muted-foreground whitespace-nowrap flex-shrink-0">
+                              {format(new Date(comm.created_at), "h:mm a")}
+                            </span>
+                          </div>
+                          {/* Type badges - only show Draft and New */}
+                          <div className="flex items-center gap-1.5 mb-1.5 flex-wrap">
+                            {comm.type === "draft" && (
+                              <Badge className="text-xs h-5 px-2 bg-amber-500 text-white border-0">Draft</Badge>
+                            )}
+                            {comm.type === "personal_sms" && (
+                              <Badge variant="outline" className="text-xs h-5 px-2">SMS</Badge>
+                            )}
+                            {comm.type === "call" && (
+                              <div className="flex items-center gap-1">
+                                <Badge variant="outline" className="text-xs h-5 px-2">
+                                  <Phone className="h-3 w-3 mr-1" />Call
+                                </Badge>
+                              </div>
+                            )}
+                            {comm.direction === "inbound" && !comm.is_resolved && (
+                              <Badge className="text-xs h-5 px-2 bg-blue-500 text-white border-0">New</Badge>
+                            )}
+                          </div>
+                          <p className="text-sm text-muted-foreground line-clamp-2">{getMessagePreview(comm)}</p>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
               ))}

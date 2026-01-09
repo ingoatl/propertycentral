@@ -38,7 +38,7 @@ export function useGhlAutoSync() {
         
         // Sync conversations with higher limit for initial sync
         const { data: convData, error: convError } = await supabase.functions.invoke("ghl-sync-conversations", {
-          body: { limit: 100 }
+          body: { limit: 200 }
         });
         
         if (convError) {
