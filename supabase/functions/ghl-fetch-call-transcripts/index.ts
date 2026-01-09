@@ -110,7 +110,7 @@ serve(async (req) => {
         const { data: matchingOwners } = await supabase
           .from("property_owners")
           .select("id, name, email, phone")
-          .or(`phone.ilike.%${cleanPhone}%,secondary_phone.ilike.%${cleanPhone}%`)
+          .ilike("phone", `%${cleanPhone}%`)
           .limit(1);
 
         if (matchingOwners && matchingOwners.length > 0) {
@@ -132,11 +132,14 @@ serve(async (req) => {
             matchedEmail = matchingLeads[0].email;
             console.log(`Matched call ${call.id} to lead: ${matchedName}`);
           } else {
-            console.log(`No owner or lead match found for phone: ${phoneNumber}`);
-            // Still proceed - we'll create the record without a match
-            matchedName = phoneNumber; // Use phone as fallback name
+            console.log(`No owner or lead match found for phone: ${phoneNumber} - skipping call ${call.id}`);
+            // Skip calls without a match - database constraint requires lead_id or owner_id
+            continue;
           }
         }
+      } else {
+        console.log(`No phone number for call ${call.id} - skipping`);
+        continue;
       }
 
       // Create communication record - store even without match
