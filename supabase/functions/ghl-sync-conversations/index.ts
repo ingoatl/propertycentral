@@ -194,27 +194,32 @@ serve(async (req) => {
         if (contactResponse.ok) {
           const contactData = await contactResponse.json();
           const contact = contactData.contact;
-          const contactPhone = contact?.phone?.replace(/\D/g, '').slice(-10) || '';
+          const rawContactPhone = contact?.phone || '';
+          const contactPhone = rawContactPhone.replace(/\D/g, '').slice(-10);
           const contactEmail = contact?.email?.toLowerCase() || '';
           
+          console.log(`Contact lookup - Phone: ${rawContactPhone} (normalized: ${contactPhone}), Email: ${contactEmail}`);
+          
           // PRIORITY 1: Match to property owner by phone or email using normalized formats
-          if (contactPhone) {
-            const phonePatterns = normalizePhone(contactPhone);
-            const phoneOrConditions = phonePatterns.map(p => {
-              const last10 = p.replace(/\D/g, '').slice(-10);
-              return `phone.ilike.%${last10}%`;
-            }).join(',');
-            
-            const { data: ownerByPhone } = await supabase
+          // More robust phone matching - check if last 10 digits match
+          if (contactPhone && contactPhone.length >= 10) {
+            // Try direct query first - check all owners and normalize their phones too
+            const { data: allOwners } = await supabase
               .from("property_owners")
-              .select("id, name, phone")
-              .or(phoneOrConditions)
-              .limit(1);
-
-            if (ownerByPhone && ownerByPhone.length > 0) {
-              matchedOwnerId = ownerByPhone[0].id;
-              matchedOwnerName = ownerByPhone[0].name;
-              console.log(`Matched to owner by phone: ${ownerByPhone[0].name}`);
+              .select("id, name, phone, email");
+              
+            if (allOwners) {
+              for (const owner of allOwners) {
+                if (owner.phone) {
+                  const ownerPhone = owner.phone.replace(/\D/g, '').slice(-10);
+                  if (ownerPhone === contactPhone) {
+                    matchedOwnerId = owner.id;
+                    matchedOwnerName = owner.name;
+                    console.log(`Matched to owner by normalized phone: ${owner.name} (${owner.phone})`);
+                    break;
+                  }
+                }
+              }
             }
           }
           
@@ -426,7 +431,38 @@ serve(async (req) => {
             ghl_message_id: message.id,
             type: commType,
             lead_id: matchedLeadId,
+            owner_id: matchedOwnerId,
           });
+          
+          // For calls with transcripts, trigger analysis to extract tasks
+          if (commType === "call" && messageBody && messageBody.length > 100) {
+            console.log(`Triggering call analysis for ${inserted.id}`);
+            try {
+              const analysisBody = {
+                communicationId: inserted.id,
+                ownerId: matchedOwnerId || null,
+                leadId: matchedLeadId || null,
+                propertyId: null, // Would need to look up from owner
+                matchedName: callerDisplayName,
+                matchedEmail: null,
+                callDuration: message.duration || null,
+                transcript: messageBody,
+                ghlCallId: message.id,
+              };
+              
+              // Fire and forget - don't wait for response
+              fetch(`${supabaseUrl}/functions/v1/analyze-call-transcript`, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  "Authorization": `Bearer ${supabaseServiceKey}`,
+                },
+                body: JSON.stringify(analysisBody),
+              }).catch(e => console.error("Analysis trigger failed:", e));
+            } catch (analysisError) {
+              console.error("Error triggering call analysis:", analysisError);
+            }
+          }
         }
       }
     }

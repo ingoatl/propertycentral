@@ -32,6 +32,8 @@ import {
   ThumbsUp,
   ThumbsDown,
   Meh,
+  PhoneCall,
+  SkipForward,
 } from "lucide-react";
 import { usePendingCallRecaps, PendingCallRecap } from "@/hooks/usePendingCallRecaps";
 import {
@@ -39,6 +41,8 @@ import {
   PendingTaskConfirmation,
 } from "@/hooks/usePendingTaskConfirmations";
 import { formatDistanceToNow, format } from "date-fns";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 const sentimentConfig = {
   positive: { icon: ThumbsUp, color: "text-green-500", bg: "bg-green-100" },
@@ -108,21 +112,31 @@ interface RecapEditorProps {
   recap: PendingCallRecap;
   onSend: (subject: string, body: string) => void;
   onDismiss: () => void;
+  onCallback: () => void;
+  onSendSMS: (message: string) => void;
+  onSkipToNext: () => void;
   isSending: boolean;
   isDismissing: boolean;
+  hasNext: boolean;
 }
 
-function RecapEditor({ recap, onSend, onDismiss, isSending, isDismissing }: RecapEditorProps) {
+function RecapEditor({ recap, onSend, onDismiss, onCallback, onSendSMS, onSkipToNext, isSending, isDismissing, hasNext }: RecapEditorProps) {
   const [subject, setSubject] = useState(recap.subject);
   const [emailBody, setEmailBody] = useState(recap.email_body);
   const [isPreview, setIsPreview] = useState(false);
+  const [showSMSInput, setShowSMSInput] = useState(false);
+  const [smsMessage, setSmsMessage] = useState(() => {
+    const name = recap.recipient_name?.split(' ')[0] || 'there';
+    const summary = recap.transcript_summary?.slice(0, 100) || 'our recent call';
+    return `Hi ${name}, following up on ${summary}. Let me know if you need anything else! - PeachHaus`;
+  });
 
   const SentimentIcon = sentimentConfig[recap.sentiment as keyof typeof sentimentConfig]?.icon || Meh;
   const sentimentStyles = sentimentConfig[recap.sentiment as keyof typeof sentimentConfig] || sentimentConfig.neutral;
 
   return (
     <div className="space-y-4">
-      {/* Call Info Header */}
+      {/* Call Info Header with Actions */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="p-2 rounded-full bg-primary/10">
@@ -147,10 +161,78 @@ function RecapEditor({ recap, onSend, onDismiss, isSending, isDismissing }: Reca
             </div>
           </div>
         </div>
-        <div className={`p-2 rounded-full ${sentimentStyles.bg}`}>
-          <SentimentIcon className={`h-4 w-4 ${sentimentStyles.color}`} />
+        <div className="flex items-center gap-2">
+          <div className={`p-2 rounded-full ${sentimentStyles.bg}`}>
+            <SentimentIcon className={`h-4 w-4 ${sentimentStyles.color}`} />
+          </div>
         </div>
       </div>
+
+      {/* Quick Action Buttons */}
+      <div className="flex items-center gap-2 p-3 bg-muted/30 rounded-lg">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onCallback}
+          className="flex-1 text-blue-600 border-blue-200 hover:bg-blue-50"
+        >
+          <PhoneCall className="h-4 w-4 mr-2" />
+          Call Back
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setShowSMSInput(!showSMSInput)}
+          className="flex-1 text-green-600 border-green-200 hover:bg-green-50"
+        >
+          <MessageSquare className="h-4 w-4 mr-2" />
+          Send SMS Recap
+        </Button>
+        {hasNext && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onSkipToNext}
+            className="text-muted-foreground"
+          >
+            <SkipForward className="h-4 w-4 mr-1" />
+            Next
+          </Button>
+        )}
+      </div>
+
+      {/* SMS Input */}
+      {showSMSInput && (
+        <div className="space-y-2 p-3 bg-green-50 rounded-lg border border-green-200">
+          <Textarea
+            value={smsMessage}
+            onChange={(e) => setSmsMessage(e.target.value)}
+            rows={2}
+            placeholder="Quick SMS recap..."
+            className="text-sm bg-white"
+          />
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowSMSInput(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => {
+                onSendSMS(smsMessage);
+                setShowSMSInput(false);
+              }}
+              className="bg-green-600 hover:bg-green-700"
+            >
+              <Send className="h-3 w-3 mr-1" />
+              Send SMS
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Summary */}
       {recap.transcript_summary && (
@@ -437,6 +519,46 @@ export function CallRecapModal() {
                     recap={currentRecap}
                     onSend={handleSend}
                     onDismiss={handleDismiss}
+                    onCallback={async () => {
+                      // Get phone from owner/lead
+                      if (currentRecap.owner_id) {
+                        const { data: owner } = await supabase
+                          .from("property_owners")
+                          .select("phone")
+                          .eq("id", currentRecap.owner_id)
+                          .single();
+                        if (owner?.phone) {
+                          window.open(`tel:${owner.phone}`, '_self');
+                          toast.success(`Calling ${currentRecap.recipient_name}...`);
+                          // Move to next after callback
+                          if (activeRecapIndex < displayedRecaps.length - 1) {
+                            setActiveRecapIndex(prev => prev + 1);
+                          }
+                        } else {
+                          toast.error("No phone number on file");
+                        }
+                      } else {
+                        toast.error("No contact info available");
+                      }
+                    }}
+                    onSendSMS={async (message) => {
+                      if (currentRecap.owner_id) {
+                        try {
+                          await supabase.functions.invoke('ghl-send-sms', {
+                            body: { ownerId: currentRecap.owner_id, message }
+                          });
+                          toast.success(`SMS sent to ${currentRecap.recipient_name}`);
+                        } catch (e: any) {
+                          toast.error(e.message || "Failed to send SMS");
+                        }
+                      }
+                    }}
+                    onSkipToNext={() => {
+                      if (activeRecapIndex < displayedRecaps.length - 1) {
+                        setActiveRecapIndex(prev => prev + 1);
+                      }
+                    }}
+                    hasNext={activeRecapIndex < displayedRecaps.length - 1}
                     isSending={isSending}
                     isDismissing={isDismissing}
                   />
