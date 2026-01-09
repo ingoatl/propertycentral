@@ -34,13 +34,16 @@ serve(async (req) => {
       throw new Error("GHL_API_KEY and GHL_LOCATION_ID are required");
     }
 
-    const { leadId, phone, message, fromNumber } = await req.json();
+    const { leadId, phone, to, message, fromNumber } = await req.json();
 
-    if (!phone || !message) {
-      throw new Error("phone and message are required");
+    // Accept either 'phone' or 'to' parameter for the recipient
+    const recipientPhone = phone || to;
+    
+    if (!recipientPhone || !message) {
+      throw new Error("phone/to and message are required");
     }
 
-    const formattedPhone = formatPhoneE164(phone);
+    const formattedPhone = formatPhoneE164(recipientPhone);
     // Use the 404-800-5932 number as the default from number
     const formattedFromNumber = formatPhoneE164(fromNumber || "+14048005932");
     
