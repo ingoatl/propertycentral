@@ -83,6 +83,7 @@ interface GmailEmail {
   from: string;
   fromName: string;
   to: string;
+  targetInbox?: string;
   date: string;
   body: string;
   bodyHtml?: string;
@@ -321,14 +322,14 @@ export function InboxView() {
     enabled: !!selectedLeadId,
   });
 
-  // Fetch Gmail inbox emails
+  // Fetch Gmail inbox emails for both Ingo and Anja
   const { data: gmailEmails = [], isLoading: isLoadingGmail } = useQuery({
     queryKey: ["gmail-inbox", activeTab],
     queryFn: async () => {
       if (activeTab !== "emails") return [];
       
       const { data, error } = await supabase.functions.invoke("fetch-gmail-inbox", {
-        body: { daysBack: 3, targetEmail: "ingo@peachhausgroup.com" }
+        body: { daysBack: 3 }
       });
       
       if (error) {
@@ -340,7 +341,7 @@ export function InboxView() {
     },
     enabled: activeTab === "emails",
     staleTime: 30000,
-    refetchInterval: 60000,
+    refetchInterval: 30000, // Refresh every 30 seconds
   });
 
   const { data: communications = [], isLoading } = useQuery({
@@ -501,7 +502,8 @@ export function InboxView() {
             {isAdmin && <AdminInboxSelector selectedUserId={selectedInboxUserId} onUserChange={handleInboxChange} currentUserId={currentUserId} />}
           </div>
 
-          {userPhoneAssignment && (
+          {/* Only show phone number on Chats/Calls tabs */}
+          {activeTab !== "emails" && userPhoneAssignment && (
             <div className="mb-3 px-3 py-2 bg-emerald-50 dark:bg-emerald-950/30 rounded-lg border border-emerald-200 dark:border-emerald-900">
               <div className="flex items-center gap-2">
                 <Phone className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
@@ -510,13 +512,16 @@ export function InboxView() {
             </div>
           )}
 
-          <div className="flex items-center gap-2">
-            {(["all", "open", "unread", "unresponded"] as FilterType[]).map((filter) => (
-              <button key={filter} onClick={() => setActiveFilter(filter)} className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${activeFilter === filter ? "bg-primary text-primary-foreground border-primary" : "bg-background text-muted-foreground border-border hover:border-primary/50"}`}>
-                {filter.charAt(0).toUpperCase() + filter.slice(1)}
-              </button>
-            ))}
-          </div>
+          {/* Only show filters for Chats/Calls tabs */}
+          {activeTab !== "emails" && (
+            <div className="flex items-center gap-2">
+              {(["all", "open", "unread", "unresponded"] as FilterType[]).map((filter) => (
+                <button key={filter} onClick={() => setActiveFilter(filter)} className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${activeFilter === filter ? "bg-primary text-primary-foreground border-primary" : "bg-background text-muted-foreground border-border hover:border-primary/50"}`}>
+                  {filter.charAt(0).toUpperCase() + filter.slice(1)}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="p-3 border-b">
