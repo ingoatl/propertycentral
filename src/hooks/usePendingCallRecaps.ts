@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect, useRef, useCallback, useState } from "react";
-
+import { useAuth } from "@/components/ProtectedRoute";
 import { toast } from "sonner";
 
 export interface PendingCallRecap {
@@ -51,26 +51,20 @@ export interface PendingCallRecap {
 
 export function usePendingCallRecaps() {
   const queryClient = useQueryClient();
-  const [user, setUser] = useState<{ id: string } | null>(null);
+  const { user } = useAuth() as any;
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Get current user
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      setUser(data.user);
-    });
-  }, []);
-
-  // Fetch pending recaps
+  // Fetch pending recaps - user-specific filtering
   const {
     data: pendingRecaps = [],
     isLoading,
     refetch,
   } = useQuery({
-    queryKey: ["pending-call-recaps"],
+    queryKey: ["pending-call-recaps", user?.id],
     queryFn: async () => {
-      const { data, error } = await supabase
+      // First get all pending recaps
+      const { data: allRecaps, error } = await supabase
         .from("pending_call_recaps")
         .select(`
           *,
@@ -86,9 +80,29 @@ export function usePendingCallRecaps() {
         throw error;
       }
 
-      return (data || []) as PendingCallRecap[];
+      if (!allRecaps) return [];
+
+      // Sort by user relevance:
+      // 1. User's own calls (caller_user_id matches)
+      // 2. Calls without a caller assigned (team-wide)
+      // 3. Other users' calls (still visible but lower priority)
+      const sorted = [...allRecaps].sort((a, b) => {
+        const aIsUserCall = a.caller_user_id === user?.id;
+        const bIsUserCall = b.caller_user_id === user?.id;
+        const aIsUnassigned = !a.caller_user_id;
+        const bIsUnassigned = !b.caller_user_id;
+
+        if (aIsUserCall && !bIsUserCall) return -1;
+        if (!aIsUserCall && bIsUserCall) return 1;
+        if (aIsUnassigned && !bIsUnassigned) return -1;
+        if (!aIsUnassigned && bIsUnassigned) return 1;
+        
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      });
+
+      return sorted as PendingCallRecap[];
     },
-    enabled: !!user,
+    enabled: !!user?.id,
     staleTime: 30000,
   });
 
@@ -219,8 +233,14 @@ export function usePendingCallRecaps() {
     },
   });
 
+  // Categorize recaps for UI
+  const userRecaps = pendingRecaps.filter((r) => r.caller_user_id === user?.id);
+  const teamRecaps = pendingRecaps.filter((r) => !r.caller_user_id || r.caller_user_id !== user?.id);
+
   return {
     pendingRecaps,
+    userRecaps,
+    teamRecaps,
     isLoading,
     sendRecap: sendRecapMutation.mutate,
     dismissRecap: dismissRecapMutation.mutate,
@@ -229,5 +249,6 @@ export function usePendingCallRecaps() {
     isDismissing: dismissRecapMutation.isPending,
     isUpdating: updateRecapMutation.isPending,
     refetch,
+    currentUserId: user?.id,
   };
 }
