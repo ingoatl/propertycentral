@@ -614,11 +614,23 @@ export function InboxView() {
 
             <div className="p-4 border-t">
               <div className="flex gap-2 max-w-3xl mx-auto">
-                <Button variant="outline" size="sm" onClick={() => setShowComposeEmail(true)}>
+                <Button variant="outline" size="sm" onClick={() => setShowEmailReply(true)}>
                   <Mail className="h-4 w-4 mr-2" />Reply
                 </Button>
               </div>
             </div>
+          
+            {/* Reply dialog for Gmail emails */}
+            <SendEmailDialog
+              open={showEmailReply}
+              onOpenChange={setShowEmailReply}
+              contactName={selectedGmailEmail.fromName}
+              contactEmail={selectedGmailEmail.from}
+              contactType="lead"
+              contactId=""
+              replyToSubject={selectedGmailEmail.subject}
+              replyToBody={selectedGmailEmail.body}
+            />
           </>
         ) : selectedMessage ? (
           <>
@@ -751,7 +763,7 @@ export function InboxView() {
       </div>
 
       {selectedMessage && selectedMessage.contact_phone && <SendSMSDialog open={showSmsReply} onOpenChange={setShowSmsReply} contactName={selectedMessage.contact_name} contactPhone={selectedMessage.contact_phone} contactType={selectedMessage.contact_type === "external" || selectedMessage.contact_type === "draft" || selectedMessage.contact_type === "personal" ? "lead" : selectedMessage.contact_type} contactId={selectedMessage.contact_id} />}
-      {selectedMessage && (selectedMessage.contact_email || selectedMessage.sender_email) && selectedMessage.contact_type !== "external" && <SendEmailDialog open={showEmailReply} onOpenChange={setShowEmailReply} contactName={selectedMessage.contact_name} contactEmail={selectedMessage.contact_email || selectedMessage.sender_email || ""} contactType={selectedMessage.contact_type as "lead" | "owner"} contactId={selectedMessage.contact_id} />}
+      {selectedMessage && (selectedMessage.contact_email || selectedMessage.sender_email) && selectedMessage.contact_type !== "external" && <SendEmailDialog open={showEmailReply} onOpenChange={setShowEmailReply} contactName={selectedMessage.contact_name} contactEmail={selectedMessage.contact_email || selectedMessage.sender_email || ""} contactType={selectedMessage.contact_type as "lead" | "owner"} contactId={selectedMessage.contact_id} replyToSubject={selectedMessage.subject} replyToBody={selectedMessage.body} />}
       <ComposeEmailDialog open={showComposeEmail} onOpenChange={setShowComposeEmail} />
       {selectedMessage && <ContactInfoModal open={showContactInfo} onOpenChange={setShowContactInfo} contactId={selectedMessage.contact_id} contactType={selectedMessage.contact_type} contactName={selectedMessage.contact_name} contactPhone={selectedMessage.contact_phone} contactEmail={selectedMessage.contact_email} />}
       {selectedMessage && <ConversationNotes open={showNotes} onOpenChange={setShowNotes} contactPhone={selectedMessage.contact_phone} contactEmail={selectedMessage.contact_email} contactName={selectedMessage.contact_name} />}
