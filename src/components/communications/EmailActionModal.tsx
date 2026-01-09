@@ -34,6 +34,7 @@ interface DetectedContext {
   meetingTitle: string;
   taskSuggestion: string;
   reason: string;
+  communicationHistory: string; // Added for AI context
 }
 
 // Keywords that indicate actionable content for a PM business
@@ -105,6 +106,35 @@ export function EmailActionModal({ open, onClose, email }: EmailActionModalProps
     const contactEmail = emailMatch[1] || email.from;
     
     const fullContent = (email.body + " " + email.subject).toLowerCase();
+    
+    // Fetch related communication history for context
+    let communicationHistory = "";
+    try {
+      // Try to find lead by email
+      const { data: leads } = await supabase
+        .from("leads")
+        .select("id, name")
+        .eq("email", contactEmail)
+        .limit(1);
+      
+      if (leads && leads.length > 0) {
+        // Fetch recent communications including GHL synced ones
+        const { data: comms } = await supabase
+          .from("lead_communications")
+          .select("communication_type, direction, body, subject, created_at")
+          .eq("lead_id", leads[0].id)
+          .order("created_at", { ascending: false })
+          .limit(10);
+        
+        if (comms && comms.length > 0) {
+          communicationHistory = comms.map(c => 
+            `[${c.communication_type}/${c.direction}] ${c.subject || ""} ${c.body?.slice(0, 100) || ""}`
+          ).join("\n");
+        }
+      }
+    } catch (err) {
+      console.log("Could not fetch communication history:", err);
+    }
     
     // Check if this is an automated/marketing email we should ignore
     const isAutomatedEmail = IGNORE_KEYWORDS.some(kw => fullContent.includes(kw)) ||
@@ -211,6 +241,7 @@ export function EmailActionModal({ open, onClose, email }: EmailActionModalProps
       meetingTitle: `Meeting with ${email.fromName}`,
       taskSuggestion,
       reason,
+      communicationHistory, // Include history for context
     };
     
     setContext(detectedContext);
