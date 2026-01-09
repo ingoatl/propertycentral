@@ -36,9 +36,9 @@ export function useGhlAutoSync() {
 
         console.log("[GHL Sync] Starting background sync...");
         
-        // Sync conversations with higher limit for initial sync
+        // Sync conversations (GHL API max limit is 100)
         const { data: convData, error: convError } = await supabase.functions.invoke("ghl-sync-conversations", {
-          body: { limit: 200 }
+          body: { limit: 100 }
         });
         
         if (convError) {
