@@ -245,9 +245,35 @@ export function TwilioCallDialog({
         toast.success('Call connected');
       });
 
-      call.on('disconnect', () => {
+      call.on('disconnect', async () => {
         console.log('Call disconnected');
+        const finalDuration = callDuration;
         handleEndCall();
+        
+        // Capture call transcript from Twilio if we have metadata
+        if (metadata?.communicationId || metadata?.ownerId || metadata?.leadId) {
+          try {
+            console.log('Fetching Twilio call transcript...');
+            const { error: transcriptError } = await supabase.functions.invoke('twilio-get-transcript', {
+              body: {
+                callSid: call.parameters?.CallSid,
+                communicationId: metadata?.communicationId,
+                ownerId: metadata?.ownerId,
+                leadId: metadata?.leadId,
+                duration: finalDuration,
+                contactName: contactName,
+              }
+            });
+            if (transcriptError) {
+              console.error('Failed to get transcript:', transcriptError);
+            } else {
+              console.log('Transcript captured successfully');
+            }
+          } catch (e) {
+            console.error('Error capturing transcript:', e);
+          }
+        }
+        
         // Trigger callback after call ends
         if (onCallComplete) {
           toast.success(`Call with ${contactName} completed`);
