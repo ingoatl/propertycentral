@@ -35,6 +35,7 @@ import { EmojiPicker } from "./EmojiPicker";
 import { ContactInfoModal } from "./ContactInfoModal";
 import { ConversationNotes } from "./ConversationNotes";
 import { AdminInboxSelector } from "./AdminInboxSelector";
+import { EmailActionModal } from "./EmailActionModal";
 import LeadDetailModal from "@/components/leads/LeadDetailModal";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -115,6 +116,7 @@ export function InboxView() {
   const [selectedInboxUserId, setSelectedInboxUserId] = useState<string | null>(null);
   const [viewAllInboxes, setViewAllInboxes] = useState(false);
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
+  const [showEmailActionModal, setShowEmailActionModal] = useState(false);
   
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -492,6 +494,7 @@ export function InboxView() {
   // Mark email as read when selected (local only - Gmail modify scope not available)
   const handleSelectGmailEmail = (email: GmailEmail) => {
     setSelectedGmailEmail(email);
+    setShowEmailActionModal(true); // Show action modal when email is clicked
     
     // Update local state to remove UNREAD label (visual only)
     if (email.labelIds?.includes('UNREAD')) {
@@ -836,6 +839,13 @@ export function InboxView() {
         open={!!selectedLeadId}
         onOpenChange={(open) => !open && setSelectedLeadId(null)}
         onRefresh={() => queryClient.invalidateQueries({ queryKey: ["lead-for-modal", selectedLeadId] })}
+      />
+      
+      {/* Email Action Modal */}
+      <EmailActionModal
+        open={showEmailActionModal}
+        onClose={() => setShowEmailActionModal(false)}
+        email={selectedGmailEmail}
       />
     </div>
   );
