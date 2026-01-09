@@ -165,13 +165,13 @@ export function useConversationContext(leadId?: string | null, ownerId?: string 
   return useQuery({
     queryKey: ["conversation-context", leadId, ownerId],
     queryFn: async () => {
-      if (!leadId && !ownerId) return { messages: [], summary: "" };
+      if (!leadId && !ownerId) return { messages: [], summary: "", contextForAI: "" };
       
       let query = supabase
         .from("lead_communications")
         .select("id, communication_type, direction, body, subject, created_at")
         .order("created_at", { ascending: true })
-        .limit(10);
+        .limit(15); // Get more messages for better context
       
       if (leadId) {
         query = query.eq("lead_id", leadId);
@@ -184,35 +184,60 @@ export function useConversationContext(leadId?: string | null, ownerId?: string 
       
       const messages = (data || []) as Communication[];
       
-      // Build context summary for AI
+      // Build detailed context for AI - include FULL message content
       const contextParts: string[] = [];
-      messages.forEach((msg, idx) => {
-        const direction = msg.direction === "inbound" ? "They said" : "We said";
-        const type = msg.communication_type;
+      const pendingRequests: string[] = [];
+      let hasAskedForInfo = false;
+      let lastOutboundAsk: string | null = null;
+      
+      messages.forEach((msg) => {
+        const direction = msg.direction === "inbound" ? "THEM" : "US";
+        const type = msg.communication_type.toUpperCase();
+        const dateStr = format(new Date(msg.created_at), "MMM d 'at' h:mma");
+        
         if (msg.body) {
-          // Truncate long messages
-          const content = msg.body.length > 200 ? msg.body.slice(0, 200) + "..." : msg.body;
-          contextParts.push(`[${type.toUpperCase()}] ${direction}: ${content}`);
+          // Include full body content for context
+          contextParts.push(`[${dateStr}] [${type}] ${direction}: ${msg.body}`);
+          
+          // Track what WE asked for
+          if (msg.direction === "outbound") {
+            const bodyLower = msg.body.toLowerCase();
+            if (bodyLower.includes("address") || bodyLower.includes("send me") || 
+                bodyLower.includes("please") || bodyLower.includes("can you") ||
+                bodyLower.includes("let me know") || bodyLower.includes("need")) {
+              hasAskedForInfo = true;
+              lastOutboundAsk = msg.body;
+              
+              // Extract what we specifically asked for
+              if (bodyLower.includes("address")) pendingRequests.push("their address");
+              if (bodyLower.includes("insurance")) pendingRequests.push("insurance documents");
+              if (bodyLower.includes("income") || bodyLower.includes("report")) pendingRequests.push("income report info");
+              if (bodyLower.includes("document")) pendingRequests.push("documents");
+            }
+          }
         }
       });
       
+      // Build a summary focusing on outstanding requests
+      let summary = contextParts.join("\n");
+      
+      // Add explicit note about what we're waiting for
+      let contextForAI = summary;
+      if (pendingRequests.length > 0) {
+        contextForAI += `\n\nIMPORTANT: We previously asked them for: ${pendingRequests.join(", ")}. Reference this in follow-up.`;
+      }
+      if (lastOutboundAsk) {
+        contextForAI += `\n\nOur last request was: "${lastOutboundAsk.slice(0, 200)}"`;
+      }
+      
       return {
         messages,
-        summary: contextParts.join("\n"),
+        summary,
+        contextForAI,
         lastMessage: messages[messages.length - 1] || null,
-        hasAskedForInfo: messages.some(m => 
-          m.body?.toLowerCase().includes("address") || 
-          m.body?.toLowerCase().includes("send me") ||
-          m.body?.toLowerCase().includes("let me know")
-        ),
-        pendingRequests: messages
-          .filter(m => m.direction === "outbound")
-          .filter(m => 
-            m.body?.toLowerCase().includes("please") ||
-            m.body?.toLowerCase().includes("can you") ||
-            m.body?.toLowerCase().includes("would you")
-          )
-          .map(m => m.body?.slice(0, 100))
+        hasAskedForInfo,
+        pendingRequests,
+        lastOutboundAsk,
       };
     },
     enabled: !!(leadId || ownerId),
