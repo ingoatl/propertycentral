@@ -99,7 +99,6 @@ serve(async (req) => {
       const phoneNumber = call.fromNumber || call.toNumber;
       let ownerId = null;
       let leadId = null;
-      let propertyId = null;
       let matchedName = null;
       let matchedEmail = null;
 
@@ -119,18 +118,6 @@ serve(async (req) => {
           matchedName = matchingOwners[0].name;
           matchedEmail = matchingOwners[0].email;
           console.log(`Matched call ${call.id} to owner: ${matchedName}`);
-
-          // Get a property for this owner
-          const { data: ownerProperty } = await supabase
-            .from("properties")
-            .select("id")
-            .eq("owner_id", ownerId)
-            .limit(1)
-            .single();
-
-          if (ownerProperty) {
-            propertyId = ownerProperty.id;
-          }
         } else {
           // Try to match to lead
           const { data: matchingLeads } = await supabase
@@ -153,10 +140,10 @@ serve(async (req) => {
       }
 
       // Create communication record - store even without match
-      const communicationData = {
+      // Note: property_id is not in lead_communications table, so we don't include it
+      const communicationData: Record<string, unknown> = {
         lead_id: leadId,
         owner_id: ownerId,
-        property_id: propertyId,
         communication_type: "call",
         direction: call.direction || "inbound",
         body: call.transcript || null,
@@ -219,7 +206,6 @@ serve(async (req) => {
             communicationId: inserted.id,
             ownerId,
             leadId,
-            propertyId,
             matchedName,
             matchedEmail,
             callDuration: call.duration,
