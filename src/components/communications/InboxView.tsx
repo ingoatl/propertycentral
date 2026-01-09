@@ -600,6 +600,61 @@ export function InboxView() {
   // Mobile: show list or detail based on selection
   const [showMobileDetail, setShowMobileDetail] = useState(false);
   
+  // Fetch conversation thread for selected contact (all SMS messages from same contact)
+  const { data: conversationThread = [] } = useQuery({
+    queryKey: ["conversation-thread", selectedMessage?.contact_id, selectedMessage?.contact_phone, selectedMessage?.contact_type],
+    queryFn: async () => {
+      if (!selectedMessage) return [];
+      
+      // For leads, fetch all communications for the same lead_id
+      if (selectedMessage.contact_type === "lead" && selectedMessage.contact_id) {
+        const { data, error } = await supabase
+          .from("lead_communications")
+          .select("id, communication_type, direction, body, subject, created_at, status")
+          .eq("lead_id", selectedMessage.contact_id)
+          .in("communication_type", ["sms", "call"])
+          .order("created_at", { ascending: true });
+        
+        if (error) throw error;
+        return (data || []).map(comm => ({
+          id: comm.id,
+          type: comm.communication_type,
+          direction: comm.direction,
+          body: comm.body,
+          created_at: comm.created_at,
+        }));
+      }
+      
+      // For personal SMS, fetch by phone number
+      if (selectedMessage.contact_type === "personal" && selectedMessage.contact_phone) {
+        const { data, error } = await supabase
+          .from("user_phone_messages")
+          .select("id, direction, body, created_at")
+          .or(`from_number.eq.${selectedMessage.contact_phone},to_number.eq.${selectedMessage.contact_phone}`)
+          .order("created_at", { ascending: true });
+        
+        if (error) throw error;
+        return (data || []).map(msg => ({
+          id: msg.id,
+          type: "sms",
+          direction: msg.direction,
+          body: msg.body,
+          created_at: msg.created_at,
+        }));
+      }
+      
+      // Fallback: just show the selected message
+      return [{
+        id: selectedMessage.id,
+        type: selectedMessage.type,
+        direction: selectedMessage.direction,
+        body: selectedMessage.body,
+        created_at: selectedMessage.created_at,
+      }];
+    },
+    enabled: !!selectedMessage && selectedMessage.contact_type !== "owner", // Owners use OwnerCommunicationDetail
+  });
+  
   const handleSelectMessage = (comm: CommunicationItem) => {
     setSelectedMessage(comm);
     setShowMobileDetail(true);
@@ -778,7 +833,12 @@ export function InboxView() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-2 mb-1">
                       <span className="font-semibold text-sm truncate">{comm.contact_name}</span>
-                      <span className="text-xs text-muted-foreground whitespace-nowrap flex-shrink-0">{format(new Date(comm.created_at), "MMM d")}</span>
+                      <span className="text-xs text-muted-foreground whitespace-nowrap flex-shrink-0">
+                        {comm.type === "call" 
+                          ? format(new Date(comm.created_at), "MMM d, h:mm a")
+                          : format(new Date(comm.created_at), "MMM d")
+                        }
+                      </span>
                     </div>
                     {/* Type badges - only show Draft and New */}
                     <div className="flex items-center gap-1.5 mb-1.5 flex-wrap">
@@ -977,16 +1037,68 @@ export function InboxView() {
                   </div>
                 ) : (
                   <>
-                    <div className={`flex ${selectedMessage.direction === "outbound" ? "justify-end" : "justify-start"}`}>
-                      <div className="max-w-[75%]">
-                        {selectedMessage.direction === "inbound" && <div className="text-xs text-muted-foreground mb-1 ml-1">{selectedMessage.contact_name}</div>}
-                        <div className={`rounded-2xl px-4 py-2.5 ${selectedMessage.direction === "outbound" ? "bg-gradient-to-br from-violet-500 to-violet-600 text-white" : "bg-muted"}`}>
-                          {selectedMessage.subject && <p className={`text-sm font-medium mb-1 ${selectedMessage.direction === "outbound" ? "text-white/90" : ""}`}>{selectedMessage.subject}</p>}
-                          <p className="text-sm whitespace-pre-wrap">{selectedMessage.body}</p>
-                        </div>
-                        <div className={`text-xs text-muted-foreground mt-1 ${selectedMessage.direction === "outbound" ? "text-right mr-1" : "ml-1"}`}>{format(new Date(selectedMessage.created_at), "h:mm a")}</div>
+                    {/* Conversation Thread - show all messages */}
+                    {conversationThread.length > 1 ? (
+                      <div className="space-y-3">
+                        {conversationThread.map((msg, idx) => {
+                          const isOutbound = msg.direction === "outbound";
+                          const showDateSeparator = idx === 0 || 
+                            format(new Date(msg.created_at), "yyyy-MM-dd") !== 
+                            format(new Date(conversationThread[idx - 1].created_at), "yyyy-MM-dd");
+                          
+                          return (
+                            <div key={msg.id}>
+                              {showDateSeparator && (
+                                <div className="flex items-center justify-center my-4">
+                                  <span className="text-xs text-muted-foreground bg-muted px-3 py-1 rounded-full">
+                                    {format(new Date(msg.created_at), "EEEE, MMMM d")}
+                                  </span>
+                                </div>
+                              )}
+                              <div className={`flex ${isOutbound ? "justify-end" : "justify-start"}`}>
+                                <div className="max-w-[75%]">
+                                  {!isOutbound && (
+                                    <div className="text-xs text-muted-foreground mb-1 ml-1">
+                                      {selectedMessage?.contact_name}
+                                    </div>
+                                  )}
+                                  <div className={`rounded-2xl px-4 py-2.5 ${
+                                    isOutbound 
+                                      ? "bg-gradient-to-br from-violet-500 to-violet-600 text-white" 
+                                      : "bg-muted"
+                                  }`}>
+                                    {msg.type === "call" && (
+                                      <div className="flex items-center gap-1 text-xs opacity-80 mb-1">
+                                        <Phone className="h-3 w-3" />
+                                        {isOutbound ? "Outgoing call" : "Incoming call"}
+                                      </div>
+                                    )}
+                                    <p className="text-sm whitespace-pre-wrap">{msg.body}</p>
+                                  </div>
+                                  <div className={`text-xs text-muted-foreground mt-1 ${
+                                    isOutbound ? "text-right mr-1" : "ml-1"
+                                  }`}>
+                                    {format(new Date(msg.created_at), "h:mm a")}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
-                    </div>
+                    ) : (
+                      /* Single message fallback */
+                      <div className={`flex ${selectedMessage.direction === "outbound" ? "justify-end" : "justify-start"}`}>
+                        <div className="max-w-[75%]">
+                          {selectedMessage.direction === "inbound" && <div className="text-xs text-muted-foreground mb-1 ml-1">{selectedMessage.contact_name}</div>}
+                          <div className={`rounded-2xl px-4 py-2.5 ${selectedMessage.direction === "outbound" ? "bg-gradient-to-br from-violet-500 to-violet-600 text-white" : "bg-muted"}`}>
+                            {selectedMessage.subject && <p className={`text-sm font-medium mb-1 ${selectedMessage.direction === "outbound" ? "text-white/90" : ""}`}>{selectedMessage.subject}</p>}
+                            <p className="text-sm whitespace-pre-wrap">{selectedMessage.body}</p>
+                          </div>
+                          <div className={`text-xs text-muted-foreground mt-1 ${selectedMessage.direction === "outbound" ? "text-right mr-1" : "ml-1"}`}>{format(new Date(selectedMessage.created_at), "h:mm a")}</div>
+                        </div>
+                      </div>
+                    )}
 
                     {selectedMessage.is_draft && selectedMessage.draft_id && (
                       <div className="flex justify-center gap-2 pt-4">

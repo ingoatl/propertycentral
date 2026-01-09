@@ -7,7 +7,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Delete, Loader2, PhoneOff, PhoneCall, User } from "lucide-react";
+import { Delete, Loader2, PhoneOff, PhoneCall, User, Minimize2, Maximize2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Device, Call } from "@twilio/voice-sdk";
@@ -28,6 +28,48 @@ interface TwilioCallDialogProps {
   };
 }
 
+// Minimized call indicator component
+function MinimizedCallIndicator({ 
+  contactName, 
+  duration, 
+  onMaximize,
+  onEndCall,
+}: { 
+  contactName: string; 
+  duration: number; 
+  onMaximize: () => void;
+  onEndCall: () => void;
+}) {
+  const formatDuration = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  return (
+    <div 
+      className="fixed bottom-4 right-4 z-50 bg-green-600 text-white rounded-full shadow-lg flex items-center gap-2 px-4 py-2 cursor-pointer hover:bg-green-700 transition-colors"
+      onClick={onMaximize}
+    >
+      <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
+      <span className="font-medium text-sm">{contactName}</span>
+      <span className="text-sm opacity-80">{formatDuration(duration)}</span>
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-6 w-6 text-white hover:bg-green-800 ml-1"
+        onClick={(e) => {
+          e.stopPropagation();
+          onEndCall();
+        }}
+      >
+        <PhoneOff className="h-3 w-3" />
+      </Button>
+      <Maximize2 className="h-4 w-4 ml-1" />
+    </div>
+  );
+}
+
 export function TwilioCallDialog({
   isOpen,
   onOpenChange,
@@ -41,6 +83,7 @@ export function TwilioCallDialog({
   const [isConnecting, setIsConnecting] = useState(false);
   const [isOnCall, setIsOnCall] = useState(false);
   const [callDuration, setCallDuration] = useState(0);
+  const [isMinimized, setIsMinimized] = useState(false);
   const isMobile = useIsMobile();
   
   const deviceRef = useRef<Device | null>(null);
@@ -233,13 +276,22 @@ export function TwilioCallDialog({
 
   const handleOpenChange = (newOpen: boolean) => {
     if (!newOpen && isOnCall) {
-      // Don't close if on a call
+      // Minimize instead of closing if on a call
+      setIsMinimized(true);
       return;
     }
     if (!newOpen) {
       handleEndCall();
     }
     onOpenChange(newOpen);
+  };
+
+  const handleMaximize = () => {
+    setIsMinimized(false);
+  };
+
+  const handleMinimize = () => {
+    setIsMinimized(true);
   };
 
   // Extract first name for display, handling "Unknown" patterns
@@ -250,38 +302,69 @@ export function TwilioCallDialog({
   })();
 
   return (
-    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
-      <DialogContent 
-        className={cn(
-          "p-4",
-          isMobile 
-            ? "fixed inset-0 w-full h-full max-w-none max-h-none rounded-none m-0 flex flex-col" 
-            : "sm:max-w-[380px]"
-        )} 
-        onClick={(e) => e.stopPropagation()}
-      >
-        <DialogHeader className="shrink-0">
-          <DialogTitle className="text-center text-xl">Call {displayName}</DialogTitle>
-        </DialogHeader>
-        
-        <div className={cn(
-          "space-y-4 flex-1 flex flex-col",
-          isMobile && "justify-center pb-[env(safe-area-inset-bottom)]"
-        )}>
-          {/* Contact info */}
-          <div className="p-4 bg-muted rounded-xl">
-            <div className="flex items-center gap-3">
-              <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
-                <User className="h-6 w-6 text-primary" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-medium text-lg truncate">{displayName}</p>
-                {contactAddress && (
-                  <p className="text-sm text-muted-foreground truncate">{contactAddress}</p>
-                )}
+    <>
+      {/* Minimized call indicator */}
+      {isMinimized && isOnCall && (
+        <MinimizedCallIndicator
+          contactName={displayName}
+          duration={callDuration}
+          onMaximize={handleMaximize}
+          onEndCall={() => {
+            handleEndCall();
+            setIsMinimized(false);
+            onOpenChange(false);
+            onCallComplete?.();
+          }}
+        />
+      )}
+
+      <Dialog open={isOpen && !isMinimized} onOpenChange={handleOpenChange}>
+        <DialogContent 
+          className={cn(
+            "p-4",
+            isMobile 
+              ? "fixed inset-0 w-full h-full max-w-none max-h-none rounded-none m-0 flex flex-col" 
+              : "sm:max-w-[380px]"
+          )} 
+          onClick={(e) => e.stopPropagation()}
+        >
+          <DialogHeader className="shrink-0">
+            <div className="flex items-center justify-between">
+              <div className="w-8" /> {/* Spacer */}
+              <DialogTitle className="text-center text-xl">Call {displayName}</DialogTitle>
+              {isOnCall && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={handleMinimize}
+                  title="Minimize call"
+                >
+                  <Minimize2 className="h-4 w-4" />
+                </Button>
+              )}
+              {!isOnCall && <div className="w-8" />}
+            </div>
+          </DialogHeader>
+          
+          <div className={cn(
+            "space-y-4 flex-1 flex flex-col",
+            isMobile && "justify-center pb-[env(safe-area-inset-bottom)]"
+          )}>
+            {/* Contact info */}
+            <div className="p-4 bg-muted rounded-xl">
+              <div className="flex items-center gap-3">
+                <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
+                  <User className="h-6 w-6 text-primary" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-lg truncate">{displayName}</p>
+                  {contactAddress && (
+                    <p className="text-sm text-muted-foreground truncate">{contactAddress}</p>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
           
           {/* Phone input */}
           <div className="relative">
@@ -370,5 +453,6 @@ export function TwilioCallDialog({
         </div>
       </DialogContent>
     </Dialog>
+    </>
   );
 }
