@@ -425,3 +425,9 @@ verify_jwt = true
 
 [functions.ghl-sync-conversations]
 verify_jwt = true
+
+[functions.analyze-call-transcript]
+verify_jwt = false
+
+[functions.send-call-recap-email]
+verify_jwt = true

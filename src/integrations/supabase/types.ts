@@ -5022,14 +5022,133 @@ export type Database = {
         }
         Relationships: []
       }
+      pending_call_recaps: {
+        Row: {
+          action_items: Json | null
+          call_date: string
+          call_duration: number | null
+          caller_user_id: string | null
+          communication_id: string | null
+          created_at: string
+          dismissed_reason: string | null
+          email_body: string
+          id: string
+          key_topics: Json | null
+          lead_id: string | null
+          owner_id: string | null
+          property_id: string | null
+          recipient_email: string | null
+          recipient_name: string
+          recipient_phone: string | null
+          recipient_type: string
+          sent_at: string | null
+          sent_by: string | null
+          sentiment: string | null
+          status: string
+          subject: string
+          transcript_summary: string | null
+          updated_at: string
+        }
+        Insert: {
+          action_items?: Json | null
+          call_date: string
+          call_duration?: number | null
+          caller_user_id?: string | null
+          communication_id?: string | null
+          created_at?: string
+          dismissed_reason?: string | null
+          email_body: string
+          id?: string
+          key_topics?: Json | null
+          lead_id?: string | null
+          owner_id?: string | null
+          property_id?: string | null
+          recipient_email?: string | null
+          recipient_name: string
+          recipient_phone?: string | null
+          recipient_type?: string
+          sent_at?: string | null
+          sent_by?: string | null
+          sentiment?: string | null
+          status?: string
+          subject: string
+          transcript_summary?: string | null
+          updated_at?: string
+        }
+        Update: {
+          action_items?: Json | null
+          call_date?: string
+          call_duration?: number | null
+          caller_user_id?: string | null
+          communication_id?: string | null
+          created_at?: string
+          dismissed_reason?: string | null
+          email_body?: string
+          id?: string
+          key_topics?: Json | null
+          lead_id?: string | null
+          owner_id?: string | null
+          property_id?: string | null
+          recipient_email?: string | null
+          recipient_name?: string
+          recipient_phone?: string | null
+          recipient_type?: string
+          sent_at?: string | null
+          sent_by?: string | null
+          sentiment?: string | null
+          status?: string
+          subject?: string
+          transcript_summary?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pending_call_recaps_communication_id_fkey"
+            columns: ["communication_id"]
+            isOneToOne: false
+            referencedRelation: "lead_communications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pending_call_recaps_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pending_call_recaps_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "property_owners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pending_call_recaps_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "comprehensive_property_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pending_call_recaps_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pending_task_confirmations: {
         Row: {
           approved_at: string | null
           approved_by: string | null
           assigned_to_user_id: string | null
+          caller_user_id: string | null
           created_at: string | null
           created_task_id: string | null
           expires_at: string | null
+          ghl_call_id: string | null
           id: string
           owner_id: string | null
           phase_suggestion: number | null
@@ -5049,9 +5168,11 @@ export type Database = {
           approved_at?: string | null
           approved_by?: string | null
           assigned_to_user_id?: string | null
+          caller_user_id?: string | null
           created_at?: string | null
           created_task_id?: string | null
           expires_at?: string | null
+          ghl_call_id?: string | null
           id?: string
           owner_id?: string | null
           phase_suggestion?: number | null
@@ -5071,9 +5192,11 @@ export type Database = {
           approved_at?: string | null
           approved_by?: string | null
           assigned_to_user_id?: string | null
+          caller_user_id?: string | null
           created_at?: string | null
           created_task_id?: string | null
           expires_at?: string | null
+          ghl_call_id?: string | null
           id?: string
           owner_id?: string | null
           phase_suggestion?: number | null

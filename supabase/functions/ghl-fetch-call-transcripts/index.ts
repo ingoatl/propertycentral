@@ -80,6 +80,7 @@ serve(async (req) => {
     }
 
     const syncedCalls = [];
+    const callsToAnalyze = [];
 
     for (const call of callLogs) {
       // Check if we already have this call
@@ -94,32 +95,72 @@ serve(async (req) => {
         continue;
       }
 
-      // Try to find matching lead by phone number
+      // Try to find matching owner by phone number FIRST
       const phoneNumber = call.fromNumber || call.toNumber;
+      let ownerId = null;
       let leadId = null;
+      let propertyId = null;
+      let matchedName = null;
+      let matchedEmail = null;
 
       if (phoneNumber) {
         // Clean phone number for matching
         const cleanPhone = phoneNumber.replace(/\D/g, '').slice(-10);
         
-        const { data: matchingLeads } = await supabase
-          .from("leads")
-          .select("id")
-          .or(`phone.ilike.%${cleanPhone}%,phone.ilike.%${phoneNumber}%`)
+        // Try to match to property owner first
+        const { data: matchingOwners } = await supabase
+          .from("property_owners")
+          .select("id, name, email, phone")
+          .or(`phone.ilike.%${cleanPhone}%,secondary_phone.ilike.%${cleanPhone}%`)
           .limit(1);
 
-        if (matchingLeads && matchingLeads.length > 0) {
-          leadId = matchingLeads[0].id;
+        if (matchingOwners && matchingOwners.length > 0) {
+          ownerId = matchingOwners[0].id;
+          matchedName = matchingOwners[0].name;
+          matchedEmail = matchingOwners[0].email;
+          console.log(`Matched call ${call.id} to owner: ${matchedName}`);
+
+          // Get a property for this owner
+          const { data: ownerProperty } = await supabase
+            .from("properties")
+            .select("id")
+            .eq("owner_id", ownerId)
+            .limit(1)
+            .single();
+
+          if (ownerProperty) {
+            propertyId = ownerProperty.id;
+          }
+        } else {
+          // Try to match to lead
+          const { data: matchingLeads } = await supabase
+            .from("leads")
+            .select("id, name, email")
+            .or(`phone.ilike.%${cleanPhone}%,phone.ilike.%${phoneNumber}%`)
+            .limit(1);
+
+          if (matchingLeads && matchingLeads.length > 0) {
+            leadId = matchingLeads[0].id;
+            matchedName = matchingLeads[0].name;
+            matchedEmail = matchingLeads[0].email;
+            console.log(`Matched call ${call.id} to lead: ${matchedName}`);
+          } else {
+            console.log(`No owner or lead match found for phone: ${phoneNumber}`);
+            // Still proceed - we'll create the record without a match
+            matchedName = phoneNumber; // Use phone as fallback name
+          }
         }
       }
 
-      // Create communication record
+      // Create communication record - store even without match
       const communicationData = {
         lead_id: leadId,
+        owner_id: ownerId,
+        property_id: propertyId,
         communication_type: "call",
         direction: call.direction || "inbound",
         body: call.transcript || null,
-        subject: call.summary || `Call from ${call.fromNumber || 'Unknown'}`,
+        subject: call.summary || `Call from ${matchedName || call.fromNumber || 'Unknown'}`,
         status: call.status || "completed",
         ghl_call_id: call.id,
         call_duration: call.duration || null,
@@ -133,6 +174,8 @@ serve(async (req) => {
             extractedData: call.extractedData,
             endedReason: call.endedReason,
             createdAt: call.createdAt,
+            matchedName,
+            matchedEmail,
           }
         },
         external_id: call.id,
@@ -150,22 +193,67 @@ serve(async (req) => {
         syncedCalls.push({
           id: inserted.id,
           ghl_call_id: call.id,
+          owner_id: ownerId,
           lead_id: leadId,
           has_transcript: !!call.transcript,
+          matched_name: matchedName,
         });
 
-        // Add timeline entry if we found a lead
-        if (leadId) {
+        // Add timeline entry if we found an owner
+        if (ownerId) {
           await supabase.from("lead_timeline").insert({
             lead_id: leadId,
-            action: `Call synced from HighLevel${call.transcript ? ' (with transcript)' : ''}`,
+            action: `Call synced from HighLevel${call.transcript ? ' (with transcript)' : ''} - ${matchedName}`,
             metadata: {
               ghl_call_id: call.id,
               duration: call.duration,
               sentiment: call.sentiment,
+              owner_id: ownerId,
             },
           });
         }
+
+        // Queue for analysis if has transcript
+        if (call.transcript && call.transcript.length > 50) {
+          callsToAnalyze.push({
+            communicationId: inserted.id,
+            ownerId,
+            leadId,
+            propertyId,
+            matchedName,
+            matchedEmail,
+            callDuration: call.duration,
+            transcript: call.transcript,
+            ghlCallId: call.id,
+          });
+        }
+      }
+    }
+
+    // Trigger analysis for calls with transcripts
+    for (const callData of callsToAnalyze) {
+      try {
+        console.log(`Triggering analysis for call ${callData.communicationId}`);
+        const analysisResponse = await fetch(
+          `${supabaseUrl}/functions/v1/analyze-call-transcript`,
+          {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${supabaseServiceKey}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(callData),
+          }
+        );
+
+        if (!analysisResponse.ok) {
+          const errorText = await analysisResponse.text();
+          console.error(`Analysis failed for call ${callData.communicationId}:`, errorText);
+        } else {
+          console.log(`Analysis triggered for call ${callData.communicationId}`);
+        }
+      } catch (analysisError) {
+        console.error(`Error triggering analysis for call ${callData.communicationId}:`, analysisError);
       }
     }
 
@@ -173,6 +261,7 @@ serve(async (req) => {
       JSON.stringify({
         success: true,
         syncedCount: syncedCalls.length,
+        analyzedCount: callsToAnalyze.length,
         calls: syncedCalls,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
