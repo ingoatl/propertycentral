@@ -314,9 +314,15 @@ serve(async (req) => {
         // Determine communication type - check multiple GHL message type formats
         // GHL uses: type field with "TYPE_CALL", "TYPE_SMS", etc OR messageType with numeric codes
         // Numeric codes: 1=SMS, 2=SMS, 3=Email, 7=Call, 10=Call/Voicemail
-        const msgType = String(message.type || "").toUpperCase();
-        const msgMessageType = String(message.messageType || "");
-        const contentType = String(message.contentType || "").toLowerCase();
+        // IMPORTANT: message.type can be an object, number, or string - safely convert
+        const rawType = message.type;
+        const rawMessageType = message.messageType;
+        const rawContentType = message.contentType;
+        
+        // Safely convert to strings - handle objects/numbers
+        const msgType = (typeof rawType === 'string' ? rawType : String(rawType ?? '')).toUpperCase();
+        const msgMessageType = (typeof rawMessageType === 'number' ? String(rawMessageType) : String(rawMessageType ?? ''));
+        const contentType = (typeof rawContentType === 'string' ? rawContentType : String(rawContentType ?? '')).toLowerCase();
         
         let commType = "sms";
         // Check string type first (TYPE_CALL format)
