@@ -104,7 +104,7 @@ export function ConversationHistory({
         <span>Conversation History</span>
         <Badge variant="outline" className="text-[10px]">{communications.length} messages</Badge>
       </div>
-      <ScrollArea className="pr-3" style={{ maxHeight }}>
+      <div className="h-[200px] overflow-y-auto pr-2">
         <div className="space-y-2">
           {communications.map((comm) => {
             const Icon = getIcon(comm.communication_type);
@@ -148,14 +148,14 @@ export function ConversationHistory({
                     <p className="font-medium text-foreground truncate">{comm.subject}</p>
                   )}
                   {comm.body && (
-                    <p className="text-muted-foreground line-clamp-2">{comm.body}</p>
+                    <p className="text-muted-foreground whitespace-pre-wrap break-words">{comm.body}</p>
                   )}
                 </div>
               </div>
             );
           })}
         </div>
-      </ScrollArea>
+      </div>
     </div>
   );
 }
