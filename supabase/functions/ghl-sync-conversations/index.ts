@@ -71,7 +71,7 @@ serve(async (req) => {
       throw new Error("GHL_API_KEY and GHL_LOCATION_ID are required");
     }
 
-    const { leadId, contactId, limit = 150 } = await req.json();
+    const { leadId, contactId, limit = 100 } = await req.json();
 
     // Initialize Supabase
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
