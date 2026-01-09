@@ -5022,6 +5022,56 @@ export type Database = {
         }
         Relationships: []
       }
+      payment_setup_requests: {
+        Row: {
+          completed_at: string | null
+          created_at: string | null
+          final_reminder_sent_at: string | null
+          id: string
+          initial_sent_at: string
+          owner_id: string
+          reminder_1_sent_at: string | null
+          reminder_2_sent_at: string | null
+          status: string
+          stripe_session_url: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string | null
+          final_reminder_sent_at?: string | null
+          id?: string
+          initial_sent_at?: string
+          owner_id: string
+          reminder_1_sent_at?: string | null
+          reminder_2_sent_at?: string | null
+          status?: string
+          stripe_session_url?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string | null
+          final_reminder_sent_at?: string | null
+          id?: string
+          initial_sent_at?: string
+          owner_id?: string
+          reminder_1_sent_at?: string | null
+          reminder_2_sent_at?: string | null
+          status?: string
+          stripe_session_url?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_setup_requests_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "property_owners"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pending_actions: {
         Row: {
           action_type: string

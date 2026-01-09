@@ -100,6 +100,19 @@ serve(async (req) => {
 
     logStep("Updated owner with Stripe customer ID");
 
+    // Create payment setup request record for reminder tracking
+    await supabase.from("payment_setup_requests").upsert({
+      owner_id: ownerId,
+      initial_sent_at: new Date().toISOString(),
+      status: "pending",
+      stripe_session_url: session.url,
+    }, {
+      onConflict: "owner_id",
+      ignoreDuplicates: false,
+    });
+
+    logStep("Created payment setup request for reminders");
+
     // Get owner's properties for context
     const { data: properties } = await supabase
       .from("properties")
