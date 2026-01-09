@@ -85,6 +85,7 @@ interface GmailEmail {
   to: string;
   date: string;
   body: string;
+  bodyHtml?: string;
   snippet: string;
   labelIds: string[];
 }
@@ -600,14 +601,27 @@ export function InboxView() {
 
             <ScrollArea className="flex-1 p-4">
               <div className="max-w-3xl mx-auto space-y-4">
-                <div className="bg-muted/30 rounded-lg p-4">
-                  <h2 className="font-semibold text-lg mb-2">{selectedGmailEmail.subject}</h2>
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
-                    <span>From: <strong>{selectedGmailEmail.fromName}</strong> &lt;{selectedGmailEmail.from}&gt;</span>
+                <div className="bg-background rounded-lg border overflow-hidden">
+                  <div className="p-4 border-b bg-muted/30">
+                    <h2 className="font-semibold text-lg mb-2">{selectedGmailEmail.subject}</h2>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <span>From: <strong>{selectedGmailEmail.fromName}</strong> &lt;{selectedGmailEmail.from}&gt;</span>
+                    </div>
                   </div>
-                  <div className="text-sm whitespace-pre-wrap border-t pt-4">
-                    {selectedGmailEmail.body}
-                  </div>
+                  {selectedGmailEmail.bodyHtml ? (
+                    <div 
+                      className="p-4 email-content prose prose-sm max-w-none dark:prose-invert"
+                      dangerouslySetInnerHTML={{ __html: selectedGmailEmail.bodyHtml }}
+                      style={{ 
+                        fontSize: '14px',
+                        lineHeight: '1.6',
+                      }}
+                    />
+                  ) : (
+                    <div className="p-4 text-sm whitespace-pre-wrap">
+                      {selectedGmailEmail.body}
+                    </div>
+                  )}
                 </div>
               </div>
             </ScrollArea>
