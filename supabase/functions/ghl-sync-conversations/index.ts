@@ -101,15 +101,19 @@ serve(async (req) => {
       const messagesData = await messagesResponse.json();
       
       // Handle different GHL API response structures
+      // GHL can return: { messages: [...] } OR { messages: { messages: [...] } }
       let messages: Array<Record<string, unknown>> = [];
       if (Array.isArray(messagesData)) {
         messages = messagesData;
+      } else if (messagesData.messages?.messages && Array.isArray(messagesData.messages.messages)) {
+        // Nested structure: { messages: { messages: [...] } }
+        messages = messagesData.messages.messages;
       } else if (messagesData.messages && Array.isArray(messagesData.messages)) {
         messages = messagesData.messages;
       } else if (messagesData.data?.messages && Array.isArray(messagesData.data.messages)) {
         messages = messagesData.data.messages;
       } else {
-        console.log(`Unexpected messages response structure for conversation ${conversation.id}:`, JSON.stringify(messagesData).slice(0, 200));
+        console.log(`Unexpected messages response structure for conversation ${conversation.id}:`, JSON.stringify(messagesData).slice(0, 300));
         continue;
       }
       
