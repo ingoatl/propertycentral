@@ -106,7 +106,8 @@ serve(async (req: Request): Promise<Response> => {
     let propertyQuery = supabase
       .from("properties")
       .select("id, name, address, rental_type, image_path, management_fee_percentage, nightly_rate")
-      .is("offboarded_at", null);
+      .is("offboarded_at", null)
+      .order("name", { ascending: true });
 
     if (validatedPropertyId) {
       propertyQuery = propertyQuery.eq("id", validatedPropertyId);
@@ -114,7 +115,9 @@ serve(async (req: Request): Promise<Response> => {
       propertyQuery = propertyQuery.eq("owner_id", validatedOwnerId);
     }
 
-    const { data: property, error: propertyError } = await propertyQuery.single();
+    // Use limit(1) and get first item to handle owners with multiple properties
+    const { data: properties, error: propertyError } = await propertyQuery.limit(1);
+    const property = properties?.[0] || null;
 
     if (propertyError || !property) {
       console.error("Property fetch failed:", propertyError);
