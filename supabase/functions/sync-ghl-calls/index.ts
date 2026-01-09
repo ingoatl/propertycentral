@@ -28,8 +28,9 @@ serve(async (req) => {
 
     console.log("Starting GHL call sync for user:", userId);
 
-    // Call the existing ghl-fetch-call-transcripts function
-    const response = await fetch(`${supabaseUrl}/functions/v1/ghl-fetch-call-transcripts`, {
+    // 1. Sync Voice AI bot calls
+    console.log("Syncing Voice AI bot calls...");
+    const voiceAiResponse = await fetch(`${supabaseUrl}/functions/v1/ghl-fetch-call-transcripts`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -38,28 +39,52 @@ serve(async (req) => {
       body: JSON.stringify({
         syncAll: true,
         limit: 50,
-        userId: userId, // Pass user ID for attribution
+        userId: userId,
       }),
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("GHL sync error:", errorText);
-      return new Response(
-        JSON.stringify({ error: "Failed to sync calls", details: errorText }),
-        { status: response.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    let voiceAiResult = { syncedCount: 0, analyzedCount: 0 };
+    if (voiceAiResponse.ok) {
+      voiceAiResult = await voiceAiResponse.json();
+      console.log("Voice AI sync complete:", voiceAiResult);
+    } else {
+      const errorText = await voiceAiResponse.text();
+      console.error("Voice AI sync error:", errorText);
     }
 
-    const result = await response.json();
-    console.log("GHL sync complete:", result);
+    // 2. Sync human phone calls and other conversations (SMS, Email)
+    console.log("Syncing human conversations...");
+    const conversationsResponse = await fetch(`${supabaseUrl}/functions/v1/ghl-sync-conversations`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${supabaseKey}`,
+      },
+      body: JSON.stringify({
+        limit: 100, // Fetch more conversations to capture all calls
+      }),
+    });
+
+    let conversationsResult = { syncedCount: 0, conversationsProcessed: 0 };
+    if (conversationsResponse.ok) {
+      conversationsResult = await conversationsResponse.json();
+      console.log("Conversations sync complete:", conversationsResult);
+    } else {
+      const errorText = await conversationsResponse.text();
+      console.error("Conversations sync error:", errorText);
+    }
+
+    const totalSynced = (voiceAiResult.syncedCount || 0) + (conversationsResult.syncedCount || 0);
 
     return new Response(
       JSON.stringify({
         success: true,
-        syncedCount: result.syncedCount || 0,
-        analyzedCount: result.analyzedCount || 0,
-        message: `Synced ${result.syncedCount || 0} calls, analyzed ${result.analyzedCount || 0}`,
+        voiceAiSynced: voiceAiResult.syncedCount || 0,
+        voiceAiAnalyzed: voiceAiResult.analyzedCount || 0,
+        conversationsSynced: conversationsResult.syncedCount || 0,
+        conversationsProcessed: conversationsResult.conversationsProcessed || 0,
+        totalSynced,
+        message: `Synced ${totalSynced} total (${voiceAiResult.syncedCount || 0} AI calls, ${conversationsResult.syncedCount || 0} conversations)`,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
