@@ -479,21 +479,24 @@ export default function BookDiscoveryCall() {
               </ul>
             </div>
             
-            {/* Signature */}
+            {/* Signature - Ingo */}
             <div className="border-t pt-6 mt-4">
-              <p className="text-xs text-muted-foreground uppercase tracking-wider mb-3">Looking forward to speaking with you</p>
-              <img 
-                src={anjaSignature} 
-                alt="Anja & Ingo Schaer" 
-                className="h-10 mx-auto mb-2"
-              />
-              <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium">PeachHaus Group</p>
-              <div className="mt-3">
+              <p className="text-xs text-muted-foreground uppercase tracking-wider mb-4">Looking forward to speaking with you</p>
+              <div className="flex items-center justify-center gap-4">
                 <img 
-                  src={anjaIngoHosts} 
-                  alt="Anja & Ingo" 
-                  className="w-16 h-16 rounded-full mx-auto border-2 border-muted object-cover"
+                  src="/images/ingo-headshot.png" 
+                  alt="Ingo Schaer" 
+                  className="w-16 h-16 rounded-full border-2 border-primary object-cover"
                 />
+                <div className="text-left">
+                  <img 
+                    src="/images/ingo-signature.png" 
+                    alt="Ingo Schaer" 
+                    className="h-8 mb-1"
+                  />
+                  <p className="text-xs text-muted-foreground">Co-Founder, Operations Manager</p>
+                  <p className="text-xs font-medium">PeachHaus Group LLC</p>
+                </div>
               </div>
             </div>
           </CardContent>

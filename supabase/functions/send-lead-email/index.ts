@@ -22,15 +22,17 @@ interface EmailRequest {
   senderName?: string;
 }
 
-// Team signatures based on email
+// Team signatures based on email - using hosted images
+const SITE_URL = "https://propertycentral.lovable.app";
+
 const SIGNATURES: Record<string, string> = {
   "ingo@peachhausgroup.com": `
 <br/><br/>
 <table cellpadding="0" cellspacing="0" style="font-family: Arial, sans-serif; font-size: 14px; color: #333; border-collapse: collapse;">
   <tr>
-    <td style="padding-right: 12px; border-right: 3px solid #e5a653; vertical-align: top; width: 110px;">
-      <img src="https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/assets/ingo-photo.png" alt="Ingo Schaer" width="90" height="90" style="border-radius: 50%; display: block;" />
-      <img src="https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/assets/ingo-sig.png" alt="" width="90" style="display: block; margin-top: 8px; font-style: italic;" />
+    <td style="padding-right: 12px; border-right: 3px solid #e5a653; vertical-align: top; width: 100px;">
+      <img src="${SITE_URL}/images/ingo-headshot.png" alt="Ingo Schaer" width="80" height="80" style="border-radius: 50%; display: block; border: 2px solid #e5a653;" />
+      <img src="${SITE_URL}/images/ingo-signature.png" alt="" width="80" style="display: block; margin-top: 6px;" />
     </td>
     <td style="padding-left: 12px; vertical-align: top;">
       <p style="margin: 0; font-size: 16px; font-weight: bold; color: #1a1a1a;">Ingo Schaer</p>
@@ -38,7 +40,7 @@ const SIGNATURES: Record<string, string> = {
       <p style="margin: 2px 0 0; font-size: 12px; font-weight: 600; color: #1a1a1a;">PeachHaus Group LLC</p>
       <p style="margin: 8px 0 0; font-size: 12px; color: #555;">(404) 800-5932</p>
       <p style="margin: 2px 0 0;"><a href="mailto:ingo@peachhausgroup.com" style="font-size: 12px; color: #1a73e8; text-decoration: none;">ingo@peachhausgroup.com</a></p>
-      <p style="margin: 2px 0 0;"><a href="https://propertycentral.lovable.app" style="font-size: 12px; color: #1a73e8; text-decoration: none;">propertycentral.lovable.app</a></p>
+      <p style="margin: 2px 0 0;"><a href="https://www.peachhausgroup.com" style="font-size: 12px; color: #1a73e8; text-decoration: none;">www.peachhausgroup.com</a></p>
     </td>
   </tr>
 </table>`,
@@ -46,9 +48,9 @@ const SIGNATURES: Record<string, string> = {
 <br/><br/>
 <table cellpadding="0" cellspacing="0" style="font-family: Arial, sans-serif; font-size: 14px; color: #333; border-collapse: collapse;">
   <tr>
-    <td style="padding-right: 12px; border-right: 3px solid #e5a653; vertical-align: top; width: 110px;">
-      <img src="https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/assets/anja-photo.png" alt="Anja Schaer" width="90" height="90" style="border-radius: 50%; display: block;" />
-      <img src="https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/assets/anja-sig.png" alt="" width="90" style="display: block; margin-top: 8px; font-style: italic;" />
+    <td style="padding-right: 12px; border-right: 3px solid #e5a653; vertical-align: top; width: 100px;">
+      <img src="${SITE_URL}/images/anja-headshot.png" alt="Anja Schaer" width="80" height="80" style="border-radius: 50%; display: block; border: 2px solid #e5a653;" />
+      <img src="${SITE_URL}/images/anja-signature.png" alt="" width="80" style="display: block; margin-top: 6px;" />
     </td>
     <td style="padding-left: 12px; vertical-align: top;">
       <p style="margin: 0; font-size: 16px; font-weight: bold; color: #1a1a1a;">Anja Schaer</p>
@@ -56,7 +58,7 @@ const SIGNATURES: Record<string, string> = {
       <p style="margin: 2px 0 0; font-size: 12px; font-weight: 600; color: #1a1a1a;">PeachHaus Group LLC</p>
       <p style="margin: 8px 0 0; font-size: 12px; color: #555;">(404) 800-5932</p>
       <p style="margin: 2px 0 0;"><a href="mailto:anja@peachhausgroup.com" style="font-size: 12px; color: #1a73e8; text-decoration: none;">anja@peachhausgroup.com</a></p>
-      <p style="margin: 2px 0 0;"><a href="https://propertycentral.lovable.app" style="font-size: 12px; color: #1a73e8; text-decoration: none;">propertycentral.lovable.app</a></p>
+      <p style="margin: 2px 0 0;"><a href="https://www.peachhausgroup.com" style="font-size: 12px; color: #1a73e8; text-decoration: none;">www.peachhausgroup.com</a></p>
     </td>
   </tr>
 </table>`,
