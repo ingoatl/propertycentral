@@ -134,6 +134,45 @@ All colors MUST be HSL.
   .active-scale-sm {
     @apply active:scale-98 transition-transform;
   }
+
+  /* Email content - prevent HTML emails from breaking layout */
+  .email-content {
+    max-width: 100%;
+    overflow-x: auto;
+    overflow-y: visible;
+  }
+
+  .email-content * {
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  .email-content img {
+    max-width: 100% !important;
+    height: auto !important;
+  }
+
+  .email-content table {
+    max-width: 100% !important;
+    table-layout: fixed !important;
+    word-wrap: break-word !important;
+  }
+
+  .email-content pre,
+  .email-content code {
+    white-space: pre-wrap !important;
+    word-wrap: break-word !important;
+    overflow-wrap: break-word !important;
+  }
+
+  .email-content div,
+  .email-content td,
+  .email-content th,
+  .email-content p,
+  .email-content span {
+    word-wrap: break-word !important;
+    overflow-wrap: break-word !important;
+  }
 }
 
 @layer base {

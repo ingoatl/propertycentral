@@ -343,12 +343,10 @@ export function InboxView() {
 
   // Fetch Gmail inbox emails for both Ingo and Anja
   const { data: gmailEmails = [], isLoading: isLoadingGmail } = useQuery({
-    queryKey: ["gmail-inbox", activeTab],
+    queryKey: ["gmail-inbox"],
     queryFn: async () => {
-      if (activeTab !== "emails") return [];
-      
       const { data, error } = await supabase.functions.invoke("fetch-gmail-inbox", {
-        body: { daysBack: 7 } // Extended from 3 to 7 days
+        body: { daysBack: 14 } // Extended to 14 days to find older emails
       });
       
       if (error) {
@@ -571,7 +569,7 @@ export function InboxView() {
     // Update local state to remove UNREAD label FIRST (visual only)
     if (email.labelIds?.includes('UNREAD')) {
       // Update the gmail-inbox query cache with correct key
-      queryClient.setQueryData(['gmail-inbox', 'emails'], (old: GmailEmail[] | undefined) => {
+      queryClient.setQueryData(['gmail-inbox'], (old: GmailEmail[] | undefined) => {
         if (!old) return old;
         return old.map(e => 
           e.id === email.id 
@@ -816,7 +814,7 @@ export function InboxView() {
       </Button>
 
       {/* Right Panel - Detail View (Full screen on mobile when showing detail) */}
-      <div className={`flex-1 flex flex-col ${showMobileDetail ? 'flex' : 'hidden md:flex'}`}>
+      <div className={`flex-1 flex flex-col min-w-0 overflow-hidden ${showMobileDetail ? 'flex' : 'hidden md:flex'}`}>
         {activeTab === "emails" && selectedGmailEmail ? (
           // Gmail Email Detail View - Mobile optimized
           <>

@@ -82,7 +82,7 @@ serve(async (req) => {
     console.log(`Fetching emails with query: ${query}`);
 
     const messagesResponse = await fetch(
-      `https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=100&q=${encodeURIComponent(query)}`,
+      `https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=200&q=${encodeURIComponent(query)}`,
       {
         headers: { Authorization: `Bearer ${accessToken}` },
       }
@@ -101,7 +101,7 @@ serve(async (req) => {
 
     // Fetch full email data for each message
     const emails = [];
-    for (const msg of messageIds.slice(0, 100)) {
+    for (const msg of messageIds.slice(0, 150)) {
       try {
         const messageResponse = await fetch(
           `https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}?format=full`,
