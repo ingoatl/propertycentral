@@ -322,6 +322,9 @@ export function InboxView() {
     enabled: !!selectedLeadId,
   });
 
+  // Determine which inbox to show based on selected user
+  const [selectedEmailInbox, setSelectedEmailInbox] = useState<"ingo" | "anja">("ingo");
+
   // Fetch Gmail inbox emails for both Ingo and Anja
   const { data: gmailEmails = [], isLoading: isLoadingGmail } = useQuery({
     queryKey: ["gmail-inbox", activeTab],
@@ -342,6 +345,16 @@ export function InboxView() {
     enabled: activeTab === "emails",
     staleTime: 30000,
     refetchInterval: 30000, // Refresh every 30 seconds
+  });
+
+  // Filter emails based on selected inbox
+  const filteredGmailEmails = gmailEmails.filter(email => {
+    const targetInbox = email.targetInbox?.toLowerCase() || '';
+    if (selectedEmailInbox === "ingo") {
+      return targetInbox.includes("ingo") || !email.targetInbox;
+    } else {
+      return targetInbox.includes("anja");
+    }
   });
 
   const { data: communications = [], isLoading } = useQuery({
@@ -512,6 +525,24 @@ export function InboxView() {
             </div>
           )}
 
+          {/* Email inbox selector for Emails tab */}
+          {activeTab === "emails" && (
+            <div className="flex items-center gap-2">
+              <button 
+                onClick={() => setSelectedEmailInbox("ingo")} 
+                className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${selectedEmailInbox === "ingo" ? "bg-primary text-primary-foreground border-primary" : "bg-background text-muted-foreground border-border hover:border-primary/50"}`}
+              >
+                Ingo's Inbox
+              </button>
+              <button 
+                onClick={() => setSelectedEmailInbox("anja")} 
+                className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${selectedEmailInbox === "anja" ? "bg-primary text-primary-foreground border-primary" : "bg-background text-muted-foreground border-border hover:border-primary/50"}`}
+              >
+                Anja's Inbox
+              </button>
+            </div>
+          )}
+
           {/* Only show filters for Chats/Calls tabs */}
           {activeTab !== "emails" && (
             <div className="flex items-center gap-2">
@@ -536,11 +567,11 @@ export function InboxView() {
             // Gmail Inbox View
             isLoadingGmail ? (
               <div className="p-4 text-center text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin mx-auto mb-2" /><p className="text-sm">Loading emails...</p></div>
-            ) : gmailEmails.length === 0 ? (
-              <div className="p-8 text-center text-muted-foreground"><Mail className="h-10 w-10 mx-auto mb-3 opacity-40" /><p className="text-sm">No emails in the last 3 days</p></div>
+            ) : filteredGmailEmails.length === 0 ? (
+              <div className="p-8 text-center text-muted-foreground"><Mail className="h-10 w-10 mx-auto mb-3 opacity-40" /><p className="text-sm">No emails in {selectedEmailInbox === "ingo" ? "Ingo's" : "Anja's"} inbox</p></div>
             ) : (
               <div>
-                {gmailEmails.filter(email => !search || email.subject.toLowerCase().includes(search.toLowerCase()) || email.fromName.toLowerCase().includes(search.toLowerCase())).map((email) => (
+                {filteredGmailEmails.filter(email => !search || email.subject.toLowerCase().includes(search.toLowerCase()) || email.fromName.toLowerCase().includes(search.toLowerCase())).map((email) => (
                   <div key={email.id} onClick={() => setSelectedGmailEmail(email)} className={`flex items-start gap-3 p-3 cursor-pointer transition-colors border-l-2 ${selectedGmailEmail?.id === email.id ? "bg-muted/70 border-l-primary" : "hover:bg-muted/30 border-l-transparent"}`}>
                     <div className="h-10 w-10 rounded-full bg-blue-500 flex items-center justify-center flex-shrink-0">
                       <span className="text-sm font-medium text-white">{getInitials(email.fromName)}</span>

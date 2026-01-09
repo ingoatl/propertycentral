@@ -1,6 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { MapPin, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -119,46 +118,32 @@ export function OnboardingPropertiesTimeline() {
 
   if (isLoading) {
     return (
-      <Card className="border-primary/20 bg-gradient-to-br from-primary/5 via-background to-accent/5">
-        <CardHeader className="pb-3">
-          <Skeleton className="h-7 w-48" />
-          <Skeleton className="h-4 w-64 mt-1" />
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {[1, 2, 3].map((i) => (
-              <Skeleton key={i} className="h-28 w-full" />
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+      <div className="p-4">
+        <div className="space-y-4">
+          {[1, 2, 3].map((i) => (
+            <Skeleton key={i} className="h-28 w-full" />
+          ))}
+        </div>
+      </div>
     );
   }
 
   if (!properties || properties.length === 0) {
-    return null;
+    return (
+      <div className="p-6 text-center text-muted-foreground">
+        <p className="text-sm">No properties currently in onboarding</p>
+      </div>
+    );
   }
 
   return (
-    <Card className="border-primary/20 bg-gradient-to-br from-primary/5 via-background to-accent/5">
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle className="text-xl flex items-center gap-2">
-              <span className="text-2xl">🏗️</span>
-              Properties Onboarding
-            </CardTitle>
-            <p className="text-sm text-muted-foreground mt-1">
-              Track onboarding progress for new properties
-            </p>
-          </div>
-          <Badge variant="secondary" className="text-sm">
-            {properties.length} in progress
-          </Badge>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+    <div className="p-4">
+      <div className="flex items-center justify-end mb-4">
+        <Badge variant="secondary" className="text-sm">
+          {properties.length} in progress
+        </Badge>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {properties.map((property) => (
             <div 
               key={property.id}
@@ -241,9 +226,8 @@ export function OnboardingPropertiesTimeline() {
                 </div>
               </div>
             </div>
-          ))}
-        </div>
-      </CardContent>
-    </Card>
+        ))}
+      </div>
+    </div>
   );
 }
