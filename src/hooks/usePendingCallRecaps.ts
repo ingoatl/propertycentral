@@ -17,16 +17,11 @@ export interface PendingCallRecap {
   call_date: string;
   call_duration: number | null;
   caller_user_id: string | null;
+  assigned_to_user_id: string | null; // For smart routing based on transcript
   subject: string;
   email_body: string;
   key_topics: string[];
-  action_items: Array<{
-    title: string;
-    description: string;
-    priority: string;
-    category: string;
-    source_quote?: string;
-  }>;
+  action_items: unknown; // JSON type from database
   transcript_summary: string | null;
   sentiment: string | null;
   status: string;
@@ -83,17 +78,27 @@ export function usePendingCallRecaps() {
       if (!allRecaps) return [];
 
       // Sort by user relevance:
-      // 1. User's own calls (caller_user_id matches)
-      // 2. Calls without a caller assigned (team-wide)
-      // 3. Other users' calls (still visible but lower priority)
+      // 1. Recaps assigned to current user (assigned_to_user_id matches) - e.g. "speak with Anja"
+      // 2. User's own calls (caller_user_id matches)
+      // 3. Calls without a caller assigned (team-wide)
+      // 4. Other users' calls (still visible but lower priority)
       const sorted = [...allRecaps].sort((a, b) => {
+        const aIsAssignedToUser = a.assigned_to_user_id === user?.id;
+        const bIsAssignedToUser = b.assigned_to_user_id === user?.id;
         const aIsUserCall = a.caller_user_id === user?.id;
         const bIsUserCall = b.caller_user_id === user?.id;
         const aIsUnassigned = !a.caller_user_id;
         const bIsUnassigned = !b.caller_user_id;
 
+        // Assigned to user takes highest priority
+        if (aIsAssignedToUser && !bIsAssignedToUser) return -1;
+        if (!aIsAssignedToUser && bIsAssignedToUser) return 1;
+
+        // Then user's own calls
         if (aIsUserCall && !bIsUserCall) return -1;
         if (!aIsUserCall && bIsUserCall) return 1;
+        
+        // Then unassigned calls
         if (aIsUnassigned && !bIsUnassigned) return -1;
         if (!aIsUnassigned && bIsUnassigned) return 1;
         

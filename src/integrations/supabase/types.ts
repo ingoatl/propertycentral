@@ -5170,6 +5170,7 @@ export type Database = {
       pending_call_recaps: {
         Row: {
           action_items: Json | null
+          assigned_to_user_id: string | null
           call_date: string
           call_duration: number | null
           caller_user_id: string | null
@@ -5196,6 +5197,7 @@ export type Database = {
         }
         Insert: {
           action_items?: Json | null
+          assigned_to_user_id?: string | null
           call_date: string
           call_duration?: number | null
           caller_user_id?: string | null
@@ -5222,6 +5224,7 @@ export type Database = {
         }
         Update: {
           action_items?: Json | null
+          assigned_to_user_id?: string | null
           call_date?: string
           call_duration?: number | null
           caller_user_id?: string | null
