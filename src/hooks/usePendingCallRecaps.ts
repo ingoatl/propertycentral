@@ -238,6 +238,26 @@ export function usePendingCallRecaps() {
     },
   });
 
+  // Mark done mutation (complete without sending email)
+  const markDoneMutation = useMutation({
+    mutationFn: async ({ recapId }: { recapId: string }) => {
+      const { error } = await supabase
+        .from("pending_call_recaps")
+        .update({ status: "completed" })
+        .eq("id", recapId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["pending-call-recaps"] });
+      toast.success("Call marked as done");
+    },
+    onError: (error) => {
+      console.error("Error marking recap done:", error);
+      toast.error("Failed to mark call as done");
+    },
+  });
+
   // Categorize recaps for UI
   const userRecaps = pendingRecaps.filter((r) => r.caller_user_id === user?.id);
   const teamRecaps = pendingRecaps.filter((r) => !r.caller_user_id || r.caller_user_id !== user?.id);
@@ -250,9 +270,11 @@ export function usePendingCallRecaps() {
     sendRecap: sendRecapMutation.mutate,
     dismissRecap: dismissRecapMutation.mutate,
     updateRecap: updateRecapMutation.mutate,
+    markDone: markDoneMutation.mutate,
     isSending: sendRecapMutation.isPending,
     isDismissing: dismissRecapMutation.isPending,
     isUpdating: updateRecapMutation.isPending,
+    isMarkingDone: markDoneMutation.isPending,
     refetch,
     currentUserId: user?.id,
   };

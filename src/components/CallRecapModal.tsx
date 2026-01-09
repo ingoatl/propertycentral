@@ -45,7 +45,14 @@ import {
   ChevronRight,
   UserPlus,
   Trash2,
+  Calendar,
+  Check,
 } from "lucide-react";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { usePendingCallRecaps, PendingCallRecap } from "@/hooks/usePendingCallRecaps";
 import {
   usePendingTaskConfirmations,
@@ -131,14 +138,17 @@ interface RecapEditorProps {
   recap: PendingCallRecap;
   onSend: (subject: string, body: string) => void;
   onDismiss: () => void;
+  onMarkDone: () => void;
   onCallback: () => void;
   onSendSMS: (message: string) => void;
+  onScheduleFollowUp: (days: number, method: 'sms' | 'email', message: string) => void;
   onSkipToNext: () => void;
   onAssignTo: (userId: string) => void;
   teamMembers: TeamMember[];
   currentUserId: string | null;
   isSending: boolean;
   isDismissing: boolean;
+  isMarkingDone: boolean;
   hasNext: boolean;
   hasPrevious: boolean;
   onPrevious: () => void;
@@ -148,14 +158,17 @@ function RecapEditor({
   recap, 
   onSend, 
   onDismiss, 
+  onMarkDone,
   onCallback, 
-  onSendSMS, 
+  onSendSMS,
+  onScheduleFollowUp,
   onSkipToNext, 
   onAssignTo,
   teamMembers,
   currentUserId,
   isSending, 
-  isDismissing, 
+  isDismissing,
+  isMarkingDone,
   hasNext,
   hasPrevious,
   onPrevious,
@@ -164,15 +177,34 @@ function RecapEditor({
   const [emailBody, setEmailBody] = useState(recap.email_body);
   const [isPreview, setIsPreview] = useState(false);
   const [showSMSInput, setShowSMSInput] = useState(false);
+  const [showFollowUp, setShowFollowUp] = useState(false);
+  const [followUpDays, setFollowUpDays] = useState(3);
+  const [followUpMethod, setFollowUpMethod] = useState<'sms' | 'email'>('sms');
   
   // Use smart greeting utility to avoid "Hi Unknown"
   const firstName = extractFirstName(recap.recipient_name);
   const greeting = createSmartGreeting(recap.recipient_name);
   
-  const [smsMessage, setSmsMessage] = useState(() => {
-    const summary = recap.transcript_summary?.slice(0, 100) || 'our recent call';
-    return `${greeting} following up on ${summary}. Let me know if you need anything else! - PeachHaus`;
-  });
+  // Generate smart SMS from call transcript
+  const generateSmsFromTranscript = () => {
+    const topics = recap.key_topics?.slice(0, 2).join(' and ') || 'your property';
+    const summary = recap.transcript_summary?.slice(0, 80) || '';
+    
+    if (summary) {
+      return `${greeting} following up on our call about ${topics}. ${summary.includes('next steps') ? '' : 'Let me know if you have any questions!'} - PeachHaus`;
+    }
+    return `${greeting} thanks for your call about ${topics}. Let me know if you need anything else! - PeachHaus`;
+  };
+  
+  const [smsMessage, setSmsMessage] = useState(generateSmsFromTranscript);
+  
+  // Generate follow-up message from transcript
+  const generateFollowUpMessage = () => {
+    const topics = recap.key_topics?.slice(0, 2).join(' and ') || 'your property';
+    return `${greeting} just checking in about ${topics}. Have you had a chance to think it over? Happy to answer any questions! - PeachHaus`;
+  };
+  
+  const [followUpMessage, setFollowUpMessage] = useState(generateFollowUpMessage);
 
   const SentimentIcon = sentimentConfig[recap.sentiment as keyof typeof sentimentConfig]?.icon || Meh;
   const sentimentStyles = sentimentConfig[recap.sentiment as keyof typeof sentimentConfig] || sentimentConfig.neutral;
@@ -240,17 +272,7 @@ function RecapEditor({
           className="flex-1 text-green-600 border-green-200 hover:bg-green-50"
         >
           <MessageSquare className="h-4 w-4 mr-2" />
-          SMS Recap
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={onDismiss}
-          disabled={isDismissing}
-          className="text-destructive border-destructive/30 hover:bg-destructive/10"
-        >
-          <Trash2 className="h-4 w-4 mr-1" />
-          Dismiss
+          Send SMS
         </Button>
         {hasNext && (
           <Button
@@ -351,6 +373,78 @@ function RecapEditor({
         </div>
       )}
 
+      {/* Schedule Follow-up Section */}
+      <Collapsible open={showFollowUp} onOpenChange={setShowFollowUp}>
+        <CollapsibleTrigger asChild>
+          <Button variant="ghost" size="sm" className="w-full justify-start text-muted-foreground hover:text-foreground">
+            <Calendar className="h-4 w-4 mr-2" />
+            Schedule Follow-up
+            <ChevronRight className={`h-4 w-4 ml-auto transition-transform ${showFollowUp ? 'rotate-90' : ''}`} />
+          </Button>
+        </CollapsibleTrigger>
+        <CollapsibleContent className="space-y-3 p-3 bg-muted/30 rounded-lg mt-2">
+          <p className="text-xs text-muted-foreground">
+            AI suggests: Based on the call sentiment ({recap.sentiment}), a follow-up in a few days may help continue the conversation.
+          </p>
+          <div className="flex gap-2">
+            <Button
+              variant={followUpDays === 1 ? "default" : "outline"}
+              size="sm"
+              onClick={() => setFollowUpDays(1)}
+            >
+              Tomorrow
+            </Button>
+            <Button
+              variant={followUpDays === 3 ? "default" : "outline"}
+              size="sm"
+              onClick={() => setFollowUpDays(3)}
+            >
+              3 Days
+            </Button>
+            <Button
+              variant={followUpDays === 7 ? "default" : "outline"}
+              size="sm"
+              onClick={() => setFollowUpDays(7)}
+            >
+              1 Week
+            </Button>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              variant={followUpMethod === 'sms' ? "default" : "outline"}
+              size="sm"
+              onClick={() => setFollowUpMethod('sms')}
+            >
+              <MessageSquare className="h-3 w-3 mr-1" />
+              SMS
+            </Button>
+            <Button
+              variant={followUpMethod === 'email' ? "default" : "outline"}
+              size="sm"
+              onClick={() => setFollowUpMethod('email')}
+            >
+              <Mail className="h-3 w-3 mr-1" />
+              Email
+            </Button>
+          </div>
+          <Textarea
+            value={followUpMessage}
+            onChange={(e) => setFollowUpMessage(e.target.value)}
+            rows={2}
+            placeholder="Follow-up message..."
+            className="text-sm"
+          />
+          <Button
+            size="sm"
+            onClick={() => onScheduleFollowUp(followUpDays, followUpMethod, followUpMessage)}
+            className="w-full"
+          >
+            <Calendar className="h-3 w-3 mr-1" />
+            Schedule for {followUpDays === 1 ? 'Tomorrow' : `${followUpDays} Days`}
+          </Button>
+        </CollapsibleContent>
+      </Collapsible>
+
       <Separator />
 
       {/* Email Editor */}
@@ -395,28 +489,10 @@ function RecapEditor({
                 value={emailBody}
                 onChange={(e) => setEmailBody(e.target.value)}
                 placeholder="Email body..."
-                rows={10}
+                rows={8}
                 className="text-sm font-mono"
               />
             )}
-
-            <div className="flex items-center justify-between pt-2">
-              <Button
-                variant="outline"
-                onClick={onDismiss}
-                disabled={isDismissing}
-              >
-                <X className="h-4 w-4 mr-2" />
-                Skip Email
-              </Button>
-              <Button
-                onClick={() => onSend(subject, emailBody)}
-                disabled={isSending || !recap.recipient_email}
-              >
-                <Send className="h-4 w-4 mr-2" />
-                Send to {firstName || 'Contact'}
-              </Button>
-            </div>
           </>
         ) : (
           <Card className="bg-yellow-50 border-yellow-200">
@@ -425,12 +501,45 @@ function RecapEditor({
               <div>
                 <p className="text-sm font-medium text-yellow-800">No email address available</p>
                 <p className="text-xs text-yellow-700">
-                  We couldn't find an email for this contact. You can dismiss this or add their email later.
+                  We couldn't find an email for this contact. You can mark done or add their email later.
                 </p>
               </div>
             </CardContent>
           </Card>
         )}
+      </div>
+
+      {/* Footer Actions - Dismiss moved here */}
+      <div className="flex items-center justify-between pt-4 border-t">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onDismiss}
+          disabled={isDismissing}
+          className="text-muted-foreground hover:text-destructive"
+        >
+          <Trash2 className="h-4 w-4 mr-1" />
+          Dismiss
+        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={onMarkDone}
+            disabled={isMarkingDone}
+          >
+            <Check className="h-4 w-4 mr-2" />
+            Mark Done
+          </Button>
+          {recap.recipient_email && (
+            <Button
+              onClick={() => onSend(subject, emailBody)}
+              disabled={isSending}
+            >
+              <Send className="h-4 w-4 mr-2" />
+              Send & Done
+            </Button>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -458,8 +567,10 @@ export function CallRecapModal() {
     isLoading: isLoadingRecaps,
     sendRecap,
     dismissRecap,
+    markDone,
     isSending,
     isDismissing,
+    isMarkingDone,
     currentUserId,
   } = usePendingCallRecaps();
 
@@ -533,6 +644,52 @@ export function CallRecapModal() {
       }
     }
   }, [currentRecap, dismissRecap, activeRecapIndex, displayedRecaps.length]);
+
+  const handleMarkDone = useCallback(() => {
+    if (currentRecap) {
+      markDone({ recapId: currentRecap.id });
+      // Move to next recap or close
+      if (activeRecapIndex < displayedRecaps.length - 1) {
+        setActiveRecapIndex((prev) => prev + 1);
+      }
+    }
+  }, [currentRecap, markDone, activeRecapIndex, displayedRecaps.length]);
+
+  const handleScheduleFollowUp = useCallback(async (days: number, method: 'sms' | 'email', message: string) => {
+    if (!currentRecap) return;
+    
+    try {
+      const scheduledDate = new Date();
+      scheduledDate.setDate(scheduledDate.getDate() + days);
+      
+      // Create a follow-up schedule entry
+      const { error } = await supabase
+        .from("lead_follow_up_schedules")
+        .insert({
+          lead_id: currentRecap.lead_id,
+          sequence_id: null, // Manual follow-up
+          step_id: null,
+          scheduled_for: scheduledDate.toISOString(),
+          action_type: method,
+          subject: method === 'email' ? `Follow-up: ${currentRecap.subject}` : null,
+          content: message,
+          status: "pending",
+        });
+      
+      if (error) throw error;
+      
+      toast.success(`Follow-up scheduled for ${days === 1 ? 'tomorrow' : `${days} days from now`}`);
+      
+      // Mark the recap as done after scheduling
+      markDone({ recapId: currentRecap.id });
+      
+      if (activeRecapIndex < displayedRecaps.length - 1) {
+        setActiveRecapIndex((prev) => prev + 1);
+      }
+    } catch (e: any) {
+      toast.error(e.message || "Failed to schedule follow-up");
+    }
+  }, [currentRecap, markDone, activeRecapIndex, displayedRecaps.length]);
 
   const handleApproveTask = useCallback(
     (id: string) => {
@@ -723,6 +880,7 @@ export function CallRecapModal() {
                       recap={currentRecap}
                       onSend={handleSend}
                       onDismiss={handleDismiss}
+                      onMarkDone={handleMarkDone}
                       onCallback={handleCallback}
                       onSendSMS={async (message) => {
                         let phone: string | null = null;
@@ -757,6 +915,7 @@ export function CallRecapModal() {
                           toast.error("No phone number on file");
                         }
                       }}
+                      onScheduleFollowUp={handleScheduleFollowUp}
                       onSkipToNext={() => {
                         if (activeRecapIndex < displayedRecaps.length - 1) {
                           setActiveRecapIndex(prev => prev + 1);
@@ -770,6 +929,7 @@ export function CallRecapModal() {
                       onPrevious={() => setActiveRecapIndex(prev => Math.max(0, prev - 1))}
                       isSending={isSending}
                       isDismissing={isDismissing}
+                      isMarkingDone={isMarkingDone}
                     />
                   </div>
                 ) : (

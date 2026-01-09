@@ -36,6 +36,11 @@ interface AnalysisResult {
   };
   transcript_summary: string;
   sentiment: "positive" | "neutral" | "negative";
+  follow_up_suggestion?: {
+    recommended_days: number;
+    reason: string;
+    suggested_message: string;
+  };
 }
 
 // Team member IDs for smart routing
@@ -149,6 +154,7 @@ Your job is to:
 3. Generate a professional recap email for the caller
 4. Summarize the call
 5. Assess the overall sentiment
+6. Suggest follow-up timing based on the conversation
 
 The caller is ${recipientType === "owner" ? "a property owner we manage for" : recipientType === "lead" ? "a prospective client" : "someone who called our office"}.
 Their name is: ${recipientName}
@@ -174,8 +180,19 @@ Return a JSON object with this structure:
     "body": "HTML formatted email body"
   },
   "transcript_summary": "2-3 sentence summary",
-  "sentiment": "positive|neutral|negative"
+  "sentiment": "positive|neutral|negative",
+  "follow_up_suggestion": {
+    "recommended_days": 3,
+    "reason": "Brief reason for this timing, e.g. 'Caller mentioned wanting to think it over'",
+    "suggested_message": "Short follow-up message to send"
+  }
 }
+
+For follow_up_suggestion:
+- If caller said "call me back next week" or similar, set recommended_days to 7
+- If caller said "I need to think about it", set recommended_days to 3
+- If caller expressed strong interest but needs more info, set recommended_days to 1-2
+- If call was very positive with clear next steps, recommended_days can be null (no follow-up needed)
 
 For the recap email:
 - Be professional but warm
