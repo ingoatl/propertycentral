@@ -430,4 +430,13 @@ verify_jwt = true
 verify_jwt = false
 
 [functions.send-call-recap-email]
-verify_jwt = true
+verify_jwt = false
+
+[functions.recall-meeting-webhook]
+verify_jwt = false
+
+[functions.recall-send-bot]
+verify_jwt = false
+
+[functions.sync-ghl-calls]
+verify_jwt = false

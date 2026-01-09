@@ -266,14 +266,18 @@ function RecapEditor({ recap, onSend, onDismiss, isSending, isDismissing }: Reca
 export function CallRecapModal() {
   const [isOpen, setIsOpen] = useState(true);
   const [activeRecapIndex, setActiveRecapIndex] = useState(0);
+  const [showAllRecaps, setShowAllRecaps] = useState(false);
 
   const {
     pendingRecaps,
+    userRecaps,
+    teamRecaps,
     isLoading: isLoadingRecaps,
     sendRecap,
     dismissRecap,
     isSending,
     isDismissing,
+    currentUserId,
   } = usePendingCallRecaps();
 
   const {
@@ -288,18 +292,24 @@ export function CallRecapModal() {
     isApprovingAll,
   } = usePendingTaskConfirmations();
 
+  // Show user's recaps first, then team recaps if toggled
+  const displayedRecaps = showAllRecaps ? pendingRecaps : userRecaps.length > 0 ? userRecaps : pendingRecaps;
+
   // Filter tasks that came from call transcripts
   const callTasks = pendingConfirmations.filter(
     (task) => task.source_type === "call_transcript"
   );
 
-  // Get current recap
-  const currentRecap = pendingRecaps[activeRecapIndex];
+  // Get current recap from displayed list
+  const currentRecap = displayedRecaps[activeRecapIndex];
 
   // Get tasks for the current recap
   const currentRecapTasks = currentRecap
     ? callTasks.filter((task) => task.source_id === currentRecap.communication_id)
     : [];
+
+  // Check if current recap is user's own call
+  const isUserCall = currentRecap?.caller_user_id === currentUserId;
 
   // Don't render if nothing to show
   if (!isEligibleUser || (pendingRecaps.length === 0 && callTasks.length === 0)) {
@@ -311,23 +321,23 @@ export function CallRecapModal() {
       if (currentRecap) {
         sendRecap({ recapId: currentRecap.id, subject, emailBody: body });
         // Move to next recap or close
-        if (activeRecapIndex < pendingRecaps.length - 1) {
+        if (activeRecapIndex < displayedRecaps.length - 1) {
           setActiveRecapIndex((prev) => prev + 1);
         }
       }
     },
-    [currentRecap, sendRecap, activeRecapIndex, pendingRecaps.length]
+    [currentRecap, sendRecap, activeRecapIndex, displayedRecaps.length]
   );
 
   const handleDismiss = useCallback(() => {
     if (currentRecap) {
       dismissRecap({ recapId: currentRecap.id });
       // Move to next recap or close
-      if (activeRecapIndex < pendingRecaps.length - 1) {
+      if (activeRecapIndex < displayedRecaps.length - 1) {
         setActiveRecapIndex((prev) => prev + 1);
       }
     }
-  }, [currentRecap, dismissRecap, activeRecapIndex, pendingRecaps.length]);
+  }, [currentRecap, dismissRecap, activeRecapIndex, displayedRecaps.length]);
 
   const handleApproveTask = useCallback(
     (id: string) => {
@@ -356,16 +366,21 @@ export function CallRecapModal() {
               <Phone className="h-5 w-5 text-primary" />
             </div>
             <div>
-              <DialogTitle>
-                {pendingRecaps.length > 0
-                  ? `Call${pendingRecaps.length > 1 ? "s" : ""} to Review`
+              <DialogTitle className="flex items-center gap-2">
+                {displayedRecaps.length > 0
+                  ? `Call${displayedRecaps.length > 1 ? "s" : ""} to Review`
                   : "Tasks from Calls"}
+                {userRecaps.length > 0 && (
+                  <Badge variant="default" className="text-xs">
+                    {userRecaps.length} Your Calls
+                  </Badge>
+                )}
               </DialogTitle>
               <DialogDescription>
-                {pendingRecaps.length > 0
-                  ? `${pendingRecaps.length} call recap${pendingRecaps.length > 1 ? "s" : ""} ready to send`
+                {displayedRecaps.length > 0
+                  ? `${displayedRecaps.length} call recap${displayedRecaps.length > 1 ? "s" : ""} ready to send`
                   : `${callTasks.length} task${callTasks.length !== 1 ? "s" : ""} detected`}
-                {callTasks.length > 0 && pendingRecaps.length > 0 && ` • ${callTasks.length} tasks detected`}
+                {callTasks.length > 0 && displayedRecaps.length > 0 && ` • ${callTasks.length} tasks detected`}
               </DialogDescription>
             </div>
           </div>
@@ -376,9 +391,9 @@ export function CallRecapModal() {
             <TabsTrigger value="recap" className="flex items-center gap-2">
               <Mail className="h-4 w-4" />
               Recap Email
-              {pendingRecaps.length > 0 && (
+              {displayedRecaps.length > 0 && (
                 <Badge variant="secondary" className="ml-1">
-                  {pendingRecaps.length}
+                  {displayedRecaps.length}
                 </Badge>
               )}
             </TabsTrigger>
@@ -393,16 +408,38 @@ export function CallRecapModal() {
             </TabsTrigger>
           </TabsList>
 
-          <ScrollArea className="flex-1 mt-4">
+          {/* Toggle for showing all recaps vs just user's */}
+          {teamRecaps.length > 0 && userRecaps.length > 0 && (
+            <div className="flex justify-end mt-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowAllRecaps(!showAllRecaps)}
+              >
+                <User className="h-4 w-4 mr-1" />
+                {showAllRecaps ? "Show My Calls" : `Show All (${pendingRecaps.length})`}
+              </Button>
+            </div>
+          )}
+
+          <ScrollArea className="flex-1 mt-2">
             <TabsContent value="recap" className="m-0">
               {currentRecap ? (
-                <RecapEditor
-                  recap={currentRecap}
-                  onSend={handleSend}
-                  onDismiss={handleDismiss}
-                  isSending={isSending}
-                  isDismissing={isDismissing}
-                />
+                <div className="space-y-2">
+                  {!isUserCall && currentRecap.caller_user_id && (
+                    <div className="flex items-center gap-2 p-2 rounded-lg bg-muted/50 text-xs text-muted-foreground">
+                      <User className="h-3 w-3" />
+                      <span>This call was made by another team member</span>
+                    </div>
+                  )}
+                  <RecapEditor
+                    recap={currentRecap}
+                    onSend={handleSend}
+                    onDismiss={handleDismiss}
+                    isSending={isSending}
+                    isDismissing={isDismissing}
+                  />
+                </div>
               ) : (
                 <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
                   <Mail className="h-12 w-12 mb-4 opacity-50" />
@@ -442,19 +479,20 @@ export function CallRecapModal() {
         </Tabs>
 
         {/* Pagination for multiple recaps */}
-        {pendingRecaps.length > 1 && (
+        {displayedRecaps.length > 1 && (
           <div className="flex items-center justify-center gap-2 pt-4 border-t">
             <span className="text-sm text-muted-foreground">
-              {activeRecapIndex + 1} of {pendingRecaps.length} recaps
+              {activeRecapIndex + 1} of {displayedRecaps.length} recaps
             </span>
             <div className="flex gap-1">
-              {pendingRecaps.map((_, idx) => (
+              {displayedRecaps.map((recap, idx) => (
                 <button
-                  key={idx}
+                  key={recap.id}
                   onClick={() => setActiveRecapIndex(idx)}
                   className={`w-2 h-2 rounded-full transition-colors ${
                     idx === activeRecapIndex ? "bg-primary" : "bg-muted"
-                  }`}
+                  } ${recap.caller_user_id === currentUserId ? "ring-1 ring-primary" : ""}`}
+                  title={recap.caller_user_id === currentUserId ? "Your call" : "Team call"}
                 />
               ))}
             </div>
