@@ -102,19 +102,46 @@ serve(async (req) => {
         const senderName = fromMatch[1]?.replace(/"/g, '').trim() || from;
         const senderEmail = fromMatch[2]?.trim() || from;
 
-        // Get email body
-        let body = '';
-        if (emailData.payload.body?.data) {
-          body = atob(emailData.payload.body.data.replace(/-/g, '+').replace(/_/g, '/'));
-        } else if (emailData.payload.parts) {
-          const textPart = emailData.payload.parts.find((p: any) => p.mimeType === 'text/plain');
-          if (textPart?.body?.data) {
-            body = atob(textPart.body.data.replace(/-/g, '+').replace(/_/g, '/'));
+        // Get email body - prefer HTML for proper display
+        let bodyText = '';
+        let bodyHtml = '';
+        
+        const extractBody = (payload: any): { text: string; html: string } => {
+          let text = '';
+          let html = '';
+          
+          if (payload.body?.data) {
+            const decoded = atob(payload.body.data.replace(/-/g, '+').replace(/_/g, '/'));
+            if (payload.mimeType === 'text/html') {
+              html = decoded;
+            } else {
+              text = decoded;
+            }
           }
-        }
-
-        // Clean up body - remove excessive whitespace
-        body = body.replace(/\r\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+          
+          if (payload.parts) {
+            for (const part of payload.parts) {
+              if (part.mimeType === 'text/plain' && part.body?.data) {
+                text = atob(part.body.data.replace(/-/g, '+').replace(/_/g, '/'));
+              }
+              if (part.mimeType === 'text/html' && part.body?.data) {
+                html = atob(part.body.data.replace(/-/g, '+').replace(/_/g, '/'));
+              }
+              // Handle multipart/alternative
+              if (part.parts) {
+                const nested = extractBody(part);
+                if (nested.text) text = nested.text;
+                if (nested.html) html = nested.html;
+              }
+            }
+          }
+          
+          return { text, html };
+        };
+        
+        const extracted = extractBody(emailData.payload);
+        bodyText = extracted.text;
+        bodyHtml = extracted.html;
 
         emails.push({
           id: msg.id,
@@ -124,7 +151,8 @@ serve(async (req) => {
           fromName: senderName,
           to,
           date: new Date(dateStr).toISOString(),
-          body: body.substring(0, 2000), // Limit body size
+          body: bodyText.substring(0, 3000),
+          bodyHtml: bodyHtml, // Full HTML for display
           snippet: emailData.snippet,
           labelIds: emailData.labelIds || [],
         });

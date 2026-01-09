@@ -27,7 +27,6 @@ serve(async (req) => {
     // Fetch previous email communications with this contact
     let emailHistory: any[] = [];
     
-    // Get from lead_communications if we have emails there
     const { data: leadComms } = await supabase
       .from("lead_communications")
       .select("direction, subject, body, created_at, leads!inner(email)")
@@ -46,43 +45,117 @@ serve(async (req) => {
         }));
     }
 
-    // Build context from email history
+    // Fetch property owner info and their properties
+    const { data: ownerData } = await supabase
+      .from("property_owners")
+      .select(`
+        id, name, email, phone,
+        properties (
+          id, name, address, status, property_type,
+          onboarding_projects (
+            id, status, progress_percentage, current_phase
+          )
+        )
+      `)
+      .ilike("email", `%${contactEmail?.split('@')[0]}%`)
+      .limit(1)
+      .maybeSingle();
+
+    // Fetch lead info
+    const { data: leadData } = await supabase
+      .from("leads")
+      .select("id, name, email, phone, status, property_address, notes, property_type")
+      .ilike("email", `%${contactEmail?.split('@')[0]}%`)
+      .limit(1)
+      .maybeSingle();
+
+    // Build context
     const historyContext = emailHistory.length > 0 
       ? emailHistory.map(e => 
           `[${e.direction === 'outbound' ? 'SENT' : 'RECEIVED'}] Subject: ${e.subject}\n${e.body}`
         ).join('\n\n---\n\n')
-      : 'No previous email history with this contact.';
+      : '';
 
-    const systemPrompt = `You are a professional email assistant for PeachHaus Group, a property management company in Atlanta, Georgia.
+    // Build property/owner context
+    let propertyContext = '';
+    let isOwner = false;
+    
+    if (ownerData) {
+      isOwner = true;
+      propertyContext = `\n\nCONTACT STATUS: This is an existing property owner.`;
+      
+      if (ownerData.properties && ownerData.properties.length > 0) {
+        const props = ownerData.properties as any[];
+        propertyContext += `\n\nPROPERTIES THEY OWN:`;
+        for (const prop of props) {
+          propertyContext += `\n- ${prop.name || prop.address} (Status: ${prop.status || 'Active'})`;
+          if (prop.onboarding_projects && prop.onboarding_projects.length > 0) {
+            const project = prop.onboarding_projects[0];
+            propertyContext += `\n  Onboarding: ${project.status} - ${project.progress_percentage || 0}% complete, Phase: ${project.current_phase || 'Unknown'}`;
+            
+            // Determine what they need to do next based on onboarding status
+            if (project.status === 'in_progress') {
+              propertyContext += `\n  IMPORTANT: They are actively onboarding. Check what documents/items are still pending before suggesting they complete onboarding.`;
+            } else if (project.status === 'completed') {
+              propertyContext += `\n  Their onboarding is COMPLETE - do NOT suggest completing onboarding forms.`;
+            }
+          }
+        }
+      }
+    } else if (leadData) {
+      propertyContext = `\n\nCONTACT STATUS: This is a lead (potential client).`;
+      propertyContext += `\nLead Status: ${leadData.status || 'New'}`;
+      if (leadData.property_address) {
+        propertyContext += `\nProperty of Interest: ${leadData.property_address}`;
+      }
+      if (leadData.notes) {
+        propertyContext += `\nNotes: ${leadData.notes}`;
+      }
+    }
 
-Your task is to draft a professional, warm, and helpful email reply.
+    const systemPrompt = `You are a professional email assistant for PeachHaus Group, a premium property management company in Atlanta, Georgia.
 
-Guidelines:
-- Be professional but friendly
-- Keep responses concise and to the point
-- Focus on being helpful and addressing their needs
-- Use a conversational yet professional tone
+Your task is to draft a polished, professional, and warm email reply.
+
+CRITICAL GUIDELINES:
+- Write in a highly professional yet personable tone
+- Be thorough and detailed - aim for 4-6 paragraphs for owners, 3-4 for leads
+- Address their specific inquiry or concern directly
+- Show genuine care and attention to their needs
+- Use proper business email formatting
 - Don't include a signature (it will be added automatically)
-- Don't include greeting like "Dear" - start with "Hi [FirstName],"
-- End with "Best regards" or similar
+- Start with "Hi [FirstName]," 
+- End with "Best regards" or "Warm regards"
 
-About PeachHaus Group:
-- Property management company specializing in short-term and mid-term rentals
-- Based in Atlanta, Georgia
-- Known for personalized service and attention to detail`;
+${isOwner ? `IMPORTANT - This is a PROPERTY OWNER:
+- Be extra attentive and service-oriented
+- They are a valued client - treat them accordingly
+- Reference their specific property/situation when relevant
+- Be proactive in offering assistance
+- If they completed an onboarding step, acknowledge it and guide them to the NEXT step
+- DO NOT suggest completing tasks they have already done` : `This is a LEAD (potential client):
+- Be welcoming and informative
+- Focus on the value PeachHaus provides
+- Encourage next steps in the sales process`}
+
+ABOUT PEACHHAUS GROUP:
+- Premium property management specializing in short-term and mid-term rentals
+- Based in Atlanta, Georgia  
+- Known for white-glove service and attention to detail
+- We handle everything: marketing, guest communication, maintenance, cleaning, owner reporting`;
 
     const userPrompt = `Contact: ${contactName} (${contactEmail})
 ${currentSubject ? `Subject: ${currentSubject}` : ''}
+${propertyContext}
 
-${incomingEmailBody ? `Email they sent:
-${incomingEmailBody}` : ''}
+${incomingEmailBody ? `EMAIL THEY SENT:
+${incomingEmailBody.substring(0, 2000)}` : ''}
 
-Previous email history with this contact:
-${historyContext}
+${historyContext ? `PREVIOUS EMAIL HISTORY:\n${historyContext}` : 'No previous email history.'}
 
-Please draft a professional reply email. Start with "Hi ${contactName?.split(' ')[0] || 'there'},"`;
+Please draft a professional, detailed reply. Be thorough and address all points they raised. Start with "Hi ${contactName?.split(' ')[0] || 'there'},"`;
 
-    console.log("Generating AI email suggestion for:", contactEmail);
+    console.log("Generating AI email suggestion for:", contactEmail, "isOwner:", isOwner);
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -96,7 +169,7 @@ Please draft a professional reply email. Start with "Hi ${contactName?.split(' '
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
         ],
-        max_tokens: 500,
+        max_tokens: 1000,
       }),
     });
 
@@ -121,13 +194,14 @@ Please draft a professional reply email. Start with "Hi ${contactName?.split(' '
     const data = await response.json();
     const suggestedReply = data.choices?.[0]?.message?.content || "";
 
-    console.log("Generated suggestion successfully");
+    console.log("Generated suggestion successfully, isOwner:", isOwner);
 
     return new Response(
       JSON.stringify({ 
         success: true, 
         suggestion: suggestedReply,
-        emailHistory: emailHistory.length 
+        emailHistory: emailHistory.length,
+        isOwner 
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
