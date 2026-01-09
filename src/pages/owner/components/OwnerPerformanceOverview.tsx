@@ -31,6 +31,7 @@ interface PerformanceMetrics {
   occupancyRate: number;
   averageRating: number | null;
   reviewCount: number;
+  rentalType?: string; // "hybrid" | "mid_term" | "long_term"
 }
 
 interface MtrBreakdownItem {
@@ -68,15 +69,21 @@ interface OwnerPerformanceOverviewProps {
   metrics: PerformanceMetrics;
   propertyName?: string;
   revenueBreakdown?: RevenueBreakdown;
+  rentalType?: string; // Passed from parent for display logic
 }
 
-export function OwnerPerformanceOverview({ metrics, propertyName, revenueBreakdown }: OwnerPerformanceOverviewProps) {
+export function OwnerPerformanceOverview({ metrics, propertyName, revenueBreakdown, rentalType }: OwnerPerformanceOverviewProps) {
   const [showTotalRevenueModal, setShowTotalRevenueModal] = useState(false);
   const [showOccupancyModal, setShowOccupancyModal] = useState(false);
   const [showBookingsModal, setShowBookingsModal] = useState(false);
   const [showRatingModal, setShowRatingModal] = useState(false);
   const [showMtrModal, setShowMtrModal] = useState(false);
   const [showStrModal, setShowStrModal] = useState(false);
+
+  // Determine if property is mid-term only (no STR section needed)
+  const effectiveRentalType = rentalType || metrics.rentalType;
+  const isMidTermOnly = effectiveRentalType === 'mid_term' || effectiveRentalType === 'long_term';
+  const isHybrid = effectiveRentalType === 'hybrid' || !effectiveRentalType;
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-US", {
@@ -225,49 +232,53 @@ export function OwnerPerformanceOverview({ metrics, propertyName, revenueBreakdo
         </Card>
       </div>
 
-      {/* Revenue Breakdown - Clickable */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card 
-          className="border-none shadow-lg cursor-pointer hover:shadow-xl transition-shadow group"
-          onClick={() => setShowStrModal(true)}
-        >
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-lg bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center">
-                <Building2 className="h-5 w-5 text-orange-600" />
-              </div>
-              <div className="flex-1">
-                <p className="font-semibold">Short-Term Rental Revenue</p>
-                <p className="text-xs text-muted-foreground">Nightly bookings via Airbnb, VRBO, etc.</p>
-              </div>
-              <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:text-foreground transition-colors" />
-            </div>
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Total STR Revenue</span>
-                <span className="font-semibold font-mono">{formatCurrency(metrics.strRevenue)}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">STR Bookings</span>
-                <span className="font-semibold">{metrics.strBookings}</span>
-              </div>
-              {metrics.strBookings > 0 && (
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Avg per Booking</span>
-                  <span className="font-semibold font-mono">
-                    {formatCurrency(metrics.strRevenue / metrics.strBookings)}
-                  </span>
+      {/* Revenue Breakdown - Conditional based on rental type */}
+      <div className={`grid grid-cols-1 ${isHybrid ? 'md:grid-cols-2' : ''} gap-4`}>
+        {/* STR Card - Only show for hybrid properties */}
+        {isHybrid && (
+          <Card 
+            className="border-none shadow-lg cursor-pointer hover:shadow-xl transition-shadow group"
+            onClick={() => setShowStrModal(true)}
+          >
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-lg bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center">
+                  <Building2 className="h-5 w-5 text-orange-600" />
                 </div>
-              )}
-            </div>
-            <div className="mt-4 pt-3 border-t border-border/50">
-              <p className="text-xs text-muted-foreground flex items-center gap-1">
-                <Info className="h-3 w-3" /> Click for detailed breakdown
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+                <div className="flex-1">
+                  <p className="font-semibold">Short-Term Rental Revenue</p>
+                  <p className="text-xs text-muted-foreground">Nightly bookings via Airbnb, VRBO, etc.</p>
+                </div>
+                <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:text-foreground transition-colors" />
+              </div>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Total STR Revenue</span>
+                  <span className="font-semibold font-mono">{formatCurrency(metrics.strRevenue)}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">STR Bookings</span>
+                  <span className="font-semibold">{metrics.strBookings}</span>
+                </div>
+                {metrics.strBookings > 0 && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Avg per Booking</span>
+                    <span className="font-semibold font-mono">
+                      {formatCurrency(metrics.strRevenue / metrics.strBookings)}
+                    </span>
+                  </div>
+                )}
+              </div>
+              <div className="mt-4 pt-3 border-t border-border/50">
+                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Info className="h-3 w-3" /> Click for detailed breakdown
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
+        {/* MTR Card - Always show, but with different label for mid-term only properties */}
         <Card 
           className="border-none shadow-lg cursor-pointer hover:shadow-xl transition-shadow group"
           onClick={() => setShowMtrModal(true)}
@@ -278,23 +289,31 @@ export function OwnerPerformanceOverview({ metrics, propertyName, revenueBreakdo
                 <Calendar className="h-5 w-5 text-indigo-600" />
               </div>
               <div className="flex-1">
-                <p className="font-semibold">Mid-Term Rental Revenue</p>
-                <p className="text-xs text-muted-foreground">Monthly stays (30+ nights)</p>
+                <p className="font-semibold">
+                  {isMidTermOnly ? 'Total Rental Revenue' : 'Mid-Term Rental Revenue'}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {isMidTermOnly ? 'All bookings (30+ day stays)' : 'Monthly stays (30+ nights)'}
+                </p>
               </div>
               <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:text-foreground transition-colors" />
             </div>
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">Total MTR Revenue</span>
+                <span className="text-sm text-muted-foreground">
+                  {isMidTermOnly ? 'Total Revenue' : 'Total MTR Revenue'}
+                </span>
                 <span className="font-semibold font-mono">{formatCurrency(metrics.mtrRevenue)}</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">MTR Bookings</span>
+                <span className="text-sm text-muted-foreground">
+                  {isMidTermOnly ? 'Total Bookings' : 'MTR Bookings'}
+                </span>
                 <span className="font-semibold">{metrics.mtrBookings}</span>
               </div>
               {metrics.mtrBookings > 0 && (
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Avg Monthly Rate</span>
+                  <span className="text-sm text-muted-foreground">Avg per Booking</span>
                   <span className="font-semibold font-mono">
                     {formatCurrency(metrics.mtrRevenue / metrics.mtrBookings)}
                   </span>
@@ -333,18 +352,28 @@ export function OwnerPerformanceOverview({ metrics, propertyName, revenueBreakdo
                   <p className="text-4xl font-bold text-emerald-700 dark:text-emerald-400">{formatCurrency(metrics.totalRevenue)}</p>
                 </div>
                 <Separator className="my-4" />
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="text-center p-3 bg-white/50 dark:bg-black/20 rounded-lg">
-                    <Building2 className="h-5 w-5 mx-auto text-orange-600 mb-1" />
-                    <p className="text-xs text-muted-foreground">Short-Term Rentals</p>
-                    <p className="font-bold text-lg">{formatCurrency(metrics.strRevenue)}</p>
-                  </div>
+                {isMidTermOnly ? (
+                  // Mid-term only properties: Show single revenue card
                   <div className="text-center p-3 bg-white/50 dark:bg-black/20 rounded-lg">
                     <Calendar className="h-5 w-5 mx-auto text-indigo-600 mb-1" />
-                    <p className="text-xs text-muted-foreground">Mid-Term Rentals</p>
+                    <p className="text-xs text-muted-foreground">All Rental Revenue</p>
                     <p className="font-bold text-lg">{formatCurrency(metrics.mtrRevenue)}</p>
                   </div>
-                </div>
+                ) : (
+                  // Hybrid properties: Show STR and MTR separately
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="text-center p-3 bg-white/50 dark:bg-black/20 rounded-lg">
+                      <Building2 className="h-5 w-5 mx-auto text-orange-600 mb-1" />
+                      <p className="text-xs text-muted-foreground">Short-Term Rentals</p>
+                      <p className="font-bold text-lg">{formatCurrency(metrics.strRevenue)}</p>
+                    </div>
+                    <div className="text-center p-3 bg-white/50 dark:bg-black/20 rounded-lg">
+                      <Calendar className="h-5 w-5 mx-auto text-indigo-600 mb-1" />
+                      <p className="text-xs text-muted-foreground">Mid-Term Rentals</p>
+                      <p className="font-bold text-lg">{formatCurrency(metrics.mtrRevenue)}</p>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Calculation Explanation */}
@@ -354,24 +383,40 @@ export function OwnerPerformanceOverview({ metrics, propertyName, revenueBreakdo
                   How We Calculate This
                 </h4>
                 <div className="bg-muted/30 rounded-lg p-4 space-y-3 text-sm">
-                  <div className="flex items-start gap-3">
-                    <div className="w-6 h-6 rounded-full bg-orange-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-                      <span className="text-xs font-bold text-orange-600">1</span>
+                  {isMidTermOnly ? (
+                    // Mid-term only explanation
+                    <div className="flex items-start gap-3">
+                      <div className="w-6 h-6 rounded-full bg-indigo-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <span className="text-xs font-bold text-indigo-600">1</span>
+                      </div>
+                      <div>
+                        <p className="font-medium">Total Rental Revenue = {formatCurrency(metrics.mtrRevenue)}</p>
+                        <p className="text-muted-foreground">Sum of {metrics.mtrBookings} booking(s) from all platforms (30+ day stays)</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-medium">Short-Term Rental Revenue = {formatCurrency(metrics.strRevenue)}</p>
-                      <p className="text-muted-foreground">Sum of {metrics.strBookings} bookings from platforms like Airbnb and VRBO</p>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-3">
-                    <div className="w-6 h-6 rounded-full bg-indigo-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-                      <span className="text-xs font-bold text-indigo-600">2</span>
-                    </div>
-                    <div>
-                      <p className="font-medium">Mid-Term Rental Revenue = {formatCurrency(metrics.mtrRevenue)}</p>
-                      <p className="text-muted-foreground">Monthly rent from {metrics.mtrBookings} long-term tenant(s)</p>
-                    </div>
-                  </div>
+                  ) : (
+                    // Hybrid explanation
+                    <>
+                      <div className="flex items-start gap-3">
+                        <div className="w-6 h-6 rounded-full bg-orange-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                          <span className="text-xs font-bold text-orange-600">1</span>
+                        </div>
+                        <div>
+                          <p className="font-medium">Short-Term Rental Revenue = {formatCurrency(metrics.strRevenue)}</p>
+                          <p className="text-muted-foreground">Sum of {metrics.strBookings} bookings from platforms like Airbnb and VRBO</p>
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-3">
+                        <div className="w-6 h-6 rounded-full bg-indigo-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                          <span className="text-xs font-bold text-indigo-600">2</span>
+                        </div>
+                        <div>
+                          <p className="font-medium">Mid-Term Rental Revenue = {formatCurrency(metrics.mtrRevenue)}</p>
+                          <p className="text-muted-foreground">Monthly rent from {metrics.mtrBookings} long-term tenant(s)</p>
+                        </div>
+                      </div>
+                    </>
+                  )}
                   <Separator />
                   <div className="flex items-center justify-between font-semibold text-base pt-1">
                     <span>Total Revenue</span>

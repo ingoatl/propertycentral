@@ -324,10 +324,19 @@ serve(async (req: Request): Promise<Response> => {
     );
 
     // Calculate performance metrics from actual data
+    // IMPORTANT: Respect property rental_type classification
+    // - "mid_term" properties: ALL revenue is MTR (even Airbnb 30+ day stays)
+    // - "long_term" properties: ALL revenue is MTR
+    // - "hybrid" properties: STR and MTR are tracked separately
+    const isMidTermOnly = property.rental_type === 'mid_term' || property.rental_type === 'long_term';
+    console.log(`Property rental_type: ${property.rental_type}, isMidTermOnly: ${isMidTermOnly}`);
+    
     // STR revenue: from reconciliation data (most accurate), fallback to bookings
     const totalSTRFromRecon = statements.reduce((sum, s) => sum + (s.short_term_revenue || 0), 0);
     const calculatedSTRRevenue = validSTRBookings.reduce((sum, b) => sum + (b.total_amount || 0), 0);
-    const strRevenue = totalSTRFromRecon > 0 ? totalSTRFromRecon : calculatedSTRRevenue;
+    
+    // For mid_term/long_term properties, ALL booking revenue is classified as MTR
+    const strRevenue = isMidTermOnly ? 0 : (totalSTRFromRecon > 0 ? totalSTRFromRecon : calculatedSTRRevenue);
 
     // MTR revenue: Use statement data for months with statements (most accurate after reconciliation)
     // For future months without statements, calculate from bookings
@@ -479,8 +488,10 @@ serve(async (req: Request): Promise<Response> => {
       });
     }
     
-    const mtrRevenue = mtrFromStatements + mtrFromFutureBookings;
-    console.log(`MTR revenue: from statements=$${mtrFromStatements.toFixed(2)}, from future bookings=$${mtrFromFutureBookings.toFixed(2)}, total=$${mtrRevenue.toFixed(2)}`);
+    // For mid_term/long_term properties, include ALL STR bookings as MTR revenue
+    const strRevenueAsMtr = isMidTermOnly ? (totalSTRFromRecon > 0 ? totalSTRFromRecon : calculatedSTRRevenue) : 0;
+    const mtrRevenue = mtrFromStatements + mtrFromFutureBookings + strRevenueAsMtr;
+    console.log(`MTR revenue: from statements=$${mtrFromStatements.toFixed(2)}, from future bookings=$${mtrFromFutureBookings.toFixed(2)}, STR as MTR=$${strRevenueAsMtr.toFixed(2)}, total=$${mtrRevenue.toFixed(2)}`);
     
     // Total revenue is STR + MTR
     const totalRevenue = strRevenue + mtrRevenue;
@@ -645,16 +656,18 @@ serve(async (req: Request): Promise<Response> => {
       }));
 
     // Build performance object - use allSTRBookings for counts, validSTRBookings for revenue
+    // For mid_term/long_term properties, classify ALL bookings as MTR
     const performance = {
       totalRevenue,
       strRevenue,
       mtrRevenue,
       totalBookings: allSTRBookings.length + mtrBookings.length,
-      strBookings: allSTRBookings.length,
-      mtrBookings: mtrBookings.length,
+      strBookings: isMidTermOnly ? 0 : allSTRBookings.length,
+      mtrBookings: isMidTermOnly ? (allSTRBookings.length + mtrBookings.length) : mtrBookings.length,
       occupancyRate,
       averageRating,
       reviewCount: reviews.length,
+      rentalType: property.rental_type, // Include for frontend display logic
     };
 
     console.log("Performance metrics calculated:", performance);
