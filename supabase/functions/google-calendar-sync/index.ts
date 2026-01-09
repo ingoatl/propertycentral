@@ -821,6 +821,55 @@ serve(async (req) => {
       );
     }
 
+    // Create a direct calendar event (not tied to discovery calls)
+    if (action === "create-event-direct") {
+      const { summary, description, startTime, endTime, attendeeEmail } = body;
+
+      const hasConnection = await hasGoogleCalendarConnection(userId);
+      if (!hasConnection) {
+        throw new Error("Google Calendar not connected. Please connect your calendar first.");
+      }
+
+      const accessToken = await getPipedreamAccessToken();
+      
+      console.log(`Creating direct calendar event: "${summary}" with attendee ${attendeeEmail}`);
+      
+      const result = await callMCPTool(
+        accessToken,
+        userId,
+        "google_calendar-create-event",
+        {
+          calendarId: "primary",
+          summary: summary,
+          description: description || "",
+          start: {
+            dateTime: startTime,
+            timeZone: "America/New_York",
+          },
+          end: {
+            dateTime: endTime,
+            timeZone: "America/New_York",
+          },
+          attendees: attendeeEmail ? [{ email: attendeeEmail }] : [],
+          sendUpdates: "all",
+          guestsCanModify: false,
+          guestsCanInviteOthers: false,
+          instruction: `Create a Google Calendar event titled "${summary}" starting at ${startTime} (America/New_York timezone). ${attendeeEmail ? `Add ${attendeeEmail} as an attendee and SEND THEM AN EMAIL INVITATION by setting sendUpdates to "all".` : ""} The event should be on the primary calendar.`
+        }
+      );
+
+      console.log("MCP create-event-direct result:", JSON.stringify(result).substring(0, 500));
+
+      const eventId = result?.result?.content?.[0]?.text || 
+                      result?.content?.[0]?.text || 
+                      result?.id || 
+                      `mcp-event-${Date.now()}`;
+
+      return new Response(JSON.stringify({ success: true, eventId }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     // Disconnect Google Calendar
     if (action === "disconnect") {
       await deleteUserAccount(userId);
