@@ -25,36 +25,48 @@ interface EmailRequest {
 // Team signatures based on email
 const SIGNATURES: Record<string, string> = {
   "ingo@peachhausgroup.com": `
-<table cellpadding="0" cellspacing="0" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 14px; color: #333;">
+<table cellpadding="0" cellspacing="0" style="font-family: Arial, sans-serif; font-size: 14px; color: #333;">
   <tr>
-    <td style="padding-top: 20px; border-top: 2px solid #e5a653;">
-      <strong style="font-size: 16px; color: #333;">INGO SCHAER</strong><br/>
-      <span style="color: #666; font-size: 12px;">CO-FOUNDER, OPERATIONS</span><br/>
-      <span style="font-weight: 600; color: #e5a653;">PEACHHAUS GROUP LLC</span>
-    </td>
-  </tr>
-  <tr>
-    <td style="padding-top: 12px; font-size: 13px; color: #666;">
-      <strong>website</strong> <a href="https://www.peachhausgroup.com" style="color: #e5a653; text-decoration: none;">www.peachhausgroup.com</a><br/>
-      <strong>phone</strong> (404) 800-5932<br/>
-      <strong>email</strong> <a href="mailto:ingo@peachhausgroup.com" style="color: #e5a653; text-decoration: none;">ingo@peachhausgroup.com</a>
+    <td style="padding: 20px 0; vertical-align: top;">
+      <table cellpadding="0" cellspacing="0">
+        <tr>
+          <td style="padding-right: 15px; border-right: 2px solid #e5a653; vertical-align: top;">
+            <img src="https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/assets/ingo-signature-photo.png" alt="Ingo Schaer" width="100" style="border-radius: 50%; display: block;" />
+            <img src="https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/assets/ingo-signature.png" alt="Signature" width="100" style="display: block; margin-top: 10px;" />
+          </td>
+          <td style="padding-left: 15px; vertical-align: top;">
+            <p style="margin: 0; font-size: 18px; font-weight: bold; color: #333;">Ingo Schaer</p>
+            <p style="margin: 4px 0 0; font-size: 13px; color: #666;">Co-Founder, Operations Manager</p>
+            <p style="margin: 4px 0 0; font-size: 13px; font-weight: 600; color: #333;">PeachHaus Group LLC</p>
+            <p style="margin: 10px 0 0; font-size: 13px; color: #666;">(404) 800-5932</p>
+            <p style="margin: 4px 0 0;"><a href="mailto:ingo@peachhausgroup.com" style="font-size: 13px; color: #1a73e8; text-decoration: none;">ingo@peachhausgroup.com</a></p>
+            <p style="margin: 4px 0 0;"><a href="https://propertycentral.lovable.app" style="font-size: 13px; color: #1a73e8; text-decoration: none;">propertycentral.lovable.app</a></p>
+          </td>
+        </tr>
+      </table>
     </td>
   </tr>
 </table>`,
   "anja@peachhausgroup.com": `
-<table cellpadding="0" cellspacing="0" style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 14px; color: #333;">
+<table cellpadding="0" cellspacing="0" style="font-family: Arial, sans-serif; font-size: 14px; color: #333;">
   <tr>
-    <td style="padding-top: 20px; border-top: 2px solid #e5a653;">
-      <strong style="font-size: 16px; color: #333;">ANJA SCHAER</strong><br/>
-      <span style="color: #666; font-size: 12px;">CO-FOUNDER, GA REAL ESTATE BROKER</span><br/>
-      <span style="font-weight: 600; color: #e5a653;">PEACHHAUS GROUP LLC</span>
-    </td>
-  </tr>
-  <tr>
-    <td style="padding-top: 12px; font-size: 13px; color: #666;">
-      <strong>website</strong> <a href="https://www.peachhausgroup.com" style="color: #e5a653; text-decoration: none;">www.peachhausgroup.com</a><br/>
-      <strong>phone</strong> (404) 800-5932<br/>
-      <strong>email</strong> <a href="mailto:anja@peachhausgroup.com" style="color: #e5a653; text-decoration: none;">anja@peachhausgroup.com</a>
+    <td style="padding: 20px 0; vertical-align: top;">
+      <table cellpadding="0" cellspacing="0">
+        <tr>
+          <td style="padding-right: 15px; border-right: 2px solid #e5a653; vertical-align: top;">
+            <img src="https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/assets/anja-signature-photo.png" alt="Anja Schaer" width="100" style="border-radius: 50%; display: block;" />
+            <img src="https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/assets/anja-signature.png" alt="Signature" width="100" style="display: block; margin-top: 10px;" />
+          </td>
+          <td style="padding-left: 15px; vertical-align: top;">
+            <p style="margin: 0; font-size: 18px; font-weight: bold; color: #333;">Anja Schaer</p>
+            <p style="margin: 4px 0 0; font-size: 13px; color: #666;">Co-Founder, GA Real Estate Broker</p>
+            <p style="margin: 4px 0 0; font-size: 13px; font-weight: 600; color: #333;">PeachHaus Group LLC</p>
+            <p style="margin: 10px 0 0; font-size: 13px; color: #666;">(404) 800-5932</p>
+            <p style="margin: 4px 0 0;"><a href="mailto:anja@peachhausgroup.com" style="font-size: 13px; color: #1a73e8; text-decoration: none;">anja@peachhausgroup.com</a></p>
+            <p style="margin: 4px 0 0;"><a href="https://propertycentral.lovable.app" style="font-size: 13px; color: #1a73e8; text-decoration: none;">propertycentral.lovable.app</a></p>
+          </td>
+        </tr>
+      </table>
     </td>
   </tr>
 </table>`,

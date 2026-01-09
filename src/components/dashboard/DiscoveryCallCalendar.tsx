@@ -10,8 +10,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
-  DialogFooter,
 } from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -38,6 +36,7 @@ import {
   Star,
   FileText,
   Loader2,
+  Mail,
 } from "lucide-react";
 import {
   format,
@@ -55,6 +54,7 @@ import {
 import { cn } from "@/lib/utils";
 import { PropertyPhotos } from "@/components/ui/property-photos";
 import { toast } from "sonner";
+import { SendEmailDialog } from "@/components/communications/SendEmailDialog";
 
 interface DiscoveryCall {
   id: string;
@@ -369,6 +369,7 @@ interface DiscoveryCallDetailModalProps {
 function DiscoveryCallDetailModal({ call, onClose }: DiscoveryCallDetailModalProps) {
   const [showCallConfirm, setShowCallConfirm] = useState(false);
   const [isCallingLead, setIsCallingLead] = useState(false);
+  const [showEmailDialog, setShowEmailDialog] = useState(false);
 
   if (!call) return null;
 
@@ -378,9 +379,14 @@ function DiscoveryCallDetailModal({ call, onClose }: DiscoveryCallDetailModalPro
   );
   const scheduledAt = new Date(call.scheduled_at);
 
-  // Use Google Maps static image for reliable map display
+  // Use Google Maps link
   const googleMapsLink = call.leads?.property_address
     ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(call.leads.property_address)}`
+    : null;
+
+  // Google Maps embed URL for iframe
+  const googleMapsEmbedUrl = call.leads?.property_address
+    ? `https://maps.google.com/maps?q=${encodeURIComponent(call.leads.property_address)}&t=&z=15&ie=UTF8&iwloc=&output=embed`
     : null;
 
   // Combine all notes
@@ -444,14 +450,14 @@ function DiscoveryCallDetailModal({ call, onClose }: DiscoveryCallDetailModalPro
           </DialogHeader>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-4">
-            {/* Property Photos & Map Section */}
-            <div className="space-y-3">
+            {/* Left Column - Property & Map */}
+            <div className="space-y-4">
               {/* Property Address - Prominent */}
               {call.leads?.property_address && (
                 <div className="p-4 rounded-lg bg-primary/5 border-2 border-primary/20">
                   <div className="flex items-start gap-3">
                     <MapPin className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-                    <div>
+                    <div className="flex-1">
                       <p className="font-semibold text-lg">{call.leads.property_address}</p>
                       <div className="flex gap-2 mt-2">
                         {googleMapsLink && (
@@ -493,46 +499,34 @@ function DiscoveryCallDetailModal({ call, onClose }: DiscoveryCallDetailModalPro
                 </div>
               )}
               
-              {/* Map - Simple Iframe Embed */}
+              {/* Map - Google Maps Embed */}
               <div>
                 <h3 className="font-semibold flex items-center gap-2 mb-2">
                   <MapPin className="h-4 w-4" />
                   Location
                 </h3>
-                {call.leads?.property_address ? (
-                  <div className="rounded-lg overflow-hidden border h-[200px]">
+                {googleMapsEmbedUrl ? (
+                  <div className="rounded-lg overflow-hidden border h-[280px]">
                     <iframe
                       width="100%"
                       height="100%"
                       style={{ border: 0 }}
                       loading="lazy"
+                      allowFullScreen
                       referrerPolicy="no-referrer-when-downgrade"
-                      src={`https://www.openstreetmap.org/export/embed.html?bbox=${encodeURIComponent(call.leads.property_address)}&layer=mapnik&marker=true`}
+                      src={googleMapsEmbedUrl}
                       title="Property Location"
-                      onError={(e) => {
-                        // Fallback to static image on error
-                        const target = e.target as HTMLIFrameElement;
-                        target.style.display = 'none';
-                        target.parentElement!.innerHTML = `
-                          <div class="h-full flex items-center justify-center bg-muted">
-                            <a href="${googleMapsLink}" target="_blank" rel="noopener noreferrer" class="text-primary hover:underline flex items-center gap-2">
-                              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
-                              Open in Google Maps
-                            </a>
-                          </div>
-                        `;
-                      }}
                     />
                   </div>
                 ) : (
-                  <div className="h-[200px] bg-muted rounded-lg flex items-center justify-center">
+                  <div className="h-[280px] bg-muted rounded-lg flex items-center justify-center">
                     <p className="text-muted-foreground">No address provided</p>
                   </div>
                 )}
               </div>
             </div>
 
-            {/* Call Details Section */}
+            {/* Right Column - Contact & Details */}
             <div className="space-y-4">
               {/* Score Card */}
               <div
@@ -558,39 +552,63 @@ function DiscoveryCallDetailModal({ call, onClose }: DiscoveryCallDetailModalPro
                 </div>
               </div>
 
-              {/* Contact Info */}
-              <div className="p-4 rounded-lg border space-y-3">
+              {/* Contact Info with Action Buttons */}
+              <div className="p-4 rounded-lg border space-y-4">
                 <h4 className="font-semibold flex items-center gap-2">
                   <User className="h-4 w-4" />
                   Contact Information
                 </h4>
-                <div className="grid grid-cols-2 gap-3 text-sm">
+                
+                {/* Name */}
+                <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-muted-foreground">Name</p>
-                    <p className="font-medium">{call.leads?.name || "N/A"}</p>
+                    <p className="text-sm text-muted-foreground">Name</p>
+                    <p className="font-semibold text-lg">{call.leads?.name || "N/A"}</p>
                   </div>
-                  <div>
-                    <p className="text-muted-foreground">Email</p>
-                    <p className="font-medium">{call.leads?.email || "N/A"}</p>
+                </div>
+
+                {/* Email with button */}
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">Email</p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-medium flex-1">{call.leads?.email || "N/A"}</p>
                   </div>
-                  <div>
-                    <p className="text-muted-foreground">Phone</p>
-                    {call.leads?.phone ? (
-                      <button
-                        onClick={() => setShowCallConfirm(true)}
-                        className="font-medium text-primary hover:underline cursor-pointer flex items-center gap-1"
-                      >
-                        <Phone className="h-3 w-3" />
-                        {call.leads.phone}
-                      </button>
-                    ) : (
-                      <p className="font-medium">N/A</p>
-                    )}
+                  {call.leads?.email && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full"
+                      onClick={() => setShowEmailDialog(true)}
+                    >
+                      <Mail className="h-4 w-4 mr-2" />
+                      Send Email
+                    </Button>
+                  )}
+                </div>
+
+                {/* Phone with button */}
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">Phone</p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-medium flex-1">{call.leads?.phone || "N/A"}</p>
                   </div>
-                  <div>
-                    <p className="text-muted-foreground">Duration</p>
-                    <p className="font-medium">{call.duration_minutes} minutes</p>
-                  </div>
+                  {call.leads?.phone && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full"
+                      onClick={() => setShowCallConfirm(true)}
+                    >
+                      <Phone className="h-4 w-4 mr-2" />
+                      Call Lead
+                    </Button>
+                  )}
+                </div>
+
+                {/* Duration */}
+                <div>
+                  <p className="text-sm text-muted-foreground">Duration</p>
+                  <p className="font-medium">{call.duration_minutes} minutes</p>
                 </div>
               </div>
 
@@ -702,6 +720,18 @@ function DiscoveryCallDetailModal({ call, onClose }: DiscoveryCallDetailModalPro
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Email Dialog */}
+      {call.leads?.email && call.leads?.id && (
+        <SendEmailDialog
+          open={showEmailDialog}
+          onOpenChange={setShowEmailDialog}
+          contactName={call.leads.name}
+          contactEmail={call.leads.email}
+          contactType="lead"
+          contactId={call.leads.id}
+        />
+      )}
     </>
   );
 }
