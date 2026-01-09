@@ -489,28 +489,20 @@ export function InboxView() {
   // Selected Gmail email state
   const [selectedGmailEmail, setSelectedGmailEmail] = useState<GmailEmail | null>(null);
 
-  // Mark email as read when selected
-  const handleSelectGmailEmail = async (email: GmailEmail) => {
+  // Mark email as read when selected (local only - Gmail modify scope not available)
+  const handleSelectGmailEmail = (email: GmailEmail) => {
     setSelectedGmailEmail(email);
     
-    // Mark as read if it's unread
+    // Update local state to remove UNREAD label (visual only)
     if (email.labelIds?.includes('UNREAD')) {
-      try {
-        await supabase.functions.invoke('mark-gmail-read', {
-          body: { messageId: email.id }
-        });
-        // Update local state to remove UNREAD label
-        queryClient.setQueryData(['gmail-inbox', activeTab], (old: GmailEmail[] | undefined) => {
-          if (!old) return old;
-          return old.map(e => 
-            e.id === email.id 
-              ? { ...e, labelIds: e.labelIds?.filter(l => l !== 'UNREAD') || [] }
-              : e
-          );
-        });
-      } catch (err) {
-        console.error('Failed to mark email as read:', err);
-      }
+      queryClient.setQueryData(['gmail-inbox', activeTab], (old: GmailEmail[] | undefined) => {
+        if (!old) return old;
+        return old.map(e => 
+          e.id === email.id 
+            ? { ...e, labelIds: e.labelIds?.filter(l => l !== 'UNREAD') || [] }
+            : e
+        );
+      });
     }
   };
 
