@@ -52,29 +52,29 @@ serve(async (req) => {
       console.error("Voice AI sync error:", errorText);
     }
 
-    // 2. Sync human phone calls and other conversations (SMS, Email)
-    console.log("Syncing human conversations...");
-    const conversationsResponse = await fetch(`${supabaseUrl}/functions/v1/ghl-sync-conversations`, {
+    // 2. Sync ALL human phone calls using new comprehensive sync
+    console.log("Syncing ALL human calls...");
+    const allCallsResponse = await fetch(`${supabaseUrl}/functions/v1/ghl-sync-all-calls`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${supabaseKey}`,
       },
       body: JSON.stringify({
-        limit: 200, // Increased limit to capture more calls including older ones
+        limit: 200,
       }),
     });
 
-    let conversationsResult = { syncedCount: 0, conversationsProcessed: 0 };
-    if (conversationsResponse.ok) {
-      conversationsResult = await conversationsResponse.json();
-      console.log("Conversations sync complete:", conversationsResult);
+    let allCallsResult = { syncedCount: 0, totalFound: 0 };
+    if (allCallsResponse.ok) {
+      allCallsResult = await allCallsResponse.json();
+      console.log("All calls sync complete:", allCallsResult);
     } else {
-      const errorText = await conversationsResponse.text();
-      console.error("Conversations sync error:", errorText);
+      const errorText = await allCallsResponse.text();
+      console.error("All calls sync error:", errorText);
     }
 
-    const totalSynced = (voiceAiResult.syncedCount || 0) + (conversationsResult.syncedCount || 0);
+    const totalSynced = (voiceAiResult.syncedCount || 0) + (allCallsResult.syncedCount || 0);
 
     return new Response(
       JSON.stringify({
