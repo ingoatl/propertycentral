@@ -27,8 +27,13 @@ serve(async (req) => {
   try {
     const { daysBack = 3 } = await req.json().catch(() => ({}));
     
-    // Fetch emails for both Ingo and Anja
-    const targetEmails = ['ingo@peachhausgroup.com', 'anja@peachhausgroup.com'];
+    // Fetch emails for both Ingo and Anja - include all known email variants
+    const targetEmails = [
+      'ingo@peachhausgroup.com', 
+      'anja@peachhausgroup.com',
+      'ingo@peachhg.com',
+      'anja@peachhg.com'
+    ];
     
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
@@ -159,9 +164,11 @@ serve(async (req) => {
         bodyText = extracted.text;
         bodyHtml = extracted.html;
 
-        // Determine which inbox this email is for
+        // Determine which inbox this email is for (check all email variants)
         const toLower = to.toLowerCase();
-        const targetInbox = toLower.includes('anja@') ? 'anja' : 'ingo';
+        const targetInbox = (toLower.includes('anja@peachhausgroup.com') || toLower.includes('anja@peachhg.com')) 
+          ? 'anja' 
+          : 'ingo';
 
         emails.push({
           id: msg.id,

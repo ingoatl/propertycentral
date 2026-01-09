@@ -568,12 +568,10 @@ export function InboxView() {
 
   // Mark email as read when selected (local only - Gmail modify scope not available)
   const handleSelectGmailEmail = (email: GmailEmail) => {
-    setSelectedGmailEmail(email);
-    // Removed auto-showing EmailActionModal - let users view email first
-    
-    // Update local state to remove UNREAD label (visual only)
+    // Update local state to remove UNREAD label FIRST (visual only)
     if (email.labelIds?.includes('UNREAD')) {
-      queryClient.setQueryData(['gmail-inbox', activeTab], (old: GmailEmail[] | undefined) => {
+      // Update the gmail-inbox query cache with correct key
+      queryClient.setQueryData(['gmail-inbox', 'emails'], (old: GmailEmail[] | undefined) => {
         if (!old) return old;
         return old.map(e => 
           e.id === email.id 
@@ -581,6 +579,10 @@ export function InboxView() {
             : e
         );
       });
+      // Set selected email with updated labelIds
+      setSelectedGmailEmail({ ...email, labelIds: email.labelIds?.filter(l => l !== 'UNREAD') || [] });
+    } else {
+      setSelectedGmailEmail(email);
     }
   };
 
@@ -839,26 +841,28 @@ export function InboxView() {
               </Badge>
             </div>
 
-            <ScrollArea className="flex-1 p-4">
-              <div className="max-w-3xl mx-auto space-y-4">
+            <ScrollArea className="flex-1">
+              <div className="p-4 max-w-3xl mx-auto space-y-4">
                 <div className="bg-background rounded-lg border overflow-hidden">
                   <div className="p-4 border-b bg-muted/30">
-                    <h2 className="font-semibold text-lg mb-2">{selectedGmailEmail.subject}</h2>
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <h2 className="font-semibold text-lg mb-2 break-words">{selectedGmailEmail.subject}</h2>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground flex-wrap">
                       <span>From: <strong>{selectedGmailEmail.fromName}</strong> &lt;{selectedGmailEmail.from}&gt;</span>
                     </div>
                   </div>
                   {selectedGmailEmail.bodyHtml ? (
                     <div 
-                      className="p-4 email-content prose prose-sm max-w-none dark:prose-invert"
+                      className="p-4 email-content prose prose-sm max-w-none dark:prose-invert overflow-x-auto"
                       dangerouslySetInnerHTML={{ __html: selectedGmailEmail.bodyHtml }}
                       style={{ 
                         fontSize: '14px',
                         lineHeight: '1.6',
+                        wordBreak: 'break-word',
+                        overflowWrap: 'break-word',
                       }}
                     />
                   ) : (
-                    <div className="p-4 text-sm whitespace-pre-wrap">
+                    <div className="p-4 text-sm whitespace-pre-wrap break-words">
                       {selectedGmailEmail.body}
                     </div>
                   )}
