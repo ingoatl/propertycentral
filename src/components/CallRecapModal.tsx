@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import {
   Dialog,
   DialogContent,
@@ -47,6 +47,8 @@ import {
   Trash2,
   Calendar,
   Check,
+  History,
+  Loader2,
 } from "lucide-react";
 import {
   Collapsible,
@@ -64,6 +66,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { TwilioCallDialog } from "@/components/TwilioCallDialog";
 import { createSmartGreeting, extractFirstName } from "@/lib/nameUtils";
+import { ConversationHistory, useConversationContext } from "@/components/communications/ConversationHistory";
 
 const sentimentConfig = {
   positive: { icon: ThumbsUp, color: "text-green-500", bg: "bg-green-100" },
@@ -178,31 +181,110 @@ function RecapEditor({
   const [isPreview, setIsPreview] = useState(false);
   const [showSMSInput, setShowSMSInput] = useState(false);
   const [showFollowUp, setShowFollowUp] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
   const [followUpDays, setFollowUpDays] = useState(3);
   const [followUpMethod, setFollowUpMethod] = useState<'sms' | 'email'>('sms');
+  const [isGeneratingSmart, setIsGeneratingSmart] = useState(false);
   
   // Use smart greeting utility to avoid "Hi Unknown"
   const firstName = extractFirstName(recap.recipient_name);
   const greeting = createSmartGreeting(recap.recipient_name);
   
-  // Generate smart SMS from call transcript
-  const generateSmsFromTranscript = () => {
+  // Get conversation context for smart follow-ups
+  const { data: conversationContext, isLoading: isLoadingContext } = useConversationContext(
+    recap.lead_id,
+    recap.owner_id
+  );
+  
+  // Generate smart SMS based on conversation history + call transcript
+  const generateSmsFromContext = useMemo(() => {
     const topics = recap.key_topics?.slice(0, 2).join(' and ') || 'your property';
     const summary = recap.transcript_summary?.slice(0, 80) || '';
+    
+    // Check if there are pending requests from previous conversations
+    if (conversationContext?.hasAskedForInfo) {
+      // Reference what we asked for
+      return `${greeting} just following up on our conversation. Please let me know if you had a chance to gather that information. Happy to help with any questions! - PeachHaus`;
+    }
+    
+    // Check last message context
+    if (conversationContext?.lastMessage?.body && conversationContext.lastMessage.direction === "inbound") {
+      const lastMsg = conversationContext.lastMessage.body.toLowerCase();
+      if (lastMsg.includes("address") || lastMsg.includes("income") || lastMsg.includes("report")) {
+        return `${greeting} got your message! I'll get that information over to you shortly. Is there anything else you need? - PeachHaus`;
+      }
+    }
     
     if (summary) {
       return `${greeting} following up on our call about ${topics}. ${summary.includes('next steps') ? '' : 'Let me know if you have any questions!'} - PeachHaus`;
     }
     return `${greeting} thanks for your call about ${topics}. Let me know if you need anything else! - PeachHaus`;
-  };
+  }, [greeting, recap.key_topics, recap.transcript_summary, conversationContext]);
   
-  const [smsMessage, setSmsMessage] = useState(generateSmsFromTranscript);
+  const [smsMessage, setSmsMessage] = useState(generateSmsFromContext);
   
-  // Generate follow-up message from transcript
-  const generateFollowUpMessage = () => {
+  // Update SMS when context loads
+  useEffect(() => {
+    if (!isLoadingContext && conversationContext) {
+      setSmsMessage(generateSmsFromContext);
+    }
+  }, [generateSmsFromContext, isLoadingContext, conversationContext]);
+  
+  // Generate smart follow-up message using AI with full context
+  const generateSmartFollowUp = useCallback(async () => {
+    setIsGeneratingSmart(true);
+    try {
+      const contextSummary = conversationContext?.summary || "";
+      const prompt = `Generate a warm, professional follow-up SMS for a property management company. 
+
+CONTEXT:
+- Contact name: ${recap.recipient_name || "property owner"}
+- This is about: ${recap.key_topics?.join(", ") || "property management"}
+- Call summary: ${recap.transcript_summary || "General inquiry call"}
+
+PREVIOUS CONVERSATION HISTORY:
+${contextSummary || "No previous messages"}
+
+IMPORTANT GUIDELINES (based on sales best practices):
+1. Reference specific details from previous conversations to show you remember them
+2. Be warm but professional - use their first name
+3. Add value in every message - don't just "check in"
+4. If they asked for something specific, acknowledge it
+5. Keep it under 160 characters for SMS
+6. End with a clear next step or question
+7. Sign off with "- PeachHaus"
+
+Generate ONLY the SMS text, nothing else.`;
+
+      const { data, error } = await supabase.functions.invoke("ai-assistant", {
+        body: { prompt, type: "generate_followup" }
+      });
+      
+      if (error) throw error;
+      
+      if (data?.message) {
+        setSmsMessage(data.message);
+        toast.success("Smart follow-up generated!");
+      }
+    } catch (e: any) {
+      console.error("Error generating smart follow-up:", e);
+      toast.error("Couldn't generate smart message");
+    } finally {
+      setIsGeneratingSmart(false);
+    }
+  }, [recap, conversationContext]);
+  
+  // Generate follow-up message from context
+  const generateFollowUpMessage = useMemo(() => {
     const topics = recap.key_topics?.slice(0, 2).join(' and ') || 'your property';
+    
+    // If we've asked them for something, reference it
+    if (conversationContext?.pendingRequests && conversationContext.pendingRequests.length > 0) {
+      return `${greeting} hope you're doing well! Just wanted to follow up and see if you had any questions about what we discussed. I'm here to help whenever you're ready. - PeachHaus`;
+    }
+    
     return `${greeting} just checking in about ${topics}. Have you had a chance to think it over? Happy to answer any questions! - PeachHaus`;
-  };
+  }, [greeting, recap.key_topics, conversationContext]);
   
   const [followUpMessage, setFollowUpMessage] = useState(generateFollowUpMessage);
 
@@ -297,6 +379,24 @@ function RecapEditor({
         )}
       </div>
 
+      {/* Conversation History Toggle */}
+      <Collapsible open={showHistory} onOpenChange={setShowHistory}>
+        <CollapsibleTrigger asChild>
+          <Button variant="ghost" size="sm" className="w-full justify-start text-muted-foreground hover:text-foreground">
+            <History className="h-4 w-4 mr-2" />
+            View Conversation History
+            <ChevronRight className={`h-4 w-4 ml-auto transition-transform ${showHistory ? 'rotate-90' : ''}`} />
+          </Button>
+        </CollapsibleTrigger>
+        <CollapsibleContent className="mt-2">
+          <ConversationHistory 
+            leadId={recap.lead_id} 
+            ownerId={recap.owner_id}
+            maxHeight="180px"
+          />
+        </CollapsibleContent>
+      </Collapsible>
+
       {/* Assign to Team Member */}
       <div className="flex items-center gap-2">
         <UserPlus className="h-4 w-4 text-muted-foreground" />
@@ -324,9 +424,26 @@ function RecapEditor({
         </Select>
       </div>
 
-      {/* SMS Input */}
+      {/* SMS Input with Smart AI */}
       {showSMSInput && (
         <div className="space-y-2 p-3 bg-green-50 rounded-lg border border-green-200">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-xs font-medium text-green-800">Quick SMS</span>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={generateSmartFollowUp}
+              disabled={isGeneratingSmart}
+              className="h-6 text-xs text-green-700 hover:text-green-900 hover:bg-green-100"
+            >
+              {isGeneratingSmart ? (
+                <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+              ) : (
+                <Sparkles className="h-3 w-3 mr-1" />
+              )}
+              {isGeneratingSmart ? "Generating..." : "AI Smart Message"}
+            </Button>
+          </div>
           <Textarea
             value={smsMessage}
             onChange={(e) => setSmsMessage(e.target.value)}
@@ -334,6 +451,11 @@ function RecapEditor({
             placeholder="Quick SMS recap..."
             className="text-sm bg-white"
           />
+          {conversationContext?.hasAskedForInfo && (
+            <p className="text-[10px] text-green-700 italic">
+              💡 Tip: You previously asked for information - the message above references that context
+            </p>
+          )}
           <div className="flex justify-end gap-2">
             <Button
               variant="ghost"
