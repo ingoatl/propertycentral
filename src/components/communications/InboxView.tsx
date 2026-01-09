@@ -489,6 +489,31 @@ export function InboxView() {
   // Selected Gmail email state
   const [selectedGmailEmail, setSelectedGmailEmail] = useState<GmailEmail | null>(null);
 
+  // Mark email as read when selected
+  const handleSelectGmailEmail = async (email: GmailEmail) => {
+    setSelectedGmailEmail(email);
+    
+    // Mark as read if it's unread
+    if (email.labelIds?.includes('UNREAD')) {
+      try {
+        await supabase.functions.invoke('mark-gmail-read', {
+          body: { messageId: email.id }
+        });
+        // Update local state to remove UNREAD label
+        queryClient.setQueryData(['gmail-inbox', activeTab], (old: GmailEmail[] | undefined) => {
+          if (!old) return old;
+          return old.map(e => 
+            e.id === email.id 
+              ? { ...e, labelIds: e.labelIds?.filter(l => l !== 'UNREAD') || [] }
+              : e
+          );
+        });
+      } catch (err) {
+        console.error('Failed to mark email as read:', err);
+      }
+    }
+  };
+
   const getInitials = (name: string) => name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2);
   const getMessagePreview = (comm: CommunicationItem) => {
     if (comm.type === "call") return comm.direction === "inbound" ? "Incoming call" : "Outgoing call";
@@ -566,7 +591,7 @@ export function InboxView() {
                 {filteredGmailEmails.filter(email => !search || email.subject.toLowerCase().includes(search.toLowerCase()) || email.fromName.toLowerCase().includes(search.toLowerCase())).map((email) => {
                   const isUnread = email.labelIds?.includes('UNREAD');
                   return (
-                    <div key={email.id} onClick={() => setSelectedGmailEmail(email)} className={`flex items-start gap-3 p-3 cursor-pointer transition-colors border-l-2 ${selectedGmailEmail?.id === email.id ? "bg-muted/70 border-l-primary" : "hover:bg-muted/30 border-l-transparent"}`}>
+                    <div key={email.id} onClick={() => handleSelectGmailEmail(email)} className={`flex items-start gap-3 p-3 cursor-pointer transition-colors border-l-2 ${selectedGmailEmail?.id === email.id ? "bg-muted/70 border-l-primary" : "hover:bg-muted/30 border-l-transparent"}`}>
                       <div className="h-10 w-10 rounded-full bg-blue-500 flex items-center justify-center flex-shrink-0">
                         <span className="text-sm font-medium text-white">{getInitials(email.fromName)}</span>
                       </div>
