@@ -108,7 +108,7 @@ serve(async (req) => {
 
     const propertyList = properties?.map(p => p.name || p.address).join(", ") || "your properties";
 
-    // Send email with Stripe payment setup link
+    // Send email with Stripe payment setup link - improved persuasive copy
     const emailHtml = `
 <!DOCTYPE html>
 <html>
@@ -124,43 +124,61 @@ serve(async (req) => {
     </div>
     
     <div style="background: white; border-radius: 16px; padding: 40px; margin-top: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
-      <h2 style="margin: 0 0 20px 0; color: #1a1a2e; font-size: 24px;">Payment Authorization Required</h2>
+      <h2 style="margin: 0 0 20px 0; color: #1a1a2e; font-size: 24px;">Quick Update to Simplify Your Payments</h2>
       
-      <p style="color: #4a5568; line-height: 1.6; margin-bottom: 20px;">
+      <p style="color: #4a5568; line-height: 1.8; margin-bottom: 20px;">
         Hi ${name || 'there'},
       </p>
       
-      <p style="color: #4a5568; line-height: 1.6; margin-bottom: 20px;">
-        To streamline billing for <strong>${propertyList}</strong>, we need to set up your payment method for recurring management fees and property expenses.
+      <p style="color: #4a5568; line-height: 1.8; margin-bottom: 20px;">
+        We've been working with you on <strong>${propertyList}</strong> for a while now, and we want to make your experience even smoother.
       </p>
       
-      <p style="color: #4a5568; line-height: 1.6; margin-bottom: 20px;">
-        You can securely connect your bank account (ACH) or credit/debit card through our trusted payment partner, Stripe.
+      <p style="color: #4a5568; line-height: 1.8; margin-bottom: 20px;">
+        <strong>We do have your current payment information on file</strong>, but we're transitioning to <strong>Stripe</strong> — a bank-level secure payment system used by millions of businesses worldwide. This change offers better security and a smoother experience for both of us.
       </p>
       
-      <div style="background: #f7fafc; border-radius: 8px; padding: 16px; margin-bottom: 20px;">
-        <p style="color: #1a1a2e; font-weight: 600; margin: 0 0 10px 0; font-size: 14px;">Payment Method Options:</p>
-        <ul style="color: #4a5568; margin: 0; padding: 0 0 0 20px; font-size: 14px; line-height: 1.8;">
-          <li><strong>Bank Account (ACH):</strong> 1% processing fee - Recommended</li>
-          <li><strong>Credit/Debit Card:</strong> 3% processing fee</li>
+      <div style="background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border-radius: 12px; padding: 24px; margin: 24px 0; border-left: 4px solid #10b981;">
+        <p style="color: #166534; font-weight: 600; margin: 0 0 16px 0; font-size: 16px;">✨ Here's what this means for you:</p>
+        <ul style="color: #15803d; margin: 0; padding: 0 0 0 20px; font-size: 15px; line-height: 2;">
+          <li><strong>One-time setup</strong> — Takes just 2 minutes, then payments happen automatically</li>
+          <li><strong>Your choice</strong> — Bank transfer (1% fee) or card (3% fee)</li>
+          <li><strong>Complete transparency</strong> — See every charge before it posts</li>
+          <li><strong>Instant receipts</strong> — Get email confirmations for every transaction</li>
+          <li><strong>Bank-level security</strong> — Your info is encrypted and never stored on our servers</li>
         </ul>
       </div>
       
-      <div style="text-align: center; margin: 30px 0;">
-        <a href="${session.url}" style="display: inline-block; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; text-decoration: none; padding: 16px 40px; border-radius: 8px; font-weight: 600; font-size: 16px;">
-          Set Up Payment Method →
+      <p style="color: #4a5568; line-height: 1.8; margin-bottom: 24px;">
+        This small change now saves you time every month — no more manual payments or check-writing. Just set it and forget it! 📬
+      </p>
+      
+      <div style="text-align: center; margin: 32px 0;">
+        <a href="${session.url}" style="display: inline-block; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; text-decoration: none; padding: 18px 48px; border-radius: 10px; font-weight: 600; font-size: 17px; box-shadow: 0 4px 14px rgba(16, 185, 129, 0.4);">
+          Set Up My Payment Method →
         </a>
+      </div>
+      
+      <div style="background: #f8fafc; border-radius: 8px; padding: 16px; margin: 24px 0;">
+        <p style="color: #64748b; font-size: 14px; margin: 0; line-height: 1.6;">
+          <strong>💡 Why the change?</strong> Stripe provides enterprise-grade security, automatic payment retries if a charge fails, and detailed statements — all designed to make property management billing hassle-free.
+        </p>
       </div>
       
       <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 30px 0;">
       
-      <p style="color: #a0aec0; font-size: 12px; text-align: center;">
-        This link will expire in 24 hours. If you have any questions, reply to this email or contact us at info@peachhausgroup.com
+      <p style="color: #64748b; font-size: 14px; line-height: 1.6;">
+        <strong>Questions?</strong> Just reply to this email or call us at <a href="tel:+14049873388" style="color: #10b981; text-decoration: none;">(404) 987-3388</a>. We're happy to walk you through the process!
+      </p>
+      
+      <p style="color: #a0aec0; font-size: 12px; margin-top: 20px;">
+        This link will expire in 24 hours. If you need a new one, just let us know.
       </p>
     </div>
     
     <div style="text-align: center; padding: 20px; color: #a0aec0; font-size: 12px;">
       <p>© ${new Date().getFullYear()} PeachHaus Group. All rights reserved.</p>
+      <p style="margin: 5px 0 0 0;">Making property ownership easier, one home at a time.</p>
     </div>
   </div>
 </body>
