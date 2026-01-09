@@ -159,7 +159,7 @@ serve(async (req) => {
               .insert({
                 name: `Unknown Caller (${phoneNumber})`,
                 phone: phoneNumber,
-                source: "ghl_call_sync",
+                opportunity_source: "ghl_call_sync",
                 stage: "new",
               })
               .select()
