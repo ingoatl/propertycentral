@@ -427,20 +427,11 @@ function DiscoveryCallDetailModal({ call, onClose }: DiscoveryCallDetailModalPro
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-3">
-              <div
-                className={cn(
-                  "p-2 rounded-full",
-                  call.meeting_type === "video"
-                    ? "bg-green-100 dark:bg-green-900/30"
-                    : "bg-blue-100 dark:bg-blue-900/30"
-                )}
-              >
-                {call.meeting_type === "video" ? (
-                  <Video className="h-5 w-5 text-green-600" />
-                ) : (
-                  <Phone className="h-5 w-5 text-blue-600" />
-                )}
-              </div>
+              <img 
+                src="/images/peachhaus-logo.png" 
+                alt="PeachHaus" 
+                className="h-10 w-auto"
+              />
               <div>
                 <span>Discovery Call with {call.leads?.name || "Unknown"}</span>
                 <p className="text-sm font-normal text-muted-foreground">

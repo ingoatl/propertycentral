@@ -13,14 +13,17 @@ serve(async (req) => {
   }
 
   try {
-    const { daysBack = 3, targetEmail = 'ingo@peachhausgroup.com' } = await req.json().catch(() => ({}));
+    const { daysBack = 3 } = await req.json().catch(() => ({}));
+    
+    // Fetch emails for both Ingo and Anja
+    const targetEmails = ['ingo@peachhausgroup.com', 'anja@peachhausgroup.com'];
     
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
-    console.log(`Fetching Gmail inbox for ${targetEmail}, last ${daysBack} days...`);
+    console.log(`Fetching Gmail inbox for ${targetEmails.join(', ')}, last ${daysBack} days...`);
 
     // Get OAuth tokens
     const { data: tokenData, error: tokenError } = await supabase
@@ -55,13 +58,14 @@ serve(async (req) => {
     daysAgo.setDate(daysAgo.getDate() - daysBack);
     const afterDate = Math.floor(daysAgo.getTime() / 1000);
 
-    // Build search query - fetch emails TO the target email
-    const query = `to:${targetEmail} after:${afterDate}`;
+    // Build search query - fetch emails TO either Ingo or Anja
+    const toQuery = targetEmails.map(e => `to:${e}`).join(' OR ');
+    const query = `(${toQuery}) after:${afterDate}`;
 
     console.log(`Fetching emails with query: ${query}`);
 
     const messagesResponse = await fetch(
-      `https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=50&q=${encodeURIComponent(query)}`,
+      `https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=100&q=${encodeURIComponent(query)}`,
       {
         headers: { Authorization: `Bearer ${accessToken}` },
       }
@@ -80,7 +84,7 @@ serve(async (req) => {
 
     // Fetch full email data for each message
     const emails = [];
-    for (const msg of messageIds.slice(0, 50)) {
+    for (const msg of messageIds.slice(0, 100)) {
       try {
         const messageResponse = await fetch(
           `https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}?format=full`,
@@ -111,27 +115,35 @@ serve(async (req) => {
           let html = '';
           
           if (payload.body?.data) {
-            const decoded = atob(payload.body.data.replace(/-/g, '+').replace(/_/g, '/'));
-            if (payload.mimeType === 'text/html') {
-              html = decoded;
-            } else {
-              text = decoded;
+            try {
+              const decoded = atob(payload.body.data.replace(/-/g, '+').replace(/_/g, '/'));
+              if (payload.mimeType === 'text/html') {
+                html = decoded;
+              } else {
+                text = decoded;
+              }
+            } catch (e) {
+              console.error('Error decoding body:', e);
             }
           }
           
           if (payload.parts) {
             for (const part of payload.parts) {
-              if (part.mimeType === 'text/plain' && part.body?.data) {
-                text = atob(part.body.data.replace(/-/g, '+').replace(/_/g, '/'));
-              }
-              if (part.mimeType === 'text/html' && part.body?.data) {
-                html = atob(part.body.data.replace(/-/g, '+').replace(/_/g, '/'));
-              }
-              // Handle multipart/alternative
-              if (part.parts) {
-                const nested = extractBody(part);
-                if (nested.text) text = nested.text;
-                if (nested.html) html = nested.html;
+              try {
+                if (part.mimeType === 'text/plain' && part.body?.data) {
+                  text = atob(part.body.data.replace(/-/g, '+').replace(/_/g, '/'));
+                }
+                if (part.mimeType === 'text/html' && part.body?.data) {
+                  html = atob(part.body.data.replace(/-/g, '+').replace(/_/g, '/'));
+                }
+                // Handle multipart/alternative
+                if (part.parts) {
+                  const nested = extractBody(part);
+                  if (nested.text) text = nested.text;
+                  if (nested.html) html = nested.html;
+                }
+              } catch (e) {
+                console.error('Error decoding part:', e);
               }
             }
           }
@@ -143,6 +155,10 @@ serve(async (req) => {
         bodyText = extracted.text;
         bodyHtml = extracted.html;
 
+        // Determine which inbox this email is for
+        const toLower = to.toLowerCase();
+        const targetInbox = toLower.includes('anja@') ? 'anja' : 'ingo';
+
         emails.push({
           id: msg.id,
           threadId: emailData.threadId,
@@ -150,9 +166,10 @@ serve(async (req) => {
           from: senderEmail,
           fromName: senderName,
           to,
+          targetInbox,
           date: new Date(dateStr).toISOString(),
           body: bodyText.substring(0, 3000),
-          bodyHtml: bodyHtml, // Full HTML for display
+          bodyHtml: bodyHtml,
           snippet: emailData.snippet,
           labelIds: emailData.labelIds || [],
         });
