@@ -72,9 +72,22 @@ interface PhoneAssignment {
   display_name: string | null;
 }
 
-type TabType = "chats" | "calls";
+type TabType = "chats" | "calls" | "emails";
 type FilterType = "all" | "open" | "unread" | "unresponded";
 type MessageChannel = "sms" | "email";
+
+interface GmailEmail {
+  id: string;
+  threadId: string;
+  subject: string;
+  from: string;
+  fromName: string;
+  to: string;
+  date: string;
+  body: string;
+  snippet: string;
+  labelIds: string[];
+}
 
 export function InboxView() {
   const [search, setSearch] = useState("");
@@ -307,11 +320,33 @@ export function InboxView() {
     enabled: !!selectedLeadId,
   });
 
+  // Fetch Gmail inbox emails
+  const { data: gmailEmails = [], isLoading: isLoadingGmail } = useQuery({
+    queryKey: ["gmail-inbox", activeTab],
+    queryFn: async () => {
+      if (activeTab !== "emails") return [];
+      
+      const { data, error } = await supabase.functions.invoke("fetch-gmail-inbox", {
+        body: { daysBack: 3, targetEmail: "ingo@peachhausgroup.com" }
+      });
+      
+      if (error) {
+        console.error("Failed to fetch Gmail inbox:", error);
+        return [];
+      }
+      
+      return (data?.emails || []) as GmailEmail[];
+    },
+    enabled: activeTab === "emails",
+    staleTime: 30000,
+    refetchInterval: 60000,
+  });
+
   const { data: communications = [], isLoading } = useQuery({
     queryKey: ["all-communications", search, activeTab, activeFilter, selectedInboxUserId, viewAllInboxes],
     refetchInterval: 10000,
     staleTime: 5000,
-    enabled: !!currentUserId,
+    enabled: !!currentUserId && activeTab !== "emails",
     queryFn: async () => {
       const results: CommunicationItem[] = [];
       const fetchCalls = activeTab === "calls";
@@ -436,6 +471,9 @@ export function InboxView() {
     },
   });
 
+  // Selected Gmail email state
+  const [selectedGmailEmail, setSelectedGmailEmail] = useState<GmailEmail | null>(null);
+
   const getInitials = (name: string) => name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2);
   const getMessagePreview = (comm: CommunicationItem) => {
     if (comm.type === "call") return comm.direction === "inbound" ? "Incoming call" : "Outgoing call";
@@ -449,11 +487,14 @@ export function InboxView() {
       <div className="w-80 border-r flex flex-col">
         <div className="p-4 border-b">
           <div className="flex items-center gap-4 mb-4">
-            <button onClick={() => setActiveTab("chats")} className={`flex items-center gap-2 pb-2 border-b-2 transition-colors ${activeTab === "chats" ? "border-primary text-foreground font-medium" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
+            <button onClick={() => { setActiveTab("chats"); setSelectedGmailEmail(null); }} className={`flex items-center gap-2 pb-2 border-b-2 transition-colors ${activeTab === "chats" ? "border-primary text-foreground font-medium" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
               <MessageSquare className="h-4 w-4" /><span>Chats</span>
             </button>
-            <button onClick={() => setActiveTab("calls")} className={`flex items-center gap-2 pb-2 border-b-2 transition-colors ${activeTab === "calls" ? "border-primary text-foreground font-medium" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
+            <button onClick={() => { setActiveTab("calls"); setSelectedGmailEmail(null); }} className={`flex items-center gap-2 pb-2 border-b-2 transition-colors ${activeTab === "calls" ? "border-primary text-foreground font-medium" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
               <Phone className="h-4 w-4" /><span>Calls</span>
+            </button>
+            <button onClick={() => { setActiveTab("emails"); setSelectedMessage(null); }} className={`flex items-center gap-2 pb-2 border-b-2 transition-colors ${activeTab === "emails" ? "border-primary text-foreground font-medium" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
+              <Mail className="h-4 w-4" /><span>Emails</span>
             </button>
             <div className="flex-1" />
             {isAdmin && <AdminInboxSelector selectedUserId={selectedInboxUserId} onUserChange={handleInboxChange} currentUserId={currentUserId} />}
@@ -485,7 +526,32 @@ export function InboxView() {
         </div>
 
         <ScrollArea className="flex-1">
-          {isLoading ? (
+          {activeTab === "emails" ? (
+            // Gmail Inbox View
+            isLoadingGmail ? (
+              <div className="p-4 text-center text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin mx-auto mb-2" /><p className="text-sm">Loading emails...</p></div>
+            ) : gmailEmails.length === 0 ? (
+              <div className="p-8 text-center text-muted-foreground"><Mail className="h-10 w-10 mx-auto mb-3 opacity-40" /><p className="text-sm">No emails in the last 3 days</p></div>
+            ) : (
+              <div>
+                {gmailEmails.filter(email => !search || email.subject.toLowerCase().includes(search.toLowerCase()) || email.fromName.toLowerCase().includes(search.toLowerCase())).map((email) => (
+                  <div key={email.id} onClick={() => setSelectedGmailEmail(email)} className={`flex items-start gap-3 p-3 cursor-pointer transition-colors border-l-2 ${selectedGmailEmail?.id === email.id ? "bg-muted/70 border-l-primary" : "hover:bg-muted/30 border-l-transparent"}`}>
+                    <div className="h-10 w-10 rounded-full bg-blue-500 flex items-center justify-center flex-shrink-0">
+                      <span className="text-sm font-medium text-white">{getInitials(email.fromName)}</span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-medium text-sm truncate">{email.fromName}</span>
+                        <span className="text-xs text-muted-foreground whitespace-nowrap">{format(new Date(email.date), "MMM d")}</span>
+                      </div>
+                      <p className="text-xs font-medium truncate">{email.subject}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{email.snippet}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )
+          ) : isLoading ? (
             <div className="p-4 text-center text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin mx-auto mb-2" /><p className="text-sm">Loading...</p></div>
           ) : communications.length === 0 ? (
             <div className="p-8 text-center text-muted-foreground"><MessageSquare className="h-10 w-10 mx-auto mb-3 opacity-40" /><p className="text-sm">No conversations</p></div>
@@ -516,7 +582,45 @@ export function InboxView() {
 
       {/* Right Panel */}
       <div className="flex-1 flex flex-col">
-        {selectedMessage ? (
+        {activeTab === "emails" && selectedGmailEmail ? (
+          // Gmail Email Detail View
+          <>
+            <div className="p-4 border-b flex items-center gap-4">
+              <div className="h-11 w-11 rounded-full bg-blue-500 flex items-center justify-center flex-shrink-0">
+                <span className="text-sm font-medium text-white">{getInitials(selectedGmailEmail.fromName)}</span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="font-semibold text-base">{selectedGmailEmail.fromName}</h3>
+                <p className="text-sm text-muted-foreground truncate">{selectedGmailEmail.from}</p>
+              </div>
+              <Badge variant="secondary" className="text-xs">
+                {format(new Date(selectedGmailEmail.date), "MMM d, h:mm a")}
+              </Badge>
+            </div>
+
+            <ScrollArea className="flex-1 p-4">
+              <div className="max-w-3xl mx-auto space-y-4">
+                <div className="bg-muted/30 rounded-lg p-4">
+                  <h2 className="font-semibold text-lg mb-2">{selectedGmailEmail.subject}</h2>
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
+                    <span>From: <strong>{selectedGmailEmail.fromName}</strong> &lt;{selectedGmailEmail.from}&gt;</span>
+                  </div>
+                  <div className="text-sm whitespace-pre-wrap border-t pt-4">
+                    {selectedGmailEmail.body}
+                  </div>
+                </div>
+              </div>
+            </ScrollArea>
+
+            <div className="p-4 border-t">
+              <div className="flex gap-2 max-w-3xl mx-auto">
+                <Button variant="outline" size="sm" onClick={() => setShowComposeEmail(true)}>
+                  <Mail className="h-4 w-4 mr-2" />Reply
+                </Button>
+              </div>
+            </div>
+          </>
+        ) : selectedMessage ? (
           <>
             <div className="p-4 border-b flex items-center gap-4">
               <div className="h-11 w-11 rounded-full bg-emerald-500 flex items-center justify-center flex-shrink-0">
@@ -629,9 +733,19 @@ export function InboxView() {
           </>
         ) : (
           <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground">
-            <MessageSquare className="h-16 w-16 mb-4 opacity-30" />
-            <p className="text-lg font-medium">Select a conversation</p>
-            <p className="text-sm">Choose from your existing conversations or start a new one</p>
+            {activeTab === "emails" ? (
+              <>
+                <Mail className="h-16 w-16 mb-4 opacity-30" />
+                <p className="text-lg font-medium">Select an email</p>
+                <p className="text-sm">Choose from your inbox to view the full message</p>
+              </>
+            ) : (
+              <>
+                <MessageSquare className="h-16 w-16 mb-4 opacity-30" />
+                <p className="text-lg font-medium">Select a conversation</p>
+                <p className="text-sm">Choose from your existing conversations or start a new one</p>
+              </>
+            )}
           </div>
         )}
       </div>

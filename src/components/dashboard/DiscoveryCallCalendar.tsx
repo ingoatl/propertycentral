@@ -384,9 +384,10 @@ function DiscoveryCallDetailModal({ call, onClose }: DiscoveryCallDetailModalPro
     ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(call.leads.property_address)}`
     : null;
 
-  // Google Maps embed URL - iwloc=B hides the info window
+  // Google Maps Static API - clean map without address popup
+  // Using place search with no markers to show just the area
   const googleMapsEmbedUrl = call.leads?.property_address
-    ? `https://maps.google.com/maps?q=${encodeURIComponent(call.leads.property_address)}&z=10&ie=UTF8&iwloc=B&output=embed`
+    ? `https://www.google.com/maps/embed/v1/place?key=AIzaSyBFw0Qbyq9zTFTd-tUY6dZWTgaQzuU17R8&q=${encodeURIComponent(call.leads.property_address)}&zoom=12&maptype=roadmap`
     : null;
 
   // Combine all notes
