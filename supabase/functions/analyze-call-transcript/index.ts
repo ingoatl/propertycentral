@@ -182,6 +182,37 @@ CALL DURATION: ${callData.callDuration ? Math.round(callData.callDuration / 60) 
       console.log(`Created pending recap: ${recapData.id}`);
     }
 
+    // If lead has "Unknown Caller" name and we found a real name from analysis, update the lead
+    if (callData.leadId && recipientName.includes("Unknown Caller")) {
+      // Try to extract caller name from transcript
+      const namePattern = /(?:this is|my name is|i'm|i am|human:)\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/gi;
+      const matches = [...callData.transcript.matchAll(namePattern)];
+      const teamMembers = ['ingo', 'tom', 'anja', 'jason', 'peachhaus'];
+      
+      for (const match of matches) {
+        const extractedName = match[1]?.trim();
+        if (extractedName && extractedName.length >= 2 && extractedName.length <= 30) {
+          const nameLower = extractedName.toLowerCase();
+          if (!teamMembers.some(tm => nameLower.includes(tm))) {
+            console.log(`Updating lead ${callData.leadId} name from transcript: ${extractedName}`);
+            await supabase
+              .from("leads")
+              .update({ name: extractedName })
+              .eq("id", callData.leadId);
+            
+            // Also update the recap recipient name
+            if (recapData) {
+              await supabase
+                .from("pending_call_recaps")
+                .update({ recipient_name: extractedName })
+                .eq("id", recapData.id);
+            }
+            break;
+          }
+        }
+      }
+    }
+
     // Insert pending task confirmations for each action item
     const insertedTasks = [];
     for (const task of analysis.action_items || []) {

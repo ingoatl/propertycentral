@@ -520,37 +520,66 @@ export function CallRecapModal() {
                     onSend={handleSend}
                     onDismiss={handleDismiss}
                     onCallback={async () => {
-                      // Get phone from owner/lead
+                      // Get phone from owner OR lead
+                      let phone: string | null = null;
+                      
                       if (currentRecap.owner_id) {
                         const { data: owner } = await supabase
                           .from("property_owners")
                           .select("phone")
                           .eq("id", currentRecap.owner_id)
                           .single();
-                        if (owner?.phone) {
-                          window.open(`tel:${owner.phone}`, '_self');
-                          toast.success(`Calling ${currentRecap.recipient_name}...`);
-                          // Move to next after callback
-                          if (activeRecapIndex < displayedRecaps.length - 1) {
-                            setActiveRecapIndex(prev => prev + 1);
-                          }
-                        } else {
-                          toast.error("No phone number on file");
+                        phone = owner?.phone || null;
+                      } else if (currentRecap.lead_id) {
+                        const { data: lead } = await supabase
+                          .from("leads")
+                          .select("phone")
+                          .eq("id", currentRecap.lead_id)
+                          .single();
+                        phone = lead?.phone || null;
+                      }
+                      
+                      if (phone) {
+                        window.open(`tel:${phone}`, '_self');
+                        toast.success(`Calling ${currentRecap.recipient_name}...`);
+                        // Move to next after callback
+                        if (activeRecapIndex < displayedRecaps.length - 1) {
+                          setActiveRecapIndex(prev => prev + 1);
                         }
                       } else {
-                        toast.error("No contact info available");
+                        toast.error("No phone number on file");
                       }
                     }}
                     onSendSMS={async (message) => {
+                      let phone: string | null = null;
+                      
                       if (currentRecap.owner_id) {
+                        const { data: owner } = await supabase
+                          .from("property_owners")
+                          .select("phone")
+                          .eq("id", currentRecap.owner_id)
+                          .single();
+                        phone = owner?.phone || null;
+                      } else if (currentRecap.lead_id) {
+                        const { data: lead } = await supabase
+                          .from("leads")
+                          .select("phone")
+                          .eq("id", currentRecap.lead_id)
+                          .single();
+                        phone = lead?.phone || null;
+                      }
+                      
+                      if (phone) {
                         try {
                           await supabase.functions.invoke('ghl-send-sms', {
-                            body: { ownerId: currentRecap.owner_id, message }
+                            body: { to: phone, message }
                           });
                           toast.success(`SMS sent to ${currentRecap.recipient_name}`);
                         } catch (e: any) {
                           toast.error(e.message || "Failed to send SMS");
                         }
+                      } else {
+                        toast.error("No phone number on file");
                       }
                     }}
                     onSkipToNext={() => {
