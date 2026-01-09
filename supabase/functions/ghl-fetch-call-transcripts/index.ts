@@ -160,7 +160,7 @@ serve(async (req) => {
                 name: `Unknown Caller (${phoneNumber})`,
                 phone: phoneNumber,
                 opportunity_source: "ghl_call_sync",
-                stage: "new",
+                stage: "new_lead",
               })
               .select()
               .single();
