@@ -384,9 +384,9 @@ function DiscoveryCallDetailModal({ call, onClose }: DiscoveryCallDetailModalPro
     ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(call.leads.property_address)}`
     : null;
 
-  // Google Maps embed URL for iframe
+  // Google Maps embed URL for iframe - z=10 for zoomed out view
   const googleMapsEmbedUrl = call.leads?.property_address
-    ? `https://maps.google.com/maps?q=${encodeURIComponent(call.leads.property_address)}&t=&z=15&ie=UTF8&iwloc=&output=embed`
+    ? `https://maps.google.com/maps?q=${encodeURIComponent(call.leads.property_address)}&t=&z=10&ie=UTF8&iwloc=&output=embed`
     : null;
 
   // Combine all notes
@@ -449,16 +449,16 @@ function DiscoveryCallDetailModal({ call, onClose }: DiscoveryCallDetailModalPro
             </DialogTitle>
           </DialogHeader>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-3">
             {/* Left Column - Property & Map */}
-            <div className="space-y-4">
+            <div className="space-y-3">
               {/* Property Address - Prominent */}
               {call.leads?.property_address && (
-                <div className="p-4 rounded-lg bg-primary/5 border-2 border-primary/20">
-                  <div className="flex items-start gap-3">
-                    <MapPin className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+                <div className="p-3 rounded-lg bg-primary/5 border border-primary/20">
+                  <div className="flex items-start gap-2">
+                    <MapPin className="h-4 w-4 text-primary shrink-0 mt-0.5" />
                     <div className="flex-1">
-                      <p className="font-semibold text-lg">{call.leads.property_address}</p>
+                      <p className="font-semibold">{call.leads.property_address}</p>
                       <div className="flex gap-2 mt-2">
                         {googleMapsLink && (
                           <Button variant="outline" size="sm" asChild>
@@ -493,7 +493,7 @@ function DiscoveryCallDetailModal({ call, onClose }: DiscoveryCallDetailModalPro
                   </h3>
                   <PropertyPhotos 
                     address={call.leads.property_address} 
-                    height="180px"
+                    height="140px"
                     className="rounded-lg overflow-hidden border"
                   />
                 </div>
@@ -506,7 +506,7 @@ function DiscoveryCallDetailModal({ call, onClose }: DiscoveryCallDetailModalPro
                   Location
                 </h3>
                 {googleMapsEmbedUrl ? (
-                  <div className="rounded-lg overflow-hidden border h-[280px]">
+                  <div className="rounded-lg overflow-hidden border h-[220px]">
                     <iframe
                       width="100%"
                       height="100%"
