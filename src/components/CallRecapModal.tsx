@@ -311,11 +311,7 @@ export function CallRecapModal() {
   // Check if current recap is user's own call
   const isUserCall = currentRecap?.caller_user_id === currentUserId;
 
-  // Don't render if nothing to show
-  if (!isEligibleUser || (pendingRecaps.length === 0 && callTasks.length === 0)) {
-    return null;
-  }
-
+  // ALL HOOKS MUST BE CALLED BEFORE ANY EARLY RETURNS
   const handleSend = useCallback(
     (subject: string, body: string) => {
       if (currentRecap) {
@@ -356,6 +352,11 @@ export function CallRecapModal() {
   const handleApproveAllTasks = useCallback(() => {
     approveAllTasks();
   }, [approveAllTasks]);
+
+  // Don't render if nothing to show - AFTER all hooks
+  if (!isEligibleUser || (pendingRecaps.length === 0 && callTasks.length === 0)) {
+    return null;
+  }
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
