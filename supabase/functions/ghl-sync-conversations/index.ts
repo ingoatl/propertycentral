@@ -71,7 +71,7 @@ serve(async (req) => {
       throw new Error("GHL_API_KEY and GHL_LOCATION_ID are required");
     }
 
-    const { leadId, contactId, limit = 50 } = await req.json();
+    const { leadId, contactId, limit = 150 } = await req.json();
 
     // Initialize Supabase
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
@@ -368,10 +368,85 @@ serve(async (req) => {
         
         // Build communication record - prioritize owner_id over lead_id
         // Provide default body for calls without content to avoid null constraint violation
-        const messageBody = (message.body as string) || (message.text as string) || 
-          (commType === "call" 
+        let messageBody = (message.body as string) || (message.text as string) || "";
+        
+        // For human calls with empty/short body, try to fetch transcript from GHL's dedicated endpoint
+        if (commType === "call" && (!messageBody || messageBody.length < 50)) {
+          console.log(`Attempting to fetch transcript for call message ${message.id}`);
+          try {
+            const transcriptionResponse = await fetch(
+              `https://services.leadconnectorhq.com/conversations/locations/${ghlLocationId}/messages/${message.id}/transcription`,
+              {
+                method: "GET",
+                headers: {
+                  "Authorization": `Bearer ${ghlApiKey}`,
+                  "Version": "2021-04-15",
+                  "Content-Type": "application/json",
+                },
+              }
+            );
+            
+            if (transcriptionResponse.ok) {
+              const transcriptionData = await transcriptionResponse.json();
+              console.log(`GHL transcription response:`, JSON.stringify(transcriptionData).slice(0, 200));
+              
+              // Handle different response formats - could be array of sentences or object
+              if (Array.isArray(transcriptionData)) {
+                messageBody = transcriptionData.map((t: { sentence?: string; text?: string }) => t.sentence || t.text || "").join(" ").trim();
+              } else if (transcriptionData.transcription) {
+                messageBody = transcriptionData.transcription;
+              } else if (transcriptionData.text) {
+                messageBody = transcriptionData.text;
+              }
+              
+              if (messageBody && messageBody.length > 10) {
+                console.log(`Successfully fetched GHL transcription: ${messageBody.slice(0, 100)}...`);
+              }
+            } else {
+              console.log(`GHL transcription API returned ${transcriptionResponse.status}`);
+            }
+          } catch (transcriptError) {
+            console.log(`No GHL transcription available for message ${message.id}:`, transcriptError);
+          }
+        }
+        
+        // If still no transcript but has recording URL, try to transcribe via Whisper
+        if (commType === "call" && (!messageBody || messageBody.length < 50) && message.recordingUrl) {
+          console.log(`Attempting Whisper transcription for recording: ${message.recordingUrl}`);
+          try {
+            const whisperResponse = await fetch(`${supabaseUrl}/functions/v1/transcribe-call`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${supabaseServiceKey}`,
+              },
+              body: JSON.stringify({
+                recordingUrl: message.recordingUrl,
+                fromNumber: message.direction === "inbound" ? message.from : message.to,
+                toNumber: message.direction === "inbound" ? message.to : message.from,
+                duration: message.duration || 0,
+                callSid: message.id,
+              }),
+            });
+            
+            if (whisperResponse.ok) {
+              const whisperData = await whisperResponse.json();
+              if (whisperData.transcription && whisperData.transcription.length > 10) {
+                messageBody = whisperData.transcription;
+                console.log(`Whisper transcription successful: ${messageBody.slice(0, 100)}...`);
+              }
+            }
+          } catch (whisperError) {
+            console.log(`Whisper transcription failed:`, whisperError);
+          }
+        }
+        
+        // Final fallback for calls without transcripts
+        if (!messageBody || messageBody.length < 10) {
+          messageBody = commType === "call" 
             ? `Phone call ${direction === "inbound" ? "from" : "to"} ${callerDisplayName || "Contact"}. Duration: ${message.duration ? Math.round((message.duration as number) / 60) + ' min' : 'Unknown'}.`
-            : `${commType.toUpperCase()} message`);
+            : `${commType.toUpperCase()} message`;
+        }
         
         // Parse the correct date from GHL data
         const dateAddedStr = message.dateAdded as string | undefined;

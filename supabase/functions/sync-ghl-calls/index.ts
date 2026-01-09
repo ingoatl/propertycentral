@@ -61,7 +61,7 @@ serve(async (req) => {
         "Authorization": `Bearer ${supabaseKey}`,
       },
       body: JSON.stringify({
-        limit: 100, // Fetch more conversations to capture all calls
+        limit: 200, // Increased limit to capture more calls including older ones
       }),
     });
 
