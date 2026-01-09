@@ -5022,6 +5022,101 @@ export type Database = {
         }
         Relationships: []
       }
+      pending_actions: {
+        Row: {
+          action_type: string
+          approved_at: string | null
+          approved_by: string | null
+          channel: string | null
+          communication_id: string | null
+          created_at: string | null
+          description: string | null
+          detected_intent: string | null
+          dismissed_reason: string | null
+          id: string
+          lead_id: string | null
+          owner_id: string | null
+          property_id: string | null
+          sentiment_score: number | null
+          status: string | null
+          suggested_response: string | null
+          title: string
+          updated_at: string | null
+          urgency: string | null
+        }
+        Insert: {
+          action_type: string
+          approved_at?: string | null
+          approved_by?: string | null
+          channel?: string | null
+          communication_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          detected_intent?: string | null
+          dismissed_reason?: string | null
+          id?: string
+          lead_id?: string | null
+          owner_id?: string | null
+          property_id?: string | null
+          sentiment_score?: number | null
+          status?: string | null
+          suggested_response?: string | null
+          title: string
+          updated_at?: string | null
+          urgency?: string | null
+        }
+        Update: {
+          action_type?: string
+          approved_at?: string | null
+          approved_by?: string | null
+          channel?: string | null
+          communication_id?: string | null
+          created_at?: string | null
+          description?: string | null
+          detected_intent?: string | null
+          dismissed_reason?: string | null
+          id?: string
+          lead_id?: string | null
+          owner_id?: string | null
+          property_id?: string | null
+          sentiment_score?: number | null
+          status?: string | null
+          suggested_response?: string | null
+          title?: string
+          updated_at?: string | null
+          urgency?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pending_actions_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pending_actions_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "property_owners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pending_actions_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "comprehensive_property_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pending_actions_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pending_call_recaps: {
         Row: {
           action_items: Json | null

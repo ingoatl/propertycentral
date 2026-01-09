@@ -6,6 +6,58 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Normalize phone number to multiple formats for matching
+function normalizePhone(phone: string): string[] {
+  if (!phone) return [];
+  
+  // Strip all non-digits
+  const digits = phone.replace(/\D/g, '');
+  
+  // Get last 10 digits (remove country code if present)
+  const last10 = digits.slice(-10);
+  
+  if (last10.length !== 10) return [digits];
+  
+  // Return multiple formats to match against
+  return [
+    last10,                                                    // 2169783598
+    `+1${last10}`,                                            // +12169783598
+    `1${last10}`,                                             // 12169783598
+    `${last10.slice(0,3)}-${last10.slice(3,6)}-${last10.slice(6)}`,  // 216-978-3598
+    `(${last10.slice(0,3)}) ${last10.slice(3,6)}-${last10.slice(6)}`, // (216) 978-3598
+    `${last10.slice(0,3)}.${last10.slice(3,6)}.${last10.slice(6)}`,  // 216.978.3598
+  ];
+}
+
+// Extract caller name from transcript, excluding team members
+function extractCallerNameFromTranscript(transcript: string | null): string | null {
+  if (!transcript) return null;
+  
+  const teamMembers = ['ingo', 'tom', 'anja', 'thomas', 'peachhaus', 'peach haus'];
+  
+  // Patterns to match introductions
+  const patterns = [
+    /(?:this is|my name is|i'm|i am|it's|its)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/gi,
+    /(?:hi,?\s*this is|hey,?\s*it's|hello,?\s*this is)\s+([A-Z][a-z]+)/gi,
+    /^([A-Z][a-z]+)(?:\s+here|(?:\s+[A-Z][a-z]+)?\s+calling)/gm,
+  ];
+  
+  for (const pattern of patterns) {
+    const matches = transcript.matchAll(pattern);
+    for (const match of matches) {
+      if (match[1]) {
+        const name = match[1].trim();
+        const nameLower = name.toLowerCase();
+        // Skip team members
+        if (!teamMembers.some(tm => nameLower.includes(tm))) {
+          return name;
+        }
+      }
+    }
+  }
+  return null;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -122,6 +174,8 @@ serve(async (req) => {
       // Try to find matching owner FIRST, then lead
       let matchedLeadId = leadId;
       let matchedOwnerId: string | null = null;
+      let matchedOwnerName: string | null = null;
+      let matchedLeadName: string | null = null;
       
       if (conversation.contactId) {
         // Fetch contact details to get phone/email
@@ -143,16 +197,23 @@ serve(async (req) => {
           const contactPhone = contact?.phone?.replace(/\D/g, '').slice(-10) || '';
           const contactEmail = contact?.email?.toLowerCase() || '';
           
-          // PRIORITY 1: Match to property owner by phone or email
+          // PRIORITY 1: Match to property owner by phone or email using normalized formats
           if (contactPhone) {
+            const phonePatterns = normalizePhone(contactPhone);
+            const phoneOrConditions = phonePatterns.map(p => {
+              const last10 = p.replace(/\D/g, '').slice(-10);
+              return `phone.ilike.%${last10}%`;
+            }).join(',');
+            
             const { data: ownerByPhone } = await supabase
               .from("property_owners")
-              .select("id, name")
-              .or(`phone.ilike.%${contactPhone}%`)
+              .select("id, name, phone")
+              .or(phoneOrConditions)
               .limit(1);
 
             if (ownerByPhone && ownerByPhone.length > 0) {
               matchedOwnerId = ownerByPhone[0].id;
+              matchedOwnerName = ownerByPhone[0].name;
               console.log(`Matched to owner by phone: ${ownerByPhone[0].name}`);
             }
           }
@@ -166,40 +227,54 @@ serve(async (req) => {
 
             if (ownerByEmail && ownerByEmail.length > 0) {
               matchedOwnerId = ownerByEmail[0].id;
+              matchedOwnerName = ownerByEmail[0].name;
               console.log(`Matched to owner by email: ${ownerByEmail[0].name}`);
             }
           }
           
-          // PRIORITY 2: If no owner match, try leads
+          // PRIORITY 2: If no owner match, try leads with normalized phone
+          if (!matchedOwnerId && !matchedLeadId && contactPhone) {
+            const phonePatterns = normalizePhone(contactPhone);
+            const phoneOrConditions = phonePatterns.map(p => {
+              const last10 = p.replace(/\D/g, '').slice(-10);
+              return `phone.ilike.%${last10}%`;
+            }).join(',');
+            
+            const { data: leadByPhone } = await supabase
+              .from("leads")
+              .select("id, name")
+              .or(phoneOrConditions)
+              .limit(1);
+
+            if (leadByPhone && leadByPhone.length > 0) {
+              matchedLeadId = leadByPhone[0].id;
+              matchedLeadName = leadByPhone[0].name;
+              console.log(`Matched to lead by phone: ${leadByPhone[0].name}`);
+            }
+          }
+          
+          // PRIORITY 3: If still no match, try by ghl_contact_id or email
           if (!matchedOwnerId && !matchedLeadId) {
             // Match by ghl_contact_id first
             const { data: leadByGhlId } = await supabase
               .from("leads")
-              .select("id")
+              .select("id, name")
               .eq("ghl_contact_id", conversation.contactId)
               .single();
 
             if (leadByGhlId) {
               matchedLeadId = leadByGhlId.id;
-            } else if (contactPhone) {
-              const { data: leadByPhone } = await supabase
-                .from("leads")
-                .select("id")
-                .or(`phone.ilike.%${contactPhone}%`)
-                .limit(1);
-
-              if (leadByPhone && leadByPhone.length > 0) {
-                matchedLeadId = leadByPhone[0].id;
-              }
+              matchedLeadName = leadByGhlId.name;
             } else if (contactEmail) {
               const { data: leadByEmail } = await supabase
                 .from("leads")
-                .select("id")
+                .select("id, name")
                 .ilike("email", contactEmail)
                 .limit(1);
 
               if (leadByEmail && leadByEmail.length > 0) {
                 matchedLeadId = leadByEmail[0].id;
+                matchedLeadName = leadByEmail[0].name;
               }
             }
           }
@@ -236,12 +311,34 @@ serve(async (req) => {
         // Determine direction
         const direction = message.direction === "outbound" ? "outbound" : "inbound";
 
+        // Try to extract caller name from transcript if we don't have a match name
+        let callerDisplayName = matchedOwnerName || matchedLeadName || (conversation.contactName as string) || null;
+        
+        // For calls, try to extract name from transcript/body if still unknown
+        if (!callerDisplayName && commType === "call") {
+          const transcriptText = (message.body as string) || (message.text as string) || "";
+          const extractedName = extractCallerNameFromTranscript(transcriptText);
+          if (extractedName) {
+            callerDisplayName = extractedName;
+            console.log(`Extracted caller name from transcript: ${extractedName}`);
+          }
+        }
+        
         // Build communication record - prioritize owner_id over lead_id
         // Provide default body for calls without content to avoid null constraint violation
-        const messageBody = message.body || message.text || 
+        const messageBody = (message.body as string) || (message.text as string) || 
           (commType === "call" 
-            ? `Phone call ${direction === "inbound" ? "from" : "to"} ${conversation.contactName || "Contact"}. Duration: ${message.duration ? Math.round((message.duration as number) / 60) + ' min' : 'Unknown'}.`
+            ? `Phone call ${direction === "inbound" ? "from" : "to"} ${callerDisplayName || "Contact"}. Duration: ${message.duration ? Math.round((message.duration as number) / 60) + ' min' : 'Unknown'}.`
             : `${commType.toUpperCase()} message`);
+        
+        // Parse the correct date from GHL data
+        const dateAddedStr = message.dateAdded as string | undefined;
+        const createdAtStr = message.createdAt as string | undefined;
+        const messageDate = dateAddedStr 
+          ? new Date(dateAddedStr).toISOString()
+          : createdAtStr
+            ? new Date(createdAtStr).toISOString()
+            : new Date().toISOString();
         
         const communicationData: Record<string, unknown> = {
           lead_id: matchedOwnerId ? null : matchedLeadId,
@@ -250,22 +347,24 @@ serve(async (req) => {
           direction: direction,
           body: messageBody, // Use default body if empty
           subject: commType === "call" 
-            ? `Call ${direction === "inbound" ? "from" : "to"} ${conversation.contactName || "Contact"}`
+            ? `Call ${direction === "inbound" ? "from" : "to"} ${callerDisplayName || "Contact"}`
             : null,
           status: message.status || "delivered",
           ghl_message_id: message.id,
           ghl_conversation_id: conversation.id,
           external_id: message.id,
-          created_at: message.dateAdded || new Date().toISOString(),
+          created_at: messageDate, // Use parsed date from GHL
           metadata: {
             ghl_data: {
               conversationId: conversation.id,
               contactId: conversation.contactId,
-              contactName: conversation.contactName,
+              contactName: callerDisplayName || conversation.contactName,
               messageType: message.type || message.messageType,
               attachments: message.attachments,
               contentType: message.contentType,
               callType: commType === "call" ? "human" : undefined, // Mark as human call
+              dateAdded: message.dateAdded,
+              createdAt: message.createdAt,
             }
           },
         };
