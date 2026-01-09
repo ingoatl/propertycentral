@@ -171,6 +171,18 @@ async function handleSetupComplete(
       .eq("id", ownerId);
 
     console.log(`Updated owner ${ownerId} with payment method`);
+
+    // Mark payment setup request as completed
+    await supabase
+      .from("payment_setup_requests")
+      .update({
+        status: "completed",
+        completed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("owner_id", ownerId);
+
+    console.log(`Marked payment setup request as completed for owner ${ownerId}`);
   }
 
   // Update lead and advance stage if we have a lead ID

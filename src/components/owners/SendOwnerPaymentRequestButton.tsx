@@ -9,6 +9,7 @@ interface SendOwnerPaymentRequestButtonProps {
   email: string | null;
   name: string;
   stripeCustomerId: string | null;
+  paymentMethod?: string | null; // Added to check if payment method is actually set up
   className?: string;
   variant?: "default" | "outline" | "ghost";
   size?: "default" | "sm" | "lg" | "icon";
@@ -19,14 +20,15 @@ export function SendOwnerPaymentRequestButton({
   email,
   name,
   stripeCustomerId,
+  paymentMethod,
   className,
   variant = "outline",
   size = "sm",
 }: SendOwnerPaymentRequestButtonProps) {
   const [isSending, setIsSending] = useState(false);
 
-  // Check if payment method is already set up
-  const hasPaymentMethod = !!stripeCustomerId;
+  // Check if payment method is already set up - need BOTH stripe customer AND payment method
+  const hasPaymentMethod = !!stripeCustomerId && !!paymentMethod;
 
   if (!email) {
     return (

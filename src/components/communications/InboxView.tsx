@@ -793,20 +793,6 @@ export function InboxView() {
                           <Badge variant="outline" className="text-xs h-5 px-2">
                             <Phone className="h-3 w-3 mr-1" />Call
                           </Badge>
-                          {comm.contact_phone && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                window.open(`tel:${comm.contact_phone}`, '_self');
-                                toast.success(`Calling ${comm.contact_name}...`);
-                              }}
-                            >
-                              <PhoneCall className="h-3 w-3" />
-                            </Button>
-                          )}
                         </div>
                       )}
                       {comm.direction === "inbound" && !comm.is_resolved && (
