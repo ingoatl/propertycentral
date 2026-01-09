@@ -274,6 +274,16 @@ function RecapEditor({
           <MessageSquare className="h-4 w-4 mr-2" />
           Send SMS
         </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onMarkDone}
+          disabled={isMarkingDone}
+          className="text-primary border-primary/30 hover:bg-primary/10"
+        >
+          <Check className="h-4 w-4 mr-1" />
+          Done
+        </Button>
         {hasNext && (
           <Button
             variant="ghost"

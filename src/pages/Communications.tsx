@@ -2,17 +2,22 @@ import { useState } from "react";
 import { InboxView } from "@/components/communications/InboxView";
 import { OwnerQuickPanel } from "@/components/communications/OwnerQuickPanel";
 import { CallSyncButton } from "@/components/communications/CallSyncButton";
-import { MessageSquare, Users } from "lucide-react";
+import { MessageSquare, Users, Phone } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { CallRecapModal } from "@/components/CallRecapModal";
+import { usePendingCallRecaps } from "@/hooks/usePendingCallRecaps";
 
 const Communications = () => {
   const [showOwnerPanel, setShowOwnerPanel] = useState(false);
+  const [showCallReview, setShowCallReview] = useState(false);
+  const { pendingRecaps } = usePendingCallRecaps();
 
   return (
     <div className="space-y-6">
@@ -30,6 +35,19 @@ const Communications = () => {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {pendingRecaps.length > 0 && (
+            <Button 
+              variant="default"
+              onClick={() => setShowCallReview(true)}
+              className="gap-2"
+            >
+              <Phone className="h-4 w-4" />
+              Review Calls
+              <Badge variant="secondary" className="ml-1 bg-white/20">
+                {pendingRecaps.length}
+              </Badge>
+            </Button>
+          )}
           <CallSyncButton />
           <Button 
             variant="outline" 
@@ -59,6 +77,15 @@ const Communications = () => {
           <OwnerQuickPanel />
         </DialogContent>
       </Dialog>
+
+      {/* Call Review Modal */}
+      {showCallReview && (
+        <Dialog open={showCallReview} onOpenChange={setShowCallReview}>
+          <DialogContent className="max-w-3xl max-h-[90vh] p-0">
+            <CallRecapModal />
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 };
