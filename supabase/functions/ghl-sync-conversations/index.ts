@@ -9,51 +9,16 @@ const corsHeaders = {
 // Normalize phone number to multiple formats for matching
 function normalizePhone(phone: string): string[] {
   if (!phone) return [];
-  
-  // Strip all non-digits
   const digits = phone.replace(/\D/g, '');
-  
-  // Get last 10 digits (remove country code if present)
   const last10 = digits.slice(-10);
-  
   if (last10.length !== 10) return [digits];
-  
-  // Return multiple formats to match against
   return [
     last10,
     `+1${last10}`,
     `1${last10}`,
     `${last10.slice(0,3)}-${last10.slice(3,6)}-${last10.slice(6)}`,
     `(${last10.slice(0,3)}) ${last10.slice(3,6)}-${last10.slice(6)}`,
-    `${last10.slice(0,3)}.${last10.slice(3,6)}.${last10.slice(6)}`,
   ];
-}
-
-// Extract caller name from transcript, excluding team members
-function extractCallerNameFromTranscript(transcript: string | null): string | null {
-  if (!transcript) return null;
-  
-  const teamMembers = ['ingo', 'tom', 'anja', 'thomas', 'peachhaus', 'peach haus'];
-  
-  const patterns = [
-    /(?:this is|my name is|i'm|i am|it's|its)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/gi,
-    /(?:hi,?\s*this is|hey,?\s*it's|hello,?\s*this is)\s+([A-Z][a-z]+)/gi,
-    /^([A-Z][a-z]+)(?:\s+here|(?:\s+[A-Z][a-z]+)?\s+calling)/gm,
-  ];
-  
-  for (const pattern of patterns) {
-    const matches = transcript.matchAll(pattern);
-    for (const match of matches) {
-      if (match[1]) {
-        const name = match[1].trim();
-        const nameLower = name.toLowerCase();
-        if (!teamMembers.some(tm => nameLower.includes(tm))) {
-          return name;
-        }
-      }
-    }
-  }
-  return null;
 }
 
 serve(async (req) => {
@@ -70,10 +35,8 @@ serve(async (req) => {
     }
 
     const { leadId, contactId, limit = 100 } = await req.json();
-    // Ensure limit doesn't exceed 100 (GHL API limit)
     const safeLimit = Math.min(limit, 100);
 
-    // Initialize Supabase
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
@@ -81,58 +44,153 @@ serve(async (req) => {
     const syncedMessages: Array<Record<string, unknown>> = [];
     let conversationsToProcess: Array<Record<string, unknown>> = [];
 
-    console.log("=== Starting GHL Sync ===");
+    console.log("=== Starting GHL Sync (ALL conversations) ===");
 
     // Fetch conversations from GHL
-    if (contactId) {
-      console.log(`Fetching conversations for contact: ${contactId}`);
-      const response = await fetch(
-        `https://services.leadconnectorhq.com/conversations/search?locationId=${ghlLocationId}&contactId=${contactId}&limit=${safeLimit}`,
-        {
-          method: "GET",
-          headers: {
-            "Authorization": `Bearer ${ghlApiKey}`,
-            "Version": "2021-04-15",
-            "Content-Type": "application/json",
-          },
-        }
-      );
+    const endpoint = contactId 
+      ? `https://services.leadconnectorhq.com/conversations/search?locationId=${ghlLocationId}&contactId=${contactId}&limit=${safeLimit}`
+      : `https://services.leadconnectorhq.com/conversations/search?locationId=${ghlLocationId}&limit=${safeLimit}&sort=desc&sortBy=last_message_date`;
+    
+    console.log(`Fetching from: ${endpoint}`);
+    
+    const response = await fetch(endpoint, {
+      method: "GET",
+      headers: {
+        "Authorization": `Bearer ${ghlApiKey}`,
+        "Version": "2021-04-15",
+        "Content-Type": "application/json",
+      },
+    });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("GHL Conversations API error:", errorText);
-        throw new Error(`GHL API error: ${response.status}`);
-      }
-
-      const data = await response.json();
-      conversationsToProcess = data.conversations || [];
-    } else {
-      console.log(`Fetching recent conversations for location: ${ghlLocationId}`);
-      const response = await fetch(
-        `https://services.leadconnectorhq.com/conversations/search?locationId=${ghlLocationId}&limit=${safeLimit}&sort=desc&sortBy=last_message_date`,
-        {
-          method: "GET",
-          headers: {
-            "Authorization": `Bearer ${ghlApiKey}`,
-            "Version": "2021-04-15",
-            "Content-Type": "application/json",
-          },
-        }
-      );
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("GHL Conversations API error:", errorText);
-        throw new Error(`GHL API error: ${response.status}`);
-      }
-
-      const data = await response.json();
-      conversationsToProcess = data.conversations || [];
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("GHL Conversations API error:", errorText);
+      throw new Error(`GHL API error: ${response.status}`);
     }
 
+    const data = await response.json();
+    conversationsToProcess = data.conversations || [];
     console.log(`Processing ${conversationsToProcess.length} conversations`);
 
     for (const conversation of conversationsToProcess) {
+      // Get contact details first
+      let contactName = conversation.contactName || "Unknown";
+      let contactPhone = "";
+      let contactEmail = "";
+      
+      if (conversation.contactId) {
+        try {
+          const contactResponse = await fetch(
+            `https://services.leadconnectorhq.com/contacts/${conversation.contactId}`,
+            {
+              method: "GET",
+              headers: {
+                "Authorization": `Bearer ${ghlApiKey}`,
+                "Version": "2021-07-28",
+                "Content-Type": "application/json",
+              },
+            }
+          );
+
+          if (contactResponse.ok) {
+            const contactData = await contactResponse.json();
+            const contact = contactData.contact;
+            contactPhone = contact?.phone || '';
+            contactEmail = contact?.email?.toLowerCase() || '';
+            contactName = contact?.name || contact?.firstName || contactName;
+            console.log(`Contact: ${contactName}, Phone: ${contactPhone}, Email: ${contactEmail}`);
+          }
+        } catch (e) {
+          console.log(`Failed to fetch contact ${conversation.contactId}`);
+        }
+      }
+
+      // Try to match to owner or lead
+      let matchedLeadId = leadId;
+      let matchedOwnerId: string | null = null;
+      let matchedOwnerName: string | null = null;
+      let matchedLeadName: string | null = null;
+      const normalizedPhone = contactPhone.replace(/\D/g, '').slice(-10);
+      
+      if (normalizedPhone && normalizedPhone.length >= 10) {
+        const { data: allOwners } = await supabase
+          .from("property_owners")
+          .select("id, name, phone, email");
+          
+        if (allOwners) {
+          for (const owner of allOwners) {
+            if (owner.phone) {
+              const ownerPhone = owner.phone.replace(/\D/g, '').slice(-10);
+              if (ownerPhone === normalizedPhone) {
+                matchedOwnerId = owner.id;
+                matchedOwnerName = owner.name;
+                console.log(`Matched to owner: ${owner.name}`);
+                break;
+              }
+            }
+          }
+        }
+      }
+      
+      if (!matchedOwnerId && contactEmail) {
+        const { data: ownerByEmail } = await supabase
+          .from("property_owners")
+          .select("id, name")
+          .ilike("email", contactEmail)
+          .limit(1);
+
+        if (ownerByEmail && ownerByEmail.length > 0) {
+          matchedOwnerId = ownerByEmail[0].id;
+          matchedOwnerName = ownerByEmail[0].name;
+          console.log(`Matched to owner by email: ${ownerByEmail[0].name}`);
+        }
+      }
+      
+      if (!matchedOwnerId && !matchedLeadId && normalizedPhone) {
+        const phonePatterns = normalizePhone(normalizedPhone);
+        const phoneOrConditions = phonePatterns.map(p => `phone.ilike.%${p.replace(/\D/g, '').slice(-10)}%`).join(',');
+        
+        const { data: leadByPhone } = await supabase
+          .from("leads")
+          .select("id, name")
+          .or(phoneOrConditions)
+          .limit(1);
+
+        if (leadByPhone && leadByPhone.length > 0) {
+          matchedLeadId = leadByPhone[0].id;
+          matchedLeadName = leadByPhone[0].name;
+          console.log(`Matched to lead: ${leadByPhone[0].name}`);
+        }
+      }
+      
+      if (!matchedOwnerId && !matchedLeadId) {
+        const { data: leadByGhlId } = await supabase
+          .from("leads")
+          .select("id, name")
+          .eq("ghl_contact_id", conversation.contactId)
+          .single();
+
+        if (leadByGhlId) {
+          matchedLeadId = leadByGhlId.id;
+          matchedLeadName = leadByGhlId.name;
+        } else if (contactEmail) {
+          const { data: leadByEmail } = await supabase
+            .from("leads")
+            .select("id, name")
+            .ilike("email", contactEmail)
+            .limit(1);
+
+          if (leadByEmail && leadByEmail.length > 0) {
+            matchedLeadId = leadByEmail[0].id;
+            matchedLeadName = leadByEmail[0].name;
+          }
+        }
+      }
+      
+      // IMPORTANT: Even if no match, we still sync the conversation for visibility
+      // Store contact info in metadata for later matching
+      const displayName = matchedOwnerName || matchedLeadName || contactName;
+      
       // Fetch messages for this conversation
       const messagesResponse = await fetch(
         `https://services.leadconnectorhq.com/conversations/${conversation.id}/messages?limit=50`,
@@ -153,7 +211,6 @@ serve(async (req) => {
 
       const messagesData = await messagesResponse.json();
       
-      // Handle different GHL API response structures
       let messages: Array<Record<string, unknown>> = [];
       if (Array.isArray(messagesData)) {
         messages = messagesData;
@@ -164,145 +221,11 @@ serve(async (req) => {
       } else if (messagesData.data?.messages && Array.isArray(messagesData.data.messages)) {
         messages = messagesData.data.messages;
       } else {
-        console.log(`Unexpected messages response for conversation ${conversation.id}`);
         continue;
       }
       
-      console.log(`Processing ${messages.length} messages for conversation ${conversation.id}`);
+      console.log(`Processing ${messages.length} messages for ${displayName}`);
 
-      // Log raw message structure for debugging
-      if (messages.length > 0) {
-        const sample = messages[0];
-        console.log(`Sample message structure:`, JSON.stringify({
-          id: sample.id,
-          type: sample.type,
-          messageType: sample.messageType,
-          contentType: sample.contentType,
-          body: typeof sample.body === 'string' ? sample.body?.slice(0, 100) : sample.body,
-          text: typeof sample.text === 'string' ? sample.text?.slice(0, 100) : sample.text,
-          direction: sample.direction,
-        }));
-      }
-
-      // Match contact to owner or lead
-      let matchedLeadId = leadId;
-      let matchedOwnerId: string | null = null;
-      let matchedOwnerName: string | null = null;
-      let matchedLeadName: string | null = null;
-      
-      if (conversation.contactId) {
-        const contactResponse = await fetch(
-          `https://services.leadconnectorhq.com/contacts/${conversation.contactId}`,
-          {
-            method: "GET",
-            headers: {
-              "Authorization": `Bearer ${ghlApiKey}`,
-              "Version": "2021-07-28",
-              "Content-Type": "application/json",
-            },
-          }
-        );
-
-        if (contactResponse.ok) {
-          const contactData = await contactResponse.json();
-          const contact = contactData.contact;
-          const rawContactPhone = contact?.phone || '';
-          const contactPhone = rawContactPhone.replace(/\D/g, '').slice(-10);
-          const contactEmail = contact?.email?.toLowerCase() || '';
-          
-          console.log(`Contact lookup - Phone: ${rawContactPhone} (normalized: ${contactPhone}), Email: ${contactEmail}`);
-          
-          // Match to property owner by phone
-          if (contactPhone && contactPhone.length >= 10) {
-            const { data: allOwners } = await supabase
-              .from("property_owners")
-              .select("id, name, phone, email");
-              
-            if (allOwners) {
-              for (const owner of allOwners) {
-                if (owner.phone) {
-                  const ownerPhone = owner.phone.replace(/\D/g, '').slice(-10);
-                  if (ownerPhone === contactPhone) {
-                    matchedOwnerId = owner.id;
-                    matchedOwnerName = owner.name;
-                    console.log(`Matched to owner by normalized phone: ${owner.name}`);
-                    break;
-                  }
-                }
-              }
-            }
-          }
-          
-          // Match by email if no phone match
-          if (!matchedOwnerId && contactEmail) {
-            const { data: ownerByEmail } = await supabase
-              .from("property_owners")
-              .select("id, name")
-              .ilike("email", contactEmail)
-              .limit(1);
-
-            if (ownerByEmail && ownerByEmail.length > 0) {
-              matchedOwnerId = ownerByEmail[0].id;
-              matchedOwnerName = ownerByEmail[0].name;
-              console.log(`Matched to owner by email: ${ownerByEmail[0].name}`);
-            }
-          }
-          
-          // Try leads if no owner match
-          if (!matchedOwnerId && !matchedLeadId && contactPhone) {
-            const phonePatterns = normalizePhone(contactPhone);
-            const phoneOrConditions = phonePatterns.map(p => {
-              const last10 = p.replace(/\D/g, '').slice(-10);
-              return `phone.ilike.%${last10}%`;
-            }).join(',');
-            
-            const { data: leadByPhone } = await supabase
-              .from("leads")
-              .select("id, name")
-              .or(phoneOrConditions)
-              .limit(1);
-
-            if (leadByPhone && leadByPhone.length > 0) {
-              matchedLeadId = leadByPhone[0].id;
-              matchedLeadName = leadByPhone[0].name;
-              console.log(`Matched to lead by phone: ${leadByPhone[0].name}`);
-            }
-          }
-          
-          // Try by ghl_contact_id or email
-          if (!matchedOwnerId && !matchedLeadId) {
-            const { data: leadByGhlId } = await supabase
-              .from("leads")
-              .select("id, name")
-              .eq("ghl_contact_id", conversation.contactId)
-              .single();
-
-            if (leadByGhlId) {
-              matchedLeadId = leadByGhlId.id;
-              matchedLeadName = leadByGhlId.name;
-            } else if (contactEmail) {
-              const { data: leadByEmail } = await supabase
-                .from("leads")
-                .select("id, name")
-                .ilike("email", contactEmail)
-                .limit(1);
-
-              if (leadByEmail && leadByEmail.length > 0) {
-                matchedLeadId = leadByEmail[0].id;
-                matchedLeadName = leadByEmail[0].name;
-              }
-            }
-          }
-        }
-      }
-      
-      // Skip if no match found
-      if (!matchedLeadId && !matchedOwnerId) {
-        console.log(`No lead or owner match for conversation ${conversation.id}, skipping`);
-        continue;
-      }
-
-      // Process each message
       for (const message of messages) {
         // Skip if already synced
         const { data: existing } = await supabase
@@ -311,9 +234,7 @@ serve(async (req) => {
           .eq("ghl_message_id", message.id)
           .single();
 
-        if (existing) {
-          continue;
-        }
+        if (existing) continue;
 
         // Determine communication type
         const rawType = message.type;
@@ -321,51 +242,41 @@ serve(async (req) => {
         const rawContentType = message.contentType;
         
         const msgType = (typeof rawType === 'string' ? rawType : String(rawType ?? '')).toUpperCase();
-        const msgMessageType = (typeof rawMessageType === 'number' ? String(rawMessageType) : String(rawMessageType ?? ''));
+        const msgMessageType = String(rawMessageType ?? '');
         const contentType = (typeof rawContentType === 'string' ? rawContentType : String(rawContentType ?? '')).toLowerCase();
         
         let commType = "sms";
         let isCall = false;
         
-        // Check if this is a call
         if (msgType === "TYPE_CALL" || msgType === "CALL" || msgType.includes("CALL") || 
-            contentType === "call" || msgType === "TYPE_VOICEMAIL" || msgType.includes("VOICEMAIL") ||
+            contentType === "call" || msgType.includes("VOICEMAIL") ||
             msgMessageType === "7" || msgMessageType === "10") {
           commType = "call";
           isCall = true;
-          console.log(`Detected call: type=${msgType}, messageType=${msgMessageType}, id=${message.id}`);
-        } else if (msgType === "TYPE_EMAIL" || msgType === "EMAIL" ||
-            contentType.includes("email") || msgMessageType === "3") {
+        } else if (msgType === "TYPE_EMAIL" || msgType === "EMAIL" || contentType.includes("email") || msgMessageType === "3") {
           commType = "email";
         }
 
-        // Determine direction
         const direction = message.direction === "outbound" ? "outbound" : "inbound";
 
-        // Get display name
-        const callerDisplayName = matchedOwnerName || matchedLeadName || (conversation.contactName as string) || null;
-        
-        // IMPORTANT: Extract message body correctly
-        // GHL stores content in different fields depending on type
+        // CRITICAL: Extract message body from all possible fields
         let messageBody = "";
         
-        // Try multiple fields where body content might be stored
-        if (typeof message.body === 'string' && message.body.trim()) {
-          messageBody = message.body;
-        } else if (typeof message.text === 'string' && message.text.trim()) {
-          messageBody = message.text;
-        } else if (typeof message.message === 'string' && message.message.trim()) {
-          messageBody = message.message;
-        } else if (typeof message.content === 'string' && message.content.trim()) {
-          messageBody = message.content;
+        // GHL stores body in different fields - check all
+        const bodyFields = ['body', 'text', 'message', 'content', 'snippet'];
+        for (const field of bodyFields) {
+          const value = message[field];
+          if (typeof value === 'string' && value.trim() && value.trim().length > messageBody.length) {
+            messageBody = value.trim();
+          }
         }
         
-        console.log(`Message ${message.id} body extraction: body=${typeof message.body}, text=${typeof message.text}, extracted=${messageBody.slice(0, 50)}`);
+        // Log what we found for debugging
+        console.log(`Message ${message.id}: type=${commType}, body fields: body=${typeof message.body}/${String(message.body).slice(0, 30)}, text=${typeof message.text}, extracted=${messageBody.slice(0, 50)}`);
 
-        // For calls, try to get transcript from GHL transcription endpoint
+        // For calls, try to get transcript
         if (isCall && (!messageBody || messageBody.length < 50)) {
           try {
-            console.log(`Fetching transcript for call message ${message.id}`);
             const transcriptResponse = await fetch(
               `https://services.leadconnectorhq.com/conversations/locations/${ghlLocationId}/messages/${message.id}/transcription`,
               {
@@ -380,37 +291,32 @@ serve(async (req) => {
             
             if (transcriptResponse.ok) {
               const transcriptData = await transcriptResponse.json();
-              console.log(`GHL transcript response:`, JSON.stringify(transcriptData).slice(0, 200));
-              
               if (Array.isArray(transcriptData)) {
-                const transcriptText = transcriptData.map((t: { sentence?: string; text?: string }) => t.sentence || t.text || "").join(" ").trim();
-                if (transcriptText) messageBody = transcriptText;
+                const text = transcriptData.map((t: { sentence?: string; text?: string }) => t.sentence || t.text || "").join(" ").trim();
+                if (text) messageBody = text;
               } else if (transcriptData.transcription) {
                 messageBody = transcriptData.transcription;
               } else if (transcriptData.text) {
                 messageBody = transcriptData.text;
               }
-            } else {
-              console.log(`No transcript available for ${message.id}: ${transcriptResponse.status}`);
             }
           } catch (e) {
-            console.log(`Transcript fetch error for ${message.id}:`, e);
+            console.log(`No transcript for call ${message.id}`);
           }
         }
         
         // Fallback for calls without transcripts
         if (isCall && (!messageBody || messageBody.length < 10)) {
           const durationMins = message.duration ? Math.round((message.duration as number) / 60) : 0;
-          messageBody = `Phone call ${direction === "inbound" ? "from" : "to"} ${callerDisplayName || "Contact"}. Duration: ${durationMins > 0 ? durationMins + ' min' : 'Unknown'}.`;
+          messageBody = `Phone call ${direction === "inbound" ? "from" : "to"} ${displayName}. Duration: ${durationMins > 0 ? durationMins + ' min' : 'Unknown'}.`;
         }
         
-        // For SMS/email, if still no body, skip (we need actual content)
+        // Skip messages with no content (but NOT calls - we always want calls)
         if (!isCall && (!messageBody || messageBody.length < 2)) {
-          console.log(`Skipping ${commType} message ${message.id} - no body content found`);
+          console.log(`Skipping ${commType} ${message.id} - no body`);
           continue;
         }
         
-        // Parse date
         const dateAddedStr = message.dateAdded as string | undefined;
         const createdAtStr = message.createdAt as string | undefined;
         const messageDate = dateAddedStr 
@@ -419,36 +325,38 @@ serve(async (req) => {
             ? new Date(createdAtStr).toISOString()
             : new Date().toISOString();
         
+        // Store ALL communications - even unmatched ones
+        // Store contact info in metadata for later matching
         const communicationData: Record<string, unknown> = {
-          lead_id: matchedOwnerId ? null : matchedLeadId,
-          owner_id: matchedOwnerId,
+          lead_id: matchedOwnerId ? null : (matchedLeadId || null),
+          owner_id: matchedOwnerId || null,
           communication_type: commType,
           direction: direction,
           body: messageBody,
-          subject: commType === "call" 
-            ? `Call ${direction === "inbound" ? "from" : "to"} ${callerDisplayName || "Contact"}`
+          subject: isCall 
+            ? `Call ${direction === "inbound" ? "from" : "to"} ${displayName}`
             : (message.subject as string) || null,
           status: message.status || "delivered",
           ghl_message_id: message.id,
           ghl_conversation_id: conversation.id,
+          ghl_contact_id: conversation.contactId || null,
           external_id: message.id,
           created_at: messageDate,
           metadata: {
             ghl_data: {
               conversationId: conversation.id,
               contactId: conversation.contactId,
-              contactName: callerDisplayName || conversation.contactName,
+              contactName: displayName,
+              contactPhone: contactPhone,
+              contactEmail: contactEmail,
               messageType: message.type || message.messageType,
-              attachments: message.attachments,
               contentType: message.contentType,
               callType: isCall ? "human" : undefined,
-              dateAdded: message.dateAdded,
-              createdAt: message.createdAt,
+              unmatched: !matchedOwnerId && !matchedLeadId,
             }
           },
         };
 
-        // Add call-specific fields
         if (isCall) {
           communicationData.call_duration = message.duration || null;
           communicationData.call_recording_url = message.recordingUrl || null;
@@ -461,20 +369,19 @@ serve(async (req) => {
           .single();
 
         if (insertError) {
-          console.error(`Error inserting message ${message.id}:`, insertError);
+          console.error(`Error inserting ${message.id}:`, insertError);
         } else {
-          console.log(`Synced ${commType} ${direction} for ${callerDisplayName}: ${messageBody.slice(0, 50)}...`);
+          console.log(`✓ Synced ${commType} for ${displayName}: ${messageBody.slice(0, 40)}...`);
           syncedMessages.push({
             id: inserted.id,
             ghl_message_id: message.id,
             type: commType,
-            lead_id: matchedLeadId,
-            owner_id: matchedOwnerId,
+            matched: !!(matchedOwnerId || matchedLeadId),
+            contact_name: displayName,
           });
           
-          // For calls with good transcripts, trigger analysis
-          if (isCall && messageBody && messageBody.length > 100) {
-            console.log(`Triggering call analysis for ${inserted.id}`);
+          // Trigger call analysis for good transcripts
+          if (isCall && messageBody && messageBody.length > 100 && (matchedOwnerId || matchedLeadId)) {
             try {
               fetch(`${supabaseUrl}/functions/v1/analyze-call-transcript`, {
                 method: "POST",
@@ -486,14 +393,14 @@ serve(async (req) => {
                   communicationId: inserted.id,
                   ownerId: matchedOwnerId,
                   leadId: matchedLeadId,
-                  matchedName: callerDisplayName,
+                  matchedName: displayName,
                   callDuration: message.duration,
                   transcript: messageBody,
                   ghlCallId: message.id,
                 }),
               }).catch(e => console.error("Analysis trigger failed:", e));
             } catch (e) {
-              console.error("Error triggering analysis:", e);
+              console.error("Analysis error:", e);
             }
           }
         }

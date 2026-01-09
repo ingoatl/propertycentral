@@ -499,7 +499,7 @@ export function InboxView() {
         // Fetch lead call communications
         const { data: callComms } = await supabase
           .from("lead_communications")
-          .select(`id, communication_type, direction, body, subject, created_at, status, lead_id, owner_id, leads(id, name, phone, email)`)
+          .select(`id, communication_type, direction, body, subject, created_at, status, lead_id, owner_id, ghl_contact_id, metadata, leads(id, name, phone, email)`)
           .eq("communication_type", "call")
           .not("lead_id", "is", null)
           .order("created_at", { ascending: false })
@@ -520,7 +520,7 @@ export function InboxView() {
         // Fetch owner call communications
         const { data: ownerCallComms } = await supabase
           .from("lead_communications")
-          .select(`id, communication_type, direction, body, subject, created_at, status, owner_id, property_owners(id, name, email, phone)`)
+          .select(`id, communication_type, direction, body, subject, created_at, status, owner_id, ghl_contact_id, metadata, property_owners(id, name, email, phone)`)
           .eq("communication_type", "call")
           .not("owner_id", "is", null)
           .order("created_at", { ascending: false })
@@ -535,6 +535,32 @@ export function InboxView() {
               contact_phone: owner?.phone || undefined, contact_email: owner?.email || undefined,
               contact_type: "owner", contact_id: comm.owner_id || "", status: comm.status || undefined,
               owner_id: comm.owner_id || undefined,
+            });
+          }
+        }
+
+        // Fetch UNMATCHED calls (no lead_id or owner_id) - these are synced from GHL but not matched yet
+        const { data: unmatchedCallComms } = await supabase
+          .from("lead_communications")
+          .select(`id, communication_type, direction, body, subject, created_at, status, ghl_contact_id, metadata`)
+          .eq("communication_type", "call")
+          .is("lead_id", null)
+          .is("owner_id", null)
+          .order("created_at", { ascending: false })
+          .limit(50);
+
+        if (unmatchedCallComms) {
+          for (const comm of unmatchedCallComms) {
+            // Extract contact name from metadata if available
+            const metadata = comm.metadata as { ghl_data?: { contactName?: string; contactPhone?: string } } | null;
+            const contactName = metadata?.ghl_data?.contactName || "Unknown Caller";
+            const contactPhone = metadata?.ghl_data?.contactPhone || undefined;
+            
+            results.push({
+              id: comm.id, type: "call", direction: comm.direction as "inbound" | "outbound",
+              body: comm.body || "Call", created_at: comm.created_at, contact_name: contactName,
+              contact_phone: contactPhone, contact_type: "external", contact_id: comm.id, 
+              status: comm.status || undefined,
             });
           }
         }
