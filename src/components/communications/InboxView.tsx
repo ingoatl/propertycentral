@@ -38,6 +38,7 @@ import { ConversationNotes } from "./ConversationNotes";
 import { AdminInboxSelector } from "./AdminInboxSelector";
 import { EmailActionModal } from "./EmailActionModal";
 import LeadDetailModal from "@/components/leads/LeadDetailModal";
+import { OwnerCommunicationDetail } from "./OwnerCommunicationDetail";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useAdminCheck } from "@/hooks/useAdminCheck";
@@ -78,7 +79,7 @@ interface PhoneAssignment {
 }
 
 type TabType = "chats" | "calls" | "emails";
-type FilterType = "all" | "open" | "unread" | "unresponded";
+type FilterType = "all" | "open" | "unread" | "unresponded" | "owners";
 type MessageChannel = "sms" | "email";
 
 interface GmailEmail {
@@ -121,6 +122,12 @@ export function InboxView() {
   const [viewAllInboxes, setViewAllInboxes] = useState(false);
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [showEmailActionModal, setShowEmailActionModal] = useState(false);
+  const [selectedOwnerForDetail, setSelectedOwnerForDetail] = useState<{
+    id: string;
+    name: string;
+    email?: string | null;
+    phone?: string | null;
+  } | null>(null);
   
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -658,9 +665,19 @@ export function InboxView() {
           {/* Only show filters for Chats/Calls tabs */}
           {activeTab !== "emails" && (
             <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide pb-1">
-              {(["all", "open", "unread", "unresponded"] as FilterType[]).map((filter) => (
-                <button key={filter} onClick={() => setActiveFilter(filter)} className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors whitespace-nowrap ${activeFilter === filter ? "bg-primary text-primary-foreground border-primary" : "bg-background text-muted-foreground border-border hover:border-primary/50"}`}>
-                  {filter.charAt(0).toUpperCase() + filter.slice(1)}
+              {(["all", "owners", "open", "unread", "unresponded"] as FilterType[]).map((filter) => (
+                <button 
+                  key={filter} 
+                  onClick={() => setActiveFilter(filter)} 
+                  className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors whitespace-nowrap ${
+                    activeFilter === filter 
+                      ? filter === "owners" 
+                        ? "bg-purple-500 text-white border-purple-500" 
+                        : "bg-primary text-primary-foreground border-primary" 
+                      : "bg-background text-muted-foreground border-border hover:border-primary/50"
+                  }`}
+                >
+                  {filter === "owners" ? "Owners" : filter.charAt(0).toUpperCase() + filter.slice(1)}
                 </button>
               ))}
             </div>
@@ -713,14 +730,27 @@ export function InboxView() {
             )
           ) : isLoading ? (
             <div className="p-4 text-center text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin mx-auto mb-2" /><p className="text-sm">Loading...</p></div>
-          ) : communications.length === 0 ? (
-            <div className="p-8 text-center text-muted-foreground"><MessageSquare className="h-10 w-10 mx-auto mb-3 opacity-40" /><p className="text-sm">No conversations</p></div>
+          ) : communications.filter(c => activeFilter !== "owners" || c.contact_type === "owner").length === 0 ? (
+            <div className="p-8 text-center text-muted-foreground"><MessageSquare className="h-10 w-10 mx-auto mb-3 opacity-40" /><p className="text-sm">{activeFilter === "owners" ? "No owner conversations" : "No conversations"}</p></div>
           ) : (
             <div className="divide-y divide-border/50">
-              {communications.map((comm) => (
+              {communications
+                .filter(c => activeFilter !== "owners" || c.contact_type === "owner")
+                .map((comm) => (
                 <div 
                   key={comm.id} 
-                  onClick={() => handleSelectMessage(comm)} 
+                  onClick={() => {
+                    if (comm.contact_type === "owner" && comm.owner_id) {
+                      setSelectedOwnerForDetail({
+                        id: comm.owner_id,
+                        name: comm.contact_name,
+                        email: comm.contact_email,
+                        phone: comm.contact_phone,
+                      });
+                    } else {
+                      handleSelectMessage(comm);
+                    }
+                  }}
                   className={`flex items-start gap-3 p-4 cursor-pointer transition-colors active:bg-muted/70 ${selectedMessage?.id === comm.id ? "bg-muted/70" : "hover:bg-muted/30"}`}
                 >
                   {/* Avatar with status indicator */}
@@ -1021,6 +1051,18 @@ export function InboxView() {
         onClose={() => setShowEmailActionModal(false)}
         email={selectedGmailEmail}
       />
+      
+      {/* Owner Communication Detail Modal */}
+      {selectedOwnerForDetail && (
+        <OwnerCommunicationDetail
+          ownerId={selectedOwnerForDetail.id}
+          ownerName={selectedOwnerForDetail.name}
+          ownerEmail={selectedOwnerForDetail.email}
+          ownerPhone={selectedOwnerForDetail.phone}
+          isOpen={!!selectedOwnerForDetail}
+          onClose={() => setSelectedOwnerForDetail(null)}
+        />
+      )}
     </div>
   );
 }
