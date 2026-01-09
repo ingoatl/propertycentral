@@ -89,6 +89,7 @@ interface PropertyData {
   square_feet?: number;
   max_guests?: number;
   amenities?: string[];
+  onboarding_stage?: string | null;
 }
 
 interface Credential {
@@ -843,7 +844,7 @@ export default function OwnerDashboard() {
           </TabsList>
 
           {/* Show onboarding timeline if property is in onboarding */}
-          {property?.id && <OwnerOnboardingTimeline propertyId={property.id} />}
+          {property?.onboarding_stage && <OwnerOnboardingTimeline onboardingStage={property.onboarding_stage} />}
 
           <TabsContent value="overview">
             <div className="space-y-8">
