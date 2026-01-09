@@ -234,25 +234,31 @@ function RecapEditor({
   const generateSmartFollowUp = useCallback(async () => {
     setIsGeneratingSmart(true);
     try {
-      const contextSummary = conversationContext?.summary || "";
+      // Use the enhanced contextForAI which includes pending requests
+      const contextForAI = conversationContext?.contextForAI || conversationContext?.summary || "";
+      const pendingReqs = conversationContext?.pendingRequests || [];
+      const lastAsk = conversationContext?.lastOutboundAsk || "";
+      
       const prompt = `Generate a warm, professional follow-up SMS for a property management company. 
 
-CONTEXT:
-- Contact name: ${recap.recipient_name || "property owner"}
+CONTACT INFO:
+- Contact name: ${recap.recipient_name || "property owner"} (use their first name)
 - This is about: ${recap.key_topics?.join(", ") || "property management"}
 - Call summary: ${recap.transcript_summary || "General inquiry call"}
 
-PREVIOUS CONVERSATION HISTORY:
-${contextSummary || "No previous messages"}
+COMPLETE CONVERSATION HISTORY (MOST IMPORTANT - read every message):
+${contextForAI || "No previous messages"}
 
-IMPORTANT GUIDELINES (based on sales best practices):
-1. Reference specific details from previous conversations to show you remember them
-2. Be warm but professional - use their first name
-3. Add value in every message - don't just "check in"
-4. If they asked for something specific, acknowledge it
-5. Keep it under 160 characters for SMS
-6. End with a clear next step or question
-7. Sign off with "- PeachHaus"
+${pendingReqs.length > 0 ? `\n⚠️ WE ARE WAITING FOR THEM TO SEND: ${pendingReqs.join(", ")}. MUST reference this in your message!` : ""}
+${lastAsk ? `\nOur last outbound message asked: "${lastAsk.slice(0, 300)}"` : ""}
+
+CRITICAL RULES:
+1. If we asked them for something (address, documents, info), DIRECTLY reference it! Say "Did you have a chance to get that address to me?" or similar
+2. Be specific - don't be vague. Reference actual details from the conversation
+3. Be warm and conversational - not corporate
+4. Keep under 160 characters for SMS
+5. End with a clear question or next step
+6. Sign off with "- PeachHaus"
 
 Generate ONLY the SMS text, nothing else.`;
 
@@ -266,7 +272,7 @@ Generate ONLY the SMS text, nothing else.`;
         setSmsMessage(data.message);
         toast.success("Smart follow-up generated!");
       }
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error("Error generating smart follow-up:", e);
       toast.error("Couldn't generate smart message");
     } finally {
@@ -274,13 +280,23 @@ Generate ONLY the SMS text, nothing else.`;
     }
   }, [recap, conversationContext]);
   
-  // Generate follow-up message from context
+  // Generate follow-up message from context - reference specific pending requests
   const generateFollowUpMessage = useMemo(() => {
     const topics = recap.key_topics?.slice(0, 2).join(' and ') || 'your property';
+    const pendingReqs = conversationContext?.pendingRequests || [];
     
-    // If we've asked them for something, reference it
-    if (conversationContext?.pendingRequests && conversationContext.pendingRequests.length > 0) {
-      return `${greeting} hope you're doing well! Just wanted to follow up and see if you had any questions about what we discussed. I'm here to help whenever you're ready. - PeachHaus`;
+    // If we've asked them for something specific, reference it directly
+    if (pendingReqs.length > 0) {
+      if (pendingReqs.includes("their address")) {
+        return `${greeting} just following up - did you have a chance to send over that address? Let me know if you need anything! - PeachHaus`;
+      }
+      if (pendingReqs.includes("insurance documents")) {
+        return `${greeting} checking in on the insurance documents. Let me know if you have any questions! - PeachHaus`;
+      }
+      if (pendingReqs.includes("income report info")) {
+        return `${greeting} wanted to follow up on the income report info. Have you had a chance to gather that? - PeachHaus`;
+      }
+      return `${greeting} following up on our last conversation. Did you have a chance to get that info together? Happy to help! - PeachHaus`;
     }
     
     return `${greeting} just checking in about ${topics}. Have you had a chance to think it over? Happy to answer any questions! - PeachHaus`;
