@@ -721,11 +721,15 @@ export function InboxView() {
                 <div 
                   key={comm.id} 
                   onClick={() => handleSelectMessage(comm)} 
-                  className={`flex items-start gap-3 p-3 md:p-3 cursor-pointer transition-colors active:bg-muted/70 ${selectedMessage?.id === comm.id ? "bg-muted/70" : "hover:bg-muted/30"}`}
+                  className={`flex items-start gap-3 p-4 cursor-pointer transition-colors active:bg-muted/70 ${selectedMessage?.id === comm.id ? "bg-muted/70" : "hover:bg-muted/30"}`}
                 >
                   {/* Avatar with status indicator */}
                   <div className="relative">
-                    <div className="h-11 w-11 md:h-10 md:w-10 rounded-full bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center flex-shrink-0 shadow-sm">
+                    <div className={`h-12 w-12 rounded-full flex items-center justify-center flex-shrink-0 shadow-sm ${
+                      comm.contact_type === "owner" 
+                        ? "bg-gradient-to-br from-purple-500 to-purple-600" 
+                        : "bg-gradient-to-br from-emerald-500 to-emerald-600"
+                    }`}>
                       <span className="text-sm font-semibold text-white">{getInitials(comm.contact_name)}</span>
                     </div>
                     {comm.is_resolved && (
@@ -735,19 +739,34 @@ export function InboxView() {
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="font-medium text-sm truncate">{comm.contact_name}</span>
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <span className="font-semibold text-sm truncate">{comm.contact_name}</span>
                       <span className="text-xs text-muted-foreground whitespace-nowrap flex-shrink-0">{format(new Date(comm.created_at), "MMM d")}</span>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{getMessagePreview(comm)}</p>
-                    {/* Type indicator */}
-                    <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                      {comm.type === "draft" && <Badge variant="outline" className="text-xs h-5 px-1.5 bg-amber-500/10 text-amber-600 border-amber-500/30">Draft</Badge>}
-                      {comm.type === "personal_sms" && <Badge variant="outline" className="text-xs h-5 px-1.5">SMS</Badge>}
-                      {comm.contact_type === "owner" && <Badge variant="outline" className="text-xs h-5 px-1.5 bg-purple-500/10 text-purple-600 border-purple-500/30">Owner</Badge>}
-                      {comm.contact_type === "lead" && comm.type !== "draft" && <Badge variant="outline" className="text-xs h-5 px-1.5 bg-emerald-500/10 text-emerald-600 border-emerald-500/30">Lead</Badge>}
-                      {comm.direction === "inbound" && !comm.is_resolved && <Badge variant="outline" className="text-xs h-5 px-1.5 bg-blue-500/10 text-blue-600 border-blue-500/30">New</Badge>}
+                    {/* Type badges - more prominent on mobile */}
+                    <div className="flex items-center gap-1.5 mb-1.5 flex-wrap">
+                      {comm.contact_type === "owner" && (
+                        <Badge className="text-xs h-5 px-2 bg-purple-500 text-white border-0">Owner</Badge>
+                      )}
+                      {comm.contact_type === "lead" && comm.type !== "draft" && (
+                        <Badge className="text-xs h-5 px-2 bg-emerald-500 text-white border-0">Lead</Badge>
+                      )}
+                      {comm.type === "draft" && (
+                        <Badge className="text-xs h-5 px-2 bg-amber-500 text-white border-0">Draft</Badge>
+                      )}
+                      {comm.type === "personal_sms" && (
+                        <Badge variant="outline" className="text-xs h-5 px-2">SMS</Badge>
+                      )}
+                      {comm.type === "call" && (
+                        <Badge variant="outline" className="text-xs h-5 px-2">
+                          <Phone className="h-3 w-3 mr-1" />Call
+                        </Badge>
+                      )}
+                      {comm.direction === "inbound" && !comm.is_resolved && (
+                        <Badge className="text-xs h-5 px-2 bg-blue-500 text-white border-0">New</Badge>
+                      )}
                     </div>
+                    <p className="text-sm text-muted-foreground line-clamp-2">{getMessagePreview(comm)}</p>
                   </div>
                 </div>
               ))}

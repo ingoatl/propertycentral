@@ -115,10 +115,11 @@ serve(async (req) => {
       
       console.log(`Processing ${messages.length} messages for conversation ${conversation.id}`);
 
-      // Try to find matching lead by contact phone or email
+      // Try to find matching owner FIRST, then lead
       let matchedLeadId = leadId;
+      let matchedOwnerId: string | null = null;
       
-      if (!matchedLeadId && conversation.contactId) {
+      if (conversation.contactId) {
         // Fetch contact details to get phone/email
         const contactResponse = await fetch(
           `https://services.leadconnectorhq.com/contacts/${conversation.contactId}`,
@@ -135,41 +136,76 @@ serve(async (req) => {
         if (contactResponse.ok) {
           const contactData = await contactResponse.json();
           const contact = contactData.contact;
+          const contactPhone = contact?.phone?.replace(/\D/g, '').slice(-10) || '';
+          const contactEmail = contact?.email?.toLowerCase() || '';
           
-          // Match by ghl_contact_id first
-          const { data: leadByGhlId } = await supabase
-            .from("leads")
-            .select("id")
-            .eq("ghl_contact_id", conversation.contactId)
-            .single();
-
-          if (leadByGhlId) {
-            matchedLeadId = leadByGhlId.id;
-          } else if (contact?.phone) {
-            // Try matching by phone
-            const cleanPhone = contact.phone.replace(/\D/g, '').slice(-10);
-            const { data: leadByPhone } = await supabase
-              .from("leads")
-              .select("id")
-              .or(`phone.ilike.%${cleanPhone}%`)
+          // PRIORITY 1: Match to property owner by phone or email
+          if (contactPhone) {
+            const { data: ownerByPhone } = await supabase
+              .from("property_owners")
+              .select("id, name")
+              .or(`phone.ilike.%${contactPhone}%`)
               .limit(1);
 
-            if (leadByPhone && leadByPhone.length > 0) {
-              matchedLeadId = leadByPhone[0].id;
+            if (ownerByPhone && ownerByPhone.length > 0) {
+              matchedOwnerId = ownerByPhone[0].id;
+              console.log(`Matched to owner by phone: ${ownerByPhone[0].name}`);
             }
-          } else if (contact?.email) {
-            // Try matching by email
-            const { data: leadByEmail } = await supabase
-              .from("leads")
-              .select("id")
-              .eq("email", contact.email)
+          }
+          
+          if (!matchedOwnerId && contactEmail) {
+            const { data: ownerByEmail } = await supabase
+              .from("property_owners")
+              .select("id, name")
+              .ilike("email", contactEmail)
               .limit(1);
 
-            if (leadByEmail && leadByEmail.length > 0) {
-              matchedLeadId = leadByEmail[0].id;
+            if (ownerByEmail && ownerByEmail.length > 0) {
+              matchedOwnerId = ownerByEmail[0].id;
+              console.log(`Matched to owner by email: ${ownerByEmail[0].name}`);
+            }
+          }
+          
+          // PRIORITY 2: If no owner match, try leads
+          if (!matchedOwnerId && !matchedLeadId) {
+            // Match by ghl_contact_id first
+            const { data: leadByGhlId } = await supabase
+              .from("leads")
+              .select("id")
+              .eq("ghl_contact_id", conversation.contactId)
+              .single();
+
+            if (leadByGhlId) {
+              matchedLeadId = leadByGhlId.id;
+            } else if (contactPhone) {
+              const { data: leadByPhone } = await supabase
+                .from("leads")
+                .select("id")
+                .or(`phone.ilike.%${contactPhone}%`)
+                .limit(1);
+
+              if (leadByPhone && leadByPhone.length > 0) {
+                matchedLeadId = leadByPhone[0].id;
+              }
+            } else if (contactEmail) {
+              const { data: leadByEmail } = await supabase
+                .from("leads")
+                .select("id")
+                .ilike("email", contactEmail)
+                .limit(1);
+
+              if (leadByEmail && leadByEmail.length > 0) {
+                matchedLeadId = leadByEmail[0].id;
+              }
             }
           }
         }
+      }
+      
+      // Skip if no match found
+      if (!matchedLeadId && !matchedOwnerId) {
+        console.log(`No lead or owner match for conversation ${conversation.id}, skipping`);
+        continue;
       }
 
       // Process each message
@@ -196,9 +232,10 @@ serve(async (req) => {
         // Determine direction
         const direction = message.direction === "outbound" ? "outbound" : "inbound";
 
-        // Build communication record
+        // Build communication record - prioritize owner_id over lead_id
         const communicationData: Record<string, unknown> = {
-          lead_id: matchedLeadId,
+          lead_id: matchedOwnerId ? null : matchedLeadId,
+          owner_id: matchedOwnerId,
           communication_type: commType,
           direction: direction,
           body: message.body || message.text || null,
