@@ -348,7 +348,7 @@ export function InboxView() {
       if (activeTab !== "emails") return [];
       
       const { data, error } = await supabase.functions.invoke("fetch-gmail-inbox", {
-        body: { daysBack: 3 }
+        body: { daysBack: 7 } // Extended from 3 to 7 days
       });
       
       if (error) {
@@ -569,7 +569,7 @@ export function InboxView() {
   // Mark email as read when selected (local only - Gmail modify scope not available)
   const handleSelectGmailEmail = (email: GmailEmail) => {
     setSelectedGmailEmail(email);
-    setShowEmailActionModal(true); // Show action modal when email is clicked
+    // Removed auto-showing EmailActionModal - let users view email first
     
     // Update local state to remove UNREAD label (visual only)
     if (email.labelIds?.includes('UNREAD')) {
@@ -773,14 +773,8 @@ export function InboxView() {
                       <span className="font-semibold text-sm truncate">{comm.contact_name}</span>
                       <span className="text-xs text-muted-foreground whitespace-nowrap flex-shrink-0">{format(new Date(comm.created_at), "MMM d")}</span>
                     </div>
-                    {/* Type badges - more prominent on mobile */}
+                    {/* Type badges - only show Draft and New */}
                     <div className="flex items-center gap-1.5 mb-1.5 flex-wrap">
-                      {comm.contact_type === "owner" && (
-                        <Badge className="text-xs h-5 px-2 bg-purple-500 text-white border-0">Owner</Badge>
-                      )}
-                      {comm.contact_type === "lead" && comm.type !== "draft" && (
-                        <Badge className="text-xs h-5 px-2 bg-emerald-500 text-white border-0">Lead</Badge>
-                      )}
                       {comm.type === "draft" && (
                         <Badge className="text-xs h-5 px-2 bg-amber-500 text-white border-0">Draft</Badge>
                       )}
