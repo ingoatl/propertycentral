@@ -81,10 +81,10 @@ serve(async (req) => {
         success: true,
         voiceAiSynced: voiceAiResult.syncedCount || 0,
         voiceAiAnalyzed: voiceAiResult.analyzedCount || 0,
-        conversationsSynced: conversationsResult.syncedCount || 0,
-        conversationsProcessed: conversationsResult.conversationsProcessed || 0,
+        humanCallsSynced: allCallsResult.syncedCount || 0,
+        humanCallsFound: allCallsResult.totalFound || 0,
         totalSynced,
-        message: `Synced ${totalSynced} total (${voiceAiResult.syncedCount || 0} AI calls, ${conversationsResult.syncedCount || 0} conversations)`,
+        message: `Synced ${totalSynced} total (${voiceAiResult.syncedCount || 0} AI calls, ${allCallsResult.syncedCount || 0} human calls)`,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
