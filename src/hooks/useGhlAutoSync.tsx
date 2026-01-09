@@ -57,6 +57,8 @@ export function useGhlAutoSync() {
         } else {
           console.log("[GHL Sync] Call transcripts result:", callData);
         }
+
+        // Note: Recall AI transcripts are synced automatically via webhook when meetings complete
         
         // Update last sync time
         localStorage.setItem(SYNC_STORAGE_KEY, Date.now().toString());
@@ -64,6 +66,7 @@ export function useGhlAutoSync() {
         // Invalidate relevant queries
         queryClient.invalidateQueries({ queryKey: ["all-communications"] });
         queryClient.invalidateQueries({ queryKey: ["lead-communications"] });
+        queryClient.invalidateQueries({ queryKey: ["owners-with-comms"] });
         
         console.log("[GHL Sync] Background sync completed");
       } catch (err) {

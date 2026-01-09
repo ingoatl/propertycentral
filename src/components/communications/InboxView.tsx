@@ -882,7 +882,7 @@ export function InboxView() {
 </html>`}
                       sandbox="allow-same-origin allow-popups"
                       className="w-full border-0"
-                      style={{ height: '60vh', minHeight: '400px', maxHeight: '600px' }}
+                      style={{ height: 'calc(100vh - 280px)', minHeight: '500px' }}
                       title="Email content"
                     />
                   ) : (
