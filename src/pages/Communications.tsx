@@ -1,9 +1,18 @@
+import { useState } from "react";
 import { InboxView } from "@/components/communications/InboxView";
 import { OwnerQuickPanel } from "@/components/communications/OwnerQuickPanel";
-import { CallSyncButton } from "@/components/communications/CallSyncButton";
-import { MessageSquare } from "lucide-react";
+import { MessageSquare, Users } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 const Communications = () => {
+  const [showOwnerPanel, setShowOwnerPanel] = useState(false);
+
   return (
     <div className="space-y-6">
       {/* Page Header */}
@@ -19,18 +28,33 @@ const Communications = () => {
             </p>
           </div>
         </div>
-        <CallSyncButton />
+        <Button 
+          variant="outline" 
+          onClick={() => setShowOwnerPanel(true)}
+          className="gap-2"
+        >
+          <Users className="h-4 w-4" />
+          Owner Comms
+        </Button>
       </div>
 
-      {/* Main Layout - Inbox + Owner Panel */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        <div className="lg:col-span-3">
-          <InboxView />
-        </div>
-        <div className="hidden lg:block">
-          <OwnerQuickPanel />
-        </div>
+      {/* Main Layout - Full Width Inbox */}
+      <div className="w-full">
+        <InboxView />
       </div>
+
+      {/* Owner Communications Modal */}
+      <Dialog open={showOwnerPanel} onOpenChange={setShowOwnerPanel}>
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5 text-purple-500" />
+              Owner Communications
+            </DialogTitle>
+          </DialogHeader>
+          <OwnerQuickPanel />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

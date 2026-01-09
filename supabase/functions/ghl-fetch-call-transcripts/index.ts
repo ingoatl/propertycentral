@@ -152,9 +152,27 @@ serve(async (req) => {
             matchedEmail = matchingLeads[0].email;
             console.log(`Matched call ${call.id} to lead: ${matchedName}`);
           } else {
-            console.log(`No owner or lead match found for phone: ${phoneNumber} - skipping call ${call.id}`);
-            // Skip calls without a match - database constraint requires lead_id or owner_id
-            continue;
+            // Create a new lead for unknown callers to ensure all calls are captured
+            console.log(`No match found for phone: ${phoneNumber} - creating new lead`);
+            const { data: newLead, error: leadError } = await supabase
+              .from("leads")
+              .insert({
+                name: `Unknown Caller (${phoneNumber})`,
+                phone: phoneNumber,
+                source: "ghl_call_sync",
+                stage: "new",
+              })
+              .select()
+              .single();
+
+            if (newLead && !leadError) {
+              leadId = newLead.id;
+              matchedName = newLead.name;
+              console.log(`Created new lead ${newLead.id} for call ${call.id}`);
+            } else {
+              console.error(`Failed to create lead for call ${call.id}:`, leadError);
+              continue;
+            }
           }
         }
       } else {
