@@ -25,13 +25,16 @@ import {
   ChevronUp,
   Sparkles,
   Building2,
-  User
+  User,
+  Send
 } from "lucide-react";
 import { 
   usePendingTaskConfirmations, 
   PendingTaskConfirmation 
 } from "@/hooks/usePendingTaskConfirmations";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 const sourceTypeConfig = {
   email: { icon: Mail, label: "Email", color: "bg-blue-500" },
@@ -59,6 +62,8 @@ interface TaskCardProps {
   confirmation: PendingTaskConfirmation;
   onApprove: (id: string, title?: string, description?: string) => void;
   onReject: (id: string, reason?: string) => void;
+  onCall: (phone: string, name: string) => void;
+  onSendSMS: (phone: string, name: string, message: string) => void;
   isApproving: boolean;
   isRejecting: boolean;
 }
@@ -66,7 +71,9 @@ interface TaskCardProps {
 const TaskCard = memo(function TaskCard({ 
   confirmation, 
   onApprove, 
-  onReject, 
+  onReject,
+  onCall,
+  onSendSMS,
   isApproving, 
   isRejecting 
 }: TaskCardProps) {
@@ -76,10 +83,19 @@ const TaskCard = memo(function TaskCard({
     confirmation.task_description || ""
   );
   const [showQuote, setShowQuote] = useState(false);
+  const [showSMSInput, setShowSMSInput] = useState(false);
+  const [smsMessage, setSmsMessage] = useState(() => {
+    // Generate a short SMS recap
+    const ownerName = confirmation.owner?.name?.split(' ')[0] || 'there';
+    return `Hi ${ownerName}, just confirming we discussed: ${confirmation.task_title}. We'll take care of this for you. - PeachHaus`;
+  });
 
   const sourceConfig = sourceTypeConfig[confirmation.source_type as keyof typeof sourceTypeConfig] 
     || sourceTypeConfig.manual;
   const SourceIcon = sourceConfig.icon;
+
+  // Check if this came from a call (for SMS recap suggestion)
+  const isFromCall = confirmation.source_type === 'call_transcript';
 
   const handleApprove = useCallback(() => {
     if (isEditing) {
@@ -185,17 +201,76 @@ const TaskCard = memo(function TaskCard({
           </Badge>
         )}
 
+        {/* SMS Recap Input for Call-based tasks */}
+        {showSMSInput && (
+          <div className="space-y-2 p-3 bg-muted/50 rounded-lg">
+            <Textarea
+              value={smsMessage}
+              onChange={(e) => setSmsMessage(e.target.value)}
+              rows={2}
+              placeholder="Quick SMS recap..."
+              className="text-sm"
+            />
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowSMSInput(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => {
+                  // Get phone from owner data - would need to fetch
+                  onSendSMS("", confirmation.owner?.name || "", smsMessage);
+                  setShowSMSInput(false);
+                }}
+                className="bg-green-600 hover:bg-green-700"
+              >
+                <Send className="h-3 w-3 mr-1" />
+                Send SMS
+              </Button>
+            </div>
+          </div>
+        )}
+
         {/* Actions */}
         <div className="flex items-center justify-between pt-2 border-t">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={toggleEditing}
-            className="text-xs"
-          >
-            <Pencil className="h-3 w-3 mr-1" />
-            {isEditing ? "Cancel Edit" : "Edit"}
-          </Button>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={toggleEditing}
+              className="text-xs"
+            >
+              <Pencil className="h-3 w-3 mr-1" />
+              {isEditing ? "Cancel" : "Edit"}
+            </Button>
+            
+            {/* Call button */}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onCall("", confirmation.owner?.name || "")}
+              className="text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+            >
+              <Phone className="h-3 w-3 mr-1" />
+              Call
+            </Button>
+            
+            {/* SMS button - especially for call recaps */}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowSMSInput(!showSMSInput)}
+              className="text-xs text-green-600 hover:text-green-700 hover:bg-green-50"
+            >
+              <MessageSquare className="h-3 w-3 mr-1" />
+              {isFromCall ? "Send Recap" : "SMS"}
+            </Button>
+          </div>
+          
           <div className="flex items-center gap-2">
             <Button
               variant="outline"
@@ -254,6 +329,46 @@ export function TaskConfirmationModal() {
     approveAllTasks();
   }, [approveAllTasks]);
 
+  const handleCall = useCallback(async (phone: string, name: string) => {
+    // For now, initiate call via tel: link - could integrate with Twilio
+    const confirmation = pendingConfirmations.find(c => c.owner?.name === name);
+    if (confirmation?.owner_id) {
+      // Get owner phone from database
+      const { data: owner } = await supabase
+        .from("property_owners")
+        .select("phone")
+        .eq("id", confirmation.owner_id)
+        .single();
+      
+      if (owner?.phone) {
+        window.open(`tel:${owner.phone}`, '_self');
+        toast.success(`Calling ${name}...`);
+      } else {
+        toast.error("No phone number on file");
+      }
+    }
+  }, [pendingConfirmations]);
+
+  const handleSendSMS = useCallback(async (phone: string, name: string, message: string) => {
+    const confirmation = pendingConfirmations.find(c => c.owner?.name === name);
+    if (confirmation?.owner_id) {
+      try {
+        const { data, error } = await supabase.functions.invoke('send-sms', {
+          body: {
+            ownerId: confirmation.owner_id,
+            message,
+          }
+        });
+        
+        if (error) throw error;
+        toast.success(`SMS sent to ${name}`);
+      } catch (error: any) {
+        console.error("Error sending SMS:", error);
+        toast.error(error.message || "Failed to send SMS");
+      }
+    }
+  }, [pendingConfirmations]);
+
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogContent className="max-w-2xl max-h-[85vh]">
@@ -279,6 +394,8 @@ export function TaskConfirmationModal() {
                 confirmation={confirmation}
                 onApprove={handleApprove}
                 onReject={handleReject}
+                onCall={handleCall}
+                onSendSMS={handleSendSMS}
                 isApproving={isApproving}
                 isRejecting={isRejecting}
               />
