@@ -2264,9 +2264,10 @@ export type Database = {
           ghl_message_id: string | null
           id: string
           is_read: boolean | null
-          lead_id: string
+          lead_id: string | null
           metadata: Json | null
           opened_at: string | null
+          owner_id: string | null
           replied_at: string | null
           sent_at: string | null
           sequence_id: string | null
@@ -2292,9 +2293,10 @@ export type Database = {
           ghl_message_id?: string | null
           id?: string
           is_read?: boolean | null
-          lead_id: string
+          lead_id?: string | null
           metadata?: Json | null
           opened_at?: string | null
+          owner_id?: string | null
           replied_at?: string | null
           sent_at?: string | null
           sequence_id?: string | null
@@ -2320,9 +2322,10 @@ export type Database = {
           ghl_message_id?: string | null
           id?: string
           is_read?: boolean | null
-          lead_id?: string
+          lead_id?: string | null
           metadata?: Json | null
           opened_at?: string | null
+          owner_id?: string | null
           replied_at?: string | null
           sent_at?: string | null
           sequence_id?: string | null
@@ -2336,6 +2339,13 @@ export type Database = {
             columns: ["lead_id"]
             isOneToOne: false
             referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_communications_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "property_owners"
             referencedColumns: ["id"]
           },
           {
