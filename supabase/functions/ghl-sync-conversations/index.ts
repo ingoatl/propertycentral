@@ -289,6 +289,17 @@ serve(async (req) => {
 
       // Process each message
       for (const message of messages) {
+        // Debug: Log raw message structure for first few messages to understand call format
+        if (messages.indexOf(message) < 3) {
+          console.log(`Raw message sample:`, JSON.stringify({
+            type: message.type,
+            messageType: message.messageType,
+            contentType: message.contentType,
+            direction: message.direction,
+            body: (message.body as string || "").slice(0, 50),
+          }));
+        }
+        
         // Skip if already synced
         const { data: existing } = await supabase
           .from("lead_communications")
@@ -300,12 +311,32 @@ serve(async (req) => {
           continue;
         }
 
-        // Determine communication type
+        // Determine communication type - check multiple GHL message type formats
+        // GHL uses: type field with "TYPE_CALL", "TYPE_SMS", etc OR messageType with numeric codes
+        // Numeric codes: 1=SMS, 2=SMS, 3=Email, 7=Call, 10=Call/Voicemail
+        const msgType = String(message.type || "").toUpperCase();
+        const msgMessageType = String(message.messageType || "");
+        const contentType = String(message.contentType || "").toLowerCase();
+        
         let commType = "sms";
-        if (message.type === "TYPE_CALL" || message.messageType === "call") {
+        // Check string type first (TYPE_CALL format)
+        if (msgType === "TYPE_CALL" || msgType === "CALL" || 
+            msgType.includes("CALL") || contentType === "call") {
           commType = "call";
-        } else if (message.type === "TYPE_EMAIL" || message.messageType === "email") {
+        } else if (msgType === "TYPE_EMAIL" || msgType === "EMAIL" ||
+            contentType.includes("email") || msgMessageType === "3") {
           commType = "email";
+        } else if (msgType === "TYPE_VOICEMAIL" || msgType.includes("VOICEMAIL")) {
+          commType = "call"; // Treat voicemails as calls
+        }
+        // Also check numeric messageType for calls (7, 10 are typically call types)
+        else if (msgMessageType === "7" || msgMessageType === "10") {
+          commType = "call";
+        }
+        
+        // Log when we detect a call
+        if (commType === "call") {
+          console.log(`Detected human call: type=${msgType}, messageType=${msgMessageType}`);
         }
 
         // Determine direction
