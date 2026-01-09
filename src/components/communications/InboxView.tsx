@@ -840,7 +840,7 @@ export function InboxView() {
             </div>
 
             <ScrollArea className="flex-1">
-              <div className="p-4 max-w-3xl mx-auto space-y-4">
+              <div className="p-4 space-y-4" style={{ maxWidth: '100%' }}>
                 <div className="bg-background rounded-lg border overflow-hidden">
                   <div className="p-4 border-b bg-muted/30">
                     <h2 className="font-semibold text-lg mb-2 break-words">{selectedGmailEmail.subject}</h2>
@@ -850,15 +850,22 @@ export function InboxView() {
                   </div>
                   {selectedGmailEmail.bodyHtml ? (
                     <div 
-                      className="p-4 email-content prose prose-sm max-w-none dark:prose-invert overflow-x-auto"
-                      dangerouslySetInnerHTML={{ __html: selectedGmailEmail.bodyHtml }}
+                      className="p-4 email-content overflow-x-auto"
                       style={{ 
                         fontSize: '14px',
                         lineHeight: '1.6',
-                        wordBreak: 'break-word',
-                        overflowWrap: 'break-word',
+                        maxWidth: '100%',
+                        width: '100%',
                       }}
-                    />
+                    >
+                      <div 
+                        dangerouslySetInnerHTML={{ __html: selectedGmailEmail.bodyHtml }}
+                        style={{
+                          maxWidth: '600px',
+                          overflow: 'hidden',
+                        }}
+                      />
+                    </div>
                   ) : (
                     <div className="p-4 text-sm whitespace-pre-wrap break-words">
                       {selectedGmailEmail.body}
