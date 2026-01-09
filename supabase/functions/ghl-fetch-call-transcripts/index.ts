@@ -52,29 +52,49 @@ serve(async (req) => {
       const data = await response.json();
       callLogs = [data];
     } else if (syncAll) {
-      // Fetch all call logs - Voice AI endpoint doesn't accept limit param
+      // Fetch call logs with pagination to get more historical calls
       console.log(`Fetching call logs from HighLevel for location: ${ghlLocationId}`);
-      const response = await fetch(
-        `https://services.leadconnectorhq.com/voice-ai/dashboard/call-logs?locationId=${ghlLocationId}`,
-        {
-          method: "GET",
-          headers: {
-            "Authorization": `Bearer ${ghlApiKey}`,
-            "Version": "2021-07-28",
-            "Content-Type": "application/json",
-          },
+      
+      let page = 1;
+      const maxPages = 10; // Fetch up to 10 pages of calls
+      let hasMore = true;
+      
+      while (hasMore && page <= maxPages) {
+        console.log(`Fetching page ${page} of call logs...`);
+        const response = await fetch(
+          `https://services.leadconnectorhq.com/voice-ai/dashboard/call-logs?locationId=${ghlLocationId}&page=${page}`,
+          {
+            method: "GET",
+            headers: {
+              "Authorization": `Bearer ${ghlApiKey}`,
+              "Version": "2021-07-28",
+              "Content-Type": "application/json",
+            },
+          }
+        );
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error("HighLevel API error:", errorText);
+          // Don't throw on pagination errors, just stop fetching
+          if (page === 1) {
+            throw new Error(`HighLevel API error: ${response.status}`);
+          }
+          break;
         }
-      );
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("HighLevel API error:", errorText);
-        throw new Error(`HighLevel API error: ${response.status}`);
+        const data = await response.json();
+        const pageCalls = data.callLogs || [];
+        console.log(`Page ${page}: fetched ${pageCalls.length} calls`);
+        
+        callLogs.push(...pageCalls);
+        
+        // Stop if no more calls or fewer than expected (assuming ~10 per page)
+        hasMore = pageCalls.length >= 10;
+        page++;
       }
-
-      const data = await response.json();
-      callLogs = data.callLogs || [];
-      console.log(`Fetched ${callLogs.length} call logs from HighLevel`);
+      
+      console.log(`Total fetched: ${callLogs.length} call logs from HighLevel (${page - 1} pages)`);
     } else {
       throw new Error("Either callId or syncAll must be provided");
     }

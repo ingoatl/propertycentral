@@ -563,25 +563,31 @@ export function InboxView() {
 
   // Selected Gmail email state
   const [selectedGmailEmail, setSelectedGmailEmail] = useState<GmailEmail | null>(null);
-
-  // Mark email as read when selected (local only - Gmail modify scope not available)
-  const handleSelectGmailEmail = (email: GmailEmail) => {
-    // Update local state to remove UNREAD label FIRST (visual only)
-    if (email.labelIds?.includes('UNREAD')) {
-      // Update the gmail-inbox query cache with correct key
-      queryClient.setQueryData(['gmail-inbox'], (old: GmailEmail[] | undefined) => {
-        if (!old) return old;
-        return old.map(e => 
-          e.id === email.id 
-            ? { ...e, labelIds: e.labelIds?.filter(l => l !== 'UNREAD') || [] }
-            : e
-        );
-      });
-      // Set selected email with updated labelIds
-      setSelectedGmailEmail({ ...email, labelIds: email.labelIds?.filter(l => l !== 'UNREAD') || [] });
-    } else {
-      setSelectedGmailEmail(email);
+  
+  // Track read emails in localStorage (persists across refetches)
+  const [readGmailIds, setReadGmailIds] = useState<Set<string>>(() => {
+    try {
+      const saved = localStorage.getItem('readGmailIds');
+      return saved ? new Set(JSON.parse(saved)) : new Set();
+    } catch {
+      return new Set();
     }
+  });
+
+  // Mark email as read when selected - persists to localStorage
+  const handleSelectGmailEmail = (email: GmailEmail) => {
+    // Add to localStorage read set
+    setReadGmailIds(prev => {
+      const updated = new Set(prev);
+      updated.add(email.id);
+      try {
+        localStorage.setItem('readGmailIds', JSON.stringify([...updated]));
+      } catch {
+        // localStorage full, ignore
+      }
+      return updated;
+    });
+    setSelectedGmailEmail(email);
   };
 
   const getInitials = (name: string) => name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2);
@@ -702,8 +708,9 @@ export function InboxView() {
               <div className="p-8 text-center text-muted-foreground"><Mail className="h-10 w-10 mx-auto mb-3 opacity-40" /><p className="text-sm">No emails in {selectedEmailInbox === "ingo" ? "Ingo's" : "Anja's"} inbox</p></div>
             ) : (
               <div className="divide-y divide-border/50">
-                {filteredGmailEmails.filter(email => !search || email.subject.toLowerCase().includes(search.toLowerCase()) || email.fromName.toLowerCase().includes(search.toLowerCase())).map((email) => {
-                  const isUnread = email.labelIds?.includes('UNREAD');
+              {filteredGmailEmails.filter(email => !search || email.subject.toLowerCase().includes(search.toLowerCase()) || email.fromName.toLowerCase().includes(search.toLowerCase())).map((email) => {
+                  // Check both API labelIds AND localStorage for read status
+                  const isUnread = email.labelIds?.includes('UNREAD') && !readGmailIds.has(email.id);
                   return (
                     <div 
                       key={email.id} 
@@ -849,23 +856,35 @@ export function InboxView() {
                     </div>
                   </div>
                   {selectedGmailEmail.bodyHtml ? (
-                    <div 
-                      className="p-4 email-content overflow-x-auto"
-                      style={{ 
-                        fontSize: '14px',
-                        lineHeight: '1.6',
-                        maxWidth: '100%',
-                        width: '100%',
-                      }}
-                    >
-                      <div 
-                        dangerouslySetInnerHTML={{ __html: selectedGmailEmail.bodyHtml }}
-                        style={{
-                          maxWidth: '600px',
-                          overflow: 'hidden',
-                        }}
-                      />
-                    </div>
+                    <iframe
+                      srcDoc={`<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { 
+      margin: 0; 
+      padding: 16px; 
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      font-size: 14px;
+      line-height: 1.6;
+      color: #333;
+      overflow-x: auto;
+    }
+    img { max-width: 100% !important; height: auto !important; }
+    table { max-width: 100% !important; }
+    * { box-sizing: border-box; }
+    a { color: #2563eb; }
+  </style>
+</head>
+<body>${selectedGmailEmail.bodyHtml}</body>
+</html>`}
+                      sandbox="allow-same-origin allow-popups"
+                      className="w-full border-0"
+                      style={{ height: '60vh', minHeight: '400px', maxHeight: '600px' }}
+                      title="Email content"
+                    />
                   ) : (
                     <div className="p-4 text-sm whitespace-pre-wrap break-words">
                       {selectedGmailEmail.body}
