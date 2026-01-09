@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { InboxView } from "@/components/communications/InboxView";
 import { OwnerQuickPanel } from "@/components/communications/OwnerQuickPanel";
+import { CallSyncButton } from "@/components/communications/CallSyncButton";
 import { MessageSquare, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -28,14 +29,17 @@ const Communications = () => {
             </p>
           </div>
         </div>
-        <Button 
-          variant="outline" 
-          onClick={() => setShowOwnerPanel(true)}
-          className="gap-2"
-        >
-          <Users className="h-4 w-4" />
-          Owner Comms
-        </Button>
+        <div className="flex items-center gap-2">
+          <CallSyncButton />
+          <Button 
+            variant="outline" 
+            onClick={() => setShowOwnerPanel(true)}
+            className="gap-2"
+          >
+            <Users className="h-4 w-4" />
+            Owner Comms
+          </Button>
+        </div>
       </div>
 
       {/* Main Layout - Full Width Inbox */}

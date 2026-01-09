@@ -182,6 +182,9 @@ serve(async (req) => {
 
       // Create communication record - store even without match
       // Note: property_id is not in lead_communications table, so we don't include it
+      // Use the original call date from GHL, not current timestamp
+      const callDate = call.createdAt ? new Date(call.createdAt).toISOString() : new Date().toISOString();
+      
       const communicationData: Record<string, unknown> = {
         lead_id: leadId,
         owner_id: ownerId,
@@ -193,6 +196,7 @@ serve(async (req) => {
         ghl_call_id: call.id,
         call_duration: call.duration || null,
         call_recording_url: call.recordingUrl || null,
+        created_at: callDate, // Use original call date
         metadata: {
           ghl_data: {
             fromNumber: call.fromNumber,

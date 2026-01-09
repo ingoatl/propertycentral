@@ -6,6 +6,40 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Human-like writing guidelines based on research from conversational copywriting best practices
+const humanLikeGuidelines = `
+WRITING STYLE RULES (based on conversational copywriting research):
+1. Write like you talk - use contractions (I'm, we'll, you're, don't, can't)
+2. Use shorter sentences - mix lengths but favor brevity
+3. Start sentences with "And" or "But" occasionally
+4. Ask questions to engage when appropriate
+5. Use "you" more than "we" or "I"
+6. Avoid jargon and formal business speak
+7. Show don't tell emotions - "I completely understand" not "We apologize for any inconvenience"
+8. Use specific details over generic statements
+9. Be direct - get to the point in the first line
+10. Match the formality level of the sender's email
+11. Use informal language markers: "honestly", "actually", "just wanted to"
+12. Include small imperfections that humans make (varied sentence structure)
+
+PHRASES TO NEVER USE:
+- "I hope this email finds you well"
+- "Per our conversation" or "As per your request"
+- "Please don't hesitate to reach out"
+- "We apologize for any inconvenience"
+- "Thank you for your patience"
+- "At your earliest convenience"
+- "Synergy", "leverage", "circle back", "touch base"
+- Corporate-speak like "moving forward" or "going forward"
+- Excessive exclamation marks (max 1 per email)
+
+NATURAL ALTERNATIVES:
+- Instead of "I apologize for the delay" → "Sorry for the slow reply"
+- Instead of "Please find attached" → "I've attached" or "Here's"
+- Instead of "Do not hesitate to contact me" → "Just let me know"
+- Instead of "I would like to inform you" → "Just wanted to let you know"
+`;
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -23,6 +57,78 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
+
+    // Step 1: Analyze sentiment and intent of the incoming email
+    let sentiment = "neutral";
+    let intent = "general";
+    let urgency = "medium";
+
+    if (incomingEmailBody) {
+      console.log("Analyzing email sentiment and intent...");
+      
+      const analysisResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "google/gemini-3-flash-preview",
+          messages: [
+            { 
+              role: "system", 
+              content: "You are an email analyst. Analyze the email and return structured data about its sentiment, intent, and urgency. Be accurate - unsubscribe requests, complaints, and declines should be identified." 
+            },
+            { role: "user", content: `Analyze this email:\n\n${incomingEmailBody.substring(0, 1500)}` }
+          ],
+          tools: [{
+            type: "function",
+            function: {
+              name: "analyze_email",
+              description: "Analyze the email's sentiment, intent, and urgency",
+              parameters: {
+                type: "object",
+                properties: {
+                  sentiment: { 
+                    type: "string", 
+                    enum: ["positive", "negative", "neutral", "frustrated", "grateful", "confused"],
+                    description: "The emotional tone of the email"
+                  },
+                  intent: { 
+                    type: "string", 
+                    enum: ["unsubscribe", "complaint", "question", "inquiry", "schedule_meeting", "pricing_request", "decline", "follow_up", "general", "thank_you"],
+                    description: "The primary purpose of the email"
+                  },
+                  urgency: { 
+                    type: "string", 
+                    enum: ["high", "medium", "low"],
+                    description: "How urgent the response needs to be"
+                  }
+                },
+                required: ["sentiment", "intent", "urgency"]
+              }
+            }
+          }],
+          tool_choice: { type: "function", function: { name: "analyze_email" } }
+        }),
+      });
+
+      if (analysisResponse.ok) {
+        const analysisData = await analysisResponse.json();
+        const toolCall = analysisData.choices?.[0]?.message?.tool_calls?.[0];
+        if (toolCall?.function?.arguments) {
+          try {
+            const analysis = JSON.parse(toolCall.function.arguments);
+            sentiment = analysis.sentiment || "neutral";
+            intent = analysis.intent || "general";
+            urgency = analysis.urgency || "medium";
+            console.log("Email analysis:", { sentiment, intent, urgency });
+          } catch (e) {
+            console.error("Failed to parse analysis:", e);
+          }
+        }
+      }
+    }
 
     // Fetch previous email communications with this contact
     let emailHistory: any[] = [];
@@ -148,19 +254,96 @@ serve(async (req) => {
       actionContext = `\n\nACTION: They mention a meeting but no link is scheduled. Suggest scheduling a call.`;
     }
 
-    const systemPrompt = `You are a professional email assistant for PeachHaus Group, a premium property management company in Atlanta.
+    // Build intent-specific system prompt
+    let intentGuidance = '';
+    
+    switch (intent) {
+      case 'unsubscribe':
+        intentGuidance = `
+INTENT DETECTED: UNSUBSCRIBE REQUEST
+- Keep response to 2-3 sentences MAX
+- Immediately acknowledge and confirm you'll remove them
+- Apologize briefly and sincerely
+- DO NOT try to convince them to stay
+- DO NOT ask why they want to unsubscribe
+- DO NOT mention any benefits or offers
 
-RULES:
-- 2-3 short paragraphs MAX - be direct
-- Address their MOST RECENT message first
-- If they ask about a meeting/call and you have a link, INCLUDE IT
-- If meeting info is provided, share date/time and link clearly
-- Include clear next step
-- Start with "Hi [FirstName]," end with "Best regards"
-- No signature needed
+Example tone: "Got it - I've removed you from our list. Sorry for any bother, and thanks for letting me know."`;
+        break;
+        
+      case 'complaint':
+        intentGuidance = `
+INTENT DETECTED: COMPLAINT (Sentiment: ${sentiment})
+- Lead with genuine empathy - acknowledge their frustration
+- Take responsibility, don't be defensive
+- Offer a specific solution or clear next step
+- Keep it personal, not corporate
+- If you can't solve it immediately, explain exactly what you'll do and when
 
-${isOwner ? `VIP OWNER - prioritize their needs, be proactive.` : `LEAD - be welcoming, guide toward next step.`}
-${actionContext}`;
+Example tone: "I completely understand why you're frustrated - that's not the experience we want anyone to have. Here's what I'm going to do to fix this..."`;
+        break;
+        
+      case 'decline':
+        intentGuidance = `
+INTENT DETECTED: DECLINE/NOT INTERESTED
+- Keep response to 2-3 sentences MAX
+- Accept gracefully without pushback
+- Thank them genuinely for their time
+- Leave door open with one brief line, but don't push
+- DO NOT list benefits or try to change their mind
+
+Example tone: "Totally understand - thanks for taking the time to look into it. If things change down the road, just give me a shout."`;
+        break;
+        
+      case 'pricing_request':
+        intentGuidance = `
+INTENT DETECTED: PRICING REQUEST
+- Be transparent and direct about pricing
+- If you have specific numbers, share them
+- Explain value without being salesy
+- Suggest a call to discuss their specific needs`;
+        break;
+        
+      case 'schedule_meeting':
+        intentGuidance = `
+INTENT DETECTED: WANTS TO SCHEDULE MEETING
+- If you have a meeting link, share it immediately
+- Offer 2-3 specific time options if possible
+- Make it easy for them to confirm`;
+        break;
+        
+      case 'thank_you':
+        intentGuidance = `
+INTENT DETECTED: THANK YOU / GRATITUDE
+- Keep response brief and warm
+- Match their positive energy without being over-the-top
+- 2-3 sentences max`;
+        break;
+        
+      default:
+        intentGuidance = '';
+    }
+
+    const systemPrompt = `You are writing an email reply for PeachHaus Group, a premium property management company in Atlanta. Your goal is to sound like a real, thoughtful human - not a corporate AI.
+
+${humanLikeGuidelines}
+
+CONTEXT:
+- Sender Sentiment: ${sentiment}
+- Email Intent: ${intent}
+- Urgency: ${urgency}
+${isOwner ? `- This is a VIP PROPERTY OWNER - prioritize their needs, be warm and proactive.` : `- This is a LEAD - be welcoming, guide them naturally toward next steps.`}
+${intentGuidance}
+${actionContext}
+
+STRUCTURE:
+- Start with "Hi [FirstName]," 
+- Get to the point in the first sentence
+- ${intent === 'unsubscribe' || intent === 'decline' || intent === 'thank_you' ? '2-3 sentences MAX' : '2-3 short paragraphs MAX'}
+- End with a clear next step (if appropriate)
+- Sign off naturally: "Best," or "Thanks," or just your name
+
+REMEMBER: Write like a friendly colleague, not a corporation.`;
 
     const userPrompt = `Contact: ${contactName} (${contactEmail})
 ${currentSubject ? `Subject: ${currentSubject}` : ''}
@@ -171,9 +354,9 @@ ${incomingEmailBody.substring(0, 2000)}` : ''}
 
 ${historyContext ? `PREVIOUS EMAIL HISTORY:\n${historyContext}` : 'No previous email history.'}
 
-Please draft a professional, detailed reply. Be thorough and address all points they raised. Start with "Hi ${contactName?.split(' ')[0] || 'there'},"`;
+Draft a reply. Start with "Hi ${contactName?.split(' ')[0] || 'there'},"`;
 
-    console.log("Generating AI email suggestion for:", contactEmail, "isOwner:", isOwner);
+    console.log("Generating AI email suggestion for:", contactEmail, "isOwner:", isOwner, "intent:", intent, "sentiment:", sentiment);
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -187,7 +370,7 @@ Please draft a professional, detailed reply. Be thorough and address all points 
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
         ],
-        max_tokens: 400,
+        max_tokens: intent === 'unsubscribe' || intent === 'decline' || intent === 'thank_you' ? 150 : 400,
       }),
     });
 
@@ -212,14 +395,15 @@ Please draft a professional, detailed reply. Be thorough and address all points 
     const data = await response.json();
     const suggestedReply = data.choices?.[0]?.message?.content || "";
 
-    console.log("Generated suggestion successfully, isOwner:", isOwner);
+    console.log("Generated suggestion successfully, isOwner:", isOwner, "intent:", intent);
 
     return new Response(
       JSON.stringify({ 
         success: true, 
         suggestion: suggestedReply,
         emailHistory: emailHistory.length,
-        isOwner 
+        isOwner,
+        analysis: { sentiment, intent, urgency }
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
