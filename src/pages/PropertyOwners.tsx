@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Building2, CreditCard, DollarSign, ExternalLink, Plus, Trash2, Wallet, Edit, Phone, Mail, Send, Loader2 } from "lucide-react";
+import { Building2, CreditCard, DollarSign, ExternalLink, Plus, Trash2, Wallet, Edit, Phone, Mail, Send, Loader2, MoreVertical, MessageSquare } from "lucide-react";
 import { z } from "zod";
 import { AddPaymentMethod } from "@/components/AddPaymentMethod";
 import {
@@ -19,6 +19,14 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { OwnerCommunicationDetail } from "@/components/communications/OwnerCommunicationDetail";
 
 const ownerSchema = z.object({
   name: z.string().min(1, "Name is required").max(255),
@@ -88,6 +96,7 @@ const PropertyOwners = () => {
     second_owner_email: "",
   });
   const [sendingInvite, setSendingInvite] = useState<string | null>(null);
+  const [selectedOwnerForComms, setSelectedOwnerForComms] = useState<PropertyOwner | null>(null);
 
   const handleSendPortalInvite = async (owner: PropertyOwner) => {
     setSendingInvite(owner.id);
@@ -557,41 +566,94 @@ const PropertyOwners = () => {
                       </CardDescription>
                     </div>
                     <div className="flex gap-2 items-center">
-                      <Button
-                        variant="default"
-                        size="sm"
-                        onClick={() => handleSendPortalInvite(owner)}
-                        disabled={sendingInvite === owner.id}
-                        title="Send portal invite to owner"
-                        className="gap-2"
-                      >
-                        {sendingInvite === owner.id ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <Send className="w-4 h-4" />
-                        )}
-                        Invite to Portal
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleEditOwner(owner)}
-                        title="Edit owner details"
-                      >
-                        <Edit className="w-4 h-4" />
-                      </Button>
-                      <Badge variant={owner.payment_method === "ach" ? "default" : "secondary"}>
-                        <CreditCard className="w-3 h-3 mr-1" />
-                        {owner.payment_method === "ach" ? "ACH" : "Credit Card"}
-                      </Badge>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleDeleteOwner(owner.id)}
-                        title="Delete owner"
-                      >
-                        <Trash2 className="w-4 h-4 text-destructive" />
-                      </Button>
+                      {/* Desktop buttons */}
+                      <div className="hidden md:flex gap-2 items-center">
+                        <Button
+                          variant="default"
+                          size="sm"
+                          onClick={() => handleSendPortalInvite(owner)}
+                          disabled={sendingInvite === owner.id}
+                          title="Send portal invite to owner"
+                          className="gap-2"
+                        >
+                          {sendingInvite === owner.id ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Send className="w-4 h-4" />
+                          )}
+                          Invite to Portal
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setSelectedOwnerForComms(owner)}
+                          title="View all communications"
+                          className="gap-2"
+                        >
+                          <MessageSquare className="w-4 h-4" />
+                          Messages
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleEditOwner(owner)}
+                          title="Edit owner details"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </Button>
+                        <Badge variant={owner.payment_method === "ach" ? "default" : "secondary"}>
+                          <CreditCard className="w-3 h-3 mr-1" />
+                          {owner.payment_method === "ach" ? "ACH" : "Card"}
+                        </Badge>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDeleteOwner(owner.id)}
+                          title="Delete owner"
+                        >
+                          <Trash2 className="w-4 h-4 text-destructive" />
+                        </Button>
+                      </div>
+                      
+                      {/* Mobile dropdown menu */}
+                      <div className="md:hidden">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon">
+                              <MoreVertical className="w-5 h-5" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-48">
+                            <DropdownMenuItem 
+                              onClick={() => handleSendPortalInvite(owner)}
+                              disabled={sendingInvite === owner.id}
+                            >
+                              <Send className="w-4 h-4 mr-2" />
+                              Send Portal Invite
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setSelectedOwnerForComms(owner)}>
+                              <MessageSquare className="w-4 h-4 mr-2" />
+                              View Messages
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleEditOwner(owner)}>
+                              <Edit className="w-4 h-4 mr-2" />
+                              Edit Owner
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setAddingPaymentFor(owner)}>
+                              <Wallet className="w-4 h-4 mr-2" />
+                              Add Payment Method
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem 
+                              onClick={() => handleDeleteOwner(owner.id)}
+                              className="text-destructive"
+                            >
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              Delete Owner
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
                     </div>
                   </div>
                 </CardHeader>
@@ -733,6 +795,18 @@ const PropertyOwners = () => {
           </p>
         </CardContent>
       </Card>
+      
+      {/* Owner Communication Detail Modal */}
+      {selectedOwnerForComms && (
+        <OwnerCommunicationDetail
+          ownerId={selectedOwnerForComms.id}
+          ownerName={selectedOwnerForComms.name}
+          ownerEmail={selectedOwnerForComms.email}
+          ownerPhone={selectedOwnerForComms.phone}
+          isOpen={!!selectedOwnerForComms}
+          onClose={() => setSelectedOwnerForComms(null)}
+        />
+      )}
     </div>
   );
 };

@@ -4073,6 +4073,80 @@ export type Database = {
           },
         ]
       }
+      owner_notifications: {
+        Row: {
+          created_at: string
+          error_message: string | null
+          id: string
+          message: string
+          notification_channel: string
+          notification_type: string
+          owner_id: string
+          positive_event_id: string | null
+          property_id: string | null
+          sent_at: string | null
+          status: string
+          subject: string | null
+        }
+        Insert: {
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          message: string
+          notification_channel?: string
+          notification_type: string
+          owner_id: string
+          positive_event_id?: string | null
+          property_id?: string | null
+          sent_at?: string | null
+          status?: string
+          subject?: string | null
+        }
+        Update: {
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          message?: string
+          notification_channel?: string
+          notification_type?: string
+          owner_id?: string
+          positive_event_id?: string | null
+          property_id?: string | null
+          sent_at?: string | null
+          status?: string
+          subject?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "owner_notifications_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "property_owners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "owner_notifications_positive_event_id_fkey"
+            columns: ["positive_event_id"]
+            isOneToOne: false
+            referencedRelation: "positive_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "owner_notifications_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "comprehensive_property_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "owner_notifications_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       owner_onboarding_submissions: {
         Row: {
           airbnb_link: string | null
@@ -5176,6 +5250,64 @@ export type Database = {
           },
           {
             foreignKeyName: "platform_listings_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      positive_events: {
+        Row: {
+          created_at: string
+          event_data: Json | null
+          event_description: string | null
+          event_title: string
+          event_type: string
+          id: string
+          occurred_at: string
+          owner_id: string | null
+          property_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          event_data?: Json | null
+          event_description?: string | null
+          event_title: string
+          event_type: string
+          id?: string
+          occurred_at?: string
+          owner_id?: string | null
+          property_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          event_data?: Json | null
+          event_description?: string | null
+          event_title?: string
+          event_type?: string
+          id?: string
+          occurred_at?: string
+          owner_id?: string | null
+          property_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "positive_events_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "property_owners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "positive_events_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "comprehensive_property_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "positive_events_property_id_fkey"
             columns: ["property_id"]
             isOneToOne: false
             referencedRelation: "properties"

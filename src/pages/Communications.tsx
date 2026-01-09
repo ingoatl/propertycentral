@@ -1,4 +1,5 @@
 import { InboxView } from "@/components/communications/InboxView";
+import { OwnerQuickPanel } from "@/components/communications/OwnerQuickPanel";
 import { MessageSquare } from "lucide-react";
 
 const Communications = () => {
@@ -17,8 +18,15 @@ const Communications = () => {
         </div>
       </div>
 
-      {/* Inbox View */}
-      <InboxView />
+      {/* Main Layout - Inbox + Owner Panel */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        <div className="lg:col-span-3">
+          <InboxView />
+        </div>
+        <div className="hidden lg:block">
+          <OwnerQuickPanel />
+        </div>
+      </div>
     </div>
   );
 };
