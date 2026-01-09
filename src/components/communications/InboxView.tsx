@@ -22,6 +22,7 @@ import {
   Info,
   MoreHorizontal,
   User,
+  ChevronLeft,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -516,20 +517,49 @@ export function InboxView() {
     return comm.body?.slice(0, 50) + (comm.body?.length > 50 ? "..." : "");
   };
 
+  // Mobile: show list or detail based on selection
+  const [showMobileDetail, setShowMobileDetail] = useState(false);
+  
+  const handleSelectMessage = (comm: CommunicationItem) => {
+    setSelectedMessage(comm);
+    setShowMobileDetail(true);
+  };
+  
+  const handleSelectGmailEmailMobile = (email: GmailEmail) => {
+    handleSelectGmailEmail(email);
+    setShowMobileDetail(true);
+  };
+  
+  const handleBackToList = () => {
+    setShowMobileDetail(false);
+    setSelectedMessage(null);
+    setSelectedGmailEmail(null);
+  };
+
   return (
-    <div className="flex h-[calc(100vh-12rem)] bg-background rounded-lg border overflow-hidden">
-      {/* Left Panel */}
-      <div className="w-80 border-r flex flex-col">
-        <div className="p-4 border-b">
-          <div className="flex items-center gap-4 mb-4">
-            <button onClick={() => { setActiveTab("chats"); setSelectedGmailEmail(null); }} className={`flex items-center gap-2 pb-2 border-b-2 transition-colors ${activeTab === "chats" ? "border-primary text-foreground font-medium" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
-              <MessageSquare className="h-4 w-4" /><span>Chats</span>
+    <div className="flex h-[calc(100vh-12rem)] md:h-[calc(100vh-12rem)] bg-background rounded-lg border overflow-hidden">
+      {/* Left Panel - Message List (Hidden on mobile when viewing detail) */}
+      <div className={`w-full md:w-80 border-r flex flex-col ${showMobileDetail ? 'hidden md:flex' : 'flex'}`}>
+        {/* Mobile-optimized tabs - Gmail style */}
+        <div className="p-3 md:p-4 border-b">
+          <div className="flex items-center gap-1 md:gap-4 mb-3 md:mb-4 overflow-x-auto scrollbar-hide">
+            <button 
+              onClick={() => { setActiveTab("chats"); setSelectedGmailEmail(null); setShowMobileDetail(false); }} 
+              className={`flex items-center gap-1.5 md:gap-2 px-3 md:px-0 py-2 md:py-0 md:pb-2 rounded-full md:rounded-none md:border-b-2 transition-colors whitespace-nowrap ${activeTab === "chats" ? "bg-primary/10 md:bg-transparent md:border-primary text-foreground font-medium" : "md:border-transparent text-muted-foreground hover:text-foreground"}`}
+            >
+              <MessageSquare className="h-4 w-4" /><span className="text-sm">Chats</span>
             </button>
-            <button onClick={() => { setActiveTab("calls"); setSelectedGmailEmail(null); }} className={`flex items-center gap-2 pb-2 border-b-2 transition-colors ${activeTab === "calls" ? "border-primary text-foreground font-medium" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
-              <Phone className="h-4 w-4" /><span>Calls</span>
+            <button 
+              onClick={() => { setActiveTab("calls"); setSelectedGmailEmail(null); setShowMobileDetail(false); }} 
+              className={`flex items-center gap-1.5 md:gap-2 px-3 md:px-0 py-2 md:py-0 md:pb-2 rounded-full md:rounded-none md:border-b-2 transition-colors whitespace-nowrap ${activeTab === "calls" ? "bg-primary/10 md:bg-transparent md:border-primary text-foreground font-medium" : "md:border-transparent text-muted-foreground hover:text-foreground"}`}
+            >
+              <Phone className="h-4 w-4" /><span className="text-sm">Calls</span>
             </button>
-            <button onClick={() => { setActiveTab("emails"); setSelectedMessage(null); }} className={`flex items-center gap-2 pb-2 border-b-2 transition-colors ${activeTab === "emails" ? "border-primary text-foreground font-medium" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
-              <Mail className="h-4 w-4" /><span>Emails</span>
+            <button 
+              onClick={() => { setActiveTab("emails"); setSelectedMessage(null); setShowMobileDetail(false); }} 
+              className={`flex items-center gap-1.5 md:gap-2 px-3 md:px-0 py-2 md:py-0 md:pb-2 rounded-full md:rounded-none md:border-b-2 transition-colors whitespace-nowrap ${activeTab === "emails" ? "bg-primary/10 md:bg-transparent md:border-primary text-foreground font-medium" : "md:border-transparent text-muted-foreground hover:text-foreground"}`}
+            >
+              <Mail className="h-4 w-4" /><span className="text-sm">Emails</span>
             </button>
           </div>
 
@@ -542,16 +572,16 @@ export function InboxView() {
 
           {/* Email inbox selector for Emails tab */}
           {activeTab === "emails" && (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide pb-1">
               <button 
                 onClick={() => setSelectedEmailInbox("ingo")} 
-                className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${selectedEmailInbox === "ingo" ? "bg-primary text-primary-foreground border-primary" : "bg-background text-muted-foreground border-border hover:border-primary/50"}`}
+                className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors whitespace-nowrap ${selectedEmailInbox === "ingo" ? "bg-primary text-primary-foreground border-primary" : "bg-background text-muted-foreground border-border hover:border-primary/50"}`}
               >
                 Ingo's Inbox
               </button>
               <button 
                 onClick={() => setSelectedEmailInbox("anja")} 
-                className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${selectedEmailInbox === "anja" ? "bg-primary text-primary-foreground border-primary" : "bg-background text-muted-foreground border-border hover:border-primary/50"}`}
+                className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors whitespace-nowrap ${selectedEmailInbox === "anja" ? "bg-primary text-primary-foreground border-primary" : "bg-background text-muted-foreground border-border hover:border-primary/50"}`}
               >
                 Anja's Inbox
               </button>
@@ -560,9 +590,9 @@ export function InboxView() {
 
           {/* Only show filters for Chats/Calls tabs */}
           {activeTab !== "emails" && (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide pb-1">
               {(["all", "open", "unread", "unresponded"] as FilterType[]).map((filter) => (
-                <button key={filter} onClick={() => setActiveFilter(filter)} className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${activeFilter === filter ? "bg-primary text-primary-foreground border-primary" : "bg-background text-muted-foreground border-border hover:border-primary/50"}`}>
+                <button key={filter} onClick={() => setActiveFilter(filter)} className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors whitespace-nowrap ${activeFilter === filter ? "bg-primary text-primary-foreground border-primary" : "bg-background text-muted-foreground border-border hover:border-primary/50"}`}>
                   {filter.charAt(0).toUpperCase() + filter.slice(1)}
                 </button>
               ))}
@@ -570,34 +600,45 @@ export function InboxView() {
           )}
         </div>
 
+        {/* Search - larger touch target on mobile */}
         <div className="p-3 border-b">
-          <Input placeholder="Search..." value={search} onChange={(e) => setSearch(e.target.value)} className="h-9 bg-muted/50 border-0" />
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input placeholder="Search..." value={search} onChange={(e) => setSearch(e.target.value)} className="h-10 md:h-9 pl-9 bg-muted/50 border-0" />
+          </div>
         </div>
 
+        {/* Message List - Gmail-style cards */}
         <ScrollArea className="flex-1">
           {activeTab === "emails" ? (
-            // Gmail Inbox View
+            // Gmail Inbox View - Enhanced mobile styling
             isLoadingGmail ? (
               <div className="p-4 text-center text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin mx-auto mb-2" /><p className="text-sm">Loading emails...</p></div>
             ) : filteredGmailEmails.length === 0 ? (
               <div className="p-8 text-center text-muted-foreground"><Mail className="h-10 w-10 mx-auto mb-3 opacity-40" /><p className="text-sm">No emails in {selectedEmailInbox === "ingo" ? "Ingo's" : "Anja's"} inbox</p></div>
             ) : (
-              <div>
+              <div className="divide-y divide-border/50">
                 {filteredGmailEmails.filter(email => !search || email.subject.toLowerCase().includes(search.toLowerCase()) || email.fromName.toLowerCase().includes(search.toLowerCase())).map((email) => {
                   const isUnread = email.labelIds?.includes('UNREAD');
                   return (
-                    <div key={email.id} onClick={() => handleSelectGmailEmail(email)} className={`flex items-start gap-3 p-3 cursor-pointer transition-colors border-l-2 ${selectedGmailEmail?.id === email.id ? "bg-muted/70 border-l-primary" : "hover:bg-muted/30 border-l-transparent"}`}>
-                      <div className="h-10 w-10 rounded-full bg-blue-500 flex items-center justify-center flex-shrink-0">
-                        <span className="text-sm font-medium text-white">{getInitials(email.fromName)}</span>
+                    <div 
+                      key={email.id} 
+                      onClick={() => handleSelectGmailEmailMobile(email)} 
+                      className={`flex items-start gap-3 p-3 md:p-3 cursor-pointer transition-colors active:bg-muted/70 ${selectedGmailEmail?.id === email.id ? "bg-muted/70" : "hover:bg-muted/30"} ${isUnread ? "bg-primary/5" : ""}`}
+                    >
+                      {/* Avatar - Gmail style */}
+                      <div className="h-11 w-11 md:h-10 md:w-10 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center flex-shrink-0 shadow-sm">
+                        <span className="text-sm font-semibold text-white">{getInitials(email.fromName)}</span>
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-2">
-                          <span className={`text-sm truncate ${isUnread ? 'font-bold' : 'font-medium'}`}>{email.fromName}</span>
-                          <span className="text-xs text-muted-foreground whitespace-nowrap">{format(new Date(email.date), "MMM d")}</span>
+                          <span className={`text-sm truncate ${isUnread ? 'font-bold text-foreground' : 'font-medium text-foreground/80'}`}>{email.fromName}</span>
+                          <span className="text-xs text-muted-foreground whitespace-nowrap flex-shrink-0">{format(new Date(email.date), "MMM d")}</span>
                         </div>
-                        <p className={`text-xs truncate ${isUnread ? 'font-bold' : 'font-medium'}`}>{email.subject}</p>
+                        <p className={`text-sm truncate ${isUnread ? 'font-semibold text-foreground' : 'text-foreground/70'}`}>{email.subject}</p>
                         <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{email.snippet}</p>
                       </div>
+                      {isUnread && <div className="w-2 h-2 rounded-full bg-primary flex-shrink-0 mt-2" />}
                     </div>
                   );
                 })}
@@ -608,18 +649,36 @@ export function InboxView() {
           ) : communications.length === 0 ? (
             <div className="p-8 text-center text-muted-foreground"><MessageSquare className="h-10 w-10 mx-auto mb-3 opacity-40" /><p className="text-sm">No conversations</p></div>
           ) : (
-            <div>
+            <div className="divide-y divide-border/50">
               {communications.map((comm) => (
-                <div key={comm.id} onClick={() => setSelectedMessage(comm)} className={`flex items-start gap-3 p-3 cursor-pointer transition-colors border-l-2 ${selectedMessage?.id === comm.id ? "bg-muted/70 border-l-primary" : "hover:bg-muted/30 border-l-transparent"}`}>
-                  <div className="h-10 w-10 rounded-full bg-emerald-500 flex items-center justify-center flex-shrink-0">
-                    <span className="text-sm font-medium text-white">{getInitials(comm.contact_name)}</span>
+                <div 
+                  key={comm.id} 
+                  onClick={() => handleSelectMessage(comm)} 
+                  className={`flex items-start gap-3 p-3 md:p-3 cursor-pointer transition-colors active:bg-muted/70 ${selectedMessage?.id === comm.id ? "bg-muted/70" : "hover:bg-muted/30"}`}
+                >
+                  {/* Avatar with status indicator */}
+                  <div className="relative">
+                    <div className="h-11 w-11 md:h-10 md:w-10 rounded-full bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center flex-shrink-0 shadow-sm">
+                      <span className="text-sm font-semibold text-white">{getInitials(comm.contact_name)}</span>
+                    </div>
+                    {comm.is_resolved && (
+                      <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-green-500 border-2 border-background flex items-center justify-center">
+                        <CheckCircle className="h-2.5 w-2.5 text-white" />
+                      </div>
+                    )}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-2">
                       <span className="font-medium text-sm truncate">{comm.contact_name}</span>
-                      <span className="text-xs text-muted-foreground whitespace-nowrap">{format(new Date(comm.created_at), "MMM d")}</span>
+                      <span className="text-xs text-muted-foreground whitespace-nowrap flex-shrink-0">{format(new Date(comm.created_at), "MMM d")}</span>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{getMessagePreview(comm)}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{getMessagePreview(comm)}</p>
+                    {/* Type indicator */}
+                    <div className="flex items-center gap-2 mt-1.5">
+                      {comm.type === "draft" && <Badge variant="outline" className="text-xs h-5 px-1.5 bg-amber-500/10 text-amber-600 border-amber-500/30">Draft</Badge>}
+                      {comm.type === "personal_sms" && <Badge variant="outline" className="text-xs h-5 px-1.5">SMS</Badge>}
+                      {comm.direction === "inbound" && !comm.is_resolved && <Badge variant="outline" className="text-xs h-5 px-1.5 bg-blue-500/10 text-blue-600 border-blue-500/30">New</Badge>}
+                    </div>
                   </div>
                 </div>
               ))}
@@ -627,17 +686,35 @@ export function InboxView() {
           )}
         </ScrollArea>
 
-        <div className="p-3 border-t">
+        {/* Compose button - FAB style on mobile */}
+        <div className="p-3 border-t hidden md:block">
           <Button onClick={() => setShowComposeEmail(true)} className="w-full" size="sm"><Plus className="h-4 w-4 mr-2" />Compose</Button>
         </div>
       </div>
+      
+      {/* Mobile FAB for compose */}
+      <Button 
+        onClick={() => setShowComposeEmail(true)} 
+        className="fixed bottom-20 right-4 h-14 w-14 rounded-full shadow-lg md:hidden z-50"
+        size="icon"
+      >
+        <Plus className="h-6 w-6" />
+      </Button>
 
-      {/* Right Panel */}
-      <div className="flex-1 flex flex-col">
+      {/* Right Panel - Detail View (Full screen on mobile when showing detail) */}
+      <div className={`flex-1 flex flex-col ${showMobileDetail ? 'flex' : 'hidden md:flex'}`}>
         {activeTab === "emails" && selectedGmailEmail ? (
-          // Gmail Email Detail View
+          // Gmail Email Detail View - Mobile optimized
           <>
-            <div className="p-4 border-b flex items-center gap-4">
+            {/* Mobile back button */}
+            <div className="md:hidden p-3 border-b flex items-center gap-3">
+              <Button variant="ghost" size="icon" className="h-10 w-10" onClick={handleBackToList}>
+                <ChevronLeft className="h-5 w-5" />
+              </Button>
+              <span className="font-medium truncate">{selectedGmailEmail.fromName}</span>
+            </div>
+            {/* Desktop email header */}
+            <div className="hidden md:flex p-4 border-b items-center gap-4">
               <div className="h-11 w-11 rounded-full bg-blue-500 flex items-center justify-center flex-shrink-0">
                 <span className="text-sm font-medium text-white">{getInitials(selectedGmailEmail.fromName)}</span>
               </div>
@@ -699,7 +776,16 @@ export function InboxView() {
           </>
         ) : selectedMessage ? (
           <>
-            <div className="p-4 border-b flex items-center gap-4">
+            {/* Mobile back header */}
+            <div className="md:hidden p-3 border-b flex items-center gap-3">
+              <Button variant="ghost" size="icon" className="h-10 w-10" onClick={handleBackToList}>
+                <ChevronLeft className="h-5 w-5" />
+              </Button>
+              <span className="font-medium truncate">{selectedMessage.contact_name}</span>
+            </div>
+            
+            {/* Desktop header */}
+            <div className="hidden md:flex p-4 border-b items-center gap-4">
               <div className="h-11 w-11 rounded-full bg-emerald-500 flex items-center justify-center flex-shrink-0">
                 <span className="text-sm font-medium text-white">{getInitials(selectedMessage.contact_name)}</span>
               </div>

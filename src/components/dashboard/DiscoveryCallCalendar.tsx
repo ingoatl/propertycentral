@@ -172,7 +172,7 @@ export function DiscoveryCallCalendar() {
   return (
     <Card className="col-span-full">
       <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <CardTitle className="flex items-center gap-2">
             <Calendar className="h-5 w-5 text-primary" />
             Discovery Calls
@@ -181,16 +181,18 @@ export function DiscoveryCallCalendar() {
             <Button
               variant="outline"
               size="icon"
+              className="h-9 w-9"
               onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
             >
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            <span className="font-medium min-w-[140px] text-center">
-              {format(currentMonth, "MMMM yyyy")}
+            <span className="font-medium min-w-[120px] sm:min-w-[140px] text-center text-sm sm:text-base">
+              {format(currentMonth, "MMM yyyy")}
             </span>
             <Button
               variant="outline"
               size="icon"
+              className="h-9 w-9"
               onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
             >
               <ChevronRight className="h-4 w-4" />
@@ -198,8 +200,128 @@ export function DiscoveryCallCalendar() {
           </div>
         </div>
       </CardHeader>
-      <CardContent>
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+      <CardContent className="px-3 sm:px-6">
+        {/* Mobile: Show upcoming calls list first, then compact calendar */}
+        <div className="lg:hidden space-y-4">
+          {/* Upcoming calls - Priority on mobile */}
+          <div>
+            <h3 className="font-semibold mb-3 flex items-center gap-2 text-sm">
+              <Clock className="h-4 w-4" />
+              Upcoming Calls ({upcomingCalls.length})
+            </h3>
+            {upcomingCalls.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-4 text-center">No upcoming calls</p>
+            ) : (
+              <div className="space-y-2">
+                {upcomingCalls.map((call) => {
+                  const score = calculateRevenueScore(
+                    call.leads?.property_address || "",
+                    call.leads?.property_type || null
+                  );
+                  return (
+                    <button
+                      key={call.id}
+                      onClick={() => setSelectedCall(call)}
+                      className="w-full text-left p-3 rounded-lg border hover:border-primary active:bg-muted/50 transition-colors"
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="font-medium text-sm">
+                          {call.leads?.name || "Unknown"}
+                        </span>
+                        <Badge
+                          variant="outline"
+                          className={cn("text-xs", getScoreColor(score))}
+                        >
+                          {score}
+                        </Badge>
+                      </div>
+                      <div className="text-xs text-muted-foreground space-y-1">
+                        <div className="flex items-center gap-1">
+                          <Calendar className="h-3 w-3" />
+                          {format(new Date(call.scheduled_at), "EEE, MMM d 'at' h:mm a")}
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1">
+                            {call.meeting_type === "video" ? (
+                              <Video className="h-3 w-3 text-green-600" />
+                            ) : (
+                              <Phone className="h-3 w-3 text-blue-600" />
+                            )}
+                            {call.meeting_type === "video" ? "Video Call" : "Phone Call"}
+                          </div>
+                          {call.leads?.property_address && (
+                            <div className="flex items-center gap-1 truncate max-w-[50%]">
+                              <MapPin className="h-3 w-3 shrink-0" />
+                              <span className="truncate text-[10px]">
+                                {call.leads.property_address.split(',')[0]}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Compact mobile calendar */}
+          <div className="border rounded-lg p-2">
+            {/* Day headers - abbreviated */}
+            <div className="grid grid-cols-7 mb-1">
+              {["S", "M", "T", "W", "T", "F", "S"].map((day, i) => (
+                <div
+                  key={i}
+                  className="text-center text-xs font-medium text-muted-foreground py-1"
+                >
+                  {day}
+                </div>
+              ))}
+            </div>
+
+            {/* Calendar days - compact */}
+            <div className="grid grid-cols-7 gap-0.5">
+              {days.map((day) => {
+                const dayCalls = getCallsForDay(day);
+                const isCurrentMonth = isSameMonth(day, currentMonth);
+                const isCurrentDay = isToday(day);
+                const hasCall = dayCalls.length > 0;
+
+                return (
+                  <button
+                    key={day.toISOString()}
+                    onClick={() => hasCall && setSelectedCall(dayCalls[0])}
+                    disabled={!hasCall}
+                    className={cn(
+                      "aspect-square p-0.5 text-xs rounded transition-colors relative",
+                      !isCurrentMonth && "opacity-30",
+                      isCurrentDay && "ring-1 ring-primary",
+                      hasCall && "cursor-pointer hover:bg-primary/10",
+                      !hasCall && "cursor-default"
+                    )}
+                  >
+                    <span className={cn(
+                      "flex items-center justify-center w-full h-full rounded-full text-xs",
+                      isCurrentDay && "bg-primary text-primary-foreground font-bold",
+                      hasCall && !isCurrentDay && "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 font-medium"
+                    )}>
+                      {format(day, "d")}
+                    </span>
+                    {dayCalls.length > 1 && (
+                      <span className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 text-[8px] text-muted-foreground">
+                        +{dayCalls.length - 1}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* Desktop: Full calendar with sidebar */}
+        <div className="hidden lg:grid grid-cols-1 lg:grid-cols-4 gap-6">
           {/* Calendar Grid */}
           <div className="lg:col-span-3">
             {/* Day headers */}
