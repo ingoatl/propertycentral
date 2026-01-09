@@ -853,6 +853,7 @@ export default function OwnerDashboard() {
                 metrics={performanceMetrics}
                 propertyName={property?.name}
                 revenueBreakdown={revenueBreakdown}
+                rentalType={property?.rental_type}
               />
 
               {/* Performance Charts */}

@@ -352,19 +352,20 @@ export const AdminDashboard = ({ summaries, onExport, onSync, syncing, onSendOve
                 Comprehensive property management overview
               </p>
             </div>
-            <div className="flex items-center gap-3 max-md:gap-2 max-md:flex-wrap max-md:w-full">
+            {/* Hide admin action buttons on mobile */}
+            <div className="hidden md:flex items-center gap-3">
               <SendTestTeamDigestButton />
-              <Button onClick={onSendOverdueEmails} variant="outline" size="sm" className="max-md:flex-1">
-                <AlertCircle className="h-4 w-4 max-md:mr-1" />
-                <span className="max-md:text-xs">Overdue</span>
+              <Button onClick={onSendOverdueEmails} variant="outline" size="sm">
+                <AlertCircle className="h-4 w-4" />
+                <span>Overdue</span>
               </Button>
-              <Button onClick={onExport} variant="outline" size="sm" className="max-md:flex-1">
-                <Download className="h-4 w-4 max-md:mr-1" />
-                <span className="max-md:text-xs">Export</span>
+              <Button onClick={onExport} variant="outline" size="sm">
+                <Download className="h-4 w-4" />
+                <span>Export</span>
               </Button>
-              <Button onClick={onSync} disabled={syncing} size="sm" className="max-md:w-full">
-                <RefreshCw className={`h-4 w-4 max-md:mr-1 ${syncing ? "animate-spin" : ""}`} />
-                <span className="max-md:text-xs">{syncing ? "Syncing..." : "Sync Data"}</span>
+              <Button onClick={onSync} disabled={syncing} size="sm">
+                <RefreshCw className={`h-4 w-4 ${syncing ? "animate-spin" : ""}`} />
+                <span>{syncing ? "Syncing..." : "Sync Data"}</span>
               </Button>
             </div>
           </div>
