@@ -12,6 +12,7 @@ const ONBOARDING_STEPS = [
 ];
 
 // Map lead stages to timeline step index
+// The step index represents the CURRENT step we're working on (not completed)
 function getTimelineStep(stage: string | null): number {
   switch(stage) {
     case 'new_lead':
@@ -21,19 +22,18 @@ function getTimelineStep(stage: string | null): number {
     case 'proposal_sent':
     case 'contract_out':
     case 'contract_signed': 
-      return 0; // Current step: Setup Payment
+      return 0; // Current step: Payment Setup
     case 'ach_form_signed': 
-      return 1; // Current step: Complete Onboarding Form
     case 'onboarding_form_requested': 
-      return 2; // Current step: Submit Insurance
+      return 1; // Current step: Onboarding Form (requested = waiting for it)
     case 'insurance_requested': 
-      return 3; // Current step: Schedule Inspection
+      return 2; // Current step: Insurance (requested = waiting for it)
     case 'inspection_scheduled': 
-      return 4; // Current step: Go Live
+      return 3; // Current step: Inspection
     case 'ops_handoff': 
       return 5; // All done
     default: 
-      return 0;
+      return 0; // Default to first step
   }
 }
 
@@ -41,7 +41,7 @@ function getStepDescription(step: number): string {
   switch(step) {
     case 0: return "We're setting up your payment processing";
     case 1: return "Please complete your onboarding form";
-    case 2: return "Awaiting insurance documentation";
+    case 2: return "Please submit your insurance documentation";
     case 3: return "Scheduling your property inspection";
     case 4: return "Final preparations before going live!";
     default: return "Getting started";
@@ -88,7 +88,7 @@ export function OwnerOnboardingTimeline({ onboardingStage }: OwnerOnboardingTime
                       "flex items-center justify-center rounded-full transition-all duration-300 shadow-sm",
                       "w-10 h-10 text-sm font-bold",
                       isCompleted && "bg-green-500 text-white shadow-green-500/30",
-                      isCurrent && "bg-primary text-primary-foreground ring-4 ring-primary/20 shadow-primary/30 animate-pulse",
+                      isCurrent && "bg-primary text-primary-foreground ring-4 ring-primary/20 shadow-primary/30",
                       !isCompleted && !isCurrent && "bg-muted text-muted-foreground"
                     )}
                   >
