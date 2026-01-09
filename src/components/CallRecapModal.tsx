@@ -641,37 +641,24 @@ Generate ONLY the SMS text, nothing else.`;
         )}
       </div>
 
-      {/* Footer Actions - Dismiss moved here */}
+      {/* Footer Actions - Simplified */}
       <div className="flex items-center justify-between pt-4 border-t">
-        <Button
-          variant="ghost"
-          size="sm"
+        <button
           onClick={onDismiss}
           disabled={isDismissing}
-          className="text-muted-foreground hover:text-destructive"
+          className="text-xs text-muted-foreground hover:text-destructive transition-colors"
         >
-          <Trash2 className="h-4 w-4 mr-1" />
-          Dismiss
-        </Button>
-        <div className="flex gap-2">
+          Dismiss this recap
+        </button>
+        {recap.recipient_email && (
           <Button
-            variant="outline"
-            onClick={onMarkDone}
-            disabled={isMarkingDone}
+            onClick={() => onSend(subject, emailBody)}
+            disabled={isSending}
           >
-            <Check className="h-4 w-4 mr-2" />
-            Mark Done
+            <Send className="h-4 w-4 mr-2" />
+            Send & Done
           </Button>
-          {recap.recipient_email && (
-            <Button
-              onClick={() => onSend(subject, emailBody)}
-              disabled={isSending}
-            >
-              <Send className="h-4 w-4 mr-2" />
-              Send & Done
-            </Button>
-          )}
-        </div>
+        )}
       </div>
     </div>
   );
