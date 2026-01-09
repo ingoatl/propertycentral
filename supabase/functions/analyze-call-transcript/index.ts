@@ -16,6 +16,7 @@ interface CallData {
   callDuration?: number;
   transcript: string;
   ghlCallId: string;
+  callerUserId?: string; // The user who made/received the call
 }
 
 interface ExtractedTask {
@@ -35,6 +36,83 @@ interface AnalysisResult {
   };
   transcript_summary: string;
   sentiment: "positive" | "neutral" | "negative";
+}
+
+// Team member IDs for smart routing
+const TEAM_MEMBERS: Record<string, string> = {
+  'anja': 'b2f495ac-2062-446e-bfa0-2197a82114c1',
+  'ingo': '8f7c8f43-536f-4587-99dc-5086c144a045',
+};
+
+// Detect if transcript mentions wanting to speak with a specific team member
+function detectAssignedUser(transcript: string): string | null {
+  const transcriptLower = transcript.toLowerCase();
+  
+  // Check for Anja mentions
+  const anjaPatterns = [
+    'speak with anja',
+    'talk to anja',
+    'connect me to anja',
+    'is anja available',
+    'speak to anja',
+    'get anja',
+    'can i speak with anja',
+    'anja please',
+    'transfer to anja',
+    'reach anja',
+  ];
+  
+  if (anjaPatterns.some(pattern => transcriptLower.includes(pattern))) {
+    return TEAM_MEMBERS['anja'];
+  }
+  
+  // Check for Ingo mentions
+  const ingoPatterns = [
+    'speak with ingo',
+    'talk to ingo',
+    'connect me to ingo',
+    'is ingo available',
+    'speak to ingo',
+    'get ingo',
+    'can i speak with ingo',
+    'ingo please',
+    'transfer to ingo',
+    'reach ingo',
+    'connect you to ingo',
+  ];
+  
+  if (ingoPatterns.some(pattern => transcriptLower.includes(pattern))) {
+    return TEAM_MEMBERS['ingo'];
+  }
+  
+  return null;
+}
+
+// Smart greeting that avoids "Hi Unknown"
+function createSmartGreeting(name: string | null): string {
+  if (!name) return 'Hi,';
+  
+  const nameLower = name.toLowerCase();
+  // Check for unknown/invalid name patterns
+  if (
+    nameLower.includes('unknown') ||
+    nameLower.includes('caller') ||
+    nameLower === 'n/a' ||
+    nameLower === 'na' ||
+    name.length < 2
+  ) {
+    return 'Hi,';
+  }
+  
+  // Extract first name
+  const parts = name.split(' ').filter(p => 
+    !['mr.', 'mrs.', 'ms.', 'dr.', 'mr', 'mrs', 'ms', 'dr'].includes(p.toLowerCase())
+  );
+  const firstName = parts[0];
+  
+  if (!firstName || firstName.length < 2) return 'Hi,';
+  
+  return `Hi ${firstName},`;
 }
 
 serve(async (req) => {
@@ -59,8 +137,11 @@ serve(async (req) => {
     // Determine recipient type
     const recipientType = callData.ownerId ? "owner" : callData.leadId ? "lead" : "unknown";
     const recipientName = callData.matchedName || "Caller";
+    
+    // Create smart greeting for email
+    const greeting = createSmartGreeting(callData.matchedName || null);
 
-    // Build AI prompt
+    // Build AI prompt with smart greeting instruction
     const systemPrompt = `You are a professional property management assistant analyzing call transcripts.
 Your job is to:
 1. Extract key topics discussed
@@ -71,6 +152,10 @@ Your job is to:
 
 The caller is ${recipientType === "owner" ? "a property owner we manage for" : recipientType === "lead" ? "a prospective client" : "someone who called our office"}.
 Their name is: ${recipientName}
+
+IMPORTANT FOR EMAIL:
+- Use "${greeting}" as the greeting - NEVER say "Hi Unknown" or "Hi Unknown Caller"
+- If the name appears to be unknown/invalid, just use "Hi," without a name
 
 Return a JSON object with this structure:
 {
@@ -152,7 +237,14 @@ CALL DURATION: ${callData.callDuration ? Math.round(callData.callDuration / 60) 
 
     console.log(`Analysis complete. Found ${analysis.action_items?.length || 0} tasks`);
 
-    // Insert pending call recap
+    // Detect if caller wants to speak with a specific team member
+    const assignedToUserId = detectAssignedUser(callData.transcript);
+    if (assignedToUserId) {
+      const teamMemberName = Object.entries(TEAM_MEMBERS).find(([_, id]) => id === assignedToUserId)?.[0];
+      console.log(`Caller requested to speak with ${teamMemberName}, assigning recap to user ${assignedToUserId}`);
+    }
+
+    // Insert pending call recap with assigned_to_user_id
     const { data: recapData, error: recapError } = await supabase
       .from("pending_call_recaps")
       .insert({
@@ -165,6 +257,8 @@ CALL DURATION: ${callData.callDuration ? Math.round(callData.callDuration / 60) 
         recipient_type: recipientType,
         call_date: new Date().toISOString(),
         call_duration: callData.callDuration || null,
+        caller_user_id: callData.callerUserId || null,
+        assigned_to_user_id: assignedToUserId, // Smart routing based on transcript
         subject: analysis.recap_email?.subject || `Call Summary - ${new Date().toLocaleDateString()}`,
         email_body: analysis.recap_email?.body || `<p>Thank you for your call. We'll follow up soon.</p>`,
         key_topics: analysis.key_topics || [],
@@ -252,6 +346,7 @@ CALL DURATION: ${callData.callDuration ? Math.round(callData.callDuration / 60) 
         summary: analysis.transcript_summary,
         sentiment: analysis.sentiment,
         keyTopics: analysis.key_topics,
+        assignedToUserId: assignedToUserId,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
     );

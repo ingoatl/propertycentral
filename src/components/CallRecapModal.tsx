@@ -34,6 +34,8 @@ import {
   Meh,
   PhoneCall,
   SkipForward,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { usePendingCallRecaps, PendingCallRecap } from "@/hooks/usePendingCallRecaps";
 import {
@@ -43,6 +45,8 @@ import {
 import { formatDistanceToNow, format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { TwilioCallDialog } from "@/components/TwilioCallDialog";
+import { createSmartGreeting, extractFirstName } from "@/lib/nameUtils";
 
 const sentimentConfig = {
   positive: { icon: ThumbsUp, color: "text-green-500", bg: "bg-green-100" },
@@ -125,10 +129,14 @@ function RecapEditor({ recap, onSend, onDismiss, onCallback, onSendSMS, onSkipTo
   const [emailBody, setEmailBody] = useState(recap.email_body);
   const [isPreview, setIsPreview] = useState(false);
   const [showSMSInput, setShowSMSInput] = useState(false);
+  
+  // Use smart greeting utility to avoid "Hi Unknown"
+  const firstName = extractFirstName(recap.recipient_name);
+  const greeting = createSmartGreeting(recap.recipient_name);
+  
   const [smsMessage, setSmsMessage] = useState(() => {
-    const name = recap.recipient_name?.split(' ')[0] || 'there';
     const summary = recap.transcript_summary?.slice(0, 100) || 'our recent call';
-    return `Hi ${name}, following up on ${summary}. Let me know if you need anything else! - PeachHaus`;
+    return `${greeting} following up on ${summary}. Let me know if you need anything else! - PeachHaus`;
   });
 
   const SentimentIcon = sentimentConfig[recap.sentiment as keyof typeof sentimentConfig]?.icon || Meh;
@@ -267,7 +275,7 @@ function RecapEditor({ recap, onSend, onDismiss, onCallback, onSendSMS, onSkipTo
         <div className="flex items-center justify-between">
           <h4 className="text-sm font-medium flex items-center gap-2">
             <Mail className="h-4 w-4" />
-            Recap Email to {recap.recipient_name}
+            Recap Email to {firstName || 'Contact'}
           </h4>
           <Button
             variant="ghost"
@@ -323,7 +331,7 @@ function RecapEditor({ recap, onSend, onDismiss, onCallback, onSendSMS, onSkipTo
                 disabled={isSending || !recap.recipient_email}
               >
                 <Send className="h-4 w-4 mr-2" />
-                Send to {recap.recipient_name}
+                Send to {firstName || 'Contact'}
               </Button>
             </div>
           </>
@@ -334,7 +342,7 @@ function RecapEditor({ recap, onSend, onDismiss, onCallback, onSendSMS, onSkipTo
               <div>
                 <p className="text-sm font-medium text-yellow-800">No email address available</p>
                 <p className="text-xs text-yellow-700">
-                  We couldn't find an email for {recap.recipient_name}. You can dismiss this or add their email later.
+                  We couldn't find an email for this contact. You can dismiss this or add their email later.
                 </p>
               </div>
             </CardContent>
@@ -349,6 +357,16 @@ export function CallRecapModal() {
   const [isOpen, setIsOpen] = useState(true);
   const [activeRecapIndex, setActiveRecapIndex] = useState(0);
   const [showAllRecaps, setShowAllRecaps] = useState(false);
+  
+  // TwilioCallDialog state
+  const [showCallDialog, setShowCallDialog] = useState(false);
+  const [callDialogPhone, setCallDialogPhone] = useState<string | null>(null);
+  const [callDialogContact, setCallDialogContact] = useState({ name: "", address: "" });
+  const [callDialogMetadata, setCallDialogMetadata] = useState<{
+    communicationId?: string;
+    ownerId?: string;
+    leadId?: string;
+  }>({});
 
   const {
     pendingRecaps,
@@ -392,6 +410,9 @@ export function CallRecapModal() {
 
   // Check if current recap is user's own call
   const isUserCall = currentRecap?.caller_user_id === currentUserId;
+  
+  // Check if current recap is assigned to current user
+  const isAssignedToUser = currentRecap?.assigned_to_user_id === currentUserId;
 
   // ALL HOOKS MUST BE CALLED BEFORE ANY EARLY RETURNS
   const handleSend = useCallback(
@@ -435,228 +456,306 @@ export function CallRecapModal() {
     approveAllTasks();
   }, [approveAllTasks]);
 
+  // Handle callback using integrated Twilio calling
+  const handleCallback = useCallback(async () => {
+    if (!currentRecap) return;
+    
+    let phone: string | null = null;
+    let address: string | null = null;
+    
+    if (currentRecap.owner_id) {
+      const { data: owner } = await supabase
+        .from("property_owners")
+        .select("phone")
+        .eq("id", currentRecap.owner_id)
+        .single();
+      phone = owner?.phone || null;
+      // Get property address if available
+      if (currentRecap.property_id) {
+        const { data: property } = await supabase
+          .from("properties")
+          .select("address")
+          .eq("id", currentRecap.property_id)
+          .single();
+        address = property?.address || null;
+      }
+    } else if (currentRecap.lead_id) {
+      const { data: lead } = await supabase
+        .from("leads")
+        .select("phone, property_address")
+        .eq("id", currentRecap.lead_id)
+        .single();
+      phone = lead?.phone || null;
+      address = lead?.property_address || null;
+    }
+    
+    if (phone) {
+      const displayName = extractFirstName(currentRecap.recipient_name) || currentRecap.recipient_name || 'Contact';
+      setCallDialogPhone(phone);
+      setCallDialogContact({
+        name: displayName,
+        address: address || ""
+      });
+      setCallDialogMetadata({
+        communicationId: currentRecap.communication_id || undefined,
+        ownerId: currentRecap.owner_id || undefined,
+        leadId: currentRecap.lead_id || undefined,
+      });
+      setShowCallDialog(true);
+    } else {
+      toast.error("No phone number on file");
+    }
+  }, [currentRecap]);
+
   // Don't render if nothing to show - AFTER all hooks
   if (!isEligibleUser || (pendingRecaps.length === 0 && callTasks.length === 0)) {
     return null;
   }
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col">
-        <DialogHeader>
-          <div className="flex items-center gap-2">
-            <div className="p-2 rounded-lg bg-primary/10">
-              <Phone className="h-5 w-5 text-primary" />
+    <>
+      <Dialog open={isOpen} onOpenChange={setIsOpen}>
+        <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col">
+          <DialogHeader>
+            <div className="flex items-center gap-2">
+              <div className="p-2 rounded-lg bg-primary/10">
+                <Phone className="h-5 w-5 text-primary" />
+              </div>
+              <div>
+                <DialogTitle className="flex items-center gap-2">
+                  {displayedRecaps.length > 0
+                    ? `Call${displayedRecaps.length > 1 ? "s" : ""} to Review`
+                    : "Tasks from Calls"}
+                  {userRecaps.length > 0 && (
+                    <Badge variant="default" className="text-xs">
+                      {userRecaps.length} Your Calls
+                    </Badge>
+                  )}
+                  {isAssignedToUser && (
+                    <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-800">
+                      Assigned to You
+                    </Badge>
+                  )}
+                </DialogTitle>
+                <DialogDescription>
+                  {displayedRecaps.length > 0
+                    ? `${displayedRecaps.length} call recap${displayedRecaps.length > 1 ? "s" : ""} ready to send`
+                    : `${callTasks.length} task${callTasks.length !== 1 ? "s" : ""} detected`}
+                  {callTasks.length > 0 && displayedRecaps.length > 0 && ` • ${callTasks.length} tasks detected`}
+                </DialogDescription>
+              </div>
             </div>
-            <div>
-              <DialogTitle className="flex items-center gap-2">
-                {displayedRecaps.length > 0
-                  ? `Call${displayedRecaps.length > 1 ? "s" : ""} to Review`
-                  : "Tasks from Calls"}
-                {userRecaps.length > 0 && (
-                  <Badge variant="default" className="text-xs">
-                    {userRecaps.length} Your Calls
+          </DialogHeader>
+
+          <Tabs defaultValue="recap" className="flex-1 flex flex-col overflow-hidden">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="recap" className="flex items-center gap-2">
+                <Mail className="h-4 w-4" />
+                Recap Email
+                {displayedRecaps.length > 0 && (
+                  <Badge variant="secondary" className="ml-1">
+                    {displayedRecaps.length}
                   </Badge>
                 )}
-              </DialogTitle>
-              <DialogDescription>
-                {displayedRecaps.length > 0
-                  ? `${displayedRecaps.length} call recap${displayedRecaps.length > 1 ? "s" : ""} ready to send`
-                  : `${callTasks.length} task${callTasks.length !== 1 ? "s" : ""} detected`}
-                {callTasks.length > 0 && displayedRecaps.length > 0 && ` • ${callTasks.length} tasks detected`}
-              </DialogDescription>
-            </div>
-          </div>
-        </DialogHeader>
+              </TabsTrigger>
+              <TabsTrigger value="tasks" className="flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4" />
+                Extracted Tasks
+                {callTasks.length > 0 && (
+                  <Badge variant="secondary" className="ml-1">
+                    {callTasks.length}
+                  </Badge>
+                )}
+              </TabsTrigger>
+            </TabsList>
 
-        <Tabs defaultValue="recap" className="flex-1 flex flex-col overflow-hidden">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="recap" className="flex items-center gap-2">
-              <Mail className="h-4 w-4" />
-              Recap Email
-              {displayedRecaps.length > 0 && (
-                <Badge variant="secondary" className="ml-1">
-                  {displayedRecaps.length}
-                </Badge>
-              )}
-            </TabsTrigger>
-            <TabsTrigger value="tasks" className="flex items-center gap-2">
-              <CheckCircle2 className="h-4 w-4" />
-              Extracted Tasks
-              {callTasks.length > 0 && (
-                <Badge variant="secondary" className="ml-1">
-                  {callTasks.length}
-                </Badge>
-              )}
-            </TabsTrigger>
-          </TabsList>
+            {/* Toggle for showing all recaps vs just user's */}
+            {teamRecaps.length > 0 && userRecaps.length > 0 && (
+              <div className="flex justify-end mt-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowAllRecaps(!showAllRecaps)}
+                >
+                  <User className="h-4 w-4 mr-1" />
+                  {showAllRecaps ? "Show My Calls" : `Show All (${pendingRecaps.length})`}
+                </Button>
+              </div>
+            )}
 
-          {/* Toggle for showing all recaps vs just user's */}
-          {teamRecaps.length > 0 && userRecaps.length > 0 && (
-            <div className="flex justify-end mt-2">
+            <ScrollArea className="flex-1 mt-2">
+              <TabsContent value="recap" className="m-0">
+                {currentRecap ? (
+                  <div className="space-y-2">
+                    {isAssignedToUser && (
+                      <div className="flex items-center gap-2 p-2 rounded-lg bg-blue-50 text-xs text-blue-700 border border-blue-200">
+                        <User className="h-3 w-3" />
+                        <span>This caller requested to speak with you</span>
+                      </div>
+                    )}
+                    {!isUserCall && !isAssignedToUser && currentRecap.caller_user_id && (
+                      <div className="flex items-center gap-2 p-2 rounded-lg bg-muted/50 text-xs text-muted-foreground">
+                        <User className="h-3 w-3" />
+                        <span>This call was made by another team member</span>
+                      </div>
+                    )}
+                    <RecapEditor
+                      recap={currentRecap}
+                      onSend={handleSend}
+                      onDismiss={handleDismiss}
+                      onCallback={handleCallback}
+                      onSendSMS={async (message) => {
+                        let phone: string | null = null;
+                        
+                        if (currentRecap.owner_id) {
+                          const { data: owner } = await supabase
+                            .from("property_owners")
+                            .select("phone")
+                            .eq("id", currentRecap.owner_id)
+                            .single();
+                          phone = owner?.phone || null;
+                        } else if (currentRecap.lead_id) {
+                          const { data: lead } = await supabase
+                            .from("leads")
+                            .select("phone")
+                            .eq("id", currentRecap.lead_id)
+                            .single();
+                          phone = lead?.phone || null;
+                        }
+                        
+                        if (phone) {
+                          try {
+                            await supabase.functions.invoke('ghl-send-sms', {
+                              body: { to: phone, message }
+                            });
+                            const displayName = extractFirstName(currentRecap.recipient_name) || 'Contact';
+                            toast.success(`SMS sent to ${displayName}`);
+                          } catch (e: any) {
+                            toast.error(e.message || "Failed to send SMS");
+                          }
+                        } else {
+                          toast.error("No phone number on file");
+                        }
+                      }}
+                      onSkipToNext={() => {
+                        if (activeRecapIndex < displayedRecaps.length - 1) {
+                          setActiveRecapIndex(prev => prev + 1);
+                        }
+                      }}
+                      hasNext={activeRecapIndex < displayedRecaps.length - 1}
+                      isSending={isSending}
+                      isDismissing={isDismissing}
+                    />
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                    <Mail className="h-12 w-12 mb-4 opacity-50" />
+                    <p>No recap emails pending</p>
+                  </div>
+                )}
+              </TabsContent>
+
+              <TabsContent value="tasks" className="m-0 space-y-3">
+                {callTasks.length > 0 ? (
+                  <>
+                    {callTasks.map((task) => (
+                      <CallTaskCard
+                        key={task.id}
+                        task={task}
+                        onApprove={handleApproveTask}
+                        onReject={handleRejectTask}
+                        isApproving={isApproving}
+                        isRejecting={isRejecting}
+                      />
+                    ))}
+                    <div className="flex justify-end pt-2">
+                      <Button onClick={handleApproveAllTasks} disabled={isApprovingAll}>
+                        <CheckCircle2 className="h-4 w-4 mr-2" />
+                        Approve All ({callTasks.length})
+                      </Button>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                    <CheckCircle2 className="h-12 w-12 mb-4 opacity-50" />
+                    <p>No tasks detected from calls</p>
+                  </div>
+                )}
+              </TabsContent>
+            </ScrollArea>
+          </Tabs>
+
+          {/* Back/Forward Navigation for multiple recaps */}
+          {displayedRecaps.length > 1 && (
+            <div className="flex items-center justify-center gap-4 pt-4 border-t">
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => setShowAllRecaps(!showAllRecaps)}
+                onClick={() => setActiveRecapIndex(prev => Math.max(0, prev - 1))}
+                disabled={activeRecapIndex === 0}
               >
-                <User className="h-4 w-4 mr-1" />
-                {showAllRecaps ? "Show My Calls" : `Show All (${pendingRecaps.length})`}
+                <ChevronLeft className="h-4 w-4 mr-1" />
+                Previous
+              </Button>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">
+                  {activeRecapIndex + 1} of {displayedRecaps.length}
+                </span>
+                <div className="flex gap-1">
+                  {displayedRecaps.map((recap, idx) => (
+                    <button
+                      key={recap.id}
+                      onClick={() => setActiveRecapIndex(idx)}
+                      className={`w-2 h-2 rounded-full transition-colors ${
+                        idx === activeRecapIndex ? "bg-primary" : "bg-muted"
+                      } ${recap.caller_user_id === currentUserId ? "ring-1 ring-primary" : ""} ${
+                        recap.assigned_to_user_id === currentUserId ? "ring-1 ring-blue-500" : ""
+                      }`}
+                      title={
+                        recap.assigned_to_user_id === currentUserId
+                          ? "Assigned to you"
+                          : recap.caller_user_id === currentUserId
+                          ? "Your call"
+                          : "Team call"
+                      }
+                    />
+                  ))}
+                </div>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setActiveRecapIndex(prev => Math.min(displayedRecaps.length - 1, prev + 1))}
+                disabled={activeRecapIndex === displayedRecaps.length - 1}
+              >
+                Next
+                <ChevronRight className="h-4 w-4 ml-1" />
               </Button>
             </div>
           )}
 
-          <ScrollArea className="flex-1 mt-2">
-            <TabsContent value="recap" className="m-0">
-              {currentRecap ? (
-                <div className="space-y-2">
-                  {!isUserCall && currentRecap.caller_user_id && (
-                    <div className="flex items-center gap-2 p-2 rounded-lg bg-muted/50 text-xs text-muted-foreground">
-                      <User className="h-3 w-3" />
-                      <span>This call was made by another team member</span>
-                    </div>
-                  )}
-                  <RecapEditor
-                    recap={currentRecap}
-                    onSend={handleSend}
-                    onDismiss={handleDismiss}
-                    onCallback={async () => {
-                      // Get phone from owner OR lead
-                      let phone: string | null = null;
-                      
-                      if (currentRecap.owner_id) {
-                        const { data: owner } = await supabase
-                          .from("property_owners")
-                          .select("phone")
-                          .eq("id", currentRecap.owner_id)
-                          .single();
-                        phone = owner?.phone || null;
-                      } else if (currentRecap.lead_id) {
-                        const { data: lead } = await supabase
-                          .from("leads")
-                          .select("phone")
-                          .eq("id", currentRecap.lead_id)
-                          .single();
-                        phone = lead?.phone || null;
-                      }
-                      
-                      if (phone) {
-                        window.open(`tel:${phone}`, '_self');
-                        toast.success(`Calling ${currentRecap.recipient_name}...`);
-                        // Move to next after callback
-                        if (activeRecapIndex < displayedRecaps.length - 1) {
-                          setActiveRecapIndex(prev => prev + 1);
-                        }
-                      } else {
-                        toast.error("No phone number on file");
-                      }
-                    }}
-                    onSendSMS={async (message) => {
-                      let phone: string | null = null;
-                      
-                      if (currentRecap.owner_id) {
-                        const { data: owner } = await supabase
-                          .from("property_owners")
-                          .select("phone")
-                          .eq("id", currentRecap.owner_id)
-                          .single();
-                        phone = owner?.phone || null;
-                      } else if (currentRecap.lead_id) {
-                        const { data: lead } = await supabase
-                          .from("leads")
-                          .select("phone")
-                          .eq("id", currentRecap.lead_id)
-                          .single();
-                        phone = lead?.phone || null;
-                      }
-                      
-                      if (phone) {
-                        try {
-                          await supabase.functions.invoke('ghl-send-sms', {
-                            body: { to: phone, message }
-                          });
-                          toast.success(`SMS sent to ${currentRecap.recipient_name}`);
-                        } catch (e: any) {
-                          toast.error(e.message || "Failed to send SMS");
-                        }
-                      } else {
-                        toast.error("No phone number on file");
-                      }
-                    }}
-                    onSkipToNext={() => {
-                      if (activeRecapIndex < displayedRecaps.length - 1) {
-                        setActiveRecapIndex(prev => prev + 1);
-                      }
-                    }}
-                    hasNext={activeRecapIndex < displayedRecaps.length - 1}
-                    isSending={isSending}
-                    isDismissing={isDismissing}
-                  />
-                </div>
-              ) : (
-                <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-                  <Mail className="h-12 w-12 mb-4 opacity-50" />
-                  <p>No recap emails pending</p>
-                </div>
-              )}
-            </TabsContent>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsOpen(false)}>
+              Review Later
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-            <TabsContent value="tasks" className="m-0 space-y-3">
-              {callTasks.length > 0 ? (
-                <>
-                  {callTasks.map((task) => (
-                    <CallTaskCard
-                      key={task.id}
-                      task={task}
-                      onApprove={handleApproveTask}
-                      onReject={handleRejectTask}
-                      isApproving={isApproving}
-                      isRejecting={isRejecting}
-                    />
-                  ))}
-                  <div className="flex justify-end pt-2">
-                    <Button onClick={handleApproveAllTasks} disabled={isApprovingAll}>
-                      <CheckCircle2 className="h-4 w-4 mr-2" />
-                      Approve All ({callTasks.length})
-                    </Button>
-                  </div>
-                </>
-              ) : (
-                <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-                  <CheckCircle2 className="h-12 w-12 mb-4 opacity-50" />
-                  <p>No tasks detected from calls</p>
-                </div>
-              )}
-            </TabsContent>
-          </ScrollArea>
-        </Tabs>
-
-        {/* Pagination for multiple recaps */}
-        {displayedRecaps.length > 1 && (
-          <div className="flex items-center justify-center gap-2 pt-4 border-t">
-            <span className="text-sm text-muted-foreground">
-              {activeRecapIndex + 1} of {displayedRecaps.length} recaps
-            </span>
-            <div className="flex gap-1">
-              {displayedRecaps.map((recap, idx) => (
-                <button
-                  key={recap.id}
-                  onClick={() => setActiveRecapIndex(idx)}
-                  className={`w-2 h-2 rounded-full transition-colors ${
-                    idx === activeRecapIndex ? "bg-primary" : "bg-muted"
-                  } ${recap.caller_user_id === currentUserId ? "ring-1 ring-primary" : ""}`}
-                  title={recap.caller_user_id === currentUserId ? "Your call" : "Team call"}
-                />
-              ))}
-            </div>
-          </div>
-        )}
-
-        <DialogFooter>
-          <Button variant="outline" onClick={() => setIsOpen(false)}>
-            Review Later
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+      {/* Twilio Call Dialog */}
+      <TwilioCallDialog
+        isOpen={showCallDialog}
+        onOpenChange={setShowCallDialog}
+        phoneNumber={callDialogPhone}
+        contactName={callDialogContact.name}
+        contactAddress={callDialogContact.address}
+        onCallComplete={() => {
+          // Move to next recap after call completes
+          if (activeRecapIndex < displayedRecaps.length - 1) {
+            setActiveRecapIndex(prev => prev + 1);
+          }
+        }}
+      />
+    </>
   );
 }
