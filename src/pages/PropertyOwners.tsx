@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { Building2, CreditCard, DollarSign, ExternalLink, Plus, Trash2, Wallet, Edit, Phone, Mail, Send, Loader2, MoreVertical, MessageSquare } from "lucide-react";
 import { z } from "zod";
 import { AddPaymentMethod } from "@/components/AddPaymentMethod";
+import { SendOwnerPaymentRequestButton } from "@/components/owners/SendOwnerPaymentRequestButton";
 import {
   Dialog,
   DialogContent,
@@ -568,6 +569,12 @@ const PropertyOwners = () => {
                     <div className="flex gap-2 items-center">
                       {/* Desktop buttons */}
                       <div className="hidden md:flex gap-2 items-center">
+                        <SendOwnerPaymentRequestButton
+                          ownerId={owner.id}
+                          email={owner.email}
+                          name={owner.name}
+                          stripeCustomerId={owner.stripe_customer_id}
+                        />
                         <Button
                           variant="default"
                           size="sm"
