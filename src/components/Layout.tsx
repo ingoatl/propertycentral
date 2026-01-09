@@ -12,6 +12,7 @@ import { QuickCommunicationButton } from "@/components/communications/QuickCommu
 import VoiceDialer from "@/components/leads/VoiceDialer";
 import { useLeadRealtimeMessages } from "@/hooks/useLeadRealtimeMessages";
 import { TaskConfirmationModal } from "@/components/TaskConfirmationModal";
+import { CallRecapModal } from "@/components/CallRecapModal";
 
 interface LayoutProps {
   children: ReactNode;
@@ -144,6 +145,7 @@ const Layout = ({ children }: LayoutProps) => {
 
       <main className="container mx-auto px-3 sm:px-4 py-4 md:py-8 text-base">{children}</main>
       <FloatingChatButton />
+      <CallRecapModal />
       <TaskConfirmationModal />
     </div>
   );
