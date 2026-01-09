@@ -102,11 +102,11 @@ serve(async (req) => {
       ? senderEmail 
       : "ingo@peachhausgroup.com";
     
-    // Format display name with crown emoji for brand recognition
+    // Format display name - use simple text to avoid encoding issues
     const getDisplayName = (email: string, name?: string) => {
-      if (email === "ingo@peachhausgroup.com") return "♚ PeachHausGroup | Ingo Schaer";
-      if (email === "anja@peachhausgroup.com") return "♚ PeachHausGroup | Anja Schaer";
-      return name ? `♚ PeachHausGroup | ${name}` : "♚ PeachHausGroup";
+      if (email === "ingo@peachhausgroup.com") return "PeachHausGroup | Ingo Schaer";
+      if (email === "anja@peachhausgroup.com") return "PeachHausGroup | Anja Schaer";
+      return name ? `PeachHausGroup | ${name}` : "PeachHausGroup";
     };
     
     const fromName = getDisplayName(fromEmail, senderName);

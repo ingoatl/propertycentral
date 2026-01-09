@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Send, Mail, Loader2 } from "lucide-react";
+import { Send, Mail, Loader2, Sparkles } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -28,6 +28,8 @@ interface SendEmailDialogProps {
   contactEmail: string;
   contactType: "lead" | "owner";
   contactId: string;
+  replyToSubject?: string;
+  replyToBody?: string;
 }
 
 const SENDERS = [
@@ -80,19 +82,56 @@ export function SendEmailDialog({
   contactEmail,
   contactType,
   contactId,
+  replyToSubject,
+  replyToBody,
 }: SendEmailDialogProps) {
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [selectedSender, setSelectedSender] = useState(SENDERS[0].email);
+  const [isLoadingAI, setIsLoadingAI] = useState(false);
   const queryClient = useQueryClient();
 
-  // Reset form when dialog opens
+  // Fetch AI suggestion when dialog opens
   useEffect(() => {
     if (open) {
-      setSubject("");
-      setBody("");
+      // Set reply subject if provided
+      if (replyToSubject) {
+        setSubject(replyToSubject.startsWith("Re:") ? replyToSubject : `Re: ${replyToSubject}`);
+      } else {
+        setSubject("");
+      }
+      
+      // Fetch AI suggestion
+      fetchAISuggestion();
     }
-  }, [open]);
+  }, [open, contactEmail, contactName, replyToSubject, replyToBody]);
+
+  const fetchAISuggestion = async () => {
+    setIsLoadingAI(true);
+    setBody("");
+    
+    try {
+      const { data, error } = await supabase.functions.invoke("suggest-email-reply", {
+        body: {
+          contactEmail,
+          contactName,
+          currentSubject: replyToSubject || "",
+          incomingEmailBody: replyToBody || "",
+        },
+      });
+
+      if (error) throw error;
+      if (data?.suggestion) {
+        setBody(data.suggestion);
+        toast.success("AI drafted a response based on your conversation history");
+      }
+    } catch (err) {
+      console.error("Failed to get AI suggestion:", err);
+      // Silently fail - user can still type manually
+    } finally {
+      setIsLoadingAI(false);
+    }
+  };
 
   const selectedSenderInfo = SENDERS.find((s) => s.email === selectedSender);
 
@@ -203,14 +242,39 @@ export function SendEmailDialog({
 
           {/* Body input */}
           <div className="space-y-2">
-            <label className="text-sm font-medium">Message</label>
-            <Textarea
-              placeholder="Type your email message..."
-              value={body}
-              onChange={(e) => setBody(e.target.value)}
-              rows={8}
-              className="resize-none"
-            />
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-medium">Message</label>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={fetchAISuggestion}
+                disabled={isLoadingAI}
+                className="h-7 text-xs"
+              >
+                {isLoadingAI ? (
+                  <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                ) : (
+                  <Sparkles className="h-3 w-3 mr-1" />
+                )}
+                {isLoadingAI ? "Generating..." : "AI Suggest"}
+              </Button>
+            </div>
+            {isLoadingAI ? (
+              <div className="flex items-center justify-center h-48 border rounded-md bg-muted/30">
+                <div className="text-center text-muted-foreground">
+                  <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
+                  <p className="text-sm">AI is drafting a response...</p>
+                </div>
+              </div>
+            ) : (
+              <Textarea
+                placeholder="Type your email message..."
+                value={body}
+                onChange={(e) => setBody(e.target.value)}
+                rows={8}
+                className="resize-none"
+              />
+            )}
           </div>
 
           {/* Send button */}
