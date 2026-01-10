@@ -5066,7 +5066,7 @@ export type Database = {
           {
             foreignKeyName: "payment_setup_requests_owner_id_fkey"
             columns: ["owner_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "property_owners"
             referencedColumns: ["id"]
           },
