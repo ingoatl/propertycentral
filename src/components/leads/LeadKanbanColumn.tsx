@@ -1,3 +1,4 @@
+import { memo, useCallback } from "react";
 import { useDroppable } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { Lead, LeadStage, STAGE_CONFIG, LEAD_STAGES } from "@/types/leads";
@@ -12,7 +13,7 @@ interface LeadKanbanColumnProps {
   onSelectLead: (lead: Lead) => void;
 }
 
-const LeadKanbanColumn = ({ stage, leads, onSelectLead }: LeadKanbanColumnProps) => {
+const LeadKanbanColumnComponent = ({ stage, leads, onSelectLead }: LeadKanbanColumnProps) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const { setNodeRef, isOver } = useDroppable({ id: stage });
 
@@ -88,5 +89,20 @@ const LeadKanbanColumn = ({ stage, leads, onSelectLead }: LeadKanbanColumnProps)
     </div>
   );
 };
+
+// Memoize column to prevent unnecessary re-renders
+const LeadKanbanColumn = memo(LeadKanbanColumnComponent, (prevProps, nextProps) => {
+  if (prevProps.stage !== nextProps.stage) return false;
+  if (prevProps.leads.length !== nextProps.leads.length) return false;
+  // Check if any lead id or key data changed
+  for (let i = 0; i < prevProps.leads.length; i++) {
+    const prev = prevProps.leads[i];
+    const next = nextProps.leads[i];
+    if (prev.id !== next.id || prev.name !== next.name || prev.stage !== next.stage) {
+      return false;
+    }
+  }
+  return true;
+});
 
 export default LeadKanbanColumn;
