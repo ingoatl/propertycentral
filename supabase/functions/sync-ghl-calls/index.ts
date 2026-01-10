@@ -62,6 +62,7 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         limit: 200,
+        forceRefresh: true, // Try to update calls without transcripts
       }),
     });
 
