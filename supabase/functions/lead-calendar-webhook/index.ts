@@ -115,7 +115,8 @@ serve(async (req) => {
 
     console.log("Extracted lead data:", leadData);
 
-    // Check for duplicate by email or event ID
+    // Check for existing lead by email or event ID
+    let existingLeadId: string | null = null;
     if (leadData.email || leadData.eventId) {
       const { data: existing } = await supabase
         .from("leads")
@@ -124,7 +125,60 @@ serve(async (req) => {
         .single();
 
       if (existing) {
-        console.log("Duplicate lead detected, skipping:", existing.id);
+        console.log("Existing lead found:", existing.id);
+        existingLeadId = existing.id;
+        
+        // For website bookings, we still need to create the discovery call for existing leads
+        if (isWebsiteBooking && discoveryCallData) {
+          let discoveryCallId: string | null = null;
+          
+          // Create discovery call for existing lead
+          const { data: newCall, error: callError } = await supabase
+            .from("discovery_calls")
+            .insert({
+              lead_id: existing.id,
+              scheduled_at: discoveryCallData.scheduled_at,
+              duration_minutes: discoveryCallData.duration_minutes || 30,
+              status: "scheduled",
+              meeting_type: discoveryCallData.meeting_type,
+              rental_strategy: discoveryCallData.rental_strategy,
+              existing_listing_url: discoveryCallData.existing_listing_url,
+              current_situation: discoveryCallData.current_situation,
+              start_timeline: discoveryCallData.start_timeline,
+              google_meet_link: discoveryCallData.google_meet_link,
+              meeting_notes: discoveryCallData.meeting_notes,
+            })
+            .select()
+            .single();
+
+          if (callError) {
+            console.error("Discovery call insert error for existing lead:", callError);
+            throw callError;
+          } else {
+            discoveryCallId = newCall.id;
+            console.log("Discovery call created for existing lead:", discoveryCallId);
+          }
+
+          // Add timeline entry
+          await supabase.from("lead_timeline").insert({
+            lead_id: existing.id,
+            action: "New discovery call scheduled from website",
+            new_stage: "call_scheduled",
+            metadata: { source: leadData.source },
+          });
+
+          return new Response(
+            JSON.stringify({ 
+              success: true, 
+              message: "Discovery call created for existing lead",
+              leadId: existing.id,
+              discoveryCallId: discoveryCallId,
+            }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        
+        // For non-website bookings with existing leads, just skip
         return new Response(
           JSON.stringify({ success: true, message: "Duplicate lead, skipped", leadId: existing.id }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }

@@ -402,15 +402,26 @@ export default function BookDiscoveryCall() {
 
       const discoveryCallId = bookingResult.discoveryCallId;
 
-      // Send notifications (don't fail if this errors)
+      // Send notifications via direct HTTP (don't fail if this errors)
       if (discoveryCallId) {
+        const notificationUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/discovery-call-notifications`;
         try {
           await Promise.all([
-            supabase.functions.invoke("discovery-call-notifications", {
-              body: { discoveryCallId, notificationType: "confirmation" },
+            fetch(notificationUrl, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "apikey": import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+              },
+              body: JSON.stringify({ discoveryCallId, notificationType: "confirmation" }),
             }),
-            supabase.functions.invoke("discovery-call-notifications", {
-              body: { discoveryCallId, notificationType: "admin_notification" },
+            fetch(notificationUrl, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "apikey": import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+              },
+              body: JSON.stringify({ discoveryCallId, notificationType: "admin_notification" }),
             }),
           ]);
         } catch (notifError) {
