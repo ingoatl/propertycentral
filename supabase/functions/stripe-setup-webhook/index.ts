@@ -183,6 +183,123 @@ async function handleSetupComplete(
       .eq("owner_id", ownerId);
 
     console.log(`Marked payment setup request as completed for owner ${ownerId}`);
+
+    // Get owner details for email
+    const { data: owner } = await supabase
+      .from("property_owners")
+      .select("name, email")
+      .eq("id", ownerId)
+      .single();
+
+    // Get properties for this owner
+    const { data: properties } = await supabase
+      .from("properties")
+      .select("name, address")
+      .eq("owner_id", ownerId);
+
+    const propertyList = properties?.map((p: { name: string | null; address: string | null }) => p.name || p.address).join(", ") || "your properties";
+
+    // Send confirmation emails for owner payment setup
+    const resendApiKey = Deno.env.get("RESEND_API_KEY");
+    if (resendApiKey && owner) {
+      const resend = new Resend(resendApiKey);
+
+      // Admin notification
+      try {
+        console.log("Sending admin payment confirmation email...");
+        await resend.emails.send({
+          from: "PeachHaus <info@peachhausgroup.com>",
+          to: ["info@peachhausgroup.com"],
+          subject: `✅ Payment Method Connected: ${owner.name}`,
+          html: `
+            <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto;">
+              <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 30px; border-radius: 12px 12px 0 0;">
+                <h1 style="color: white; margin: 0; font-size: 24px;">✅ Payment Authorization Complete</h1>
+              </div>
+              <div style="background: #f8fafc; padding: 30px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
+                <p style="color: #1a1a2e; font-size: 16px; margin-bottom: 20px;">
+                  <strong>${owner.name}</strong> has successfully connected their payment method.
+                </p>
+                <div style="background: white; padding: 20px; border-radius: 8px; border-left: 4px solid #10b981;">
+                  <p style="margin: 5px 0; color: #4a5568;"><strong>Owner:</strong> ${owner.name}</p>
+                  <p style="margin: 5px 0; color: #4a5568;"><strong>Email:</strong> ${owner.email}</p>
+                  <p style="margin: 5px 0; color: #4a5568;"><strong>Payment Method:</strong> ${paymentMethodDisplay}</p>
+                  <p style="margin: 5px 0; color: #4a5568;"><strong>Properties:</strong> ${propertyList}</p>
+                </div>
+                <p style="color: #10b981; font-weight: 600; margin-top: 20px;">
+                  ✓ This owner can now be charged without re-authorization.
+                </p>
+              </div>
+            </div>
+          `,
+        });
+        console.log("Admin payment confirmation email sent successfully");
+      } catch (emailError: any) {
+        console.error("Failed to send admin notification:", emailError.message);
+      }
+
+      // Owner confirmation email
+      try {
+        console.log("Sending owner payment confirmation email...");
+        await resend.emails.send({
+          from: "PeachHaus <info@peachhausgroup.com>",
+          to: [owner.email],
+          subject: "Payment Method Successfully Connected - PeachHaus",
+          html: `
+            <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+              <div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); border-radius: 12px; padding: 30px; text-align: center;">
+                <h1 style="color: white; margin: 0; font-size: 28px;">🍑 PeachHaus</h1>
+                <p style="color: rgba(255,255,255,0.8); margin: 5px 0 0 0;">Property Management</p>
+              </div>
+              
+              <div style="background: white; padding: 30px; margin-top: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);">
+                <div style="text-align: center; margin-bottom: 25px;">
+                  <div style="background: #d1fae5; border-radius: 50%; width: 60px; height: 60px; margin: 0 auto; display: flex; align-items: center; justify-content: center;">
+                    <span style="font-size: 30px;">✓</span>
+                  </div>
+                </div>
+                
+                <h2 style="color: #1a1a2e; text-align: center; margin: 0 0 20px 0;">Payment Method Connected!</h2>
+                
+                <p style="color: #4a5568; line-height: 1.8;">
+                  Hi ${owner.name.split(' ')[0]},
+                </p>
+                
+                <p style="color: #4a5568; line-height: 1.8;">
+                  Your payment method has been successfully connected to your PeachHaus account for <strong>${propertyList}</strong>.
+                </p>
+                
+                <div style="background: #f0fdf4; border-radius: 8px; padding: 20px; margin: 20px 0; border-left: 4px solid #10b981;">
+                  <p style="margin: 0; color: #166534;"><strong>Payment Method:</strong> ${paymentMethodDisplay}</p>
+                </div>
+                
+                <p style="color: #4a5568; line-height: 1.8;">
+                  This payment method will be used for monthly management fees and any property-related expenses. You'll receive detailed statements before any charges are processed.
+                </p>
+                
+                <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 25px 0;">
+                
+                <p style="color: #64748b; font-size: 14px; line-height: 1.6;">
+                  Questions? Reply to this email or call us at <a href="tel:+14049873388" style="color: #10b981; text-decoration: none;">(404) 987-3388</a>.
+                </p>
+                
+                <p style="color: #4a5568; margin-top: 25px;">
+                  Best regards,<br>
+                  <strong>The PeachHaus Team</strong>
+                </p>
+              </div>
+              
+              <div style="text-align: center; padding: 20px; color: #a0aec0; font-size: 12px;">
+                <p>© ${new Date().getFullYear()} PeachHaus Group. All rights reserved.</p>
+              </div>
+            </div>
+          `,
+        });
+        console.log("Owner payment confirmation email sent successfully");
+      } catch (emailError: any) {
+        console.error("Failed to send owner confirmation:", emailError.message);
+      }
+    }
   }
 
   // Update lead and advance stage if we have a lead ID
