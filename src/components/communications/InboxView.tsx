@@ -758,9 +758,10 @@ export function InboxView() {
     queryFn: async () => {
       if (!selectedMessage) return [];
       
-      // For leads, fetch all communications for the same lead_id
+      // For leads, fetch all communications for the same lead_id AND user_phone_messages by phone
       if (selectedMessage.contact_type === "lead" && selectedMessage.contact_id) {
-        const { data, error } = await supabase
+        // Fetch from lead_communications
+        const { data: leadComms, error } = await supabase
           .from("lead_communications")
           .select("id, communication_type, direction, body, subject, created_at, status")
           .eq("lead_id", selectedMessage.contact_id)
@@ -768,8 +769,8 @@ export function InboxView() {
           .order("created_at", { ascending: true });
         
         if (error) throw error;
-        return (data || []).map(comm => {
-          // Only use placeholder if body is truly empty or the exact placeholder text
+        
+        const leadMessages = (leadComms || []).map(comm => {
           const body = (!comm.body || comm.body.trim().length === 0 || comm.body === "SMS message")
             ? (comm.direction === "inbound" ? "(Received message)" : "(Sent message)")
             : comm.body;
@@ -781,6 +782,45 @@ export function InboxView() {
             created_at: comm.created_at,
           };
         });
+        
+        // Also fetch from user_phone_messages if we have a phone number
+        let userMessages: typeof leadMessages = [];
+        if (selectedMessage.contact_phone) {
+          const phone = selectedMessage.contact_phone;
+          const { data: userMsgs } = await supabase
+            .from("user_phone_messages")
+            .select("id, direction, body, created_at")
+            .or(`from_number.eq.${phone},to_number.eq.${phone}`)
+            .order("created_at", { ascending: true });
+          
+          if (userMsgs) {
+            userMessages = userMsgs.map(msg => ({
+              id: msg.id,
+              type: "sms",
+              direction: msg.direction,
+              body: msg.body || "(No content)",
+              created_at: msg.created_at,
+            }));
+          }
+        }
+        
+        // Combine and deduplicate
+        const allMsgs = [...leadMessages, ...userMessages];
+        allMsgs.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+        
+        // Deduplicate messages within 5 seconds with same body
+        const deduped: typeof allMsgs = [];
+        for (const msg of allMsgs) {
+          const isDuplicate = deduped.some(existing => {
+            const timeDiff = Math.abs(new Date(existing.created_at).getTime() - new Date(msg.created_at).getTime());
+            return timeDiff < 5000 && existing.body === msg.body && existing.direction === msg.direction;
+          });
+          if (!isDuplicate) {
+            deduped.push(msg);
+          }
+        }
+        
+        return deduped;
       }
       
       // For owners, fetch all communications for the same owner_id
