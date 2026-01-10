@@ -364,57 +364,50 @@ export default function BookDiscoveryCall() {
         formData.additionalNotes ? `Notes: ${formData.additionalNotes}` : "",
       ].filter(Boolean).join("\n");
 
-      // Create lead first
-      const { data: lead, error: leadError } = await supabase
-        .from("leads")
-        .insert({
-          name: formData.name.trim(),
-          email: formData.email.trim().toLowerCase(),
-          phone: formData.phone,
-          property_address: formData.propertyAddress,
-          property_type: formData.propertyType || null,
-          stage: "call_scheduled",
-          opportunity_source: "website_booking",
-          notes: notes,
-        })
-        .select()
-        .single();
+      // Create lead first - use edge function to bypass RLS for public bookings
+      const { data: bookingResult, error: bookingError } = await supabase.functions.invoke(
+        "lead-calendar-webhook",
+        {
+          body: {
+            name: formData.name.trim(),
+            email: formData.email.trim().toLowerCase(),
+            phone: formData.phone,
+            property_address: formData.propertyAddress,
+            property_type: formData.propertyType || null,
+            source: "Website Booking",
+            notes: notes,
+            // Include discovery call data
+            scheduled_at: scheduledAt.toISOString(),
+            duration_minutes: 30,
+            meeting_type: formData.meetingType,
+            rental_strategy: formData.rentalStrategy || null,
+            existing_listing_url: formData.existingListingUrl || null,
+            current_situation: formData.currentManagement || null,
+            start_timeline: formData.startTimeline,
+            google_meet_link: formData.meetingType === "video" ? GOOGLE_MEET_LINK : null,
+          },
+        }
+      );
 
-      if (leadError) throw new Error(leadError.message);
+      if (bookingError) throw new Error(bookingError.message);
+      if (!bookingResult?.success) throw new Error(bookingResult?.error || "Booking failed");
 
-      // Create discovery call
-      const { data: call, error: callError } = await supabase
-        .from("discovery_calls")
-        .insert({
-          lead_id: lead.id,
-          scheduled_at: scheduledAt.toISOString(),
-          duration_minutes: 30,
-          status: "scheduled",
-          meeting_type: formData.meetingType,
-          rental_strategy: formData.rentalStrategy || null,
-          existing_listing_url: formData.existingListingUrl || null,
-          current_situation: formData.currentManagement || null,
-          start_timeline: formData.startTimeline,
-          meeting_notes: notes,
-          google_meet_link: formData.meetingType === "video" ? GOOGLE_MEET_LINK : null,
-        })
-        .select()
-        .single();
-
-      if (callError) throw new Error(callError.message);
+      const discoveryCallId = bookingResult.discoveryCallId;
 
       // Send notifications (don't fail if this errors)
-      try {
-        await Promise.all([
-          supabase.functions.invoke("discovery-call-notifications", {
-            body: { discoveryCallId: call.id, notificationType: "confirmation" },
-          }),
-          supabase.functions.invoke("discovery-call-notifications", {
-            body: { discoveryCallId: call.id, notificationType: "admin_notification" },
-          }),
-        ]);
-      } catch (notifError) {
-        console.error("Notification error:", notifError);
+      if (discoveryCallId) {
+        try {
+          await Promise.all([
+            supabase.functions.invoke("discovery-call-notifications", {
+              body: { discoveryCallId, notificationType: "confirmation" },
+            }),
+            supabase.functions.invoke("discovery-call-notifications", {
+              body: { discoveryCallId, notificationType: "admin_notification" },
+            }),
+          ]);
+        } catch (notifError) {
+          console.error("Notification error:", notifError);
+        }
       }
 
       return { scheduledAt, meetingType: formData.meetingType };
