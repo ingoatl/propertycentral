@@ -78,35 +78,27 @@ export function SendSMSDialog({
 
   const sendSMS = useMutation({
     mutationFn: async () => {
-      // Use GHL for sending SMS to leads
-      if (contactType === "lead") {
-        const { data, error } = await supabase.functions.invoke("ghl-send-sms", {
-          body: {
-            leadId: contactId,
-            phone: contactPhone,
-            message: message,
-            fromNumber: "+14048005932", // GHL number
-          },
-        });
-        if (error) throw error;
-        if (!data?.success) throw new Error(data?.error || "Failed to send SMS");
-        return data;
-      } else {
-        // For owners, use telnyx
-        const { data, error } = await supabase.functions.invoke("telnyx-send-sms", {
-          body: {
-            to: contactPhone,
-            message: message,
-          },
-        });
-        if (error) throw error;
-        return data;
-      }
+      // Use GHL for ALL SMS (unified A2P compliant sending)
+      const { data, error } = await supabase.functions.invoke("ghl-send-sms", {
+        body: {
+          leadId: contactType === "lead" ? contactId : undefined,
+          ownerId: contactType === "owner" ? contactId : undefined,
+          phone: contactPhone,
+          message: message,
+          fromNumber: "+14048005932", // GHL main number
+        },
+      });
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || "Failed to send SMS");
+      return data;
     },
     onSuccess: () => {
       toast.success("SMS sent successfully!");
       setMessage("");
       queryClient.invalidateQueries({ queryKey: ["contact-sms-history"] });
+      queryClient.invalidateQueries({ queryKey: ["owner-communications"] });
+      queryClient.invalidateQueries({ queryKey: ["lead-communications"] });
+      queryClient.invalidateQueries({ queryKey: ["all-communications"] });
       onOpenChange(false);
     },
     onError: (error: any) => {
