@@ -56,18 +56,67 @@ export function OwnerCommunicationDetail({
   const [newMessage, setNewMessage] = useState("");
   const [sending, setSending] = useState(false);
 
-  // Fetch all communications for this owner
+  // Fetch all communications for this owner (from lead_communications AND user_phone_messages)
   const { data: communications = [], isLoading, refetch } = useQuery({
-    queryKey: ["owner-communications", ownerId],
+    queryKey: ["owner-communications", ownerId, ownerPhone],
     queryFn: async () => {
-      const { data, error } = await supabase
+      // Fetch from lead_communications
+      const { data: leadComms, error } = await supabase
         .from("lead_communications")
         .select("id, communication_type, direction, body, subject, created_at, status")
         .eq("owner_id", ownerId)
         .order("created_at", { ascending: false });
 
       if (error) throw error;
-      return data as Communication[];
+      
+      const leadMessages = (leadComms || []).map(comm => ({
+        id: comm.id,
+        communication_type: comm.communication_type,
+        direction: comm.direction,
+        body: comm.body,
+        subject: comm.subject,
+        created_at: comm.created_at,
+        status: comm.status,
+      }));
+      
+      // Also fetch from user_phone_messages if we have a phone number
+      let userMessages: Communication[] = [];
+      if (ownerPhone) {
+        const { data: userMsgs } = await supabase
+          .from("user_phone_messages")
+          .select("id, direction, body, created_at, status")
+          .or(`from_number.eq.${ownerPhone},to_number.eq.${ownerPhone}`)
+          .order("created_at", { ascending: false });
+        
+        if (userMsgs) {
+          userMessages = userMsgs.map(msg => ({
+            id: msg.id,
+            communication_type: "sms",
+            direction: msg.direction,
+            body: msg.body || "(No content)",
+            created_at: msg.created_at,
+            status: msg.status,
+          }));
+        }
+      }
+      
+      // Combine and deduplicate
+      const allMsgs = [...leadMessages, ...userMessages];
+      allMsgs.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      
+      // Deduplicate messages within 5 seconds with same body
+      const deduped: Communication[] = [];
+      for (const msg of allMsgs) {
+        const isDuplicate = deduped.some(existing => {
+          const timeDiff = Math.abs(new Date(existing.created_at).getTime() - new Date(msg.created_at).getTime());
+          return timeDiff < 5000 && existing.body === msg.body && existing.direction === msg.direction;
+        });
+        if (!isDuplicate) {
+          deduped.push(msg);
+        }
+      }
+      
+      return deduped;
     },
     enabled: isOpen && !!ownerId,
   });
@@ -150,8 +199,8 @@ export function OwnerCommunicationDetail({
 
   return (
     <ResponsiveModal open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <ResponsiveModalContent className="max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
-        <ResponsiveModalHeader className="border-b pb-4">
+      <ResponsiveModalContent className="max-w-2xl max-h-[85vh] flex flex-col">
+        <ResponsiveModalHeader className="border-b pb-4 flex-shrink-0">
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-3">
               <div className="h-12 w-12 rounded-full bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center">
@@ -278,7 +327,7 @@ export function OwnerCommunicationDetail({
 
         {/* Quick Reply */}
         {ownerPhone && (
-          <div className="p-4 border-t">
+          <div className="p-4 border-t flex-shrink-0">
             <div className="flex items-center gap-2">
               <Input
                 placeholder={`Message ${ownerName}...`}
