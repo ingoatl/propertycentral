@@ -19,8 +19,9 @@ serve(async (req) => {
     const payload = await req.json();
     console.log("Calendar webhook received:", JSON.stringify(payload, null, 2));
 
-    // Extract data based on calendar provider
-    // Support for Calendly, Cal.com, and generic webhooks
+    // Check if this is a website booking (direct call with all data)
+    const isWebsiteBooking = payload.scheduled_at && payload.name;
+
     let leadData: {
       name: string;
       email?: string;
@@ -28,11 +29,48 @@ serve(async (req) => {
       eventId?: string;
       source?: string;
       propertyAddress?: string;
+      propertyType?: string;
       notes?: string;
     } = { name: "" };
 
+    let discoveryCallData: {
+      scheduled_at?: string;
+      duration_minutes?: number;
+      meeting_type?: string;
+      rental_strategy?: string;
+      existing_listing_url?: string;
+      current_situation?: string;
+      start_timeline?: string;
+      google_meet_link?: string;
+      meeting_notes?: string;
+    } | null = null;
+
+    if (isWebsiteBooking) {
+      // Website booking format - direct data
+      leadData = {
+        name: payload.name || "Unknown",
+        email: payload.email,
+        phone: payload.phone,
+        source: payload.source || "Website Booking",
+        propertyAddress: payload.property_address,
+        propertyType: payload.property_type,
+        notes: payload.notes,
+      };
+
+      discoveryCallData = {
+        scheduled_at: payload.scheduled_at,
+        duration_minutes: payload.duration_minutes || 30,
+        meeting_type: payload.meeting_type,
+        rental_strategy: payload.rental_strategy,
+        existing_listing_url: payload.existing_listing_url,
+        current_situation: payload.current_situation,
+        start_timeline: payload.start_timeline,
+        google_meet_link: payload.google_meet_link,
+        meeting_notes: payload.notes,
+      };
+    }
     // Calendly format
-    if (payload.event === "invitee.created" || payload.payload?.event) {
+    else if (payload.event === "invitee.created" || payload.payload?.event) {
       const invitee = payload.payload?.invitee || payload.invitee;
       const event = payload.payload?.event || payload.event;
       
@@ -103,53 +141,91 @@ serve(async (req) => {
         phone: leadData.phone,
         opportunity_source: leadData.source,
         property_address: leadData.propertyAddress,
+        property_type: leadData.propertyType,
         calendar_event_id: leadData.eventId,
         notes: leadData.notes,
-        stage: "new_lead",
+        stage: discoveryCallData ? "call_scheduled" : "new_lead",
       })
       .select()
       .single();
 
     if (insertError) {
+      console.error("Lead insert error:", insertError);
       throw insertError;
     }
 
     console.log("Lead created:", newLead.id);
 
+    let discoveryCallId: string | null = null;
+
+    // Create discovery call if we have the data
+    if (discoveryCallData && discoveryCallData.scheduled_at) {
+      const { data: newCall, error: callError } = await supabase
+        .from("discovery_calls")
+        .insert({
+          lead_id: newLead.id,
+          scheduled_at: discoveryCallData.scheduled_at,
+          duration_minutes: discoveryCallData.duration_minutes || 30,
+          status: "scheduled",
+          meeting_type: discoveryCallData.meeting_type,
+          rental_strategy: discoveryCallData.rental_strategy,
+          existing_listing_url: discoveryCallData.existing_listing_url,
+          current_situation: discoveryCallData.current_situation,
+          start_timeline: discoveryCallData.start_timeline,
+          google_meet_link: discoveryCallData.google_meet_link,
+          meeting_notes: discoveryCallData.meeting_notes,
+        })
+        .select()
+        .single();
+
+      if (callError) {
+        console.error("Discovery call insert error:", callError);
+      } else {
+        discoveryCallId = newCall.id;
+        console.log("Discovery call created:", discoveryCallId);
+      }
+    }
+
     // Add timeline entry
     await supabase.from("lead_timeline").insert({
       lead_id: newLead.id,
-      action: "Lead created from calendar booking",
-      new_stage: "new_lead",
+      action: discoveryCallData ? "Discovery call scheduled from website" : "Lead created from calendar booking",
+      new_stage: discoveryCallData ? "call_scheduled" : "new_lead",
       metadata: { source: leadData.source, eventId: leadData.eventId },
     });
 
-    // Trigger automation for new lead
-    try {
-      await fetch(`${supabaseUrl}/functions/v1/process-lead-stage-change`, {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${supabaseServiceKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          leadId: newLead.id,
-          newStage: "new_lead",
-          previousStage: null,
-        }),
-      });
-    } catch (e) {
-      console.log("Automation trigger queued");
+    // Trigger automation for new lead (only for non-website bookings, as website handles notifications)
+    if (!isWebsiteBooking) {
+      try {
+        await fetch(`${supabaseUrl}/functions/v1/process-lead-stage-change`, {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${supabaseServiceKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            leadId: newLead.id,
+            newStage: discoveryCallData ? "call_scheduled" : "new_lead",
+            previousStage: null,
+          }),
+        });
+      } catch (e) {
+        console.log("Automation trigger queued");
+      }
     }
 
     return new Response(
-      JSON.stringify({ success: true, leadId: newLead.id }),
+      JSON.stringify({ 
+        success: true, 
+        leadId: newLead.id,
+        discoveryCallId: discoveryCallId,
+      }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error: unknown) {
     console.error("Error processing calendar webhook:", error);
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
+      JSON.stringify({ success: false, error: error instanceof Error ? error.message : "Unknown error" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
