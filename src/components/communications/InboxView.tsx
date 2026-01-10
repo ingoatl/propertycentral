@@ -23,7 +23,9 @@ import {
   MoreHorizontal,
   User,
   ChevronLeft,
+  PhoneOutgoing,
 } from "lucide-react";
+import { TwilioCallDialog } from "@/components/TwilioCallDialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -43,6 +45,7 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useAdminCheck } from "@/hooks/useAdminCheck";
 import { useGhlAutoSync } from "@/hooks/useGhlAutoSync";
+import { useLeadRealtimeMessages } from "@/hooks/useLeadRealtimeMessages";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -128,6 +131,7 @@ export function InboxView() {
     email?: string | null;
     phone?: string | null;
   } | null>(null);
+  const [showCallDialog, setShowCallDialog] = useState(false);
   
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -135,6 +139,9 @@ export function InboxView() {
   
   // Auto-sync GHL data in background
   useGhlAutoSync();
+  
+  // Real-time subscription for lead communications
+  useLeadRealtimeMessages();
 
   // Get current user and their phone assignment
   useEffect(() => {
@@ -160,9 +167,19 @@ export function InboxView() {
     fetchUserAndPhone();
   }, []);
 
-  // Send SMS mutation
+  // Send SMS mutation - use GHL for leads, Telnyx for others
   const sendSmsMutation = useMutation({
-    mutationFn: async ({ to, message }: { to: string; message: string }) => {
+    mutationFn: async ({ to, message, contactType, contactId }: { to: string; message: string; contactType?: string; contactId?: string }) => {
+      // Use GHL for leads
+      if (contactType === "lead" && contactId) {
+        const { data, error } = await supabase.functions.invoke("ghl-send-sms", {
+          body: { leadId: contactId, phone: to, message, fromNumber: "+14048005932" },
+        });
+        if (error) throw error;
+        if (!data?.success) throw new Error(data?.error || "Failed to send SMS");
+        return data;
+      }
+      // Use Telnyx for others
       const { data, error } = await supabase.functions.invoke("telnyx-send-sms", {
         body: { to, message },
       });
@@ -173,7 +190,9 @@ export function InboxView() {
     onSuccess: () => {
       toast.success("SMS sent!");
       setNewMessage("");
+      // Invalidate both the main list AND the conversation thread for real-time updates
       queryClient.invalidateQueries({ queryKey: ["all-communications"] });
+      queryClient.invalidateQueries({ queryKey: ["conversation-thread"] });
     },
     onError: (error: Error) => {
       toast.error(`Failed to send SMS: ${error.message}`);
@@ -303,7 +322,12 @@ export function InboxView() {
     if (!newMessage.trim() || !selectedMessage) return;
 
     if (selectedChannel === "sms" && selectedMessage.contact_phone) {
-      sendSmsMutation.mutate({ to: selectedMessage.contact_phone, message: newMessage });
+      sendSmsMutation.mutate({ 
+        to: selectedMessage.contact_phone, 
+        message: newMessage,
+        contactType: selectedMessage.contact_type,
+        contactId: selectedMessage.contact_id,
+      });
     } else if (selectedChannel === "email") {
       setShowEmailReply(true);
     }
@@ -1210,8 +1234,13 @@ export function InboxView() {
                     )}
 
                     {!selectedMessage.is_draft && (
-                      <div className="flex justify-center gap-2 pt-4">
+                      <div className="flex flex-wrap justify-center gap-2 pt-4">
                         {selectedMessage.contact_phone && <Button variant="outline" size="sm" onClick={() => setShowSmsReply(true)}><MessageSquare className="h-4 w-4 mr-2" />Reply SMS</Button>}
+                        {selectedMessage.contact_phone && (
+                          <Button variant="outline" size="sm" onClick={() => setShowCallDialog(true)}>
+                            <PhoneOutgoing className="h-4 w-4 mr-2" />Call
+                          </Button>
+                        )}
                         {(selectedMessage.contact_email || selectedMessage.sender_email) && selectedMessage.contact_type !== "external" && <Button variant="outline" size="sm" onClick={() => setShowEmailReply(true)}><Mail className="h-4 w-4 mr-2" />Reply Email</Button>}
                         {selectedMessage.contact_id && selectedMessage.contact_type === "lead" && (
                           <Button variant="outline" size="sm" onClick={() => setSelectedLeadId(selectedMessage.contact_id)}><User className="h-4 w-4 mr-2" />View Lead</Button>
@@ -1294,6 +1323,17 @@ export function InboxView() {
           ownerPhone={selectedOwnerForDetail.phone}
           isOpen={!!selectedOwnerForDetail}
           onClose={() => setSelectedOwnerForDetail(null)}
+        />
+      )}
+      
+      {/* Twilio Call Dialog */}
+      {selectedMessage?.contact_phone && (
+        <TwilioCallDialog
+          isOpen={showCallDialog}
+          onOpenChange={setShowCallDialog}
+          phoneNumber={selectedMessage.contact_phone}
+          contactName={selectedMessage.contact_name}
+          metadata={selectedMessage.contact_type === "lead" ? { leadId: selectedMessage.contact_id } : undefined}
         />
       )}
     </div>
