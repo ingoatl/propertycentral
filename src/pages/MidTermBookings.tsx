@@ -9,13 +9,13 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Textarea } from "@/components/ui/textarea";
-// Removed Tabs import - no longer needed
 import { toast } from "sonner";
 import { z } from "zod";
 import { format } from "date-fns";
-import { Plus, Trash2, CalendarIcon, Edit, User, Mail } from "lucide-react";
+import { Plus, Trash2, CalendarIcon, Edit, User, Mail, MessageSquare, Phone } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
+import { GuestCommunicationModal } from "@/components/bookings/GuestCommunicationModal";
 
 const bookingSchema = z.object({
   propertyId: z.string().uuid("Please select a property"),
@@ -56,6 +56,21 @@ const MidTermBookings = () => {
   const [loading, setLoading] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingBooking, setEditingBooking] = useState<MidTermBooking | null>(null);
+  
+  // Communication modal state
+  const [communicationOpen, setCommunicationOpen] = useState(false);
+  const [communicationMode, setCommunicationMode] = useState<'text' | 'call'>('text');
+  const [selectedGuest, setSelectedGuest] = useState<{
+    id: string;
+    name: string;
+    phone: string;
+    email?: string;
+    propertyName: string;
+    monthlyRent?: number;
+    startDate?: string;
+    endDate?: string;
+  } | null>(null);
+  
   const [formData, setFormData] = useState({
     propertyId: "",
     tenantName: "",
@@ -222,6 +237,44 @@ const MidTermBookings = () => {
 
   const getPropertyName = (propertyId: string) => {
     return properties.find(p => p.id === propertyId)?.name || "Unknown Property";
+  };
+
+  const handleTextGuest = (booking: MidTermBooking) => {
+    if (!booking.tenant_phone) {
+      toast.error("No phone number available for this guest");
+      return;
+    }
+    setSelectedGuest({
+      id: booking.id,
+      name: booking.tenant_name,
+      phone: booking.tenant_phone,
+      email: booking.tenant_email || undefined,
+      propertyName: getPropertyName(booking.property_id),
+      monthlyRent: booking.monthly_rent,
+      startDate: booking.start_date,
+      endDate: booking.end_date,
+    });
+    setCommunicationMode('text');
+    setCommunicationOpen(true);
+  };
+
+  const handleCallGuest = (booking: MidTermBooking) => {
+    if (!booking.tenant_phone) {
+      toast.error("No phone number available for this guest");
+      return;
+    }
+    setSelectedGuest({
+      id: booking.id,
+      name: booking.tenant_name,
+      phone: booking.tenant_phone,
+      email: booking.tenant_email || undefined,
+      propertyName: getPropertyName(booking.property_id),
+      monthlyRent: booking.monthly_rent,
+      startDate: booking.start_date,
+      endDate: booking.end_date,
+    });
+    setCommunicationMode('call');
+    setCommunicationOpen(true);
   };
 
   return (
@@ -468,7 +521,29 @@ const MidTermBookings = () => {
                           {booking.tenant_phone && <div>📞 {booking.tenant_phone}</div>}
                         </CardDescription>
                       </div>
-                      <div className="flex gap-2 flex-wrap justify-end">
+                      <div className="flex gap-1 flex-wrap justify-end items-center">
+                        {booking.tenant_phone && (
+                          <>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleTextGuest(booking)}
+                              className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                              title="Send text message"
+                            >
+                              <MessageSquare className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleCallGuest(booking)}
+                              className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                              title="Call guest"
+                            >
+                              <Phone className="w-4 h-4" />
+                            </Button>
+                          </>
+                        )}
                         <Badge variant={booking.status === "active" ? "default" : "secondary"}>
                           {booking.status}
                         </Badge>
@@ -528,6 +603,14 @@ const MidTermBookings = () => {
             )}
           </div>
       </div>
+
+      {/* Guest Communication Modal */}
+      <GuestCommunicationModal
+        open={communicationOpen}
+        onOpenChange={setCommunicationOpen}
+        guest={selectedGuest}
+        mode={communicationMode}
+      />
     </div>
   );
 };
