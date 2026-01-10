@@ -39,6 +39,8 @@ const Leads = () => {
       if (error) throw error;
       return data as Lead[];
     },
+    staleTime: 30000, // Cache for 30 seconds to reduce unnecessary refetches
+    refetchOnWindowFocus: false, // Don't refetch on every window focus
   });
 
   const availableSources = useMemo(() => {

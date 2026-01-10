@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, memo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Select,
@@ -33,7 +34,10 @@ import {
   Send,
   CalendarClock,
   Calendar,
-  Circle
+  Circle,
+  Pencil,
+  Check,
+  X
 } from "lucide-react";
 import { Lead, LeadStage, LeadTimeline, LeadCommunication, LEAD_STAGES, STAGE_CONFIG } from "@/types/leads";
 import FollowUpManager from "./FollowUpManager";
@@ -62,6 +66,8 @@ const LeadDetailModal = ({ lead, open, onOpenChange, onRefresh }: LeadDetailModa
   const [showScheduleCall, setShowScheduleCall] = useState(false);
   const [showEmailDialog, setShowEmailDialog] = useState(false);
   const [showSMSDialog, setShowSMSDialog] = useState(false);
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [editedName, setEditedName] = useState(lead?.name || "");
 
   // Fetch timeline
   const { data: timeline } = useQuery({
@@ -77,6 +83,7 @@ const LeadDetailModal = ({ lead, open, onOpenChange, onRefresh }: LeadDetailModa
       return data as LeadTimeline[];
     },
     enabled: !!lead?.id,
+    staleTime: 30000,
   });
 
   // Fetch communications
@@ -93,6 +100,7 @@ const LeadDetailModal = ({ lead, open, onOpenChange, onRefresh }: LeadDetailModa
       return data as LeadCommunication[];
     },
     enabled: !!lead?.id,
+    staleTime: 15000, // Refresh communications more frequently
   });
 
   // Update stage mutation
@@ -137,6 +145,34 @@ const LeadDetailModal = ({ lead, open, onOpenChange, onRefresh }: LeadDetailModa
     },
     onError: (error) => {
       toast.error("Failed to update: " + error.message);
+    },
+  });
+
+  // Update name mutation
+  const updateName = useMutation({
+    mutationFn: async (newName: string) => {
+      if (!lead || !newName.trim()) return;
+      const { error } = await supabase
+        .from("leads")
+        .update({ name: newName.trim() })
+        .eq("id", lead.id);
+      if (error) throw error;
+      
+      // Log timeline
+      await supabase.from("lead_timeline").insert({
+        lead_id: lead.id,
+        action: `Name updated to "${newName.trim()}"`,
+        metadata: { previousName: lead.name, newName: newName.trim() },
+      });
+    },
+    onSuccess: () => {
+      toast.success("Name updated");
+      setIsEditingName(false);
+      queryClient.invalidateQueries({ queryKey: ["leads"] });
+      onRefresh();
+    },
+    onError: (error) => {
+      toast.error("Failed to update name: " + error.message);
     },
   });
 
@@ -229,6 +265,28 @@ const LeadDetailModal = ({ lead, open, onOpenChange, onRefresh }: LeadDetailModa
     },
   });
 
+  // Reset edited name when lead changes
+  useEffect(() => {
+    if (lead) {
+      setEditedName(lead.name);
+      setIsEditingName(false);
+    }
+  }, [lead?.id, lead?.name]);
+
+  const handleSaveName = useCallback(() => {
+    if (editedName.trim() && editedName.trim() !== lead?.name) {
+      updateName.mutate(editedName.trim());
+    } else {
+      setIsEditingName(false);
+      setEditedName(lead?.name || "");
+    }
+  }, [editedName, lead?.name, updateName]);
+
+  const handleCancelNameEdit = useCallback(() => {
+    setIsEditingName(false);
+    setEditedName(lead?.name || "");
+  }, [lead?.name]);
+
   if (!lead) return null;
 
   const stageConfig = STAGE_CONFIG[lead.stage];
@@ -238,8 +296,50 @@ const LeadDetailModal = ({ lead, open, onOpenChange, onRefresh }: LeadDetailModa
       <DialogContent className="max-w-4xl w-[95vw] max-h-[90vh] flex flex-col">
         <DialogHeader className="flex-shrink-0">
           <div className="flex items-start justify-between">
-            <div>
-              <DialogTitle className="text-xl">{lead.name}</DialogTitle>
+            <div className="flex-1 min-w-0">
+              {isEditingName ? (
+                <div className="flex items-center gap-2">
+                  <Input
+                    value={editedName}
+                    onChange={(e) => setEditedName(e.target.value)}
+                    className="text-xl font-semibold h-9 max-w-[300px]"
+                    autoFocus
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") handleSaveName();
+                      if (e.key === "Escape") handleCancelNameEdit();
+                    }}
+                  />
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-50"
+                    onClick={handleSaveName}
+                    disabled={updateName.isPending}
+                  >
+                    <Check className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                    onClick={handleCancelNameEdit}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 group">
+                  <DialogTitle className="text-xl">{lead.name}</DialogTitle>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={() => setIsEditingName(true)}
+                  >
+                    <Pencil className="h-3 w-3" />
+                  </Button>
+                </div>
+              )}
               <p className="text-sm text-muted-foreground mt-1">
                 Lead #{lead.lead_number} • {lead.opportunity_source || 'Unknown Source'}
               </p>

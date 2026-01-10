@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { Lead, STAGE_CONFIG } from "@/types/leads";
@@ -10,7 +11,7 @@ interface LeadKanbanCardProps {
   onClick: () => void;
 }
 
-const LeadKanbanCard = ({ lead, onClick }: LeadKanbanCardProps) => {
+const LeadKanbanCardComponent = ({ lead, onClick }: LeadKanbanCardProps) => {
   const {
     attributes,
     listeners,
@@ -138,5 +139,17 @@ const LeadKanbanCard = ({ lead, onClick }: LeadKanbanCardProps) => {
     </div>
   );
 };
+
+// Memoize to prevent re-renders when parent re-renders but lead data hasn't changed
+const LeadKanbanCard = memo(LeadKanbanCardComponent, (prevProps, nextProps) => {
+  // Only re-render if lead data or onClick reference changes
+  return prevProps.lead.id === nextProps.lead.id &&
+    prevProps.lead.name === nextProps.lead.name &&
+    prevProps.lead.stage === nextProps.lead.stage &&
+    prevProps.lead.phone === nextProps.lead.phone &&
+    prevProps.lead.email === nextProps.lead.email &&
+    prevProps.lead.property_address === nextProps.lead.property_address &&
+    prevProps.lead.ai_qualification_score === nextProps.lead.ai_qualification_score;
+});
 
 export default LeadKanbanCard;
