@@ -58,31 +58,60 @@ serve(async (req) => {
       console.log(`Created Stripe customer ${customerId} for ${owner.name}`);
     }
 
-    // Get payment methods - try both card and bank account
-    let paymentMethods = await stripe.paymentMethods.list({
-      customer: customerId,
-      type: "card",
-      limit: 1,
-    });
-
-    // If no cards, try bank accounts
-    if (paymentMethods.data.length === 0) {
-      paymentMethods = await stripe.paymentMethods.list({
+    // Retrieve customer to check for default payment method
+    const customer = await stripe.customers.retrieve(customerId);
+    
+    let paymentMethodId: string | null = null;
+    let paymentMethodType = "card";
+    
+    // First check for default payment method in invoice_settings
+    if (customer && !customer.deleted && customer.invoice_settings?.default_payment_method) {
+      const defaultPm = customer.invoice_settings.default_payment_method;
+      paymentMethodId = typeof defaultPm === 'string' ? defaultPm : defaultPm.id;
+      console.log(`Using default payment method from invoice_settings: ${paymentMethodId}`);
+      
+      // Get payment method details to determine type
+      const pmDetails = await stripe.paymentMethods.retrieve(paymentMethodId);
+      paymentMethodType = pmDetails.type === "us_bank_account" ? "ach" : "card";
+    }
+    
+    // Fallback: list payment methods
+    if (!paymentMethodId) {
+      let paymentMethods = await stripe.paymentMethods.list({
         customer: customerId,
-        type: "us_bank_account",
+        type: "card",
         limit: 1,
       });
+
+      if (paymentMethods.data.length === 0) {
+        paymentMethods = await stripe.paymentMethods.list({
+          customer: customerId,
+          type: "us_bank_account",
+          limit: 1,
+        });
+        if (paymentMethods.data.length > 0) {
+          paymentMethodType = "ach";
+        }
+      }
+
+      if (paymentMethods.data.length === 0) {
+        throw new Error("No payment method on file for this owner. Please set up payment in the owner dashboard first.");
+      }
+
+      paymentMethodId = paymentMethods.data[0].id;
+      console.log(`Using first available payment method: ${paymentMethodId} (${paymentMethodType})`);
     }
 
-    if (paymentMethods.data.length === 0) {
-      throw new Error("No payment method on file for this owner. Please set up payment first.");
-    }
-
-    const paymentMethodId = paymentMethods.data[0].id;
+    // Calculate processing fee (3% for card, 1% for ACH)
+    const processingFeeRate = paymentMethodType === "ach" ? 0.01 : 0.03;
+    const processingFee = amount * processingFeeRate;
+    const totalAmount = amount + processingFee;
     
-    // Create and confirm payment intent
+    console.log(`Base amount: $${amount}, Processing fee (${processingFeeRate * 100}%): $${processingFee.toFixed(2)}, Total: $${totalAmount.toFixed(2)}`);
+    
+    // Create and confirm payment intent with total amount including fees
     const paymentIntent = await stripe.paymentIntents.create({
-      amount: Math.round(amount * 100),
+      amount: Math.round(totalAmount * 100),
       currency: "usd",
       customer: customerId,
       payment_method: paymentMethodId,
@@ -92,18 +121,21 @@ serve(async (req) => {
       metadata: {
         owner_id: owner.id,
         charge_month: chargeMonth,
+        base_amount: amount.toString(),
+        processing_fee: processingFee.toFixed(2),
+        payment_method_type: paymentMethodType,
       },
     });
 
     console.log(`Payment intent ${paymentIntent.id} status: ${paymentIntent.status}`);
 
-    // Record the charge
+    // Record the charge (including processing fee in total)
     const { data: charge, error: chargeError } = await supabaseClient
       .from("monthly_charges")
       .insert({
         owner_id: owner.id,
         charge_month: chargeMonth,
-        total_management_fees: amount,
+        total_management_fees: totalAmount,
         stripe_payment_intent_id: paymentIntent.id,
         charge_status: paymentIntent.status === "succeeded" ? "succeeded" : "processing",
         charged_at: paymentIntent.status === "succeeded" ? new Date().toISOString() : null,
@@ -112,6 +144,22 @@ serve(async (req) => {
       .single();
 
     if (chargeError) throw chargeError;
+    
+    // Add line items for tracking (base amount and processing fee separately)
+    await supabaseClient.from("charge_line_items").insert([
+      {
+        charge_id: charge.id,
+        category: "Management Fee",
+        description: description || `Charge for ${chargeMonth}`,
+        amount: amount,
+      },
+      {
+        charge_id: charge.id,
+        category: "Processing Fee",
+        description: `${paymentMethodType === "ach" ? "ACH (1%)" : "Card (3%)"} processing fee`,
+        amount: processingFee,
+      }
+    ]);
 
     // Send email notification
     const emailHtml = `
@@ -151,15 +199,27 @@ serve(async (req) => {
                     </td>
                   </tr>
                   <tr>
-                    <td style="padding: 8px 0; color: #6c757d; font-size: 14px;">Amount Charged:</td>
-                    <td style="padding: 8px 0; color: #2c3e50; font-size: 18px; font-weight: 700; text-align: right;">
+                    <td style="padding: 8px 0; color: #6c757d; font-size: 14px;">Base Amount:</td>
+                    <td style="padding: 8px 0; color: #2c3e50; font-size: 14px; text-align: right;">
                       $${amount.toFixed(2)}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px 0; color: #6c757d; font-size: 14px;">Processing Fee (${processingFeeRate * 100}%):</td>
+                    <td style="padding: 8px 0; color: #2c3e50; font-size: 14px; text-align: right;">
+                      $${processingFee.toFixed(2)}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 8px 0; color: #6c757d; font-size: 14px;">Total Charged:</td>
+                    <td style="padding: 8px 0; color: #2c3e50; font-size: 18px; font-weight: 700; text-align: right;">
+                      $${totalAmount.toFixed(2)}
                     </td>
                   </tr>
                   <tr>
                     <td style="padding: 8px 0; color: #6c757d; font-size: 14px;">Payment Method:</td>
                     <td style="padding: 8px 0; color: #2c3e50; font-size: 14px; font-weight: 600; text-align: right;">
-                      ${owner.payment_method === 'ach' ? 'ACH Bank Transfer' : 'Credit Card'}
+                      ${paymentMethodType === 'ach' ? 'ACH Bank Transfer' : 'Credit Card'}
                     </td>
                   </tr>
                   <tr>
@@ -203,7 +263,7 @@ serve(async (req) => {
       await resend.emails.send({
         from: "PeachHaus <info@peachhausgroup.com>",
         to: [owner.email],
-        subject: `Payment Confirmation - ${new Date(chargeMonth).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`,
+        subject: `Payment Confirmation - $${totalAmount.toFixed(2)} - ${new Date(chargeMonth).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`,
         html: emailHtml,
       });
       console.log(`Confirmation email sent to ${owner.email}`);
@@ -214,11 +274,18 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: true,
+        message: `Successfully charged $${totalAmount.toFixed(2)} (includes $${processingFee.toFixed(2)} processing fee)`,
         charge,
         paymentIntent: {
           id: paymentIntent.id,
           status: paymentIntent.status,
         },
+        breakdown: {
+          baseAmount: amount,
+          processingFee: processingFee,
+          totalAmount: totalAmount,
+          paymentMethodType: paymentMethodType,
+        }
       }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },

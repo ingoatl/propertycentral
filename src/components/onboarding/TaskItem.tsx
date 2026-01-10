@@ -859,14 +859,14 @@ export const TaskItem = ({ task, onUpdate }: TaskItemProps) => {
         return (
           <div className="space-y-2">
             <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
               <Input
                 type="number"
                 step="0.01"
                 value={fieldValue}
                 onChange={(e) => handleInputChange(e.target.value)}
                 className={cn(
-                  "pl-7 h-9 text-sm",
+                  "pl-8 h-9 text-sm",
                   isReadOnly && "border-2 border-green-200 bg-green-50/30 text-foreground font-medium"
                 )}
                 placeholder="0.00"
