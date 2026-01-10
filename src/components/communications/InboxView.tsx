@@ -24,6 +24,7 @@ import {
   User,
   ChevronLeft,
   PhoneOutgoing,
+  UserPlus,
 } from "lucide-react";
 import { TwilioCallDialog } from "@/components/TwilioCallDialog";
 import { Input } from "@/components/ui/input";
@@ -360,6 +361,44 @@ export function InboxView() {
       return data;
     },
     enabled: !!selectedLeadId,
+  });
+
+  // Create lead from communication mutation
+  const createLeadMutation = useMutation({
+    mutationFn: async (contact: { name: string; phone?: string; email?: string }) => {
+      // Insert new lead
+      const { data: newLead, error: leadError } = await supabase
+        .from("leads")
+        .insert({
+          name: contact.name,
+          phone: contact.phone || null,
+          email: contact.email || null,
+          source: "communication_hub" as const,
+          stage: "new_lead" as const,
+        })
+        .select()
+        .single();
+      
+      if (leadError) throw leadError;
+
+      // Add timeline entry
+      await supabase.from("lead_timeline").insert({
+        lead_id: newLead.id,
+        action: "Lead created from Communications Hub",
+        metadata: { source: "communication_hub", phone: contact.phone, email: contact.email },
+      });
+
+      return newLead;
+    },
+    onSuccess: (newLead) => {
+      toast.success(`Lead "${newLead.name}" created!`);
+      queryClient.invalidateQueries({ queryKey: ["leads"] });
+      queryClient.invalidateQueries({ queryKey: ["all-communications"] });
+      setSelectedLeadId(newLead.id);
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to create lead: ${error.message}`);
+    },
   });
 
   // Determine which inbox to show based on selected user
@@ -1128,12 +1167,23 @@ export function InboxView() {
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-9 w-9"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    {selectedMessage.contact_type === "lead" ? (
+                    {selectedMessage.contact_type === "lead" && selectedMessage.contact_id ? (
                       <DropdownMenuItem onClick={() => setSelectedLeadId(selectedMessage.contact_id)}>
                         <User className="h-4 w-4 mr-2" />View Lead
                       </DropdownMenuItem>
+                    ) : selectedMessage.contact_type === "owner" ? (
+                      <DropdownMenuItem onClick={() => navigate("/property-owners")}>View Owner</DropdownMenuItem>
                     ) : (
-                      <DropdownMenuItem onClick={() => navigate("/property-owners")}>View Contact</DropdownMenuItem>
+                      <DropdownMenuItem 
+                        onClick={() => createLeadMutation.mutate({
+                          name: selectedMessage.contact_name,
+                          phone: selectedMessage.contact_phone || undefined,
+                          email: selectedMessage.contact_email || undefined,
+                        })}
+                        disabled={createLeadMutation.isPending}
+                      >
+                        <Plus className="h-4 w-4 mr-2" />{createLeadMutation.isPending ? "Creating..." : "Create Lead"}
+                      </DropdownMenuItem>
                     )}
                     <DropdownMenuItem onClick={() => setShowNotes(true)}>Add Note</DropdownMenuItem>
                   </DropdownMenuContent>
@@ -1242,11 +1292,23 @@ export function InboxView() {
                           </Button>
                         )}
                         {(selectedMessage.contact_email || selectedMessage.sender_email) && selectedMessage.contact_type !== "external" && <Button variant="outline" size="sm" onClick={() => setShowEmailReply(true)}><Mail className="h-4 w-4 mr-2" />Reply Email</Button>}
-                        {selectedMessage.contact_id && selectedMessage.contact_type === "lead" && (
+                        {selectedMessage.contact_type === "lead" && selectedMessage.contact_id ? (
                           <Button variant="outline" size="sm" onClick={() => setSelectedLeadId(selectedMessage.contact_id)}><User className="h-4 w-4 mr-2" />View Lead</Button>
-                        )}
-                        {selectedMessage.contact_id && selectedMessage.contact_type === "owner" && (
+                        ) : selectedMessage.contact_type === "owner" && selectedMessage.contact_id ? (
                           <Button variant="outline" size="sm" onClick={() => navigate("/property-owners")}><ArrowUpRight className="h-4 w-4 mr-2" />View Owner</Button>
+                        ) : (
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={() => createLeadMutation.mutate({
+                              name: selectedMessage.contact_name,
+                              phone: selectedMessage.contact_phone || undefined,
+                              email: selectedMessage.contact_email || undefined,
+                            })}
+                            disabled={createLeadMutation.isPending}
+                          >
+                            <Plus className="h-4 w-4 mr-2" />{createLeadMutation.isPending ? "Creating..." : "Create Lead"}
+                          </Button>
                         )}
                       </div>
                     )}
