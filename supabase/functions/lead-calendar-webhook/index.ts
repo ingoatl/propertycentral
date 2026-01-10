@@ -132,6 +132,19 @@ serve(async (req) => {
         if (isWebsiteBooking && discoveryCallData) {
           let discoveryCallId: string | null = null;
           
+          // Update lead with new property address if provided
+          if (leadData.propertyAddress) {
+            console.log("Updating existing lead property address to:", leadData.propertyAddress);
+            await supabase
+              .from("leads")
+              .update({
+                property_address: leadData.propertyAddress,
+                property_type: leadData.propertyType || undefined,
+                notes: leadData.notes || undefined,
+              })
+              .eq("id", existing.id);
+          }
+          
           // Create discovery call for existing lead
           const { data: newCall, error: callError } = await supabase
             .from("discovery_calls")
