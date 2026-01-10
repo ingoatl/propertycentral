@@ -306,10 +306,10 @@ const handler = async (req: Request): Promise<Response> => {
       const scoreColor = revenueData.score >= 75 ? "#2e7d32" : revenueData.score >= 50 ? "#ed6c02" : "#d32f2f";
       const callId = `CALL-${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}-${discoveryCallId.slice(0, 6).toUpperCase()}`;
 
-      console.log("Sending admin notification email to: alex@peachhausgroup.com, anja@peachhausgroup.com");
+      console.log("Sending admin notification email to: info@peachhausgroup.com, alex@peachhausgroup.com, anja@peachhausgroup.com");
       const adminEmailResult = await resend.emails.send({
         from: FROM_EMAIL,
-        to: ["alex@peachhausgroup.com", "anja@peachhausgroup.com"],
+        to: ["info@peachhausgroup.com", "alex@peachhausgroup.com", "anja@peachhausgroup.com"],
         subject: `New Discovery Call Booked - ${lead?.name}`,
         html: `
           <!DOCTYPE html>

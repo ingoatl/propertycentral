@@ -642,6 +642,10 @@ export default function BookDiscoveryCall() {
                     setFormData(prev => ({ ...prev, propertyAddress: value }));
                     setErrors(prev => ({ ...prev, propertyAddress: "" }));
                   }}
+                  onPlaceSelect={(place) => {
+                    setFormData(prev => ({ ...prev, propertyAddress: place.formattedAddress }));
+                    setErrors(prev => ({ ...prev, propertyAddress: "" }));
+                  }}
                   className={cn(touched.propertyAddress && errors.propertyAddress && "border-destructive")}
                 />
                 {touched.propertyAddress && errors.propertyAddress && (
