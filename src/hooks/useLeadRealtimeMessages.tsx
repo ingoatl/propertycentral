@@ -17,57 +17,60 @@ export function useLeadRealtimeMessages() {
       queryClient.invalidateQueries({ queryKey: ["all-communications"] });
       queryClient.invalidateQueries({ queryKey: ["conversation-thread"] });
       queryClient.invalidateQueries({ queryKey: ["leads"] });
-    }, 300);
+    }, 150); // Reduced debounce for faster updates
   }, [queryClient]);
 
   useEffect(() => {
-    // Subscribe to lead_communications realtime updates
+    // Subscribe to lead_communications realtime updates - both INSERT and UPDATE
     const channel = supabase
       .channel("lead-communications-realtime")
       .on(
         "postgres_changes",
         {
-          event: "INSERT",
+          event: "*", // Listen to all events (INSERT, UPDATE, DELETE)
           schema: "public",
           table: "lead_communications",
         },
         async (payload) => {
-          console.log("New lead communication received:", payload);
+          console.log("Lead communication change received:", payload.eventType, payload);
           
-          const newComm = payload.new as {
-            id: string;
-            lead_id: string;
-            direction: string;
-            communication_type: string;
-            body: string;
-            is_read?: boolean;
-          };
+          // Handle INSERT events
+          if (payload.eventType === "INSERT") {
+            const newComm = payload.new as {
+              id: string;
+              lead_id: string;
+              direction: string;
+              communication_type: string;
+              body: string;
+              is_read?: boolean;
+            };
 
-          // Only show toast for inbound messages
-          if (newComm.direction === "inbound") {
-            // Fetch lead name for the toast
-            const { data: lead } = await supabase
-              .from("leads")
-              .select("name")
-              .eq("id", newComm.lead_id)
-              .single();
+            // Only show toast for inbound messages
+            if (newComm.direction === "inbound") {
+              // Fetch lead name for the toast
+              const { data: lead } = await supabase
+                .from("leads")
+                .select("name")
+                .eq("id", newComm.lead_id)
+                .single();
 
-            const leadName = lead?.name || "Lead";
-            const preview = newComm.body?.slice(0, 50) + (newComm.body?.length > 50 ? "..." : "");
+              const leadName = lead?.name || "Lead";
+              const preview = newComm.body?.slice(0, 50) + (newComm.body?.length > 50 ? "..." : "");
 
-            toast.info(`New ${newComm.communication_type.toUpperCase()} from ${leadName}`, {
-              description: preview,
-              duration: 8000,
-              action: {
-                label: "View",
-                onClick: () => {
-                  queryClient.invalidateQueries({ queryKey: ["leads"] });
+              toast.info(`New ${newComm.communication_type.toUpperCase()} from ${leadName}`, {
+                description: preview,
+                duration: 8000,
+                action: {
+                  label: "View",
+                  onClick: () => {
+                    queryClient.invalidateQueries({ queryKey: ["leads"] });
+                  },
                 },
-              },
-            });
+              });
+            }
           }
 
-          // Debounced invalidation to prevent rapid re-fetches
+          // Debounced invalidation for all events
           debouncedInvalidate();
         }
       )
