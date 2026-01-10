@@ -147,7 +147,7 @@ export function ConversationHistory({
                   {comm.subject && (
                     <p className="font-medium text-foreground truncate">{comm.subject}</p>
                   )}
-                  {comm.body && (
+                  {comm.body && comm.body !== "SMS message" && comm.body.trim().length > 0 && (
                     <p className="text-muted-foreground whitespace-pre-wrap break-words">{comm.body}</p>
                   )}
                 </div>

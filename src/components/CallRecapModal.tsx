@@ -595,67 +595,53 @@ Generate ONLY the SMS text, nothing else.`;
 
       <Separator />
 
-      {/* Email Editor */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h4 className="text-sm font-medium flex items-center gap-2">
-            <Mail className="h-4 w-4" />
-            Recap Email to {firstName || 'Contact'}
-          </h4>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setIsPreview(!isPreview)}
-          >
-            {isPreview ? <Edit3 className="h-4 w-4 mr-1" /> : <Eye className="h-4 w-4 mr-1" />}
-            {isPreview ? "Edit" : "Preview"}
-          </Button>
-        </div>
+      {/* Email Editor - Only show if email exists */}
+      {recap.recipient_email && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h4 className="text-sm font-medium flex items-center gap-2">
+              <Mail className="h-4 w-4" />
+              Recap Email to {firstName || 'Contact'}
+            </h4>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsPreview(!isPreview)}
+            >
+              {isPreview ? <Edit3 className="h-4 w-4 mr-1" /> : <Eye className="h-4 w-4 mr-1" />}
+              {isPreview ? "Edit" : "Preview"}
+            </Button>
+          </div>
 
-        {recap.recipient_email ? (
-          <>
-            <div className="text-xs text-muted-foreground">
-              To: {recap.recipient_email}
-            </div>
+          <div className="text-xs text-muted-foreground">
+            To: {recap.recipient_email}
+          </div>
 
-            <Input
-              value={subject}
-              onChange={(e) => setSubject(e.target.value)}
-              placeholder="Email subject"
-              className="font-medium"
-              disabled={isPreview}
+          <Input
+            value={subject}
+            onChange={(e) => setSubject(e.target.value)}
+            placeholder="Email subject"
+            className="font-medium"
+            disabled={isPreview}
+          />
+
+          {isPreview ? (
+            <Card>
+              <CardContent className="p-4 prose prose-sm max-w-none">
+                <div dangerouslySetInnerHTML={{ __html: emailBody }} />
+              </CardContent>
+            </Card>
+          ) : (
+            <Textarea
+              value={emailBody}
+              onChange={(e) => setEmailBody(e.target.value)}
+              placeholder="Email body..."
+              rows={8}
+              className="text-sm font-mono"
             />
-
-            {isPreview ? (
-              <Card>
-                <CardContent className="p-4 prose prose-sm max-w-none">
-                  <div dangerouslySetInnerHTML={{ __html: emailBody }} />
-                </CardContent>
-              </Card>
-            ) : (
-              <Textarea
-                value={emailBody}
-                onChange={(e) => setEmailBody(e.target.value)}
-                placeholder="Email body..."
-                rows={8}
-                className="text-sm font-mono"
-              />
-            )}
-          </>
-        ) : (
-          <Card className="bg-yellow-50 border-yellow-200">
-            <CardContent className="p-4 flex items-center gap-3">
-              <Mail className="h-5 w-5 text-yellow-600" />
-              <div>
-                <p className="text-sm font-medium text-yellow-800">No email address available</p>
-                <p className="text-xs text-yellow-700">
-                  We couldn't find an email for this contact. You can mark done or add their email later.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-      </div>
+          )}
+        </div>
+      )}
 
       {/* Footer Actions - Simplified */}
       <div className="flex items-center justify-between pt-4 border-t">
@@ -684,6 +670,7 @@ export function CallRecapModal() {
   const [isOpen, setIsOpen] = useState(true);
   const [activeRecapIndex, setActiveRecapIndex] = useState(0);
   const [showAllRecaps, setShowAllRecaps] = useState(false);
+  const [isClosing, setIsClosing] = useState(false);
   
   // TwilioCallDialog state
   const [showCallDialog, setShowCallDialog] = useState(false);

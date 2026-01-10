@@ -135,7 +135,10 @@ serve(async (req) => {
           }
         );
         
-        if (!msgResponse.ok) continue;
+        if (!msgResponse.ok) {
+          console.log(`Failed to fetch messages for conv ${conv.id}: ${msgResponse.status}`);
+          continue;
+        }
         
         const msgData = await msgResponse.json();
         let messages: Array<Record<string, unknown>> = [];
@@ -144,20 +147,32 @@ serve(async (req) => {
         else if (msgData.messages) messages = msgData.messages;
         else if (msgData.data?.messages) messages = msgData.data.messages;
         
+        console.log(`Conv ${conv.id} (${contactName}): ${messages.length} messages`);
+        
         for (const msg of messages) {
           const rawType = String(msg.type || '').toUpperCase();
           const rawMsgType = String(msg.messageType || '');
           const contentType = String(msg.contentType || '').toLowerCase();
           
-          // Check if this is a call
+          // Log ALL messages to see what types exist
+          console.log(`Msg ${msg.id}: type=${rawType}, msgType=${rawMsgType}, contentType=${contentType}`);
+          
+          // Check if this is a call - expand detection to catch more
           const isCall = rawType.includes("CALL") || 
                         rawType === "TYPE_CALL" ||
                         rawMsgType === "7" || 
                         rawMsgType === "10" ||
+                        rawMsgType === "TYPE_CALL" ||
                         contentType === "call" ||
-                        rawType.includes("VOICEMAIL");
+                        contentType.includes("call") ||
+                        rawType.includes("VOICEMAIL") ||
+                        rawType.includes("PHONE") ||
+                        // Also check if body mentions call details
+                        (msg.body && String(msg.body).includes("Call Duration:")) ||
+                        (msg.body && String(msg.body).includes("Your AI Employee has handled another call"));
           
           if (isCall) {
+            console.log(`✓ Found call: ${msg.id}`);
             allCalls.push({
               id: msg.id as string,
               type: msg.type as string | undefined,
