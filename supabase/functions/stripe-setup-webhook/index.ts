@@ -160,8 +160,12 @@ async function handleSetupComplete(
 
   // Update owner record if we have an owner ID
   if (ownerId) {
+    // Determine payment method type from actual payment method (not metadata)
+    const actualPaymentType = paymentMethod.type === "us_bank_account" ? "ach" : "card";
+    console.log(`Actual payment method type from Stripe: ${paymentMethod.type} -> storing as: ${actualPaymentType}`);
+    
     const updateData: any = {
-      payment_method: paymentMethodType === "card" ? "cc" : "ach",
+      payment_method: actualPaymentType,
       stripe_customer_id: session.customer as string,
     };
 

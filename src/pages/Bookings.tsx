@@ -13,10 +13,11 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { z } from "zod";
-import { ChevronLeft, ChevronRight, RefreshCw, Calendar as CalendarIcon, Plus, Trash2, Edit, User, Mail, DollarSign, Home, Star } from "lucide-react";
+import { ChevronLeft, ChevronRight, RefreshCw, Calendar as CalendarIcon, Plus, Trash2, Edit, User, Mail, DollarSign, Home, Star, MessageSquare, Phone } from "lucide-react";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, addMonths, subMonths, isSameDay, isWithinInterval } from "date-fns";
 import { cn } from "@/lib/utils";
 import GoogleReviewsTab from "@/components/bookings/GoogleReviewsTab";
+import { GuestCommunicationModal } from "@/components/bookings/GuestCommunicationModal";
 // Mid-term booking schema
 const bookingSchema = z.object({
   propertyId: z.string().uuid("Please select a property"),
@@ -77,6 +78,21 @@ const Bookings = () => {
   const [midTermLoading, setMidTermLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingBooking, setEditingBooking] = useState<MidTermBooking | null>(null);
+  
+  // Communication modal state
+  const [communicationOpen, setCommunicationOpen] = useState(false);
+  const [communicationMode, setCommunicationMode] = useState<'text' | 'call'>('text');
+  const [selectedGuest, setSelectedGuest] = useState<{
+    id: string;
+    name: string;
+    phone: string;
+    email?: string;
+    propertyName: string;
+    monthlyRent?: number;
+    startDate?: string;
+    endDate?: string;
+  } | null>(null);
+  
   const [formData, setFormData] = useState({
     propertyId: "",
     tenantName: "",
@@ -241,6 +257,44 @@ const Bookings = () => {
 
   const getMidTermPropertyName = (propertyId: string) => {
     return midTermProperties.find(p => p.id === propertyId)?.name || "Unknown Property";
+  };
+
+  const handleTextGuest = (booking: MidTermBooking) => {
+    if (!booking.tenant_phone) {
+      toast.error("No phone number available for this guest");
+      return;
+    }
+    setSelectedGuest({
+      id: booking.id,
+      name: booking.tenant_name,
+      phone: booking.tenant_phone,
+      email: booking.tenant_email || undefined,
+      propertyName: getMidTermPropertyName(booking.property_id),
+      monthlyRent: booking.monthly_rent,
+      startDate: booking.start_date,
+      endDate: booking.end_date,
+    });
+    setCommunicationMode('text');
+    setCommunicationOpen(true);
+  };
+
+  const handleCallGuest = (booking: MidTermBooking) => {
+    if (!booking.tenant_phone) {
+      toast.error("No phone number available for this guest");
+      return;
+    }
+    setSelectedGuest({
+      id: booking.id,
+      name: booking.tenant_name,
+      phone: booking.tenant_phone,
+      email: booking.tenant_email || undefined,
+      propertyName: getMidTermPropertyName(booking.property_id),
+      monthlyRent: booking.monthly_rent,
+      startDate: booking.start_date,
+      endDate: booking.end_date,
+    });
+    setCommunicationMode('call');
+    setCommunicationOpen(true);
   };
 
   // OwnerRez functions
@@ -683,7 +737,29 @@ const Bookings = () => {
                           )}
                         </CardDescription>
                       </div>
-                      <div className="flex gap-2">
+                      <div className="flex gap-1 items-center">
+                        {booking.tenant_phone && (
+                          <>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleTextGuest(booking)}
+                              className="text-green-600 hover:text-green-700 hover:bg-green-50"
+                              title="Send text message"
+                            >
+                              <MessageSquare className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleCallGuest(booking)}
+                              className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                              title="Call guest"
+                            >
+                              <Phone className="w-4 h-4" />
+                            </Button>
+                          </>
+                        )}
                         <Button
                           variant="outline"
                           size="icon"
@@ -905,6 +981,14 @@ const Bookings = () => {
           <GoogleReviewsTab />
         </TabsContent>
       </Tabs>
+
+      {/* Guest Communication Modal */}
+      <GuestCommunicationModal
+        open={communicationOpen}
+        onOpenChange={setCommunicationOpen}
+        guest={selectedGuest}
+        mode={communicationMode}
+      />
     </div>
   );
 };

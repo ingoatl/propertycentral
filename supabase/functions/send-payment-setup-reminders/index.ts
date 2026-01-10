@@ -257,12 +257,29 @@ serve(async (req) => {
       // Get owner details
       const { data: owner, error: ownerError } = await supabase
         .from("property_owners")
-        .select("id, name, email, phone")
+        .select("id, name, email, phone, stripe_customer_id")
         .eq("id", request.owner_id)
         .single();
 
       if (ownerError || !owner) {
         logStep(`Owner not found for request ${request.id}`, { ownerId: request.owner_id });
+        continue;
+      }
+
+      // Skip owners who already have a Stripe customer ID with payment methods
+      if (owner.stripe_customer_id) {
+        logStep(`Skipping ${owner.name} - already has Stripe customer ID, marking request as completed`);
+        
+        // Mark the request as completed since they already have payment set up
+        await supabase
+          .from("payment_setup_requests")
+          .update({
+            status: "completed",
+            completed_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", request.id);
+        
         continue;
       }
 
