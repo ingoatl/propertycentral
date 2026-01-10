@@ -969,201 +969,250 @@ export function InboxView() {
   };
 
   return (
-    <div className="flex h-[calc(100vh-12rem)] md:h-[calc(100vh-12rem)] bg-background rounded-lg border overflow-hidden">
+    <div className="flex h-full md:h-[calc(100vh-8rem)] bg-background md:rounded-lg md:border overflow-hidden">
       {/* Left Panel - Message List (Hidden on mobile when viewing detail) */}
-      <div className={`w-full md:w-80 border-r flex flex-col ${showMobileDetail ? 'hidden md:flex' : 'flex'}`}>
-        {/* Mobile-optimized tabs - Gmail style */}
-        <div className="p-3 md:p-4 border-b">
-          <div className="flex items-center gap-1 md:gap-4 mb-3 md:mb-4 overflow-x-auto scrollbar-hide">
+      <div className={`w-full md:w-96 lg:w-[420px] md:border-r flex flex-col ${showMobileDetail ? 'hidden md:flex' : 'flex'}`}>
+        {/* Compact tab bar - Gmail style */}
+        <div className="flex items-center gap-2 px-4 py-3 border-b bg-background">
+          {/* Tabs */}
+          <div className="flex items-center gap-1 flex-1">
             <button 
               onClick={() => { setActiveTab("chats"); setSelectedGmailEmail(null); setShowMobileDetail(false); }} 
-              className={`flex items-center gap-1.5 md:gap-2 px-3 md:px-0 py-2 md:py-0 md:pb-2 rounded-full md:rounded-none md:border-b-2 transition-colors whitespace-nowrap ${activeTab === "chats" ? "bg-primary/10 md:bg-transparent md:border-primary text-foreground font-medium" : "md:border-transparent text-muted-foreground hover:text-foreground"}`}
+              className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-colors ${activeTab === "chats" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"}`}
             >
-              <MessageSquare className="h-4 w-4" /><span className="text-sm">Chats</span>
+              <MessageSquare className="h-4 w-4" />
+              <span className="hidden sm:inline">Chats</span>
             </button>
             <button 
               onClick={() => { setActiveTab("calls"); setSelectedGmailEmail(null); setShowMobileDetail(false); }} 
-              className={`flex items-center gap-1.5 md:gap-2 px-3 md:px-0 py-2 md:py-0 md:pb-2 rounded-full md:rounded-none md:border-b-2 transition-colors whitespace-nowrap ${activeTab === "calls" ? "bg-primary/10 md:bg-transparent md:border-primary text-foreground font-medium" : "md:border-transparent text-muted-foreground hover:text-foreground"}`}
+              className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-colors ${activeTab === "calls" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"}`}
             >
-              <Phone className="h-4 w-4" /><span className="text-sm">Calls</span>
+              <Phone className="h-4 w-4" />
+              <span className="hidden sm:inline">Calls</span>
             </button>
             <button 
               onClick={() => { setActiveTab("emails"); setSelectedMessage(null); setShowMobileDetail(false); }} 
-              className={`flex items-center gap-1.5 md:gap-2 px-3 md:px-0 py-2 md:py-0 md:pb-2 rounded-full md:rounded-none md:border-b-2 transition-colors whitespace-nowrap ${activeTab === "emails" ? "bg-primary/10 md:bg-transparent md:border-primary text-foreground font-medium" : "md:border-transparent text-muted-foreground hover:text-foreground"}`}
+              className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-colors ${activeTab === "emails" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"}`}
             >
-              <Mail className="h-4 w-4" /><span className="text-sm">Emails</span>
+              <Mail className="h-4 w-4" />
+              <span className="hidden sm:inline">Emails</span>
             </button>
           </div>
-
-          {/* My Inbox selector - own row for Chats/Calls tabs */}
-          {activeTab !== "emails" && isAdmin && (
-            <div className="mb-2">
-              <AdminInboxSelector selectedUserId={selectedInboxUserId} onUserChange={handleInboxChange} currentUserId={currentUserId} />
-            </div>
-          )}
-
-          {/* Email inbox selector for Emails tab */}
-          {activeTab === "emails" && (
-            <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide pb-1">
-              <button 
-                onClick={() => setSelectedEmailInbox("ingo")} 
-                className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors whitespace-nowrap ${selectedEmailInbox === "ingo" ? "bg-primary text-primary-foreground border-primary" : "bg-background text-muted-foreground border-border hover:border-primary/50"}`}
-              >
-                Ingo's Inbox
-              </button>
-              <button 
-                onClick={() => setSelectedEmailInbox("anja")} 
-                className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors whitespace-nowrap ${selectedEmailInbox === "anja" ? "bg-primary text-primary-foreground border-primary" : "bg-background text-muted-foreground border-border hover:border-primary/50"}`}
-              >
-                Anja's Inbox
-              </button>
-            </div>
-          )}
-
-          {/* Only show filters for Chats/Calls tabs */}
-          {activeTab !== "emails" && (
-            <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide pb-1">
-              {(["all", "owners", "open", "unread", "unresponded"] as FilterType[]).map((filter) => (
-                <button 
-                  key={filter} 
-                  onClick={() => setActiveFilter(filter)} 
-                  className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors whitespace-nowrap ${
-                    activeFilter === filter 
-                      ? filter === "owners" 
-                        ? "bg-purple-500 text-white border-purple-500" 
-                        : "bg-primary text-primary-foreground border-primary" 
-                      : "bg-background text-muted-foreground border-border hover:border-primary/50"
-                  }`}
-                >
-                  {filter === "owners" ? "Owners" : filter.charAt(0).toUpperCase() + filter.slice(1)}
-                </button>
-              ))}
-            </div>
-          )}
+          
+          {/* Search toggle */}
+          <button 
+            onClick={() => setSearch(search ? "" : " ")}
+            className="p-2 rounded-full text-muted-foreground hover:bg-muted"
+          >
+            <Search className="h-5 w-5" />
+          </button>
         </div>
 
-        {/* Search - larger touch target on mobile */}
-        <div className="p-3 border-b">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Search..." value={search} onChange={(e) => setSearch(e.target.value)} className="h-10 md:h-9 pl-9 bg-muted/50 border-0" />
+        {/* Expanded search bar - only show when active */}
+        {search !== "" && (
+          <div className="px-4 py-2 border-b bg-muted/30">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input 
+                placeholder="Search conversations..." 
+                value={search === " " ? "" : search} 
+                onChange={(e) => setSearch(e.target.value || " ")} 
+                className="h-10 pl-10 pr-10 bg-background border-border" 
+                autoFocus
+              />
+              <button 
+                onClick={() => setSearch("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Filters row - compact horizontal scroll */}
+        <div className="px-4 py-2 border-b overflow-x-auto scrollbar-hide">
+          <div className="flex items-center gap-2 min-w-max">
+            {/* Admin inbox selector */}
+            {activeTab !== "emails" && isAdmin && (
+              <AdminInboxSelector selectedUserId={selectedInboxUserId} onUserChange={handleInboxChange} currentUserId={currentUserId} />
+            )}
+            
+            {/* Email inbox selector */}
+            {activeTab === "emails" && (
+              <>
+                <button 
+                  onClick={() => setSelectedEmailInbox("ingo")} 
+                  className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${selectedEmailInbox === "ingo" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}
+                >
+                  Ingo
+                </button>
+                <button 
+                  onClick={() => setSelectedEmailInbox("anja")} 
+                  className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${selectedEmailInbox === "anja" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}
+                >
+                  Anja
+                </button>
+              </>
+            )}
+            
+            {/* Quick filters for chats/calls */}
+            {activeTab !== "emails" && (
+              <>
+                {(["all", "owners", "open", "unread"] as FilterType[]).map((filter) => (
+                  <button 
+                    key={filter} 
+                    onClick={() => setActiveFilter(filter)} 
+                    className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                      activeFilter === filter 
+                        ? filter === "owners" 
+                          ? "bg-purple-500 text-white" 
+                          : "bg-primary text-primary-foreground" 
+                        : "bg-muted text-muted-foreground hover:bg-muted/80"
+                    }`}
+                  >
+                    {filter === "owners" ? "Owners" : filter.charAt(0).toUpperCase() + filter.slice(1)}
+                  </button>
+                ))}
+              </>
+            )}
           </div>
         </div>
 
-        {/* Message List - Gmail-style cards */}
+        {/* Message List - Clean, content-first cards */}
         <ScrollArea className="flex-1">
           {activeTab === "emails" ? (
-            // Gmail Inbox View - Enhanced mobile styling
+            // Gmail Inbox View
             isLoadingGmail ? (
-              <div className="p-4 text-center text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin mx-auto mb-2" /><p className="text-sm">Loading emails...</p></div>
+              <div className="flex items-center justify-center h-32">
+                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+              </div>
             ) : filteredGmailEmails.length === 0 ? (
-              <div className="p-8 text-center text-muted-foreground"><Mail className="h-10 w-10 mx-auto mb-3 opacity-40" /><p className="text-sm">No emails in {selectedEmailInbox === "ingo" ? "Ingo's" : "Anja's"} inbox</p></div>
+              <div className="flex flex-col items-center justify-center h-48 text-muted-foreground">
+                <Mail className="h-12 w-12 mb-3 opacity-30" />
+                <p className="text-sm">No emails</p>
+              </div>
             ) : (
-              <div className="divide-y divide-border/50">
-              {filteredGmailEmails.filter(email => !search || email.subject.toLowerCase().includes(search.toLowerCase()) || email.fromName.toLowerCase().includes(search.toLowerCase())).map((email) => {
-                  // Check both API labelIds AND localStorage for read status
+              <div>
+                {filteredGmailEmails.filter(email => !search || search === " " || email.subject.toLowerCase().includes(search.toLowerCase()) || email.fromName.toLowerCase().includes(search.toLowerCase())).map((email) => {
                   const isUnread = email.labelIds?.includes('UNREAD') && !readGmailIds.has(email.id);
                   return (
                     <div 
                       key={email.id} 
                       onClick={() => handleSelectGmailEmailMobile(email)} 
-                      className={`flex items-start gap-3 p-3 md:p-3 cursor-pointer transition-colors active:bg-muted/70 ${selectedGmailEmail?.id === email.id ? "bg-muted/70" : "hover:bg-muted/30"} ${isUnread ? "bg-primary/5" : ""}`}
+                      className={`flex items-start gap-3 px-4 py-3 cursor-pointer transition-colors border-b border-border/30 active:bg-muted/50 ${selectedGmailEmail?.id === email.id ? "bg-primary/5" : "hover:bg-muted/30"} ${isUnread ? "bg-primary/[0.03]" : ""}`}
                     >
-                      {/* Avatar - Gmail style */}
-                      <div className="h-11 w-11 md:h-10 md:w-10 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center flex-shrink-0 shadow-sm">
-                        <span className="text-sm font-semibold text-white">{getInitials(email.fromName)}</span>
+                      <div className="h-10 w-10 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center flex-shrink-0">
+                        <span className="text-xs font-semibold text-white">{getInitials(email.fromName)}</span>
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-2">
-                          <span className={`text-sm truncate ${isUnread ? 'font-bold text-foreground' : 'font-medium text-foreground/80'}`}>{email.fromName}</span>
-                          <span className="text-xs text-muted-foreground whitespace-nowrap flex-shrink-0">{format(new Date(email.date), "MMM d")}</span>
+                      <div className="flex-1 min-w-0 py-0.5">
+                        <div className="flex items-baseline justify-between gap-2 mb-0.5">
+                          <span className={`text-sm truncate ${isUnread ? 'font-semibold' : 'font-medium text-foreground/80'}`}>
+                            {email.fromName}
+                          </span>
+                          <span className="text-[11px] text-muted-foreground whitespace-nowrap">
+                            {format(new Date(email.date), "MMM d")}
+                          </span>
                         </div>
-                        <p className={`text-sm truncate ${isUnread ? 'font-semibold text-foreground' : 'text-foreground/70'}`}>{email.subject}</p>
-                        <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{email.snippet}</p>
+                        <p className={`text-[13px] leading-snug ${isUnread ? 'font-medium' : 'text-foreground/70'}`}>
+                          {email.subject}
+                        </p>
+                        <p className="text-[13px] text-muted-foreground mt-0.5 line-clamp-2 leading-relaxed">
+                          {email.snippet}
+                        </p>
                       </div>
-                      {isUnread && <div className="w-2 h-2 rounded-full bg-primary flex-shrink-0 mt-2" />}
+                      {isUnread && <div className="w-2 h-2 rounded-full bg-primary flex-shrink-0 mt-3" />}
                     </div>
                   );
                 })}
               </div>
             )
           ) : isLoading ? (
-            <div className="p-4 text-center text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin mx-auto mb-2" /><p className="text-sm">Loading...</p></div>
+            <div className="flex items-center justify-center h-32">
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            </div>
           ) : groupedCommunications.length === 0 ? (
-            <div className="p-8 text-center text-muted-foreground"><MessageSquare className="h-10 w-10 mx-auto mb-3 opacity-40" /><p className="text-sm">{activeFilter === "owners" ? "No owner conversations" : "No conversations"}</p></div>
+            <div className="flex flex-col items-center justify-center h-48 text-muted-foreground">
+              <MessageSquare className="h-12 w-12 mb-3 opacity-30" />
+              <p className="text-sm">{activeFilter === "owners" ? "No owner conversations" : "No conversations"}</p>
+            </div>
           ) : (
             <div>
-              {groupedCommunications.map(([dateKey, comms]) => (
+              {groupedCommunications.map(([dateKey, comms], groupIndex) => (
                 <div key={dateKey}>
-                  {/* Date separator header */}
-                  <div className="sticky top-0 bg-background/95 backdrop-blur-sm px-3 py-2 border-b border-border/50 z-10">
-                    <span className="text-xs font-medium text-muted-foreground">{formatDateHeader(dateKey)}</span>
+                  {/* Inline date label - not sticky, scrolls with content */}
+                  <div className="px-4 py-2 bg-muted/30">
+                    <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                      {formatDateHeader(dateKey)}
+                    </span>
                   </div>
                   {/* Messages for this date */}
-                  <div className="divide-y divide-border/50">
-                    {comms.map((comm) => (
-                      <div 
-                        key={comm.id} 
-                        onClick={() => {
-                          if (comm.contact_type === "owner" && comm.owner_id) {
-                            setSelectedOwnerForDetail({
-                              id: comm.owner_id,
-                              name: comm.contact_name,
-                              email: comm.contact_email,
-                              phone: comm.contact_phone,
-                            });
-                          } else {
-                            handleSelectMessage(comm);
-                          }
-                        }}
-                        className={`flex items-start gap-3 p-4 cursor-pointer transition-colors active:bg-muted/70 ${selectedMessage?.id === comm.id ? "bg-muted/70" : "hover:bg-muted/30"}`}
-                      >
-                        {/* Avatar with status indicator */}
-                        <div className="relative">
-                          <div className={`h-12 w-12 rounded-full flex items-center justify-center flex-shrink-0 shadow-sm ${
-                            comm.contact_type === "owner" 
-                              ? "bg-gradient-to-br from-purple-500 to-purple-600" 
-                              : "bg-gradient-to-br from-emerald-500 to-emerald-600"
-                          }`}>
-                            <span className="text-sm font-semibold text-white">{getInitials(comm.contact_name)}</span>
-                          </div>
-                          {comm.is_resolved && (
-                            <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-green-500 border-2 border-background flex items-center justify-center">
-                              <CheckCircle className="h-2.5 w-2.5 text-white" />
-                            </div>
-                          )}
+                  {comms.map((comm) => (
+                    <div 
+                      key={comm.id} 
+                      onClick={() => {
+                        if (comm.contact_type === "owner" && comm.owner_id) {
+                          setSelectedOwnerForDetail({
+                            id: comm.owner_id,
+                            name: comm.contact_name,
+                            email: comm.contact_email,
+                            phone: comm.contact_phone,
+                          });
+                        } else {
+                          handleSelectMessage(comm);
+                        }
+                      }}
+                      className={`flex items-start gap-3 px-4 py-3 cursor-pointer transition-colors border-b border-border/30 active:bg-muted/50 ${selectedMessage?.id === comm.id ? "bg-primary/5" : "hover:bg-muted/30"}`}
+                    >
+                      {/* Compact avatar */}
+                      <div className="relative flex-shrink-0">
+                        <div className={`h-10 w-10 rounded-full flex items-center justify-center ${
+                          comm.contact_type === "owner" 
+                            ? "bg-gradient-to-br from-purple-500 to-purple-600" 
+                            : "bg-gradient-to-br from-emerald-500 to-emerald-600"
+                        }`}>
+                          <span className="text-xs font-semibold text-white">{getInitials(comm.contact_name)}</span>
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between gap-2 mb-1">
-                            <span className="font-semibold text-sm truncate">{comm.contact_name}</span>
-                            <span className="text-xs text-muted-foreground whitespace-nowrap flex-shrink-0">
-                              {format(new Date(comm.created_at), "h:mm a")}
-                            </span>
+                        {comm.is_resolved && (
+                          <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-green-500 border-2 border-background flex items-center justify-center">
+                            <CheckCircle className="h-2 w-2 text-white" />
                           </div>
-                          {/* Type badges - only show Draft and New */}
-                          <div className="flex items-center gap-1.5 mb-1.5 flex-wrap">
-                            {comm.type === "draft" && (
-                              <Badge className="text-xs h-5 px-2 bg-amber-500 text-white border-0">Draft</Badge>
-                            )}
-                            {comm.type === "personal_sms" && (
-                              <Badge variant="outline" className="text-xs h-5 px-2">SMS</Badge>
-                            )}
+                        )}
+                      </div>
+                      
+                      {/* Content - maximize text visibility */}
+                      <div className="flex-1 min-w-0 py-0.5">
+                        <div className="flex items-baseline justify-between gap-2 mb-0.5">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="font-semibold text-sm truncate">{comm.contact_name}</span>
                             {comm.type === "call" && (
-                              <div className="flex items-center gap-1">
-                                <Badge variant="outline" className="text-xs h-5 px-2">
-                                  <Phone className="h-3 w-3 mr-1" />Call
-                                </Badge>
-                              </div>
+                              <Phone className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                            )}
+                          </div>
+                          <span className="text-[11px] text-muted-foreground whitespace-nowrap">
+                            {format(new Date(comm.created_at), "h:mm a")}
+                          </span>
+                        </div>
+                        
+                        {/* Inline badges only for important states */}
+                        {(comm.type === "draft" || (comm.direction === "inbound" && !comm.is_resolved)) && (
+                          <div className="flex items-center gap-1.5 mb-1">
+                            {comm.type === "draft" && (
+                              <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600">Draft</span>
                             )}
                             {comm.direction === "inbound" && !comm.is_resolved && (
-                              <Badge className="text-xs h-5 px-2 bg-blue-500 text-white border-0">New</Badge>
+                              <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-600">New</span>
                             )}
                           </div>
-                          <p className="text-sm text-muted-foreground line-clamp-2">{getMessagePreview(comm)}</p>
-                        </div>
+                        )}
+                        
+                        {/* Message preview - show more content */}
+                        <p className="text-[13px] text-muted-foreground line-clamp-2 leading-relaxed">
+                          {getMessagePreview(comm)}
+                        </p>
                       </div>
-                    ))}
-                  </div>
+                    </div>
+                  ))}
                 </div>
               ))}
             </div>
@@ -1190,13 +1239,17 @@ export function InboxView() {
         {activeTab === "emails" && selectedGmailEmail ? (
           // Gmail Email Detail View - Mobile optimized
           <>
-            {/* Mobile back button */}
-            <div className="md:hidden p-3 border-b flex items-center gap-3">
+            {/* Mobile back header - minimal */}
+            <div className="md:hidden flex items-center gap-2 px-2 py-2 border-b">
               <Button variant="ghost" size="icon" className="h-10 w-10" onClick={handleBackToList}>
                 <ChevronLeft className="h-5 w-5" />
               </Button>
-              <span className="font-medium truncate">{selectedGmailEmail.fromName}</span>
+              <div className="flex-1 min-w-0">
+                <span className="font-medium text-sm truncate block">{selectedGmailEmail.fromName}</span>
+                <span className="text-xs text-muted-foreground truncate block">{selectedGmailEmail.from}</span>
+              </div>
             </div>
+            
             {/* Desktop email header */}
             <div className="hidden md:flex p-4 border-b items-center gap-4">
               <div className="h-11 w-11 rounded-full bg-blue-500 flex items-center justify-center flex-shrink-0">
@@ -1281,15 +1334,57 @@ export function InboxView() {
           </>
         ) : selectedMessage ? (
           <>
-            {/* Mobile back header */}
-            <div className="md:hidden p-3 border-b flex items-center gap-3">
+            {/* Mobile back header - minimal */}
+            <div className="md:hidden flex items-center gap-2 px-2 py-2 border-b">
               <Button variant="ghost" size="icon" className="h-10 w-10" onClick={handleBackToList}>
                 <ChevronLeft className="h-5 w-5" />
               </Button>
-              <span className="font-medium truncate">{selectedMessage.contact_name}</span>
+              <div className="flex-1 min-w-0">
+                <span className="font-medium text-sm truncate block">{selectedMessage.contact_name}</span>
+                <span className="text-xs text-muted-foreground truncate block">
+                  {selectedMessage.contact_phone || selectedMessage.contact_email || ""}
+                </span>
+              </div>
+              {/* Minimal mobile actions */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-10 w-10">
+                    <MoreHorizontal className="h-5 w-5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {selectedMessage.contact_phone && (
+                    <DropdownMenuItem onClick={() => setShowCallDialog(true)}>
+                      <PhoneOutgoing className="h-4 w-4 mr-2" />Call
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuItem onClick={() => setShowContactInfo(true)}>
+                    <Info className="h-4 w-4 mr-2" />Contact Info
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setShowNotes(true)}>
+                    <FileText className="h-4 w-4 mr-2" />Notes
+                  </DropdownMenuItem>
+                  {selectedMessage.contact_type === "lead" && selectedMessage.contact_id ? (
+                    <DropdownMenuItem onClick={() => setSelectedLeadId(selectedMessage.contact_id)}>
+                      <User className="h-4 w-4 mr-2" />View Lead
+                    </DropdownMenuItem>
+                  ) : selectedMessage.contact_type !== "lead" && selectedMessage.contact_type !== "owner" && (
+                    <DropdownMenuItem 
+                      onClick={() => createLeadMutation.mutate({
+                        name: selectedMessage.contact_name,
+                        phone: selectedMessage.contact_phone || undefined,
+                        email: selectedMessage.contact_email || undefined,
+                      })}
+                      disabled={createLeadMutation.isPending}
+                    >
+                      <UserPlus className="h-4 w-4 mr-2" />{createLeadMutation.isPending ? "Creating..." : "Create Lead"}
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
             
-            {/* Desktop header */}
+            {/* Desktop header - unchanged */}
             <div className="hidden md:flex p-4 border-b items-center gap-4">
               <div className="h-11 w-11 rounded-full bg-emerald-500 flex items-center justify-center flex-shrink-0">
                 <span className="text-sm font-medium text-white">{getInitials(selectedMessage.contact_name)}</span>
@@ -1427,7 +1522,7 @@ export function InboxView() {
                     )}
 
                     {!selectedMessage.is_draft && (
-                      <div className="flex flex-wrap justify-center gap-2 pt-4">
+                      <div className="hidden md:flex flex-wrap justify-center gap-2 pt-4">
                         {selectedMessage.contact_phone && <Button variant="outline" size="sm" onClick={() => setShowSmsReply(true)}><MessageSquare className="h-4 w-4 mr-2" />Reply SMS</Button>}
                         {selectedMessage.contact_phone && (
                           <Button variant="outline" size="sm" onClick={() => setShowCallDialog(true)}>
@@ -1461,19 +1556,19 @@ export function InboxView() {
             </ScrollArea>
 
             {!selectedMessage.is_draft && (
-              <div className="p-4 border-t">
+              <div className="p-3 md:p-4 border-t safe-area-bottom">
                 <div className="flex items-center gap-2 max-w-3xl mx-auto">
-                  <div className="flex items-center gap-1 mr-2">
+                  <div className="hidden md:flex items-center gap-1 mr-2">
                     <Button variant={selectedChannel === "sms" ? "default" : "ghost"} size="sm" className="h-7 px-2" onClick={() => setSelectedChannel("sms")} disabled={!selectedMessage.contact_phone}><MessageSquare className="h-3.5 w-3.5" /></Button>
                     <Button variant={selectedChannel === "email" ? "default" : "ghost"} size="sm" className="h-7 px-2" onClick={() => setSelectedChannel("email")} disabled={!selectedMessage.contact_email}><Mail className="h-3.5 w-3.5" /></Button>
                   </div>
-                  <div className="flex-1 flex items-center gap-2 bg-muted/50 rounded-full px-4 py-2">
+                  <div className="flex-1 flex items-center gap-2 bg-muted/50 rounded-full px-3 py-1.5">
                     <AIWritingAssistant currentMessage={newMessage} onMessageGenerated={handleAIMessage} contactName={selectedMessage.contact_name} messageType={selectedChannel} />
-                    <Input placeholder="Write a message..." value={newMessage} onChange={(e) => setNewMessage(e.target.value)} onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSendMessage()} className="flex-1 border-0 bg-transparent focus-visible:ring-0 px-0 h-8" />
+                    <Input placeholder="Message..." value={newMessage} onChange={(e) => setNewMessage(e.target.value)} onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSendMessage()} className="flex-1 border-0 bg-transparent focus-visible:ring-0 px-0 h-9 text-sm" />
                     <EmojiPicker onEmojiSelect={handleEmojiSelect} />
                   </div>
-                  <Button size="icon" className="h-10 w-10 rounded-full bg-gradient-to-br from-violet-500 to-violet-600 hover:from-violet-600 hover:to-violet-700" onClick={handleSendMessage} disabled={!newMessage.trim() || sendSmsMutation.isPending}>
-                    {sendSmsMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin text-white" /> : <Send className="h-4 w-4 text-white" />}
+                  <Button size="icon" className="h-10 w-10 rounded-full bg-primary hover:bg-primary/90" onClick={handleSendMessage} disabled={!newMessage.trim() || sendSmsMutation.isPending}>
+                    {sendSmsMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin text-primary-foreground" /> : <Send className="h-4 w-4 text-primary-foreground" />}
                   </Button>
                 </div>
               </div>
