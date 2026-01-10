@@ -204,33 +204,133 @@ async function handleSetupComplete(
     if (resendApiKey && owner) {
       const resend = new Resend(resendApiKey);
 
-      // Admin notification
+      // Admin notification - Fortune 500 style matching owner statements
       try {
         console.log("Sending admin payment confirmation email...");
+        const LOGO_URL = "https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/email-assets/peachhaus-logo.png";
+        const notificationId = `PAY-${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}${String(new Date().getDate()).padStart(2, '0')}-${ownerId.slice(0, 8).toUpperCase()}`;
+        const issueDate = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+        const issueTime = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+        
         await resend.emails.send({
           from: "PeachHaus <info@peachhausgroup.com>",
           to: ["info@peachhausgroup.com"],
-          subject: `✅ Payment Method Connected: ${owner.name}`,
+          subject: `Payment Method Connected: ${owner.name}`,
           html: `
-            <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto;">
-              <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 30px; border-radius: 12px 12px 0 0;">
-                <h1 style="color: white; margin: 0; font-size: 24px;">✅ Payment Authorization Complete</h1>
-              </div>
-              <div style="background: #f8fafc; padding: 30px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
-                <p style="color: #1a1a2e; font-size: 16px; margin-bottom: 20px;">
-                  <strong>${owner.name}</strong> has successfully connected their payment method.
-                </p>
-                <div style="background: white; padding: 20px; border-radius: 8px; border-left: 4px solid #10b981;">
-                  <p style="margin: 5px 0; color: #4a5568;"><strong>Owner:</strong> ${owner.name}</p>
-                  <p style="margin: 5px 0; color: #4a5568;"><strong>Email:</strong> ${owner.email}</p>
-                  <p style="margin: 5px 0; color: #4a5568;"><strong>Payment Method:</strong> ${paymentMethodDisplay}</p>
-                  <p style="margin: 5px 0; color: #4a5568;"><strong>Properties:</strong> ${propertyList}</p>
+            <!DOCTYPE html>
+            <html>
+              <head>
+                <meta charset="utf-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>Payment Setup Complete</title>
+              </head>
+              <body style="margin: 0; padding: 0; background: #f5f5f5; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', Arial, sans-serif;">
+                <div style="max-width: 600px; margin: 0 auto; background: #ffffff;">
+                  
+                  <!-- Header - Corporate Minimal with Logo -->
+                  <div style="padding: 24px 32px; border-bottom: 2px solid #111111;">
+                    <table style="width: 100%;">
+                      <tr>
+                        <td style="vertical-align: middle;">
+                          <img src="${LOGO_URL}" alt="PeachHaus" style="height: 40px; width: auto;" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';" />
+                          <div style="display: none; font-size: 20px; font-weight: 700; color: #111111; letter-spacing: -0.3px;">PeachHaus</div>
+                        </td>
+                        <td style="text-align: right; vertical-align: middle;">
+                          <div style="font-size: 16px; font-weight: 600; color: #111111; margin-bottom: 4px;">PAYMENT SETUP CONFIRMATION</div>
+                          <div style="font-size: 10px; color: #666666; font-family: 'SF Mono', Menlo, Consolas, 'Courier New', monospace;">
+                            ${notificationId}
+                          </div>
+                        </td>
+                      </tr>
+                    </table>
+                  </div>
+
+                  <!-- Owner & Date Info -->
+                  <div style="padding: 20px 32px; background: #f9f9f9; border-bottom: 1px solid #e5e5e5;">
+                    <table style="width: 100%;">
+                      <tr>
+                        <td style="vertical-align: top; width: 50%;">
+                          <div style="font-size: 10px; color: #666666; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Owner</div>
+                          <div style="font-size: 14px; font-weight: 600; color: #111111;">${owner.name}</div>
+                          <div style="font-size: 12px; color: #666666; margin-top: 2px;">${owner.email}</div>
+                        </td>
+                        <td style="vertical-align: top; text-align: right;">
+                          <div style="font-size: 10px; color: #666666; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Completed</div>
+                          <div style="font-size: 14px; font-weight: 600; color: #111111;">${issueDate}</div>
+                          <div style="font-size: 12px; color: #666666; margin-top: 2px;">${issueTime}</div>
+                        </td>
+                      </tr>
+                    </table>
+                  </div>
+
+                  <!-- SUCCESS STATUS - Primary Focus -->
+                  <div style="padding: 24px 32px;">
+                    <table style="width: 100%; border: 2px solid #10b981;">
+                      <tr>
+                        <td style="padding: 16px 20px; background: #10b981;">
+                          <table style="width: 100%;">
+                            <tr>
+                              <td style="vertical-align: middle;">
+                                <div style="font-size: 10px; color: #ffffff; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.9;">PAYMENT AUTHORIZATION</div>
+                                <div style="font-size: 10px; color: #ffffff; opacity: 0.7; margin-top: 2px;">Status Update</div>
+                              </td>
+                              <td style="text-align: right; vertical-align: middle;">
+                                <div style="font-size: 24px; font-weight: 700; color: #ffffff; font-family: 'SF Mono', Menlo, Consolas, 'Courier New', monospace;">
+                                  ✓ COMPLETE
+                                </div>
+                              </td>
+                            </tr>
+                          </table>
+                        </td>
+                      </tr>
+                    </table>
+                  </div>
+
+                  <!-- Details Section -->
+                  <div style="padding: 0 32px 24px 32px;">
+                    <div style="font-size: 11px; font-weight: 600; color: #111111; padding: 8px 0; border-bottom: 1px solid #111111; text-transform: uppercase; letter-spacing: 0.5px;">
+                      Setup Details
+                    </div>
+                    <table style="width: 100%;">
+                      <tr>
+                        <td style="padding: 12px 0; font-size: 13px; color: #111111; border-bottom: 1px solid #e5e5e5;">Payment Method</td>
+                        <td style="padding: 12px 0; font-size: 13px; color: #111111; text-align: right; font-family: 'SF Mono', Menlo, Consolas, 'Courier New', monospace; border-bottom: 1px solid #e5e5e5; font-weight: 600;">${paymentMethodDisplay}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 12px 0; font-size: 13px; color: #111111; border-bottom: 1px solid #e5e5e5;">Properties Managed</td>
+                        <td style="padding: 12px 0; font-size: 13px; color: #111111; text-align: right; border-bottom: 1px solid #e5e5e5;">${propertyList}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 12px 0; font-size: 13px; color: #111111; border-bottom: 1px solid #e5e5e5;">Stripe Customer ID</td>
+                        <td style="padding: 12px 0; font-size: 11px; color: #666666; text-align: right; font-family: 'SF Mono', Menlo, Consolas, 'Courier New', monospace; border-bottom: 1px solid #e5e5e5;">${session.customer}</td>
+                      </tr>
+                      <tr style="background: #f0fdf4;">
+                        <td style="padding: 12px 0; font-size: 13px; font-weight: 600; color: #166534;">Billing Status</td>
+                        <td style="padding: 12px 0; font-size: 13px; color: #166534; text-align: right; font-weight: 600;">Ready for Charges</td>
+                      </tr>
+                    </table>
+                  </div>
+
+                  <!-- Action Note -->
+                  <div style="padding: 0 32px 24px 32px;">
+                    <div style="background: #f0fdf4; border-left: 3px solid #10b981; padding: 16px;">
+                      <p style="font-size: 13px; color: #166534; margin: 0; line-height: 1.6;">
+                        <strong>✓ This owner can now be charged from the Reconciliation Panel.</strong><br>
+                        <span style="font-size: 12px; color: #15803d;">Monthly management fees and expenses can be processed via Stripe without re-authorization.</span>
+                      </p>
+                    </div>
+                  </div>
+
+                  <!-- Footer -->
+                  <div style="padding: 20px 32px; border-top: 1px solid #e5e5e5; background: #f9f9f9;">
+                    <p style="font-size: 11px; color: #666666; margin: 0; text-align: center;">
+                      PeachHaus Property Management • Atlanta, GA<br>
+                      <span style="color: #999999;">This is an automated notification from the payment system.</span>
+                    </p>
+                  </div>
                 </div>
-                <p style="color: #10b981; font-weight: 600; margin-top: 20px;">
-                  ✓ This owner can now be charged without re-authorization.
-                </p>
-              </div>
-            </div>
+              </body>
+            </html>
           `,
         });
         console.log("Admin payment confirmation email sent successfully");
