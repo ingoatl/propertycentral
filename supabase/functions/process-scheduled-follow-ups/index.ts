@@ -213,7 +213,7 @@ serve(async (req) => {
 
         const recipientFirstName = lead.name?.split(' ')[0] || 'there';
 
-        // Process template variables
+        // Process template variables (fallback)
         const processTemplate = (template: string) => {
           return template
             .replace(/\{\{name\}\}/g, lead.name || "")
@@ -226,9 +226,62 @@ serve(async (req) => {
             .replace(/\{\{onboarding_link\}\}/g, `https://peachhaus.co/onboard/existing-str`);
         };
 
-        const messageBody = step ? processTemplate(step.template_content) : "";
-        const emailSubject = step?.template_subject ? processTemplate(step.template_subject) : "Message from PeachHaus";
         const actionType = step?.action_type || "sms";
+        const isFirstStep = step?.step_number === 1;
+        const purpose = isFirstStep ? "first_touch" : "follow_up";
+        
+        // Try AI-generated message first
+        let messageBody = "";
+        let emailSubject = step?.template_subject ? processTemplate(step.template_subject) : "Message from PeachHaus";
+        let usedAI = false;
+        
+        try {
+          console.log(`Generating contextual ${actionType} for lead ${lead.id}, purpose: ${purpose}`);
+          
+          const aiResponse = await fetch(
+            `${supabaseUrl}/functions/v1/generate-contextual-message`,
+            {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${supabaseServiceKey}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                leadId: lead.id,
+                messageType: actionType === "both" ? "sms" : actionType,
+                purpose,
+                templateHint: step?.template_content,
+                stepNumber: step?.step_number,
+                sequenceName: sequence?.name,
+              }),
+            }
+          );
+
+          if (aiResponse.ok) {
+            const aiResult = await aiResponse.json();
+            if (aiResult.success && aiResult.message) {
+              messageBody = aiResult.message;
+              usedAI = true;
+              console.log(`Using AI-generated message for lead ${lead.id}`);
+            }
+          } else {
+            console.log(`AI generation failed, falling back to template for lead ${lead.id}`);
+          }
+        } catch (aiError) {
+          console.error(`AI generation error for lead ${lead.id}:`, aiError);
+        }
+        
+        // Fallback to static template if AI failed
+        if (!messageBody && step?.template_content) {
+          messageBody = processTemplate(step.template_content);
+          console.log(`Using template fallback for lead ${lead.id}`);
+        }
+        
+        if (!messageBody) {
+          console.log(`No message body for lead ${lead.id}, skipping`);
+          skipped++;
+          continue;
+        }
 
         let sendSuccess = false;
 
