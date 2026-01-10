@@ -130,7 +130,8 @@ const handler = async (req: Request): Promise<Response> => {
     if (notificationType === "confirmation") {
       // Send confirmation to the lead
       if (lead?.email) {
-        await resend.emails.send({
+        console.log("Sending confirmation email to:", lead.email);
+        const emailResult = await resend.emails.send({
           from: "PeachHaus <notifications@peachhausgroup.com>",
           to: [lead.email],
           subject: `Your Discovery Call is Confirmed - ${formattedDate}`,
@@ -210,8 +211,7 @@ const handler = async (req: Request): Promise<Response> => {
             </div>
           `,
         });
-
-        // Also send SMS confirmation if phone available
+        console.log("Confirmation email result:", JSON.stringify(emailResult));
         if (lead?.phone) {
           try {
             await supabase.functions.invoke("send-sms", {
@@ -240,7 +240,8 @@ const handler = async (req: Request): Promise<Response> => {
       const scoreColor = revenueData.score >= 75 ? "#2e7d32" : revenueData.score >= 50 ? "#ed6c02" : "#d32f2f";
       const callId = `CALL-${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}-${discoveryCallId.slice(0, 6).toUpperCase()}`;
 
-      await resend.emails.send({
+      console.log("Sending admin notification email to: alex@peachhausgroup.com, anja@peachhausgroup.com");
+      const adminEmailResult = await resend.emails.send({
         from: "PeachHaus <notifications@peachhausgroup.com>",
         to: ["alex@peachhausgroup.com", "anja@peachhausgroup.com"],
         subject: `New Discovery Call Booked - ${lead?.name}`,
@@ -368,6 +369,7 @@ const handler = async (req: Request): Promise<Response> => {
           </html>
         `,
       });
+      console.log("Admin email result:", JSON.stringify(adminEmailResult));
     }
 
     if (notificationType === "reminder_24h" || notificationType === "reminder_1h") {
