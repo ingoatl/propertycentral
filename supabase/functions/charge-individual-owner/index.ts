@@ -58,15 +58,24 @@ serve(async (req) => {
       console.log(`Created Stripe customer ${customerId} for ${owner.name}`);
     }
 
-    // Get payment methods
-    const paymentMethods = await stripe.paymentMethods.list({
+    // Get payment methods - try both card and bank account
+    let paymentMethods = await stripe.paymentMethods.list({
       customer: customerId,
-      type: owner.payment_method === "ach" ? "us_bank_account" : "card",
+      type: "card",
       limit: 1,
     });
 
+    // If no cards, try bank accounts
     if (paymentMethods.data.length === 0) {
-      throw new Error("No payment method on file for this owner");
+      paymentMethods = await stripe.paymentMethods.list({
+        customer: customerId,
+        type: "us_bank_account",
+        limit: 1,
+      });
+    }
+
+    if (paymentMethods.data.length === 0) {
+      throw new Error("No payment method on file for this owner. Please set up payment first.");
     }
 
     const paymentMethodId = paymentMethods.data[0].id;

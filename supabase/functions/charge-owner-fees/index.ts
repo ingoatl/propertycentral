@@ -95,7 +95,8 @@ serve(async (req) => {
     
     console.log("Total amount (with fees):", totalAmount);
 
-    let chargeStatus = isDraft ? "draft" : (isTest ? "test" : "pending");
+    // Use valid status values: pending, processing, succeeded, failed, refunded
+    let chargeStatus = isDraft ? "pending" : "pending";
     let stripePaymentIntentId = null;
     let chargeId = null;
 
@@ -162,11 +163,11 @@ serve(async (req) => {
           });
 
           stripePaymentIntentId = paymentIntent.id;
-          chargeStatus = paymentIntent.status === "succeeded" ? "paid" : "pending";
+          chargeStatus = paymentIntent.status === "succeeded" ? "succeeded" : "processing";
           console.log("Stripe payment created:", paymentIntent.id, paymentIntent.status);
         } else {
           console.log("No payment method found for customer, creating pending charge");
-          chargeStatus = "pending_payment_method";
+          chargeStatus = "pending";
         }
       } catch (stripeError: any) {
         console.error("Stripe charge failed:", stripeError.message);
@@ -320,13 +321,13 @@ serve(async (req) => {
                       <td style="padding: 6px 0; font-size: 14px; color: #6b7280;">Payment Status</td>
                       <td style="padding: 6px 0; text-align: right;">
                         <span style="display: inline-block; padding: 4px 12px; border-radius: 9999px; font-size: 12px; font-weight: 600; ${
-                          chargeStatus === "paid" 
+                          chargeStatus === "succeeded" 
                             ? "background-color: #dcfce7; color: #166534;" 
-                            : chargeStatus === "test"
+                            : chargeStatus === "processing"
                             ? "background-color: #fef3c7; color: #92400e;"
                             : "background-color: #fef9c3; color: #854d0e;"
                         }">
-                          ${chargeStatus === "paid" ? "✓ Paid" : chargeStatus === "test" ? "🔬 Test" : "Pending"}
+                          ${chargeStatus === "succeeded" ? "✓ Paid" : chargeStatus === "processing" ? "Processing" : "Pending"}
                         </span>
                       </td>
                     </tr>
