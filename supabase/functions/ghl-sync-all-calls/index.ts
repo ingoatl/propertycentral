@@ -64,6 +64,7 @@ serve(async (req) => {
 
     const requestBody = await req.json().catch(() => ({}));
     const limit = requestBody.limit || 200;
+    const forceRefresh = requestBody.forceRefresh || false; // Re-sync existing calls to update transcripts
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -240,13 +241,18 @@ serve(async (req) => {
       // Check if already synced
       const { data: existing } = await supabase
         .from("lead_communications")
-        .select("id")
+        .select("id, body")
         .or(`ghl_call_id.eq.${callId},ghl_message_id.eq.${callId},external_id.eq.${callId}`)
         .single();
 
       if (existing) {
-        console.log(`Call ${callId} already synced, skipping`);
-        continue;
+        // If forceRefresh is enabled and the body is just a placeholder, try to get transcript
+        const hasRealTranscript = existing.body && existing.body.length > 100 && !existing.body.startsWith("Phone call ");
+        if (!forceRefresh || hasRealTranscript) {
+          console.log(`Call ${callId} already synced, skipping`);
+          continue;
+        }
+        console.log(`Call ${callId} has no transcript, will try to update...`);
       }
 
       // Extract call details
@@ -424,47 +430,77 @@ serve(async (req) => {
         },
       };
 
-      const { data: inserted, error: insertError } = await supabase
-        .from("lead_communications")
-        .insert(communicationData)
-        .select()
-        .single();
+      let insertedId: string;
+      
+      // If we're updating an existing record (forceRefresh case)
+      if (existing) {
+        const { data: updated, error: updateError } = await supabase
+          .from("lead_communications")
+          .update({
+            body: callBody,
+            subject: communicationData.subject,
+            call_duration: communicationData.call_duration,
+            call_recording_url: communicationData.call_recording_url,
+            lead_id: communicationData.lead_id,
+            owner_id: communicationData.owner_id,
+            metadata: communicationData.metadata,
+          })
+          .eq("id", existing.id)
+          .select()
+          .single();
 
-      if (insertError) {
-        console.error(`Error inserting call ${callId}:`, insertError);
+        if (updateError) {
+          console.error(`Error updating call ${callId}:`, updateError);
+          continue;
+        }
+        insertedId = updated.id;
+        console.log(`✓ Updated call from ${matchedName}: ${callBody.slice(0, 50)}...`);
       } else {
-        console.log(`✓ Synced call from ${matchedName}: ${callBody.slice(0, 50)}...`);
-        syncedCalls.push({
-          id: inserted.id,
-          ghl_call_id: callId,
-          contact_name: matchedName,
-          matched_owner: matchedOwnerId ? true : false,
-          matched_lead: matchedLeadId ? true : false,
-          has_transcript: callBody.length > 50,
-        });
+        const { data: inserted, error: insertError } = await supabase
+          .from("lead_communications")
+          .insert(communicationData)
+          .select()
+          .single();
 
-        // Trigger analysis for calls with transcripts
-        if (callBody && callBody.length > 100 && (matchedOwnerId || matchedLeadId)) {
-          try {
-            fetch(`${supabaseUrl}/functions/v1/analyze-call-transcript`, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                "Authorization": `Bearer ${supabaseServiceKey}`,
-              },
-              body: JSON.stringify({
-                communicationId: inserted.id,
-                ownerId: matchedOwnerId,
-                leadId: matchedLeadId,
-                matchedName: matchedName,
-                callDuration: duration,
-                transcript: callBody,
-                ghlCallId: callId,
-              }),
-            }).catch(e => console.error("Analysis trigger failed:", e));
-          } catch (e) {
-            console.error("Analysis error:", e);
-          }
+        if (insertError) {
+          console.error(`Error inserting call ${callId}:`, insertError);
+          continue;
+        }
+        insertedId = inserted.id;
+        console.log(`✓ Synced call from ${matchedName}: ${callBody.slice(0, 50)}...`);
+      }
+      
+      syncedCalls.push({
+        id: insertedId,
+        ghl_call_id: callId,
+        contact_name: matchedName,
+        matched_owner: matchedOwnerId ? true : false,
+        matched_lead: matchedLeadId ? true : false,
+        has_transcript: callBody.length > 50,
+        updated: !!existing,
+      });
+
+      // Trigger analysis for calls with transcripts
+      if (callBody && callBody.length > 100 && (matchedOwnerId || matchedLeadId)) {
+        try {
+          fetch(`${supabaseUrl}/functions/v1/analyze-call-transcript`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${supabaseServiceKey}`,
+            },
+            body: JSON.stringify({
+              communicationId: insertedId,
+              ownerId: matchedOwnerId,
+              leadId: matchedLeadId,
+              matchedName: matchedName,
+              callDuration: duration,
+              transcript: callBody,
+              ghlCallId: callId,
+            }),
+          }).catch(e => console.error("Analysis trigger failed:", e));
+        } catch (e) {
+          console.error("Analysis error:", e);
         }
       }
     }
