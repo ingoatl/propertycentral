@@ -460,15 +460,33 @@ export const QuickChargeBuilder = ({ onSuccess }: QuickChargeBuilderProps) => {
           </div>
         )}
 
-        {/* Totals */}
+        {/* Payment Method & Totals */}
         {selectedOwner && subtotal > 0 && (
-          <div className="border-t pt-4 space-y-2">
+          <div className="border-t pt-4 space-y-3">
+            {/* Payment Method Display */}
+            <div className="flex items-center justify-between text-sm bg-muted/50 p-3 rounded-lg">
+              <span className="text-muted-foreground flex items-center gap-2">
+                {paymentMethod === 'ach' ? (
+                  <Banknote className="w-4 h-4" />
+                ) : (
+                  <CreditCard className="w-4 h-4" />
+                )}
+                Payment Method:
+              </span>
+              <Badge variant="outline" className="font-medium">
+                {paymentMethod === 'ach' ? 'ACH Bank Transfer' : 'Credit Card'}
+              </Badge>
+            </div>
+
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">Subtotal:</span>
               <span>${subtotal.toFixed(2)}</span>
             </div>
             <div className="flex justify-between text-sm text-amber-600">
-              <span>Processing Fee ({(processingFeeRate * 100).toFixed(0)}%):</span>
+              <span className="flex items-center gap-1">
+                Processing Fee 
+                <span className="text-xs">({paymentMethod === 'ach' ? '1% ACH' : '3% CC'})</span>:
+              </span>
               <span>${processingFee.toFixed(2)}</span>
             </div>
             <div className="flex justify-between text-lg font-bold pt-2 border-t">
