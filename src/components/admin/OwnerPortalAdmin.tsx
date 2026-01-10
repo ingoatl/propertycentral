@@ -24,6 +24,7 @@ import {
   Send,
   CheckCircle,
   Clock,
+  CreditCard,
 } from "lucide-react";
 
 interface OwnerProperty {
@@ -42,6 +43,8 @@ interface OwnerWithProperties {
   properties: OwnerProperty[];
   last_invite_sent: string | null;
   last_portal_access: string | null;
+  stripe_customer_id: string | null;
+  payment_method: string | null;
 }
 
 interface OwnerStats {
@@ -79,7 +82,9 @@ export function OwnerPortalAdmin() {
           email,
           phone,
           second_owner_name,
-          second_owner_email
+          second_owner_email,
+          stripe_customer_id,
+          payment_method
         `)
         .order("name");
 
@@ -324,6 +329,7 @@ export function OwnerPortalAdmin() {
               <TableRow>
                 <TableHead>Owner</TableHead>
                 <TableHead>Property</TableHead>
+                <TableHead>Payment</TableHead>
                 <TableHead>Last Invite</TableHead>
                 <TableHead>Last Access</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
@@ -347,6 +353,20 @@ export function OwnerPortalAdmin() {
                           <p className="font-medium truncate" title={property.name}>{property.name}</p>
                           <p className="text-xs text-muted-foreground truncate" title={property.address || ''}>{property.address}</p>
                         </div>
+                      </TableCell>
+                      <TableCell>
+                        {idx === 0 && (
+                          owner.stripe_customer_id && owner.payment_method ? (
+                            <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                              <CreditCard className="h-3 w-3 mr-1" />
+                              {owner.payment_method === 'card' ? 'Card' : 'ACH'}
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-muted-foreground">
+                              Pending
+                            </Badge>
+                          )
+                        )}
                       </TableCell>
                       <TableCell>
                         {idx === 0 && owner.last_invite_sent ? (
@@ -411,6 +431,18 @@ export function OwnerPortalAdmin() {
                       <Badge variant="outline" className="text-amber-600">
                         No Property
                       </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {owner.stripe_customer_id && owner.payment_method ? (
+                        <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                          <CreditCard className="h-3 w-3 mr-1" />
+                          {owner.payment_method === 'card' ? 'Card' : 'ACH'}
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-muted-foreground">
+                          Pending
+                        </Badge>
+                      )}
                     </TableCell>
                     <TableCell>
                       <span className="text-muted-foreground text-sm">-</span>
