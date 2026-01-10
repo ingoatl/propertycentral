@@ -1429,8 +1429,8 @@ export function InboxView() {
               </div>
             </div>
 
-            <ScrollArea className="flex-1 p-4">
-              <div className="space-y-4 max-w-3xl mx-auto">
+            <ScrollArea className="flex-1">
+              <div className="px-3 py-2 md:px-4 md:py-4 max-w-3xl mx-auto">
                 {selectedMessage.is_draft && isEditingDraft && editedDraft ? (
                   <div className="space-y-3 p-4 bg-muted/30 rounded-lg">
                     <div><label className="text-sm font-medium">To Email</label><Input value={editedDraft.to_email} onChange={(e) => setEditedDraft({ ...editedDraft, to_email: e.target.value })} className="mt-1" /></div>
@@ -1445,10 +1445,10 @@ export function InboxView() {
                     </div>
                   </div>
                 ) : (
-                  <>
-                    {/* Conversation Thread - show all messages */}
-                    {conversationThread.length > 1 ? (
-                      <div className="space-y-3">
+                  <div className="space-y-2">
+                    {/* Conversation Thread - clean minimal bubbles */}
+                    {conversationThread.length > 0 ? (
+                      <>
                         {conversationThread.map((msg, idx) => {
                           const isOutbound = msg.direction === "outbound";
                           const showDateSeparator = idx === 0 || 
@@ -1458,35 +1458,28 @@ export function InboxView() {
                           return (
                             <div key={msg.id}>
                               {showDateSeparator && (
-                                <div className="flex items-center justify-center my-4">
-                                  <span className="text-xs text-muted-foreground bg-muted px-3 py-1 rounded-full">
-                                    {format(new Date(msg.created_at), "EEEE, MMMM d")}
+                                <div className="flex items-center justify-center py-3">
+                                  <span className="text-[11px] text-muted-foreground bg-muted/50 px-2.5 py-1 rounded-full">
+                                    {format(new Date(msg.created_at), "MMM d")}
                                   </span>
                                 </div>
                               )}
                               <div className={`flex ${isOutbound ? "justify-end" : "justify-start"}`}>
-                                <div className="max-w-[75%]">
-                                  {!isOutbound && (
-                                    <div className="text-xs text-muted-foreground mb-1 ml-1">
-                                      {selectedMessage?.contact_name}
-                                    </div>
-                                  )}
-                                  <div className={`rounded-2xl px-4 py-2.5 ${
+                                <div className={`max-w-[85%] ${isOutbound ? "" : ""}`}>
+                                  <div className={`rounded-2xl px-3.5 py-2 ${
                                     isOutbound 
-                                      ? "bg-gradient-to-br from-violet-500 to-violet-600 text-white" 
+                                      ? "bg-primary text-primary-foreground" 
                                       : "bg-muted"
                                   }`}>
                                     {msg.type === "call" && (
-                                      <div className="flex items-center gap-1 text-xs opacity-80 mb-1">
+                                      <div className={`flex items-center gap-1 text-[11px] mb-1 ${isOutbound ? "opacity-80" : "text-muted-foreground"}`}>
                                         <Phone className="h-3 w-3" />
                                         {isOutbound ? "Outgoing call" : "Incoming call"}
                                       </div>
                                     )}
-                                    <p className="text-sm whitespace-pre-wrap">{msg.body}</p>
+                                    <p className="text-sm whitespace-pre-wrap leading-relaxed">{msg.body}</p>
                                   </div>
-                                  <div className={`text-xs text-muted-foreground mt-1 ${
-                                    isOutbound ? "text-right mr-1" : "ml-1"
-                                  }`}>
+                                  <div className={`text-[10px] text-muted-foreground mt-0.5 px-1 ${isOutbound ? "text-right" : ""}`}>
                                     {format(new Date(msg.created_at), "h:mm a")}
                                   </div>
                                 </div>
@@ -1494,17 +1487,18 @@ export function InboxView() {
                             </div>
                           );
                         })}
-                      </div>
+                      </>
                     ) : (
                       /* Single message fallback */
                       <div className={`flex ${selectedMessage.direction === "outbound" ? "justify-end" : "justify-start"}`}>
-                        <div className="max-w-[75%]">
-                          {selectedMessage.direction === "inbound" && <div className="text-xs text-muted-foreground mb-1 ml-1">{selectedMessage.contact_name}</div>}
-                          <div className={`rounded-2xl px-4 py-2.5 ${selectedMessage.direction === "outbound" ? "bg-gradient-to-br from-violet-500 to-violet-600 text-white" : "bg-muted"}`}>
-                            {selectedMessage.subject && <p className={`text-sm font-medium mb-1 ${selectedMessage.direction === "outbound" ? "text-white/90" : ""}`}>{selectedMessage.subject}</p>}
-                            <p className="text-sm whitespace-pre-wrap">{selectedMessage.body}</p>
+                        <div className="max-w-[85%]">
+                          <div className={`rounded-2xl px-3.5 py-2 ${selectedMessage.direction === "outbound" ? "bg-primary text-primary-foreground" : "bg-muted"}`}>
+                            {selectedMessage.subject && <p className={`text-sm font-medium mb-1 ${selectedMessage.direction === "outbound" ? "opacity-90" : ""}`}>{selectedMessage.subject}</p>}
+                            <p className="text-sm whitespace-pre-wrap leading-relaxed">{selectedMessage.body}</p>
                           </div>
-                          <div className={`text-xs text-muted-foreground mt-1 ${selectedMessage.direction === "outbound" ? "text-right mr-1" : "ml-1"}`}>{format(new Date(selectedMessage.created_at), "h:mm a")}</div>
+                          <div className={`text-[10px] text-muted-foreground mt-0.5 px-1 ${selectedMessage.direction === "outbound" ? "text-right" : ""}`}>
+                            {format(new Date(selectedMessage.created_at), "h:mm a")}
+                          </div>
                         </div>
                       </div>
                     )}
@@ -1550,7 +1544,7 @@ export function InboxView() {
                         )}
                       </div>
                     )}
-                  </>
+                  </div>
                 )}
               </div>
             </ScrollArea>
