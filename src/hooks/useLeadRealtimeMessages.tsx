@@ -15,6 +15,7 @@ export function useLeadRealtimeMessages() {
     debounceTimerRef.current = setTimeout(() => {
       queryClient.invalidateQueries({ queryKey: ["lead-communications"] });
       queryClient.invalidateQueries({ queryKey: ["all-communications"] });
+      queryClient.invalidateQueries({ queryKey: ["conversation-thread"] });
       queryClient.invalidateQueries({ queryKey: ["leads"] });
     }, 300);
   }, [queryClient]);
