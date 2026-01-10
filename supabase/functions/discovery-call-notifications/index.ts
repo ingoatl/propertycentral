@@ -13,6 +13,8 @@ const GOOGLE_MEET_LINK = "https://meet.google.com/jww-deey-iaa";
 const HOSTS_PHOTO_URL = "https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/anja-ingo-hosts.jpg";
 const SIGNATURE_URL = "https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/anja-signature.png";
 const FRONTEND_URL = "https://preview--peachhaus-property-central.lovable.app";
+const BOOKING_URL = "https://propertycentral.lovable.app/book-discovery-call";
+const LOGO_URL = "https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/peachhaus-logo.png";
 
 interface DiscoveryCallNotificationRequest {
   discoveryCallId: string;
@@ -232,71 +234,138 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     if (notificationType === "admin_notification") {
-      // Send admin notification with map and revenue score
+      // Send admin notification with owner statement styling (Fortune 500, institutional)
       const revenueData = calculateRevenueScore(lead?.property_address || "", lead?.property_type);
-      const mapImageUrl = getStaticMapUrl(lead?.property_address || "");
       const mapsLink = getGoogleMapsLink(lead?.property_address || "");
-
-      const scoreColor = revenueData.score >= 75 ? "#4CAF50" : revenueData.score >= 50 ? "#FF9800" : "#f44336";
+      const scoreColor = revenueData.score >= 75 ? "#2e7d32" : revenueData.score >= 50 ? "#ed6c02" : "#d32f2f";
+      const callId = `CALL-${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}-${discoveryCallId.slice(0, 6).toUpperCase()}`;
 
       await resend.emails.send({
-        from: "PeachHaus System <notifications@peachhausgroup.com>",
+        from: "PeachHaus <notifications@peachhausgroup.com>",
         to: ["alex@peachhausgroup.com", "anja@peachhausgroup.com"],
-        subject: `🗓️ New Discovery Call Booked - ${lead?.name} (Score: ${revenueData.score}/100)`,
+        subject: `New Discovery Call Booked - ${lead?.name}`,
         html: `
-          <div style="font-family: Arial, sans-serif; max-width: 700px; margin: 0 auto;">
-            <div style="background: #1a1a2e; padding: 20px; text-align: center;">
-              <h1 style="color: #f97316; margin: 0;">New Discovery Call Booked!</h1>
-            </div>
-            
-            <div style="padding: 25px; background: #fff;">
-              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                <div>
-                  <h2 style="margin: 0; color: #333;">${lead?.name}</h2>
-                  <p style="margin: 5px 0; color: #666;">${lead?.email} | ${lead?.phone}</p>
+          <!DOCTYPE html>
+          <html>
+            <head>
+              <meta charset="utf-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+              <title>Discovery Call Notification</title>
+            </head>
+            <body style="margin: 0; padding: 0; background: #f5f5f5; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', Arial, sans-serif;">
+              <div style="max-width: 600px; margin: 0 auto; background: #ffffff;">
+                
+                <!-- Header - Corporate Minimal -->
+                <div style="padding: 24px 32px; border-bottom: 2px solid #111111;">
+                  <table style="width: 100%;">
+                    <tr>
+                      <td style="vertical-align: middle;">
+                        <img src="${LOGO_URL}" alt="PeachHaus" style="height: 40px; width: auto;" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';" />
+                        <div style="display: none; font-size: 20px; font-weight: 700; color: #111111; letter-spacing: -0.3px;">PeachHaus</div>
+                      </td>
+                      <td style="text-align: right; vertical-align: middle;">
+                        <div style="font-size: 16px; font-weight: 600; color: #111111; margin-bottom: 4px;">DISCOVERY CALL</div>
+                        <div style="font-size: 10px; color: #666666; font-family: 'SF Mono', Menlo, Consolas, 'Courier New', monospace;">
+                          ${callId}
+                        </div>
+                      </td>
+                    </tr>
+                  </table>
                 </div>
-                <div style="background: ${scoreColor}; color: white; padding: 15px 25px; border-radius: 50%; text-align: center;">
-                  <div style="font-size: 24px; font-weight: bold;">${revenueData.score}</div>
-                  <div style="font-size: 10px;">SCORE</div>
+
+                <!-- Lead Info Section -->
+                <div style="padding: 20px 32px; background: #f9f9f9; border-bottom: 1px solid #e5e5e5;">
+                  <table style="width: 100%;">
+                    <tr>
+                      <td style="vertical-align: top; width: 60%;">
+                        <div style="font-size: 10px; color: #666666; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Lead</div>
+                        <div style="font-size: 18px; font-weight: 600; color: #111111;">${lead?.name || "Unknown"}</div>
+                        <div style="font-size: 12px; color: #666666; margin-top: 4px;">
+                          ${lead?.email || ""} ${lead?.phone ? `• ${lead.phone}` : ""}
+                        </div>
+                      </td>
+                      <td style="vertical-align: top; text-align: right;">
+                        <div style="font-size: 10px; color: #666666; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Revenue Score</div>
+                        <div style="display: inline-block; background: ${scoreColor}; color: white; padding: 8px 16px; border-radius: 4px; font-family: 'SF Mono', Menlo, monospace;">
+                          <span style="font-size: 20px; font-weight: 700;">${revenueData.score}</span>
+                          <span style="font-size: 10px;">/100</span>
+                        </div>
+                      </td>
+                    </tr>
+                  </table>
+                </div>
+
+                <!-- Call Details -->
+                <div style="padding: 24px 32px;">
+                  <table style="width: 100%; border-collapse: collapse;">
+                    <tr>
+                      <td style="padding: 12px 0; font-size: 13px; color: #666666; border-bottom: 1px solid #e5e5e5; width: 140px;">Scheduled Date</td>
+                      <td style="padding: 12px 0; font-size: 13px; color: #111111; font-weight: 600; border-bottom: 1px solid #e5e5e5;">${formattedDate}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 12px 0; font-size: 13px; color: #666666; border-bottom: 1px solid #e5e5e5;">Time</td>
+                      <td style="padding: 12px 0; font-size: 13px; color: #111111; font-weight: 600; border-bottom: 1px solid #e5e5e5;">${formattedTime}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 12px 0; font-size: 13px; color: #666666; border-bottom: 1px solid #e5e5e5;">Meeting Type</td>
+                      <td style="padding: 12px 0; font-size: 13px; color: #111111; border-bottom: 1px solid #e5e5e5;">
+                        ${isVideoCall ? "📹 Video Call (Google Meet)" : "📞 Phone Call"}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 12px 0; font-size: 13px; color: #666666; border-bottom: 1px solid #e5e5e5;">Service Interest</td>
+                      <td style="padding: 12px 0; font-size: 13px; color: #111111; border-bottom: 1px solid #e5e5e5;">${serviceInterestText}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 12px 0; font-size: 13px; color: #666666; border-bottom: 1px solid #e5e5e5;">Timeline</td>
+                      <td style="padding: 12px 0; font-size: 13px; color: #111111; border-bottom: 1px solid #e5e5e5;">${call.start_timeline || "Not specified"}</td>
+                    </tr>
+                    ${lead?.property_address ? `
+                    <tr>
+                      <td style="padding: 12px 0; font-size: 13px; color: #666666; border-bottom: 1px solid #e5e5e5;">Property</td>
+                      <td style="padding: 12px 0; font-size: 13px; color: #111111; border-bottom: 1px solid #e5e5e5;">
+                        <a href="${mapsLink}" style="color: #2563eb; text-decoration: none;">${lead.property_address}</a>
+                      </td>
+                    </tr>
+                    ` : ""}
+                    ${call.meeting_notes ? `
+                    <tr>
+                      <td style="padding: 12px 0; font-size: 13px; color: #666666; border-bottom: 1px solid #e5e5e5; vertical-align: top;">Notes</td>
+                      <td style="padding: 12px 0; font-size: 13px; color: #111111; border-bottom: 1px solid #e5e5e5;">${call.meeting_notes}</td>
+                    </tr>
+                    ` : ""}
+                  </table>
+
+                  <!-- Revenue Analysis Box -->
+                  <div style="background: #f9f9f9; border: 1px solid #e5e5e5; padding: 16px; margin-top: 20px;">
+                    <div style="font-size: 10px; color: #666666; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">Revenue Potential Analysis</div>
+                    <div style="background: #e0e0e0; border-radius: 4px; overflow: hidden; margin: 8px 0;">
+                      <div style="background: ${scoreColor}; height: 8px; width: ${revenueData.score}%;"></div>
+                    </div>
+                    <p style="font-size: 12px; color: #666666; margin: 8px 0 0 0;">${revenueData.reasoning}</p>
+                  </div>
+
+                  ${isVideoCall ? `
+                  <!-- Meeting Link -->
+                  <div style="text-align: center; margin-top: 24px; padding: 20px; background: #f0fdf4; border: 1px solid #bbf7d0;">
+                    <p style="font-size: 12px; color: #166534; margin: 0 0 12px 0; font-weight: 600;">JOIN VIDEO CALL</p>
+                    <a href="${GOOGLE_MEET_LINK}" style="display: inline-block; background: #16a34a; color: white; padding: 12px 32px; text-decoration: none; font-size: 13px; font-weight: 600; letter-spacing: 0.5px;">
+                      Open Google Meet
+                    </a>
+                    <p style="font-size: 11px; color: #666666; margin: 12px 0 0 0; font-family: 'SF Mono', Menlo, monospace;">${GOOGLE_MEET_LINK}</p>
+                  </div>
+                  ` : ""}
+                </div>
+
+                <!-- Footer -->
+                <div style="padding: 16px 32px; background-color: #f9f9f9; border-top: 1px solid #e5e5e5; text-align: center;">
+                  <p style="margin: 0; font-size: 11px; color: #666666;">
+                    PeachHaus Property Management • Atlanta, Georgia
+                  </p>
                 </div>
               </div>
-              
-              <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
-                <p><strong>📅 Scheduled:</strong> ${formattedDate} at ${formattedTime}</p>
-                <p><strong>📹 Meeting Type:</strong> ${isVideoCall ? "Video Call (Google Meet)" : "Phone Call"}</p>
-                <p><strong>🏠 Interest:</strong> ${serviceInterestText}</p>
-                <p><strong>⏰ Start Timeline:</strong> ${call.start_timeline || "Not specified"}</p>
-                ${call.meeting_notes ? `<p><strong>📝 Notes:</strong> ${call.meeting_notes}</p>` : ""}
-              </div>
-              
-              <h3>📍 Property Location</h3>
-              <p><strong>${lead?.property_address}</strong></p>
-              <a href="${mapsLink}" target="_blank">
-                <img src="${mapImageUrl}" alt="Property Location" style="width: 100%; border-radius: 8px; cursor: pointer;" />
-              </a>
-              <p style="text-align: center;">
-                <a href="${mapsLink}" style="color: #4285f4;">🔍 Open in Google Maps for full view</a>
-              </p>
-              
-              <div style="background: #fff3e0; padding: 15px; border-radius: 8px; margin-top: 20px;">
-                <h4 style="margin-top: 0; color: #e65100;">💰 Revenue Potential Analysis</h4>
-                <div style="background: #e0e0e0; border-radius: 10px; overflow: hidden; margin: 10px 0;">
-                  <div style="background: ${scoreColor}; height: 20px; width: ${revenueData.score}%;"></div>
-                </div>
-                <p><strong>Score:</strong> ${revenueData.score}/100</p>
-                <p><strong>Reasoning:</strong> ${revenueData.reasoning}</p>
-                <p><strong>Property Type:</strong> ${lead?.property_type || "Not specified"}</p>
-                ${lead?.opportunity_value ? `<p><strong>Estimated Value:</strong> $${lead.opportunity_value.toLocaleString()}</p>` : ""}
-              </div>
-              
-              ${isVideoCall ? `
-              <div style="background: #e8f5e9; padding: 15px; border-radius: 8px; margin-top: 20px; text-align: center;">
-                <p style="margin: 0 0 10px 0;"><strong>📹 Video Meeting Link:</strong></p>
-                <a href="${GOOGLE_MEET_LINK}" style="display: inline-block; background: #4CAF50; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: bold;">Join Google Meet</a>
-              </div>
-              ` : ""}
-            </div>
-          </div>
+            </body>
+          </html>
         `,
       });
     }
