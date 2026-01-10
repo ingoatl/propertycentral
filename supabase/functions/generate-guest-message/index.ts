@@ -15,6 +15,7 @@ interface MessageRequest {
   messageType: 'check_in' | 'check_out' | 'maintenance' | 'payment' | 'general' | 'custom';
   customDescription?: string;
   tone?: 'friendly' | 'professional' | 'casual';
+  senderName?: string; // User's name for signature
 }
 
 serve(async (req) => {
@@ -32,7 +33,8 @@ serve(async (req) => {
       endDate,
       messageType,
       customDescription,
-      tone = 'friendly'
+      tone = 'friendly',
+      senderName = 'PeachHaus Team'
     } = request;
 
     // Build context for the AI
@@ -49,7 +51,7 @@ IMPORTANT CONTEXT:
 - Use hospitality language - "stay", "guest", "accommodation" - NOT "rent", "tenant", "lease"
 - Be warm, professional, and service-oriented like a boutique hotel
 - Keep messages concise for SMS (under 300 characters ideal, max 480)
-- Always sign off with "- PeachHaus" or similar
+- Sign off with "- ${senderName} at PeachHaus" (use the sender's first name)
 
 TONE: ${tone === 'professional' ? 'More formal and business-like' : tone === 'casual' ? 'Very casual and friendly' : 'Warm and welcoming but professional'}
 

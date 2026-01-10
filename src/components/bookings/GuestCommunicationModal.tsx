@@ -61,6 +61,7 @@ export const GuestCommunicationModal = ({
 }: GuestCommunicationModalProps) => {
   const [smsPhone, setSmsPhone] = useState<string>(GHL_SMS_NUMBER);
   const [callPhone, setCallPhone] = useState<UserPhoneAssignment | null>(null);
+  const [userName, setUserName] = useState<string>('');
   const [messageType, setMessageType] = useState<string>('general');
   const [contextInput, setContextInput] = useState('');
   const [generatedMessage, setGeneratedMessage] = useState('');
@@ -68,13 +69,24 @@ export const GuestCommunicationModal = ({
   const [isSending, setIsSending] = useState(false);
   const [loadingPhone, setLoadingPhone] = useState(true);
 
-  // Load user's assigned phone number for calls only
+  // Load user's assigned phone number for calls only and user name
   useEffect(() => {
-    const loadUserPhone = async () => {
+    const loadUserData = async () => {
       setLoadingPhone(true);
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
+
+        // Get user profile for name
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('first_name')
+          .eq('id', user.id)
+          .single();
+        
+        if (profile?.first_name) {
+          setUserName(profile.first_name);
+        }
 
         // Get Twilio phone for calls
         const { data } = await supabase
@@ -92,14 +104,14 @@ export const GuestCommunicationModal = ({
           setCallPhone(twilioPhone || data[0]);
         }
       } catch (error) {
-        console.error('Error loading user phone:', error);
+        console.error('Error loading user data:', error);
       } finally {
         setLoadingPhone(false);
       }
     };
 
     if (open) {
-      loadUserPhone();
+      loadUserData();
       setGeneratedMessage('');
       setMessageType('general');
       setContextInput('');
@@ -136,6 +148,7 @@ export const GuestCommunicationModal = ({
           messageType,
           customDescription: contextInput, // Always use the context input
           tone: 'friendly',
+          senderName: userName || 'PeachHaus Team', // Pass user's name for signature
         },
       });
 
