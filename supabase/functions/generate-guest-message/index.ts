@@ -38,16 +38,10 @@ serve(async (req) => {
     // Build context for the AI
     const firstName = guestName.split(' ')[0];
     
-    // Message type templates - using guest-appropriate language (NOT rent reminders)
-    const messageTemplates: Record<string, string> = {
-      check_in: `Generate a warm welcome check-in message for ${firstName} who just moved into ${propertyName}. Ask how they're settling in and if they need anything.`,
-      check_out: `Generate a friendly departure message for ${firstName} at ${propertyName}. Thank them for their stay and ask about their experience.`,
-      maintenance: `Generate a message to ${firstName} at ${propertyName} about upcoming maintenance or asking if there are any issues that need attention.`,
-      payment: `Generate a polite, professional payment reminder for ${firstName} at ${propertyName}. The monthly amount is $${monthlyRent?.toLocaleString() || 'their agreed amount'}. Be tactful and offer to help if there are any questions.`,
-      general: `Generate a friendly general check-in message for ${firstName} staying at ${propertyName}. Just touching base to see how everything is going.`,
-      custom: customDescription || `Generate a message for ${firstName} at ${propertyName}.`,
-    };
-
+    // If custom description is provided, always use it as the base context
+    const hasCustomContext = customDescription && customDescription.trim().length > 0;
+    
+    // System prompt for refining user's message
     const systemPrompt = `You are a property management assistant for PeachHaus Group, a premium property management company.
 
 IMPORTANT CONTEXT:
@@ -65,9 +59,19 @@ ${startDate ? `Stay Start: ${startDate}` : ''}
 ${endDate ? `Stay End: ${endDate}` : ''}
 ${monthlyRent ? `Monthly Rate: $${monthlyRent.toLocaleString()}` : ''}
 
-Generate ONLY the message text, no explanations or alternatives.`;
+MESSAGE TYPE: ${messageType}
 
-    const userPrompt = messageTemplates[messageType] || messageTemplates.general;
+YOUR TASK: Take the user's message idea below and refine it into a polished, warm, professional SMS message.
+- Keep the core meaning and intent
+- Add warmth and professionalism
+- Make it sound natural, not robotic
+- Keep it concise for SMS
+
+Generate ONLY the refined message text, no explanations or alternatives.`;
+
+    const userPrompt = hasCustomContext 
+      ? `Refine this message for ${firstName}: "${customDescription}"`
+      : `Generate a ${messageType} message for ${firstName} at ${propertyName}.`;
 
     // Call OpenAI via Lovable AI
     const response = await fetch("https://ijsxcaaqphaciaenlegl.supabase.co/functions/v1/ai-assistant", {

@@ -49,21 +49,26 @@ const MESSAGE_TYPES = [
   { id: 'custom', label: 'Custom', icon: '✏️' },
 ] as const;
 
+// GHL number for SMS, Twilio for calls
+const GHL_SMS_NUMBER = '+14048005932';
+const TWILIO_CALL_NUMBER = '+14049241CALL'; // placeholder, actual Twilio number from assignments
+
 export const GuestCommunicationModal = ({
   open,
   onOpenChange,
   guest,
   mode,
 }: GuestCommunicationModalProps) => {
-  const [userPhone, setUserPhone] = useState<UserPhoneAssignment | null>(null);
+  const [smsPhone, setSmsPhone] = useState<string>(GHL_SMS_NUMBER);
+  const [callPhone, setCallPhone] = useState<UserPhoneAssignment | null>(null);
   const [messageType, setMessageType] = useState<string>('general');
-  const [customDescription, setCustomDescription] = useState('');
+  const [contextInput, setContextInput] = useState('');
   const [generatedMessage, setGeneratedMessage] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [loadingPhone, setLoadingPhone] = useState(true);
 
-  // Load user's assigned phone number
+  // Load user's assigned phone number for calls only
   useEffect(() => {
     const loadUserPhone = async () => {
       setLoadingPhone(true);
@@ -71,18 +76,20 @@ export const GuestCommunicationModal = ({
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
 
-        // Get company phone first, then personal
+        // Get Twilio phone for calls
         const { data } = await supabase
           .from('user_phone_assignments')
           .select('phone_number, display_name, phone_type')
           .eq('user_id', user.id)
           .eq('is_active', true)
-          .order('phone_type', { ascending: true }); // 'company' comes before 'personal'
+          .order('phone_type', { ascending: true });
 
         if (data && data.length > 0) {
-          // Prefer company phone
-          const companyPhone = data.find(p => p.phone_type === 'company');
-          setUserPhone(companyPhone || data[0]);
+          // Find Twilio phone (personal type or the 404-924 number)
+          const twilioPhone = data.find(p => 
+            p.phone_number.includes('4049241') || p.phone_type === 'personal'
+          );
+          setCallPhone(twilioPhone || data[0]);
         }
       } catch (error) {
         console.error('Error loading user phone:', error);
@@ -95,7 +102,7 @@ export const GuestCommunicationModal = ({
       loadUserPhone();
       setGeneratedMessage('');
       setMessageType('general');
-      setCustomDescription('');
+      setContextInput('');
     }
   }, [open]);
 
@@ -112,6 +119,10 @@ export const GuestCommunicationModal = ({
 
   const handleGenerateMessage = async () => {
     if (!guest) return;
+    if (!contextInput.trim()) {
+      toast.error('Please enter what you want to say');
+      return;
+    }
 
     setIsGenerating(true);
     try {
@@ -123,7 +134,7 @@ export const GuestCommunicationModal = ({
           startDate: guest.startDate,
           endDate: guest.endDate,
           messageType,
-          customDescription: messageType === 'custom' ? customDescription : undefined,
+          customDescription: contextInput, // Always use the context input
           tone: 'friendly',
         },
       });
@@ -139,7 +150,7 @@ export const GuestCommunicationModal = ({
   };
 
   const handleSendMessage = async () => {
-    if (!guest || !generatedMessage || !userPhone) return;
+    if (!guest || !generatedMessage) return;
 
     setIsSending(true);
     try {
@@ -147,7 +158,7 @@ export const GuestCommunicationModal = ({
         body: {
           phone: guest.phone,
           message: generatedMessage,
-          fromNumber: userPhone.phone_number,
+          fromNumber: smsPhone, // Always use GHL 404-800 number for SMS
         },
       });
 
@@ -196,11 +207,11 @@ export const GuestCommunicationModal = ({
               <p className="text-lg font-medium mb-2">
                 {formatPhoneDisplay(guest.phone)}
               </p>
-              {userPhone && (
+              {callPhone && (
                 <p className="text-sm text-muted-foreground">
-                  Calling from: {formatPhoneDisplay(userPhone.phone_number)}
+                  Calling from: {formatPhoneDisplay(callPhone.phone_number)}
                   <Badge variant="outline" className="ml-2 text-xs">
-                    {userPhone.display_name}
+                    Twilio
                   </Badge>
                 </p>
               )}
@@ -216,28 +227,22 @@ export const GuestCommunicationModal = ({
           </div>
         ) : (
           <div className="space-y-4">
-            {/* From Number */}
+            {/* From Number - Always GHL for SMS */}
             <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg">
               <span className="text-sm text-muted-foreground">Sending from:</span>
-              {loadingPhone ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : userPhone ? (
-                <div className="flex items-center gap-2">
-                  <span className="font-medium">
-                    {formatPhoneDisplay(userPhone.phone_number)}
-                  </span>
-                  <Badge variant="secondary" className="text-xs">
-                    {userPhone.display_name}
-                  </Badge>
-                </div>
-              ) : (
-                <span className="text-destructive">No phone assigned</span>
-              )}
+              <div className="flex items-center gap-2">
+                <span className="font-medium">
+                  {formatPhoneDisplay(smsPhone)}
+                </span>
+                <Badge variant="secondary" className="text-xs">
+                  GHL SMS
+                </Badge>
+              </div>
             </div>
 
             {/* Quick Actions */}
             <div className="space-y-2">
-              <Label>Quick Actions</Label>
+              <Label>Message Type</Label>
               <div className="flex flex-wrap gap-2">
                 {MESSAGE_TYPES.map((type) => (
                   <Button
@@ -254,23 +259,24 @@ export const GuestCommunicationModal = ({
               </div>
             </div>
 
-            {/* Custom Description (when custom is selected) */}
-            {messageType === 'custom' && (
-              <div className="space-y-2">
-                <Label>What would you like to say?</Label>
-                <Textarea
-                  value={customDescription}
-                  onChange={(e) => setCustomDescription(e.target.value)}
-                  placeholder={`Describe what you want to tell ${firstName}...`}
-                  rows={2}
-                />
-              </div>
-            )}
+            {/* Context Input - Always visible */}
+            <div className="space-y-2">
+              <Label>What do you want to say?</Label>
+              <Textarea
+                value={contextInput}
+                onChange={(e) => setContextInput(e.target.value)}
+                placeholder={`Enter your message idea and AI will refine it for ${firstName}...`}
+                rows={3}
+              />
+              <p className="text-xs text-muted-foreground">
+                The AI will refine your message with a warm, professional tone
+              </p>
+            </div>
 
             {/* Generate Button */}
             <Button
               onClick={handleGenerateMessage}
-              disabled={isGenerating || (messageType === 'custom' && !customDescription)}
+              disabled={isGenerating || !contextInput.trim()}
               variant="outline"
               className="w-full gap-2"
             >
@@ -279,7 +285,7 @@ export const GuestCommunicationModal = ({
               ) : (
                 <Sparkles className="w-4 h-4" />
               )}
-              {isGenerating ? 'Generating...' : 'Generate with AI'}
+              {isGenerating ? 'Refining with AI...' : 'Refine with AI'}
             </Button>
 
             {/* Generated Message */}
@@ -321,7 +327,7 @@ export const GuestCommunicationModal = ({
             </Button>
             <Button
               onClick={handleSendMessage}
-              disabled={!generatedMessage || isSending || !userPhone}
+              disabled={!generatedMessage || isSending}
               className="gap-2 bg-green-600 hover:bg-green-700"
             >
               {isSending ? (
