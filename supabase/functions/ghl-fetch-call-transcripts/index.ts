@@ -184,38 +184,20 @@ serve(async (req) => {
             matchedEmail = matchingLeads[0].email;
             console.log(`Matched call ${call.id} to lead: ${matchedName}`);
           } else {
-            // Create a new lead for unknown callers to ensure all calls are captured
-            console.log(`No match found for phone: ${phoneNumber} - creating new lead`);
+            // No match found - store as unmatched call (don't auto-create leads)
+            console.log(`No match found for phone: ${phoneNumber} - storing as unmatched call`);
             
-            // Extract name from transcript if available
-            let callerName = `Unknown Caller (${phoneNumber})`;
+            // Try to extract name from transcript for display purposes only
             if (call.transcript) {
               const extractedName = extractCallerNameFromTranscript(call.transcript);
               if (extractedName) {
-                callerName = extractedName;
+                matchedName = extractedName;
                 console.log(`Extracted caller name from transcript: ${extractedName}`);
               }
             }
             
-            const { data: newLead, error: leadError } = await supabase
-              .from("leads")
-              .insert({
-                name: callerName,
-                phone: phoneNumber,
-                opportunity_source: "ghl_call_sync",
-                stage: "new_lead",
-              })
-              .select()
-              .single();
-
-            if (newLead && !leadError) {
-              leadId = newLead.id;
-              matchedName = newLead.name;
-              console.log(`Created new lead ${newLead.id} for call ${call.id}`);
-            } else {
-              console.error(`Failed to create lead for call ${call.id}:`, leadError);
-              continue;
-            }
+            // Leave leadId and ownerId as null - this is an unmatched call
+            // It will still be stored in lead_communications for manual review
           }
         }
       } else {
