@@ -653,11 +653,10 @@ export function InboxView() {
         
         if (error) throw error;
         return (data || []).map(comm => {
-          // Handle placeholder SMS body text
-          let body = comm.body || "(No content)";
-          if (body === "SMS message" || body.trim().length === 0) {
-            body = comm.direction === "inbound" ? "(Received message)" : "(Sent message)";
-          }
+          // Only use placeholder if body is truly empty or the exact placeholder text
+          const body = (!comm.body || comm.body.trim().length === 0 || comm.body === "SMS message")
+            ? (comm.direction === "inbound" ? "(Received message)" : "(Sent message)")
+            : comm.body;
           return {
             id: comm.id,
             type: comm.communication_type,
@@ -679,11 +678,10 @@ export function InboxView() {
         
         if (error) throw error;
         return (data || []).map(comm => {
-          // Handle placeholder SMS body text
-          let body = comm.body || "(No content)";
-          if (body === "SMS message" || body.trim().length === 0) {
-            body = comm.direction === "inbound" ? "(Received message)" : "(Sent message)";
-          }
+          // Only use placeholder if body is truly empty or the exact placeholder text
+          const body = (!comm.body || comm.body.trim().length === 0 || comm.body === "SMS message")
+            ? (comm.direction === "inbound" ? "(Received message)" : "(Sent message)")
+            : comm.body;
           return {
             id: comm.id,
             type: comm.communication_type,
