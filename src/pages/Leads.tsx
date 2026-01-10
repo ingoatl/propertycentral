@@ -124,17 +124,17 @@ const Leads = () => {
 
   return (
     <div className="space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+      {/* Header - stacks on mobile */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Leads Pipeline</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Leads Pipeline</h1>
+          <p className="text-sm sm:text-base text-muted-foreground">
             Manage your sales pipeline from inquiry to ops handoff
           </p>
         </div>
         <div className="flex gap-2">
           <VoiceDialer />
-          <Button onClick={() => setIsCreateOpen(true)}>
+          <Button onClick={() => setIsCreateOpen(true)} className="flex-1 sm:flex-none">
             <Plus className="h-4 w-4 mr-2" />
             Add Lead
           </Button>
@@ -146,12 +146,14 @@ const Leads = () => {
 
       {/* Search, Filters, and View Toggle */}
       <div className="flex flex-col gap-3">
-        <div className="flex items-center gap-4">
-          <div className="relative flex-1 max-w-sm">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4">
+          {/* Search - full width on mobile */}
+          <div className="relative w-full sm:flex-1 sm:max-w-sm">
             <Input
               placeholder="Search leads..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full"
             />
           </div>
 
@@ -186,7 +188,7 @@ const Leads = () => {
           )}
         </div>
 
-        {/* Quick Filters */}
+        {/* Quick Filters - scrollable on mobile */}
         <LeadQuickFilters
           activeFilters={activeFilters}
           onFilterChange={setActiveFilters}
