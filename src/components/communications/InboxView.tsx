@@ -652,13 +652,20 @@ export function InboxView() {
           .order("created_at", { ascending: true });
         
         if (error) throw error;
-        return (data || []).map(comm => ({
-          id: comm.id,
-          type: comm.communication_type,
-          direction: comm.direction,
-          body: comm.body || "(No content)",
-          created_at: comm.created_at,
-        }));
+        return (data || []).map(comm => {
+          // Handle placeholder SMS body text
+          let body = comm.body || "(No content)";
+          if (body === "SMS message" || body.trim().length === 0) {
+            body = comm.direction === "inbound" ? "(Received message)" : "(Sent message)";
+          }
+          return {
+            id: comm.id,
+            type: comm.communication_type,
+            direction: comm.direction,
+            body,
+            created_at: comm.created_at,
+          };
+        });
       }
       
       // For owners, fetch all communications for the same owner_id
@@ -671,13 +678,20 @@ export function InboxView() {
           .order("created_at", { ascending: true });
         
         if (error) throw error;
-        return (data || []).map(comm => ({
-          id: comm.id,
-          type: comm.communication_type,
-          direction: comm.direction,
-          body: comm.body || "(No content)",
-          created_at: comm.created_at,
-        }));
+        return (data || []).map(comm => {
+          // Handle placeholder SMS body text
+          let body = comm.body || "(No content)";
+          if (body === "SMS message" || body.trim().length === 0) {
+            body = comm.direction === "inbound" ? "(Received message)" : "(Sent message)";
+          }
+          return {
+            id: comm.id,
+            type: comm.communication_type,
+            direction: comm.direction,
+            body,
+            created_at: comm.created_at,
+          };
+        });
       }
       
       // For personal SMS, fetch by phone number
