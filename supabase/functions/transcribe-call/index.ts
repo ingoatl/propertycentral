@@ -147,6 +147,24 @@ function getRecommendedStage(insights: any, currentStage: string, callDuration: 
   return null;
 }
 
+// Retry helper for transient failures
+async function withRetry<T>(fn: () => Promise<T>, retries = 3, delay = 1000): Promise<T> {
+  let lastError: Error | null = null;
+  for (let i = 0; i < retries; i++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      console.log(`Attempt ${i + 1} failed: ${lastError.message}. Retrying in ${delay}ms...`);
+      if (i < retries - 1) {
+        await new Promise(resolve => setTimeout(resolve, delay));
+        delay *= 2; // Exponential backoff
+      }
+    }
+  }
+  throw lastError;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -186,7 +204,8 @@ serve(async (req) => {
     // Try to find lead by phone number first
     let lead = null;
     if (phoneVariants.length > 0) {
-      const phoneConditions = phoneVariants.map(p => `phone.ilike.%${p}%`).join(',');
+      // Build a more comprehensive phone search
+      const phoneConditions = phoneVariants.map(p => `phone.ilike.%${p.slice(-10)}%`).join(',');
       const { data: phoneLead } = await supabase
         .from('leads')
         .select('id, name, property_address, stage, phone')
@@ -199,51 +218,98 @@ serve(async (req) => {
       }
     }
 
-    // Download the recording from Twilio (with authentication)
+    // Download the recording from Twilio (with authentication and retry)
     let audioBlob: Blob;
     try {
-      const twilioAuth = btoa(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`);
-      const recordingResponse = await fetch(recordingUrl, {
-        headers: {
-          'Authorization': `Basic ${twilioAuth}`,
-        },
-      });
+      audioBlob = await withRetry(async () => {
+        const twilioAuth = btoa(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`);
+        const recordingResponse = await fetch(recordingUrl, {
+          headers: {
+            'Authorization': `Basic ${twilioAuth}`,
+          },
+        });
 
-      if (!recordingResponse.ok) {
-        throw new Error(`Failed to download recording: ${recordingResponse.status}`);
-      }
+        if (!recordingResponse.ok) {
+          throw new Error(`Failed to download recording: ${recordingResponse.status}`);
+        }
 
-      audioBlob = await recordingResponse.blob();
+        return await recordingResponse.blob();
+      }, 3, 2000);
+      
       console.log('Downloaded recording:', audioBlob.size, 'bytes');
     } catch (downloadError) {
-      console.error('Error downloading recording:', downloadError);
+      console.error('Error downloading recording after retries:', downloadError);
+      
+      // Log the failed transcription attempt
+      if (lead) {
+        await supabase.from('lead_timeline').insert({
+          lead_id: lead.id,
+          action: 'transcription_failed',
+          metadata: {
+            call_sid: callSid,
+            error: downloadError instanceof Error ? downloadError.message : 'Download failed',
+            recording_url: recordingUrl,
+          },
+        });
+      }
       throw downloadError;
     }
 
-    // Transcribe using OpenAI Whisper
-    const formData = new FormData();
-    formData.append('file', audioBlob, 'recording.mp3');
-    formData.append('model', 'whisper-1');
-    formData.append('response_format', 'verbose_json');
+    // Transcribe using OpenAI Whisper with retry
+    let transcriptText = '';
+    try {
+      const formData = new FormData();
+      formData.append('file', audioBlob, 'recording.mp3');
+      formData.append('model', 'whisper-1');
+      formData.append('response_format', 'verbose_json');
 
-    const transcriptionResponse = await fetch('https://api.openai.com/v1/audio/transcriptions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${OPENAI_API_KEY}`,
-      },
-      body: formData,
-    });
+      const transcriptionResult = await withRetry(async () => {
+        const transcriptionResponse = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${OPENAI_API_KEY}`,
+          },
+          body: formData,
+        });
 
-    if (!transcriptionResponse.ok) {
-      const errorText = await transcriptionResponse.text();
-      console.error('Transcription error:', errorText);
-      throw new Error(`Transcription failed: ${errorText}`);
+        if (!transcriptionResponse.ok) {
+          const errorText = await transcriptionResponse.text();
+          throw new Error(`Transcription failed: ${errorText}`);
+        }
+
+        return await transcriptionResponse.json();
+      }, 3, 2000);
+
+      transcriptText = transcriptionResult.text;
+      console.log('Transcription complete:', transcriptText?.substring(0, 200));
+    } catch (transcriptionError) {
+      console.error('Transcription failed after retries:', transcriptionError);
+      
+      // Still create a communication record with the error
+      if (lead) {
+        await supabase.from('lead_communications').upsert({
+          lead_id: lead.id,
+          communication_type: 'call',
+          direction: 'outbound',
+          body: `[Transcription failed: ${transcriptionError instanceof Error ? transcriptionError.message : 'Unknown error'}]`,
+          external_id: callSid,
+          status: 'transcription_failed',
+          sent_at: new Date().toISOString(),
+        }, { onConflict: 'external_id' });
+
+        await supabase.from('lead_timeline').insert({
+          lead_id: lead.id,
+          action: 'transcription_failed',
+          metadata: {
+            call_sid: callSid,
+            error: transcriptionError instanceof Error ? transcriptionError.message : 'Unknown error',
+            duration: duration,
+          },
+        });
+      }
+      
+      throw transcriptionError;
     }
-
-    const transcriptionResult = await transcriptionResponse.json();
-    const transcriptText = transcriptionResult.text;
-
-    console.log('Transcription complete:', transcriptText?.substring(0, 200));
 
     // Check if transcript is spam/noise - skip AI analysis if so
     if (isSpamOrNoise(transcriptText)) {
@@ -597,8 +663,18 @@ Always provide at least: caller_name (if mentioned), interest_level, sentiment, 
 
       console.log('Updated lead with call transcription and insights:', lead.id);
     } else {
-      // No lead matched - create an unmatched call record in timeline or log
+      // No lead matched - create an unmatched call record for later manual review
       console.log('No matching lead found for call. Creating orphan record.');
+      
+      // Store in user_phone_messages for tracking
+      await supabase.from('user_phone_messages').insert({
+        direction: 'inbound',
+        from_number: fromNumber,
+        to_number: toNumber,
+        body: transcriptText || `Call recording - ${duration}s`,
+        status: 'unmatched',
+        external_id: callSid,
+      });
       
       // Log the unmatched call for review
       console.log('Unmatched call details:', {

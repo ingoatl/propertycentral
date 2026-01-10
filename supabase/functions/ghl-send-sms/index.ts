@@ -34,7 +34,7 @@ serve(async (req) => {
       throw new Error("GHL_API_KEY and GHL_LOCATION_ID are required");
     }
 
-    const { leadId, phone, to, message, fromNumber } = await req.json();
+    const { leadId, ownerId, phone, to, message, fromNumber } = await req.json();
 
     // Accept either 'phone' or 'to' parameter for the recipient
     const recipientPhone = phone || to;
@@ -69,27 +69,39 @@ serve(async (req) => {
     );
 
     let contactId = null;
+    let contactName = "Contact";
 
     if (searchResponse.ok) {
       const searchData = await searchResponse.json();
       if (searchData.contact?.id) {
         contactId = searchData.contact.id;
+        contactName = searchData.contact.name || contactName;
         console.log(`Found existing GHL contact: ${contactId}`);
       }
     }
 
     // If no contact found, create one
     if (!contactId) {
-      // Get lead data if leadId provided
-      let leadData = null;
+      // Get lead or owner data for creating the contact
+      let contactData = null;
+      
       if (leadId) {
         const { data } = await supabase
           .from("leads")
           .select("name, email, phone")
           .eq("id", leadId)
           .single();
-        leadData = data;
+        contactData = data;
+      } else if (ownerId) {
+        const { data } = await supabase
+          .from("property_owners")
+          .select("name, email, phone")
+          .eq("id", ownerId)
+          .single();
+        contactData = data;
       }
+
+      contactName = contactData?.name || "Contact";
 
       const createContactResponse = await fetch(
         `https://services.leadconnectorhq.com/contacts/`,
@@ -103,8 +115,8 @@ serve(async (req) => {
           body: JSON.stringify({
             locationId: ghlLocationId,
             phone: formattedPhone,
-            name: leadData?.name || "Lead",
-            email: leadData?.email || undefined,
+            name: contactName,
+            email: contactData?.email || undefined,
             source: "PropertyCentral",
           }),
         }
@@ -153,7 +165,7 @@ serve(async (req) => {
     const sendData = await sendResponse.json();
     console.log(`SMS sent successfully via GHL. Message ID: ${sendData.messageId}`);
 
-    // Record communication if leadId provided
+    // Record communication for leads
     if (leadId) {
       await supabase.from("lead_communications").insert({
         lead_id: leadId,
@@ -180,6 +192,43 @@ serve(async (req) => {
         },
       });
     }
+
+    // Record communication for owners
+    if (ownerId) {
+      await supabase.from("lead_communications").insert({
+        owner_id: ownerId,
+        communication_type: "sms",
+        direction: "outbound",
+        body: message,
+        status: "sent",
+        external_id: sendData.messageId || sendData.conversationId,
+        metadata: {
+          provider: "gohighlevel",
+          ghl_contact_id: contactId,
+          from_number: formattedFromNumber,
+          to_number: formattedPhone,
+        },
+      });
+    }
+
+    // Also store in user_phone_messages for unified tracking
+    // Get user ID from auth header
+    const authHeader = req.headers.get('Authorization');
+    let userId = null;
+    if (authHeader) {
+      const { data: { user } } = await supabase.auth.getUser(authHeader.replace('Bearer ', ''));
+      userId = user?.id;
+    }
+
+    await supabase.from("user_phone_messages").insert({
+      user_id: userId,
+      direction: "outbound",
+      from_number: formattedFromNumber,
+      to_number: formattedPhone,
+      body: message,
+      status: "sent",
+      external_id: sendData.messageId || sendData.conversationId,
+    });
 
     return new Response(
       JSON.stringify({
