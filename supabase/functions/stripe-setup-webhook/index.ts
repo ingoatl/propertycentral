@@ -207,7 +207,7 @@ async function handleSetupComplete(
       // Admin notification - Fortune 500 style matching owner statements
       try {
         console.log("Sending admin payment confirmation email...");
-        const LOGO_URL = "https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/email-assets/peachhaus-logo.png";
+        const LOGO_URL = "https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/peachhaus-logo.png";
         const notificationId = `PAY-${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}${String(new Date().getDate()).padStart(2, '0')}-${ownerId.slice(0, 8).toUpperCase()}`;
         const issueDate = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
         const issueTime = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
@@ -263,22 +263,32 @@ async function handleSetupComplete(
                     </table>
                   </div>
 
-                  <!-- SUCCESS STATUS - Primary Focus -->
+                  <!-- SUCCESS STATUS - Primary Focus (matching owner statement black style) -->
                   <div style="padding: 24px 32px;">
-                    <table style="width: 100%; border: 2px solid #10b981;">
+                    <table style="width: 100%; border: 2px solid #111111;">
                       <tr>
-                        <td style="padding: 16px 20px; background: #10b981;">
+                        <td style="padding: 16px 20px; background: #111111;">
                           <table style="width: 100%;">
                             <tr>
                               <td style="vertical-align: middle;">
-                                <div style="font-size: 10px; color: #ffffff; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.9;">PAYMENT AUTHORIZATION</div>
-                                <div style="font-size: 10px; color: #ffffff; opacity: 0.7; margin-top: 2px;">Status Update</div>
+                                <div style="font-size: 10px; color: #ffffff; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.8;">PAYMENT AUTHORIZATION</div>
+                                <div style="font-size: 10px; color: #ffffff; opacity: 0.6; margin-top: 2px;">Status Update</div>
                               </td>
                               <td style="text-align: right; vertical-align: middle;">
                                 <div style="font-size: 24px; font-weight: 700; color: #ffffff; font-family: 'SF Mono', Menlo, Consolas, 'Courier New', monospace;">
                                   ✓ COMPLETE
                                 </div>
                               </td>
+                            </tr>
+                          </table>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 12px 20px; background: #f9f9f9;">
+                          <table style="width: 100%;">
+                            <tr>
+                              <td style="font-size: 11px; color: #666666;">Owner</td>
+                              <td style="font-size: 13px; font-weight: 600; color: #111111; text-align: right;">${owner.name}</td>
                             </tr>
                           </table>
                         </td>
@@ -304,19 +314,19 @@ async function handleSetupComplete(
                         <td style="padding: 12px 0; font-size: 13px; color: #111111; border-bottom: 1px solid #e5e5e5;">Stripe Customer ID</td>
                         <td style="padding: 12px 0; font-size: 11px; color: #666666; text-align: right; font-family: 'SF Mono', Menlo, Consolas, 'Courier New', monospace; border-bottom: 1px solid #e5e5e5;">${session.customer}</td>
                       </tr>
-                      <tr style="background: #f0fdf4;">
-                        <td style="padding: 12px 0; font-size: 13px; font-weight: 600; color: #166534;">Billing Status</td>
-                        <td style="padding: 12px 0; font-size: 13px; color: #166534; text-align: right; font-weight: 600;">Ready for Charges</td>
+                      <tr style="background: #f9f9f9;">
+                        <td style="padding: 12px 0; font-size: 13px; font-weight: 600; color: #111111;">Billing Status</td>
+                        <td style="padding: 12px 0; font-size: 13px; color: #111111; text-align: right; font-weight: 600;">Ready for Charges</td>
                       </tr>
                     </table>
                   </div>
 
                   <!-- Action Note -->
                   <div style="padding: 0 32px 24px 32px;">
-                    <div style="background: #f0fdf4; border-left: 3px solid #10b981; padding: 16px;">
-                      <p style="font-size: 13px; color: #166534; margin: 0; line-height: 1.6;">
+                    <div style="background: #f9f9f9; border-left: 3px solid #111111; padding: 16px;">
+                      <p style="font-size: 13px; color: #111111; margin: 0; line-height: 1.6;">
                         <strong>✓ This owner can now be charged from the Reconciliation Panel.</strong><br>
-                        <span style="font-size: 12px; color: #15803d;">Monthly management fees and expenses can be processed via Stripe without re-authorization.</span>
+                        <span style="font-size: 12px; color: #666666;">Monthly management fees and expenses can be processed via Stripe without re-authorization.</span>
                       </p>
                     </div>
                   </div>
@@ -324,7 +334,7 @@ async function handleSetupComplete(
                   <!-- Footer -->
                   <div style="padding: 20px 32px; border-top: 1px solid #e5e5e5; background: #f9f9f9;">
                     <p style="font-size: 11px; color: #666666; margin: 0; text-align: center;">
-                      PeachHaus Property Management • Atlanta, GA<br>
+                      PeachHaus Property Management • (404) 800-5932 • Atlanta, GA<br>
                       <span style="color: #999999;">This is an automated notification from the payment system.</span>
                     </p>
                   </div>
@@ -380,7 +390,7 @@ async function handleSetupComplete(
                 <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 25px 0;">
                 
                 <p style="color: #64748b; font-size: 14px; line-height: 1.6;">
-                  Questions? Reply to this email or call us at <a href="tel:+14049873388" style="color: #10b981; text-decoration: none;">(404) 987-3388</a>.
+                  Questions? Reply to this email or call us at <a href="tel:+14048005932" style="color: #10b981; text-decoration: none;">(404) 800-5932</a>.
                 </p>
                 
                 <p style="color: #4a5568; margin-top: 25px;">

@@ -95,7 +95,7 @@ function getEmailTemplates(firstName: string, name: string, setupUrl: string) {
       </div>
       
       <p style="color: #64748b; font-size: 14px; line-height: 1.6;">
-        Questions? Just reply to this email or call us at (404) 987-3388.
+        Questions? Just reply to this email or call us at (404) 800-5932.
       </p>
     </div>
     
@@ -143,7 +143,7 @@ function getEmailTemplates(firstName: string, name: string, setupUrl: string) {
       </div>
       
       <p style="color: #64748b; font-size: 14px; line-height: 1.6;">
-        Need help? We're just a call away at (404) 987-3388.
+        Need help? We're just a call away at (404) 800-5932.
       </p>
     </div>
     
@@ -187,7 +187,7 @@ function getEmailTemplates(firstName: string, name: string, setupUrl: string) {
       </div>
       
       <p style="color: #64748b; font-size: 14px; line-height: 1.6;">
-        If you're having any issues or have questions, please reply to this email or call us at (404) 987-3388. We're here to help!
+        If you're having any issues or have questions, please reply to this email or call us at (404) 800-5932. We're here to help!
       </p>
     </div>
     

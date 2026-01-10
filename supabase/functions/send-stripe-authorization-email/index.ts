@@ -167,7 +167,7 @@ serve(async (req) => {
       <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 30px 0;">
       
       <p style="color: #64748b; font-size: 14px; line-height: 1.6;">
-        <strong>Questions?</strong> Just reply to this email or call us at <a href="tel:+14049873388" style="color: #10b981; text-decoration: none;">(404) 987-3388</a>.
+        <strong>Questions?</strong> Just reply to this email or call us at <a href="tel:+14048005932" style="color: #10b981; text-decoration: none;">(404) 800-5932</a>.
       </p>
       
       <p style="color: #a0aec0; font-size: 12px; margin-top: 20px;">
