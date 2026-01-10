@@ -544,13 +544,66 @@ export function InboxView() {
 
         const { data: personalMessages } = await messagesQuery;
         if (personalMessages) {
+          // Get all unique phone numbers to look up contacts
+          const uniquePhones = new Set<string>();
+          personalMessages.forEach(msg => {
+            const phone = msg.direction === "inbound" ? msg.from_number : msg.to_number;
+            if (phone) uniquePhones.add(phone);
+          });
+          
+          // Lookup leads and owners by phone numbers
+          const phoneContactMap: Record<string, { name: string; type: 'lead' | 'owner'; id: string; email?: string | null }> = {};
+          
+          if (uniquePhones.size > 0) {
+            const phoneArray = Array.from(uniquePhones);
+            
+            // Lookup leads
+            const { data: matchedLeads } = await supabase
+              .from("leads")
+              .select("id, name, phone, email")
+              .in("phone", phoneArray);
+            
+            if (matchedLeads) {
+              matchedLeads.forEach(lead => {
+                if (lead.phone) {
+                  phoneContactMap[lead.phone] = { name: lead.name, type: 'lead', id: lead.id, email: lead.email };
+                }
+              });
+            }
+            
+            // Lookup owners
+            const { data: matchedOwners } = await supabase
+              .from("property_owners")
+              .select("id, name, phone, email")
+              .in("phone", phoneArray);
+            
+            if (matchedOwners) {
+              matchedOwners.forEach(owner => {
+                if (owner.phone && !phoneContactMap[owner.phone]) {
+                  phoneContactMap[owner.phone] = { name: owner.name, type: 'owner', id: owner.id, email: owner.email };
+                }
+              });
+            }
+          }
+          
           for (const msg of personalMessages) {
             const contactNumber = msg.direction === "inbound" ? msg.from_number : msg.to_number;
+            const matchedContact = contactNumber ? phoneContactMap[contactNumber] : null;
+            
             const item: CommunicationItem = {
-              id: msg.id, type: "personal_sms", direction: msg.direction as "inbound" | "outbound",
-              body: msg.body || "", created_at: msg.created_at, contact_name: contactNumber,
-              contact_phone: contactNumber, contact_type: "personal", contact_id: msg.id,
-              status: msg.status || undefined, is_resolved: msg.is_resolved || false,
+              id: msg.id, 
+              type: "personal_sms", 
+              direction: msg.direction as "inbound" | "outbound",
+              body: msg.body || "", 
+              created_at: msg.created_at, 
+              contact_name: matchedContact?.name || contactNumber || "Unknown",
+              contact_phone: contactNumber || undefined, 
+              contact_email: matchedContact?.email || undefined,
+              contact_type: matchedContact ? matchedContact.type : "personal", 
+              contact_id: matchedContact ? matchedContact.id : msg.id,
+              status: msg.status || undefined, 
+              is_resolved: msg.is_resolved || false,
+              owner_id: matchedContact?.type === 'owner' ? matchedContact.id : undefined,
             };
             if (search && !item.contact_name.toLowerCase().includes(search.toLowerCase()) && !item.body.toLowerCase().includes(search.toLowerCase())) continue;
             results.push(item);
@@ -755,22 +808,72 @@ export function InboxView() {
         });
       }
       
-      // For personal SMS, fetch by phone number
-      if (selectedMessage.contact_type === "personal" && selectedMessage.contact_phone) {
-        const { data, error } = await supabase
+      // For personal SMS, fetch by phone number - also check lead_communications
+      if (selectedMessage.contact_phone) {
+        const phone = selectedMessage.contact_phone;
+        
+        // Fetch from user_phone_messages
+        const { data: userMsgs, error: userMsgsError } = await supabase
           .from("user_phone_messages")
           .select("id, direction, body, created_at")
-          .or(`from_number.eq.${selectedMessage.contact_phone},to_number.eq.${selectedMessage.contact_phone}`)
+          .or(`from_number.eq.${phone},to_number.eq.${phone}`)
           .order("created_at", { ascending: true });
         
-        if (error) throw error;
-        return (data || []).map(msg => ({
-          id: msg.id,
-          type: "sms",
-          direction: msg.direction,
-          body: msg.body || "(No content)",
-          created_at: msg.created_at,
-        }));
+        // If this was matched to a lead, also fetch lead_communications
+        let leadMsgs: typeof userMsgs = [];
+        if (selectedMessage.contact_type === "lead" && selectedMessage.contact_id) {
+          const { data: leadCommsData } = await supabase
+            .from("lead_communications")
+            .select("id, communication_type, direction, body, created_at")
+            .eq("lead_id", selectedMessage.contact_id)
+            .in("communication_type", ["sms", "call"])
+            .order("created_at", { ascending: true });
+          
+          if (leadCommsData) {
+            leadMsgs = leadCommsData.map(c => ({
+              id: c.id,
+              direction: c.direction,
+              body: c.body,
+              created_at: c.created_at,
+              type: c.communication_type,
+            }));
+          }
+        }
+        
+        // Combine and deduplicate by timestamp (within 5 seconds) and body content
+        const allMsgs = [
+          ...(userMsgs || []).map(msg => ({
+            id: msg.id,
+            type: "sms" as const,
+            direction: msg.direction,
+            body: msg.body || "(No content)",
+            created_at: msg.created_at,
+          })),
+          ...leadMsgs.map(msg => ({
+            id: msg.id,
+            type: "sms" as const,
+            direction: msg.direction,
+            body: msg.body || "(No content)",
+            created_at: msg.created_at,
+          })),
+        ];
+        
+        // Sort by timestamp
+        allMsgs.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+        
+        // Deduplicate messages that are within 5 seconds and have the same body
+        const deduped: typeof allMsgs = [];
+        for (const msg of allMsgs) {
+          const isDuplicate = deduped.some(existing => {
+            const timeDiff = Math.abs(new Date(existing.created_at).getTime() - new Date(msg.created_at).getTime());
+            return timeDiff < 5000 && existing.body === msg.body && existing.direction === msg.direction;
+          });
+          if (!isDuplicate) {
+            deduped.push(msg);
+          }
+        }
+        
+        return deduped;
       }
       
       // Fallback: just show the selected message

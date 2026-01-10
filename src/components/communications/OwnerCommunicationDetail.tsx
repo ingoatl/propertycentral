@@ -150,7 +150,7 @@ export function OwnerCommunicationDetail({
 
   return (
     <ResponsiveModal open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <ResponsiveModalContent className="max-w-2xl h-[90vh] flex flex-col">
+      <ResponsiveModalContent className="max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
         <ResponsiveModalHeader className="border-b pb-4">
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-3">
@@ -207,7 +207,8 @@ export function OwnerCommunicationDetail({
         </ResponsiveModalHeader>
 
         {/* Communication List */}
-        <ScrollArea className="flex-1 p-4">
+        <ScrollArea className="flex-1 min-h-0 overflow-y-auto">
+          <div className="p-4">
           {isLoading ? (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -272,6 +273,7 @@ export function OwnerCommunicationDetail({
                 ))}
             </div>
           )}
+          </div>
         </ScrollArea>
 
         {/* Quick Reply */}
