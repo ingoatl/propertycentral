@@ -69,14 +69,14 @@ export function ResponsiveModalContent({ children, className }: ResponsiveModalC
 
   if (isMobile) {
     return (
-      <DrawerContent className={cn("max-h-[95vh] flex flex-col", className)}>
+      <DrawerContent className={cn("max-h-[95vh] flex flex-col overflow-hidden", className)}>
         {children}
       </DrawerContent>
     );
   }
 
   return (
-    <DialogContent className={cn("max-h-[90vh] flex flex-col", className)}>
+    <DialogContent className={cn("max-h-[90vh] flex flex-col overflow-hidden", className)}>
       {children}
     </DialogContent>
   );
