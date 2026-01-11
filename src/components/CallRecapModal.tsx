@@ -999,6 +999,7 @@ export function CallRecapModal() {
                       </div>
                     )}
                     <RecapEditor
+                      key={currentRecap.id}
                       recap={currentRecap}
                       onSend={handleSend}
                       onDismiss={handleDismiss}
