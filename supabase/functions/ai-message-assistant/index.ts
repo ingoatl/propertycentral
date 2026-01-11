@@ -27,10 +27,17 @@ FOR SMS:
 - Casual but professional
 `;
 
-// Company knowledge base
+// Scheduling link for discovery calls
+const SCHEDULING_LINK = "https://propertycentral.lovable.app/book-discovery-call";
+
+// Company knowledge base with psychology-informed communication guidance
 const companyKnowledge = `
 COMPANY: PeachHaus Group
 BUSINESS: Mid-term rental property management in Atlanta, GA
+
+SCHEDULING LINK: ${SCHEDULING_LINK}
+- ALWAYS include this link when suggesting a call or deeper conversation
+- Present it as a convenience, not a sales tactic
 
 KEY SERVICES:
 - Mid-term rental management (30+ day stays)
@@ -49,11 +56,26 @@ CONTACT INFO:
 - Email: info@peachhausgroup.com
 - Office hours: Monday-Friday 9am-6pm EST
 
-BRAND VOICE:
-- Professional but warm
-- Responsive and proactive
-- Solution-oriented
-- Transparent about policies
+BRAND VOICE & PSYCHOLOGY PRINCIPLES:
+1. RECIPROCITY: Always lead with value (insights, tips) before asking
+2. SOCIAL PROOF: Reference "many Atlanta property owners" when relevant
+3. LIKING: Use their name, acknowledge their specific situation
+4. AUTHORITY: Position PeachHaus as trusted experts, not salespeople
+5. COMMITMENT: Reference their interest to reinforce engagement
+
+TONE GUIDELINES (based on communication psychology):
+- Sound like a trusted advisor helping them, not selling to them
+- Acknowledge emotions - if they sounded stressed or excited, reflect that
+- Use "we" and "together" to create partnership feeling
+- Be specific - vague messages feel impersonal
+- End with clarity - they should know exactly what to do next
+
+AFTER SOMEONE CALLS IN:
+- Thank them for reaching out (reciprocity)
+- Acknowledge what they're interested in (active listening)
+- If they need to speak with someone, invite them to schedule: ${SCHEDULING_LINK}
+- If it sounded urgent, offer to have someone call back quickly
+- Make them feel their inquiry is valued and will be handled
 
 COMMON TOPICS:
 - Move-in/move-out procedures
@@ -201,21 +223,30 @@ CRITICAL INSTRUCTIONS:
 
     switch (action) {
       case "generate_contextual_reply":
-        userPrompt = `Based on the full conversation history above, generate a contextual SMS reply.
+        userPrompt = `Based on the full conversation history above, generate a warm, professional SMS reply.
 
-IMPORTANT: 
-- Look at what the contact LAST said and respond directly to that
-- If they asked something, answer it
-- If they mentioned something specific, acknowledge it
-- Be natural and conversational
+PSYCHOLOGY-INFORMED APPROACH:
+1. If they CALLED in: Thank them, acknowledge their interest, and invite them to schedule a proper discovery call: ${SCHEDULING_LINK}
+2. If they seem interested: Make them feel valued, provide a clear next step
+3. If they have questions: Answer directly, then offer to discuss more in a call
+4. If it seems urgent: Acknowledge urgency, offer quick callback option OR the scheduling link
 
-Generate ONLY the reply text, nothing else.`;
+RESPONSE FRAMEWORK:
+- Warmth first (acknowledge them as a person)
+- Address their specific need/interest
+- Provide value or answer
+- Clear call-to-action (schedule link when appropriate)
+- Sign off: "- PeachHaus"
+
+Keep under 280 characters for SMS. Generate ONLY the reply text.`;
         break;
 
       case "generate":
-        userPrompt = `Generate a professional ${messageType === "sms" ? "SMS" : "email"} reply based on the conversation context.
-${currentMessage ? `Current draft to improve: "${currentMessage}"` : "Create an appropriate response based on the context."}
-Be helpful, specific, and natural-sounding.`;
+        userPrompt = `Generate a professional ${messageType === "sms" ? "SMS" : "email"} reply.
+${currentMessage ? `Current draft: "${currentMessage}"` : "Create an appropriate response."}
+
+Include scheduling link when suggesting a call: ${SCHEDULING_LINK}
+Be warm, specific, and action-oriented. Make them feel valued.`;
         break;
 
       case "improve":

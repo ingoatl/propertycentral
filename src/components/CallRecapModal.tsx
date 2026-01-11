@@ -196,29 +196,32 @@ function RecapEditor({
     recap.owner_id
   );
   
+  const SCHEDULING_LINK = "https://propertycentral.lovable.app/book-discovery-call";
+  
   // Generate smart SMS based on conversation history + call transcript
   const generateSmsFromContext = useMemo(() => {
     const topics = recap.key_topics?.slice(0, 2).join(' and ') || 'your property';
     const summary = recap.transcript_summary?.slice(0, 80) || '';
+    const firstName = recap.recipient_name?.split(' ')[0] || '';
     
     // Check if there are pending requests from previous conversations
     if (conversationContext?.hasAskedForInfo) {
-      // Reference what we asked for
-      return `${greeting} just following up on our conversation. Please let me know if you had a chance to gather that information. Happy to help with any questions! - PeachHaus`;
+      return `${greeting} wanted to check in - did you have a chance to get that info together? No rush at all. If you'd like to hop on a quick call, here's my calendar: ${SCHEDULING_LINK} - PeachHaus`;
     }
     
     // Check last message context
     if (conversationContext?.lastMessage?.body && conversationContext.lastMessage.direction === "inbound") {
       const lastMsg = conversationContext.lastMessage.body.toLowerCase();
       if (lastMsg.includes("address") || lastMsg.includes("income") || lastMsg.includes("report")) {
-        return `${greeting} got your message! I'll get that information over to you shortly. Is there anything else you need? - PeachHaus`;
+        return `${greeting} got your message! I'll pull that together and send it over. Happy to chat through anything - schedule a call here if easier: ${SCHEDULING_LINK} - PeachHaus`;
       }
     }
     
+    // After a call - suggest scheduling a proper discovery call if they seem interested
     if (summary) {
-      return `${greeting} following up on our call about ${topics}. ${summary.includes('next steps') ? '' : 'Let me know if you have any questions!'} - PeachHaus`;
+      return `${greeting} great chatting with you about ${topics}! If you'd like to discuss in more detail, pick a time here: ${SCHEDULING_LINK} - PeachHaus`;
     }
-    return `${greeting} thanks for your call about ${topics}. Let me know if you need anything else! - PeachHaus`;
+    return `${greeting} thanks for calling about ${topics}! If it's urgent, let us know and we'll get right back to you. Or schedule time to chat: ${SCHEDULING_LINK} - PeachHaus`;
   }, [greeting, recap.key_topics, recap.transcript_summary, conversationContext]);
   
   const [smsMessage, setSmsMessage] = useState(generateSmsFromContext);
@@ -239,28 +242,44 @@ function RecapEditor({
       const pendingReqs = conversationContext?.pendingRequests || [];
       const lastAsk = conversationContext?.lastOutboundAsk || "";
       
-      const prompt = `Generate a warm, professional follow-up SMS for a property management company. 
+      const prompt = `Generate a warm, professional follow-up SMS for PeachHaus Group (property management company).
 
 CONTACT INFO:
-- Contact name: ${recap.recipient_name || "property owner"} (use their first name)
-- This is about: ${recap.key_topics?.join(", ") || "property management"}
+- Contact name: ${recap.recipient_name || "property owner"} (use their first name: ${recap.recipient_name?.split(' ')[0] || 'there'})
+- Topics discussed: ${recap.key_topics?.join(", ") || "property management"}
 - Call summary: ${recap.transcript_summary || "General inquiry call"}
 
-COMPLETE CONVERSATION HISTORY (MOST IMPORTANT - read every message):
-${contextForAI || "No previous messages"}
+CONVERSATION HISTORY:
+${contextForAI || "This was their first contact with us - they called in"}
 
-${pendingReqs.length > 0 ? `\n⚠️ WE ARE WAITING FOR THEM TO SEND: ${pendingReqs.join(", ")}. MUST reference this in your message!` : ""}
-${lastAsk ? `\nOur last outbound message asked: "${lastAsk.slice(0, 300)}"` : ""}
+${pendingReqs.length > 0 ? `\n⚠️ PENDING INFO FROM THEM: ${pendingReqs.join(", ")}. Reference this naturally.` : ""}
+${lastAsk ? `\nOur last question: "${lastAsk.slice(0, 200)}"` : ""}
 
-CRITICAL RULES:
-1. If we asked them for something (address, documents, info), DIRECTLY reference it! Say "Did you have a chance to get that address to me?" or similar
-2. Be specific - don't be vague. Reference actual details from the conversation
-3. Be warm and conversational - not corporate
-4. Keep under 160 characters for SMS
-5. End with a clear question or next step
-6. Sign off with "- PeachHaus"
+SCHEDULING LINK (USE THIS): https://propertycentral.lovable.app/book-discovery-call
 
-Generate ONLY the SMS text, nothing else.`;
+PSYCHOLOGY-BASED COMMUNICATION RULES:
+1. RECIPROCITY: Offer value first (tip, insight, helpful info) before asking
+2. SOCIAL PROOF: Reference that "many property owners in Atlanta" or similar
+3. SCARCITY: If relevant, mention limited availability without being pushy
+4. LIKING: Be genuinely warm - use their name, acknowledge their specific situation
+5. COMMITMENT: Reference their interest to reinforce their engagement
+
+MESSAGE STRUCTURE:
+- Start with warmth (great chatting, appreciate you calling)
+- Acknowledge their specific interest or need
+- Provide a clear, low-pressure next step
+- Include scheduling link for a discovery call
+- If they sounded urgent, acknowledge that and offer faster callback option
+
+TONE:
+- Sound like a trusted advisor, not a salesperson
+- Be concise but not cold
+- Make them feel valued and understood
+- Avoid corporate speak - write like a friendly professional
+
+Keep under 280 characters. Sign off with "- PeachHaus"
+
+Generate ONLY the SMS text.`;
 
       const { data, error } = await supabase.functions.invoke("ai-assistant", {
         body: { prompt, type: "generate_followup" }
