@@ -163,6 +163,24 @@ IMPORTANT FOR EMAIL:
 - Use "${greeting}" as the greeting - NEVER say "Hi Unknown" or "Hi Unknown Caller"
 - If the name appears to be unknown/invalid, just use "Hi," without a name
 
+CRITICAL FOR TASK EXTRACTION:
+Look for these types of action items and ALWAYS create tasks for them:
+1. **Discovery Call / Meeting Scheduling**: If the caller expresses interest in learning more, wants to discuss property management, mentions scheduling a call, or says things like:
+   - "I'd like to learn more"
+   - "Can we schedule a call?"
+   - "I want to discuss my property"
+   - "Let's talk about management"
+   - "I'm interested in your services"
+   Create a task with category "Scheduling" and title like "Schedule discovery call with [name]"
+
+2. **Property Information Requests**: If they mention wanting an income report, analysis, or property evaluation
+
+3. **Document Requests**: If they need contracts, agreements, or documentation
+
+4. **Follow-up Actions**: Any promises made during the call that need follow-through
+
+5. **Maintenance/Service Requests**: Any property issues or service requests mentioned
+
 Return a JSON object with this structure:
 {
   "key_topics": ["topic1", "topic2", ...],
@@ -171,7 +189,7 @@ Return a JSON object with this structure:
       "title": "Task title",
       "description": "Detailed description of what needs to be done",
       "priority": "high|medium|low",
-      "category": "Insurance|Utilities|Documentation|Inspection|Maintenance|Communication|Other",
+      "category": "Insurance|Utilities|Documentation|Inspection|Maintenance|Communication|Scheduling|Other",
       "source_quote": "Relevant quote from transcript"
     }
   ],
