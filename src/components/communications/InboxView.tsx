@@ -42,6 +42,7 @@ import { AIReplyButton } from "./AIReplyButton";
 import { SmartSchedulingCard, detectSchedulingIntent } from "./SmartSchedulingCard";
 import { SmartTaskExtractButton } from "./SmartTaskExtractButton";
 import { EmojiPicker } from "./EmojiPicker";
+import { FollowUpSchedulerModal } from "./FollowUpSchedulerModal";
 import { ContactInfoModal } from "./ContactInfoModal";
 import { ConversationNotes } from "./ConversationNotes";
 import { AdminInboxSelector } from "./AdminInboxSelector";
@@ -150,6 +151,8 @@ export function InboxView() {
     phone?: string | null;
   } | null>(null);
   const [showCallDialog, setShowCallDialog] = useState(false);
+  const [showFollowUpModal, setShowFollowUpModal] = useState(false);
+  const [lastSentMessage, setLastSentMessage] = useState<string>("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
   const navigate = useNavigate();
@@ -208,6 +211,9 @@ export function InboxView() {
   // Send SMS mutation - ALWAYS use GHL for unified A2P compliant sending
   const sendSmsMutation = useMutation({
     mutationFn: async ({ to, message, contactType, contactId }: { to: string; message: string; contactType?: string; contactId?: string }) => {
+      // Store the message for follow-up context
+      setLastSentMessage(message);
+      
       // Always use GHL for SMS - ensures messages sync to GHL conversations
       const { data, error } = await supabase.functions.invoke("ghl-send-sms", {
         body: { 
@@ -228,6 +234,15 @@ export function InboxView() {
       // Invalidate both the main list AND the conversation thread for real-time updates
       queryClient.invalidateQueries({ queryKey: ["all-communications"] });
       queryClient.invalidateQueries({ queryKey: ["conversation-thread"] });
+      
+      // Show follow-up scheduler modal after sending - but only for inbound conversations
+      // Check if this is a response to an inbound message
+      if (selectedMessage && selectedMessage.direction === "inbound") {
+        // Small delay to let the success toast show first
+        setTimeout(() => {
+          setShowFollowUpModal(true);
+        }, 500);
+      }
     },
     onError: (error: Error) => {
       toast.error(`Failed to send SMS: ${error.message}`);
@@ -2254,6 +2269,25 @@ export function InboxView() {
             onClick={(e) => e.stopPropagation()}
           />
         </div>
+      )}
+
+      {/* Follow-Up Scheduler Modal */}
+      {selectedMessage && (
+        <FollowUpSchedulerModal
+          open={showFollowUpModal}
+          onOpenChange={setShowFollowUpModal}
+          contactName={selectedMessage.contact_name}
+          contactPhone={selectedMessage.contact_phone}
+          contactEmail={selectedMessage.contact_email}
+          contactType={selectedMessage.contact_type}
+          contactId={selectedMessage.contact_id}
+          leadId={selectedMessage.contact_type === "lead" ? selectedMessage.contact_id : undefined}
+          conversationContext={conversationThread.map(m => `${m.direction}: ${m.body}`).join("\n")}
+          lastMessageSent={lastSentMessage}
+          onScheduled={() => {
+            queryClient.invalidateQueries({ queryKey: ["all-communications"] });
+          }}
+        />
       )}
     </div>
   );
