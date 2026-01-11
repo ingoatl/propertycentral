@@ -113,13 +113,17 @@ export function AIReplyButton({
           <Textarea
             value={editedReply}
             onChange={(e) => setEditedReply(e.target.value)}
-            className="min-h-[80px] text-sm bg-background"
+            className="min-h-[120px] text-sm bg-background resize-y"
             autoFocus
           />
         ) : (
-          <p className="text-sm bg-background/80 rounded-lg p-3 whitespace-pre-wrap">
+          <div
+            onClick={handleEdit}
+            className="text-sm bg-background/80 rounded-lg p-3 whitespace-pre-wrap cursor-text hover:bg-background/90 transition-colors border border-transparent hover:border-primary/20"
+            title="Click to edit"
+          >
             {generatedReply}
-          </p>
+          </div>
         )}
 
         <div className="flex items-center gap-2">
