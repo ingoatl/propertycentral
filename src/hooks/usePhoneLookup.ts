@@ -19,6 +19,7 @@ interface PhoneLookupCache {
 export function usePhoneLookup() {
   const [lookupCache, setLookupCache] = useState<PhoneLookupCache>({});
   const [pendingLookups, setPendingLookups] = useState<Set<string>>(new Set());
+  const [failedLookups, setFailedLookups] = useState<Set<string>>(new Set());
   const queryClient = useQueryClient();
 
   // Fetch cached lookups from database
@@ -48,7 +49,8 @@ export function usePhoneLookup() {
       });
       return cache;
     },
-    staleTime: 1000 * 60 * 10, // 10 minutes
+    staleTime: 1000 * 60 * 5, // 5 minutes - refresh more often
+    refetchOnWindowFocus: true,
   });
 
   // Merge db cache into local cache
@@ -111,18 +113,20 @@ export function usePhoneLookup() {
     return null;
   }, [lookupCache, pendingLookups, normalizePhone]);
 
-  // Batch lookup multiple phones
+  // Batch lookup multiple phones - more aggressive
   const lookupPhones = useCallback(async (phones: string[]): Promise<PhoneLookupCache> => {
     const normalizedPhones = phones.map(normalizePhone).filter((p) => p.length >= 10);
     
-    // Filter out already cached
+    // Filter out already cached, pending, or previously failed
     const phonesToLookup = normalizedPhones.filter(
-      (p) => !lookupCache[p] && !pendingLookups.has(p)
+      (p) => !lookupCache[p] && !pendingLookups.has(p) && !failedLookups.has(p)
     );
 
     if (phonesToLookup.length === 0) {
       return lookupCache;
     }
+
+    console.log(`[PhoneLookup] Looking up ${phonesToLookup.length} phones:`, phonesToLookup);
 
     // Mark as pending
     setPendingLookups((prev) => {
@@ -138,15 +142,24 @@ export function usePhoneLookup() {
 
       if (error) {
         console.error("Batch phone lookup error:", error);
+        // Mark as failed to avoid retrying immediately
+        setFailedLookups((prev) => {
+          const next = new Set(prev);
+          phonesToLookup.forEach((p) => next.add(p));
+          return next;
+        });
         return lookupCache;
       }
 
       const results = data?.results || [];
+      console.log(`[PhoneLookup] Got ${results.length} results`);
+      
       const newCache: PhoneLookupCache = { ...lookupCache };
       
       results.forEach((result: PhoneLookupResult) => {
         const normalized = normalizePhone(result.phone);
         newCache[normalized] = result;
+        console.log(`[PhoneLookup] ${normalized} -> ${result.callerName || result.name || "No name found"}`);
       });
 
       setLookupCache(newCache);
@@ -155,6 +168,12 @@ export function usePhoneLookup() {
       return newCache;
     } catch (err) {
       console.error("Batch phone lookup failed:", err);
+      // Mark as failed
+      setFailedLookups((prev) => {
+        const next = new Set(prev);
+        phonesToLookup.forEach((p) => next.add(p));
+        return next;
+      });
     } finally {
       setPendingLookups((prev) => {
         const next = new Set(prev);
@@ -164,7 +183,7 @@ export function usePhoneLookup() {
     }
 
     return lookupCache;
-  }, [lookupCache, pendingLookups, normalizePhone, queryClient]);
+  }, [lookupCache, pendingLookups, failedLookups, normalizePhone, queryClient]);
 
   // Get name for a phone number from cache
   const getNameForPhone = useCallback((phone: string): string | undefined => {
