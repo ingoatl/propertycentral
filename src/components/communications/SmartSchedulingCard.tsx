@@ -108,32 +108,62 @@ export function SmartSchedulingCard({
       const [hours, minutes] = selectedTime.split(":").map(Number);
       const scheduledAt = setMinutes(setHours(selectedDate, hours), minutes);
 
-      // Create discovery call
-      const { data: call, error: callError } = await supabase
-        .from("discovery_calls")
-        .insert({
-          lead_id: leadId || contactId,
-          scheduled_at: scheduledAt.toISOString(),
-          status: "scheduled",
-          meeting_type: "video",
-          duration_minutes: 30,
-        })
-        .select()
-        .single();
+      // Determine if we have a valid lead ID
+      const validLeadId = leadId || (contactType === "lead" ? contactId : null);
 
-      if (callError) throw callError;
+      let callId: string | null = null;
 
-      // Try to sync to Google Calendar
-      try {
-        const { error: calError } = await supabase.functions.invoke("sync-discovery-call-to-calendar", {
-          body: { discoveryCallId: call.id },
-        });
-        if (calError) {
-          console.error("Calendar sync failed:", calError);
-          // Don't throw - call is still scheduled
+      // Only create discovery_call if we have a valid lead ID
+      if (validLeadId) {
+        const { data: call, error: callError } = await supabase
+          .from("discovery_calls")
+          .insert({
+            lead_id: validLeadId,
+            scheduled_at: scheduledAt.toISOString(),
+            status: "scheduled",
+            meeting_type: "video",
+            duration_minutes: 30,
+          })
+          .select()
+          .single();
+
+        if (callError) {
+          console.error("Discovery call creation error:", callError);
+          // If lead doesn't exist, continue without creating discovery_call
+          if (callError.code !== "23503") {
+            throw callError;
+          }
+        } else {
+          callId = call.id;
         }
-      } catch (calSyncErr) {
-        console.error("Calendar sync error:", calSyncErr);
+      }
+
+      // Try to sync to Google Calendar if we have a discovery call
+      if (callId) {
+        try {
+          const { error: calError } = await supabase.functions.invoke("sync-discovery-call-to-calendar", {
+            body: { discoveryCallId: callId },
+          });
+          if (calError) {
+            console.error("Calendar sync failed:", calError);
+          }
+        } catch (calSyncErr) {
+          console.error("Calendar sync error:", calSyncErr);
+        }
+      } else {
+        // For non-lead contacts, create a Google Calendar event directly
+        try {
+          await supabase.functions.invoke("create-calendar-event", {
+            body: {
+              summary: `Call with ${contactName || "Contact"}`,
+              description: `Scheduled call with ${contactName}${contactPhone ? ` (${contactPhone})` : ""}${contactEmail ? ` - ${contactEmail}` : ""}`,
+              startTime: scheduledAt.toISOString(),
+              durationMinutes: 30,
+            },
+          });
+        } catch (calErr) {
+          console.error("Direct calendar event creation failed:", calErr);
+        }
       }
 
       // Send SMS invite to the contact
@@ -146,7 +176,7 @@ export function SmartSchedulingCard({
           
           await supabase.functions.invoke("ghl-send-sms", {
             body: {
-              leadId: leadId || (contactType === "lead" ? contactId : undefined),
+              leadId: validLeadId || undefined,
               phone: contactPhone,
               message,
             },
