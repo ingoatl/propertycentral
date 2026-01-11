@@ -841,19 +841,27 @@ export function InboxView() {
 
   const getInitials = (name: string) => name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2);
   const getMessagePreview = (comm: CommunicationItem) => {
-    if (comm.type === "call") {
-      // Show transcript preview if available, otherwise show call direction
-      if (comm.body && comm.body.length > 10 && comm.body !== "Call" && !comm.body.startsWith("Phone call")) {
-        return comm.body.slice(0, 60) + (comm.body.length > 60 ? "..." : "");
+    // For calls, show transcript or direction with icon prefix
+    if (comm.type === "call" || comm.type === "personal_call") {
+      if (comm.body && comm.body.length > 10 && comm.body !== "Call" && !comm.body.startsWith("Phone call") && !comm.body.startsWith("Incoming call") && !comm.body.startsWith("Outgoing call")) {
+        return "📞 " + comm.body.slice(0, 100) + (comm.body.length > 100 ? "..." : "");
       }
-      return comm.direction === "inbound" ? "Incoming call" : "Outgoing call";
+      return comm.direction === "inbound" ? "📞 Incoming call" : "📞 Outgoing call";
     }
-    if (comm.type === "draft") return `Draft: ${comm.subject || "No subject"}`;
+    // For emails, show subject with icon
+    if (comm.type === "email" && comm.subject) {
+      return "📧 " + comm.subject;
+    }
+    if (comm.type === "draft") return `📝 Draft: ${comm.subject || "No subject"}`;
+    // For SMS with images but no/empty text
+    if ((!comm.body || comm.body === "SMS message" || comm.body.trim().length === 0) && comm.media_urls?.length) {
+      return `📷 Image message (${comm.media_urls.length} attachment${comm.media_urls.length > 1 ? 's' : ''})`;
+    }
     // Handle empty or placeholder SMS bodies
     if (!comm.body || comm.body === "SMS message" || comm.body.trim().length === 0) {
       return comm.direction === "inbound" ? "Received message" : "Sent message";
     }
-    return comm.body.slice(0, 80) + (comm.body.length > 80 ? "..." : "");
+    return comm.body.slice(0, 120) + (comm.body.length > 120 ? "..." : "");
   };
 
   // Mobile: show list or detail based on selection
@@ -985,10 +993,11 @@ export function InboxView() {
         });
         
         // Also fetch from lead_communications by searching in metadata for this phone/tenant
+        // Include ALL communication types for unified thread
         const { data: leadComms } = await supabase
           .from("lead_communications")
-          .select("id, communication_type, direction, body, created_at, media_urls, metadata, ghl_contact_id")
-          .in("communication_type", ["sms", "call"])
+          .select("id, communication_type, direction, body, subject, created_at, media_urls, metadata, ghl_contact_id, call_duration, call_recording_url")
+          .in("communication_type", ["sms", "call", "email"])
           .order("created_at", { ascending: true });
         
         // Check metadata for phone or tenant_id matching
@@ -1002,7 +1011,8 @@ export function InboxView() {
             unmatched_phone?: string; 
             tenant_phone?: string; 
             tenant_id?: string;
-            ghl_data?: { contactPhone?: string } 
+            contact_name?: string;
+            ghl_data?: { contactPhone?: string; contactName?: string } 
           } | null;
           
           // Match by tenant_id if we have one
@@ -1010,12 +1020,17 @@ export function InboxView() {
             return true;
           }
           
-          // Match by phone number in metadata
-          if (metadata && normalizedPhone) {
-            const unmatchedPhone = metadata.unmatched_phone?.replace(/\D/g, "").slice(-10);
-            const tenantPhone = metadata.tenant_phone?.replace(/\D/g, "").slice(-10);
-            const ghlPhone = metadata.ghl_data?.contactPhone?.replace(/\D/g, "").slice(-10);
-            return unmatchedPhone === normalizedPhone || tenantPhone === normalizedPhone || ghlPhone === normalizedPhone;
+          // Match by phone number in metadata - check all possible phone locations
+          if (normalizedPhone) {
+            const phonesToCheck = [
+              metadata?.unmatched_phone,
+              metadata?.tenant_phone,
+              metadata?.ghl_data?.contactPhone,
+            ].filter(Boolean).map(p => p!.replace(/[^\d]/g, "").slice(-10));
+            
+            if (phonesToCheck.includes(normalizedPhone)) {
+              return true;
+            }
           }
           return false;
         });
@@ -1025,18 +1040,21 @@ export function InboxView() {
           ...filteredUserMsgs.map(msg => ({
             id: msg.id,
             type: "sms" as const,
-            direction: msg.direction,
+            direction: msg.direction as "inbound" | "outbound",
             body: msg.body || "(No content)",
             created_at: msg.created_at,
             media_urls: (Array.isArray(msg.media_urls) ? msg.media_urls : []) as string[],
           })),
           ...filteredLeadComms.map(msg => ({
             id: msg.id,
-            type: "sms" as const,
-            direction: msg.direction,
+            type: msg.communication_type as "sms" | "call" | "email",
+            direction: msg.direction as "inbound" | "outbound",
             body: msg.body || "(No content)",
+            subject: msg.subject || undefined,
             created_at: msg.created_at,
             media_urls: (Array.isArray(msg.media_urls) ? msg.media_urls : []) as string[],
+            call_duration: msg.call_duration,
+            call_recording_url: msg.call_recording_url,
           })),
         ];
         
@@ -1070,7 +1088,17 @@ export function InboxView() {
     enabled: !!selectedMessage,
   });
 
+  // Auto-scroll to newest message when conversation loads
+  useEffect(() => {
+    if (conversationThread.length > 0 && messagesEndRef.current) {
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+      }, 100);
+    }
+  }, [conversationThread, selectedMessage?.id]);
+
   // Group communications by contact (for "All" tab - show only latest message per contact)
+  // Then group those by date for date separators
   const groupedByContact = useMemo(() => {
     if (activeTab !== "all") return null;
     
@@ -1095,6 +1123,29 @@ export function InboxView() {
         new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       );
   }, [communications, activeFilter, activeTab]);
+
+  // Group "All" tab contacts by date for date separators
+  const groupedByContactWithDates = useMemo(() => {
+    if (!groupedByContact) return null;
+    
+    const dateGroups = new Map<string, CommunicationItem[]>();
+    for (const comm of groupedByContact) {
+      const dateKey = format(parseISO(comm.created_at), "yyyy-MM-dd");
+      const existing = dateGroups.get(dateKey) || [];
+      existing.push(comm);
+      dateGroups.set(dateKey, existing);
+    }
+    
+    return Array.from(dateGroups.entries())
+      .sort(([a], [b]) => b.localeCompare(a))
+      .map(([date, comms]) => ({
+        date,
+        label: isToday(parseISO(date)) ? "Today" : 
+               isYesterday(parseISO(date)) ? "Yesterday" : 
+               format(parseISO(date), "EEEE, MMM d"),
+        communications: comms,
+      }));
+  }, [groupedByContact]);
 
   // Group communications by date for the inbox list (for non-All tabs)
   const groupedCommunications = useMemo(() => {
@@ -1308,94 +1359,102 @@ export function InboxView() {
             <div className="flex items-center justify-center h-32">
               <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
             </div>
-          ) : activeTab === "all" && groupedByContact ? (
-            // "All" tab - grouped by contact, showing only latest message per contact
-            groupedByContact.length === 0 ? (
+          ) : activeTab === "all" && groupedByContactWithDates ? (
+            // "All" tab - grouped by contact with date separators
+            groupedByContactWithDates.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-48 text-muted-foreground">
                 <MessageSquare className="h-12 w-12 mb-3 opacity-30" />
                 <p className="text-sm">{activeFilter === "owners" ? "No owner conversations" : "No conversations"}</p>
               </div>
             ) : (
               <div>
-                {groupedByContact.map((comm) => (
-                  <div 
-                    key={comm.id} 
-                    onClick={() => {
-                      if (comm.contact_type === "owner" && comm.owner_id) {
-                        setSelectedOwnerForDetail({
-                          id: comm.owner_id,
-                          name: comm.contact_name,
-                          email: comm.contact_email,
-                          phone: comm.contact_phone,
-                        });
-                      } else {
-                        handleSelectMessage(comm);
-                      }
-                    }}
-                    className={`flex items-start gap-3 px-4 py-3 cursor-pointer transition-colors border-b border-border/30 active:bg-muted/50 ${selectedMessage?.id === comm.id ? "bg-primary/5" : "hover:bg-muted/30"}`}
-                  >
-                    {/* Compact avatar */}
-                    <div className="relative flex-shrink-0">
-                      <div className={`h-10 w-10 rounded-full flex items-center justify-center ${
-                        comm.contact_type === "owner" 
-                          ? "bg-gradient-to-br from-purple-500 to-purple-600" 
-                          : comm.contact_type === "tenant"
-                          ? "bg-gradient-to-br from-blue-500 to-blue-600"
-                          : "bg-gradient-to-br from-emerald-500 to-emerald-600"
-                      }`}>
-                        <span className="text-xs font-semibold text-white">{getInitials(comm.contact_name)}</span>
-                      </div>
-                      {comm.is_resolved && (
-                        <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-green-500 border-2 border-background flex items-center justify-center">
-                          <CheckCircle className="h-2 w-2 text-white" />
-                        </div>
-                      )}
+                {groupedByContactWithDates.map((group) => (
+                  <div key={group.date}>
+                    {/* Date separator header */}
+                    <div className="sticky top-0 bg-background/95 backdrop-blur px-4 py-2 border-b z-10">
+                      <span className="text-xs font-medium text-muted-foreground">{group.label}</span>
                     </div>
-                    
-                    {/* Content */}
-                    <div className="flex-1 min-w-0 py-0.5">
-                      <div className="flex items-baseline justify-between gap-2 mb-0.5">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <span className="font-semibold text-sm truncate">{comm.contact_name}</span>
-                          {/* Type indicator badges */}
-                          {comm.type === "call" && (
-                            <span className="flex items-center gap-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded bg-orange-500/10 text-orange-600">
-                              <Phone className="h-2.5 w-2.5" />
-                            </span>
-                          )}
-                          {comm.type === "email" && (
-                            <span className="flex items-center gap-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-600">
-                              <Mail className="h-2.5 w-2.5" />
-                            </span>
-                          )}
-                        </div>
-                        <span className="text-[11px] text-muted-foreground whitespace-nowrap">
-                          {isToday(new Date(comm.created_at)) 
-                            ? format(new Date(comm.created_at), "h:mm a")
-                            : isYesterday(new Date(comm.created_at))
-                            ? "Yesterday"
-                            : format(new Date(comm.created_at), "MMM d")
+                    {group.communications.map((comm) => (
+                      <div 
+                        key={comm.id} 
+                        onClick={() => {
+                          if (comm.contact_type === "owner" && comm.owner_id) {
+                            setSelectedOwnerForDetail({
+                              id: comm.owner_id,
+                              name: comm.contact_name,
+                              email: comm.contact_email,
+                              phone: comm.contact_phone,
+                            });
+                          } else {
+                            handleSelectMessage(comm);
                           }
-                        </span>
-                      </div>
-                      
-                      {/* Inline badges */}
-                      {(comm.type === "draft" || (comm.direction === "inbound" && !comm.is_resolved)) && (
-                        <div className="flex items-center gap-1.5 mb-1">
-                          {comm.type === "draft" && (
-                            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600">Draft</span>
-                          )}
-                          {comm.direction === "inbound" && !comm.is_resolved && (
-                            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-600">New</span>
+                        }}
+                        className={`flex items-start gap-3 px-4 py-3 cursor-pointer transition-colors border-b border-border/30 active:bg-muted/50 ${selectedMessage?.id === comm.id ? "bg-primary/5" : "hover:bg-muted/30"}`}
+                      >
+                        {/* Compact avatar */}
+                        <div className="relative flex-shrink-0">
+                          <div className={`h-10 w-10 rounded-full flex items-center justify-center ${
+                            comm.contact_type === "owner" 
+                              ? "bg-gradient-to-br from-purple-500 to-purple-600" 
+                              : comm.contact_type === "tenant"
+                              ? "bg-gradient-to-br from-blue-500 to-blue-600"
+                              : "bg-gradient-to-br from-emerald-500 to-emerald-600"
+                          }`}>
+                            <span className="text-xs font-semibold text-white">{getInitials(comm.contact_name)}</span>
+                          </div>
+                          {comm.is_resolved && (
+                            <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-green-500 border-2 border-background flex items-center justify-center">
+                              <CheckCircle className="h-2 w-2 text-white" />
+                            </div>
                           )}
                         </div>
-                      )}
-                      
-                      {/* Message preview */}
-                      <p className="text-[13px] text-muted-foreground line-clamp-2 leading-relaxed">
-                        {getMessagePreview(comm)}
-                      </p>
-                    </div>
+                        
+                        {/* Content */}
+                        <div className="flex-1 min-w-0 py-0.5">
+                          <div className="flex items-baseline justify-between gap-2 mb-0.5">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="font-semibold text-sm truncate">{comm.contact_name}</span>
+                              {/* Type indicator badges */}
+                              {comm.type === "call" && (
+                                <span className="flex items-center gap-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded bg-orange-500/10 text-orange-600">
+                                  <Phone className="h-2.5 w-2.5" />
+                                </span>
+                              )}
+                              {comm.type === "email" && (
+                                <span className="flex items-center gap-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-600">
+                                  <Mail className="h-2.5 w-2.5" />
+                                </span>
+                              )}
+                            </div>
+                            <span className="text-[11px] text-muted-foreground whitespace-nowrap">
+                              {isToday(new Date(comm.created_at)) 
+                                ? format(new Date(comm.created_at), "h:mm a")
+                                : isYesterday(new Date(comm.created_at))
+                                ? "Yesterday"
+                                : format(new Date(comm.created_at), "MMM d")
+                              }
+                            </span>
+                          </div>
+                          
+                          {/* Inline badges */}
+                          {(comm.type === "draft" || (comm.direction === "inbound" && !comm.is_resolved)) && (
+                            <div className="flex items-center gap-1.5 mb-1">
+                              {comm.type === "draft" && (
+                                <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600">Draft</span>
+                              )}
+                              {comm.direction === "inbound" && !comm.is_resolved && (
+                                <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-600">New</span>
+                              )}
+                            </div>
+                          )}
+                          
+                          {/* Message preview - 3 lines */}
+                          <p className="text-[13px] text-muted-foreground line-clamp-3 leading-relaxed">
+                            {getMessagePreview(comm)}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 ))}
               </div>
@@ -1796,6 +1855,8 @@ export function InboxView() {
                             </div>
                           );
                         })}
+                        {/* Auto-scroll anchor */}
+                        <div ref={messagesEndRef} />
                       </>
                     ) : (
                       /* Single message fallback */

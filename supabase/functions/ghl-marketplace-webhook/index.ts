@@ -84,18 +84,44 @@ serve(async (req) => {
       });
     }
 
-    // Extract media URLs from attachments array
+    // Extract media URLs from attachments array - check ALL possible formats
     const mediaUrls: string[] = [];
+    
+    // Check attachments array
     if (attachments && Array.isArray(attachments)) {
       for (const attachment of attachments) {
-        // Attachments can be strings (URLs) or objects with url property
         if (typeof attachment === "string") {
           mediaUrls.push(attachment);
         } else if (attachment?.url) {
           mediaUrls.push(attachment.url);
+        } else if (attachment?.mediaUrl) {
+          mediaUrls.push(attachment.mediaUrl);
+        } else if (attachment?.link) {
+          mediaUrls.push(attachment.link);
         }
       }
     }
+    
+    // Check payload.mediaUrls (alternative location)
+    if (payload.mediaUrls && Array.isArray(payload.mediaUrls)) {
+      for (const url of payload.mediaUrls) {
+        if (typeof url === "string" && !mediaUrls.includes(url)) {
+          mediaUrls.push(url);
+        }
+      }
+    }
+    
+    // Check payload.media (another alternative)
+    if (payload.media && Array.isArray(payload.media)) {
+      for (const media of payload.media) {
+        if (typeof media === "string" && !mediaUrls.includes(media)) {
+          mediaUrls.push(media);
+        } else if (media?.url && !mediaUrls.includes(media.url)) {
+          mediaUrls.push(media.url);
+        }
+      }
+    }
+    
     console.log("Media URLs found:", mediaUrls);
 
     // We need to get the contact's phone number from GHL API using contactId
