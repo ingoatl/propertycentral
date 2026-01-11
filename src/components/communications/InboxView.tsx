@@ -884,7 +884,7 @@ export function InboxView() {
           .select("id, communication_type, direction, body, subject, created_at, status, media_urls, call_duration, call_recording_url")
           .eq("lead_id", selectedMessage.contact_id)
           .in("communication_type", commTypes)
-          .order("created_at", { ascending: true });
+          .order("created_at", { ascending: false });
         
         if (error) throw error;
         
@@ -914,7 +914,7 @@ export function InboxView() {
             .from("user_phone_messages")
             .select("id, direction, body, created_at, media_urls")
             .or(`from_number.eq.${phone},to_number.eq.${phone}`)
-            .order("created_at", { ascending: true });
+            .order("created_at", { ascending: false });
           
           if (userMsgs) {
             userMessages = userMsgs.map(msg => ({
@@ -930,7 +930,7 @@ export function InboxView() {
         
         // Combine and deduplicate
         const allMsgs = [...leadMessages, ...userMessages];
-        allMsgs.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+        allMsgs.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
         
         // Deduplicate messages within 5 seconds with same body
         const deduped: typeof allMsgs = [];
@@ -954,7 +954,7 @@ export function InboxView() {
           .select("id, communication_type, direction, body, subject, created_at, status, media_urls")
           .eq("owner_id", selectedMessage.owner_id)
           .in("communication_type", ["sms", "call", "email"])
-          .order("created_at", { ascending: true });
+          .order("created_at", { ascending: false });
         
         if (error) throw error;
         return (data || []).map(comm => {
@@ -983,7 +983,7 @@ export function InboxView() {
         const { data: userMsgs } = phone ? await supabase
           .from("user_phone_messages")
           .select("id, direction, body, created_at, media_urls, from_number, to_number")
-          .order("created_at", { ascending: true }) : { data: [] };
+          .order("created_at", { ascending: false }) : { data: [] };
         
         // Filter by normalized phone
         const filteredUserMsgs = (userMsgs || []).filter(msg => {
@@ -998,7 +998,7 @@ export function InboxView() {
           .from("lead_communications")
           .select("id, communication_type, direction, body, subject, created_at, media_urls, metadata, ghl_contact_id, call_duration, call_recording_url")
           .in("communication_type", ["sms", "call", "email"])
-          .order("created_at", { ascending: true });
+          .order("created_at", { ascending: false });
         
         // Check metadata for phone or tenant_id matching
         const filteredLeadComms = (leadComms || []).filter(comm => {
@@ -1059,7 +1059,7 @@ export function InboxView() {
         ];
         
         // Sort by timestamp
-        allMsgs.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+        allMsgs.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
         
         // Deduplicate messages that are within 5 seconds and have the same body
         const deduped: typeof allMsgs = [];
@@ -1088,14 +1088,8 @@ export function InboxView() {
     enabled: !!selectedMessage,
   });
 
-  // Auto-scroll to newest message when conversation loads
-  useEffect(() => {
-    if (conversationThread.length > 0 && messagesEndRef.current) {
-      setTimeout(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-      }, 100);
-    }
-  }, [conversationThread, selectedMessage?.id]);
+
+  // No auto-scroll needed - newest messages are at the top now
 
   // Group communications by contact (for "All" tab - show only latest message per contact)
   // Then group those by date for date separators
@@ -1415,6 +1409,11 @@ export function InboxView() {
                             <div className="flex items-center gap-2 min-w-0">
                               <span className="font-semibold text-sm truncate">{comm.contact_name}</span>
                               {/* Type indicator badges */}
+                              {comm.type === "sms" && (
+                                <span className="flex items-center gap-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded bg-green-500/10 text-green-600">
+                                  <MessageSquare className="h-2.5 w-2.5" />
+                                </span>
+                              )}
                               {comm.type === "call" && (
                                 <span className="flex items-center gap-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded bg-orange-500/10 text-orange-600">
                                   <Phone className="h-2.5 w-2.5" />
@@ -1513,8 +1512,21 @@ export function InboxView() {
                         <div className="flex items-baseline justify-between gap-2 mb-0.5">
                           <div className="flex items-center gap-2 min-w-0">
                             <span className="font-semibold text-sm truncate">{comm.contact_name}</span>
+                            {/* Type indicator badges */}
+                            {comm.type === "sms" && (
+                              <span className="flex items-center gap-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded bg-green-500/10 text-green-600">
+                                <MessageSquare className="h-2.5 w-2.5" />
+                              </span>
+                            )}
                             {comm.type === "call" && (
-                              <Phone className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                              <span className="flex items-center gap-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded bg-orange-500/10 text-orange-600">
+                                <Phone className="h-2.5 w-2.5" />
+                              </span>
+                            )}
+                            {comm.type === "email" && (
+                              <span className="flex items-center gap-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-600">
+                                <Mail className="h-2.5 w-2.5" />
+                              </span>
                             )}
                           </div>
                           <span className="text-[11px] text-muted-foreground whitespace-nowrap">
@@ -1783,12 +1795,19 @@ export function InboxView() {
                             format(new Date(msg.created_at), "yyyy-MM-dd") !== 
                             format(new Date(conversationThread[idx - 1].created_at), "yyyy-MM-dd");
                           
+                          // Format date label
+                          const formatDateLabel = (date: Date) => {
+                            if (isToday(date)) return "Today";
+                            if (isYesterday(date)) return "Yesterday";
+                            return format(date, "EEEE, MMM d");
+                          };
+                          
                           return (
                             <div key={msg.id}>
                               {showDateSeparator && (
                                 <div className="flex items-center justify-center py-3">
-                                  <span className="text-[11px] text-muted-foreground bg-muted/50 px-2.5 py-1 rounded-full">
-                                    {format(new Date(msg.created_at), "MMM d")}
+                                  <span className="text-[11px] font-medium text-muted-foreground bg-muted/50 px-3 py-1 rounded-full">
+                                    {formatDateLabel(new Date(msg.created_at))}
                                   </span>
                                 </div>
                               )}
@@ -1799,6 +1818,7 @@ export function InboxView() {
                                       ? "bg-primary text-primary-foreground" 
                                       : "bg-muted"
                                   }`}>
+                                    {/* Type indicator for all message types */}
                                     {msg.type === "call" && (
                                       <div className={`flex items-center gap-1.5 text-[11px] mb-1.5 ${isOutbound ? "opacity-80" : "text-muted-foreground"}`}>
                                         <Phone className="h-3 w-3" />
@@ -1811,10 +1831,16 @@ export function InboxView() {
                                         )}
                                       </div>
                                     )}
-                                    {msg.type === "email" && msg.subject && (
-                                      <div className={`flex items-center gap-1 text-xs font-medium mb-1 ${isOutbound ? "opacity-90" : ""}`}>
+                                    {msg.type === "email" && (
+                                      <div className={`flex items-center gap-1 text-xs font-medium mb-1 ${isOutbound ? "opacity-90" : "text-muted-foreground"}`}>
                                         <Mail className="h-3 w-3" />
-                                        {msg.subject}
+                                        {msg.subject ? msg.subject : (isOutbound ? "Email sent" : "Email received")}
+                                      </div>
+                                    )}
+                                    {msg.type === "sms" && (
+                                      <div className={`flex items-center gap-1.5 text-[11px] mb-1 ${isOutbound ? "opacity-70" : "text-muted-foreground"}`}>
+                                        <MessageSquare className="h-3 w-3" />
+                                        <span>{isOutbound ? "SMS sent" : "SMS received"}</span>
                                       </div>
                                     )}
                                     {/* MMS Images - OpenPhone style grid with lightbox */}
