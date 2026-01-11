@@ -23,7 +23,7 @@ import {
   Zap,
   BarChart3
 } from "lucide-react";
-import { UpcomingEventsTimeline } from "./UpcomingEventsTimeline";
+import { EnhancedEventsTimeline } from "./EnhancedEventsTimeline";
 import { CorporateHousingDemandCard } from "./CorporateHousingDemandCard";
 
 interface ComparableProperty {
@@ -409,7 +409,7 @@ export const OwnerMarketInsightsEnhanced = memo(function OwnerMarketInsightsEnha
           propertyAddress={propertyAddress}
         />
       ) : (
-        <UpcomingEventsTimeline
+        <EnhancedEventsTimeline
           events={demandDrivers.length > 0 ? demandDrivers : [
             { event: "FIFA World Cup 2026 - Atlanta Host City", date: "2026-06-15", impact: "Unprecedented demand expected with 300-400% rate increases" },
             { event: "SEC Championship - Mercedes-Benz Stadium", date: "2026-12-07", impact: "Major college football event drawing 75,000+ fans" },
