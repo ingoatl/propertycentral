@@ -66,6 +66,7 @@ interface CommunicationItem {
   contact_email?: string;
   contact_type: "lead" | "owner" | "external" | "draft" | "personal" | "tenant";
   contact_id: string;
+  media_urls?: string[];
   status?: string;
   sender_email?: string;
   is_draft?: boolean;
@@ -453,18 +454,80 @@ export function InboxView() {
       const targetUserId = viewAllInboxes ? null : (selectedInboxUserId || currentUserId);
 
       if (fetchMessages) {
-        // Fetch lead communications (with leads)
-        const { data: leadComms } = await supabase
+        // Fetch ALL lead communications (including those without lead_id for tenants/external contacts)
+        const { data: allComms } = await supabase
           .from("lead_communications")
-          .select(`id, communication_type, direction, body, subject, created_at, status, lead_id, owner_id, leads(id, name, phone, email)`)
+          .select(`id, communication_type, direction, body, subject, created_at, status, lead_id, owner_id, metadata, media_urls, leads(id, name, phone, email)`)
           .in("communication_type", ["sms", "email"])
-          .not("lead_id", "is", null)
           .order("created_at", { ascending: false })
-          .limit(50);
+          .limit(100);
 
-        if (leadComms) {
-          for (const comm of leadComms) {
+        if (allComms) {
+          // Lookup tenants for matching
+          const { data: allTenants } = await supabase
+            .from("mid_term_bookings")
+            .select("id, tenant_name, tenant_phone, tenant_email");
+          
+          const tenantMap = new Map<string, { id: string; name: string; phone: string; email: string | null }>();
+          allTenants?.forEach(t => {
+            if (t.tenant_phone) {
+              const normalized = normalizePhone(t.tenant_phone);
+              tenantMap.set(normalized, { id: t.id, name: t.tenant_name, phone: t.tenant_phone, email: t.tenant_email });
+            }
+          });
+
+          for (const comm of allComms) {
             const lead = comm.leads as { id: string; name: string; phone: string | null; email: string | null } | null;
+            const metadata = comm.metadata as { 
+              unmatched_phone?: string; 
+              contact_name?: string; 
+              tenant_id?: string; 
+              tenant_name?: string; 
+              tenant_phone?: string;
+              ghl_data?: { contactPhone?: string; contactName?: string };
+            } | null;
+            
+            let contactName = "Unknown";
+            let contactPhone: string | undefined;
+            let contactEmail: string | undefined;
+            let contactType: CommunicationItem["contact_type"] = "external";
+            let contactId = comm.id;
+
+            if (comm.lead_id && lead) {
+              // Has a linked lead
+              contactName = lead.name;
+              contactPhone = lead.phone || undefined;
+              contactEmail = lead.email || undefined;
+              contactType = "lead";
+              contactId = comm.lead_id;
+            } else if (comm.owner_id) {
+              // Skip owner comms here - they're fetched separately
+              continue;
+            } else if (metadata?.tenant_id) {
+              // Tenant match from metadata
+              contactName = metadata.tenant_name || "Tenant";
+              contactPhone = metadata.tenant_phone;
+              contactType = "tenant";
+              contactId = metadata.tenant_id;
+            } else if (metadata?.unmatched_phone || metadata?.ghl_data?.contactPhone) {
+              // External/unmatched contact - try to match to tenant
+              const phone = metadata.unmatched_phone || metadata.ghl_data?.contactPhone;
+              const normalizedPhone = phone ? normalizePhone(phone) : "";
+              const matchedTenant = tenantMap.get(normalizedPhone);
+              
+              if (matchedTenant) {
+                contactName = matchedTenant.name;
+                contactPhone = matchedTenant.phone;
+                contactEmail = matchedTenant.email || undefined;
+                contactType = "tenant";
+                contactId = matchedTenant.id;
+              } else {
+                contactName = metadata.contact_name || metadata.ghl_data?.contactName || phone || "Unknown";
+                contactPhone = phone;
+                contactType = "external";
+              }
+            }
+            
             const item: CommunicationItem = {
               id: comm.id,
               type: comm.communication_type as "sms" | "email",
@@ -472,12 +535,13 @@ export function InboxView() {
               body: comm.body,
               subject: comm.subject || undefined,
               created_at: comm.created_at,
-              contact_name: lead?.name || "Unknown",
-              contact_phone: lead?.phone || undefined,
-              contact_email: lead?.email || undefined,
-              contact_type: "lead",
-              contact_id: comm.lead_id || "",
+              contact_name: contactName,
+              contact_phone: contactPhone,
+              contact_email: contactEmail,
+              contact_type: contactType,
+              contact_id: contactId,
               status: comm.status || undefined,
+              media_urls: Array.isArray(comm.media_urls) ? comm.media_urls as string[] : undefined,
             };
 
             if (search) {
@@ -899,15 +963,16 @@ export function InboxView() {
       }
       
       // For personal SMS, tenants, or external contacts - fetch by phone number
-      if (selectedMessage.contact_phone) {
+      if (selectedMessage.contact_phone || selectedMessage.contact_type === "tenant" || selectedMessage.contact_type === "external") {
         const phone = selectedMessage.contact_phone;
-        const normalizedPhone = normalizePhone(phone);
+        const normalizedPhone = phone ? normalizePhone(phone) : "";
+        const tenantId = selectedMessage.contact_type === "tenant" ? selectedMessage.contact_id : null;
         
         // Fetch from user_phone_messages using normalized phone matching
-        const { data: userMsgs } = await supabase
+        const { data: userMsgs } = phone ? await supabase
           .from("user_phone_messages")
           .select("id, direction, body, created_at, media_urls, from_number, to_number")
-          .order("created_at", { ascending: true });
+          .order("created_at", { ascending: true }) : { data: [] };
         
         // Filter by normalized phone
         const filteredUserMsgs = (userMsgs || []).filter(msg => {
@@ -916,23 +981,34 @@ export function InboxView() {
           return fromNorm === normalizedPhone || toNorm === normalizedPhone;
         });
         
-        // Also fetch from lead_communications by searching in metadata for this phone
+        // Also fetch from lead_communications by searching in metadata for this phone/tenant
         const { data: leadComms } = await supabase
           .from("lead_communications")
           .select("id, communication_type, direction, body, created_at, media_urls, metadata, ghl_contact_id")
           .in("communication_type", ["sms", "call"])
           .order("created_at", { ascending: true });
         
-        // If matched to a lead, filter by lead_id
-        // Otherwise, check metadata for phone matching
+        // Check metadata for phone or tenant_id matching
         const filteredLeadComms = (leadComms || []).filter(comm => {
           if (selectedMessage.contact_type === "lead" && selectedMessage.contact_id) {
             // For leads, we already fetched above, so skip here
             return false;
           }
-          // Check if metadata contains this phone number (for unmatched/tenant messages)
-          const metadata = comm.metadata as { unmatched_phone?: string; tenant_phone?: string; ghl_data?: { contactPhone?: string } } | null;
-          if (metadata) {
+          // Check if metadata contains this phone number or tenant_id
+          const metadata = comm.metadata as { 
+            unmatched_phone?: string; 
+            tenant_phone?: string; 
+            tenant_id?: string;
+            ghl_data?: { contactPhone?: string } 
+          } | null;
+          
+          // Match by tenant_id if we have one
+          if (tenantId && metadata?.tenant_id === tenantId) {
+            return true;
+          }
+          
+          // Match by phone number in metadata
+          if (metadata && normalizedPhone) {
             const unmatchedPhone = metadata.unmatched_phone?.replace(/\D/g, "").slice(-10);
             const tenantPhone = metadata.tenant_phone?.replace(/\D/g, "").slice(-10);
             const ghlPhone = metadata.ghl_data?.contactPhone?.replace(/\D/g, "").slice(-10);
