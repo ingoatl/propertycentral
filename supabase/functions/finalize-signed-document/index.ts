@@ -325,27 +325,29 @@ async function fillPdfWithValues(
         const { width: pageWidth, height: pageHeight } = page.getSize();
         
         // Convert percentage positions to absolute coordinates
+        // x% is distance from LEFT edge (same in CSS and PDF)
         const absX = (x / 100) * pageWidth;
-        // PDF y-coordinates start from bottom, so convert from top-based percentage
-        // The y percentage is measured from TOP of page, PDF measures from BOTTOM
-        const absY = pageHeight - ((y / 100) * pageHeight);
+        
+        // y% is distance from TOP edge (CSS top property)
+        // PDF uses y from BOTTOM edge, so we need to convert
+        // The y% points to the TOP of the field input area
+        const topFromTop = (y / 100) * pageHeight;
+        const fieldHeight = height ? (height / 100) * pageHeight : 14; // Default ~14pt field height
         const absWidth = width ? (width / 100) * pageWidth : 100;
-        const absHeight = height ? (height / 100) * pageHeight : 20;
+        
+        // The text should be drawn at the BOTTOM of the field area (where the underline is)
+        // PDF's y coordinate for text is the BASELINE
+        // So we need: pageHeight - topFromTop - fieldHeight + small baseline adjustment
+        const fontSize = 9; // Standard form font size
+        const textBaselineAdjust = fontSize * 0.25; // Lift text slightly above the exact bottom
+        
+        // Final Y position: convert top-to-bottom, then position at bottom of field
+        const drawY = pageHeight - topFromTop - fieldHeight + textBaselineAdjust;
+        const drawX = absX;
         
         const textValue = sanitizeTextForPdf(String(value));
-        // Calculate appropriate font size based on typical form line height
-        const fontSize = 9; // Standard form font size
         
-        // Field position is where the INPUT AREA starts (after the label/colon)
-        // For proper alignment:
-        // - X should be the start of the value area (absX is correct)
-        // - Y needs adjustment: the y% points to the TOP of the field area
-        //   But PDF drawText uses BASELINE, so we need to offset down by font size
-        const drawX = absX;
-        // The y coordinate should place text so it sits ON the underline
-        // Subtract a small offset to account for text baseline vs. field top
-        const baselineOffset = fontSize * 0.3; // Adjust text baseline to sit on the line
-        const drawY = absY - baselineOffset;
+        console.log(`Field ${api_id}: y%=${y}, topFromTop=${topFromTop.toFixed(1)}, fieldHeight=${fieldHeight.toFixed(1)}, drawY=${drawY.toFixed(1)}`);
         
         try {
           // Handle signature fields - determine which signer's signature to embed
@@ -369,15 +371,16 @@ async function fillPdfWithValues(
                 const sigWidth = Math.min(absWidth * 0.4, 80);
                 const sigHeight = 18; // Fixed height for consistency
                 
-                // Draw signature with its BOTTOM on the underline
-                // Since y in PDF is bottom-based, we draw at the line position
+                // Draw signature with its BOTTOM at the field's bottom (same as text baseline area)
+                // Use drawY which is already calculated to be at the bottom of the field
+                const sigY = drawY - sigHeight + fontSize; // Align signature bottom with text baseline
                 page.drawImage(sigImage, {
                   x: drawX,
-                  y: absY - sigHeight, // Place signature so bottom sits on line
+                  y: sigY,
                   width: sigWidth,
                   height: sigHeight,
                 });
-                console.log("Embedded signature for", signerType, "at", api_id, "x:", drawX, "y:", absY - sigHeight);
+                console.log("Embedded signature for", signerType, "at", api_id, "x:", drawX, "y:", sigY);
               } catch (sigError) {
                 console.error("Error embedding signature for", signerType, ":", sigError);
                 page.drawText(`[Signed by ${sigData.name}]`, {
