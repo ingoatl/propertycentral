@@ -189,6 +189,22 @@ export function InboxView() {
     fetchUserAndPhone();
   }, []);
 
+  // Fetch current user's profile for name display
+  const { data: currentUserProfile } = useQuery({
+    queryKey: ["current-user-profile", currentUserId],
+    queryFn: async () => {
+      if (!currentUserId) return null;
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("first_name, email")
+        .eq("id", currentUserId)
+        .single();
+      if (error) return null;
+      return data;
+    },
+    enabled: !!currentUserId,
+  });
+
   // Send SMS mutation - ALWAYS use GHL for unified A2P compliant sending
   const sendSmsMutation = useMutation({
     mutationFn: async ({ to, message, contactType, contactId }: { to: string; message: string; contactType?: string; contactId?: string }) => {
@@ -1217,13 +1233,35 @@ export function InboxView() {
   }, [groupedByContact]);
 
   // Group communications by date for the inbox list (for non-All tabs)
+  // Now also groups by contact first, then by date (like "All" tab)
   const groupedCommunications = useMemo(() => {
     if (activeTab === "all") return [];
     
-    const groups: Record<string, CommunicationItem[]> = {};
     const filteredComms = enhancedCommunications.filter(c => activeFilter !== "owners" || c.contact_type === "owner");
     
+    // First, group by contact (phone or email) to show only latest message per contact
+    const contactMap = new Map<string, CommunicationItem[]>();
     for (const comm of filteredComms) {
+      // Create unique key based on contact phone, email, or id
+      const key = comm.contact_phone ? normalizePhone(comm.contact_phone) : 
+                  comm.contact_email || comm.contact_id;
+      const existing = contactMap.get(key) || [];
+      existing.push(comm);
+      contactMap.set(key, existing);
+    }
+    
+    // Get only the latest message per contact
+    const latestByContact = Array.from(contactMap.values())
+      .map(messages => messages.sort((a, b) => 
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      )[0])
+      .sort((a, b) => 
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+    
+    // Now group these by date
+    const groups: Record<string, CommunicationItem[]> = {};
+    for (const comm of latestByContact) {
       const dateKey = format(parseISO(comm.created_at), "yyyy-MM-dd");
       if (!groups[dateKey]) groups[dateKey] = [];
       groups[dateKey].push(comm);
@@ -1962,8 +2000,18 @@ export function InboxView() {
                                   </span>
                                 </div>
                               )}
-                              <div className={`flex ${isOutbound ? "justify-end" : "justify-start"}`}>
-                                <div className={`max-w-[85%] ${isOutbound ? "" : ""}`}>
+                              <div className={`flex ${isOutbound ? "justify-end" : "justify-start"} gap-2`}>
+                                {/* Show sender initials for outbound messages */}
+                                {isOutbound && currentUserProfile?.first_name && (
+                                  <div className="flex-shrink-0 self-end mb-5">
+                                    <div className="h-7 w-7 rounded-full bg-primary/20 flex items-center justify-center">
+                                      <span className="text-[10px] font-semibold text-primary">
+                                        {currentUserProfile.first_name.charAt(0).toUpperCase()}
+                                      </span>
+                                    </div>
+                                  </div>
+                                )}
+                                <div className={`max-w-[80%]`}>
                                   <div className={`rounded-2xl px-3.5 py-2 ${
                                     isOutbound 
                                       ? "bg-primary text-primary-foreground" 
@@ -2024,8 +2072,11 @@ export function InboxView() {
                                     )}
                                     <p className="text-sm whitespace-pre-wrap leading-relaxed">{msg.body}</p>
                                   </div>
-                                  <div className={`text-[10px] text-muted-foreground mt-0.5 px-1 ${isOutbound ? "text-right" : ""}`}>
-                                    {format(new Date(msg.created_at), "h:mm a")}
+                                  <div className={`flex items-center gap-1.5 text-[10px] text-muted-foreground mt-0.5 px-1 ${isOutbound ? "justify-end" : ""}`}>
+                                    {isOutbound && currentUserProfile?.first_name && (
+                                      <span className="font-medium">{currentUserProfile.first_name}</span>
+                                    )}
+                                    <span>{format(new Date(msg.created_at), "h:mm a")}</span>
                                   </div>
                                 </div>
                               </div>
