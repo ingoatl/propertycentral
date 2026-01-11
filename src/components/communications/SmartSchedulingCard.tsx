@@ -1,10 +1,11 @@
 import { useState, useMemo } from "react";
-import { Calendar, Clock, Send, X, Loader2, Check, Phone, Video } from "lucide-react";
+import { Calendar, Clock, Send, X, Loader2, Check, Phone, Video, ChevronDown, ChevronUp, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format, addDays, setHours, setMinutes, isBefore, isAfter, startOfDay, parseISO } from "date-fns";
@@ -45,6 +46,8 @@ export function SmartSchedulingCard({
   const [meetingType, setMeetingType] = useState<MeetingType>("video");
   const [isScheduling, setIsScheduling] = useState(false);
   const [isSendingInvite, setIsSendingInvite] = useState(false);
+  const [isSendingTest, setIsSendingTest] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
 
   // Generate available dates based on intent
   const availableDates = useMemo(() => {
@@ -277,6 +280,61 @@ export function SmartSchedulingCard({
     return "PeachHaus";
   };
 
+  const handleSendTestEmail = async () => {
+    setIsSendingTest(true);
+    try {
+      const testDate = selectedDate || addDays(new Date(), 1);
+      const testTime = selectedTime || "10:00";
+      const [hours, minutes] = testTime.split(":").map(Number);
+      const scheduledAt = setMinutes(setHours(testDate, hours), minutes);
+      
+      const displayName = contactName || "Test Contact";
+      const formattedDate = format(scheduledAt, "EEEE, MMMM d, yyyy");
+      const formattedTime = format(scheduledAt, "h:mm a");
+      const userName = await getCurrentUserName();
+      
+      const googleMeetLink = meetingType === "video" ? "https://meet.google.com/abc-defg-hij" : null;
+
+      const { error } = await supabase.functions.invoke("send-test-template-email", {
+        body: {
+          templateId: null,
+          testEmail: "schaer76@gmail.com",
+          customEmail: {
+            subject: `${meetingType === "video" ? "Video" : "Phone"} Call Scheduled with ${displayName}`,
+            body: `
+Hi ${displayName.split(" ")[0]}!
+
+Your ${meetingType === "video" ? "video" : "phone"} call has been scheduled.
+
+📅 Date: ${formattedDate}
+🕐 Time: ${formattedTime} EST
+${meetingType === "video" ? `📹 Google Meet Link: ${googleMeetLink}` : "📞 We will call you at the number you provided."}
+
+Contact Details:
+• Name: ${displayName}
+• Phone: ${contactPhone || "Not provided"}
+• Email: ${contactEmail || "Not provided"}
+• Contact Type: ${contactType}
+• Lead ID: ${leadId || contactId || "N/A"}
+
+Scheduled by: ${userName} @ PeachHaus Group
+
+Looking forward to our conversation!
+            `.trim()
+          }
+        },
+      });
+
+      if (error) throw error;
+      toast.success("Test email sent to schaer76@gmail.com!");
+    } catch (error: any) {
+      console.error("Error sending test email:", error);
+      toast.error(`Failed to send test: ${error.message}`);
+    } finally {
+      setIsSendingTest(false);
+    }
+  };
+
   if (!detectedIntent) return null;
 
   const intentMessages = {
@@ -288,130 +346,158 @@ export function SmartSchedulingCard({
 
   return (
     <Card className="border-primary/30 bg-gradient-to-br from-primary/5 to-primary/10 mb-4">
-      <CardHeader className="pb-2">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Calendar className="h-4 w-4 text-primary" />
-            <CardTitle className="text-sm font-medium">
-              Schedule a Call
-            </CardTitle>
-          </div>
-          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={onDismiss}>
-            <X className="h-3 w-3" />
-          </Button>
-        </div>
-        <Badge variant="secondary" className="w-fit text-xs">
-          {intentMessages[detectedIntent]}
-        </Badge>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        {/* Meeting Type Selection */}
-        <div>
-          <p className="text-xs text-muted-foreground mb-2">Meeting type:</p>
-          <RadioGroup 
-            value={meetingType} 
-            onValueChange={(v) => setMeetingType(v as MeetingType)}
-            className="flex gap-3"
-          >
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="video" id="video" />
-              <Label htmlFor="video" className="flex items-center gap-1.5 text-xs cursor-pointer">
-                <Video className="h-3.5 w-3.5" />
-                Google Meet
-              </Label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="phone" id="phone" />
-              <Label htmlFor="phone" className="flex items-center gap-1.5 text-xs cursor-pointer">
-                <Phone className="h-3.5 w-3.5" />
-                Phone Call
-              </Label>
-            </div>
-          </RadioGroup>
-        </div>
-
-        {/* Date Selection */}
-        <div>
-          <p className="text-xs text-muted-foreground mb-2">Select a date:</p>
-          <div className="flex flex-wrap gap-1.5">
-            {availableDates.map((date) => (
-              <Button
-                key={date.toISOString()}
-                variant={selectedDate?.toDateString() === date.toDateString() ? "default" : "outline"}
-                size="sm"
-                className="text-xs h-7 px-2"
-                onClick={() => {
-                  setSelectedDate(date);
-                  setSelectedTime(null);
-                }}
-              >
-                {format(date, "EEE, MMM d")}
+      <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+        <CardHeader className="pb-2">
+          <div className="flex items-center justify-between">
+            <CollapsibleTrigger asChild>
+              <Button variant="ghost" className="flex items-center gap-2 p-0 h-auto hover:bg-transparent">
+                <Calendar className="h-4 w-4 text-primary" />
+                <CardTitle className="text-sm font-medium">
+                  Schedule a Call
+                </CardTitle>
+                {isOpen ? (
+                  <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                ) : (
+                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                )}
               </Button>
-            ))}
-          </div>
-        </div>
-
-        {/* Time Selection */}
-        {selectedDate && (
-          <div>
-            <p className="text-xs text-muted-foreground mb-2">Select a time:</p>
-            <div className="flex flex-wrap gap-1">
-              {timeSlots.filter(s => s.available).slice(0, 8).map((slot) => (
-                <Button
-                  key={slot.time}
-                  variant={selectedTime === slot.time ? "default" : "outline"}
-                  size="sm"
-                  className="text-xs h-6 px-2"
-                  onClick={() => setSelectedTime(slot.time)}
-                >
-                  {slot.display}
-                </Button>
-              ))}
+            </CollapsibleTrigger>
+            <div className="flex items-center gap-1">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="h-6 text-xs gap-1" 
+                onClick={handleSendTestEmail}
+                disabled={isSendingTest}
+              >
+                {isSendingTest ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <Mail className="h-3 w-3" />
+                )}
+                Test
+              </Button>
+              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={onDismiss}>
+                <X className="h-3 w-3" />
+              </Button>
             </div>
           </div>
-        )}
+          <Badge variant="secondary" className="w-fit text-xs">
+            {intentMessages[detectedIntent]}
+          </Badge>
+        </CardHeader>
+        
+        <CollapsibleContent>
+          <CardContent className="space-y-3">
+            {/* Meeting Type Selection */}
+            <div>
+              <p className="text-xs text-muted-foreground mb-2">Meeting type:</p>
+              <RadioGroup 
+                value={meetingType} 
+                onValueChange={(v) => setMeetingType(v as MeetingType)}
+                className="flex gap-3"
+              >
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="video" id="video" />
+                  <Label htmlFor="video" className="flex items-center gap-1.5 text-xs cursor-pointer">
+                    <Video className="h-3.5 w-3.5" />
+                    Google Meet
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="phone" id="phone" />
+                  <Label htmlFor="phone" className="flex items-center gap-1.5 text-xs cursor-pointer">
+                    <Phone className="h-3.5 w-3.5" />
+                    Phone Call
+                  </Label>
+                </div>
+              </RadioGroup>
+            </div>
 
-        {/* Actions */}
-        <div className="flex flex-wrap gap-2 pt-2">
-          {selectedDate && selectedTime ? (
-            <Button
-              size="sm"
-              onClick={handleScheduleCall}
-              disabled={isScheduling}
-              className="gap-1.5"
-            >
-              {isScheduling ? (
-                <Loader2 className="h-3 w-3 animate-spin" />
+            {/* Date Selection */}
+            <div>
+              <p className="text-xs text-muted-foreground mb-2">Select a date:</p>
+              <div className="flex flex-wrap gap-1.5">
+                {availableDates.map((date) => (
+                  <Button
+                    key={date.toISOString()}
+                    variant={selectedDate?.toDateString() === date.toDateString() ? "default" : "outline"}
+                    size="sm"
+                    className="text-xs h-7 px-2"
+                    onClick={() => {
+                      setSelectedDate(date);
+                      setSelectedTime(null);
+                    }}
+                  >
+                    {format(date, "EEE, MMM d")}
+                  </Button>
+                ))}
+              </div>
+            </div>
+
+            {/* Time Selection */}
+            {selectedDate && (
+              <div>
+                <p className="text-xs text-muted-foreground mb-2">Select a time:</p>
+                <div className="flex flex-wrap gap-1">
+                  {timeSlots.filter(s => s.available).slice(0, 8).map((slot) => (
+                    <Button
+                      key={slot.time}
+                      variant={selectedTime === slot.time ? "default" : "outline"}
+                      size="sm"
+                      className="text-xs h-6 px-2"
+                      onClick={() => setSelectedTime(slot.time)}
+                    >
+                      {slot.display}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Actions */}
+            <div className="flex flex-wrap gap-2 pt-2">
+              {selectedDate && selectedTime ? (
+                <Button
+                  size="sm"
+                  onClick={handleScheduleCall}
+                  disabled={isScheduling}
+                  className="gap-1.5"
+                >
+                  {isScheduling ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <Check className="h-3 w-3" />
+                  )}
+                  Schedule for {format(selectedDate, "MMM d")} at {timeSlots.find(s => s.time === selectedTime)?.display}
+                </Button>
               ) : (
-                <Check className="h-3 w-3" />
+                <p className="text-xs text-muted-foreground italic">
+                  Select a date and time above to schedule
+                </p>
               )}
-              Schedule for {format(selectedDate, "MMM d")} at {timeSlots.find(s => s.time === selectedTime)?.display}
-            </Button>
-          ) : (
-            <p className="text-xs text-muted-foreground italic">
-              Select a date and time above to schedule
-            </p>
-          )}
-          
-          {/* Only show Send Calendar Link option if no time selected yet */}
-          {(!selectedDate || !selectedTime) && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleSendInviteLink}
-              disabled={isSendingInvite || !contactPhone}
-              className="gap-1.5"
-            >
-              {isSendingInvite ? (
-                <Loader2 className="h-3 w-3 animate-spin" />
-              ) : (
-                <Send className="h-3 w-3" />
+              
+              {/* Only show Send Calendar Link option if no time selected yet */}
+              {(!selectedDate || !selectedTime) && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleSendInviteLink}
+                  disabled={isSendingInvite || !contactPhone}
+                  className="gap-1.5"
+                >
+                  {isSendingInvite ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <Send className="h-3 w-3" />
+                  )}
+                  Send Calendar Link
+                </Button>
               )}
-              Send Calendar Link
-            </Button>
-          )}
-        </div>
-      </CardContent>
+            </div>
+          </CardContent>
+        </CollapsibleContent>
+      </Collapsible>
     </Card>
   );
 }
