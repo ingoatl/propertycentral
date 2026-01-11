@@ -185,24 +185,21 @@ export function InboxView() {
     fetchUserAndPhone();
   }, []);
 
-  // Send SMS mutation - use GHL for leads, Telnyx for others
+  // Send SMS mutation - ALWAYS use GHL for unified A2P compliant sending
   const sendSmsMutation = useMutation({
     mutationFn: async ({ to, message, contactType, contactId }: { to: string; message: string; contactType?: string; contactId?: string }) => {
-      // Use GHL for leads
-      if (contactType === "lead" && contactId) {
-        const { data, error } = await supabase.functions.invoke("ghl-send-sms", {
-          body: { leadId: contactId, phone: to, message, fromNumber: "+14048005932" },
-        });
-        if (error) throw error;
-        if (!data?.success) throw new Error(data?.error || "Failed to send SMS");
-        return data;
-      }
-      // Use Telnyx for others
-      const { data, error } = await supabase.functions.invoke("telnyx-send-sms", {
-        body: { to, message },
+      // Always use GHL for SMS - ensures messages sync to GHL conversations
+      const { data, error } = await supabase.functions.invoke("ghl-send-sms", {
+        body: { 
+          leadId: contactType === "lead" ? contactId : undefined,
+          ownerId: contactType === "owner" ? contactId : undefined,
+          phone: to, 
+          message, 
+          fromNumber: "+14048005932" 
+        },
       });
       if (error) throw error;
-      if (data?.error) throw new Error(data.error);
+      if (!data?.success) throw new Error(data?.error || "Failed to send SMS");
       return data;
     },
     onSuccess: () => {

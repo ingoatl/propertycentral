@@ -224,6 +224,17 @@ const SignDocument = () => {
     if (token) {
       validateToken();
     }
+    
+    // Timeout fallback - if still loading after 15 seconds, show error
+    const timeout = setTimeout(() => {
+      if (loading && !data && !error) {
+        console.error("Document loading timeout - took too long to load");
+        setError("Document loading timed out. Please try refreshing the page.");
+        setLoading(false);
+      }
+    }, 15000);
+    
+    return () => clearTimeout(timeout);
   }, [token]);
 
   useEffect(() => {

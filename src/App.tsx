@@ -64,6 +64,21 @@ const PageLoader = () => (
   </div>
 );
 
+// Branded loading for signing pages
+const SigningLoader = () => (
+  <div className="min-h-screen bg-[#1a1a2e] flex items-center justify-center">
+    <div className="text-center">
+      <img 
+        src="https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/peachhaus-logo.png" 
+        alt="PeachHaus" 
+        className="h-16 mx-auto mb-4"
+      />
+      <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#fae052] border-t-transparent mx-auto mb-3"></div>
+      <p className="text-white/80 text-sm">Loading your document...</p>
+    </div>
+  </div>
+);
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
@@ -92,7 +107,7 @@ const App = () => (
             <Route path="/owner-payment-success" element={<OwnerPaymentSuccess />} />
             <Route path="/audit/:token" element={<AuditPortal />} />
             <Route path="/owner" element={<OwnerDashboard />} />
-            <Route path="/sign/:token" element={<SignDocument />} />
+            <Route path="/sign/:token" element={<Suspense fallback={<SigningLoader />}><SignDocument /></Suspense>} />
             <Route path="*" element={
               <Layout>
                 <Suspense fallback={<PageLoader />}>
