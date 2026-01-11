@@ -5483,6 +5483,45 @@ export type Database = {
           },
         ]
       }
+      phone_lookups: {
+        Row: {
+          caller_name: string | null
+          carrier: string | null
+          created_at: string
+          e164_phone: string | null
+          id: string
+          line_type: string | null
+          looked_up_at: string | null
+          phone: string
+          raw_response: Json | null
+          valid: boolean | null
+        }
+        Insert: {
+          caller_name?: string | null
+          carrier?: string | null
+          created_at?: string
+          e164_phone?: string | null
+          id?: string
+          line_type?: string | null
+          looked_up_at?: string | null
+          phone: string
+          raw_response?: Json | null
+          valid?: boolean | null
+        }
+        Update: {
+          caller_name?: string | null
+          carrier?: string | null
+          created_at?: string
+          e164_phone?: string | null
+          id?: string
+          line_type?: string | null
+          looked_up_at?: string | null
+          phone?: string
+          raw_response?: Json | null
+          valid?: boolean | null
+        }
+        Relationships: []
+      }
       platform_listings: {
         Row: {
           created_at: string

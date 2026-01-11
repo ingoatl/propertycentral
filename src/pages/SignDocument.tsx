@@ -87,6 +87,21 @@ const SignDocument = () => {
   // Mobile-specific: Toggle between PDF view and Mobile Focus (field list) view
   const [mobileViewMode, setMobileViewMode] = useState<"pdf" | "fields">("pdf"); // Default to PDF view
 
+  // Show branded loading immediately to prevent flash
+  if (loading && !data) {
+    return (
+      <div className="min-h-screen bg-[#1a1a2e] flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 mx-auto mb-4 rounded-lg bg-[#fae052] flex items-center justify-center">
+            <span className="text-[#1a1a2e] font-bold text-2xl">P</span>
+          </div>
+          <Loader2 className="h-8 w-8 animate-spin text-[#fae052] mx-auto mb-3" />
+          <p className="text-white/80 text-sm">Loading your document...</p>
+        </div>
+      </div>
+    );
+  }
+
   // Filter fields for current signer
   // Owner 2 fields are NOT mandatory - they become active only when clicked
   const allGuestFields = (data?.fields || []).filter(f => f.filled_by === "guest");
@@ -703,16 +718,7 @@ const SignDocument = () => {
     return allFields.filter(f => f.page === pageNum);
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-[#f5f5f5] flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="h-10 w-10 animate-spin text-[#4c4c4c] mx-auto mb-4" />
-          <p className="text-[#666]">Loading document...</p>
-        </div>
-      </div>
-    );
-  }
+  // Loading state is now handled at the top of the component with branded loading screen
 
   if (error) {
     return (
