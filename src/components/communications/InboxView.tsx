@@ -29,7 +29,7 @@ import {
   Play,
   TrendingUp,
 } from "lucide-react";
-import { IncomeReportEmbed } from "@/components/IncomeReportEmbed";
+import { IncomeReportButton } from "@/components/IncomeReportEmbed";
 import { TwilioCallDialog } from "@/components/TwilioCallDialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -154,7 +154,7 @@ export function InboxView() {
   } | null>(null);
   const [showCallDialog, setShowCallDialog] = useState(false);
   const [showFollowUpModal, setShowFollowUpModal] = useState(false);
-  const [showIncomeReport, setShowIncomeReport] = useState(false);
+  // Income report now opens directly in new tab via IncomeReportButton
   const [lastSentMessage, setLastSentMessage] = useState<string>("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
@@ -1838,7 +1838,7 @@ export function InboxView() {
                       <PhoneOutgoing className="h-4 w-4 mr-2" />Call
                     </DropdownMenuItem>
                   )}
-                  <DropdownMenuItem onClick={() => setShowIncomeReport(true)}>
+                  <DropdownMenuItem onClick={() => window.open("https://www.peachhausgroup.com/embed/income-report", "_blank", "noopener,noreferrer")}>
                     <TrendingUp className="h-4 w-4 mr-2 text-orange-500" />Income Report
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => setShowContactInfo(true)}>
@@ -1878,15 +1878,11 @@ export function InboxView() {
               </div>
               <div className="flex items-center gap-1">
                 {/* Income Report button in detail header */}
-                <Button 
+                <IncomeReportButton 
                   variant="ghost" 
                   size="sm"
                   className="h-9 gap-1.5 text-orange-600 hover:text-orange-700 hover:bg-orange-50"
-                  onClick={() => setShowIncomeReport(true)}
-                >
-                  <TrendingUp className="h-4 w-4" />
-                  <span className="hidden lg:inline text-xs">Income Report</span>
-                </Button>
+                />
                 {selectedMessage.contact_phone && (
                   <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => setShowSmsReply(true)}><PhoneCall className="h-4 w-4" /></Button>
                 )}
@@ -2306,11 +2302,7 @@ export function InboxView() {
         />
       )}
 
-      {/* Income Report Modal */}
-      <IncomeReportEmbed 
-        open={showIncomeReport} 
-        onOpenChange={setShowIncomeReport}
-      />
+      {/* Income Report is now opened via direct button click to new tab */}
     </div>
   );
 }

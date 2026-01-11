@@ -823,7 +823,7 @@ serve(async (req) => {
 
     // Create a direct calendar event (not tied to discovery calls)
     if (action === "create-event-direct") {
-      const { summary, description, startTime, endTime, attendeeEmail } = body;
+      const { summary, description, startTime, endTime, attendeeEmail, addConferenceData } = body;
 
       const hasConnection = await hasGoogleCalendarConnection(userId);
       if (!hasConnection) {
@@ -832,7 +832,12 @@ serve(async (req) => {
 
       const accessToken = await getPipedreamAccessToken();
       
-      console.log(`Creating direct calendar event: "${summary}" with attendee ${attendeeEmail}`);
+      console.log(`Creating direct calendar event: "${summary}" with attendee ${attendeeEmail}, addConferenceData: ${addConferenceData}`);
+      
+      // Build conference data instruction if video call requested
+      const conferenceInstruction = addConferenceData 
+        ? "IMPORTANT: Add a Google Meet video conferencing link to this event by setting conferenceData with createRequest.requestId and conferenceDataVersion to 1." 
+        : "";
       
       const result = await callMCPTool(
         accessToken,
@@ -854,18 +859,57 @@ serve(async (req) => {
           sendUpdates: "all",
           guestsCanModify: false,
           guestsCanInviteOthers: false,
-          instruction: `Create a Google Calendar event titled "${summary}" starting at ${startTime} (America/New_York timezone). ${attendeeEmail ? `Add ${attendeeEmail} as an attendee and SEND THEM AN EMAIL INVITATION by setting sendUpdates to "all".` : ""} The event should be on the primary calendar.`
+          conferenceDataVersion: addConferenceData ? 1 : undefined,
+          conferenceData: addConferenceData ? {
+            createRequest: {
+              requestId: `meet-${Date.now()}`,
+              conferenceSolutionKey: { type: "hangoutsMeet" }
+            }
+          } : undefined,
+          instruction: `Create a Google Calendar event titled "${summary}" starting at ${startTime} (America/New_York timezone). ${attendeeEmail ? `Add ${attendeeEmail} as an attendee and SEND THEM AN EMAIL INVITATION by setting sendUpdates to "all".` : ""} ${conferenceInstruction} The event should be on the primary calendar.`
         }
       );
 
-      console.log("MCP create-event-direct result:", JSON.stringify(result).substring(0, 500));
+      console.log("MCP create-event-direct result:", JSON.stringify(result).substring(0, 1000));
 
-      const eventId = result?.result?.content?.[0]?.text || 
-                      result?.content?.[0]?.text || 
-                      result?.id || 
-                      `mcp-event-${Date.now()}`;
+      // Extract event ID and meet link from result
+      let eventId = `mcp-event-${Date.now()}`;
+      let meetLink: string | null = null;
+      
+      try {
+        const content = result?.result?.content?.[0]?.text || result?.content?.[0]?.text;
+        if (content) {
+          try {
+            const parsed = JSON.parse(content);
+            eventId = parsed.id || parsed.eventId || eventId;
+            // Extract Google Meet link
+            meetLink = parsed.hangoutLink || 
+                      parsed.conferenceData?.entryPoints?.[0]?.uri ||
+                      parsed.conferenceData?.entryPoints?.find((e: any) => e.entryPointType === 'video')?.uri ||
+                      null;
+          } catch {
+            // Not JSON, check if it contains an event ID pattern
+            const idMatch = content.match(/[a-z0-9]{26}/);
+            if (idMatch) {
+              eventId = idMatch[0];
+            }
+            // Try to find meet link in text
+            const meetMatch = content.match(/https:\/\/meet\.google\.com\/[a-z-]+/);
+            if (meetMatch) {
+              meetLink = meetMatch[0];
+            }
+          }
+        } else if (result?.id) {
+          eventId = result.id;
+          meetLink = result.hangoutLink || null;
+        }
+      } catch (e) {
+        console.log("Could not extract event details:", e);
+      }
 
-      return new Response(JSON.stringify({ success: true, eventId }), {
+      console.log(`Extracted event ID: ${eventId}, Meet link: ${meetLink}`);
+
+      return new Response(JSON.stringify({ success: true, eventId, meetLink }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
