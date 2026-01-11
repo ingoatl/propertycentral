@@ -87,27 +87,29 @@ const SignDocument = () => {
   // Mobile-specific: Toggle between PDF view and Mobile Focus (field list) view
   const [mobileViewMode, setMobileViewMode] = useState<"pdf" | "fields">("pdf"); // Default to PDF view
 
-  // Company logo URL
+  // Company logo URL - using public storage URL
   const LOGO_URL = "https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/peachhaus-logo.png";
+
+  // State for logo loading fallback
+  const [logoFailed, setLogoFailed] = useState(false);
 
   // Show branded loading immediately to prevent flash
   if (loading && !data) {
     return (
       <div className="min-h-screen bg-[#1a1a2e] flex items-center justify-center">
         <div className="text-center">
-          <img 
-            src={LOGO_URL} 
-            alt="PeachHaus" 
-            className="h-16 mx-auto mb-4"
-            onError={(e) => {
-              // Fallback to P icon if image fails to load
-              e.currentTarget.style.display = 'none';
-              e.currentTarget.nextElementSibling?.classList.remove('hidden');
-            }}
-          />
-          <div className="hidden w-16 h-16 mx-auto mb-4 rounded-lg bg-[#fae052] flex items-center justify-center">
-            <span className="text-[#1a1a2e] font-bold text-2xl">P</span>
-          </div>
+          {!logoFailed ? (
+            <img 
+              src={LOGO_URL} 
+              alt="PeachHaus" 
+              className="h-16 mx-auto mb-4"
+              onError={() => setLogoFailed(true)}
+            />
+          ) : (
+            <div className="w-16 h-16 mx-auto mb-4 rounded-lg bg-[#fae052] flex items-center justify-center">
+              <span className="text-[#1a1a2e] font-bold text-2xl">P</span>
+            </div>
+          )}
           <Loader2 className="h-8 w-8 animate-spin text-[#fae052] mx-auto mb-3" />
           <p className="text-white/80 text-sm">Loading your document...</p>
         </div>
@@ -815,11 +817,18 @@ const SignDocument = () => {
       {/* Header - Mobile optimized with larger touch targets */}
       <header className="bg-[#1a1a2e] text-white px-3 md:px-4 py-3 flex items-center justify-between sticky top-0 z-50 shadow-md">
         <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1">
-          <img 
-            src={LOGO_URL} 
-            alt="PeachHaus" 
-            className="h-8 md:h-10 flex-shrink-0"
-          />
+          {!logoFailed ? (
+            <img 
+              src={LOGO_URL} 
+              alt="PeachHaus" 
+              className="h-8 md:h-10 flex-shrink-0"
+              onError={() => setLogoFailed(true)}
+            />
+          ) : (
+            <div className="w-8 h-8 md:w-10 md:h-10 rounded bg-[#fae052] flex items-center justify-center flex-shrink-0">
+              <span className="text-[#1a1a2e] font-bold text-sm md:text-base">P</span>
+            </div>
+          )}
           <div className="min-w-0 flex-1">
             <h1 className="font-medium text-xs md:text-sm truncate max-w-[120px] md:max-w-none">{data?.documentName}</h1>
             <p className="text-[10px] md:text-xs text-white/60 truncate">{data?.signerName}</p>
