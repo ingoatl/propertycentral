@@ -6,6 +6,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { format } from "date-fns";
 import { CalendarIcon, Check, Lock, Pencil } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { GooglePlacesAutocomplete } from "@/components/ui/google-places-autocomplete";
 
 export interface FieldData {
   api_id: string;
@@ -230,6 +231,14 @@ export function InlineField({
     );
   }
 
+  // Check if field is an address field
+  const isAddressField = () => {
+    const label = field.label.toLowerCase();
+    const apiId = field.api_id.toLowerCase();
+    return label.includes("address") || apiId.includes("address") ||
+           label.includes("property location") || apiId.includes("property_location");
+  };
+
   // Text, email, phone fields
   if (isReadOnly) {
     return (
@@ -244,6 +253,26 @@ export function InlineField({
   }
 
   if (isActive) {
+    // Use Google Places Autocomplete for address fields
+    if (isAddressField()) {
+      return (
+        <div className="relative" style={{ fontSize, fontFamily }}>
+          <GooglePlacesAutocomplete
+            value={(value as string) || ""}
+            onChange={(val) => {
+              onChange(val);
+            }}
+            onPlaceSelect={(place) => {
+              onChange(place.formattedAddress);
+              onBlur();
+            }}
+            placeholder={field.label}
+            className={cn(baseFieldClass, activeClass, "w-full h-[24px] px-1.5 rounded text-xs")}
+          />
+        </div>
+      );
+    }
+    
     return (
       <Input
         ref={inputRef}
