@@ -759,6 +759,33 @@ const SignDocument = () => {
     return allFields.filter(f => f.page === pageNum);
   };
 
+  // Get the correct signature data for a field based on signer type and field type
+  const getSignatureForField = (field: FieldData): string | null => {
+    // For Owner 2 signature fields - use owner2SignatureData
+    if (isOwner2Field(field)) {
+      return owner2SignatureData;
+    }
+    
+    // For manager/admin signature fields
+    if (isManagerField(field)) {
+      // Only show signature if current signer is admin/manager
+      return isAdminSigner ? signatureData : null;
+    }
+    
+    // For Owner 1 signature fields
+    // Only show if current signer is NOT admin (owner 1 signing) 
+    // OR if there's saved value from previous owner signing
+    if (isAdminSigner) {
+      // Admin viewing - don't show their signature on owner fields
+      // Check if there's a saved value from previous owner
+      const savedValue = data?.savedFieldValues?.[field.api_id];
+      return savedValue && typeof savedValue === 'string' ? savedValue : null;
+    }
+    
+    // Owner 1 signing - show their signature
+    return signatureData;
+  };
+
   // Loading state - show branded loading screen
   if (loading) {
     return (
@@ -1139,13 +1166,15 @@ const SignDocument = () => {
                     {/* Field Input - Mobile optimized with large touch targets */}
                     <div className="relative">
                       {field.type === "signature" ? (() => {
-                        // Use correct signature data based on owner
-                        const sigData = isOwner2 ? owner2SignatureData : signatureData;
+                        // Use correct signature data based on field type and signer
+                        const sigData = getSignatureForField(field);
                         // Owner 2 field should only be interactive for Owner 2 signer
                         const isOwner2FieldBlocked = isOwner2 && !isOwner2Signer;
                         // Owner 1 field should not be interactive for Owner 2 signer
-                        const isOwner1FieldBlocked = !isOwner2 && isOwner2Signer;
-                        const isFieldBlocked = isOwner2FieldBlocked || isOwner1FieldBlocked;
+                        const isOwner1FieldBlocked = !isOwner2 && isOwner2Signer && !isManagerField(field);
+                        // Manager field should only be interactive for manager signer
+                        const isManagerFieldBlocked = isManagerField(field) && !isAdminSigner;
+                        const isFieldBlocked = isOwner2FieldBlocked || isOwner1FieldBlocked || isManagerFieldBlocked;
                         
                         return (
                           <button
@@ -1398,7 +1427,7 @@ const SignDocument = () => {
                                   isActive={isActive}
                                   isCompleted={isCompleted}
                                   isReadOnly={isReadOnly}
-                                  signatureData={isOwner2Field(field) ? owner2SignatureData : (isManagerField(field) ? null : signatureData)}
+                                  signatureData={getSignatureForField(field)}
                                   onFocus={() => {
                                     if (field.type === "signature" && !isReadOnly) {
                                       const isOwner2FieldBlocked = isOwner2Field(field) && !isOwner2Signer;
