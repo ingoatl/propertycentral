@@ -37,6 +37,7 @@ import { SendSMSDialog } from "./SendSMSDialog";
 import { SendEmailDialog } from "./SendEmailDialog";
 import { ComposeEmailDialog } from "./ComposeEmailDialog";
 import { AIWritingAssistant } from "./AIWritingAssistant";
+import { AIReplyButton } from "./AIReplyButton";
 import { EmojiPicker } from "./EmojiPicker";
 import { ContactInfoModal } from "./ContactInfoModal";
 import { ConversationNotes } from "./ConversationNotes";
@@ -814,27 +815,43 @@ export function InboxView() {
     },
   });
 
-  // Trigger phone lookups for unknown contacts
+  // Trigger phone lookups for unknown contacts - more aggressive matching
   useEffect(() => {
     if (!communications || communications.length === 0) return;
     
-    // Find contacts with unknown or phone-number-like names
+    // Find contacts that need name lookup
     const unknownPhones = communications
       .filter(comm => {
-        const name = comm.contact_name;
-        // Consider unknown if name is "Unknown", looks like a phone number, or is empty
-        return (
-          comm.contact_phone &&
-          (name === "Unknown" || 
-           name === "Unknown Caller" || 
-           name.match(/^[\d\s\-\(\)\+]+$/) || // Pure phone number format
-           name.length < 3)
-        );
+        if (!comm.contact_phone) return false;
+        
+        const name = comm.contact_name?.trim() || "";
+        
+        // Check if we should look up this contact:
+        // 1. Name is "Unknown" or similar
+        // 2. Name looks like a phone number
+        // 3. Name is very short (likely first name only like "Hector")
+        // 4. Name starts with a "+" (phone number format)
+        const isUnknown = !name || 
+          name === "Unknown" || 
+          name === "Unknown Caller" ||
+          name === "Unknown Contact" ||
+          name.toLowerCase() === "unknown";
+          
+        const isPhoneFormat = name.match(/^[\d\s\-\(\)\+\.]+$/) || 
+          name.startsWith("+");
+          
+        // Single word names under 15 chars might be first name only
+        const isSingleName = name.split(" ").length === 1 && 
+          name.length < 15 && 
+          !name.includes("@");
+        
+        return isUnknown || isPhoneFormat || isSingleName;
       })
       .map(comm => comm.contact_phone!)
       .filter((phone, index, self) => self.indexOf(phone) === index); // Unique
 
     if (unknownPhones.length > 0) {
+      console.log(`[InboxView] Found ${unknownPhones.length} contacts needing lookup`);
       // Trigger batch lookup (limited to 10)
       lookupPhones(unknownPhones.slice(0, 10));
     }
@@ -845,11 +862,22 @@ export function InboxView() {
     return communications.map(comm => {
       if (comm.contact_phone) {
         const lookedUpName = getNameForPhone(comm.contact_phone);
-        if (lookedUpName && 
-            (comm.contact_name === "Unknown" || 
-             comm.contact_name === "Unknown Caller" ||
-             comm.contact_name.match(/^[\d\s\-\(\)\+]+$/))) {
-          return { ...comm, contact_name: lookedUpName };
+        if (lookedUpName) {
+          const currentName = comm.contact_name?.trim() || "";
+          
+          // Replace if current name is unknown, a phone number, or just a first name
+          const shouldReplace = 
+            !currentName ||
+            currentName === "Unknown" || 
+            currentName === "Unknown Caller" ||
+            currentName.match(/^[\d\s\-\(\)\+\.]+$/) ||
+            currentName.startsWith("+") ||
+            // If looked up name is longer/better, use it
+            (currentName.split(" ").length === 1 && lookedUpName.split(" ").length > 1);
+          
+          if (shouldReplace) {
+            return { ...comm, contact_name: lookedUpName };
+          }
         }
       }
       return comm;
@@ -1831,7 +1859,35 @@ export function InboxView() {
                     </div>
                   </div>
                 ) : (
-                  <div className="space-y-2">
+                  <div className="space-y-3">
+                    {/* AI Reply Button - positioned at top for quick access */}
+                    {!selectedMessage.is_draft && selectedMessage.contact_phone && conversationThread.length > 0 && (
+                      <div className="pb-2">
+                        <AIReplyButton
+                          contactName={selectedMessage.contact_name}
+                          contactPhone={selectedMessage.contact_phone}
+                          contactId={selectedMessage.contact_id}
+                          contactType={selectedMessage.contact_type}
+                          conversationThread={conversationThread.map(msg => ({
+                            type: msg.type,
+                            direction: msg.direction,
+                            body: msg.body,
+                            created_at: msg.created_at,
+                            subject: msg.subject,
+                          }))}
+                          onSendMessage={(message) => {
+                            sendSmsMutation.mutate({
+                              to: selectedMessage.contact_phone!,
+                              message,
+                              contactType: selectedMessage.contact_type,
+                              contactId: selectedMessage.contact_id,
+                            });
+                          }}
+                          isSending={sendSmsMutation.isPending}
+                        />
+                      </div>
+                    )}
+                    
                     {/* Conversation Thread - clean minimal bubbles */}
                     {conversationThread.length > 0 ? (
                       <>

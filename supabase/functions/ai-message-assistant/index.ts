@@ -27,13 +27,58 @@ FOR SMS:
 - Casual but professional
 `;
 
+// Company knowledge base
+const companyKnowledge = `
+COMPANY: PeachHaus Group
+BUSINESS: Mid-term rental property management in Atlanta, GA
+
+KEY SERVICES:
+- Mid-term rental management (30+ day stays)
+- Property onboarding and setup
+- Guest communication and support
+- Cleaning and maintenance coordination
+- Owner financial reporting
+
+PRICING & POLICIES:
+- Management fee: Typically 15-20% of rental income
+- Minimum stay: 30 days
+- Security deposit: Usually equal to one month's rent
+- Cleaning: Professional cleaning between guests
+
+CONTACT INFO:
+- Email: info@peachhausgroup.com
+- Office hours: Monday-Friday 9am-6pm EST
+
+BRAND VOICE:
+- Professional but warm
+- Responsive and proactive
+- Solution-oriented
+- Transparent about policies
+
+COMMON TOPICS:
+- Move-in/move-out procedures
+- Maintenance requests
+- Booking inquiries
+- Document collection for owner onboarding
+- Monthly owner statements
+`;
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { action, currentMessage, contactName, conversationContext, messageType, leadId, ownerId } = await req.json();
+    const { 
+      action, 
+      currentMessage, 
+      contactName, 
+      conversationContext, 
+      messageType, 
+      leadId, 
+      ownerId,
+      includeCompanyKnowledge 
+    } = await req.json();
 
     console.log("AI Message Assistant request:", { action, contactName, messageType, leadId, ownerId });
 
@@ -49,6 +94,8 @@ serve(async (req) => {
     // Fetch full conversation context if leadId or ownerId provided
     let fullContext = conversationContext || "";
     let commHistory = "";
+    let leadData: any = null;
+    let ownerData: any = null;
     
     if (leadId) {
       // Fetch lead data
@@ -58,9 +105,13 @@ serve(async (req) => {
         .eq("id", leadId)
         .single();
       
+      leadData = lead;
+      
       if (lead) {
-        fullContext = `Lead: ${lead.name}\nProperty: ${lead.property_address || "N/A"}\nStage: ${lead.stage}`;
+        fullContext = `Lead: ${lead.name}\nPhone: ${lead.phone || "N/A"}\nEmail: ${lead.email || "N/A"}\nProperty: ${lead.property_address || "N/A"}\nStage: ${lead.stage}`;
         if (lead.ai_summary) fullContext += `\nNotes: ${lead.ai_summary}`;
+        if (lead.move_in_date) fullContext += `\nMove-in: ${lead.move_in_date}`;
+        if (lead.budget) fullContext += `\nBudget: $${lead.budget}`;
       }
 
       // Fetch communications
@@ -69,17 +120,18 @@ serve(async (req) => {
         .select("*")
         .eq("lead_id", leadId)
         .order("created_at", { ascending: false })
-        .limit(10);
+        .limit(15);
       
       if (comms && comms.length > 0) {
-        commHistory = "\n\nRECENT MESSAGES:\n";
-        for (const c of comms.slice(0, 5)) {
-          const dir = c.direction === "outbound" ? "SENT" : "RECEIVED";
-          const preview = (c.body || "").substring(0, 150);
-          commHistory += `[${dir}]: ${preview}${preview.length >= 150 ? "..." : ""}\n`;
+        commHistory = "\n\nFULL CONVERSATION HISTORY (newest first):\n";
+        for (const c of comms) {
+          const dir = c.direction === "outbound" ? "WE SENT" : "THEY REPLIED";
+          const type = c.communication_type?.toUpperCase() || "MSG";
+          const preview = (c.body || "").substring(0, 200);
+          commHistory += `[${dir} - ${type}]: ${preview}${preview.length >= 200 ? "..." : ""}\n`;
           
           if (c.transcript) {
-            commHistory += `[CALL TRANSCRIPT]: ${c.transcript.substring(0, 200)}...\n`;
+            commHistory += `[CALL TRANSCRIPT]: ${c.transcript.substring(0, 300)}...\n`;
           }
         }
       }
@@ -91,8 +143,10 @@ serve(async (req) => {
         .eq("id", ownerId)
         .single();
       
+      ownerData = owner;
+      
       if (owner) {
-        fullContext = `Owner: ${owner.name}\nProperties: ${owner.properties?.map((p: any) => p.name || p.address).join(", ") || "N/A"}`;
+        fullContext = `Owner: ${owner.name}\nEmail: ${owner.email || "N/A"}\nPhone: ${owner.phone || "N/A"}\nProperties: ${owner.properties?.map((p: any) => p.name || p.address).join(", ") || "N/A"}`;
       }
 
       // Fetch communications
@@ -101,34 +155,63 @@ serve(async (req) => {
         .select("*")
         .eq("owner_id", ownerId)
         .order("created_at", { ascending: false })
-        .limit(10);
+        .limit(15);
       
       if (comms && comms.length > 0) {
-        commHistory = "\n\nRECENT MESSAGES:\n";
-        for (const c of comms.slice(0, 5)) {
-          const dir = c.direction === "outbound" ? "SENT" : "RECEIVED";
-          const preview = (c.body || "").substring(0, 150);
-          commHistory += `[${dir}]: ${preview}${preview.length >= 150 ? "..." : ""}\n`;
+        commHistory = "\n\nFULL CONVERSATION HISTORY (newest first):\n";
+        for (const c of comms) {
+          const dir = c.direction === "outbound" ? "WE SENT" : "THEY REPLIED";
+          const type = c.communication_type?.toUpperCase() || "MSG";
+          const preview = (c.body || "").substring(0, 200);
+          commHistory += `[${dir} - ${type}]: ${preview}${preview.length >= 200 ? "..." : ""}\n`;
         }
       }
     }
 
+    // If conversationContext was passed directly (from UI), use it
+    if (conversationContext && !commHistory) {
+      commHistory = "\n\nCONVERSATION CONTEXT:\n" + conversationContext;
+    }
+
     const firstName = contactName?.split(" ")[0] || "there";
 
+    // Build system prompt with optional company knowledge
     let systemPrompt = `You are a professional property management assistant for PeachHaus Group helping compose ${messageType === "sms" ? "SMS messages" : "emails"}.
 
 ${humanLikeGuidelines}
 
-CONTEXT:
-Contact: ${contactName || "Unknown"} (use "${firstName}")
+${includeCompanyKnowledge ? companyKnowledge : ""}
+
+CONTACT INFO:
+Name: ${contactName || "Unknown"} (use "${firstName}" when addressing them)
 ${fullContext}
 ${commHistory}
 
-${messageType === "sms" ? "Keep SMS under 160 characters when possible, max 320." : "Keep emails concise - 2-3 paragraphs max."}`;
+CRITICAL INSTRUCTIONS:
+1. Read the ENTIRE conversation history carefully before responding
+2. Your reply should directly address what they last said
+3. Be helpful and provide specific information
+4. If they asked a question, answer it
+5. If they expressed a concern, address it
+6. If they're just being conversational, respond naturally
+7. ${messageType === "sms" ? "Keep SMS under 160 characters when possible, max 320." : "Keep emails concise - 2-3 paragraphs max."}
+8. Never be generic - reference specific details from the conversation`;
 
     let userPrompt = "";
 
     switch (action) {
+      case "generate_contextual_reply":
+        userPrompt = `Based on the full conversation history above, generate a contextual SMS reply.
+
+IMPORTANT: 
+- Look at what the contact LAST said and respond directly to that
+- If they asked something, answer it
+- If they mentioned something specific, acknowledge it
+- Be natural and conversational
+
+Generate ONLY the reply text, nothing else.`;
+        break;
+
       case "generate":
         userPrompt = `Generate a professional ${messageType === "sms" ? "SMS" : "email"} reply based on the conversation context.
 ${currentMessage ? `Current draft to improve: "${currentMessage}"` : "Create an appropriate response based on the context."}
@@ -172,7 +255,7 @@ ${messageType === "sms" ? "Target under 160 characters." : ""}`;
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
         ],
-        max_tokens: messageType === "sms" ? 100 : 500,
+        max_tokens: messageType === "sms" ? 150 : 500,
         temperature: 0.7,
       }),
     });
@@ -196,10 +279,15 @@ ${messageType === "sms" ? "Target under 160 characters." : ""}`;
     }
 
     const data = await response.json();
-    const generatedMessage = data.choices?.[0]?.message?.content?.trim();
+    let generatedMessage = data.choices?.[0]?.message?.content?.trim();
 
     if (!generatedMessage) {
       throw new Error("No message generated");
+    }
+
+    // Clean up the message - remove quotes if wrapped
+    if (generatedMessage.startsWith('"') && generatedMessage.endsWith('"')) {
+      generatedMessage = generatedMessage.slice(1, -1);
     }
 
     console.log("Generated message:", generatedMessage.substring(0, 100) + "...");
