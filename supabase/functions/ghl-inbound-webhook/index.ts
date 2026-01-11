@@ -51,6 +51,25 @@ serve(async (req) => {
     const contactPhone = rawPhone;
     const contactName = fullName || firstName || "Lead";
     
+    // Extract media URLs from MMS attachments
+    const mediaUrls: string[] = [];
+    if (message.attachments && Array.isArray(message.attachments)) {
+      for (const attachment of message.attachments) {
+        if (attachment.url) {
+          mediaUrls.push(attachment.url);
+        }
+      }
+    }
+    // Also check for media array (alternative GHL format)
+    if (message.media && Array.isArray(message.media)) {
+      for (const media of message.media) {
+        if (media.url) {
+          mediaUrls.push(media.url);
+        }
+      }
+    }
+    console.log("Media URLs found:", mediaUrls);
+    
     console.log("Processing inbound SMS:", { messageBody, contactPhone, contactName });
 
     if (!contactPhone) {
@@ -109,6 +128,7 @@ serve(async (req) => {
         status: "received",
         ghl_contact_id: ghlContactId,
         is_read: false,
+        media_urls: mediaUrls.length > 0 ? mediaUrls : null,
       })
       .select()
       .single();

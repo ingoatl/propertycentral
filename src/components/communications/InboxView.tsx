@@ -754,7 +754,7 @@ export function InboxView() {
   
   // Fetch conversation thread for selected contact (all SMS messages from same contact)
   const { data: conversationThread = [] } = useQuery({
-    queryKey: ["conversation-thread", selectedMessage?.contact_id, selectedMessage?.contact_phone, selectedMessage?.contact_type, selectedMessage?.owner_id],
+    queryKey: ["conversation-thread", selectedMessage?.id, selectedMessage?.contact_id, selectedMessage?.contact_phone, selectedMessage?.contact_type, selectedMessage?.owner_id],
     queryFn: async () => {
       if (!selectedMessage) return [];
       
@@ -763,7 +763,7 @@ export function InboxView() {
         // Fetch from lead_communications
         const { data: leadComms, error } = await supabase
           .from("lead_communications")
-          .select("id, communication_type, direction, body, subject, created_at, status")
+          .select("id, communication_type, direction, body, subject, created_at, status, media_urls")
           .eq("lead_id", selectedMessage.contact_id)
           .in("communication_type", ["sms", "call"])
           .order("created_at", { ascending: true });
@@ -780,16 +780,17 @@ export function InboxView() {
             direction: comm.direction,
             body,
             created_at: comm.created_at,
+            media_urls: comm.media_urls || [],
           };
         });
         
         // Also fetch from user_phone_messages if we have a phone number
-        let userMessages: typeof leadMessages = [];
+        let userMessages: { id: string; type: string; direction: string; body: string; created_at: string; media_urls: string[] }[] = [];
         if (selectedMessage.contact_phone) {
           const phone = selectedMessage.contact_phone;
           const { data: userMsgs } = await supabase
             .from("user_phone_messages")
-            .select("id, direction, body, created_at")
+            .select("id, direction, body, created_at, media_urls")
             .or(`from_number.eq.${phone},to_number.eq.${phone}`)
             .order("created_at", { ascending: true });
           
@@ -800,6 +801,7 @@ export function InboxView() {
               direction: msg.direction,
               body: msg.body || "(No content)",
               created_at: msg.created_at,
+              media_urls: (Array.isArray(msg.media_urls) ? msg.media_urls : []) as string[],
             }));
           }
         }
@@ -827,7 +829,7 @@ export function InboxView() {
       if (selectedMessage.contact_type === "owner" && selectedMessage.owner_id) {
         const { data, error } = await supabase
           .from("lead_communications")
-          .select("id, communication_type, direction, body, subject, created_at, status")
+          .select("id, communication_type, direction, body, subject, created_at, status, media_urls")
           .eq("owner_id", selectedMessage.owner_id)
           .in("communication_type", ["sms", "call", "email"])
           .order("created_at", { ascending: true });
@@ -844,6 +846,7 @@ export function InboxView() {
             direction: comm.direction,
             body,
             created_at: comm.created_at,
+            media_urls: (Array.isArray(comm.media_urls) ? comm.media_urls : []) as string[],
           };
         });
       }
@@ -855,16 +858,16 @@ export function InboxView() {
         // Fetch from user_phone_messages
         const { data: userMsgs, error: userMsgsError } = await supabase
           .from("user_phone_messages")
-          .select("id, direction, body, created_at")
+          .select("id, direction, body, created_at, media_urls")
           .or(`from_number.eq.${phone},to_number.eq.${phone}`)
           .order("created_at", { ascending: true });
         
         // If this was matched to a lead, also fetch lead_communications
-        let leadMsgs: typeof userMsgs = [];
+        let leadMsgs: { id: string; direction: string; body: string | null; created_at: string; type: string; media_urls: string[] }[] = [];
         if (selectedMessage.contact_type === "lead" && selectedMessage.contact_id) {
           const { data: leadCommsData } = await supabase
             .from("lead_communications")
-            .select("id, communication_type, direction, body, created_at")
+            .select("id, communication_type, direction, body, created_at, media_urls")
             .eq("lead_id", selectedMessage.contact_id)
             .in("communication_type", ["sms", "call"])
             .order("created_at", { ascending: true });
@@ -876,6 +879,7 @@ export function InboxView() {
               body: c.body,
               created_at: c.created_at,
               type: c.communication_type,
+              media_urls: (Array.isArray(c.media_urls) ? c.media_urls : []) as string[],
             }));
           }
         }
@@ -888,6 +892,7 @@ export function InboxView() {
             direction: msg.direction,
             body: msg.body || "(No content)",
             created_at: msg.created_at,
+            media_urls: (Array.isArray(msg.media_urls) ? msg.media_urls : []) as string[],
           })),
           ...leadMsgs.map(msg => ({
             id: msg.id,
@@ -895,6 +900,7 @@ export function InboxView() {
             direction: msg.direction,
             body: msg.body || "(No content)",
             created_at: msg.created_at,
+            media_urls: msg.media_urls,
           })),
         ];
         
@@ -981,7 +987,7 @@ export function InboxView() {
               className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-colors ${activeTab === "chats" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"}`}
             >
               <MessageSquare className="h-4 w-4" />
-              <span className="hidden sm:inline">Chats</span>
+              <span className="hidden sm:inline">SMS</span>
             </button>
             <button 
               onClick={() => { setActiveTab("calls"); setSelectedGmailEmail(null); setShowMobileDetail(false); }} 
@@ -1475,6 +1481,20 @@ export function InboxView() {
                                       <div className={`flex items-center gap-1 text-[11px] mb-1 ${isOutbound ? "opacity-80" : "text-muted-foreground"}`}>
                                         <Phone className="h-3 w-3" />
                                         {isOutbound ? "Outgoing call" : "Incoming call"}
+                                      </div>
+                                    )}
+                                    {/* MMS Images */}
+                                    {msg.media_urls && msg.media_urls.length > 0 && (
+                                      <div className="mb-2 space-y-2">
+                                        {msg.media_urls.map((url: string, imgIdx: number) => (
+                                          <img 
+                                            key={imgIdx} 
+                                            src={url} 
+                                            alt="MMS attachment" 
+                                            className="max-w-full rounded-lg cursor-pointer hover:opacity-90"
+                                            onClick={() => window.open(url, '_blank')}
+                                          />
+                                        ))}
                                       </div>
                                     )}
                                     <p className="text-sm whitespace-pre-wrap leading-relaxed">{msg.body}</p>
