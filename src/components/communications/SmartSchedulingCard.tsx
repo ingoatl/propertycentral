@@ -280,7 +280,7 @@ export function SmartSchedulingCard({
 
         {/* Actions */}
         <div className="flex flex-wrap gap-2 pt-2">
-          {selectedDate && selectedTime && (
+          {selectedDate && selectedTime ? (
             <Button
               size="sm"
               onClick={handleScheduleCall}
@@ -294,22 +294,29 @@ export function SmartSchedulingCard({
               )}
               Schedule for {format(selectedDate, "MMM d")} at {timeSlots.find(s => s.time === selectedTime)?.display}
             </Button>
+          ) : (
+            <p className="text-xs text-muted-foreground italic">
+              Select a date and time above to schedule
+            </p>
           )}
           
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleSendInviteLink}
-            disabled={isSendingInvite || !contactPhone}
-            className="gap-1.5"
-          >
-            {isSendingInvite ? (
-              <Loader2 className="h-3 w-3 animate-spin" />
-            ) : (
-              <Send className="h-3 w-3" />
-            )}
-            Send Calendar Link
-          </Button>
+          {/* Only show Send Calendar Link option if no time selected yet */}
+          {(!selectedDate || !selectedTime) && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleSendInviteLink}
+              disabled={isSendingInvite || !contactPhone}
+              className="gap-1.5"
+            >
+              {isSendingInvite ? (
+                <Loader2 className="h-3 w-3 animate-spin" />
+              ) : (
+                <Send className="h-3 w-3" />
+              )}
+              Send Calendar Link
+            </Button>
+          )}
         </div>
       </CardContent>
     </Card>

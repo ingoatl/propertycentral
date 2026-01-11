@@ -237,7 +237,20 @@ serve(async (req) => {
     // DEEP CONVERSATION ANALYSIS
     const hasOutboundCall = commHistory.includes("[WE SENT - CALL]") || commHistory.includes("CALL TRANSCRIPT");
     const hasInboundCall = commHistory.includes("[THEY REPLIED - CALL]");
-    const hasPhoneCall = hasOutboundCall || hasInboundCall;
+    const hasCompletedDiscoveryCall = discoveryCallsData.some(c => c.status === "completed" || c.status === "done");
+    
+    // Also detect mentions of having had a call in the conversation text
+    const conversationLower = commHistory.toLowerCase();
+    const mentionedCall = conversationLower.includes("we already") && (
+      conversationLower.includes("call") || conversationLower.includes("meeting") || 
+      conversationLower.includes("spoke") || conversationLower.includes("talked") ||
+      conversationLower.includes("video") || conversationLower.includes("met")
+    ) || conversationLower.includes("already spoke") || conversationLower.includes("already talked") ||
+    conversationLower.includes("already had a call") || conversationLower.includes("already did a") ||
+    conversationLower.includes("we spoke") || conversationLower.includes("we talked") ||
+    conversationLower.includes("after our call") || conversationLower.includes("from our call");
+    
+    const hasPhoneCall = hasOutboundCall || hasInboundCall || hasCompletedDiscoveryCall || mentionedCall;
     const hasTheyReplied = commHistory.includes("[THEY REPLIED");
     const hasWeSent = commHistory.includes("[WE SENT");
     const isFirstContact = !hasWeSent;
@@ -245,13 +258,21 @@ serve(async (req) => {
     const hasEmail = leadData?.email || ownerData?.email;
     
     // Check what's been discussed already
-    const alreadyOfferedIncomeReport = commHistory.toLowerCase().includes("income analysis") || 
-                                        commHistory.toLowerCase().includes("income report") ||
-                                        commHistory.toLowerCase().includes("what your property can earn");
-    const alreadyAskedForAddress = commHistory.toLowerCase().includes("address") && hasWeSent;
-    const alreadyAskedForEmail = commHistory.toLowerCase().includes("email") && hasWeSent;
+    const alreadyOfferedIncomeReport = conversationLower.includes("income analysis") || 
+                                        conversationLower.includes("income report") ||
+                                        conversationLower.includes("what your property can earn");
+    const alreadyAskedForAddress = conversationLower.includes("address") && hasWeSent;
+    const alreadyAskedForEmail = conversationLower.includes("email") && hasWeSent;
     const hasScheduledCall = discoveryCallsData.some(c => c.status === "scheduled" || c.status === "confirmed");
     const isExistingOwner = ownerData !== null;
+    
+    // Check if they're referring to something from a previous call
+    const referencingPreviousCall = mentionedCall;
+    
+    // Check if we already sent a scheduling link
+    const alreadySentSchedulingLink = conversationLower.includes("propertycentral.lovable.app/book") ||
+                                       conversationLower.includes("pick a time") ||
+                                       conversationLower.includes("schedule a call") && hasWeSent;
     
     // Determine communication count
     const ourMessages = (commHistory.match(/\[WE SENT/g) || []).length;
@@ -275,27 +296,29 @@ ${fullContext}
 ${commHistory}
 
 CRITICAL CONVERSATION ANALYSIS:
-- Has there been an actual PHONE CALL with this person? ${hasPhoneCall ? (hasOutboundCall ? "YES - We called them" : "YES - They called us") : "NO - Only text/email communication"}
-- Total conversation messages: ${conversationCount} (our messages: ${ourMessages}, their messages: ${theirMessages})
-- Is this a new conversation? ${isNewConversation ? "YES" : "NO - ongoing conversation"}
+- Has there been a call/meeting with this person? ${hasPhoneCall ? "YES - we've talked before" : "NO - Only text/email communication"}
+- Are they REFERRING to a previous call/meeting? ${referencingPreviousCall ? "YES - they mentioned we already talked/met" : "NO"}
+- Total conversation messages: ${conversationCount} (our: ${ourMessages}, their: ${theirMessages})
+- Is this a new conversation? ${isNewConversation ? "YES" : "NO - ongoing"}
 - Is this an existing property owner? ${isExistingOwner ? "YES - do NOT offer income report" : "NO - potential new client"}
 - Do we have their property address? ${hasPropertyAddress ? "YES" : "NO"}
 - Do we have their email? ${hasEmail ? "YES" : "NO"}
 - Already offered income report? ${alreadyOfferedIncomeReport ? "YES - don't repeat" : "NO"}
-- Already asked for address? ${alreadyAskedForAddress ? "YES - don't repeat" : "NO"}
-- Already asked for email? ${alreadyAskedForEmail ? "YES - don't repeat" : "NO"}
+- Already sent scheduling link? ${alreadySentSchedulingLink ? "YES - don't send again" : "NO"}
 - Has scheduled call? ${hasScheduledCall ? "YES" : "NO"}
 
 CRITICAL INSTRUCTIONS:
-1. Read the ENTIRE conversation history carefully before responding - every word matters
-2. NEVER say "great chatting" or "great speaking" unless there was an ACTUAL phone call (calls have [CALL] or CALL TRANSCRIPT)
-3. If there was NO phone call, use "Thanks for reaching out!" or "Great to hear from you!"
-4. Your reply MUST directly address what they last said - don't ignore their question
-5. Be specific - reference details from the conversation
-6. ${messageType === "sms" ? "Keep SMS under 160 characters when possible, max 320." : "Keep emails concise - 2-3 paragraphs max."}
-7. Never repeat something we already said in the conversation
-8. Sound like a real person typing, not a bot - use contractions, be casual but professional
-9. Sign off as: "- Ingo @ PeachHaus Group"`;
+1. Read the ENTIRE conversation history carefully - every word matters
+2. If they mention "we already talked/met/had a call" - ACKNOWLEDGE this! Don't offer another scheduling link.
+3. NEVER say "great chatting" unless there was an ACTUAL phone call
+4. If there was NO phone call, use "Thanks for reaching out!" or "Great to hear from you!"
+5. Your reply MUST directly address what they last said - don't ignore their message
+6. Be specific - reference details from the conversation
+7. ${messageType === "sms" ? "Keep SMS under 160 characters when possible, max 320." : "Keep emails concise."}
+8. Never repeat something we already said in the conversation
+9. If we already sent a scheduling link, DON'T send it again
+10. Sound like a real person typing - use contractions, be casual but professional
+11. Sign off as: "- Ingo @ PeachHaus Group"`;
 
     let userPrompt = "";
 
@@ -332,9 +355,16 @@ CRITICAL INSTRUCTIONS:
         userPrompt = `Generate a warm, professional SMS reply based on the FULL conversation history.
 
 CRITICAL CONTEXT CHECK:
-- Phone call happened? ${hasPhoneCall ? "YES" : "NO - only text messages"}
-- If NO phone call: DO NOT say "great chatting" or "great speaking"
-- Use "great to hear from you" or "thanks for reaching out" instead
+- Phone call/meeting happened? ${hasPhoneCall ? "YES - we've talked before" : "NO - only text messages"}
+- Are they referencing a past call? ${referencingPreviousCall ? "YES - they said we already talked/met" : "NO"}
+- Already sent scheduling link? ${alreadySentSchedulingLink ? "YES - DON'T send it again" : "NO"}
+
+${referencingPreviousCall ? `IMPORTANT: They mentioned we already talked/met. ACKNOWLEDGE THIS! 
+- Say something like "Yes, great connecting with you!" or "Absolutely, following up from our chat..."
+- Do NOT send another scheduling link or explain what the link is for - they already know us!
+- Focus on next steps or answering their question.` : ""}
+
+${hasPhoneCall ? "Since we already talked, skip the intro pleasantries and get to the point." : "If NO phone call: DO NOT say 'great chatting' - use 'thanks for reaching out' instead"}
 
 INCOME ANALYSIS STRATEGY:
 ${incomeReportInstruction}
@@ -342,15 +372,16 @@ ${incomeReportInstruction}
 WHAT WE KNOW:
 ${hasPropertyAddress ? `✓ Property address: ${leadData?.property_address || "on file"}` : "✗ Missing property address"}
 ${hasEmail ? `✓ Email: ${leadData?.email || ownerData?.email || "on file"}` : "✗ Missing email"}
-${hasScheduledCall ? "✓ Call already scheduled" : "✗ No call scheduled yet"}
+${hasScheduledCall ? "✓ Call already scheduled" : ""}
 
 RESPONSE RULES:
-1. Directly address their last message first
+1. FIRST: Acknowledge what they said (especially if referencing a past call)
 2. Don't repeat anything we already said
-3. Only ask for info we don't have AND haven't already asked for
-4. Be concise - this is SMS (under 300 chars ideal)
-5. Sound natural, like a real person typing quickly
-6. End with: "- Ingo @ PeachHaus Group"
+3. Don't explain things they already know from our call
+4. Only ask for info we don't have AND haven't already asked for
+5. Be concise - under 300 chars ideal
+6. Sound natural, like a real person
+7. End with: "- Ingo @ PeachHaus Group"
 
 Generate ONLY the reply text, nothing else.`;
         break;

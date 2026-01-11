@@ -1352,16 +1352,6 @@ export function InboxView() {
             </button>
           </div>
           
-          {/* Income Report button */}
-          <button 
-            onClick={() => setShowIncomeReport(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-gradient-to-r from-orange-500 to-orange-600 text-white hover:from-orange-600 hover:to-orange-700 transition-colors"
-            title="Generate Income Report"
-          >
-            <TrendingUp className="h-4 w-4" />
-            <span className="hidden sm:inline">Income Report</span>
-          </button>
-          
           {/* Search toggle */}
           <button 
             onClick={() => setSearch(search ? "" : " ")}
@@ -1848,6 +1838,9 @@ export function InboxView() {
                       <PhoneOutgoing className="h-4 w-4 mr-2" />Call
                     </DropdownMenuItem>
                   )}
+                  <DropdownMenuItem onClick={() => setShowIncomeReport(true)}>
+                    <TrendingUp className="h-4 w-4 mr-2 text-orange-500" />Income Report
+                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => setShowContactInfo(true)}>
                     <Info className="h-4 w-4 mr-2" />Contact Info
                   </DropdownMenuItem>
@@ -1884,6 +1877,16 @@ export function InboxView() {
                 <p className="text-sm text-muted-foreground truncate">{selectedMessage.sender_email || selectedMessage.contact_email || selectedMessage.contact_phone || "No contact info"}</p>
               </div>
               <div className="flex items-center gap-1">
+                {/* Income Report button in detail header */}
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  className="h-9 gap-1.5 text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+                  onClick={() => setShowIncomeReport(true)}
+                >
+                  <TrendingUp className="h-4 w-4" />
+                  <span className="hidden lg:inline text-xs">Income Report</span>
+                </Button>
                 {selectedMessage.contact_phone && (
                   <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => setShowSmsReply(true)}><PhoneCall className="h-4 w-4" /></Button>
                 )}
