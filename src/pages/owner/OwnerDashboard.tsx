@@ -40,9 +40,10 @@ import { OwnerReviewsCard } from "./components/OwnerReviewsCard";
 import { OwnerMarketInsightsEnhanced } from "./components/OwnerMarketInsightsEnhanced";
 import { OwnerPropertyTab } from "./components/OwnerPropertyTab";
 import { OwnerRevenueForecast } from "./components/OwnerRevenueForecast";
-import { UpcomingEventsTimeline } from "./components/UpcomingEventsTimeline";
+import { EnhancedEventsTimeline } from "./components/EnhancedEventsTimeline";
 import { StatementViewer } from "./components/StatementViewer";
 import { OwnerOnboardingTimeline } from "./components/OwnerOnboardingTimeline";
+import { GenerateDashboardPdfButton } from "./components/GenerateDashboardPdfButton";
 
 interface OwnerSession {
   ownerId: string;
