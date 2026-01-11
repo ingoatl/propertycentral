@@ -92,48 +92,57 @@ serve(async (req) => {
   }
 
   try {
-    const { templateId, testEmail } = await req.json();
+    const { templateId, testEmail, customEmail } = await req.json();
 
-    if (!templateId || !testEmail) {
-      throw new Error("Missing required fields: templateId, testEmail");
+    if (!testEmail) {
+      throw new Error("Missing required field: testEmail");
     }
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    const resend = new Resend(RESEND_API_KEY);
 
-    // Fetch the template
-    const { data: template, error: templateError } = await supabase
-      .from("lead_email_templates")
-      .select("*")
-      .eq("id", templateId)
-      .single();
+    let processedSubject: string;
+    let emailHtml: string;
 
-    if (templateError || !template) {
-      throw new Error("Template not found");
+    // Handle custom email (no template lookup)
+    if (customEmail && customEmail.subject && customEmail.body) {
+      processedSubject = `[TEST] ${customEmail.subject}`;
+      emailHtml = buildEmailHtml(customEmail.body, "ingo");
+    } else if (templateId) {
+      // Fetch the template
+      const { data: template, error: templateError } = await supabase
+        .from("lead_email_templates")
+        .select("*")
+        .eq("id", templateId)
+        .single();
+
+      if (templateError || !template) {
+        throw new Error("Template not found");
+      }
+
+      // Test data for variable substitution
+      const testData = {
+        name: "Test User",
+        property_address: "123 Test Street, Atlanta, GA 30309",
+        email: testEmail,
+        phone: "(555) 123-4567",
+        new_str_onboarding_url: "https://app.peachhausgroup.com/new-str-onboarding",
+        existing_str_onboarding_url: "https://app.peachhausgroup.com/owner-onboarding",
+      };
+
+      // Process template variables
+      processedSubject = `[TEST] ${processTemplateVariables(template.subject, testData)}`;
+      const processedBody = processTemplateVariables(template.body_content, testData);
+      emailHtml = buildEmailHtml(processedBody, template.signature_type);
+    } else {
+      throw new Error("Either templateId or customEmail is required");
     }
 
-    // Test data for variable substitution
-    const testData = {
-      name: "Test User",
-      property_address: "123 Test Street, Atlanta, GA 30309",
-      email: testEmail,
-      phone: "(555) 123-4567",
-      new_str_onboarding_url: "https://app.peachhausgroup.com/new-str-onboarding",
-      existing_str_onboarding_url: "https://app.peachhausgroup.com/owner-onboarding",
-    };
-
-    // Process template variables
-    const processedSubject = processTemplateVariables(template.subject, testData);
-    const processedBody = processTemplateVariables(template.body_content, testData);
-
-    // Build email HTML
-    const emailHtml = buildEmailHtml(processedBody, template.signature_type);
-
     // Send the email
-    const resend = new Resend(RESEND_API_KEY);
     const emailResponse = await resend.emails.send({
       from: "PeachHaus <noreply@peachhausgroup.com>",
       to: [testEmail],
-      subject: `[TEST] ${processedSubject}`,
+      subject: processedSubject,
       html: emailHtml,
     });
 
