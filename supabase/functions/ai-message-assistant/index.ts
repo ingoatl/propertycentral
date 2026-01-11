@@ -138,6 +138,7 @@ serve(async (req) => {
     let commHistory = "";
     let leadData: any = null;
     let ownerData: any = null;
+    let discoveryCallsData: any[] = [];
     
     if (leadId) {
       // Fetch lead data
@@ -156,25 +157,41 @@ serve(async (req) => {
         if (lead.budget) fullContext += `\nBudget: $${lead.budget}`;
       }
 
-      // Fetch communications
+      // Fetch communications - get MORE history for better context
       const { data: comms } = await supabase
         .from("lead_communications")
         .select("*")
         .eq("lead_id", leadId)
         .order("created_at", { ascending: false })
-        .limit(15);
+        .limit(25);
       
       if (comms && comms.length > 0) {
         commHistory = "\n\nFULL CONVERSATION HISTORY (newest first):\n";
         for (const c of comms) {
           const dir = c.direction === "outbound" ? "WE SENT" : "THEY REPLIED";
           const type = c.communication_type?.toUpperCase() || "MSG";
-          const preview = (c.body || "").substring(0, 200);
-          commHistory += `[${dir} - ${type}]: ${preview}${preview.length >= 200 ? "..." : ""}\n`;
+          const preview = (c.body || "").substring(0, 300);
+          commHistory += `[${dir} - ${type}]: ${preview}${preview.length >= 300 ? "..." : ""}\n`;
           
           if (c.transcript) {
-            commHistory += `[CALL TRANSCRIPT]: ${c.transcript.substring(0, 300)}...\n`;
+            commHistory += `[CALL TRANSCRIPT]: ${c.transcript.substring(0, 500)}...\n`;
           }
+        }
+      }
+
+      // Fetch discovery calls for this lead
+      const { data: calls } = await supabase
+        .from("discovery_calls")
+        .select("*")
+        .eq("lead_id", leadId)
+        .order("scheduled_at", { ascending: false })
+        .limit(5);
+      
+      if (calls && calls.length > 0) {
+        discoveryCallsData = calls;
+        commHistory += "\n\nSCHEDULED CALLS:\n";
+        for (const call of calls) {
+          commHistory += `- ${call.status}: ${call.scheduled_at} (${call.meeting_type || "discovery"})\n`;
         }
       }
     } else if (ownerId) {
@@ -197,15 +214,15 @@ serve(async (req) => {
         .select("*")
         .eq("owner_id", ownerId)
         .order("created_at", { ascending: false })
-        .limit(15);
+        .limit(25);
       
       if (comms && comms.length > 0) {
         commHistory = "\n\nFULL CONVERSATION HISTORY (newest first):\n";
         for (const c of comms) {
           const dir = c.direction === "outbound" ? "WE SENT" : "THEY REPLIED";
           const type = c.communication_type?.toUpperCase() || "MSG";
-          const preview = (c.body || "").substring(0, 200);
-          commHistory += `[${dir} - ${type}]: ${preview}${preview.length >= 200 ? "..." : ""}\n`;
+          const preview = (c.body || "").substring(0, 300);
+          commHistory += `[${dir} - ${type}]: ${preview}${preview.length >= 300 ? "..." : ""}\n`;
         }
       }
     }
@@ -217,13 +234,33 @@ serve(async (req) => {
 
     const firstName = contactName?.split(" ")[0] || "there";
 
-    // Analyze conversation to determine what actually happened
+    // DEEP CONVERSATION ANALYSIS
     const hasOutboundCall = commHistory.includes("[WE SENT - CALL]") || commHistory.includes("CALL TRANSCRIPT");
     const hasInboundCall = commHistory.includes("[THEY REPLIED - CALL]");
-    const hasActualConversation = hasOutboundCall || hasInboundCall || commHistory.includes("[THEY REPLIED");
-    const isFirstContact = !commHistory.includes("[WE SENT");
+    const hasPhoneCall = hasOutboundCall || hasInboundCall;
+    const hasTheyReplied = commHistory.includes("[THEY REPLIED");
+    const hasWeSent = commHistory.includes("[WE SENT");
+    const isFirstContact = !hasWeSent;
     const hasPropertyAddress = leadData?.property_address || ownerData?.properties?.some((p: any) => p.address);
     const hasEmail = leadData?.email || ownerData?.email;
+    
+    // Check what's been discussed already
+    const alreadyOfferedIncomeReport = commHistory.toLowerCase().includes("income analysis") || 
+                                        commHistory.toLowerCase().includes("income report") ||
+                                        commHistory.toLowerCase().includes("what your property can earn");
+    const alreadyAskedForAddress = commHistory.toLowerCase().includes("address") && hasWeSent;
+    const alreadyAskedForEmail = commHistory.toLowerCase().includes("email") && hasWeSent;
+    const hasScheduledCall = discoveryCallsData.some(c => c.status === "scheduled" || c.status === "confirmed");
+    const isExistingOwner = ownerData !== null;
+    
+    // Determine communication count
+    const ourMessages = (commHistory.match(/\[WE SENT/g) || []).length;
+    const theirMessages = (commHistory.match(/\[THEY REPLIED/g) || []).length;
+    const conversationCount = ourMessages + theirMessages;
+    
+    // Determine if this is a new lead vs ongoing conversation
+    const isNewConversation = conversationCount <= 2;
+    const isOngoingConversation = conversationCount > 2;
 
     // Build system prompt with optional company knowledge
     let systemPrompt = `You are a professional property management assistant for PeachHaus Group helping compose ${messageType === "sms" ? "SMS messages" : "emails"}.
@@ -238,50 +275,84 @@ ${fullContext}
 ${commHistory}
 
 CRITICAL CONVERSATION ANALYSIS:
-- Has there been an actual PHONE CALL with this person? ${hasOutboundCall ? "YES - We called them" : hasInboundCall ? "YES - They called us" : "NO - Only text/email communication"}
-- Is this our first outreach to them? ${isFirstContact ? "YES" : "NO - We've contacted them before"}
-- Do we have their property address? ${hasPropertyAddress ? "YES" : "NO - MUST ASK FOR IT"}
-- Do we have their email? ${hasEmail ? "YES" : "NO - MUST ASK FOR IT (needed to send income analysis)"}
+- Has there been an actual PHONE CALL with this person? ${hasPhoneCall ? (hasOutboundCall ? "YES - We called them" : "YES - They called us") : "NO - Only text/email communication"}
+- Total conversation messages: ${conversationCount} (our messages: ${ourMessages}, their messages: ${theirMessages})
+- Is this a new conversation? ${isNewConversation ? "YES" : "NO - ongoing conversation"}
+- Is this an existing property owner? ${isExistingOwner ? "YES - do NOT offer income report" : "NO - potential new client"}
+- Do we have their property address? ${hasPropertyAddress ? "YES" : "NO"}
+- Do we have their email? ${hasEmail ? "YES" : "NO"}
+- Already offered income report? ${alreadyOfferedIncomeReport ? "YES - don't repeat" : "NO"}
+- Already asked for address? ${alreadyAskedForAddress ? "YES - don't repeat" : "NO"}
+- Already asked for email? ${alreadyAskedForEmail ? "YES - don't repeat" : "NO"}
+- Has scheduled call? ${hasScheduledCall ? "YES" : "NO"}
 
 CRITICAL INSTRUCTIONS:
-1. Read the ENTIRE conversation history carefully before responding
-2. NEVER say "great chatting with you" or "great speaking with you" unless there was an ACTUAL phone call (not just text messages)
-3. If there was NO phone call, say things like "Thanks for reaching out!" or "Great to hear from you!"
-4. Your reply should directly address what they last said
-5. Be helpful and provide specific information
-6. If they asked a question, answer it
-7. ${messageType === "sms" ? "Keep SMS under 160 characters when possible, max 320." : "Keep emails concise - 2-3 paragraphs max."}
-8. Never be generic - reference specific details from the conversation
-9. ALWAYS offer the FREE INCOME ANALYSIS if we don't have their property address yet
-10. If they texted and we don't have their email, ask for it so we can send the analysis`;
+1. Read the ENTIRE conversation history carefully before responding - every word matters
+2. NEVER say "great chatting" or "great speaking" unless there was an ACTUAL phone call (calls have [CALL] or CALL TRANSCRIPT)
+3. If there was NO phone call, use "Thanks for reaching out!" or "Great to hear from you!"
+4. Your reply MUST directly address what they last said - don't ignore their question
+5. Be specific - reference details from the conversation
+6. ${messageType === "sms" ? "Keep SMS under 160 characters when possible, max 320." : "Keep emails concise - 2-3 paragraphs max."}
+7. Never repeat something we already said in the conversation
+8. Sound like a real person typing, not a bot - use contractions, be casual but professional
+9. Sign off as: "- Ingo @ PeachHaus Group"`;
 
     let userPrompt = "";
 
     switch (action) {
       case "generate_contextual_reply":
-        userPrompt = `Based on the full conversation history above, generate a warm, professional SMS reply.
+        // Build smart instructions based on what's been discussed
+        let incomeReportInstruction = "";
+        
+        if (isExistingOwner) {
+          // For existing owners, never offer income report
+          incomeReportInstruction = "This is an EXISTING PROPERTY OWNER - do NOT offer income analysis. Focus on addressing their specific needs.";
+        } else if (alreadyOfferedIncomeReport) {
+          // Already offered, don't repeat
+          incomeReportInstruction = "We already offered the income analysis. If they haven't responded to that offer, gently remind them or ask what questions they have.";
+        } else if (hasPropertyAddress && hasEmail) {
+          // We have everything, don't need to ask
+          incomeReportInstruction = "We have their address and email. Offer to run the income analysis for their property if it makes sense in context.";
+        } else if (!hasPropertyAddress && !hasEmail && !alreadyAskedForAddress) {
+          // Missing both, first time asking
+          incomeReportInstruction = `Offer a FREE income analysis and ask for their property address${!hasEmail ? " and email" : ""} to send it.`;
+        } else if (!hasPropertyAddress && alreadyAskedForAddress) {
+          // Already asked for address but didn't get it
+          incomeReportInstruction = "We already asked for their address. If they didn't provide it, gently follow up or ask if they have questions.";
+        } else if (hasPropertyAddress && !hasEmail && !alreadyAskedForEmail) {
+          // Have address, need email
+          incomeReportInstruction = "We have their address. Ask for their email so we can send the income analysis.";
+        } else {
+          // Default - offer if new conversation
+          incomeReportInstruction = isNewConversation 
+            ? "Offer a FREE income analysis - show them what their property can earn with short, mid, and long-term rentals."
+            : "Continue the natural conversation flow.";
+        }
 
-CRITICAL CHECK FIRST:
-- Did we actually TALK on the phone? ${hasOutboundCall || hasInboundCall ? "YES" : "NO - only text messages"}
-- If NO phone call, DO NOT say "great chatting" or "great speaking" - use "great to hear from you" or "thanks for reaching out" instead
+        userPrompt = `Generate a warm, professional SMS reply based on the FULL conversation history.
 
-MANDATORY: ALWAYS INCLUDE FREE INCOME ANALYSIS OFFER
-- We MUST offer our FREE rental income analysis in every first/early response
-- This is our key value proposition - show them what their property can earn
-- To create it, we need: property address + email (to send the report)
+CRITICAL CONTEXT CHECK:
+- Phone call happened? ${hasPhoneCall ? "YES" : "NO - only text messages"}
+- If NO phone call: DO NOT say "great chatting" or "great speaking"
+- Use "great to hear from you" or "thanks for reaching out" instead
 
-INFORMATION WE STILL NEED:
-${!hasPropertyAddress ? "- Property address (REQUIRED for income analysis)" : "✓ Have property address"}
-${!hasEmail ? "- Email address (REQUIRED to send the income analysis)" : "✓ Have email"}
+INCOME ANALYSIS STRATEGY:
+${incomeReportInstruction}
 
-RESPONSE MUST INCLUDE:
-1. Acknowledge their message warmly (but accurately - no "great chatting" unless we called)
-2. Address their specific question or interest
-3. ALWAYS mention: "Would you like a free income analysis? It shows projected earnings for short-term, mid-term, and long-term rentals. Just need your property address${!hasEmail ? " and email" : ""} to send it over!"
-4. Clear next step
-5. Sign off: "- Ingo @ PeachHaus Group"
+WHAT WE KNOW:
+${hasPropertyAddress ? `✓ Property address: ${leadData?.property_address || "on file"}` : "✗ Missing property address"}
+${hasEmail ? `✓ Email: ${leadData?.email || ownerData?.email || "on file"}` : "✗ Missing email"}
+${hasScheduledCall ? "✓ Call already scheduled" : "✗ No call scheduled yet"}
 
-Keep under 300 characters for SMS. Generate ONLY the reply text.`;
+RESPONSE RULES:
+1. Directly address their last message first
+2. Don't repeat anything we already said
+3. Only ask for info we don't have AND haven't already asked for
+4. Be concise - this is SMS (under 300 chars ideal)
+5. Sound natural, like a real person typing quickly
+6. End with: "- Ingo @ PeachHaus Group"
+
+Generate ONLY the reply text, nothing else.`;
         break;
 
       case "generate":

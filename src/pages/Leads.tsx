@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, LayoutGrid, List } from "lucide-react";
+import { Plus, LayoutGrid, List, TrendingUp } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Lead, LeadStage } from "@/types/leads";
 import LeadKanbanBoard from "@/components/leads/LeadKanbanBoard";
@@ -14,6 +14,7 @@ import LeadQuickFilters from "@/components/leads/LeadQuickFilters";
 import LeadDetailModal from "@/components/leads/LeadDetailModal";
 import CreateLeadDialog from "@/components/leads/CreateLeadDialog";
 import VoiceDialer from "@/components/leads/VoiceDialer";
+import { IncomeReportEmbed } from "@/components/IncomeReportEmbed";
 import { cn } from "@/lib/utils";
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -26,6 +27,7 @@ const Leads = () => {
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [showIncomeReport, setShowIncomeReport] = useState(false);
   const [viewMode, setViewMode] = useState<"kanban" | "list">("kanban");
   const [activeFilters, setActiveFilters] = useState<{ type: FilterType; value: string }[]>([]);
 
@@ -133,6 +135,14 @@ const Leads = () => {
           </p>
         </div>
         <div className="flex gap-2">
+          <Button 
+            onClick={() => setShowIncomeReport(true)} 
+            variant="outline"
+            className="gap-2 border-orange-500/30 text-orange-600 hover:bg-orange-50 hover:text-orange-700"
+          >
+            <TrendingUp className="h-4 w-4" />
+            <span className="hidden sm:inline">Income Report</span>
+          </Button>
           <VoiceDialer />
           <Button onClick={() => setIsCreateOpen(true)} className="flex-1 sm:flex-none">
             <Plus className="h-4 w-4 mr-2" />
@@ -224,6 +234,12 @@ const Leads = () => {
       />
 
       <CreateLeadDialog open={isCreateOpen} onOpenChange={setIsCreateOpen} />
+
+      <IncomeReportEmbed 
+        open={showIncomeReport} 
+        onOpenChange={setShowIncomeReport}
+        onReportGenerated={() => toast.success("Income report generated!")}
+      />
     </div>
   );
 };

@@ -27,7 +27,9 @@ import {
   UserPlus,
   Inbox,
   Play,
+  TrendingUp,
 } from "lucide-react";
+import { IncomeReportEmbed } from "@/components/IncomeReportEmbed";
 import { TwilioCallDialog } from "@/components/TwilioCallDialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -152,6 +154,7 @@ export function InboxView() {
   } | null>(null);
   const [showCallDialog, setShowCallDialog] = useState(false);
   const [showFollowUpModal, setShowFollowUpModal] = useState(false);
+  const [showIncomeReport, setShowIncomeReport] = useState(false);
   const [lastSentMessage, setLastSentMessage] = useState<string>("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
@@ -1349,6 +1352,16 @@ export function InboxView() {
             </button>
           </div>
           
+          {/* Income Report button */}
+          <button 
+            onClick={() => setShowIncomeReport(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium bg-gradient-to-r from-orange-500 to-orange-600 text-white hover:from-orange-600 hover:to-orange-700 transition-colors"
+            title="Generate Income Report"
+          >
+            <TrendingUp className="h-4 w-4" />
+            <span className="hidden sm:inline">Income Report</span>
+          </button>
+          
           {/* Search toggle */}
           <button 
             onClick={() => setSearch(search ? "" : " ")}
@@ -2289,6 +2302,12 @@ export function InboxView() {
           }}
         />
       )}
+
+      {/* Income Report Modal */}
+      <IncomeReportEmbed 
+        open={showIncomeReport} 
+        onOpenChange={setShowIncomeReport}
+      />
     </div>
   );
 }
