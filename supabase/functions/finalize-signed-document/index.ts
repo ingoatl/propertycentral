@@ -327,20 +327,25 @@ async function fillPdfWithValues(
         // Convert percentage positions to absolute coordinates
         const absX = (x / 100) * pageWidth;
         // PDF y-coordinates start from bottom, so convert from top-based percentage
+        // The y percentage is measured from TOP of page, PDF measures from BOTTOM
         const absY = pageHeight - ((y / 100) * pageHeight);
-        const absWidth = (width / 100) * pageWidth;
-        const absHeight = (height / 100) * pageHeight;
+        const absWidth = width ? (width / 100) * pageWidth : 100;
+        const absHeight = height ? (height / 100) * pageHeight : 20;
         
         const textValue = sanitizeTextForPdf(String(value));
-        const fontSize = Math.min(10, absHeight * 0.6);
+        // Calculate appropriate font size based on typical form line height
+        const fontSize = 9; // Standard form font size
         
-        // The field x,y represents where the fillable area starts (after label colon)
-        // For proper alignment, draw text/signatures starting from this x position
-        // And on the SAME vertical line (not above or below)
+        // Field position is where the INPUT AREA starts (after the label/colon)
+        // For proper alignment:
+        // - X should be the start of the value area (absX is correct)
+        // - Y needs adjustment: the y% points to the TOP of the field area
+        //   But PDF drawText uses BASELINE, so we need to offset down by font size
         const drawX = absX;
-        // Y should be adjusted so text sits ON the baseline of the line
-        // The y% points to where the label text is - we need to draw at same baseline
-        const drawY = absY;
+        // The y coordinate should place text so it sits ON the underline
+        // Subtract a small offset to account for text baseline vs. field top
+        const baselineOffset = fontSize * 0.3; // Adjust text baseline to sit on the line
+        const drawY = absY - baselineOffset;
         
         try {
           // Handle signature fields - determine which signer's signature to embed
@@ -360,19 +365,19 @@ async function fillPdfWithValues(
                 const sigBytes = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
                 const sigImage = await pdfDoc.embedPng(sigBytes);
                 
-                // Signature dimensions - keep compact but readable
-                const sigWidth = Math.min(absWidth * 0.5, 100);
-                const sigHeight = Math.min(22, absHeight * 1.2);
+                // Signature dimensions - compact and readable
+                const sigWidth = Math.min(absWidth * 0.4, 80);
+                const sigHeight = 18; // Fixed height for consistency
                 
-                // Draw signature so its BOTTOM sits on the line (baseline)
-                // The line is at drawY, signature should sit on top of it
+                // Draw signature with its BOTTOM on the underline
+                // Since y in PDF is bottom-based, we draw at the line position
                 page.drawImage(sigImage, {
                   x: drawX,
-                  y: drawY - 2, // Bottom of signature at the line
+                  y: absY - sigHeight, // Place signature so bottom sits on line
                   width: sigWidth,
                   height: sigHeight,
                 });
-                console.log("Embedded signature for", signerType, "at", api_id, "position:", drawX, drawY);
+                console.log("Embedded signature for", signerType, "at", api_id, "x:", drawX, "y:", absY - sigHeight);
               } catch (sigError) {
                 console.error("Error embedding signature for", signerType, ":", sigError);
                 page.drawText(`[Signed by ${sigData.name}]`, {
@@ -397,21 +402,22 @@ async function fillPdfWithValues(
               page.drawText('X', {
                 x: drawX + 2,
                 y: drawY,
-                size: 12,
+                size: 11,
                 font,
                 color: rgb(0, 0, 0),
               });
             }
           } else if (value !== '') {
-            // Regular text/date field - draw value on the SAME LINE as label
-            // PDF text baseline: y is where the bottom of text sits
+            // Regular text/date field - draw value aligned with the underline
+            // The text baseline should sit just above the underline
             page.drawText(textValue.substring(0, 80), {
               x: drawX,
-              y: drawY, // Same baseline as the label
+              y: drawY,
               size: fontSize,
               font,
               color: rgb(0, 0, 0),
             });
+            console.log("Drew text for", api_id, "at x:", drawX, "y:", drawY, "value:", textValue.substring(0, 30));
           }
         } catch (drawError) {
           console.error("Error drawing field", api_id, ":", drawError);
