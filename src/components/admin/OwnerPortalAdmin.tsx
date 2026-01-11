@@ -25,6 +25,8 @@ import {
   CheckCircle,
   Clock,
   CreditCard,
+  Sparkles,
+  Play,
 } from "lucide-react";
 
 interface OwnerProperty {
@@ -309,10 +311,21 @@ export function OwnerPortalAdmin() {
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <Button variant="outline" onClick={loadOwners}>
-          <RefreshCw className="h-4 w-4 mr-2" />
-          Refresh
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            variant="outline" 
+            className="gap-2 bg-gradient-to-r from-amber-50 to-orange-50 border-amber-200 hover:border-amber-300 text-amber-700"
+            onClick={() => window.open('/owner?token=demo-portal-token-3069-rita-way', '_blank')}
+          >
+            <Sparkles className="h-4 w-4" />
+            <Play className="h-3 w-3" />
+            Demo Portal
+          </Button>
+          <Button variant="outline" onClick={loadOwners}>
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh
+          </Button>
+        </div>
       </div>
 
       {/* Owners Table */}

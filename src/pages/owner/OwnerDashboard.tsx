@@ -657,9 +657,18 @@ export default function OwnerDashboard() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-background via-muted/30 to-background flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <RefreshCw className="h-10 w-10 animate-spin text-primary" />
-          <p className="text-muted-foreground">Loading your dashboard...</p>
+        <div className="flex flex-col items-center gap-6 text-center p-8">
+          {/* Branded loading screen */}
+          <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary to-primary/80 flex items-center justify-center shadow-xl">
+            <Building2 className="h-10 w-10 text-primary-foreground" />
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-xl font-semibold">PeachHaus Owner Portal</h2>
+            <div className="flex items-center gap-2 justify-center text-muted-foreground">
+              <RefreshCw className="h-4 w-4 animate-spin" />
+              <p>Loading your dashboard...</p>
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -747,7 +756,16 @@ export default function OwnerDashboard() {
                   </div>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
+                {session && property && (
+                  <GenerateDashboardPdfButton
+                    ownerId={session.ownerId}
+                    propertyId={property.id}
+                    propertyName={property.name}
+                    variant={propertyImageUrl ? "outline" : "outline"}
+                    size="sm"
+                  />
+                )}
                 <Button 
                   variant={propertyImageUrl ? "secondary" : "outline"} 
                   size="sm" 
