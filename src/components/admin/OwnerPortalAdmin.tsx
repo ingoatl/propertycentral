@@ -376,12 +376,12 @@ export function OwnerPortalAdmin() {
           </Button>
           <Button 
             variant="outline" 
-            className="gap-2 bg-gradient-to-r from-amber-50 to-orange-50 border-amber-200 hover:border-amber-300 text-amber-700"
+            className="gap-2 bg-gradient-to-r from-red-100 to-red-200 border-red-400 hover:border-red-500 text-red-700 font-semibold"
             onClick={() => window.open('/owner?token=demo-portal-token-3069-rita-way', '_blank')}
           >
             <Sparkles className="h-4 w-4" />
             <Play className="h-3 w-3" />
-            Demo Portal
+            DEMO PORTAL
           </Button>
           <Button variant="outline" onClick={loadOwners}>
             <RefreshCw className="h-4 w-4 mr-2" />
