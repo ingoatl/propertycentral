@@ -115,7 +115,7 @@ export function SmartSchedulingCard({
           lead_id: leadId || contactId,
           scheduled_at: scheduledAt.toISOString(),
           status: "scheduled",
-          meeting_type: "discovery",
+          meeting_type: "video",
           duration_minutes: 30,
         })
         .select()
@@ -123,8 +123,42 @@ export function SmartSchedulingCard({
 
       if (callError) throw callError;
 
+      // Try to sync to Google Calendar
+      try {
+        const { error: calError } = await supabase.functions.invoke("sync-discovery-call-to-calendar", {
+          body: { discoveryCallId: call.id },
+        });
+        if (calError) {
+          console.error("Calendar sync failed:", calError);
+          // Don't throw - call is still scheduled
+        }
+      } catch (calSyncErr) {
+        console.error("Calendar sync error:", calSyncErr);
+      }
+
+      // Send SMS invite to the contact
+      if (contactPhone) {
+        try {
+          const userName = await getCurrentUserName();
+          const formattedDate = format(scheduledAt, "EEEE, MMM d");
+          const formattedTime = format(scheduledAt, "h:mm a");
+          const message = `Hi ${contactName?.split(" ")[0] || "there"}! I've scheduled our call for ${formattedDate} at ${formattedTime}. Looking forward to chatting! - ${userName} @ PeachHaus Group`;
+          
+          await supabase.functions.invoke("ghl-send-sms", {
+            body: {
+              leadId: leadId || (contactType === "lead" ? contactId : undefined),
+              phone: contactPhone,
+              message,
+            },
+          });
+        } catch (smsErr) {
+          console.error("SMS invite failed:", smsErr);
+        }
+      }
+
       toast.success("Call scheduled successfully!");
       onScheduled?.();
+      onDismiss();
     } catch (error: any) {
       console.error("Error scheduling call:", error);
       toast.error(`Failed to schedule: ${error.message}`);
