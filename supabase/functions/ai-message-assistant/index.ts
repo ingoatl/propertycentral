@@ -265,22 +265,23 @@ CRITICAL CHECK FIRST:
 - Did we actually TALK on the phone? ${hasOutboundCall || hasInboundCall ? "YES" : "NO - only text messages"}
 - If NO phone call, DO NOT say "great chatting" or "great speaking" - use "great to hear from you" or "thanks for reaching out" instead
 
+MANDATORY: ALWAYS INCLUDE FREE INCOME ANALYSIS OFFER
+- We MUST offer our FREE rental income analysis in every first/early response
+- This is our key value proposition - show them what their property can earn
+- To create it, we need: property address + email (to send the report)
+
 INFORMATION WE STILL NEED:
-${!hasPropertyAddress ? "- Property address (for free income analysis)" : ""}
-${!hasEmail ? "- Email address (to send the income analysis report)" : ""}
+${!hasPropertyAddress ? "- Property address (REQUIRED for income analysis)" : "✓ Have property address"}
+${!hasEmail ? "- Email address (REQUIRED to send the income analysis)" : "✓ Have email"}
 
-MUST INCLUDE IN RESPONSE:
-${!hasPropertyAddress || !hasEmail ? `- Offer our FREE rental income analysis and ask for: ${!hasPropertyAddress ? "their property address" : ""} ${!hasEmail ? "their email" : ""}` : "- They have our income analysis prerequisites, focus on next steps like scheduling a call"}
+RESPONSE MUST INCLUDE:
+1. Acknowledge their message warmly (but accurately - no "great chatting" unless we called)
+2. Address their specific question or interest
+3. ALWAYS mention: "Would you like a free income analysis? It shows projected earnings for short-term, mid-term, and long-term rentals. Just need your property address${!hasEmail ? " and email" : ""} to send it over!"
+4. Clear next step
+5. Sign off: "- Ingo @ PeachHaus Group"
 
-RESPONSE FRAMEWORK:
-- Warmth first (acknowledge them as a person - but accurately!)
-- Address their specific need/interest
-- Provide value or offer income analysis
-- Ask for missing info (address/email) if needed
-- Clear call-to-action
-- Sign off: "- PeachHaus"
-
-Keep under 280 characters for SMS. Generate ONLY the reply text.`;
+Keep under 300 characters for SMS. Generate ONLY the reply text.`;
         break;
 
       case "generate":
