@@ -27,6 +27,8 @@ import {
   CreditCard,
   Sparkles,
   Play,
+  FileText,
+  RotateCw,
 } from "lucide-react";
 
 interface OwnerProperty {
@@ -61,6 +63,8 @@ export function OwnerPortalAdmin() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [sendingInvite, setSendingInvite] = useState<string | null>(null);
+  const [syncingPayments, setSyncingPayments] = useState(false);
+  const [generatingReport, setGeneratingReport] = useState<string | null>(null);
   const [stats, setStats] = useState<OwnerStats>({
     totalOwners: 0,
     withProperties: 0,
@@ -147,6 +151,100 @@ export function OwnerPortalAdmin() {
     }
   };
 
+  const syncPaymentMethods = async () => {
+    setSyncingPayments(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error("Not authenticated");
+        return;
+      }
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sync-owner-payment-method`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ syncAll: true }),
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || "Failed to sync payment methods");
+      }
+
+      toast.success(`Synced ${result.synced} owners, ${result.updated} updated`);
+      loadOwners();
+    } catch (error: unknown) {
+      console.error("Error syncing payments:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to sync payments");
+    } finally {
+      setSyncingPayments(false);
+    }
+  };
+
+  const generateOwnerReport = async (owner: OwnerWithProperties, property: OwnerProperty) => {
+    setGeneratingReport(`${owner.id}-${property.id}`);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error("Not authenticated");
+        return;
+      }
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-owner-dashboard-pdf`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            ownerId: owner.id,
+            propertyId: property.id,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to generate report");
+      }
+
+      const result = await response.json();
+      
+      // Convert base64 to blob and download
+      const byteCharacters = atob(result.pdf);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], { type: 'application/pdf' });
+      
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = result.filename || `owner-report-${property.name}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      toast.success(`Report generated for ${property.name}`);
+    } catch (error: unknown) {
+      console.error("Error generating report:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to generate report");
+    } finally {
+      setGeneratingReport(null);
+    }
+  };
   const sendInvite = async (owner: OwnerWithProperties, propertyId: string) => {
     if (!propertyId) {
       toast.error("No property selected");
@@ -183,7 +281,7 @@ export function OwnerPortalAdmin() {
       }
 
       toast.success(`Portal invite sent to ${owner.email}`);
-      loadOwners(); // Refresh to show updated invite date
+      loadOwners();
     } catch (error: unknown) {
       console.error("Error sending invite:", error);
       toast.error(error instanceof Error ? error.message : "Failed to send invite");
@@ -311,7 +409,20 @@ export function OwnerPortalAdmin() {
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
+          <Button 
+            variant="outline" 
+            className="gap-2 bg-gradient-to-r from-blue-50 to-cyan-50 border-blue-200 hover:border-blue-300 text-blue-700"
+            onClick={syncPaymentMethods}
+            disabled={syncingPayments}
+          >
+            {syncingPayments ? (
+              <RefreshCw className="h-4 w-4 animate-spin" />
+            ) : (
+              <RotateCw className="h-4 w-4" />
+            )}
+            Sync Payments
+          </Button>
           <Button 
             variant="outline" 
             className="gap-2 bg-gradient-to-r from-amber-50 to-orange-50 border-amber-200 hover:border-amber-300 text-amber-700"
@@ -406,6 +517,19 @@ export function OwnerPortalAdmin() {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex items-center justify-end gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => generateOwnerReport(owner, property)}
+                            disabled={generatingReport === `${owner.id}-${property.id}`}
+                            title="Generate PDF Report"
+                          >
+                            {generatingReport === `${owner.id}-${property.id}` ? (
+                              <RefreshCw className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <FileText className="h-4 w-4" />
+                            )}
+                          </Button>
                           <Button
                             variant="outline"
                             size="sm"

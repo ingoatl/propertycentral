@@ -136,50 +136,100 @@ const eventCategoryStyles: Record<string, {
   "georgia state": { category: "Education", icon: GraduationCap, gradientFrom: "from-blue-500", gradientTo: "to-red-500", pricingMultiplier: 1.3 },
 };
 
-// Metro Atlanta events database
+// Metro Atlanta events database with city-specific local events
 const metroAtlantaEvents: Array<{
   event: string;
   date: string;
   impact: string;
   venue?: string;
-  isLocal?: boolean;
+  city?: string;
 }> = [
   // January-February 2026
-  { event: "Atlanta Hawks vs Lakers", date: "2026-01-15", impact: "NBA marquee matchup drives downtown hotel demand", venue: "State Farm Arena" },
-  { event: "Martin Luther King Jr. Day Events", date: "2026-01-19", impact: "National visitors for MLK historic site activities", venue: "Multiple locations" },
-  { event: "Atlanta Restaurant Week", date: "2026-01-25", impact: "Foodies travel for exclusive dining experiences", venue: "Citywide" },
-  { event: "Super Bowl LX Watch Parties", date: "2026-02-08", impact: "Major sports bars and venues packed citywide", venue: "Multiple venues" },
+  { event: "Atlanta Hawks vs Lakers", date: "2026-01-15", impact: "NBA marquee matchup drives downtown hotel demand", venue: "State Farm Arena", city: "Atlanta" },
+  { event: "Martin Luther King Jr. Day Events", date: "2026-01-19", impact: "National visitors for MLK historic site activities", venue: "Multiple locations", city: "Atlanta" },
+  { event: "Atlanta Restaurant Week", date: "2026-01-25", impact: "Foodies travel for exclusive dining experiences", venue: "Citywide", city: "Atlanta" },
+  { event: "Super Bowl LX Watch Parties", date: "2026-02-08", impact: "Major sports bars and venues packed citywide", venue: "Multiple venues", city: "Atlanta" },
   
   // March-April 2026
-  { event: "St. Patrick's Day Parade", date: "2026-03-14", impact: "Midtown celebration draws regional crowds", venue: "Midtown Atlanta" },
-  { event: "Atlanta Dogwood Festival", date: "2026-04-10", impact: "250,000+ visitors over 3-day festival weekend", venue: "Piedmont Park" },
-  { event: "Shaky Knees Music Festival", date: "2026-05-01", impact: "40,000+ music fans descend on Central Park", venue: "Central Park" },
+  { event: "St. Patrick's Day Parade", date: "2026-03-14", impact: "Midtown celebration draws regional crowds", venue: "Midtown Atlanta", city: "Atlanta" },
+  { event: "Atlanta Dogwood Festival", date: "2026-04-10", impact: "250,000+ visitors over 3-day festival weekend", venue: "Piedmont Park", city: "Atlanta" },
+  { event: "Shaky Knees Music Festival", date: "2026-05-01", impact: "40,000+ music fans descend on Central Park", venue: "Central Park", city: "Atlanta" },
   
   // May-June 2026
-  { event: "Georgia Tech Graduation", date: "2026-05-09", impact: "Thousands of families book accommodations", venue: "Bobby Dodd Stadium" },
-  { event: "Emory University Graduation", date: "2026-05-11", impact: "Major academic event fills Druid Hills area", venue: "Emory Campus" },
-  { event: "FIFA World Cup - Atlanta Matches", date: "2026-06-15", impact: "Historic 300-400% rate opportunity", venue: "Mercedes-Benz Stadium" },
-  { event: "Music Midtown Festival", date: "2026-09-19", impact: "50,000+ attendees create massive demand surge", venue: "Piedmont Park" },
+  { event: "Georgia Tech Graduation", date: "2026-05-09", impact: "Thousands of families book accommodations", venue: "Bobby Dodd Stadium", city: "Atlanta" },
+  { event: "Emory University Graduation", date: "2026-05-11", impact: "Major academic event fills Druid Hills area", venue: "Emory Campus", city: "Atlanta" },
+  { event: "FIFA World Cup - Atlanta Matches", date: "2026-06-15", impact: "Historic 300-400% rate opportunity", venue: "Mercedes-Benz Stadium", city: "Atlanta" },
+  { event: "Music Midtown Festival", date: "2026-09-19", impact: "50,000+ attendees create massive demand surge", venue: "Piedmont Park", city: "Atlanta" },
   
   // July 2026
-  { event: "Peachtree Road Race", date: "2026-07-04", impact: "60,000 runners + spectators flood Buckhead to Midtown", venue: "Peachtree Street" },
-  { event: "July 4th Fireworks - Lenox Square", date: "2026-07-04", impact: "Massive Buckhead celebration crowds", venue: "Lenox Square" },
-  { event: "July 4th Fireworks - Centennial Park", date: "2026-07-04", impact: "Downtown celebration draws 100,000+", venue: "Centennial Olympic Park" },
+  { event: "Peachtree Road Race", date: "2026-07-04", impact: "60,000 runners + spectators flood Buckhead to Midtown", venue: "Peachtree Street", city: "Atlanta" },
+  { event: "July 4th Fireworks - Lenox Square", date: "2026-07-04", impact: "Massive Buckhead celebration crowds", venue: "Lenox Square", city: "Atlanta" },
+  { event: "July 4th Fireworks - Centennial Park", date: "2026-07-04", impact: "Downtown celebration draws 100,000+", venue: "Centennial Olympic Park", city: "Atlanta" },
   
   // August-September 2026
-  { event: "Dragon Con", date: "2026-09-04", impact: "85,000+ fans overwhelm downtown hotels", venue: "Downtown Hotels" },
-  { event: "ONE Musicfest", date: "2026-09-12", impact: "30,000+ attendees for urban music festival", venue: "Piedmont Park" },
-  { event: "Atlanta Pride Festival", date: "2026-10-10", impact: "300,000+ celebrate in Piedmont Park area", venue: "Piedmont Park" },
+  { event: "Dragon Con", date: "2026-09-04", impact: "85,000+ fans overwhelm downtown hotels", venue: "Downtown Hotels", city: "Atlanta" },
+  { event: "ONE Musicfest", date: "2026-09-12", impact: "30,000+ attendees for urban music festival", venue: "Piedmont Park", city: "Atlanta" },
+  { event: "Atlanta Pride Festival", date: "2026-10-10", impact: "300,000+ celebrate in Piedmont Park area", venue: "Piedmont Park", city: "Atlanta" },
   
   // October-November 2026
-  { event: "Atlanta Braves Postseason", date: "2026-10-05", impact: "If playoffs, expect 42,000+ per home game surge", venue: "Truist Park" },
-  { event: "Taste of Atlanta", date: "2026-10-24", impact: "100,000+ foodies over 3-day event", venue: "Historic Fourth Ward" },
-  { event: "Georgia vs Georgia Tech Rivalry", date: "2026-11-28", impact: "Clean Old-Fashioned Hate brings 90,000+ to stadium", venue: "Mercedes-Benz Stadium" },
+  { event: "Atlanta Braves Postseason", date: "2026-10-05", impact: "If playoffs, expect 42,000+ per home game surge", venue: "Truist Park", city: "Atlanta" },
+  { event: "Taste of Atlanta", date: "2026-10-24", impact: "100,000+ foodies over 3-day event", venue: "Historic Fourth Ward", city: "Atlanta" },
+  { event: "Georgia vs Georgia Tech Rivalry", date: "2026-11-28", impact: "Clean Old-Fashioned Hate brings 90,000+ to stadium", venue: "Mercedes-Benz Stadium", city: "Atlanta" },
   
   // December 2026
-  { event: "SEC Championship Game", date: "2026-12-05", impact: "75,000+ fans fill downtown Atlanta", venue: "Mercedes-Benz Stadium" },
-  { event: "Chick-fil-A Peach Bowl", date: "2026-12-30", impact: "Major bowl game draws 70,000+ visitors", venue: "Mercedes-Benz Stadium" },
-  { event: "Atlanta New Year's Eve - Peach Drop", date: "2026-12-31", impact: "Underground Atlanta celebration draws regional crowds", venue: "Underground Atlanta" },
+  { event: "SEC Championship Game", date: "2026-12-05", impact: "75,000+ fans fill downtown Atlanta", venue: "Mercedes-Benz Stadium", city: "Atlanta" },
+  { event: "Chick-fil-A Peach Bowl", date: "2026-12-30", impact: "Major bowl game draws 70,000+ visitors", venue: "Mercedes-Benz Stadium", city: "Atlanta" },
+  { event: "Atlanta New Year's Eve - Peach Drop", date: "2026-12-31", impact: "Underground Atlanta celebration draws regional crowds", venue: "Underground Atlanta", city: "Atlanta" },
+  
+  // SMYRNA Local Events
+  { event: "Smyrna Spring Jonquil Festival", date: "2026-04-25", impact: "50,000+ visitors enjoy arts, crafts, and entertainment", venue: "Village Green", city: "Smyrna" },
+  { event: "Smyrna July 4th Celebration", date: "2026-07-04", impact: "Fireworks and family fun draw local crowds", venue: "Taylor-Brawner Park", city: "Smyrna" },
+  { event: "Smyrna Fall Jonquil Festival", date: "2026-10-03", impact: "Arts and crafts festival attracts regional visitors", venue: "Village Green", city: "Smyrna" },
+  { event: "Smyrna Holiday Tree Lighting", date: "2026-12-05", impact: "Community gathering kicks off holiday season", venue: "Market Village", city: "Smyrna" },
+  
+  // MARIETTA Local Events
+  { event: "Marietta Square Farmers Market (Weekly)", date: "2026-04-04", impact: "Weekly market draws steady local visitors", venue: "Marietta Square", city: "Marietta" },
+  { event: "Marietta Chalk Festival", date: "2026-04-11", impact: "20,000+ view street art masterpieces", venue: "Marietta Square", city: "Marietta" },
+  { event: "Marietta Fourth of July Parade", date: "2026-07-04", impact: "One of the South's largest July 4th parades", venue: "Marietta Square", city: "Marietta" },
+  { event: "Art in the Park Marietta", date: "2026-09-12", impact: "Regional art lovers converge on historic square", venue: "Marietta Square", city: "Marietta" },
+  { event: "Marietta Pilgrimage Christmas Home Tour", date: "2026-12-12", impact: "Historic home tours bring holiday visitors", venue: "Historic District", city: "Marietta" },
+  
+  // ALPHARETTA Local Events
+  { event: "Alpharetta Food Truck Alley (Monthly)", date: "2026-05-15", impact: "Popular monthly gathering in downtown", venue: "Downtown Alpharetta", city: "Alpharetta" },
+  { event: "Alpharetta Arts Streetfest", date: "2026-05-23", impact: "Major arts festival draws 75,000+ visitors", venue: "Downtown Alpharetta", city: "Alpharetta" },
+  { event: "Old Soldiers Day Parade", date: "2026-08-01", impact: "Nation's oldest parade south of the Mason-Dixon", venue: "Downtown Alpharetta", city: "Alpharetta" },
+  { event: "Taste of Alpharetta", date: "2026-10-17", impact: "Food festival showcases local restaurants", venue: "Downtown Alpharetta", city: "Alpharetta" },
+  
+  // ROSWELL Local Events
+  { event: "Roswell Arts Festival", date: "2026-09-19", impact: "Premier juried fine arts festival", venue: "Roswell Town Square", city: "Roswell" },
+  { event: "Roswell Lavender Festival", date: "2026-06-13", impact: "Unique festival draws garden enthusiasts", venue: "Barrington Hall", city: "Roswell" },
+  { event: "Roswell Roots Festival", date: "2026-05-16", impact: "Music and food festival in historic district", venue: "Canton Street", city: "Roswell" },
+  
+  // DECATUR Local Events
+  { event: "Decatur BBQ Blues & Bluegrass Festival", date: "2026-08-15", impact: "Popular downtown festival with live music", venue: "Decatur Square", city: "Decatur" },
+  { event: "Decatur Book Festival", date: "2026-09-05", impact: "Largest independent book festival in the US", venue: "Decatur Square", city: "Decatur" },
+  { event: "Decatur Arts Festival", date: "2026-05-23", impact: "Weekend of art, music, and family fun", venue: "Decatur Square", city: "Decatur" },
+  
+  // SANDY SPRINGS Local Events
+  { event: "Sandy Springs Festival", date: "2026-09-19", impact: "Community celebration with arts and music", venue: "City Springs", city: "Sandy Springs" },
+  { event: "Concerts in the Park Sandy Springs", date: "2026-06-06", impact: "Summer concert series draws families", venue: "City Springs", city: "Sandy Springs" },
+  
+  // DUNWOODY Local Events
+  { event: "Dunwoody Art Festival", date: "2026-05-09", impact: "Juried art show attracts collectors", venue: "Brook Run Park", city: "Dunwoody" },
+  { event: "Dunwoody 4th of July Parade", date: "2026-07-04", impact: "Community parade and celebration", venue: "Downtown Dunwoody", city: "Dunwoody" },
+  { event: "Lemonade Days Dunwoody", date: "2026-04-24", impact: "Family festival with carnival and live music", venue: "Brook Run Park", city: "Dunwoody" },
+  
+  // JOHNS CREEK Local Events
+  { event: "Johns Creek Arts Festival", date: "2026-10-03", impact: "Annual arts and crafts celebration", venue: "Newtown Park", city: "Johns Creek" },
+  { event: "Founders Day Johns Creek", date: "2026-12-01", impact: "City birthday celebration with festivities", venue: "City Hall", city: "Johns Creek" },
+  
+  // KENNESAW Local Events
+  { event: "Big Shanty Festival", date: "2026-04-18", impact: "Civil War heritage celebration", venue: "Downtown Kennesaw", city: "Kennesaw" },
+  { event: "Kennesaw Music Festival", date: "2026-09-26", impact: "Live music festival in historic downtown", venue: "Downtown Kennesaw", city: "Kennesaw" },
+  
+  // LAWRENCEVILLE Local Events
+  { event: "Lawrenceville Fall Festival", date: "2026-10-10", impact: "Community celebration on historic square", venue: "Lawrenceville Square", city: "Lawrenceville" },
+  { event: "Gwinnett County Fair", date: "2026-09-10", impact: "Major county fair draws regional visitors", venue: "Gwinnett County Fairgrounds", city: "Lawrenceville" },
 ];
 
 const getEventStyle = (eventName: string): { 
@@ -386,6 +436,9 @@ export const EnhancedEventsTimeline = memo(function EnhancedEventsTimeline({
       });
     });
     
+    // Normalize property city for matching
+    const normalizedPropertyCity = propertyCity?.toLowerCase().trim() || "";
+    
     // Add metro Atlanta events
     metroAtlantaEvents.forEach((event, idx) => {
       const parsedDate = parseEventDate(event.date);
@@ -396,6 +449,10 @@ export const EnhancedEventsTimeline = memo(function EnhancedEventsTimeline({
       const exists = combinedEvents.some(e => 
         e.event.toLowerCase().includes(event.event.toLowerCase().split(' ').slice(0, 2).join(' '))
       );
+      
+      // Determine if this is a local event (matches property city)
+      const eventCity = event.city?.toLowerCase().trim() || "";
+      const isLocalEvent = normalizedPropertyCity && eventCity === normalizedPropertyCity;
       
       if (!exists) {
         combinedEvents.push({
@@ -412,7 +469,7 @@ export const EnhancedEventsTimeline = memo(function EnhancedEventsTimeline({
           pricingMultiplier: style.pricingMultiplier,
           attendees: style.attendees,
           venue: event.venue,
-          isLocal: event.isLocal || false,
+          isLocal: isLocalEvent,
           isMetro: true,
         });
       }
@@ -421,7 +478,7 @@ export const EnhancedEventsTimeline = memo(function EnhancedEventsTimeline({
     return combinedEvents
       .filter(event => isAfter(event.parsedDate, now) || event.daysUntil === 0)
       .sort((a, b) => a.parsedDate.getTime() - b.parsedDate.getTime());
-  }, [events]);
+  }, [events, propertyCity]);
   
   const filteredEvents = useMemo(() => {
     let filtered = allEvents;
