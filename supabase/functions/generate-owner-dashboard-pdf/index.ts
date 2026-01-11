@@ -425,7 +425,7 @@ async function generatePdf(data: DashboardData): Promise<Uint8Array> {
   });
 
   if (data.performance.averageRating) {
-    page.drawText(`${data.performance.averageRating.toFixed(1)} ★`, {
+    page.drawText(`${data.performance.averageRating.toFixed(1)}/5`, {
       x: statsStartX + statWidth * 2,
       y: y - 20,
       size: 14,
@@ -650,8 +650,8 @@ async function generatePdf(data: DashboardData): Promise<Uint8Array> {
     y -= 16;
 
     data.recentReviews.slice(0, 2).forEach((review) => {
-      const stars = "★".repeat(Math.round(review.rating));
-      page.drawText(`${review.guestName} - ${stars}`, {
+      const stars = "*".repeat(Math.round(review.rating));
+      page.drawText(`${review.guestName} - ${stars} (${review.rating}/5)`, {
         x: margin,
         y,
         size: 9,
