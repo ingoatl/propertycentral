@@ -798,20 +798,29 @@ export function InboxView() {
       
       // For leads, fetch all communications for the same lead_id AND user_phone_messages by phone
       if (selectedMessage.contact_type === "lead" && selectedMessage.contact_id) {
+        // Determine what types to fetch based on selected message type
+        const isEmailMessage = selectedMessage.type === "email" || selectedMessage.type === "draft";
+        const commTypes = isEmailMessage ? ["sms", "call", "email"] : ["sms", "call"];
+        
         // Fetch from lead_communications
         const { data: leadComms, error } = await supabase
           .from("lead_communications")
           .select("id, communication_type, direction, body, subject, created_at, status, media_urls")
           .eq("lead_id", selectedMessage.contact_id)
-          .in("communication_type", ["sms", "call"])
+          .in("communication_type", commTypes)
           .order("created_at", { ascending: true });
         
         if (error) throw error;
         
         const leadMessages = (leadComms || []).map(comm => {
-          const body = (!comm.body || comm.body.trim().length === 0 || comm.body === "SMS message")
-            ? (comm.direction === "inbound" ? "(Received message)" : "(Sent message)")
-            : comm.body;
+          let body = comm.body;
+          if (!body || body.trim().length === 0 || body === "SMS message") {
+            body = comm.direction === "inbound" ? "(Received message)" : "(Sent message)";
+          }
+          // For emails, show subject too
+          if (comm.communication_type === "email" && comm.subject) {
+            body = `📧 ${comm.subject}\n\n${body}`;
+          }
           return {
             id: comm.id,
             type: comm.communication_type,
@@ -889,42 +898,52 @@ export function InboxView() {
         });
       }
       
-      // For personal SMS, fetch by phone number - also check lead_communications
+      // For personal SMS, tenants, or external contacts - fetch by phone number
       if (selectedMessage.contact_phone) {
         const phone = selectedMessage.contact_phone;
+        const normalizedPhone = normalizePhone(phone);
         
-        // Fetch from user_phone_messages
-        const { data: userMsgs, error: userMsgsError } = await supabase
+        // Fetch from user_phone_messages using normalized phone matching
+        const { data: userMsgs } = await supabase
           .from("user_phone_messages")
-          .select("id, direction, body, created_at, media_urls")
-          .or(`from_number.eq.${phone},to_number.eq.${phone}`)
+          .select("id, direction, body, created_at, media_urls, from_number, to_number")
           .order("created_at", { ascending: true });
         
-        // If this was matched to a lead, also fetch lead_communications
-        let leadMsgs: { id: string; direction: string; body: string | null; created_at: string; type: string; media_urls: string[] }[] = [];
-        if (selectedMessage.contact_type === "lead" && selectedMessage.contact_id) {
-          const { data: leadCommsData } = await supabase
-            .from("lead_communications")
-            .select("id, communication_type, direction, body, created_at, media_urls")
-            .eq("lead_id", selectedMessage.contact_id)
-            .in("communication_type", ["sms", "call"])
-            .order("created_at", { ascending: true });
-          
-          if (leadCommsData) {
-            leadMsgs = leadCommsData.map(c => ({
-              id: c.id,
-              direction: c.direction,
-              body: c.body,
-              created_at: c.created_at,
-              type: c.communication_type,
-              media_urls: (Array.isArray(c.media_urls) ? c.media_urls : []) as string[],
-            }));
-          }
-        }
+        // Filter by normalized phone
+        const filteredUserMsgs = (userMsgs || []).filter(msg => {
+          const fromNorm = msg.from_number ? normalizePhone(msg.from_number) : "";
+          const toNorm = msg.to_number ? normalizePhone(msg.to_number) : "";
+          return fromNorm === normalizedPhone || toNorm === normalizedPhone;
+        });
         
-        // Combine and deduplicate by timestamp (within 5 seconds) and body content
+        // Also fetch from lead_communications by searching in metadata for this phone
+        const { data: leadComms } = await supabase
+          .from("lead_communications")
+          .select("id, communication_type, direction, body, created_at, media_urls, metadata, ghl_contact_id")
+          .in("communication_type", ["sms", "call"])
+          .order("created_at", { ascending: true });
+        
+        // If matched to a lead, filter by lead_id
+        // Otherwise, check metadata for phone matching
+        const filteredLeadComms = (leadComms || []).filter(comm => {
+          if (selectedMessage.contact_type === "lead" && selectedMessage.contact_id) {
+            // For leads, we already fetched above, so skip here
+            return false;
+          }
+          // Check if metadata contains this phone number (for unmatched/tenant messages)
+          const metadata = comm.metadata as { unmatched_phone?: string; tenant_phone?: string; ghl_data?: { contactPhone?: string } } | null;
+          if (metadata) {
+            const unmatchedPhone = metadata.unmatched_phone?.replace(/\D/g, "").slice(-10);
+            const tenantPhone = metadata.tenant_phone?.replace(/\D/g, "").slice(-10);
+            const ghlPhone = metadata.ghl_data?.contactPhone?.replace(/\D/g, "").slice(-10);
+            return unmatchedPhone === normalizedPhone || tenantPhone === normalizedPhone || ghlPhone === normalizedPhone;
+          }
+          return false;
+        });
+        
+        // Combine all messages
         const allMsgs = [
-          ...(userMsgs || []).map(msg => ({
+          ...filteredUserMsgs.map(msg => ({
             id: msg.id,
             type: "sms" as const,
             direction: msg.direction,
@@ -932,13 +951,13 @@ export function InboxView() {
             created_at: msg.created_at,
             media_urls: (Array.isArray(msg.media_urls) ? msg.media_urls : []) as string[],
           })),
-          ...leadMsgs.map(msg => ({
+          ...filteredLeadComms.map(msg => ({
             id: msg.id,
             type: "sms" as const,
             direction: msg.direction,
             body: msg.body || "(No content)",
             created_at: msg.created_at,
-            media_urls: msg.media_urls,
+            media_urls: (Array.isArray(msg.media_urls) ? msg.media_urls : []) as string[],
           })),
         ];
         

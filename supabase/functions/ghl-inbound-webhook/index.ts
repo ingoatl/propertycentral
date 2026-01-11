@@ -98,7 +98,7 @@ serve(async (req) => {
       throw leadError;
     }
 
-    console.log("Found potential matches:", leads?.length || 0, leads?.map(l => ({ id: l.id, phone: l.phone })));
+    console.log("Found potential lead matches:", leads?.length || 0, leads?.map(l => ({ id: l.id, phone: l.phone })));
 
     // Find the best match by comparing normalized digits (last 10)
     const lead = leads?.find(l => {
@@ -107,21 +107,69 @@ serve(async (req) => {
       return leadDigits === last10Digits;
     });
 
+    // Also check mid_term_bookings (tenants) if no lead found
+    let tenantMatch: { id: string; name: string; phone: string } | null = null;
     if (!lead) {
-      console.log("No matching lead found for phone:", normalizedPhone);
+      const { data: tenants, error: tenantError } = await supabase
+        .from("mid_term_bookings")
+        .select("id, tenant_name, tenant_phone")
+        .ilike("tenant_phone", `%${last4Digits}%`)
+        .limit(20);
+
+      if (!tenantError && tenants) {
+        const tenant = tenants.find(t => {
+          const tenantDigits = t.tenant_phone?.replace(/\D/g, "").slice(-10);
+          return tenantDigits === last10Digits;
+        });
+        if (tenant) {
+          tenantMatch = { id: tenant.id, name: tenant.tenant_name, phone: tenant.tenant_phone };
+          console.log("Found matching tenant:", tenantMatch.id, tenantMatch.name);
+        }
+      }
+    }
+
+    // If neither lead nor tenant found, still store the message for later matching
+    if (!lead && !tenantMatch) {
+      console.log("No matching lead or tenant found for phone:", normalizedPhone);
+      
+      // Store in lead_communications without lead_id for manual matching later
+      const { data: comm, error: commError } = await supabase
+        .from("lead_communications")
+        .insert({
+          communication_type: "sms",
+          direction: "inbound",
+          body: messageBody,
+          status: "received",
+          ghl_contact_id: ghlContactId,
+          is_read: false,
+          media_urls: mediaUrls.length > 0 ? mediaUrls : null,
+          metadata: { 
+            unmatched_phone: normalizedPhone, 
+            contact_name: contactName,
+            ghl_data: { contactPhone: contactPhone, contactName }
+          }
+        })
+        .select()
+        .single();
+
       return new Response(
-        JSON.stringify({ success: true, message: "No matching lead found", phone: normalizedPhone }),
+        JSON.stringify({ 
+          success: true, 
+          message: "Message stored - no matching contact", 
+          phone: normalizedPhone,
+          communicationId: comm?.id
+        }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    console.log("Found matching lead:", lead.id, lead.name);
+    console.log("Found matching contact:", lead ? `Lead ${lead.id}` : `Tenant ${tenantMatch?.id}`);
 
     // Create lead_communications record
     const { data: comm, error: commError } = await supabase
       .from("lead_communications")
       .insert({
-        lead_id: lead.id,
+        lead_id: lead?.id || null,
         communication_type: "sms",
         direction: "inbound",
         body: messageBody,
@@ -129,6 +177,11 @@ serve(async (req) => {
         ghl_contact_id: ghlContactId,
         is_read: false,
         media_urls: mediaUrls.length > 0 ? mediaUrls : null,
+        metadata: tenantMatch ? { 
+          tenant_id: tenantMatch.id, 
+          tenant_name: tenantMatch.name,
+          tenant_phone: tenantMatch.phone
+        } : null
       })
       .select()
       .single();
@@ -140,66 +193,72 @@ serve(async (req) => {
 
     console.log("Communication record created:", comm.id);
 
-    // Update lead with last_response_at and has_unread_messages
-    const { error: leadUpdateError } = await supabase
-      .from("leads")
-      .update({
-        last_response_at: new Date().toISOString(),
-        has_unread_messages: true,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", lead.id);
+    // Only update lead-specific fields if we have a lead (not tenant)
+    if (lead) {
+      // Update lead with last_response_at and has_unread_messages
+      const { error: leadUpdateError } = await supabase
+        .from("leads")
+        .update({
+          last_response_at: new Date().toISOString(),
+          has_unread_messages: true,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", lead.id);
 
-    if (leadUpdateError) {
-      console.error("Error updating lead:", leadUpdateError);
-    }
+      if (leadUpdateError) {
+        console.error("Error updating lead:", leadUpdateError);
+      }
 
-    // Check if we need to pause/cancel follow-up sequences
-    if (lead.active_sequence_id) {
-      // Check if sequence has stop_on_response enabled
-      const { data: sequence } = await supabase
-        .from("lead_follow_up_sequences")
-        .select("stop_on_response")
-        .eq("id", lead.active_sequence_id)
-        .single();
+      // Check if we need to pause/cancel follow-up sequences
+      if (lead.active_sequence_id) {
+        // Check if sequence has stop_on_response enabled
+        const { data: sequence } = await supabase
+          .from("lead_follow_up_sequences")
+          .select("stop_on_response")
+          .eq("id", lead.active_sequence_id)
+          .single();
 
-      if (sequence?.stop_on_response) {
-        console.log("Cancelling pending follow-ups due to lead response");
-        
-        // Cancel all pending follow-ups for this lead
-        const { error: cancelError } = await supabase
-          .from("lead_follow_up_schedules")
-          .update({ status: "cancelled" })
-          .eq("lead_id", lead.id)
-          .eq("status", "pending");
+        if (sequence?.stop_on_response) {
+          console.log("Cancelling pending follow-ups due to lead response");
+          
+          // Cancel all pending follow-ups for this lead
+          const { error: cancelError } = await supabase
+            .from("lead_follow_up_schedules")
+            .update({ status: "cancelled" })
+            .eq("lead_id", lead.id)
+            .eq("status", "pending");
 
-        if (cancelError) {
-          console.error("Error cancelling follow-ups:", cancelError);
-        } else {
-          // Log timeline entry
-          await supabase.from("lead_timeline").insert({
-            lead_id: lead.id,
-            action: "Follow-up sequence paused due to lead response",
-            performed_by_name: "System",
-          });
+          if (cancelError) {
+            console.error("Error cancelling follow-ups:", cancelError);
+          } else {
+            // Log timeline entry
+            await supabase.from("lead_timeline").insert({
+              lead_id: lead.id,
+              action: "Follow-up sequence paused due to lead response",
+              performed_by_name: "System",
+            });
+          }
         }
       }
+
+      // Add timeline entry for the inbound message
+      const messagePreview = messageBody.length > 50 ? messageBody.slice(0, 50) + "..." : messageBody;
+      await supabase.from("lead_timeline").insert({
+        lead_id: lead.id,
+        action: `SMS received: "${messagePreview}"`,
+        performed_by_name: contactName,
+      });
     }
 
-    // Add timeline entry for the inbound message
-    const messagePreview = messageBody.length > 50 ? messageBody.slice(0, 50) + "..." : messageBody;
-    await supabase.from("lead_timeline").insert({
-      lead_id: lead.id,
-      action: `SMS received: "${messagePreview}"`,
-      performed_by_name: contactName,
-    });
-
-    console.log("GHL inbound SMS processed successfully for lead:", lead.id);
+    const contactType = lead ? "lead" : "tenant";
+    const contactId = lead?.id || tenantMatch?.id;
+    console.log(`GHL inbound SMS processed successfully for ${contactType}:`, contactId);
 
     return new Response(
       JSON.stringify({
         success: true,
-        leadId: lead.id,
+        contactType,
+        contactId,
         communicationId: comm.id,
         message: "Inbound SMS processed successfully",
       }),
