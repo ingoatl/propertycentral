@@ -1,8 +1,10 @@
 import { useState, useMemo } from "react";
-import { Calendar, Clock, Send, X, Loader2, Check } from "lucide-react";
+import { Calendar, Clock, Send, X, Loader2, Check, Phone, Video } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format, addDays, setHours, setMinutes, isBefore, isAfter, startOfDay, parseISO } from "date-fns";
@@ -25,6 +27,8 @@ interface TimeSlot {
   available: boolean;
 }
 
+type MeetingType = "phone" | "video";
+
 export function SmartSchedulingCard({
   detectedIntent,
   contactName,
@@ -38,6 +42,7 @@ export function SmartSchedulingCard({
 }: SmartSchedulingCardProps) {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
+  const [meetingType, setMeetingType] = useState<MeetingType>("video");
   const [isScheduling, setIsScheduling] = useState(false);
   const [isSendingInvite, setIsSendingInvite] = useState(false);
 
@@ -107,11 +112,16 @@ export function SmartSchedulingCard({
     try {
       const [hours, minutes] = selectedTime.split(":").map(Number);
       const scheduledAt = setMinutes(setHours(selectedDate, hours), minutes);
+      const endTime = new Date(scheduledAt.getTime() + 30 * 60 * 1000); // 30 min duration
 
+      // Use contact name, not phone number
+      const displayName = contactName || "Contact";
+      
       // Determine if we have a valid lead ID
       const validLeadId = leadId || (contactType === "lead" ? contactId : null);
 
       let callId: string | null = null;
+      let googleMeetLink: string | null = null;
 
       // Only create discovery_call if we have a valid lead ID
       if (validLeadId) {
@@ -121,7 +131,7 @@ export function SmartSchedulingCard({
             lead_id: validLeadId,
             scheduled_at: scheduledAt.toISOString(),
             status: "scheduled",
-            meeting_type: "video",
+            meeting_type: meetingType,
             duration_minutes: 30,
           })
           .select()
@@ -138,32 +148,51 @@ export function SmartSchedulingCard({
         }
       }
 
-      // Try to sync to Google Calendar if we have a discovery call
-      if (callId) {
-        try {
-          const { error: calError } = await supabase.functions.invoke("sync-discovery-call-to-calendar", {
-            body: { discoveryCallId: callId },
-          });
-          if (calError) {
-            console.error("Calendar sync failed:", calError);
+      // Get current user ID for calendar operations
+      const { data: { user } } = await supabase.auth.getUser();
+      const currentUserId = user?.id;
+
+      if (!currentUserId) {
+        throw new Error("You must be logged in to schedule calls");
+      }
+
+      // Create calendar event with Google Meet if video call
+      const meetLinkToUse = meetingType === "video" ? "https://meet.google.com/new" : null;
+      
+      try {
+        const { data: calResult, error: calError } = await supabase.functions.invoke("google-calendar-sync", {
+          body: {
+            action: "create-event-direct",
+            userId: currentUserId,
+            summary: `${meetingType === "video" ? "Video" : "Phone"} Call with ${displayName}`,
+            description: `${meetingType === "video" ? "Video" : "Phone"} call with ${displayName}${contactPhone ? `\nPhone: ${contactPhone}` : ""}${contactEmail ? `\nEmail: ${contactEmail}` : ""}\n\nScheduled via PeachHaus CRM`,
+            startTime: scheduledAt.toISOString(),
+            endTime: endTime.toISOString(),
+            attendeeEmail: contactEmail || undefined,
+            addConferenceData: meetingType === "video",
+          },
+        });
+        
+        if (calError) {
+          console.error("Calendar event creation failed:", calError);
+          toast.error("Calendar event could not be created, but call is scheduled");
+        } else {
+          console.log("Calendar event created:", calResult);
+          // Extract meet link if returned
+          if (calResult?.meetLink) {
+            googleMeetLink = calResult.meetLink;
           }
-        } catch (calSyncErr) {
-          console.error("Calendar sync error:", calSyncErr);
         }
-      } else {
-        // For non-lead contacts, create a Google Calendar event directly
-        try {
-          await supabase.functions.invoke("create-calendar-event", {
-            body: {
-              summary: `Call with ${contactName || "Contact"}`,
-              description: `Scheduled call with ${contactName}${contactPhone ? ` (${contactPhone})` : ""}${contactEmail ? ` - ${contactEmail}` : ""}`,
-              startTime: scheduledAt.toISOString(),
-              durationMinutes: 30,
-            },
-          });
-        } catch (calErr) {
-          console.error("Direct calendar event creation failed:", calErr);
-        }
+      } catch (calErr) {
+        console.error("Calendar sync error:", calErr);
+      }
+
+      // Update discovery call with meet link if we have one
+      if (callId && googleMeetLink) {
+        await supabase
+          .from("discovery_calls")
+          .update({ google_meet_link: googleMeetLink })
+          .eq("id", callId);
       }
 
       // Send SMS invite to the contact
@@ -172,7 +201,16 @@ export function SmartSchedulingCard({
           const userName = await getCurrentUserName();
           const formattedDate = format(scheduledAt, "EEEE, MMM d");
           const formattedTime = format(scheduledAt, "h:mm a");
-          const message = `Hi ${contactName?.split(" ")[0] || "there"}! I've scheduled our call for ${formattedDate} at ${formattedTime}. Looking forward to chatting! - ${userName} @ PeachHaus Group`;
+          
+          let message = `Hi ${displayName.split(" ")[0]}! I've scheduled our ${meetingType === "video" ? "video" : "phone"} call for ${formattedDate} at ${formattedTime}.`;
+          
+          if (meetingType === "video" && googleMeetLink) {
+            message += ` Here's the link: ${googleMeetLink}`;
+          } else if (meetingType === "phone") {
+            message += " I'll call you at this number.";
+          }
+          
+          message += ` Looking forward to chatting! - ${userName} @ PeachHaus Group`;
           
           await supabase.functions.invoke("ghl-send-sms", {
             body: {
@@ -267,6 +305,31 @@ export function SmartSchedulingCard({
         </Badge>
       </CardHeader>
       <CardContent className="space-y-3">
+        {/* Meeting Type Selection */}
+        <div>
+          <p className="text-xs text-muted-foreground mb-2">Meeting type:</p>
+          <RadioGroup 
+            value={meetingType} 
+            onValueChange={(v) => setMeetingType(v as MeetingType)}
+            className="flex gap-3"
+          >
+            <div className="flex items-center space-x-2">
+              <RadioGroupItem value="video" id="video" />
+              <Label htmlFor="video" className="flex items-center gap-1.5 text-xs cursor-pointer">
+                <Video className="h-3.5 w-3.5" />
+                Google Meet
+              </Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <RadioGroupItem value="phone" id="phone" />
+              <Label htmlFor="phone" className="flex items-center gap-1.5 text-xs cursor-pointer">
+                <Phone className="h-3.5 w-3.5" />
+                Phone Call
+              </Label>
+            </div>
+          </RadioGroup>
+        </div>
+
         {/* Date Selection */}
         <div>
           <p className="text-xs text-muted-foreground mb-2">Select a date:</p>
