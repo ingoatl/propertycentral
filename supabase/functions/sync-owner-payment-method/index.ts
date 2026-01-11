@@ -44,6 +44,7 @@ serve(async (req) => {
       oldMethod: string | null;
       newMethod: string;
       updated: boolean;
+      hasPaymentMethod?: boolean;
     }> = [];
 
     for (const owner of owners || []) {
@@ -58,7 +59,8 @@ serve(async (req) => {
           continue;
         }
 
-        let detectedMethod = 'card'; // Default to card
+        let detectedMethod: string | null = null; // null means no payment method found
+        let hasPaymentMethod = false;
         const defaultPmId = (customer as Stripe.Customer).invoice_settings?.default_payment_method;
 
         if (defaultPmId) {
@@ -69,6 +71,7 @@ serve(async (req) => {
           } else if (pm.type === 'card') {
             detectedMethod = 'card';
           }
+          hasPaymentMethod = true;
           console.log(`Owner ${owner.name}: Default PM is ${pm.type} (${pm.id})`);
         } else {
           // No default, check what payment methods exist
@@ -77,16 +80,32 @@ serve(async (req) => {
             stripe.paymentMethods.list({ customer: owner.stripe_customer_id, type: 'us_bank_account', limit: 1 }),
           ]);
 
-          if (banks.data.length > 0 && cards.data.length === 0) {
+          if (banks.data.length > 0) {
             detectedMethod = 'ach';
-          } else {
+            hasPaymentMethod = true;
+          } else if (cards.data.length > 0) {
             detectedMethod = 'card';
+            hasPaymentMethod = true;
           }
-          console.log(`Owner ${owner.name}: Found ${cards.data.length} cards, ${banks.data.length} banks -> ${detectedMethod}`);
+          console.log(`Owner ${owner.name}: Found ${cards.data.length} cards, ${banks.data.length} banks -> ${hasPaymentMethod ? detectedMethod : 'NO PAYMENT METHOD'}`);
+        }
+        
+        // Skip if no payment method found
+        if (!hasPaymentMethod) {
+          results.push({
+            ownerId: owner.id,
+            name: owner.name,
+            oldMethod: owner.payment_method,
+            newMethod: 'none',
+            updated: false,
+            hasPaymentMethod: false,
+          });
+          console.log(`Owner ${owner.name}: No payment method found in Stripe`);
+          continue;
         }
 
-        // Update if different
-        if (owner.payment_method !== detectedMethod) {
+        // Update if different (only if we actually have a payment method)
+        if (owner.payment_method !== detectedMethod && detectedMethod) {
           await supabase
             .from("property_owners")
             .update({ payment_method: detectedMethod })
@@ -98,6 +117,7 @@ serve(async (req) => {
             oldMethod: owner.payment_method,
             newMethod: detectedMethod,
             updated: true,
+            hasPaymentMethod: true,
           });
           console.log(`Updated ${owner.name}: ${owner.payment_method} -> ${detectedMethod}`);
         } else {
@@ -105,8 +125,9 @@ serve(async (req) => {
             ownerId: owner.id,
             name: owner.name,
             oldMethod: owner.payment_method,
-            newMethod: detectedMethod,
+            newMethod: detectedMethod || owner.payment_method,
             updated: false,
+            hasPaymentMethod: true,
           });
         }
       } catch (stripeError) {
