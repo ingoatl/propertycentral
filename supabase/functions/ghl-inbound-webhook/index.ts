@@ -52,23 +52,53 @@ serve(async (req) => {
     const contactPhone = rawPhone;
     const contactName = fullName || firstName || "Lead";
     
-    // Extract media URLs from MMS attachments
+    // Extract media URLs from MMS attachments - check ALL possible locations
     const mediaUrls: string[] = [];
+    
+    // Check message.attachments array
     if (message.attachments && Array.isArray(message.attachments)) {
       for (const attachment of message.attachments) {
-        if (attachment.url) {
+        if (typeof attachment === "string") {
+          mediaUrls.push(attachment);
+        } else if (attachment?.url) {
           mediaUrls.push(attachment.url);
+        } else if (attachment?.mediaUrl) {
+          mediaUrls.push(attachment.mediaUrl);
         }
       }
     }
-    // Also check for media array (alternative GHL format)
+    
+    // Check message.media array (alternative GHL format)
     if (message.media && Array.isArray(message.media)) {
       for (const media of message.media) {
-        if (media.url) {
+        if (typeof media === "string") {
+          mediaUrls.push(media);
+        } else if (media?.url) {
           mediaUrls.push(media.url);
         }
       }
     }
+    
+    // Check payload-level attachments (some GHL workflows put them here)
+    if (payload.attachments && Array.isArray(payload.attachments)) {
+      for (const attachment of payload.attachments) {
+        if (typeof attachment === "string" && !mediaUrls.includes(attachment)) {
+          mediaUrls.push(attachment);
+        } else if (attachment?.url && !mediaUrls.includes(attachment.url)) {
+          mediaUrls.push(attachment.url);
+        }
+      }
+    }
+    
+    // Check payload.mediaUrls array
+    if (payload.mediaUrls && Array.isArray(payload.mediaUrls)) {
+      for (const url of payload.mediaUrls) {
+        if (typeof url === "string" && !mediaUrls.includes(url)) {
+          mediaUrls.push(url);
+        }
+      }
+    }
+    
     console.log("Media URLs found:", mediaUrls);
     
     console.log("Processing inbound SMS:", { messageBody, contactPhone, contactName });
