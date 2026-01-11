@@ -10,6 +10,7 @@ import { Document, Page, pdfjs } from "react-pdf";
 import { InlineField, FieldData } from "@/components/signing/InlineField";
 import { InlineSignature } from "@/components/signing/InlineSignature";
 import { FireworksEffect } from "@/components/signing/FireworksEffect";
+import { GooglePlacesAutocomplete } from "@/components/ui/google-places-autocomplete";
 import "react-pdf/dist/esm/Page/AnnotationLayer.css";
 import "react-pdf/dist/esm/Page/TextLayer.css";
 
@@ -98,6 +99,23 @@ const SignDocument = () => {
     // Check both label and api_id for owner 2 patterns
     return label.includes("owner 2") || label.includes("owner2") || label.includes("second owner") ||
            apiId.includes("owner2") || apiId.includes("owner_2") || apiId.includes("second_owner");
+  };
+  
+  // Determine if a field belongs to Manager based on label, api_id
+  const isManagerField = (f: FieldData) => {
+    const label = f.label.toLowerCase();
+    const apiId = f.api_id.toLowerCase();
+    return label.includes("manager") || apiId.includes("manager") || 
+           label.includes("peachhaus") || apiId.includes("peachhaus") ||
+           f.filled_by === "admin";
+  };
+  
+  // Determine if a field is an address field (for Google Places autocomplete)
+  const isAddressField = (f: FieldData) => {
+    const label = f.label.toLowerCase();
+    const apiId = f.api_id.toLowerCase();
+    return label.includes("address") || apiId.includes("address") ||
+           label.includes("property location") || apiId.includes("property_location");
   };
   
   // Determine if current signer is admin/manager
@@ -1085,6 +1103,13 @@ const SignDocument = () => {
                           onChange={(e) => handleFieldChange(field.api_id, e.target.value, field)}
                           className="w-full h-14 px-4 rounded-lg border-2 border-gray-200 bg-white text-base focus:border-[#fae052] focus:outline-none focus:ring-2 focus:ring-[#fae052]/30"
                         />
+                      ) : isAddressField(field) ? (
+                        <GooglePlacesAutocomplete
+                          value={typeof value === 'string' ? value : ''}
+                          onChange={(val) => handleFieldChange(field.api_id, val, field)}
+                          placeholder={field.label}
+                          className="w-full h-14 px-4 rounded-lg border-2 border-gray-200 bg-white text-base focus:border-[#fae052] focus:outline-none focus:ring-2 focus:ring-[#fae052]/30 placeholder:text-gray-400"
+                        />
                       ) : (
                         <input
                           type={field.type === "email" ? "email" : field.type === "phone" ? "tel" : "text"}
@@ -1229,7 +1254,7 @@ const SignDocument = () => {
                                   isActive={isActive}
                                   isCompleted={isCompleted}
                                   isReadOnly={isReadOnly}
-                                  signatureData={isOwner2Field(field) ? owner2SignatureData : signatureData}
+                                  signatureData={isOwner2Field(field) ? owner2SignatureData : (isManagerField(field) ? null : signatureData)}
                                   onFocus={() => {
                                     if (field.type === "signature" && !isReadOnly) {
                                       if (isOwner2Field(field)) {
