@@ -121,6 +121,9 @@ const SignDocument = () => {
   // Determine if current signer is admin/manager
   const isAdminSigner = data?.signerType === "manager" || data?.signerType === "host";
   
+  // Determine if current signer is Owner 2 (second_owner)
+  const isOwner2Signer = data?.signerType === "second_owner";
+  
   // Required fields are: Owner 1 fields that are marked required + radio groups (one selection per group)
   // Admin signers see admin fields, guest signers see guest fields
   const signerFields = isAdminSigner ? adminFields : allGuestFields;
@@ -320,6 +323,19 @@ const SignDocument = () => {
     });
   }, []);
 
+  // Validation functions
+  const validateEmail = (email: string): boolean => {
+    if (!email) return true;
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  const validatePhone = (phone: string): boolean => {
+    if (!phone) return true;
+    const digitsOnly = phone.replace(/\D/g, "");
+    return digitsOnly.length >= 10 && digitsOnly.length <= 11;
+  };
+
   const handleFieldChange = (fieldId: string, value: string | boolean, field?: FieldData) => {
     // For radio fields, clear other selections in the same group
     if (field?.type === "radio" && field.group_name && value === true) {
@@ -450,6 +466,20 @@ const SignDocument = () => {
       if (!fieldValues[f.api_id]) {
         console.log(`Missing field: ${f.api_id} (${f.label}), value:`, fieldValues[f.api_id]);
         missingFields.push(f);
+      }
+      
+      // Validate email format
+      if (f.type === "email" && fieldValues[f.api_id] && !validateEmail(fieldValues[f.api_id] as string)) {
+        toast.error(`Invalid email format for: ${f.label}`);
+        navigateToField(f);
+        return;
+      }
+      
+      // Validate phone format
+      if (f.type === "phone" && fieldValues[f.api_id] && !validatePhone(fieldValues[f.api_id] as string)) {
+        toast.error(`Invalid phone number for: ${f.label}. Please enter 10-11 digits.`);
+        navigateToField(f);
+        return;
       }
     }
     
@@ -1017,11 +1047,21 @@ const SignDocument = () => {
                       {field.type === "signature" ? (() => {
                         // Use correct signature data based on owner
                         const sigData = isOwner2 ? owner2SignatureData : signatureData;
+                        // Owner 2 field should only be interactive for Owner 2 signer
+                        const isOwner2FieldBlocked = isOwner2 && !isOwner2Signer;
+                        // Owner 1 field should not be interactive for Owner 2 signer
+                        const isOwner1FieldBlocked = !isOwner2 && isOwner2Signer;
+                        const isFieldBlocked = isOwner2FieldBlocked || isOwner1FieldBlocked;
+                        
                         return (
                           <button
                             onClick={() => {
-                              if (isOwner2) {
+                              if (isOwner2FieldBlocked) {
                                 toast.info("This signature field is for Owner 2");
+                                return;
+                              }
+                              if (isOwner1FieldBlocked) {
+                                toast.info("This signature field is for Owner 1");
                                 return;
                               }
                               setShowSignatureFor(field.api_id);
@@ -1030,15 +1070,17 @@ const SignDocument = () => {
                               "w-full h-20 rounded-lg border-2 border-dashed flex items-center justify-center transition-all",
                               sigData 
                                 ? "border-green-300 bg-white" 
-                                : isOwner2
+                                : isFieldBlocked
                                   ? "border-gray-200 bg-gray-50"
                                   : "border-[#fae052] bg-[#fffef5] active:bg-[#fae052]/20"
                             )}
                           >
                             {sigData ? (
                               <img src={sigData} alt="Signature" className="max-h-16 max-w-full" />
-                            ) : isOwner2 ? (
+                            ) : isOwner2FieldBlocked ? (
                               <span className="text-gray-400 text-sm">For Owner 2</span>
+                            ) : isOwner1FieldBlocked ? (
+                              <span className="text-gray-400 text-sm">For Owner 1</span>
                             ) : (
                               <span className="text-[#8b7355] font-medium">Tap to sign</span>
                             )}
@@ -1116,6 +1158,14 @@ const SignDocument = () => {
                           placeholder={field.label}
                           value={typeof value === 'string' ? value : ''}
                           onChange={(e) => handleFieldChange(field.api_id, e.target.value, field)}
+                          onBlur={() => {
+                            if (field.type === "email" && typeof value === "string" && value && !validateEmail(value)) {
+                              toast.error("Please enter a valid email address");
+                            }
+                            if (field.type === "phone" && typeof value === "string" && value && !validatePhone(value)) {
+                              toast.error("Please enter a valid phone number (10-11 digits)");
+                            }
+                          }}
                           className="w-full h-14 px-4 rounded-lg border-2 border-gray-200 bg-white text-base focus:border-[#fae052] focus:outline-none focus:ring-2 focus:ring-[#fae052]/30 placeholder:text-gray-400"
                         />
                       )}
@@ -1257,8 +1307,15 @@ const SignDocument = () => {
                                   signatureData={isOwner2Field(field) ? owner2SignatureData : (isManagerField(field) ? null : signatureData)}
                                   onFocus={() => {
                                     if (field.type === "signature" && !isReadOnly) {
-                                      if (isOwner2Field(field)) {
+                                      const isOwner2FieldBlocked = isOwner2Field(field) && !isOwner2Signer;
+                                      const isOwner1FieldBlocked = !isOwner2Field(field) && isOwner2Signer;
+                                      
+                                      if (isOwner2FieldBlocked) {
                                         toast.info("This signature field is for Owner 2");
+                                        return;
+                                      }
+                                      if (isOwner1FieldBlocked) {
+                                        toast.info("This signature field is for Owner 1");
                                         return;
                                       }
                                       setShowSignatureFor(field.api_id);
@@ -1269,8 +1326,15 @@ const SignDocument = () => {
                                   onBlur={() => setActiveFieldId(null)}
                                   onSignatureClick={() => {
                                     if (isReadOnly) return;
-                                    if (isOwner2Field(field)) {
+                                    const isOwner2FieldBlocked = isOwner2Field(field) && !isOwner2Signer;
+                                    const isOwner1FieldBlocked = !isOwner2Field(field) && isOwner2Signer;
+                                    
+                                    if (isOwner2FieldBlocked) {
                                       toast.info("This signature field is for Owner 2");
+                                      return;
+                                    }
+                                    if (isOwner1FieldBlocked) {
+                                      toast.info("This signature field is for Owner 1");
                                       return;
                                     }
                                     setShowSignatureFor(field.api_id);

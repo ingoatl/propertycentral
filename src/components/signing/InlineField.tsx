@@ -4,9 +4,10 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { format } from "date-fns";
-import { CalendarIcon, Check, Lock, Pencil } from "lucide-react";
+import { CalendarIcon, Check, Lock, Pencil, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { GooglePlacesAutocomplete } from "@/components/ui/google-places-autocomplete";
+import { toast } from "sonner";
 
 export interface FieldData {
   api_id: string;
@@ -51,12 +52,47 @@ export function InlineField({
 }: InlineFieldProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dateOpen, setDateOpen] = useState(false);
+  const [validationError, setValidationError] = useState<string | null>(null);
 
   useEffect(() => {
     if (isActive && inputRef.current && field.type !== "signature" && field.type !== "checkbox" && field.type !== "date") {
       inputRef.current.focus();
     }
   }, [isActive, field.type]);
+
+  // Validation functions
+  const validateEmail = (email: string): boolean => {
+    if (!email) return true; // Allow empty
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  const validatePhone = (phone: string): boolean => {
+    if (!phone) return true; // Allow empty
+    // Remove all non-digit characters
+    const digitsOnly = phone.replace(/\D/g, "");
+    // US phone should have 10-11 digits
+    return digitsOnly.length >= 10 && digitsOnly.length <= 11;
+  };
+
+  const handleBlurWithValidation = () => {
+    if (field.type === "email" && typeof value === "string" && value) {
+      if (!validateEmail(value)) {
+        setValidationError("Please enter a valid email address");
+        toast.error("Please enter a valid email address");
+        return; // Don't blur if invalid
+      }
+    }
+    if (field.type === "phone" && typeof value === "string" && value) {
+      if (!validatePhone(value)) {
+        setValidationError("Please enter a valid phone number (10-11 digits)");
+        toast.error("Please enter a valid phone number (10-11 digits)");
+        return; // Don't blur if invalid
+      }
+    }
+    setValidationError(null);
+    onBlur();
+  };
 
   const fontSize = Math.max(10, Math.min(12, 11 * scale));
   const fontFamily = "'Lato', 'Open Sans', -apple-system, BlinkMacSystemFont, sans-serif";
@@ -274,23 +310,38 @@ export function InlineField({
     }
     
     return (
-      <Input
-        ref={inputRef}
-        type={field.type === "email" ? "email" : field.type === "phone" ? "tel" : "text"}
-        value={(value as string) || ""}
-        onChange={(e) => onChange(e.target.value)}
-        onBlur={onBlur}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === "Tab") {
-            e.preventDefault();
-            onBlur();
-          }
-        }}
-        placeholder={field.label}
-        className={cn(baseFieldClass, activeClass, "w-full h-[24px] px-1.5 rounded text-xs")}
-        style={{ fontSize, fontFamily }}
-        autoFocus
-      />
+      <div className="relative">
+        <Input
+          ref={inputRef}
+          type={field.type === "email" ? "email" : field.type === "phone" ? "tel" : "text"}
+          value={(value as string) || ""}
+          onChange={(e) => {
+            onChange(e.target.value);
+            setValidationError(null);
+          }}
+          onBlur={handleBlurWithValidation}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === "Tab") {
+              e.preventDefault();
+              handleBlurWithValidation();
+            }
+          }}
+          placeholder={field.label}
+          className={cn(
+            baseFieldClass, 
+            validationError ? "border-2 border-red-500 ring-2 ring-red-500/20" : activeClass, 
+            "w-full h-[24px] px-1.5 rounded text-xs"
+          )}
+          style={{ fontSize, fontFamily }}
+          autoFocus
+        />
+        {validationError && (
+          <div className="absolute top-full left-0 mt-1 text-xs text-red-500 flex items-center gap-1 bg-white px-1 rounded shadow-sm z-10">
+            <AlertCircle className="h-3 w-3" />
+            {validationError}
+          </div>
+        )}
+      </div>
     );
   }
 
