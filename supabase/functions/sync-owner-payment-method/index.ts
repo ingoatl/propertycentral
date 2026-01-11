@@ -90,6 +90,12 @@ serve(async (req) => {
           console.log(`Owner ${owner.name}: Found ${cards.data.length} cards, ${banks.data.length} banks -> ${hasPaymentMethod ? detectedMethod : 'NO PAYMENT METHOD'}`);
         }
         
+        // Update has_payment_method status in database
+        await supabase
+          .from("property_owners")
+          .update({ has_payment_method: hasPaymentMethod })
+          .eq("id", owner.id);
+        
         // Skip if no payment method found
         if (!hasPaymentMethod) {
           results.push({
@@ -100,7 +106,7 @@ serve(async (req) => {
             updated: false,
             hasPaymentMethod: false,
           });
-          console.log(`Owner ${owner.name}: No payment method found in Stripe`);
+          console.log(`Owner ${owner.name}: No payment method found in Stripe, updated has_payment_method=false`);
           continue;
         }
 

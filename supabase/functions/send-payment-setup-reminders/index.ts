@@ -257,7 +257,7 @@ serve(async (req) => {
       // Get owner details
       const { data: owner, error: ownerError } = await supabase
         .from("property_owners")
-        .select("id, name, email, phone, stripe_customer_id")
+        .select("id, name, email, phone, stripe_customer_id, has_payment_method")
         .eq("id", request.owner_id)
         .single();
 
@@ -266,9 +266,9 @@ serve(async (req) => {
         continue;
       }
 
-      // Skip owners who already have a Stripe customer ID with payment methods
-      if (owner.stripe_customer_id) {
-        logStep(`Skipping ${owner.name} - already has Stripe customer ID, marking request as completed`);
+      // Skip owners who already have an ACTUAL payment method (not just customer ID)
+      if (owner.has_payment_method === true) {
+        logStep(`Skipping ${owner.name} - has actual payment method, marking request as completed`);
         
         // Mark the request as completed since they already have payment set up
         await supabase
