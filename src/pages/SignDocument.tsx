@@ -87,12 +87,25 @@ const SignDocument = () => {
   // Mobile-specific: Toggle between PDF view and Mobile Focus (field list) view
   const [mobileViewMode, setMobileViewMode] = useState<"pdf" | "fields">("pdf"); // Default to PDF view
 
+  // Company logo URL
+  const LOGO_URL = "https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/peachhaus-logo.png";
+
   // Show branded loading immediately to prevent flash
   if (loading && !data) {
     return (
       <div className="min-h-screen bg-[#1a1a2e] flex items-center justify-center">
         <div className="text-center">
-          <div className="w-16 h-16 mx-auto mb-4 rounded-lg bg-[#fae052] flex items-center justify-center">
+          <img 
+            src={LOGO_URL} 
+            alt="PeachHaus" 
+            className="h-16 mx-auto mb-4"
+            onError={(e) => {
+              // Fallback to P icon if image fails to load
+              e.currentTarget.style.display = 'none';
+              e.currentTarget.nextElementSibling?.classList.remove('hidden');
+            }}
+          />
+          <div className="hidden w-16 h-16 mx-auto mb-4 rounded-lg bg-[#fae052] flex items-center justify-center">
             <span className="text-[#1a1a2e] font-bold text-2xl">P</span>
           </div>
           <Loader2 className="h-8 w-8 animate-spin text-[#fae052] mx-auto mb-3" />
@@ -224,15 +237,22 @@ const SignDocument = () => {
   }, []);
 
   const validateToken = async () => {
+    console.log("validateToken called with token:", token?.substring(0, 8) + "...");
     try {
       const { data: result, error } = await supabase.functions.invoke("validate-signing-token", {
         body: { token },
       });
 
+      console.log("validateToken response:", { result, error });
+
       if (error) throw error;
       
-      if (result.error) {
+      if (result?.error) {
+        console.log("Server returned error:", result.error);
         setError(result.error);
+      } else if (!result) {
+        console.log("No result returned from server");
+        setError("No response from server");
       } else {
         setData(result);
         
@@ -735,6 +755,22 @@ const SignDocument = () => {
     );
   }
 
+  // Handle case where loading finished but no data (shouldn't happen, but safety check)
+  if (!loading && !data) {
+    return (
+      <div className="min-h-screen bg-[#f5f5f5] flex items-center justify-center p-4">
+        <div className="bg-white rounded-lg shadow-lg p-8 max-w-md w-full text-center border">
+          <AlertCircle className="h-16 w-16 text-amber-500 mx-auto mb-4" />
+          <h1 className="text-xl font-semibold text-[#333] mb-2">Document Not Found</h1>
+          <p className="text-[#666] mb-6">The signing link may be invalid or expired. Please check your email for a valid link or contact support.</p>
+          <Button onClick={() => navigate("/")} variant="outline">
+            Return Home
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   if (isComplete) {
     // Show fireworks only for owner signers
     const isOwnerSigner = data?.signerType === 'owner' || data?.signerType === 'second_owner';
@@ -779,9 +815,11 @@ const SignDocument = () => {
       {/* Header - Mobile optimized with larger touch targets */}
       <header className="bg-[#1a1a2e] text-white px-3 md:px-4 py-3 flex items-center justify-between sticky top-0 z-50 shadow-md">
         <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1">
-          <div className="w-8 h-8 md:w-10 md:h-10 rounded bg-[#fae052] flex items-center justify-center flex-shrink-0">
-            <span className="text-[#1a1a2e] font-bold text-sm md:text-base">P</span>
-          </div>
+          <img 
+            src={LOGO_URL} 
+            alt="PeachHaus" 
+            className="h-8 md:h-10 flex-shrink-0"
+          />
           <div className="min-w-0 flex-1">
             <h1 className="font-medium text-xs md:text-sm truncate max-w-[120px] md:max-w-none">{data?.documentName}</h1>
             <p className="text-[10px] md:text-xs text-white/60 truncate">{data?.signerName}</p>
