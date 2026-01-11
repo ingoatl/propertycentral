@@ -484,80 +484,9 @@ async function handleSetupComplete(
       .eq("id", leadId)
       .single();
 
-    // Send confirmation emails
-    const resendApiKey = Deno.env.get("RESEND_API_KEY");
-    if (resendApiKey && lead) {
-      const resend = new Resend(resendApiKey);
-
-      // Admin notification
-      try {
-        await resend.emails.send({
-          from: "PeachHaus <notifications@peachhausgroup.com>",
-          to: ["info@peachhausgroup.com"],
-          subject: `✅ Payment Authorization Complete: ${lead.name}`,
-          html: `
-            <h2>Payment Authorization Complete</h2>
-            <p>A lead has successfully completed payment authorization. You can now charge this customer without further confirmation.</p>
-            <hr>
-            <p><strong>Lead:</strong> ${lead.name}</p>
-            <p><strong>Email:</strong> ${lead.email}</p>
-            <p><strong>Payment Method:</strong> ${paymentMethodDisplay}</p>
-            <p><strong>Property:</strong> ${lead.property_address || 'Not specified'}</p>
-            <hr>
-            <p>Lead stage has been automatically updated to <strong>ACH Form Signed</strong>.</p>
-            <p style="color: green;"><strong>✓ This customer can now be charged without re-authorization.</strong></p>
-          `,
-        });
-
-        // Log admin email
-        await supabase.from("lead_communications").insert({
-          lead_id: leadId,
-          communication_type: "email",
-          direction: "outbound",
-          subject: `Payment Authorization Complete: ${lead.name}`,
-          body: `Admin notification sent for payment authorization completion. Payment method: ${paymentMethodDisplay}`,
-          delivery_status: "sent",
-        });
-
-        console.log("Admin payment authorization email sent");
-      } catch (emailError: any) {
-        console.error("Failed to send admin notification:", emailError.message);
-      }
-
-      // Owner confirmation email
-      try {
-        await resend.emails.send({
-          from: "PeachHaus <info@peachhausgroup.com>",
-          to: [lead.email],
-          subject: "Payment Method Successfully Connected - PeachHaus",
-          html: `
-            <h2>Payment Method Connected Successfully!</h2>
-            <p>Hi ${lead.name.split(' ')[0]},</p>
-            <p>Your payment method has been successfully connected to your PeachHaus account.</p>
-            <p><strong>Payment Method:</strong> ${paymentMethodDisplay}</p>
-            <p>This payment method will be used for monthly management fees and any property-related expenses.</p>
-            <h3>What's Next?</h3>
-            <p>Our team will continue with the onboarding process and will reach out with next steps shortly.</p>
-            <p>If you have any questions, please don't hesitate to contact us at info@peachhausgroup.com or call (770) 906-5022.</p>
-            <p>Best regards,<br>The PeachHaus Team</p>
-          `,
-        });
-
-        // Log owner email
-        await supabase.from("lead_communications").insert({
-          lead_id: leadId,
-          communication_type: "email",
-          direction: "outbound",
-          subject: "Payment Method Successfully Connected - PeachHaus",
-          body: `Confirmation email sent to owner. Payment method: ${paymentMethodDisplay}`,
-          delivery_status: "sent",
-        });
-
-        console.log("Owner payment confirmation email sent");
-      } catch (emailError: any) {
-        console.error("Failed to send owner confirmation:", emailError.message);
-      }
-    }
+    // NOTE: Emails are now handled by process-lead-stage-change to prevent duplicates
+    // The stage change trigger above will send appropriate emails
+    console.log(`Lead ${leadId} advanced to ach_form_signed - emails handled by stage change processor`);
   }
 }
 

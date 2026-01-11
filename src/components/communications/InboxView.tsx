@@ -64,7 +64,7 @@ interface CommunicationItem {
   contact_name: string;
   contact_phone?: string;
   contact_email?: string;
-  contact_type: "lead" | "owner" | "external" | "draft" | "personal";
+  contact_type: "lead" | "owner" | "external" | "draft" | "personal" | "tenant";
   contact_id: string;
   status?: string;
   sender_email?: string;
@@ -101,8 +101,15 @@ interface GmailEmail {
   labelIds: string[];
 }
 
+// Normalize phone number to last 10 digits for comparison
+const normalizePhone = (phone: string): string => {
+  return phone.replace(/\D/g, '').slice(-10);
+};
+
 export function InboxView() {
   const [search, setSearch] = useState("");
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [lightboxImage, setLightboxImage] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>("chats");
   const [activeFilter, setActiveFilter] = useState<FilterType>("all");
   const [selectedMessage, setSelectedMessage] = useState<CommunicationItem | null>(null);
@@ -551,22 +558,29 @@ export function InboxView() {
             if (phone) uniquePhones.add(phone);
           });
           
-          // Lookup leads and owners by phone numbers
-          const phoneContactMap: Record<string, { name: string; type: 'lead' | 'owner'; id: string; email?: string | null }> = {};
+          // Lookup leads, owners, and tenants by phone numbers (using normalized comparison)
+          const phoneContactMap: Record<string, { name: string; type: 'lead' | 'owner' | 'tenant'; id: string; email?: string | null }> = {};
           
           if (uniquePhones.size > 0) {
             const phoneArray = Array.from(uniquePhones);
+            const normalizedPhoneArray = phoneArray.map(p => normalizePhone(p));
             
             // Lookup leads
             const { data: matchedLeads } = await supabase
               .from("leads")
               .select("id, name, phone, email")
-              .in("phone", phoneArray);
+              .not("phone", "is", null);
             
             if (matchedLeads) {
               matchedLeads.forEach(lead => {
                 if (lead.phone) {
-                  phoneContactMap[lead.phone] = { name: lead.name, type: 'lead', id: lead.id, email: lead.email };
+                  const normalizedLeadPhone = normalizePhone(lead.phone);
+                  // Check if any of our phone numbers match (normalized)
+                  phoneArray.forEach(originalPhone => {
+                    if (normalizePhone(originalPhone) === normalizedLeadPhone) {
+                      phoneContactMap[originalPhone] = { name: lead.name, type: 'lead', id: lead.id, email: lead.email };
+                    }
+                  });
                 }
               });
             }
@@ -575,12 +589,36 @@ export function InboxView() {
             const { data: matchedOwners } = await supabase
               .from("property_owners")
               .select("id, name, phone, email")
-              .in("phone", phoneArray);
+              .not("phone", "is", null);
             
             if (matchedOwners) {
               matchedOwners.forEach(owner => {
-                if (owner.phone && !phoneContactMap[owner.phone]) {
-                  phoneContactMap[owner.phone] = { name: owner.name, type: 'owner', id: owner.id, email: owner.email };
+                if (owner.phone) {
+                  const normalizedOwnerPhone = normalizePhone(owner.phone);
+                  phoneArray.forEach(originalPhone => {
+                    if (normalizePhone(originalPhone) === normalizedOwnerPhone && !phoneContactMap[originalPhone]) {
+                      phoneContactMap[originalPhone] = { name: owner.name, type: 'owner', id: owner.id, email: owner.email };
+                    }
+                  });
+                }
+              });
+            }
+            
+            // Lookup mid-term booking tenants
+            const { data: matchedTenants } = await supabase
+              .from("mid_term_bookings")
+              .select("id, tenant_name, tenant_phone, tenant_email")
+              .not("tenant_phone", "is", null);
+            
+            if (matchedTenants) {
+              matchedTenants.forEach(tenant => {
+                if (tenant.tenant_phone) {
+                  const normalizedTenantPhone = normalizePhone(tenant.tenant_phone);
+                  phoneArray.forEach(originalPhone => {
+                    if (normalizePhone(originalPhone) === normalizedTenantPhone && !phoneContactMap[originalPhone]) {
+                      phoneContactMap[originalPhone] = { name: tenant.tenant_name, type: 'tenant', id: tenant.id, email: tenant.tenant_email };
+                    }
+                  });
                 }
               });
             }
@@ -1483,17 +1521,31 @@ export function InboxView() {
                                         {isOutbound ? "Outgoing call" : "Incoming call"}
                                       </div>
                                     )}
-                                    {/* MMS Images */}
+                                    {/* MMS Images - OpenPhone style grid with lightbox */}
                                     {msg.media_urls && msg.media_urls.length > 0 && (
-                                      <div className="mb-2 space-y-2">
+                                      <div className={`mb-2 grid gap-1.5 ${
+                                        msg.media_urls.length === 1 ? 'grid-cols-1' : 
+                                        msg.media_urls.length === 2 ? 'grid-cols-2' : 
+                                        'grid-cols-2'
+                                      }`}>
                                         {msg.media_urls.map((url: string, imgIdx: number) => (
-                                          <img 
+                                          <div 
                                             key={imgIdx} 
-                                            src={url} 
-                                            alt="MMS attachment" 
-                                            className="max-w-full rounded-lg cursor-pointer hover:opacity-90"
-                                            onClick={() => window.open(url, '_blank')}
-                                          />
+                                            className={`relative overflow-hidden rounded-lg cursor-pointer hover:opacity-90 transition-opacity ${
+                                              msg.media_urls.length === 1 ? 'aspect-auto max-h-64' : 'aspect-square'
+                                            }`}
+                                            onClick={() => {
+                                              setLightboxImage(url);
+                                              setLightboxOpen(true);
+                                            }}
+                                          >
+                                            <img 
+                                              src={url} 
+                                              alt="MMS attachment" 
+                                              className={`w-full h-full ${msg.media_urls.length === 1 ? 'object-contain' : 'object-cover'}`}
+                                              loading="lazy"
+                                            />
+                                          </div>
                                         ))}
                                       </div>
                                     )}
@@ -1607,10 +1659,10 @@ export function InboxView() {
         )}
       </div>
 
-      {selectedMessage && selectedMessage.contact_phone && <SendSMSDialog open={showSmsReply} onOpenChange={setShowSmsReply} contactName={selectedMessage.contact_name} contactPhone={selectedMessage.contact_phone} contactType={selectedMessage.contact_type === "external" || selectedMessage.contact_type === "draft" || selectedMessage.contact_type === "personal" ? "lead" : selectedMessage.contact_type} contactId={selectedMessage.contact_id} />}
-      {selectedMessage && (selectedMessage.contact_email || selectedMessage.sender_email) && selectedMessage.contact_type !== "external" && <SendEmailDialog open={showEmailReply} onOpenChange={setShowEmailReply} contactName={selectedMessage.contact_name} contactEmail={selectedMessage.contact_email || selectedMessage.sender_email || ""} contactType={selectedMessage.contact_type as "lead" | "owner"} contactId={selectedMessage.contact_id} replyToSubject={selectedMessage.subject} replyToBody={selectedMessage.body} />}
+      {selectedMessage && selectedMessage.contact_phone && <SendSMSDialog open={showSmsReply} onOpenChange={setShowSmsReply} contactName={selectedMessage.contact_name} contactPhone={selectedMessage.contact_phone} contactType={selectedMessage.contact_type === "external" || selectedMessage.contact_type === "draft" || selectedMessage.contact_type === "personal" || selectedMessage.contact_type === "tenant" ? "lead" : selectedMessage.contact_type} contactId={selectedMessage.contact_id} />}
+      {selectedMessage && (selectedMessage.contact_email || selectedMessage.sender_email) && selectedMessage.contact_type !== "external" && <SendEmailDialog open={showEmailReply} onOpenChange={setShowEmailReply} contactName={selectedMessage.contact_name} contactEmail={selectedMessage.contact_email || selectedMessage.sender_email || ""} contactType={(selectedMessage.contact_type === "tenant" ? "lead" : selectedMessage.contact_type) as "lead" | "owner"} contactId={selectedMessage.contact_id} replyToSubject={selectedMessage.subject} replyToBody={selectedMessage.body} />}
       <ComposeEmailDialog open={showComposeEmail} onOpenChange={setShowComposeEmail} />
-      {selectedMessage && <ContactInfoModal open={showContactInfo} onOpenChange={setShowContactInfo} contactId={selectedMessage.contact_id} contactType={selectedMessage.contact_type} contactName={selectedMessage.contact_name} contactPhone={selectedMessage.contact_phone} contactEmail={selectedMessage.contact_email} />}
+      {selectedMessage && <ContactInfoModal open={showContactInfo} onOpenChange={setShowContactInfo} contactId={selectedMessage.contact_id} contactType={selectedMessage.contact_type === "tenant" ? "personal" : selectedMessage.contact_type} contactName={selectedMessage.contact_name} contactPhone={selectedMessage.contact_phone} contactEmail={selectedMessage.contact_email} />}
       {selectedMessage && <ConversationNotes open={showNotes} onOpenChange={setShowNotes} contactPhone={selectedMessage.contact_phone} contactEmail={selectedMessage.contact_email} contactName={selectedMessage.contact_name} />}
       
       {/* Lead Detail Modal */}
@@ -1649,6 +1701,27 @@ export function InboxView() {
           contactName={selectedMessage.contact_name}
           metadata={selectedMessage.contact_type === "lead" ? { leadId: selectedMessage.contact_id } : undefined}
         />
+      )}
+
+      {/* Image Lightbox */}
+      {lightboxOpen && lightboxImage && (
+        <div 
+          className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4"
+          onClick={() => setLightboxOpen(false)}
+        >
+          <button 
+            className="absolute top-4 right-4 text-white hover:text-gray-300 z-10"
+            onClick={() => setLightboxOpen(false)}
+          >
+            <X className="h-8 w-8" />
+          </button>
+          <img 
+            src={lightboxImage} 
+            alt="Full size" 
+            className="max-w-full max-h-full object-contain rounded-lg"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
       )}
     </div>
   );
