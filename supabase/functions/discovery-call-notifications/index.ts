@@ -531,6 +531,36 @@ const handler = async (req: Request): Promise<Response> => {
         sent_at: new Date().toISOString(),
         status: "sent",
       });
+
+      // For 1-hour reminder on VIDEO calls: Auto-send Recall.ai bot to record the meeting
+      if (notificationType === "reminder_1h" && isVideoCall) {
+        try {
+          console.log("Sending Recall.ai bot to join video call:", GOOGLE_MEET_LINK);
+          const recallResult = await supabase.functions.invoke("recall-send-bot", {
+            body: {
+              meetingUrl: GOOGLE_MEET_LINK,
+              meetingTitle: `Discovery Call: ${lead?.name || "Unknown"}`,
+              platform: "google_meet",
+            },
+          });
+          
+          if (recallResult.data?.recordingId) {
+            // Link the recording to the discovery call
+            await supabase
+              .from("meeting_recordings")
+              .update({
+                discovery_call_id: discoveryCallId,
+                lead_id: lead?.id,
+              })
+              .eq("id", recallResult.data.recordingId);
+            
+            console.log("Recall bot sent successfully, recording ID:", recallResult.data.recordingId);
+          }
+        } catch (recallError) {
+          console.error("Failed to send Recall bot:", recallError);
+          // Don't fail the reminder if Recall fails
+        }
+      }
     }
 
     return new Response(

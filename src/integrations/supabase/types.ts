@@ -3152,6 +3152,146 @@ export type Database = {
           },
         ]
       }
+      meeting_recordings: {
+        Row: {
+          analyzed: boolean | null
+          communication_id: string | null
+          created_at: string
+          discovery_call_id: string | null
+          duration_seconds: number | null
+          ended_at: string | null
+          error_message: string | null
+          host_user_id: string | null
+          id: string
+          lead_id: string | null
+          matched_lead_id: string | null
+          matched_owner_id: string | null
+          meeting_title: string | null
+          meeting_url: string | null
+          metadata: Json | null
+          participants: Json | null
+          platform: string | null
+          property_id: string | null
+          recall_bot_id: string | null
+          recall_meeting_id: string | null
+          recording_url: string | null
+          started_at: string | null
+          status: string | null
+          transcript: string | null
+          transcript_segments: Json | null
+          transcript_summary: string | null
+          updated_at: string
+        }
+        Insert: {
+          analyzed?: boolean | null
+          communication_id?: string | null
+          created_at?: string
+          discovery_call_id?: string | null
+          duration_seconds?: number | null
+          ended_at?: string | null
+          error_message?: string | null
+          host_user_id?: string | null
+          id?: string
+          lead_id?: string | null
+          matched_lead_id?: string | null
+          matched_owner_id?: string | null
+          meeting_title?: string | null
+          meeting_url?: string | null
+          metadata?: Json | null
+          participants?: Json | null
+          platform?: string | null
+          property_id?: string | null
+          recall_bot_id?: string | null
+          recall_meeting_id?: string | null
+          recording_url?: string | null
+          started_at?: string | null
+          status?: string | null
+          transcript?: string | null
+          transcript_segments?: Json | null
+          transcript_summary?: string | null
+          updated_at?: string
+        }
+        Update: {
+          analyzed?: boolean | null
+          communication_id?: string | null
+          created_at?: string
+          discovery_call_id?: string | null
+          duration_seconds?: number | null
+          ended_at?: string | null
+          error_message?: string | null
+          host_user_id?: string | null
+          id?: string
+          lead_id?: string | null
+          matched_lead_id?: string | null
+          matched_owner_id?: string | null
+          meeting_title?: string | null
+          meeting_url?: string | null
+          metadata?: Json | null
+          participants?: Json | null
+          platform?: string | null
+          property_id?: string | null
+          recall_bot_id?: string | null
+          recall_meeting_id?: string | null
+          recording_url?: string | null
+          started_at?: string | null
+          status?: string | null
+          transcript?: string | null
+          transcript_segments?: Json | null
+          transcript_summary?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meeting_recordings_communication_id_fkey"
+            columns: ["communication_id"]
+            isOneToOne: false
+            referencedRelation: "lead_communications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meeting_recordings_discovery_call_id_fkey"
+            columns: ["discovery_call_id"]
+            isOneToOne: false
+            referencedRelation: "discovery_calls"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meeting_recordings_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meeting_recordings_matched_lead_id_fkey"
+            columns: ["matched_lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meeting_recordings_matched_owner_id_fkey"
+            columns: ["matched_owner_id"]
+            isOneToOne: false
+            referencedRelation: "property_owners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meeting_recordings_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "comprehensive_property_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "meeting_recordings_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       mid_term_bookings: {
         Row: {
           created_at: string
