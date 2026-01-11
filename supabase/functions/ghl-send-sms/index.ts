@@ -185,9 +185,11 @@ serve(async (req) => {
         body: message,
         status: "sent",
         external_id: sendData.messageId || sendData.conversationId,
+        ghl_conversation_id: sendData.conversationId,
         metadata: {
           provider: "gohighlevel",
           ghl_contact_id: contactId,
+          ghl_conversation_id: sendData.conversationId,
           from_number: formattedFromNumber,
           to_number: formattedPhone,
         },
@@ -199,6 +201,7 @@ serve(async (req) => {
         metadata: {
           message_id: sendData.messageId,
           ghl_contact_id: contactId,
+          ghl_conversation_id: sendData.conversationId,
           from_number: formattedFromNumber,
         },
       });
@@ -213,9 +216,11 @@ serve(async (req) => {
         body: message,
         status: "sent",
         external_id: sendData.messageId || sendData.conversationId,
+        ghl_conversation_id: sendData.conversationId,
         metadata: {
           provider: "gohighlevel",
           ghl_contact_id: contactId,
+          ghl_conversation_id: sendData.conversationId,
           from_number: formattedFromNumber,
           to_number: formattedPhone,
         },
