@@ -149,6 +149,7 @@ interface RecapEditorProps {
   onAssignTo: (userId: string) => void;
   teamMembers: TeamMember[];
   currentUserId: string | null;
+  currentUserFirstName: string | null;
   isSending: boolean;
   isDismissing: boolean;
   isMarkingDone: boolean;
@@ -169,6 +170,7 @@ function RecapEditor({
   onAssignTo,
   teamMembers,
   currentUserId,
+  currentUserFirstName,
   isSending, 
   isDismissing,
   isMarkingDone,
@@ -198,6 +200,11 @@ function RecapEditor({
   
   const SCHEDULING_LINK = "https://propertycentral.lovable.app/book-discovery-call";
   
+  // Create signature with user's name
+  const signature = currentUserFirstName 
+    ? `${currentUserFirstName} @ PeachHaus Group` 
+    : 'PeachHaus Group';
+  
   // Generate smart SMS based on conversation history + call transcript
   const generateSmsFromContext = useMemo(() => {
     const topics = recap.key_topics?.slice(0, 2).join(' and ') || 'your property';
@@ -206,23 +213,23 @@ function RecapEditor({
     
     // Check if there are pending requests from previous conversations
     if (conversationContext?.hasAskedForInfo) {
-      return `${greeting} wanted to check in - did you have a chance to get that info together? No rush at all. If you'd like to hop on a quick call, here's my calendar: ${SCHEDULING_LINK} - PeachHaus`;
+      return `${greeting} wanted to check in - did you have a chance to get that info together? No rush at all. If you'd like to hop on a quick call, here's my calendar: ${SCHEDULING_LINK} - ${signature}`;
     }
     
     // Check last message context
     if (conversationContext?.lastMessage?.body && conversationContext.lastMessage.direction === "inbound") {
       const lastMsg = conversationContext.lastMessage.body.toLowerCase();
       if (lastMsg.includes("address") || lastMsg.includes("income") || lastMsg.includes("report")) {
-        return `${greeting} got your message! I'll pull that together and send it over. Happy to chat through anything - schedule a call here if easier: ${SCHEDULING_LINK} - PeachHaus`;
+        return `${greeting} got your message! I'll pull that together and send it over. Happy to chat through anything - schedule a call here if easier: ${SCHEDULING_LINK} - ${signature}`;
       }
     }
     
     // After a call - suggest scheduling a proper discovery call if they seem interested
     if (summary) {
-      return `${greeting} great chatting with you about ${topics}! If you'd like to discuss in more detail, pick a time here: ${SCHEDULING_LINK} - PeachHaus`;
+      return `${greeting} great chatting with you about ${topics}! If you'd like to discuss in more detail, pick a time here: ${SCHEDULING_LINK} - ${signature}`;
     }
-    return `${greeting} thanks for calling about ${topics}! If it's urgent, let us know and we'll get right back to you. Or schedule time to chat: ${SCHEDULING_LINK} - PeachHaus`;
-  }, [greeting, recap.key_topics, recap.transcript_summary, conversationContext]);
+    return `${greeting} thanks for calling about ${topics}! If it's urgent, let us know and we'll get right back to you. Or schedule time to chat: ${SCHEDULING_LINK} - ${signature}`;
+  }, [greeting, recap.key_topics, recap.transcript_summary, conversationContext, signature]);
   
   const [smsMessage, setSmsMessage] = useState(generateSmsFromContext);
   
@@ -277,7 +284,7 @@ TONE:
 - Make them feel valued and understood
 - Avoid corporate speak - write like a friendly professional
 
-Keep under 280 characters. Sign off with "- PeachHaus"
+Keep under 280 characters. Sign off with "- ${signature}"
 
 Generate ONLY the SMS text.`;
 
@@ -307,19 +314,19 @@ Generate ONLY the SMS text.`;
     // If we've asked them for something specific, reference it directly
     if (pendingReqs.length > 0) {
       if (pendingReqs.includes("their address")) {
-        return `${greeting} just following up - did you have a chance to send over that address? Let me know if you need anything! - PeachHaus`;
+        return `${greeting} just following up - did you have a chance to send over that address? Let me know if you need anything! - ${signature}`;
       }
       if (pendingReqs.includes("insurance documents")) {
-        return `${greeting} checking in on the insurance documents. Let me know if you have any questions! - PeachHaus`;
+        return `${greeting} checking in on the insurance documents. Let me know if you have any questions! - ${signature}`;
       }
       if (pendingReqs.includes("income report info")) {
-        return `${greeting} wanted to follow up on the income report info. Have you had a chance to gather that? - PeachHaus`;
+        return `${greeting} wanted to follow up on the income report info. Have you had a chance to gather that? - ${signature}`;
       }
-      return `${greeting} following up on our last conversation. Did you have a chance to get that info together? Happy to help! - PeachHaus`;
+      return `${greeting} following up on our last conversation. Did you have a chance to get that info together? Happy to help! - ${signature}`;
     }
     
-    return `${greeting} just checking in about ${topics}. Have you had a chance to think it over? Happy to answer any questions! - PeachHaus`;
-  }, [greeting, recap.key_topics, conversationContext]);
+    return `${greeting} just checking in about ${topics}. Have you had a chance to think it over? Happy to answer any questions! - ${signature}`;
+  }, [greeting, recap.key_topics, conversationContext, signature]);
   
   const [followUpMessage, setFollowUpMessage] = useState(generateFollowUpMessage);
 
@@ -740,6 +747,13 @@ export function CallRecapModal() {
     },
   });
 
+  // Get current user's first name for signature
+  const currentUserFirstName = useMemo(() => {
+    if (!currentUserId) return null;
+    const currentMember = teamMembers.find(m => m.id === currentUserId);
+    return currentMember?.first_name || null;
+  }, [currentUserId, teamMembers]);
+
   // Show user's recaps first, then team recaps if toggled
   const displayedRecaps = showAllRecaps ? pendingRecaps : userRecaps.length > 0 ? userRecaps : pendingRecaps;
 
@@ -874,6 +888,25 @@ export function CallRecapModal() {
     }
   }, [currentRecap, teamMembers, activeRecapIndex, displayedRecaps.length]);
 
+  // Helper to get phone from lead_communications metadata as fallback
+  const getPhoneFromMetadata = useCallback(async (communicationId: string | null): Promise<string | null> => {
+    if (!communicationId) return null;
+    const { data: comm } = await supabase
+      .from("lead_communications")
+      .select("metadata")
+      .eq("id", communicationId)
+      .single();
+    
+    // Try to extract phone from GHL metadata
+    const metadata = comm?.metadata as Record<string, any> | null;
+    const ghlData = metadata?.ghl_data;
+    if (ghlData?.fromNumber) return ghlData.fromNumber;
+    if (ghlData?.toNumber) return ghlData.toNumber;
+    if (metadata?.from_phone) return metadata.from_phone;
+    if (metadata?.phone) return metadata.phone;
+    return null;
+  }, []);
+
   // Handle callback using integrated Twilio calling
   const handleCallback = useCallback(async () => {
     if (!currentRecap) return;
@@ -907,6 +940,11 @@ export function CallRecapModal() {
       address = lead?.property_address || null;
     }
     
+    // Fallback: Get phone from communication metadata if not on lead/owner record
+    if (!phone && currentRecap.communication_id) {
+      phone = await getPhoneFromMetadata(currentRecap.communication_id);
+    }
+    
     if (phone) {
       const displayName = extractFirstName(currentRecap.recipient_name) || currentRecap.recipient_name || 'Contact';
       setCallDialogPhone(phone);
@@ -923,7 +961,7 @@ export function CallRecapModal() {
     } else {
       toast.error("No phone number on file");
     }
-  }, [currentRecap]);
+  }, [currentRecap, getPhoneFromMetadata]);
 
   // Don't render if nothing to show - AFTER all hooks
   if (!isEligibleUser || (pendingRecaps.length === 0 && callTasks.length === 0)) {
@@ -1043,6 +1081,11 @@ export function CallRecapModal() {
                           phone = lead?.phone || null;
                         }
                         
+                        // Fallback: Get phone from communication metadata
+                        if (!phone && currentRecap.communication_id) {
+                          phone = await getPhoneFromMetadata(currentRecap.communication_id);
+                        }
+                        
                         if (phone) {
                           try {
                             await supabase.functions.invoke('ghl-send-sms', {
@@ -1066,6 +1109,7 @@ export function CallRecapModal() {
                       onAssignTo={handleAssignTo}
                       teamMembers={teamMembers}
                       currentUserId={currentUserId}
+                      currentUserFirstName={currentUserFirstName}
                       hasNext={activeRecapIndex < displayedRecaps.length - 1}
                       hasPrevious={activeRecapIndex > 0}
                       onPrevious={() => setActiveRecapIndex(prev => Math.max(0, prev - 1))}
