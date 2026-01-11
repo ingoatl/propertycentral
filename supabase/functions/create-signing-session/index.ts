@@ -203,13 +203,23 @@ serve(async (req) => {
       tokens.push(tokenData);
     }
 
-    // Update booking document status
+    // Build signing URLs for each signer type
+    const ownerToken = tokens.find(t => t.signer_type === "owner");
+    const secondOwnerToken = tokens.find(t => t.signer_type === "second_owner");
+    const managerToken = tokens.find(t => t.signer_type === "manager");
+    
+    const guestSigningUrl = ownerToken ? `${APP_URL}/sign/${ownerToken.token}` : null;
+    const hostSigningUrl = managerToken ? `${APP_URL}/sign/${managerToken.token}` : null;
+
+    // Update booking document status and signing URLs
     await supabase
       .from("booking_documents")
       .update({
         status: "pending",
         is_draft: false,
         sent_at: new Date().toISOString(),
+        guest_signing_url: guestSigningUrl,
+        host_signing_url: hostSigningUrl,
       })
       .eq("id", documentId);
 
@@ -223,9 +233,8 @@ serve(async (req) => {
       },
     });
 
-    // Send signing email to the first signer (owner)
-    const ownerToken = tokens.find(t => t.signer_type === "owner");
-    const signingUrl = `${APP_URL}/sign/${ownerToken.token}`;
+    // Send signing email to the first signer (owner) - use already defined guestSigningUrl
+    const signingUrl = guestSigningUrl!;
     
     const emailHtml = buildSigningEmailHtml(
       ownerName,
