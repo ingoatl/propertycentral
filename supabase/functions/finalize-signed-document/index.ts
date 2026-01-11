@@ -338,10 +338,9 @@ async function fillPdfWithValues(
         // The field's y% points to TOP of the field input area
         // The underline is at the bottom of that area
         const fontSize = 9;
-        // Move text UP by adding offset - text was appearing below the line
-        // Add 3pt to lift text baseline to sit on the underline
-        const baselineOffset = 3;
-        const drawY = pageHeight - topFromTop - fieldHeight + baselineOffset;
+        // The text baseline in PDF needs to be at the bottom of the field area
+        // We use fieldHeight directly - no extra offset needed if template positions are accurate
+        const drawY = pageHeight - topFromTop - fieldHeight;
         const drawX = absX;
         
         const textValue = sanitizeTextForPdf(String(value));
@@ -874,9 +873,10 @@ serve(async (req) => {
     }
 
     // Update lead with property address and IDs from contract
+    // Progress lead to "contract_signed" which triggers payment link email
     if (leadData && (propertyAddress || ownerId || propertyId)) {
       const leadUpdateData: any = {
-        stage: "onboarding",
+        stage: "contract_signed",
         stage_changed_at: new Date().toISOString(),
       };
       
