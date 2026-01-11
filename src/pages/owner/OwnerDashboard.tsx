@@ -44,6 +44,7 @@ import { EnhancedEventsTimeline } from "./components/EnhancedEventsTimeline";
 import { StatementViewer } from "./components/StatementViewer";
 import { OwnerOnboardingTimeline } from "./components/OwnerOnboardingTimeline";
 import { GenerateDashboardPdfButton } from "./components/GenerateDashboardPdfButton";
+import demoPropertyImage from "@/assets/demo-property-rita-way.jpg";
 
 interface OwnerSession {
   ownerId: string;
@@ -639,6 +640,11 @@ export default function OwnerDashboard() {
 
   // Memoize property image URL to prevent recalculation
   const propertyImageUrl = useMemo(() => {
+    // Special case for demo property - use bundled image
+    if (property?.id === 'b2c3d4e5-f6a7-8901-bcde-f12345678901') {
+      return demoPropertyImage;
+    }
+    
     if (!property?.image_path) return null;
     
     // If it's already a full URL, use it directly
@@ -652,7 +658,7 @@ export default function OwnerDashboard() {
       .getPublicUrl(property.image_path);
     
     return data?.publicUrl;
-  }, [property?.image_path]);
+  }, [property?.image_path, property?.id]);
 
   if (loading) {
     return (
