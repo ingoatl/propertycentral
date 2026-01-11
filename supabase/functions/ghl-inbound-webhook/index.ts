@@ -6,9 +6,10 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-webhook-secret",
 };
 
-// Format phone number to E.164 for matching
+// Format phone number to E.164 for matching - strips ALL non-digit characters including Unicode
 function normalizePhone(phone: string): string {
-  const digits = phone.replace(/\D/g, "");
+  // Remove ALL non-digit characters including Unicode formatting characters
+  const digits = phone.replace(/[^\d]/g, "");
   if (digits.length === 10) return `+1${digits}`;
   if (digits.length === 11 && digits.startsWith("1")) return `+${digits}`;
   return phone.startsWith("+") ? phone : `+${digits}`;
