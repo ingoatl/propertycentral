@@ -296,29 +296,57 @@ ${fullContext}
 ${commHistory}
 
 CRITICAL CONVERSATION ANALYSIS:
-- Has there been a call/meeting with this person? ${hasPhoneCall ? "YES - we've talked before" : "NO - Only text/email communication"}
-- Are they REFERRING to a previous call/meeting? ${referencingPreviousCall ? "YES - they mentioned we already talked/met" : "NO"}
+- Has there been a phone call/video meeting? ${hasPhoneCall ? "YES - we've actually talked before" : "NO - ONLY text/email, no actual call yet"}
 - Total conversation messages: ${conversationCount} (our: ${ourMessages}, their: ${theirMessages})
 - Is this a new conversation? ${isNewConversation ? "YES" : "NO - ongoing"}
 - Is this an existing property owner? ${isExistingOwner ? "YES - do NOT offer income report" : "NO - potential new client"}
-- Do we have their property address? ${hasPropertyAddress ? "YES" : "NO"}
-- Do we have their email? ${hasEmail ? "YES" : "NO"}
-- Already offered income report? ${alreadyOfferedIncomeReport ? "YES - don't repeat" : "NO"}
-- Already sent scheduling link? ${alreadySentSchedulingLink ? "YES - don't send again" : "NO"}
-- Has scheduled call? ${hasScheduledCall ? "YES" : "NO"}
 
-CRITICAL INSTRUCTIONS:
-1. Read the ENTIRE conversation history carefully - every word matters
-2. If they mention "we already talked/met/had a call" - ACKNOWLEDGE this! Don't offer another scheduling link.
-3. NEVER say "great chatting" unless there was an ACTUAL phone call
-4. If there was NO phone call, use "Thanks for reaching out!" or "Great to hear from you!"
-5. Your reply MUST directly address what they last said - don't ignore their message
-6. Be specific - reference details from the conversation
-7. ${messageType === "sms" ? "Keep SMS under 160 characters when possible, max 320." : "Keep emails concise."}
-8. Never repeat something we already said in the conversation
-9. If we already sent a scheduling link, DON'T send it again
-10. Sound like a real person typing - use contractions, be casual but professional
-11. Sign off as: "- Ingo @ PeachHaus Group"`;
+CRITICAL RESPONSE RULES - FOLLOW EXACTLY:
+1. **READ THEIR MESSAGE FIRST** - What exactly did they ask for? Reply to THAT, not something else.
+2. **NO "GREAT CHATTING"** unless you see "[WE SENT - CALL]" or "CALL TRANSCRIPT" in the history - otherwise NO ACTUAL CALL HAPPENED
+3. For a NEW inbound message: Say "Thanks for reaching out!" or "Hi [Name]!" - NOT "great chatting"
+4. **ANSWER THEIR ACTUAL QUESTION** - If they asked for referrals, provide referrals. If they asked about pricing, address pricing.
+5. Be SPECIFIC - reference the exact thing they mentioned (property address, what they need, etc.)
+6. ${messageType === "sms" ? "Keep SMS under 200 characters when possible, max 300." : "Keep emails concise."}
+7. Never add sales pitches if they asked for something specific - just help them
+8. Sign off as: "- Ingo @ PeachHaus Group"`;
+
+    // DETECT SPECIFIC REQUEST TYPES from the most recent inbound message
+    const lastInboundMessage = currentMessage || "";
+    const lastMsgLower = lastInboundMessage.toLowerCase();
+    
+    const isAskingForReferrals = lastMsgLower.includes("referral") || lastMsgLower.includes("recommend") || lastMsgLower.includes("who do you use");
+    const isAskingForInsurance = lastMsgLower.includes("insurance");
+    const isAskingQuestion = lastMsgLower.includes("?") || lastMsgLower.includes("how") || lastMsgLower.includes("what") || lastMsgLower.includes("when");
+    const isProvidingInfo = lastMsgLower.includes("my address") || lastMsgLower.includes("my email") || lastMsgLower.includes("here") || /\d{4,5}\s+\w+/.test(lastMsgLower);
+
+    let specificRequestContext = "";
+    if (isAskingForReferrals && isAskingForInsurance) {
+      specificRequestContext = `
+
+THEY ARE ASKING FOR: Insurance referrals specifically.
+YOUR RESPONSE SHOULD: 
+- Acknowledge you'll get them those insurance referrals
+- Say you'll look into it or send them over
+- If you don't have their email, ask for it to send the list
+- DO NOT pitch income reports or other services - just answer their question`;
+    } else if (isAskingForReferrals) {
+      specificRequestContext = `
+
+THEY ARE ASKING FOR: Vendor/service referrals.
+YOUR RESPONSE SHOULD:
+- Acknowledge what referrals they need
+- Say you'll gather and send them
+- Ask for email if you need to send a list`;
+    } else if (isProvidingInfo) {
+      specificRequestContext = `
+
+THEY ARE PROVIDING INFO: They're giving you their details.
+YOUR RESPONSE SHOULD:
+- Thank them for the info
+- Tell them what happens next
+- Be action-oriented`;
+    }
 
     let userPrompt = "";
 
@@ -327,60 +355,33 @@ CRITICAL INSTRUCTIONS:
         // Build smart instructions based on what's been discussed
         let incomeReportInstruction = "";
         
-        if (isExistingOwner) {
-          // For existing owners, never offer income report
-          incomeReportInstruction = "This is an EXISTING PROPERTY OWNER - do NOT offer income analysis. Focus on addressing their specific needs.";
+        // If they're asking for something specific, don't push income reports
+        if (isAskingForReferrals || isAskingQuestion) {
+          incomeReportInstruction = "They asked a SPECIFIC question - ANSWER IT FIRST. Don't push income reports unless it's directly relevant.";
+        } else if (isExistingOwner) {
+          incomeReportInstruction = "This is an EXISTING PROPERTY OWNER - do NOT offer income analysis.";
         } else if (alreadyOfferedIncomeReport) {
-          // Already offered, don't repeat
-          incomeReportInstruction = "We already offered the income analysis. If they haven't responded to that offer, gently remind them or ask what questions they have.";
-        } else if (hasPropertyAddress && hasEmail) {
-          // We have everything, don't need to ask
-          incomeReportInstruction = "We have their address and email. Offer to run the income analysis for their property if it makes sense in context.";
-        } else if (!hasPropertyAddress && !hasEmail && !alreadyAskedForAddress) {
-          // Missing both, first time asking
-          incomeReportInstruction = `Offer a FREE income analysis and ask for their property address${!hasEmail ? " and email" : ""} to send it.`;
-        } else if (!hasPropertyAddress && alreadyAskedForAddress) {
-          // Already asked for address but didn't get it
-          incomeReportInstruction = "We already asked for their address. If they didn't provide it, gently follow up or ask if they have questions.";
-        } else if (hasPropertyAddress && !hasEmail && !alreadyAskedForEmail) {
-          // Have address, need email
-          incomeReportInstruction = "We have their address. Ask for their email so we can send the income analysis.";
+          incomeReportInstruction = "We already offered the income analysis. Don't repeat.";
+        } else if (isNewConversation && !isAskingForReferrals && !isAskingQuestion) {
+          incomeReportInstruction = "Offer a FREE income analysis if it fits naturally.";
         } else {
-          // Default - offer if new conversation
-          incomeReportInstruction = isNewConversation 
-            ? "Offer a FREE income analysis - show them what their property can earn with short, mid, and long-term rentals."
-            : "Continue the natural conversation flow.";
+          incomeReportInstruction = "Continue the natural conversation flow.";
         }
 
-        userPrompt = `Generate a warm, professional SMS reply based on the FULL conversation history.
+        userPrompt = `Generate a warm, professional SMS reply.
 
-CRITICAL CONTEXT CHECK:
-- Phone call/meeting happened? ${hasPhoneCall ? "YES - we've talked before" : "NO - only text messages"}
-- Are they referencing a past call? ${referencingPreviousCall ? "YES - they said we already talked/met" : "NO"}
-- Already sent scheduling link? ${alreadySentSchedulingLink ? "YES - DON'T send it again" : "NO"}
+THEIR MESSAGE (RESPOND TO THIS):
+"${currentMessage || "See conversation history"}"
 
-${referencingPreviousCall ? `IMPORTANT: They mentioned we already talked/met. ACKNOWLEDGE THIS! 
-- Say something like "Yes, great connecting with you!" or "Absolutely, following up from our chat..."
-- Do NOT send another scheduling link or explain what the link is for - they already know us!
-- Focus on next steps or answering their question.` : ""}
-
-${hasPhoneCall ? "Since we already talked, skip the intro pleasantries and get to the point." : "If NO phone call: DO NOT say 'great chatting' - use 'thanks for reaching out' instead"}
-
-INCOME ANALYSIS STRATEGY:
-${incomeReportInstruction}
-
-WHAT WE KNOW:
-${hasPropertyAddress ? `✓ Property address: ${leadData?.property_address || "on file"}` : "✗ Missing property address"}
-${hasEmail ? `✓ Email: ${leadData?.email || ownerData?.email || "on file"}` : "✗ Missing email"}
-${hasScheduledCall ? "✓ Call already scheduled" : ""}
+${specificRequestContext}
 
 RESPONSE RULES:
-1. FIRST: Acknowledge what they said (especially if referencing a past call)
-2. Don't repeat anything we already said
-3. Don't explain things they already know from our call
-4. Only ask for info we don't have AND haven't already asked for
-5. Be concise - under 300 chars ideal
-6. Sound natural, like a real person
+1. **ANSWER WHAT THEY ASKED** - If they asked for insurance referrals, say you'll get them. If they asked a question, answer it.
+2. ${hasPhoneCall ? "We talked before - skip pleasantries" : "NO phone call yet - say 'Hi ${firstName}!' or 'Thanks for reaching out!' - NEVER 'great chatting'"}
+3. Be specific - mention the exact thing they asked about
+4. ${incomeReportInstruction}
+5. Keep it SHORT - under 200 characters if possible
+6. Sound human, not like AI
 7. End with: "- Ingo @ PeachHaus Group"
 
 Generate ONLY the reply text, nothing else.`;
