@@ -334,12 +334,14 @@ async function fillPdfWithValues(
         const topFromTop = (y / 100) * pageHeight;
         const fieldHeight = height ? (height / 100) * pageHeight : 14;
         
-        // For text: draw baseline sitting ON the underline
+        // For text: the baseline should sit ON the underline
         // The field's y% points to TOP of the field input area
-        // We want text baseline at the bottom of that area
+        // The underline is at the bottom of that area
         const fontSize = 9;
-        // drawY = where the bottom of the field area is in PDF coordinates
-        const drawY = pageHeight - topFromTop - fieldHeight;
+        // Move text UP by adding offset - text was appearing below the line
+        // Add 3pt to lift text baseline to sit on the underline
+        const baselineOffset = 3;
+        const drawY = pageHeight - topFromTop - fieldHeight + baselineOffset;
         const drawX = absX;
         
         const textValue = sanitizeTextForPdf(String(value));
@@ -651,51 +653,71 @@ serve(async (req) => {
     // Get lead data - try multiple lookups
     let leadData: any = null;
     
-    // First try: lookup by signwell_document_id
+    // First try: lookup by signwell_document_id (matches booking_documents.id)
     const { data: lead } = await supabase
       .from("leads")
-      .select("id, property_id, owner_id, property_address, contact_name, email, phone, stage")
+      .select("id, property_id, owner_id, property_address, name, email, phone, stage")
       .eq("signwell_document_id", documentId)
       .maybeSingle();
     
     if (lead) {
       leadData = lead;
+      console.log("Found lead by signwell_document_id:", lead.id);
     } else {
-      // Second try: lookup by booking_document_id if stored in leads
-      const { data: leadByDocId } = await supabase
-        .from("leads")
-        .select("id, property_id, owner_id, property_address, contact_name, email, phone, stage")
-        .eq("booking_document_id", documentId)
-        .maybeSingle();
-      
-      if (leadByDocId) {
-        leadData = leadByDocId;
-      } else {
-        // Third try: find lead by matching owner email from contract
-        if (contractData.ownerEmail) {
-          const { data: leadByEmail } = await supabase
-            .from("leads")
-            .select("id, property_id, owner_id, property_address, contact_name, email, phone, stage")
-            .eq("email", contractData.ownerEmail)
-            .order("created_at", { ascending: false })
-            .limit(1)
-            .maybeSingle();
+      // Second try: find lead by matching recipient email from document
+      const recipientEmail = document.recipient_email;
+      if (recipientEmail) {
+        const { data: leadByRecipient } = await supabase
+          .from("leads")
+          .select("id, property_id, owner_id, property_address, name, email, phone, stage")
+          .eq("email", recipientEmail)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        
+        if (leadByRecipient) {
+          leadData = leadByRecipient;
+          console.log("Found lead by recipient email:", leadByRecipient.id);
           
-          if (leadByEmail) {
-            leadData = leadByEmail;
-          }
+          // Link the document to this lead for future lookups
+          await supabase
+            .from("leads")
+            .update({ signwell_document_id: documentId })
+            .eq("id", leadByRecipient.id);
+        }
+      }
+      
+      // Third try: find lead by matching owner email from contract
+      if (!leadData && contractData.ownerEmail) {
+        const { data: leadByOwnerEmail } = await supabase
+          .from("leads")
+          .select("id, property_id, owner_id, property_address, name, email, phone, stage")
+          .eq("email", contractData.ownerEmail)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        
+        if (leadByOwnerEmail) {
+          leadData = leadByOwnerEmail;
+          console.log("Found lead by owner email:", leadByOwnerEmail.id);
+          
+          // Link the document to this lead
+          await supabase
+            .from("leads")
+            .update({ signwell_document_id: documentId })
+            .eq("id", leadByOwnerEmail.id);
         }
       }
     }
     
     if (leadData) {
-      console.log("Found lead:", leadData.id, "stage:", leadData.stage);
+      console.log("Lead found:", leadData.id, "current stage:", leadData.stage);
       // If contract doesn't have property address, try lead (fallback)
       if (!propertyAddress) {
         propertyAddress = leadData.property_address;
       }
     } else {
-      console.log("No lead found for document");
+      console.log("No lead found for document - checked signwell_document_id, recipient_email, and owner_email");
     }
 
     console.log("Property address from contract:", propertyAddress);
