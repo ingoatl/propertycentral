@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { format, isToday, isYesterday, parseISO } from "date-fns";
@@ -25,6 +25,8 @@ import {
   ChevronLeft,
   PhoneOutgoing,
   UserPlus,
+  Inbox,
+  Play,
 } from "lucide-react";
 import { TwilioCallDialog } from "@/components/TwilioCallDialog";
 import { Input } from "@/components/ui/input";
@@ -83,7 +85,7 @@ interface PhoneAssignment {
   display_name: string | null;
 }
 
-type TabType = "chats" | "calls" | "emails";
+type TabType = "all" | "chats" | "calls" | "emails";
 type FilterType = "all" | "open" | "unread" | "unresponded" | "owners";
 type MessageChannel = "sms" | "email";
 
@@ -102,16 +104,17 @@ interface GmailEmail {
   labelIds: string[];
 }
 
-// Normalize phone number to last 10 digits for comparison
+// Normalize phone number to last 10 digits for comparison - strips ALL non-digit characters including Unicode
 const normalizePhone = (phone: string): string => {
-  return phone.replace(/\D/g, '').slice(-10);
+  // Remove ALL non-digit characters including invisible Unicode formatting
+  return phone.replace(/[^\d]/g, '').slice(-10);
 };
 
 export function InboxView() {
   const [search, setSearch] = useState("");
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<TabType>("chats");
+  const [activeTab, setActiveTab] = useState<TabType>("all");
   const [activeFilter, setActiveFilter] = useState<FilterType>("all");
   const [selectedMessage, setSelectedMessage] = useState<CommunicationItem | null>(null);
   const [showSmsReply, setShowSmsReply] = useState(false);
@@ -141,6 +144,7 @@ export function InboxView() {
     phone?: string | null;
   } | null>(null);
   const [showCallDialog, setShowCallDialog] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
   
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -449,8 +453,9 @@ export function InboxView() {
     enabled: !!currentUserId && activeTab !== "emails",
     queryFn: async () => {
       const results: CommunicationItem[] = [];
-      const fetchCalls = activeTab === "calls";
-      const fetchMessages = activeTab === "chats";
+      const fetchAll = activeTab === "all";
+      const fetchCalls = activeTab === "calls" || fetchAll;
+      const fetchMessages = activeTab === "chats" || fetchAll;
       const targetUserId = viewAllInboxes ? null : (selectedInboxUserId || currentUserId);
 
       if (fetchMessages) {
@@ -862,14 +867,13 @@ export function InboxView() {
       
       // For leads, fetch all communications for the same lead_id AND user_phone_messages by phone
       if (selectedMessage.contact_type === "lead" && selectedMessage.contact_id) {
-        // Determine what types to fetch based on selected message type
-        const isEmailMessage = selectedMessage.type === "email" || selectedMessage.type === "draft";
-        const commTypes = isEmailMessage ? ["sms", "call", "email"] : ["sms", "call"];
+        // Always fetch all types for unified view
+        const commTypes = ["sms", "call", "email"];
         
         // Fetch from lead_communications
         const { data: leadComms, error } = await supabase
           .from("lead_communications")
-          .select("id, communication_type, direction, body, subject, created_at, status, media_urls")
+          .select("id, communication_type, direction, body, subject, created_at, status, media_urls, call_duration, call_recording_url")
           .eq("lead_id", selectedMessage.contact_id)
           .in("communication_type", commTypes)
           .order("created_at", { ascending: true });
@@ -881,17 +885,16 @@ export function InboxView() {
           if (!body || body.trim().length === 0 || body === "SMS message") {
             body = comm.direction === "inbound" ? "(Received message)" : "(Sent message)";
           }
-          // For emails, show subject too
-          if (comm.communication_type === "email" && comm.subject) {
-            body = `📧 ${comm.subject}\n\n${body}`;
-          }
           return {
             id: comm.id,
             type: comm.communication_type,
             direction: comm.direction,
             body,
+            subject: comm.subject,
             created_at: comm.created_at,
             media_urls: comm.media_urls || [],
+            call_duration: comm.call_duration,
+            call_recording_url: comm.call_recording_url,
           };
         });
         
@@ -1067,8 +1070,36 @@ export function InboxView() {
     enabled: !!selectedMessage,
   });
 
-  // Group communications by date for the inbox list
+  // Group communications by contact (for "All" tab - show only latest message per contact)
+  const groupedByContact = useMemo(() => {
+    if (activeTab !== "all") return null;
+    
+    const contactMap = new Map<string, CommunicationItem[]>();
+    const filteredComms = communications.filter(c => activeFilter !== "owners" || c.contact_type === "owner");
+    
+    for (const comm of filteredComms) {
+      // Create unique key based on contact phone, email, or id
+      const key = comm.contact_phone ? normalizePhone(comm.contact_phone) : 
+                  comm.contact_email || comm.contact_id;
+      const existing = contactMap.get(key) || [];
+      existing.push(comm);
+      contactMap.set(key, existing);
+    }
+    
+    // Return only the latest message per contact, sorted by date descending
+    return Array.from(contactMap.values())
+      .map(messages => messages.sort((a, b) => 
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      )[0])
+      .sort((a, b) => 
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+  }, [communications, activeFilter, activeTab]);
+
+  // Group communications by date for the inbox list (for non-All tabs)
   const groupedCommunications = useMemo(() => {
+    if (activeTab === "all") return [];
+    
     const groups: Record<string, CommunicationItem[]> = {};
     const filteredComms = communications.filter(c => activeFilter !== "owners" || c.contact_type === "owner");
     
@@ -1081,7 +1112,7 @@ export function InboxView() {
     // Sort by date descending (newest first)
     const sortedEntries = Object.entries(groups).sort((a, b) => b[0].localeCompare(a[0]));
     return sortedEntries;
-  }, [communications, activeFilter]);
+  }, [communications, activeFilter, activeTab]);
 
   // Helper function to format date headers
   const formatDateHeader = (dateKey: string): string => {
@@ -1115,6 +1146,13 @@ export function InboxView() {
         <div className="flex items-center gap-2 px-4 py-3 border-b bg-background">
           {/* Tabs */}
           <div className="flex items-center gap-1 flex-1">
+            <button 
+              onClick={() => { setActiveTab("all"); setSelectedGmailEmail(null); setShowMobileDetail(false); }} 
+              className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-colors ${activeTab === "all" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"}`}
+            >
+              <MessageSquare className="h-4 w-4" />
+              <span className="hidden sm:inline">All</span>
+            </button>
             <button 
               onClick={() => { setActiveTab("chats"); setSelectedGmailEmail(null); setShowMobileDetail(false); }} 
               className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-colors ${activeTab === "chats" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"}`}
@@ -1270,6 +1308,98 @@ export function InboxView() {
             <div className="flex items-center justify-center h-32">
               <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
             </div>
+          ) : activeTab === "all" && groupedByContact ? (
+            // "All" tab - grouped by contact, showing only latest message per contact
+            groupedByContact.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-48 text-muted-foreground">
+                <MessageSquare className="h-12 w-12 mb-3 opacity-30" />
+                <p className="text-sm">{activeFilter === "owners" ? "No owner conversations" : "No conversations"}</p>
+              </div>
+            ) : (
+              <div>
+                {groupedByContact.map((comm) => (
+                  <div 
+                    key={comm.id} 
+                    onClick={() => {
+                      if (comm.contact_type === "owner" && comm.owner_id) {
+                        setSelectedOwnerForDetail({
+                          id: comm.owner_id,
+                          name: comm.contact_name,
+                          email: comm.contact_email,
+                          phone: comm.contact_phone,
+                        });
+                      } else {
+                        handleSelectMessage(comm);
+                      }
+                    }}
+                    className={`flex items-start gap-3 px-4 py-3 cursor-pointer transition-colors border-b border-border/30 active:bg-muted/50 ${selectedMessage?.id === comm.id ? "bg-primary/5" : "hover:bg-muted/30"}`}
+                  >
+                    {/* Compact avatar */}
+                    <div className="relative flex-shrink-0">
+                      <div className={`h-10 w-10 rounded-full flex items-center justify-center ${
+                        comm.contact_type === "owner" 
+                          ? "bg-gradient-to-br from-purple-500 to-purple-600" 
+                          : comm.contact_type === "tenant"
+                          ? "bg-gradient-to-br from-blue-500 to-blue-600"
+                          : "bg-gradient-to-br from-emerald-500 to-emerald-600"
+                      }`}>
+                        <span className="text-xs font-semibold text-white">{getInitials(comm.contact_name)}</span>
+                      </div>
+                      {comm.is_resolved && (
+                        <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-green-500 border-2 border-background flex items-center justify-center">
+                          <CheckCircle className="h-2 w-2 text-white" />
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* Content */}
+                    <div className="flex-1 min-w-0 py-0.5">
+                      <div className="flex items-baseline justify-between gap-2 mb-0.5">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="font-semibold text-sm truncate">{comm.contact_name}</span>
+                          {/* Type indicator badges */}
+                          {comm.type === "call" && (
+                            <span className="flex items-center gap-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded bg-orange-500/10 text-orange-600">
+                              <Phone className="h-2.5 w-2.5" />
+                            </span>
+                          )}
+                          {comm.type === "email" && (
+                            <span className="flex items-center gap-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-600">
+                              <Mail className="h-2.5 w-2.5" />
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-[11px] text-muted-foreground whitespace-nowrap">
+                          {isToday(new Date(comm.created_at)) 
+                            ? format(new Date(comm.created_at), "h:mm a")
+                            : isYesterday(new Date(comm.created_at))
+                            ? "Yesterday"
+                            : format(new Date(comm.created_at), "MMM d")
+                          }
+                        </span>
+                      </div>
+                      
+                      {/* Inline badges */}
+                      {(comm.type === "draft" || (comm.direction === "inbound" && !comm.is_resolved)) && (
+                        <div className="flex items-center gap-1.5 mb-1">
+                          {comm.type === "draft" && (
+                            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600">Draft</span>
+                          )}
+                          {comm.direction === "inbound" && !comm.is_resolved && (
+                            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-600">New</span>
+                          )}
+                        </div>
+                      )}
+                      
+                      {/* Message preview */}
+                      <p className="text-[13px] text-muted-foreground line-clamp-2 leading-relaxed">
+                        {getMessagePreview(comm)}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )
           ) : groupedCommunications.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-48 text-muted-foreground">
               <MessageSquare className="h-12 w-12 mb-3 opacity-30" />
@@ -1611,9 +1741,21 @@ export function InboxView() {
                                       : "bg-muted"
                                   }`}>
                                     {msg.type === "call" && (
-                                      <div className={`flex items-center gap-1 text-[11px] mb-1 ${isOutbound ? "opacity-80" : "text-muted-foreground"}`}>
+                                      <div className={`flex items-center gap-1.5 text-[11px] mb-1.5 ${isOutbound ? "opacity-80" : "text-muted-foreground"}`}>
                                         <Phone className="h-3 w-3" />
-                                        {isOutbound ? "Outgoing call" : "Incoming call"}
+                                        <span>{isOutbound ? "Outgoing call" : "Incoming call"}</span>
+                                        {msg.call_duration && <span>· {Math.floor(msg.call_duration / 60)}m {msg.call_duration % 60}s</span>}
+                                        {msg.call_recording_url && (
+                                          <button onClick={(e) => { e.stopPropagation(); window.open(msg.call_recording_url, "_blank"); }} className="ml-1 hover:opacity-80">
+                                            <Play className="h-3 w-3" />
+                                          </button>
+                                        )}
+                                      </div>
+                                    )}
+                                    {msg.type === "email" && msg.subject && (
+                                      <div className={`flex items-center gap-1 text-xs font-medium mb-1 ${isOutbound ? "opacity-90" : ""}`}>
+                                        <Mail className="h-3 w-3" />
+                                        {msg.subject}
                                       </div>
                                     )}
                                     {/* MMS Images - OpenPhone style grid with lightbox */}

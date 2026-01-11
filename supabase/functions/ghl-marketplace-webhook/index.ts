@@ -6,9 +6,10 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-wh-signature",
 };
 
-// Format phone number to E.164 for matching
+// Format phone number to E.164 for matching - strips ALL non-digit characters including Unicode
 function normalizePhone(phone: string): string {
-  const digits = phone.replace(/\D/g, "");
+  // Remove ALL non-digit characters including Unicode formatting characters
+  const digits = phone.replace(/[^\d]/g, "");
   if (digits.length === 10) return `+1${digits}`;
   if (digits.length === 11 && digits.startsWith("1")) return `+${digits}`;
   return phone.startsWith("+") ? phone : `+${digits}`;
@@ -60,12 +61,19 @@ serve(async (req) => {
       callStatus,
     } = payload;
 
-    // Only process InboundMessage events
-    if (type !== "InboundMessage") {
-      console.log("Ignoring non-InboundMessage event:", type);
+    // Process InboundMessage and call events
+    const supportedTypes = ["InboundMessage", "InboundCall", "CallCompleted", "OutboundMessage"];
+    if (!supportedTypes.includes(type)) {
+      console.log("Ignoring unsupported event type:", type);
       return new Response(JSON.stringify({ success: true, message: `Ignored event type: ${type}` }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
+    }
+    
+    // Handle call events
+    const isCallEvent = type === "InboundCall" || type === "CallCompleted";
+    if (isCallEvent) {
+      console.log("Processing call event:", type);
     }
 
     // Skip if no body (unless it's a call/voicemail)
