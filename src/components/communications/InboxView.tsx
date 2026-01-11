@@ -36,6 +36,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { SendSMSDialog } from "./SendSMSDialog";
 import { SendEmailDialog } from "./SendEmailDialog";
 import { ComposeEmailDialog } from "./ComposeEmailDialog";
+import { AIComposeEmailDialog } from "./AIComposeEmailDialog";
 import { AIWritingAssistant } from "./AIWritingAssistant";
 import { AIReplyButton } from "./AIReplyButton";
 import { EmojiPicker } from "./EmojiPicker";
@@ -122,6 +123,7 @@ export function InboxView() {
   const [showSmsReply, setShowSmsReply] = useState(false);
   const [showEmailReply, setShowEmailReply] = useState(false);
   const [showComposeEmail, setShowComposeEmail] = useState(false);
+  const [showAIComposeEmail, setShowAIComposeEmail] = useState(false);
   const [isEditingDraft, setIsEditingDraft] = useState(false);
   const [editedDraft, setEditedDraft] = useState<{
     to_email: string;
@@ -1334,6 +1336,15 @@ export function InboxView() {
             {/* Email inbox selector */}
             {activeTab === "emails" && (
               <>
+                <Button 
+                  onClick={() => setShowAIComposeEmail(true)} 
+                  size="sm"
+                  className="gap-1.5"
+                >
+                  <Plus className="h-4 w-4" />
+                  <span className="hidden sm:inline">Compose</span>
+                </Button>
+                <div className="w-px h-6 bg-border mx-1" />
                 <button 
                   onClick={() => setSelectedEmailInbox("ingo")} 
                   className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${selectedEmailInbox === "ingo" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}
@@ -2101,6 +2112,12 @@ export function InboxView() {
         open={showEmailActionModal}
         onClose={() => setShowEmailActionModal(false)}
         email={selectedGmailEmail}
+      />
+      
+      {/* AI Compose Email Dialog */}
+      <AIComposeEmailDialog
+        open={showAIComposeEmail}
+        onOpenChange={setShowAIComposeEmail}
       />
       
       {/* Owner Communication Detail Modal */}
