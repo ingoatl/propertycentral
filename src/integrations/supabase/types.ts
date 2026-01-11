@@ -2265,6 +2265,7 @@ export type Database = {
           id: string
           is_read: boolean | null
           lead_id: string | null
+          media_urls: string[] | null
           metadata: Json | null
           opened_at: string | null
           owner_id: string | null
@@ -2294,6 +2295,7 @@ export type Database = {
           id?: string
           is_read?: boolean | null
           lead_id?: string | null
+          media_urls?: string[] | null
           metadata?: Json | null
           opened_at?: string | null
           owner_id?: string | null
@@ -2323,6 +2325,7 @@ export type Database = {
           id?: string
           is_read?: boolean | null
           lead_id?: string | null
+          media_urls?: string[] | null
           metadata?: Json | null
           opened_at?: string | null
           owner_id?: string | null
