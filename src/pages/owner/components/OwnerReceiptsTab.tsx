@@ -76,6 +76,9 @@ export function OwnerReceiptsTab({ expenses, propertyId, token }: OwnerReceiptsT
   const filteredExpenses = useMemo(() => {
     let result = [...expenses];
 
+    // First, filter out expenses without any receipt file
+    result = result.filter(e => e.email_screenshot_path || e.file_path || e.original_receipt_path);
+
     // Search filter
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
