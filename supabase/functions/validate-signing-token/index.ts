@@ -168,7 +168,26 @@ serve(async (req) => {
 
     // Get field mappings with positions and filter by signer type
     const allFieldMappings = template?.field_mappings || [];
-    const savedFieldValues = signingToken.booking_documents?.field_configuration || {};
+    let savedFieldValues = signingToken.booking_documents?.field_configuration || {};
+    
+    // For admin/manager signers, filter out any saved signature data - they sign fresh
+    const isAdminSigner = signingToken.signer_type === "manager" || signingToken.signer_type === "host";
+    if (isAdminSigner && savedFieldValues) {
+      const filteredValues: Record<string, any> = {};
+      for (const [key, value] of Object.entries(savedFieldValues)) {
+        // Don't pass signature data to manager - they need to sign fresh
+        if (key.toLowerCase().includes("signature") && typeof value === "string" && value.startsWith("data:image")) {
+          continue;
+        }
+        // Don't pass manager date fields - they'll be auto-filled on their side
+        if (key.toLowerCase().includes("manager") && key.toLowerCase().includes("date")) {
+          continue;
+        }
+        filteredValues[key] = value;
+      }
+      savedFieldValues = filteredValues;
+      console.log("Filtered saved values for admin signer - removed signature data");
+    }
     
     // Map signer_type to filled_by value
     const signerTypeToFilledBy: Record<string, string> = {

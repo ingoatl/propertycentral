@@ -207,12 +207,20 @@ const SignDocument = () => {
         // Determine if current signer is admin (last signer)
         const isAdminSignerFromResult = result.signerType === "manager" || result.signerType === "host";
         
-        // Get current EST date in YYYY-MM-DD format
-        const getESTDate = () => {
-          const now = new Date();
-          return now.toLocaleDateString('en-CA', { timeZone: 'America/New_York' }); // en-CA gives YYYY-MM-DD
+        // Helper to detect Owner 2 fields
+        const isOwner2FieldCheck = (f: FieldData) => {
+          const label = f.label.toLowerCase();
+          const apiId = f.api_id.toLowerCase();
+          return label.includes("owner 2") || label.includes("owner2") || label.includes("second owner") ||
+                 apiId.includes("owner2") || apiId.includes("owner_2") || apiId.includes("second_owner");
         };
-        const estDate = getESTDate();
+        
+        // Helper to detect Manager fields
+        const isManagerFieldCheck = (f: FieldData) => {
+          const label = f.label.toLowerCase();
+          const apiId = f.api_id.toLowerCase();
+          return label.includes("manager") || apiId.includes("manager");
+        };
         
         // Helper to detect date fields
         const isDateFieldCheck = (f: FieldData) => {
@@ -221,19 +229,52 @@ const SignDocument = () => {
                  f.api_id.toLowerCase().includes("date");
         };
         
+        // Get current EST date in YYYY-MM-DD format
+        const getESTDate = () => {
+          const now = new Date();
+          return now.toLocaleDateString('en-CA', { timeZone: 'America/New_York' }); // en-CA gives YYYY-MM-DD
+        };
+        const estDate = getESTDate();
+        
         result.fields?.forEach((field: FieldData) => {
-          // Always load saved values from previous signers
+          // Always load saved values from previous signers (like Owner 1 name, signature, etc.)
           if (result.savedFieldValues?.[field.api_id] !== undefined) {
-            initialValues[field.api_id] = result.savedFieldValues[field.api_id];
-            if (result.savedFieldValues[field.api_id]) {
-              completed.add(field.api_id);
+            const savedValue = result.savedFieldValues[field.api_id];
+            
+            // Don't load saved signatures for admin/manager - they sign fresh
+            if (field.type === "signature" && isAdminSignerFromResult) {
+              initialValues[field.api_id] = "";
+              // Don't add to completed - manager needs to sign
+            } else {
+              initialValues[field.api_id] = savedValue;
+              if (savedValue) {
+                completed.add(field.api_id);
+              }
             }
           } else if (field.type === "checkbox") {
             initialValues[field.api_id] = false;
           } else if (isDateFieldCheck(field)) {
-            // Date fields: AUTO-FILL with current EST date for ALL signers
-            initialValues[field.api_id] = estDate;
-            completed.add(field.api_id);
+            // Date fields: Only auto-fill for the CURRENT signer's date fields
+            // Owner 1 sees Owner 1 date auto-filled, NOT Owner 2 or Manager dates
+            // Owner 2 sees Owner 2 date auto-filled (if they're signing)
+            // Manager sees Manager date auto-filled
+            const isOwner2Date = isOwner2FieldCheck(field);
+            const isManagerDate = isManagerFieldCheck(field);
+            const isSecondOwnerSigner = result.signerType === "second_owner";
+            
+            // Determine if this date field belongs to current signer
+            const shouldAutoFill = 
+              (isAdminSignerFromResult && isManagerDate) || // Manager fills manager dates
+              (isSecondOwnerSigner && isOwner2Date) || // Second owner fills owner 2 dates
+              (result.signerType === "owner" && !isOwner2Date && !isManagerDate); // Owner 1 fills owner 1 dates
+            
+            if (shouldAutoFill) {
+              initialValues[field.api_id] = estDate;
+              completed.add(field.api_id);
+            } else {
+              // Leave other signers' date fields empty - they'll fill when they sign
+              initialValues[field.api_id] = "";
+            }
           } else {
             initialValues[field.api_id] = "";
           }
