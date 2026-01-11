@@ -30,6 +30,7 @@ import {
   FileText,
   RotateCw,
 } from "lucide-react";
+import { OwnerReportModal } from "./OwnerReportModal";
 
 interface OwnerProperty {
   id: string;
@@ -64,7 +65,11 @@ export function OwnerPortalAdmin() {
   const [searchTerm, setSearchTerm] = useState("");
   const [sendingInvite, setSendingInvite] = useState<string | null>(null);
   const [syncingPayments, setSyncingPayments] = useState(false);
-  const [generatingReport, setGeneratingReport] = useState<string | null>(null);
+  const [reportModal, setReportModal] = useState<{
+    open: boolean;
+    owner: OwnerWithProperties | null;
+    property: OwnerProperty | null;
+  }>({ open: false, owner: null, property: null });
   const [stats, setStats] = useState<OwnerStats>({
     totalOwners: 0,
     withProperties: 0,
@@ -188,62 +193,8 @@ export function OwnerPortalAdmin() {
     }
   };
 
-  const generateOwnerReport = async (owner: OwnerWithProperties, property: OwnerProperty) => {
-    setGeneratingReport(`${owner.id}-${property.id}`);
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        toast.error("Not authenticated");
-        return;
-      }
-
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-owner-dashboard-pdf`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${session.access_token}`,
-          },
-          body: JSON.stringify({
-            ownerId: owner.id,
-            propertyId: property.id,
-          }),
-        }
-      );
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Failed to generate report");
-      }
-
-      const result = await response.json();
-      
-      // Convert base64 to blob and download
-      const byteCharacters = atob(result.pdf);
-      const byteNumbers = new Array(byteCharacters.length);
-      for (let i = 0; i < byteCharacters.length; i++) {
-        byteNumbers[i] = byteCharacters.charCodeAt(i);
-      }
-      const byteArray = new Uint8Array(byteNumbers);
-      const blob = new Blob([byteArray], { type: 'application/pdf' });
-      
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = result.filename || `owner-report-${property.name}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-
-      toast.success(`Report generated for ${property.name}`);
-    } catch (error: unknown) {
-      console.error("Error generating report:", error);
-      toast.error(error instanceof Error ? error.message : "Failed to generate report");
-    } finally {
-      setGeneratingReport(null);
-    }
+  const openReportModal = (owner: OwnerWithProperties, property: OwnerProperty) => {
+    setReportModal({ open: true, owner, property });
   };
   const sendInvite = async (owner: OwnerWithProperties, propertyId: string) => {
     if (!propertyId) {
@@ -520,15 +471,10 @@ export function OwnerPortalAdmin() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => generateOwnerReport(owner, property)}
-                            disabled={generatingReport === `${owner.id}-${property.id}`}
+                            onClick={() => openReportModal(owner, property)}
                             title="Generate PDF Report"
                           >
-                            {generatingReport === `${owner.id}-${property.id}` ? (
-                              <RefreshCw className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <FileText className="h-4 w-4" />
-                            )}
+                            <FileText className="h-4 w-4" />
                           </Button>
                           <Button
                             variant="outline"
@@ -597,6 +543,19 @@ export function OwnerPortalAdmin() {
           </Table>
         </CardContent>
       </Card>
+
+      {/* Report Modal */}
+      {reportModal.owner && reportModal.property && (
+        <OwnerReportModal
+          open={reportModal.open}
+          onOpenChange={(open) => setReportModal({ ...reportModal, open })}
+          ownerId={reportModal.owner.id}
+          ownerName={reportModal.owner.name}
+          ownerEmail={reportModal.owner.email}
+          propertyId={reportModal.property.id}
+          propertyName={reportModal.property.name}
+        />
+      )}
 
     </div>
   );
