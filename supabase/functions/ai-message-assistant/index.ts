@@ -217,6 +217,14 @@ serve(async (req) => {
 
     const firstName = contactName?.split(" ")[0] || "there";
 
+    // Analyze conversation to determine what actually happened
+    const hasOutboundCall = commHistory.includes("[WE SENT - CALL]") || commHistory.includes("CALL TRANSCRIPT");
+    const hasInboundCall = commHistory.includes("[THEY REPLIED - CALL]");
+    const hasActualConversation = hasOutboundCall || hasInboundCall || commHistory.includes("[THEY REPLIED");
+    const isFirstContact = !commHistory.includes("[WE SENT");
+    const hasPropertyAddress = leadData?.property_address || ownerData?.properties?.some((p: any) => p.address);
+    const hasEmail = leadData?.email || ownerData?.email;
+
     // Build system prompt with optional company knowledge
     let systemPrompt = `You are a professional property management assistant for PeachHaus Group helping compose ${messageType === "sms" ? "SMS messages" : "emails"}.
 
@@ -229,15 +237,23 @@ Name: ${contactName || "Unknown"} (use "${firstName}" when addressing them)
 ${fullContext}
 ${commHistory}
 
+CRITICAL CONVERSATION ANALYSIS:
+- Has there been an actual PHONE CALL with this person? ${hasOutboundCall ? "YES - We called them" : hasInboundCall ? "YES - They called us" : "NO - Only text/email communication"}
+- Is this our first outreach to them? ${isFirstContact ? "YES" : "NO - We've contacted them before"}
+- Do we have their property address? ${hasPropertyAddress ? "YES" : "NO - MUST ASK FOR IT"}
+- Do we have their email? ${hasEmail ? "YES" : "NO - MUST ASK FOR IT (needed to send income analysis)"}
+
 CRITICAL INSTRUCTIONS:
 1. Read the ENTIRE conversation history carefully before responding
-2. Your reply should directly address what they last said
-3. Be helpful and provide specific information
-4. If they asked a question, answer it
-5. If they expressed a concern, address it
-6. If they're just being conversational, respond naturally
+2. NEVER say "great chatting with you" or "great speaking with you" unless there was an ACTUAL phone call (not just text messages)
+3. If there was NO phone call, say things like "Thanks for reaching out!" or "Great to hear from you!"
+4. Your reply should directly address what they last said
+5. Be helpful and provide specific information
+6. If they asked a question, answer it
 7. ${messageType === "sms" ? "Keep SMS under 160 characters when possible, max 320." : "Keep emails concise - 2-3 paragraphs max."}
-8. Never be generic - reference specific details from the conversation`;
+8. Never be generic - reference specific details from the conversation
+9. ALWAYS offer the FREE INCOME ANALYSIS if we don't have their property address yet
+10. If they texted and we don't have their email, ask for it so we can send the analysis`;
 
     let userPrompt = "";
 
@@ -245,17 +261,23 @@ CRITICAL INSTRUCTIONS:
       case "generate_contextual_reply":
         userPrompt = `Based on the full conversation history above, generate a warm, professional SMS reply.
 
-PSYCHOLOGY-INFORMED APPROACH:
-1. If they CALLED in: Thank them, acknowledge their interest, and invite them to schedule a proper discovery call: ${SCHEDULING_LINK}
-2. If they seem interested: Make them feel valued, provide a clear next step
-3. If they have questions: Answer directly, then offer to discuss more in a call
-4. If it seems urgent: Acknowledge urgency, offer quick callback option OR the scheduling link
+CRITICAL CHECK FIRST:
+- Did we actually TALK on the phone? ${hasOutboundCall || hasInboundCall ? "YES" : "NO - only text messages"}
+- If NO phone call, DO NOT say "great chatting" or "great speaking" - use "great to hear from you" or "thanks for reaching out" instead
+
+INFORMATION WE STILL NEED:
+${!hasPropertyAddress ? "- Property address (for free income analysis)" : ""}
+${!hasEmail ? "- Email address (to send the income analysis report)" : ""}
+
+MUST INCLUDE IN RESPONSE:
+${!hasPropertyAddress || !hasEmail ? `- Offer our FREE rental income analysis and ask for: ${!hasPropertyAddress ? "their property address" : ""} ${!hasEmail ? "their email" : ""}` : "- They have our income analysis prerequisites, focus on next steps like scheduling a call"}
 
 RESPONSE FRAMEWORK:
-- Warmth first (acknowledge them as a person)
+- Warmth first (acknowledge them as a person - but accurately!)
 - Address their specific need/interest
-- Provide value or answer
-- Clear call-to-action (schedule link when appropriate)
+- Provide value or offer income analysis
+- Ask for missing info (address/email) if needed
+- Clear call-to-action
 - Sign off: "- PeachHaus"
 
 Keep under 280 characters for SMS. Generate ONLY the reply text.`;

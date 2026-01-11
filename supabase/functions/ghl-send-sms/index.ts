@@ -205,6 +205,16 @@ serve(async (req) => {
           from_number: formattedFromNumber,
         },
       });
+
+      // Mark all unread inbound communications for this lead as read (auto-complete review task)
+      await supabase
+        .from("lead_communications")
+        .update({ is_read: true })
+        .eq("lead_id", leadId)
+        .eq("direction", "inbound")
+        .eq("is_read", false);
+      
+      console.log(`Marked inbound communications as read for lead ${leadId}`);
     }
 
     // Record communication for owners
@@ -225,6 +235,57 @@ serve(async (req) => {
           to_number: formattedPhone,
         },
       });
+
+      // Mark all unread inbound communications for this owner as read
+      await supabase
+        .from("lead_communications")
+        .update({ is_read: true })
+        .eq("owner_id", ownerId)
+        .eq("direction", "inbound")
+        .eq("is_read", false);
+      
+      console.log(`Marked inbound communications as read for owner ${ownerId}`);
+    }
+
+    // For unmatched contacts (no leadId or ownerId), mark by phone number or ghl_contact_id
+    if (!leadId && !ownerId) {
+      // Try to mark by ghl_contact_id first (most accurate)
+      const { count: ghlCount } = await supabase
+        .from("lead_communications")
+        .update({ is_read: true })
+        .eq("ghl_contact_id", contactId)
+        .eq("direction", "inbound")
+        .eq("is_read", false);
+
+      // Also try by phone number in metadata for messages without ghl_contact_id
+      // This catches messages where the phone was stored in metadata
+      const { data: unmatchedComms } = await supabase
+        .from("lead_communications")
+        .select("id, metadata")
+        .eq("direction", "inbound")
+        .eq("is_read", false)
+        .is("lead_id", null)
+        .is("owner_id", null);
+
+      if (unmatchedComms) {
+        const matchingIds: string[] = [];
+        for (const comm of unmatchedComms) {
+          const meta = comm.metadata as any;
+          const commPhone = meta?.ghl_data?.contactPhone || meta?.unmatched_phone;
+          if (commPhone && formatPhoneE164(commPhone) === formattedPhone) {
+            matchingIds.push(comm.id);
+          }
+        }
+        if (matchingIds.length > 0) {
+          await supabase
+            .from("lead_communications")
+            .update({ is_read: true })
+            .in("id", matchingIds);
+          console.log(`Marked ${matchingIds.length} unmatched inbound communications as read for phone ${formattedPhone}`);
+        }
+      }
+      
+      console.log(`Marked communications as read for GHL contact ${contactId}`);
     }
 
     // Also store in user_phone_messages for unified tracking
