@@ -90,32 +90,11 @@ const SignDocument = () => {
   // Company logo URL - using public storage URL
   const LOGO_URL = "https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/peachhaus-logo.png";
 
-  // State for logo loading fallback
+  // State for logo loading fallback - moved BEFORE any early returns to fix React hooks order
   const [logoFailed, setLogoFailed] = useState(false);
-
-  // Show branded loading immediately to prevent flash
-  if (loading && !data) {
-    return (
-      <div className="min-h-screen bg-[#1a1a2e] flex items-center justify-center">
-        <div className="text-center">
-          {!logoFailed ? (
-            <img 
-              src={LOGO_URL} 
-              alt="PeachHaus" 
-              className="h-16 mx-auto mb-4"
-              onError={() => setLogoFailed(true)}
-            />
-          ) : (
-            <div className="w-16 h-16 mx-auto mb-4 rounded-lg bg-[#fae052] flex items-center justify-center">
-              <span className="text-[#1a1a2e] font-bold text-2xl">P</span>
-            </div>
-          )}
-          <Loader2 className="h-8 w-8 animate-spin text-[#fae052] mx-auto mb-3" />
-          <p className="text-white/80 text-sm">Loading your document...</p>
-        </div>
-      </div>
-    );
-  }
+  
+  // Loading screen component - defined here but rendered conditionally at the END of component
+  // DO NOT use early return here - it breaks React's hook rules and causes state issues
 
   // Filter fields for current signer
   // Owner 2 fields are NOT mandatory - they become active only when clicked
@@ -220,14 +199,31 @@ const SignDocument = () => {
   // Remaining fields to complete
   const remainingCount = totalRequired - totalCompleted;
 
+  // Use ref to track if validation started to prevent race conditions
+  const validationStarted = useRef(false);
+  
   useEffect(() => {
-    if (token) {
+    if (token && !validationStarted.current) {
+      validationStarted.current = true;
+      console.log("Starting token validation...");
       validateToken();
     }
-    
-    // Timeout fallback - if still loading after 15 seconds, show error
+  }, [token]);
+  
+  // Separate effect for timeout - uses refs to avoid stale closure issues
+  const loadingRef = useRef(loading);
+  const dataRef = useRef(data);
+  const errorRef = useRef(error);
+  
+  useEffect(() => {
+    loadingRef.current = loading;
+    dataRef.current = data;
+    errorRef.current = error;
+  }, [loading, data, error]);
+  
+  useEffect(() => {
     const timeout = setTimeout(() => {
-      if (loading && !data && !error) {
+      if (loadingRef.current && !dataRef.current && !errorRef.current) {
         console.error("Document loading timeout - took too long to load");
         setError("Document loading timed out. Please try refreshing the page.");
         setLoading(false);
@@ -235,7 +231,7 @@ const SignDocument = () => {
     }, 15000);
     
     return () => clearTimeout(timeout);
-  }, [token]);
+  }, []);
 
   useEffect(() => {
     const updateWidth = () => {
@@ -251,14 +247,26 @@ const SignDocument = () => {
 
   const validateToken = async () => {
     console.log("validateToken called with token:", token?.substring(0, 8) + "...");
+    setLoading(true);
+    setError(null);
+    
     try {
-      const { data: result, error } = await supabase.functions.invoke("validate-signing-token", {
+      console.log("Invoking validate-signing-token edge function...");
+      const { data: result, error: invokeError } = await supabase.functions.invoke("validate-signing-token", {
         body: { token },
       });
 
-      console.log("validateToken response:", { result, error });
+      console.log("validateToken response received:", { 
+        hasResult: !!result, 
+        hasError: !!invokeError,
+        resultKeys: result ? Object.keys(result) : [],
+        invokeError: invokeError?.message
+      });
 
-      if (error) throw error;
+      if (invokeError) {
+        console.error("Edge function invoke error:", invokeError);
+        throw invokeError;
+      }
       
       if (result?.error) {
         console.log("Server returned error:", result.error);
@@ -751,7 +759,29 @@ const SignDocument = () => {
     return allFields.filter(f => f.page === pageNum);
   };
 
-  // Loading state is now handled at the top of the component with branded loading screen
+  // Loading state - show branded loading screen
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#1a1a2e] flex items-center justify-center">
+        <div className="text-center">
+          {!logoFailed ? (
+            <img 
+              src={LOGO_URL} 
+              alt="PeachHaus" 
+              className="h-16 mx-auto mb-4"
+              onError={() => setLogoFailed(true)}
+            />
+          ) : (
+            <div className="w-16 h-16 mx-auto mb-4 rounded-lg bg-[#fae052] flex items-center justify-center">
+              <span className="text-[#1a1a2e] font-bold text-2xl">P</span>
+            </div>
+          )}
+          <Loader2 className="h-8 w-8 animate-spin text-[#fae052] mx-auto mb-3" />
+          <p className="text-white/80 text-sm">Loading your document...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (error) {
     return (

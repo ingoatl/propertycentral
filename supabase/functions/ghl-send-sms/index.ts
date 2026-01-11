@@ -138,6 +138,8 @@ serve(async (req) => {
     }
 
     // Step 2: Send SMS message
+    console.log(`Sending SMS to contact ${contactId} with message: "${message.substring(0, 50)}..."`);
+    
     const sendResponse = await fetch(
       `https://services.leadconnectorhq.com/conversations/messages`,
       {
@@ -156,14 +158,23 @@ serve(async (req) => {
       }
     );
 
+    const sendResponseText = await sendResponse.text();
+    console.log(`GHL send response status: ${sendResponse.status}, body: ${sendResponseText}`);
+    
     if (!sendResponse.ok) {
-      const errorText = await sendResponse.text();
-      console.error("Error sending SMS via GHL:", errorText);
-      throw new Error(`Failed to send SMS: ${sendResponse.status} - ${errorText}`);
+      console.error("Error sending SMS via GHL:", sendResponseText);
+      throw new Error(`Failed to send SMS: ${sendResponse.status} - ${sendResponseText}`);
     }
 
-    const sendData = await sendResponse.json();
-    console.log(`SMS sent successfully via GHL. Message ID: ${sendData.messageId}`);
+    let sendData;
+    try {
+      sendData = JSON.parse(sendResponseText);
+    } catch (e) {
+      console.error("Failed to parse GHL send response:", e);
+      throw new Error(`Failed to parse GHL response: ${sendResponseText}`);
+    }
+    
+    console.log(`SMS sent successfully via GHL. Message ID: ${sendData.messageId}, Conversation ID: ${sendData.conversationId}`);
 
     // Record communication for leads
     if (leadId) {
