@@ -49,6 +49,7 @@ import { toast } from "sonner";
 import { useAdminCheck } from "@/hooks/useAdminCheck";
 import { useGhlAutoSync } from "@/hooks/useGhlAutoSync";
 import { useLeadRealtimeMessages } from "@/hooks/useLeadRealtimeMessages";
+import { usePhoneLookup } from "@/hooks/usePhoneLookup";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -155,6 +156,9 @@ export function InboxView() {
   
   // Real-time subscription for lead communications
   useLeadRealtimeMessages();
+  
+  // Phone lookup for unknown contacts
+  const { getNameForPhone, lookupPhones, lookupCache } = usePhoneLookup();
 
   // Get current user and their phone assignment
   useEffect(() => {
@@ -810,6 +814,48 @@ export function InboxView() {
     },
   });
 
+  // Trigger phone lookups for unknown contacts
+  useEffect(() => {
+    if (!communications || communications.length === 0) return;
+    
+    // Find contacts with unknown or phone-number-like names
+    const unknownPhones = communications
+      .filter(comm => {
+        const name = comm.contact_name;
+        // Consider unknown if name is "Unknown", looks like a phone number, or is empty
+        return (
+          comm.contact_phone &&
+          (name === "Unknown" || 
+           name === "Unknown Caller" || 
+           name.match(/^[\d\s\-\(\)\+]+$/) || // Pure phone number format
+           name.length < 3)
+        );
+      })
+      .map(comm => comm.contact_phone!)
+      .filter((phone, index, self) => self.indexOf(phone) === index); // Unique
+
+    if (unknownPhones.length > 0) {
+      // Trigger batch lookup (limited to 10)
+      lookupPhones(unknownPhones.slice(0, 10));
+    }
+  }, [communications, lookupPhones]);
+
+  // Enhance communications with looked up names
+  const enhancedCommunications = useMemo(() => {
+    return communications.map(comm => {
+      if (comm.contact_phone) {
+        const lookedUpName = getNameForPhone(comm.contact_phone);
+        if (lookedUpName && 
+            (comm.contact_name === "Unknown" || 
+             comm.contact_name === "Unknown Caller" ||
+             comm.contact_name.match(/^[\d\s\-\(\)\+]+$/))) {
+          return { ...comm, contact_name: lookedUpName };
+        }
+      }
+      return comm;
+    });
+  }, [communications, lookupCache, getNameForPhone]);
+
   // Selected Gmail email state
   const [selectedGmailEmail, setSelectedGmailEmail] = useState<GmailEmail | null>(null);
   
@@ -1146,7 +1192,7 @@ export function InboxView() {
     if (activeTab === "all") return [];
     
     const groups: Record<string, CommunicationItem[]> = {};
-    const filteredComms = communications.filter(c => activeFilter !== "owners" || c.contact_type === "owner");
+    const filteredComms = enhancedCommunications.filter(c => activeFilter !== "owners" || c.contact_type === "owner");
     
     for (const comm of filteredComms) {
       const dateKey = format(parseISO(comm.created_at), "yyyy-MM-dd");
@@ -1157,7 +1203,7 @@ export function InboxView() {
     // Sort by date descending (newest first)
     const sortedEntries = Object.entries(groups).sort((a, b) => b[0].localeCompare(a[0]));
     return sortedEntries;
-  }, [communications, activeFilter, activeTab]);
+  }, [enhancedCommunications, activeFilter, activeTab]);
 
   // Helper function to format date headers
   const formatDateHeader = (dateKey: string): string => {
