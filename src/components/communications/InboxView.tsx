@@ -39,6 +39,8 @@ import { ComposeEmailDialog } from "./ComposeEmailDialog";
 import { AIComposeEmailDialog } from "./AIComposeEmailDialog";
 import { AIWritingAssistant } from "./AIWritingAssistant";
 import { AIReplyButton } from "./AIReplyButton";
+import { SmartSchedulingCard, detectSchedulingIntent } from "./SmartSchedulingCard";
+import { SmartTaskExtractButton } from "./SmartTaskExtractButton";
 import { EmojiPicker } from "./EmojiPicker";
 import { ContactInfoModal } from "./ContactInfoModal";
 import { ConversationNotes } from "./ConversationNotes";
@@ -1868,14 +1870,55 @@ export function InboxView() {
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {/* AI Reply Button - positioned at top for quick access */}
-                    {!selectedMessage.is_draft && selectedMessage.contact_phone && conversationThread.length > 0 && (
-                      <div className="pb-2">
-                        <AIReplyButton
-                          contactName={selectedMessage.contact_name}
-                          contactPhone={selectedMessage.contact_phone}
-                          contactId={selectedMessage.contact_id}
-                          contactType={selectedMessage.contact_type}
+                    {/* Smart Scheduling Card - shows when they want to schedule */}
+                    {!selectedMessage.is_draft && conversationThread.length > 0 && (() => {
+                      const schedulingIntent = detectSchedulingIntent(conversationThread);
+                      if (schedulingIntent) {
+                        return (
+                          <SmartSchedulingCard
+                            detectedIntent={schedulingIntent}
+                            contactName={selectedMessage.contact_name}
+                            contactPhone={selectedMessage.contact_phone}
+                            contactEmail={selectedMessage.contact_email}
+                            contactId={selectedMessage.contact_id}
+                            contactType={selectedMessage.contact_type}
+                            leadId={selectedMessage.contact_type === "lead" ? selectedMessage.contact_id : undefined}
+                            onDismiss={() => {}}
+                            onScheduled={() => queryClient.invalidateQueries({ queryKey: ["communications"] })}
+                          />
+                        );
+                      }
+                      return null;
+                    })()}
+                    
+                    {/* AI Reply + Smart Extract buttons */}
+                    {!selectedMessage.is_draft && conversationThread.length > 0 && (
+                      <div className="flex flex-wrap items-center gap-2 pb-2">
+                        {selectedMessage.contact_phone && (
+                          <AIReplyButton
+                            contactName={selectedMessage.contact_name}
+                            contactPhone={selectedMessage.contact_phone}
+                            contactId={selectedMessage.contact_id}
+                            contactType={selectedMessage.contact_type}
+                            conversationThread={conversationThread.map(msg => ({
+                              type: msg.type,
+                              direction: msg.direction,
+                              body: msg.body,
+                              created_at: msg.created_at,
+                              subject: msg.subject,
+                            }))}
+                            onSendMessage={(message) => {
+                              sendSmsMutation.mutate({
+                                to: selectedMessage.contact_phone!,
+                                message,
+                                contactType: selectedMessage.contact_type,
+                                contactId: selectedMessage.contact_id,
+                              });
+                            }}
+                            isSending={sendSmsMutation.isPending}
+                          />
+                        )}
+                        <SmartTaskExtractButton
                           conversationThread={conversationThread.map(msg => ({
                             type: msg.type,
                             direction: msg.direction,
@@ -1883,15 +1926,13 @@ export function InboxView() {
                             created_at: msg.created_at,
                             subject: msg.subject,
                           }))}
-                          onSendMessage={(message) => {
-                            sendSmsMutation.mutate({
-                              to: selectedMessage.contact_phone!,
-                              message,
-                              contactType: selectedMessage.contact_type,
-                              contactId: selectedMessage.contact_id,
-                            });
-                          }}
-                          isSending={sendSmsMutation.isPending}
+                          contactName={selectedMessage.contact_name}
+                          contactPhone={selectedMessage.contact_phone}
+                          contactEmail={selectedMessage.contact_email}
+                          contactId={selectedMessage.contact_id}
+                          contactType={selectedMessage.contact_type}
+                          leadId={selectedMessage.contact_type === "lead" ? selectedMessage.contact_id : undefined}
+                          onActionExecuted={() => queryClient.invalidateQueries({ queryKey: ["communications"] })}
                         />
                       </div>
                     )}
