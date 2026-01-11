@@ -327,22 +327,19 @@ async function fillPdfWithValues(
         // Convert percentage positions to absolute coordinates
         // x% is distance from LEFT edge (same in CSS and PDF)
         const absX = (x / 100) * pageWidth;
+        const absWidth = width ? (width / 100) * pageWidth : 100;
         
         // y% is distance from TOP edge (CSS top property)
         // PDF uses y from BOTTOM edge, so we need to convert
-        // The y% points to the TOP of the field input area
         const topFromTop = (y / 100) * pageHeight;
-        const fieldHeight = height ? (height / 100) * pageHeight : 14; // Default ~14pt field height
-        const absWidth = width ? (width / 100) * pageWidth : 100;
+        const fieldHeight = height ? (height / 100) * pageHeight : 14;
         
-        // The text should be drawn at the BOTTOM of the field area (where the underline is)
-        // PDF's y coordinate for text is the BASELINE
-        // So we need: pageHeight - topFromTop - fieldHeight + small baseline adjustment
-        const fontSize = 9; // Standard form font size
-        const textBaselineAdjust = fontSize * 0.25; // Lift text slightly above the exact bottom
-        
-        // Final Y position: convert top-to-bottom, then position at bottom of field
-        const drawY = pageHeight - topFromTop - fieldHeight + textBaselineAdjust;
+        // For text: draw baseline sitting ON the underline
+        // The field's y% points to TOP of the field input area
+        // We want text baseline at the bottom of that area
+        const fontSize = 9;
+        // drawY = where the bottom of the field area is in PDF coordinates
+        const drawY = pageHeight - topFromTop - fieldHeight;
         const drawX = absX;
         
         const textValue = sanitizeTextForPdf(String(value));

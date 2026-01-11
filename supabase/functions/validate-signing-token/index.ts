@@ -72,13 +72,16 @@ serve(async (req) => {
       );
     }
 
-    // Check if already signed
+    // Check if already signed - only block if THIS signer already signed
     if (signingToken.signed_at) {
       return new Response(
         JSON.stringify({ error: "You have already signed this document." }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+    
+    // Note: We allow re-opening documents that haven't been signed yet
+    // The user may have closed the browser or refreshed before signing
 
     // Check if document is already completed
     if (signingToken.booking_documents?.status === "completed") {
