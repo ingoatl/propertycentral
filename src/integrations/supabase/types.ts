@@ -6301,6 +6301,7 @@ export type Database = {
           auth_user_id: string | null
           created_at: string
           email: string
+          has_payment_method: boolean | null
           id: string
           name: string
           payment_method: string
@@ -6317,6 +6318,7 @@ export type Database = {
           auth_user_id?: string | null
           created_at?: string
           email: string
+          has_payment_method?: boolean | null
           id?: string
           name: string
           payment_method: string
@@ -6333,6 +6335,7 @@ export type Database = {
           auth_user_id?: string | null
           created_at?: string
           email?: string
+          has_payment_method?: boolean | null
           id?: string
           name?: string
           payment_method?: string

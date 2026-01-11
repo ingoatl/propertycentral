@@ -50,6 +50,7 @@ interface OwnerWithProperties {
   last_portal_access: string | null;
   stripe_customer_id: string | null;
   payment_method: string | null;
+  has_payment_method: boolean;
 }
 
 interface OwnerStats {
@@ -95,7 +96,8 @@ export function OwnerPortalAdmin() {
           second_owner_name,
           second_owner_email,
           stripe_customer_id,
-          payment_method
+          payment_method,
+          has_payment_method
         `)
         .order("name");
 
@@ -431,14 +433,14 @@ export function OwnerPortalAdmin() {
                       </TableCell>
                       <TableCell>
                         {idx === 0 && (
-                          owner.stripe_customer_id && owner.payment_method ? (
+                          owner.has_payment_method ? (
                             <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
                               <CreditCard className="h-3 w-3 mr-1" />
-                              {owner.payment_method === 'card' ? 'Card' : 'ACH'}
+                              {owner.payment_method === 'ach' ? 'ACH' : 'Card'}
                             </Badge>
                           ) : (
-                            <Badge variant="outline" className="text-muted-foreground">
-                              Pending
+                            <Badge variant="outline" className="bg-gray-50 text-gray-500 border-gray-200">
+                              No Payment
                             </Badge>
                           )
                         )}
@@ -516,14 +518,14 @@ export function OwnerPortalAdmin() {
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      {owner.stripe_customer_id && owner.payment_method ? (
+                      {owner.has_payment_method ? (
                         <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
                           <CreditCard className="h-3 w-3 mr-1" />
-                          {owner.payment_method === 'card' ? 'Card' : 'ACH'}
+                          {owner.payment_method === 'ach' ? 'ACH' : 'Card'}
                         </Badge>
                       ) : (
-                        <Badge variant="outline" className="text-muted-foreground">
-                          Pending
+                        <Badge variant="outline" className="bg-gray-50 text-gray-500 border-gray-200">
+                          No Payment
                         </Badge>
                       )}
                     </TableCell>

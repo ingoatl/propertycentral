@@ -18,6 +18,7 @@ interface PropertyOwner {
   email: string;
   payment_method?: string;
   stripe_customer_id?: string;
+  has_payment_method?: boolean;
 }
 
 interface PendingReconciliation {
@@ -85,7 +86,7 @@ export const QuickChargeBuilder = ({ onSuccess }: QuickChargeBuilderProps) => {
   const loadOwners = async () => {
     const { data, error } = await supabase
       .from('property_owners')
-      .select('id, name, email, payment_method, stripe_customer_id')
+      .select('id, name, email, payment_method, stripe_customer_id, has_payment_method')
       .order('name');
     
     if (!error && data) {
@@ -261,11 +262,15 @@ export const QuickChargeBuilder = ({ onSuccess }: QuickChargeBuilderProps) => {
                 <SelectItem key={owner.id} value={owner.id}>
                   <div className="flex items-center gap-2">
                     <span>{owner.name}</span>
-                    {owner.stripe_customer_id && (
-                      <Badge variant="outline" className="text-xs">
+                    {owner.has_payment_method ? (
+                      <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
                         {owner.payment_method === "ach" ? <Banknote className="w-3 h-3" /> : <CreditCard className="w-3 h-3" />}
                       </Badge>
-                    )}
+                    ) : owner.stripe_customer_id ? (
+                      <Badge variant="outline" className="text-xs bg-gray-50 text-gray-500 border-gray-200">
+                        <CreditCard className="w-3 h-3" />
+                      </Badge>
+                    ) : null}
                   </div>
                 </SelectItem>
               ))}
