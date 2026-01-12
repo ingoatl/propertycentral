@@ -10,12 +10,13 @@ const LOGO_URL = "https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/pub
 const SMART_LOCK_URL = "https://www.amazon.com/Yale-Security-Connected-Back-Up-YRD410-WF1-BSP/dp/B0B9HWYMV5";
 const CHECKLIST_URL = "https://propertycentral.lovable.app/documents/MTR_Start_Up_Checklist.pdf";
 
-// Build professional inspection confirmation email for lead
+// Build professional inspection confirmation email for lead with property image
 function buildInspectionConfirmationEmail(
   recipientName: string,
   scheduledAt: Date,
   inspectionType: string,
   propertyAddress: string,
+  propertyImage?: string,
   safetyNotes?: string
 ): string {
   const dateStr = scheduledAt.toLocaleDateString('en-US', { 
@@ -35,6 +36,21 @@ function buildInspectionConfirmationEmail(
   const locationDetails = isVirtual 
     ? `<p style="margin: 8px 0 0 0;"><strong>Type:</strong> 📹 Virtual Inspection (We'll send you a Google Meet link before your appointment)</p>`
     : `<p style="margin: 8px 0 0 0;"><strong>Location:</strong> ${propertyAddress || 'Your property'}</p>`;
+
+  // Property image section if available
+  const propertyImageSection = propertyImage ? `
+    <tr>
+      <td style="padding: 0 32px 20px 32px;">
+        <div style="border-radius: 12px; overflow: hidden; border: 1px solid #e5e7eb;">
+          <img src="${propertyImage}" alt="${propertyAddress}" style="width: 100%; height: 180px; object-fit: cover;" />
+          <div style="padding: 12px 16px; background: #f9fafb;">
+            <div style="font-size: 14px; font-weight: 600; color: #111827;">${propertyAddress}</div>
+            <div style="font-size: 12px; color: #6b7280; margin-top: 2px;">Your property onboarding inspection</div>
+          </div>
+        </div>
+      </td>
+    </tr>
+  ` : '';
 
   return `
     <!DOCTYPE html>
@@ -65,6 +81,9 @@ function buildInspectionConfirmationEmail(
                   </div>
                 </td>
               </tr>
+
+              <!-- Property Image -->
+              ${propertyImageSection}
 
               <!-- Appointment Details -->
               <tr>
@@ -115,6 +134,18 @@ function buildInspectionConfirmationEmail(
                 </td>
               </tr>
 
+              <!-- Utility Closet Request -->
+              <tr>
+                <td style="padding: 0 32px;">
+                  <div style="margin: 20px 0; padding: 16px 20px; background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border-left: 4px solid #f59e0b; border-radius: 0 8px 8px 0;">
+                    <div style="font-size: 14px; color: #92400e; font-weight: 600;">🗄️ Utility Closet/Cabinet Needed</div>
+                    <div style="font-size: 13px; color: #92400e; margin-top: 4px;">
+                      We'll need <strong>one closet or cabinet</strong> designated for property utilities. This will store extra blankets, towels, cleaning supplies, and guest refills. We'll install a lock on it during the inspection.
+                    </div>
+                  </div>
+                </td>
+              </tr>
+
               <!-- Prepare for Inspection -->
               <tr>
                 <td style="padding: 0 32px;">
@@ -131,9 +162,9 @@ function buildInspectionConfirmationEmail(
               <!-- Smart Lock Reminder -->
               <tr>
                 <td style="padding: 0 32px;">
-                  <div style="margin: 20px 0; padding: 16px 20px; background: #fef3c7; border-left: 4px solid #f59e0b; border-radius: 0 8px 8px 0;">
-                    <div style="font-size: 14px; color: #92400e; font-weight: 600;">🔐 Smart Lock Reminder</div>
-                    <div style="font-size: 13px; color: #92400e; margin-top: 4px;">
+                  <div style="margin: 20px 0; padding: 16px 20px; background: #f8fafc; border-left: 4px solid #3b82f6; border-radius: 0 8px 8px 0;">
+                    <div style="font-size: 14px; color: #1e40af; font-weight: 600;">🔐 Smart Lock Reminder</div>
+                    <div style="font-size: 13px; color: #475569; margin-top: 4px;">
                       Don't have a smart lock yet? We recommend the <a href="${SMART_LOCK_URL}" style="color: #1e40af;">Yale Security Smart Lock</a>. 
                       We can install it for you at <strong>no extra charge</strong> during your inspection!
                     </div>
@@ -305,7 +336,7 @@ serve(async (req) => {
 
     // Handle booking from public page
     if (type === 'booking') {
-      const { name, email, phone, propertyAddress, inspectionType, scheduledAt, safetyNotes } = body;
+      const { name, email, phone, propertyAddress, inspectionType, scheduledAt, safetyNotes, checklistResponses, leadId, propertyId, propertyImage } = body;
       
       if (!name || !email || !scheduledAt) {
         return new Response(JSON.stringify({ error: "Missing required fields" }), {
@@ -317,32 +348,136 @@ serve(async (req) => {
       const scheduledDate = new Date(scheduledAt);
       const recipientName = name.split(' ')[0] || name;
 
-      // Try to find existing lead by email
-      let leadId: string | null = null;
-      const { data: existingLead } = await supabase
-        .from("leads")
-        .select("id")
-        .eq("email", email.toLowerCase())
-        .single();
+      // Try to find existing lead by email or leadId
+      let foundLeadId: string | null = leadId || null;
+      let foundPropertyId: string | null = propertyId || null;
+      
+      if (!foundLeadId) {
+        const { data: existingLead } = await supabase
+          .from("leads")
+          .select("id, property_id")
+          .eq("email", email.toLowerCase())
+          .single();
 
-      if (existingLead) {
-        leadId = existingLead.id;
-        // Update lead with inspection date
+        if (existingLead) {
+          foundLeadId = existingLead.id;
+          foundPropertyId = foundPropertyId || existingLead.property_id;
+        }
+      }
+
+      // Update lead with inspection date and checklist responses
+      if (foundLeadId) {
         await supabase
           .from("leads")
           .update({ 
             inspection_date: scheduledDate.toISOString(),
-            stage: 'inspection_scheduled'
+            stage: 'inspection_scheduled',
+            inspection_checklist_responses: checklistResponses || null
           })
-          .eq("id", leadId);
+          .eq("id", foundLeadId);
       }
 
-      // Send confirmation email to lead
+      // Create setup tasks based on checklist responses
+      const tasksToCreate: any[] = [];
+      
+      // Always add maid cabinet lock task
+      tasksToCreate.push({
+        property_id: foundPropertyId,
+        lead_id: foundLeadId,
+        task_type: 'maid_cabinet_lock',
+        title: 'Install Maid Cabinet/Closet Lock',
+        description: 'Install lock on the designated utility closet for storing extra blankets, towels, and supplies.',
+        priority: 'high',
+        category: 'setup'
+      });
+
+      if (checklistResponses) {
+        // Smart lock installation
+        if (checklistResponses.hasSmartLock === 'need_install') {
+          tasksToCreate.push({
+            property_id: foundPropertyId,
+            lead_id: foundLeadId,
+            task_type: 'smart_lock_install',
+            title: 'Install Smart Lock (Yale)',
+            description: 'Bring and install Yale smart lock for the property.',
+            priority: 'high',
+            category: 'setup'
+          });
+        }
+
+        // Gas stove - natural gas detector
+        if (checklistResponses.stoveType === 'gas') {
+          tasksToCreate.push({
+            property_id: foundPropertyId,
+            lead_id: foundLeadId,
+            task_type: 'gas_detector',
+            title: 'Install Natural Gas Detector',
+            description: 'Property has a gas stove - install natural gas leak detector near kitchen.',
+            priority: 'high',
+            category: 'safety'
+          });
+        }
+
+        // No fire extinguisher
+        if (checklistResponses.hasFireExtinguisher === 'no') {
+          tasksToCreate.push({
+            property_id: foundPropertyId,
+            lead_id: foundLeadId,
+            task_type: 'fire_extinguisher',
+            title: 'Provide Fire Extinguisher',
+            description: 'Property needs a fire extinguisher.',
+            priority: 'high',
+            category: 'safety'
+          });
+        }
+
+        // No fire blanket
+        if (checklistResponses.hasFireBlanket === 'no') {
+          tasksToCreate.push({
+            property_id: foundPropertyId,
+            lead_id: foundLeadId,
+            task_type: 'fire_blanket',
+            title: 'Provide Fire Blanket',
+            description: 'Install fire blanket near stove area.',
+            priority: 'medium',
+            category: 'safety'
+          });
+        }
+
+        // No plungers
+        if (checklistResponses.hasPlungers === 'no') {
+          tasksToCreate.push({
+            property_id: foundPropertyId,
+            lead_id: foundLeadId,
+            task_type: 'plungers',
+            title: 'Provide Plungers for Bathrooms',
+            description: 'Ensure there is a plunger in every bathroom.',
+            priority: 'medium',
+            category: 'setup'
+          });
+        }
+      }
+
+      // Insert tasks if we have a property or lead ID
+      if (tasksToCreate.length > 0 && (foundPropertyId || foundLeadId)) {
+        const { error: tasksError } = await supabase
+          .from("property_setup_tasks")
+          .insert(tasksToCreate);
+        
+        if (tasksError) {
+          console.error("Error creating setup tasks:", tasksError);
+        } else {
+          console.log(`Created ${tasksToCreate.length} setup tasks`);
+        }
+      }
+
+      // Send confirmation email to lead with property image
       const emailHtml = buildInspectionConfirmationEmail(
         recipientName,
         scheduledDate,
         inspectionType,
         propertyAddress,
+        propertyImage,
         safetyNotes
       );
 
