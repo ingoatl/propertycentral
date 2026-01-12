@@ -35,6 +35,7 @@ import {
   CheckCheck,
   Bot,
   RotateCcw,
+  Volume2,
 } from "lucide-react";
 import { IncomeReportButton } from "@/components/IncomeReportEmbed";
 import { TwilioCallDialog } from "@/components/TwilioCallDialog";
@@ -60,6 +61,7 @@ import { InboxZeroGuide } from "./InboxZeroGuide";
 import { ConversationQuickActions } from "./ConversationQuickActions";
 import { PriorityBadge } from "./PriorityBadge";
 import { VoiceAIBadge, isVoiceAITranscript, extractCallerPhoneFromTranscript, extractAgentNameFromTranscript, extractCallSummaryFromTranscript, extractCallerNameFromTranscript } from "./VoiceAIBadge";
+import { CallRecordingPlayer } from "./CallRecordingPlayer";
 import LeadDetailModal from "@/components/leads/LeadDetailModal";
 import { OwnerCommunicationDetail } from "./OwnerCommunicationDetail";
 import { useNavigate } from "react-router-dom";
@@ -1798,7 +1800,7 @@ export function InboxView() {
                     
                     return (
                       <div 
-                        key={email.id} 
+                        key={`${email.id}-${doneGmailIds.has(email.id) ? 'done' : 'open'}`}
                         onClick={() => handleSelectGmailEmailMobile(email)} 
                         className={`group relative flex items-start gap-3 px-4 py-3 cursor-pointer transition-colors border-b border-border/30 active:bg-muted/50 
                           ${selectedGmailEmail?.id === email.id ? "bg-primary/5" : "hover:bg-muted/30"} 
@@ -2486,17 +2488,23 @@ export function InboxView() {
                                       ? "bg-primary text-primary-foreground" 
                                       : "bg-muted"
                                   }`}>
-                                    {/* Type indicator for all message types */}
-                                    {msg.type === "call" && (
+                                    {/* Call Recording Player - styled like screenshot */}
+                                    {msg.type === "call" && msg.call_recording_url && (
+                                      <div className="mb-2 -mx-3.5 -mt-2 px-0 pt-0">
+                                        <CallRecordingPlayer
+                                          recordingUrl={msg.call_recording_url}
+                                          duration={msg.call_duration}
+                                          transcript={msg.body}
+                                          isOutbound={isOutbound}
+                                        />
+                                      </div>
+                                    )}
+                                    {/* Simple call indicator when no recording */}
+                                    {msg.type === "call" && !msg.call_recording_url && (
                                       <div className={`flex items-center gap-1.5 text-[11px] mb-1.5 ${isOutbound ? "opacity-80" : "text-muted-foreground"}`}>
                                         <Phone className="h-3 w-3" />
                                         <span>{isOutbound ? "Outgoing call" : "Incoming call"}</span>
                                         {msg.call_duration && <span>· {Math.floor(msg.call_duration / 60)}m {msg.call_duration % 60}s</span>}
-                                        {msg.call_recording_url && (
-                                          <button onClick={(e) => { e.stopPropagation(); window.open(msg.call_recording_url, "_blank"); }} className="ml-1 hover:opacity-80">
-                                            <Play className="h-3 w-3" />
-                                          </button>
-                                        )}
                                       </div>
                                     )}
                                     {msg.type === "email" && (
