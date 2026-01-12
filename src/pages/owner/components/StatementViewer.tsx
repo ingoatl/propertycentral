@@ -11,6 +11,7 @@ interface Statement {
   total_revenue: number;
   total_expenses: number;
   net_to_owner: number;
+  actual_net_earnings?: number; // Calculated correctly based on service type
   status: string;
 }
 
@@ -168,7 +169,7 @@ export function StatementViewer({
                   <div className="text-right">
                     <span className="text-muted-foreground">Net:</span>
                     <span className="ml-2 font-semibold text-emerald-600">
-                      {formatCurrency(statement.net_to_owner)}
+                      {formatCurrency(statement.actual_net_earnings ?? statement.net_to_owner)}
                     </span>
                   </div>
                 </div>
