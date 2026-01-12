@@ -932,11 +932,10 @@ serve(async (req) => {
         adminEmailSubject = `🛡️ Insurance Email Sent: ${lead.name}`;
         console.log(`Sending direct insurance email for stage ${newStage}`);
       } else if (newStage === 'inspection_scheduled') {
-        const bookingUrl = "https://cal.com/peachhausgroup/onboarding-inspection";
+        const bookingUrl = "https://propertycentral.lovable.app/book-inspection";
         directEmailHtml = buildInspectionSchedulingEmailHtml(recipientFirstName, bookingUrl, newStage);
         directEmailSubject = "Schedule Your Onboarding Inspection - PeachHaus";
-        sendAdminCopy = true;
-        adminEmailSubject = `🏠 Inspection Email Sent: ${lead.name}`;
+        // No admin copy - admin gets notified when lead actually books
         console.log(`Sending direct inspection scheduling email for stage ${newStage}`);
       }
       
@@ -1401,8 +1400,8 @@ serve(async (req) => {
             } else if (newStage === 'insurance_requested') {
               finalHtmlBody = buildInsuranceEmailHtml(recipientFirstName, newStage);
             } else if (newStage === 'inspection_scheduled') {
-              // Get calendar booking URL from admin settings
-              const bookingUrl = "https://cal.com/peachhausgroup/onboarding-inspection";
+              // Use our internal booking page
+              const bookingUrl = "https://propertycentral.lovable.app/book-inspection";
               finalHtmlBody = buildInspectionSchedulingEmailHtml(recipientFirstName, bookingUrl, newStage);
               emailSubject = "Schedule Your Onboarding Inspection - PeachHaus";
             } else if (newStage === 'ach_form_signed') {

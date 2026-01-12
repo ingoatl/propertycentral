@@ -8,14 +8,15 @@ const corsHeaders = {
 
 const LOGO_URL = "https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/peachhaus-logo.png";
 const SMART_LOCK_URL = "https://www.amazon.com/Yale-Security-Connected-Back-Up-YRD410-WF1-BSP/dp/B0B9HWYMV5";
+const CHECKLIST_URL = "https://propertycentral.lovable.app/documents/MTR_Start_Up_Checklist.pdf";
 
-// Build professional inspection email
+// Build professional inspection confirmation email for lead
 function buildInspectionConfirmationEmail(
   recipientName: string,
   scheduledAt: Date,
   inspectionType: string,
   propertyAddress: string,
-  googleMeetLink?: string
+  safetyNotes?: string
 ): string {
   const dateStr = scheduledAt.toLocaleDateString('en-US', { 
     weekday: 'long', 
@@ -30,9 +31,9 @@ function buildInspectionConfirmationEmail(
     timeZone: 'America/New_York'
   });
 
-  const isVirtual = inspectionType === 'virtual_inspection' || inspectionType === 'virtual';
-  const meetingDetails = isVirtual && googleMeetLink 
-    ? `<p style="margin: 8px 0 0 0;"><strong>Google Meet:</strong> <a href="${googleMeetLink}" style="color: #2563eb;">${googleMeetLink}</a></p>`
+  const isVirtual = inspectionType === 'virtual';
+  const locationDetails = isVirtual 
+    ? `<p style="margin: 8px 0 0 0;"><strong>Type:</strong> 📹 Virtual Inspection (We'll send you a Google Meet link before your appointment)</p>`
     : `<p style="margin: 8px 0 0 0;"><strong>Location:</strong> ${propertyAddress || 'Your property'}</p>`;
 
   return `
@@ -60,7 +61,7 @@ function buildInspectionConfirmationEmail(
                 <td style="padding: 32px 32px 16px 32px;">
                   <div style="font-size: 16px; color: #111827;">Hi <strong>${recipientName}</strong>,</div>
                   <div style="font-size: 14px; color: #374151; margin-top: 12px; line-height: 1.7;">
-                    Great news! Your onboarding inspection has been scheduled. We're excited to complete this final step before getting your property live!
+                    Great news! Your onboarding inspection has been scheduled. We're excited to complete this final step before getting your property live and welcoming guests!
                   </div>
                 </td>
               </tr>
@@ -72,99 +73,69 @@ function buildInspectionConfirmationEmail(
                     <div style="font-size: 12px; color: #166534; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px; font-weight: 600;">📅 Appointment Details</div>
                     <div style="font-size: 18px; font-weight: 700; color: #166534;">${dateStr}</div>
                     <div style="font-size: 16px; color: #166534; margin-top: 4px;">${timeStr} EST</div>
-                    <div style="font-size: 14px; color: #166534; margin-top: 4px;">${isVirtual ? '📹 Virtual Inspection' : '🏠 In-Person Walkthrough'}</div>
-                    ${meetingDetails}
+                    ${locationDetails}
                   </div>
                 </td>
               </tr>
 
-              <!-- What Happens Section -->
+              <!-- What We'll Cover -->
               <tr>
                 <td style="padding: 0 32px;">
                   <div style="margin: 20px 0;">
                     <div style="padding: 12px 0; border-bottom: 2px solid #f59e0b; margin-bottom: 16px;">
                       <span style="font-size: 14px; font-weight: 700; color: #111827; text-transform: uppercase; letter-spacing: 0.5px;">🔍 What We'll Cover During Your Inspection</span>
                     </div>
-                    <div style="font-size: 14px; color: #374151; line-height: 1.7;">
-                      <table style="width: 100%;">
-                        <tr>
-                          <td style="padding: 12px 0; border-bottom: 1px solid #e5e7eb; vertical-align: top;">
-                            <div style="display: flex; align-items: flex-start;">
-                              <span style="color: #f59e0b; font-size: 18px; margin-right: 12px;">🛡️</span>
-                              <div>
-                                <strong>Safety & Onboarding Inspection</strong>
-                                <p style="margin: 4px 0 0 0; color: #6b7280; font-size: 13px;">We'll document all appliance serial numbers, verify safety equipment (fire extinguishers, smoke/CO detectors), and ensure everything meets guest-ready standards.</p>
-                              </div>
-                            </div>
-                          </td>
-                        </tr>
-                        <tr>
-                          <td style="padding: 12px 0; border-bottom: 1px solid #e5e7eb; vertical-align: top;">
-                            <div style="display: flex; align-items: flex-start;">
-                              <span style="color: #f59e0b; font-size: 18px; margin-right: 12px;">📋</span>
-                              <div>
-                                <strong>Property Inventory Check</strong>
-                                <p style="margin: 4px 0 0 0; color: #6b7280; font-size: 13px;">We verify that all essential items are in place - linens, kitchen supplies, toiletries, and everything your guests will need for a 5-star experience.</p>
-                              </div>
-                            </div>
-                          </td>
-                        </tr>
-                        <tr>
-                          <td style="padding: 12px 0; border-bottom: 1px solid #e5e7eb; vertical-align: top;">
-                            <div style="display: flex; align-items: flex-start;">
-                              <span style="color: #f59e0b; font-size: 18px; margin-right: 12px;">🔐</span>
-                              <div>
-                                <strong>Smart Lock Verification</strong>
-                                <p style="margin: 4px 0 0 0; color: #6b7280; font-size: 13px;">We'll test and verify your smart lock is properly connected and working, ensuring seamless guest check-ins.</p>
-                              </div>
-                            </div>
-                          </td>
-                        </tr>
-                        <tr>
-                          <td style="padding: 12px 0; vertical-align: top;">
-                            <div style="display: flex; align-items: flex-start;">
-                              <span style="color: #f59e0b; font-size: 18px; margin-right: 12px;">✨</span>
-                              <div>
-                                <strong>Final Go-Live Preparation</strong>
-                                <p style="margin: 4px 0 0 0; color: #6b7280; font-size: 13px;">After the inspection, your property will be ready to welcome guests!</p>
-                              </div>
-                            </div>
-                          </td>
-                        </tr>
-                      </table>
-                    </div>
+                    <table style="width: 100%; font-size: 14px; color: #374151;">
+                      <tr>
+                        <td style="padding: 12px 0; border-bottom: 1px solid #e5e7eb;">
+                          <strong style="color: #f59e0b;">🛡️ Safety Check</strong>
+                          <p style="margin: 4px 0 0 0; color: #6b7280; font-size: 13px;">Fire extinguishers, fire blankets, smoke/CO detectors verification</p>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 12px 0; border-bottom: 1px solid #e5e7eb;">
+                          <strong style="color: #f59e0b;">📋 Appliance Documentation</strong>
+                          <p style="margin: 4px 0 0 0; color: #6b7280; font-size: 13px;">Recording all appliance serial numbers and model information</p>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 12px 0; border-bottom: 1px solid #e5e7eb;">
+                          <strong style="color: #f59e0b;">🧺 Inventory Check</strong>
+                          <p style="margin: 4px 0 0 0; color: #6b7280; font-size: 13px;">Verifying all guest essentials are in place - linens, kitchen items, toiletries, plungers</p>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 12px 0;">
+                          <strong style="color: #f59e0b;">🔐 Smart Lock Setup</strong>
+                          <p style="margin: 4px 0 0 0; color: #6b7280; font-size: 13px;">Testing and verifying your smart lock is connected for seamless guest check-ins</p>
+                        </td>
+                      </tr>
+                    </table>
                   </div>
                 </td>
               </tr>
 
-              <!-- Smart Lock Recommendation -->
+              <!-- Prepare for Inspection -->
               <tr>
                 <td style="padding: 0 32px;">
-                  <div style="margin: 20px 0; padding: 20px 24px; background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%); border: 1px solid #fbbf24; border-radius: 12px;">
-                    <div style="font-size: 14px; color: #92400e; font-weight: 600; margin-bottom: 8px;">🔐 Don't have a smart lock yet?</div>
-                    <div style="font-size: 13px; color: #92400e; line-height: 1.6;">
-                      We recommend the <a href="${SMART_LOCK_URL}" style="color: #1e40af; font-weight: 600;">Yale Security Connected Smart Lock</a> for reliable, secure access.
-                      <br><br>
-                      <strong>Can't install it yourself?</strong> No problem! We can install it for you at <strong>no extra charge</strong> during your inspection.
+                  <div style="margin: 20px 0; padding: 20px 24px; background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); border: 1px solid #93c5fd; border-radius: 12px;">
+                    <div style="font-size: 12px; color: #1e40af; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; font-weight: 600;">📥 Prepare for Your Inspection</div>
+                    <div style="font-size: 14px; color: #1e40af; line-height: 1.6; margin-bottom: 12px;">
+                      Download our inventory checklist to ensure your property has everything needed for a 5-star guest experience:
                     </div>
+                    <a href="${CHECKLIST_URL}" style="display: inline-block; padding: 10px 20px; background: #1e40af; color: #ffffff; text-decoration: none; border-radius: 6px; font-size: 13px; font-weight: 600;">📄 Download STR/MTR Setup Checklist</a>
                   </div>
                 </td>
               </tr>
 
-              <!-- What to Prepare -->
+              <!-- Smart Lock Reminder -->
               <tr>
                 <td style="padding: 0 32px;">
-                  <div style="margin: 20px 0;">
-                    <div style="padding: 12px 0; border-bottom: 2px solid #f59e0b; margin-bottom: 16px;">
-                      <span style="font-size: 14px; font-weight: 700; color: #111827; text-transform: uppercase; letter-spacing: 0.5px;">📝 Please Have Ready</span>
-                    </div>
-                    <div style="font-size: 14px; color: #374151; line-height: 1.7;">
-                      <ul style="margin: 0; padding-left: 20px;">
-                        <li style="margin-bottom: 8px;">Access to all areas of the property (bedrooms, closets, utility areas)</li>
-                        <li style="margin-bottom: 8px;">WiFi network name and password</li>
-                        <li style="margin-bottom: 8px;">Smart lock access codes or the lock itself if not yet installed</li>
-                        <li style="margin-bottom: 8px;">Any questions about the onboarding process</li>
-                      </ul>
+                  <div style="margin: 20px 0; padding: 16px 20px; background: #fef3c7; border-left: 4px solid #f59e0b; border-radius: 0 8px 8px 0;">
+                    <div style="font-size: 14px; color: #92400e; font-weight: 600;">🔐 Smart Lock Reminder</div>
+                    <div style="font-size: 13px; color: #92400e; margin-top: 4px;">
+                      Don't have a smart lock yet? We recommend the <a href="${SMART_LOCK_URL}" style="color: #1e40af;">Yale Security Smart Lock</a>. 
+                      We can install it for you at <strong>no extra charge</strong> during your inspection!
                     </div>
                   </div>
                 </td>
@@ -209,19 +180,255 @@ function buildInspectionConfirmationEmail(
   `;
 }
 
+// Build admin notification email
+function buildAdminNotificationEmail(
+  leadName: string,
+  leadEmail: string,
+  leadPhone: string,
+  propertyAddress: string,
+  inspectionType: string,
+  scheduledAt: Date,
+  safetyNotes: string
+): string {
+  const dateStr = scheduledAt.toLocaleDateString('en-US', { 
+    weekday: 'long', 
+    year: 'numeric', 
+    month: 'long', 
+    day: 'numeric' 
+  });
+  const timeStr = scheduledAt.toLocaleTimeString('en-US', { 
+    hour: 'numeric', 
+    minute: '2-digit',
+    hour12: true,
+    timeZone: 'America/New_York'
+  });
+
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+    </head>
+    <body style="margin: 0; padding: 0; background-color: #f3f4f6; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
+      <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f3f4f6; padding: 40px 20px;">
+        <tr>
+          <td align="center">
+            <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+              <tr>
+                <td style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 24px; text-align: center;">
+                  <div style="font-size: 20px; font-weight: 700; color: #ffffff;">🏠 New Inspection Booked!</div>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding: 24px;">
+                  <table width="100%" style="font-size: 14px; color: #374151;">
+                    <tr>
+                      <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;">
+                        <strong>Lead Name:</strong> ${leadName}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;">
+                        <strong>Email:</strong> <a href="mailto:${leadEmail}" style="color: #2563eb;">${leadEmail}</a>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;">
+                        <strong>Phone:</strong> <a href="tel:${leadPhone}" style="color: #2563eb;">${leadPhone}</a>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;">
+                        <strong>Property:</strong> ${propertyAddress}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 8px 0; border-bottom: 1px solid #e5e7eb;">
+                        <strong>Type:</strong> ${inspectionType === 'virtual' ? '📹 Virtual Inspection' : '🏠 In-Person Inspection'}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 12px 0; background: #f0fdf4; border-radius: 8px; margin-top: 8px;">
+                        <div style="text-align: center;">
+                          <div style="font-size: 12px; color: #166534; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px;">Scheduled For</div>
+                          <div style="font-size: 18px; font-weight: 700; color: #166534;">${dateStr}</div>
+                          <div style="font-size: 16px; color: #166534;">${timeStr} EST</div>
+                        </div>
+                      </td>
+                    </tr>
+                  </table>
+                  
+                  ${safetyNotes ? `
+                  <div style="margin-top: 20px; padding: 16px; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0;">
+                    <div style="font-weight: 600; color: #111827; margin-bottom: 8px;">📋 Safety Checklist Responses:</div>
+                    <pre style="font-family: inherit; font-size: 13px; color: #6b7280; white-space: pre-wrap; margin: 0;">${safetyNotes}</pre>
+                  </div>
+                  ` : ''}
+                </td>
+              </tr>
+              <tr>
+                <td style="padding: 16px 24px; background: #f9fafb; text-align: center; border-top: 1px solid #e5e7eb;">
+                  <a href="https://propertycentral.lovable.app/leads" style="display: inline-block; padding: 10px 24px; background: #111827; color: #ffffff; text-decoration: none; border-radius: 6px; font-weight: 600;">View in PropertyCentral →</a>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+    </body>
+    </html>
+  `;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { inspectionId, leadId, notificationType, inspectionType, scheduledAt } = await req.json();
+    const body = await req.json();
+    const { type } = body;
     
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const resendApiKey = Deno.env.get("RESEND_API_KEY");
     
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    if (!resendApiKey) {
+      console.error("RESEND_API_KEY not configured");
+      return new Response(JSON.stringify({ error: "Email service not configured" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Handle booking from public page
+    if (type === 'booking') {
+      const { name, email, phone, propertyAddress, inspectionType, scheduledAt, safetyNotes } = body;
+      
+      if (!name || !email || !scheduledAt) {
+        return new Response(JSON.stringify({ error: "Missing required fields" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const scheduledDate = new Date(scheduledAt);
+      const recipientName = name.split(' ')[0] || name;
+
+      // Try to find existing lead by email
+      let leadId: string | null = null;
+      const { data: existingLead } = await supabase
+        .from("leads")
+        .select("id")
+        .eq("email", email.toLowerCase())
+        .single();
+
+      if (existingLead) {
+        leadId = existingLead.id;
+        // Update lead with inspection date
+        await supabase
+          .from("leads")
+          .update({ 
+            inspection_date: scheduledDate.toISOString(),
+            stage: 'inspection_scheduled'
+          })
+          .eq("id", leadId);
+      }
+
+      // Send confirmation email to lead
+      const emailHtml = buildInspectionConfirmationEmail(
+        recipientName,
+        scheduledDate,
+        inspectionType,
+        propertyAddress,
+        safetyNotes
+      );
+
+      const emailResponse = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${resendApiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          from: "PeachHaus Group <ingo@peachhausgroup.com>",
+          to: [email],
+          subject: "Your Onboarding Inspection is Confirmed! 🏠",
+          html: emailHtml,
+        }),
+      });
+
+      const emailResult = await emailResponse.json();
+      console.log("Lead confirmation email result:", emailResult);
+
+      // Send admin notification email
+      const adminEmailHtml = buildAdminNotificationEmail(
+        name,
+        email,
+        phone,
+        propertyAddress,
+        inspectionType,
+        scheduledDate,
+        safetyNotes
+      );
+
+      const adminResponse = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${resendApiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          from: "PeachHaus Notifications <notifications@peachhausgroup.com>",
+          to: ["info@peachhausgroup.com", "ingo@peachhausgroup.com"],
+          subject: `🏠 New Inspection Booked: ${name} - ${scheduledDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`,
+          html: adminEmailHtml,
+        }),
+      });
+
+      console.log("Admin notification sent:", await adminResponse.json());
+
+      // Record communication if we have a lead
+      if (leadId) {
+        await supabase.from("lead_communications").insert({
+          lead_id: leadId,
+          communication_type: "email",
+          direction: "outbound",
+          subject: "Inspection Confirmation Email",
+          body: `Inspection confirmed for ${scheduledDate.toLocaleString('en-US', { 
+            weekday: 'long',
+            month: 'long',
+            day: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true
+          })}`,
+          status: emailResponse.ok ? "sent" : "failed",
+          external_id: emailResult.id,
+        });
+      }
+
+      return new Response(JSON.stringify({ 
+        success: true, 
+        emailId: emailResult.id,
+        leadId 
+      }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Handle notification for existing lead (called from stage change)
+    const { leadId, inspectionType, scheduledAt } = body;
+
+    if (!leadId) {
+      return new Response(JSON.stringify({ error: "Lead ID required" }), {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     // Get lead details
     const { data: lead, error: leadError } = await supabase
@@ -246,36 +453,16 @@ serve(async (req) => {
       });
     }
 
-    if (!resendApiKey) {
-      console.error("RESEND_API_KEY not configured");
-      return new Response(JSON.stringify({ error: "Email service not configured" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
     const scheduledDate = new Date(scheduledAt);
     const recipientName = lead.name?.split(' ')[0] || lead.name || 'there';
     const propertyAddress = lead.property_address || '';
-
-    // Get Google Meet link if virtual
-    let googleMeetLink: string | undefined;
-    if (inspectionId) {
-      const { data: inspection } = await supabase
-        .from("discovery_calls")
-        .select("google_meet_link")
-        .eq("id", inspectionId)
-        .single();
-      googleMeetLink = inspection?.google_meet_link;
-    }
 
     // Build and send the email
     const emailHtml = buildInspectionConfirmationEmail(
       recipientName,
       scheduledDate,
-      inspectionType,
-      propertyAddress,
-      googleMeetLink
+      inspectionType || 'in_person',
+      propertyAddress
     );
 
     // Send to lead
@@ -286,50 +473,15 @@ serve(async (req) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        from: "PeachHaus Group LLC - Ingo Schaer <ingo@peachhausgroup.com>",
+        from: "PeachHaus Group <ingo@peachhausgroup.com>",
         to: [lead.email],
-        subject: "Your Onboarding Inspection is Confirmed! 🏠 - PeachHaus",
+        subject: "Your Onboarding Inspection is Confirmed! 🏠",
         html: emailHtml,
       }),
     });
 
     const emailResult = await emailResponse.json();
     console.log("Lead email result:", emailResult);
-
-    // Send admin notification
-    const adminEmailHtml = `
-      <h2>🏠 New Inspection Scheduled</h2>
-      <p><strong>Lead:</strong> ${lead.name}</p>
-      <p><strong>Email:</strong> ${lead.email}</p>
-      <p><strong>Phone:</strong> ${lead.phone || 'N/A'}</p>
-      <p><strong>Property:</strong> ${propertyAddress || 'Not specified'}</p>
-      <p><strong>Type:</strong> ${inspectionType === 'virtual_inspection' || inspectionType === 'virtual' ? 'Virtual Inspection' : 'In-Person Walkthrough'}</p>
-      <p><strong>Scheduled:</strong> ${scheduledDate.toLocaleString('en-US', { 
-        weekday: 'long',
-        year: 'numeric', 
-        month: 'long', 
-        day: 'numeric',
-        hour: 'numeric',
-        minute: '2-digit',
-        hour12: true,
-        timeZone: 'America/New_York'
-      })} EST</p>
-      ${googleMeetLink ? `<p><strong>Google Meet:</strong> <a href="${googleMeetLink}">${googleMeetLink}</a></p>` : ''}
-    `;
-
-    await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${resendApiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        from: "PeachHaus Notifications <notifications@peachhausgroup.com>",
-        to: ["info@peachhausgroup.com"],
-        subject: `🏠 Inspection Scheduled: ${lead.name} - ${scheduledDate.toLocaleDateString()}`,
-        html: adminEmailHtml,
-      }),
-    });
 
     // Record communication
     await supabase.from("lead_communications").insert({
