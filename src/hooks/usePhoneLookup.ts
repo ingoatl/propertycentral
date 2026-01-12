@@ -162,8 +162,9 @@ export function usePhoneLookup() {
       console.log(`[PhoneLookup] Loaded ${Object.keys(cache).length} phone->name mappings`);
       return cache;
     },
-    staleTime: 1000 * 60 * 2, // 2 minutes - refresh often
+    staleTime: 1000 * 30, // 30 seconds - refresh very often to catch new names
     refetchOnWindowFocus: true,
+    refetchOnMount: true,
   });
 
   // Merge db cache into local cache

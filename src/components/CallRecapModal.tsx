@@ -697,6 +697,7 @@ export function CallRecapModal() {
   const [activeRecapIndex, setActiveRecapIndex] = useState(0);
   const [showAllRecaps, setShowAllRecaps] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
+  const [hasUserDismissed, setHasUserDismissed] = useState(false);
   
   // TwilioCallDialog state
   const [showCallDialog, setShowCallDialog] = useState(false);
@@ -793,9 +794,12 @@ export function CallRecapModal() {
   const handleDismiss = useCallback(() => {
     if (currentRecap) {
       dismissRecap({ recapId: currentRecap.id });
-      // Move to next recap or close
+      // Move to next recap or close if this was the last one
       if (activeRecapIndex < displayedRecaps.length - 1) {
         setActiveRecapIndex((prev) => prev + 1);
+      } else {
+        setIsOpen(false);
+        setHasUserDismissed(true);
       }
     }
   }, [currentRecap, dismissRecap, activeRecapIndex, displayedRecaps.length]);
@@ -803,9 +807,13 @@ export function CallRecapModal() {
   const handleMarkDone = useCallback(() => {
     if (currentRecap) {
       markDone({ recapId: currentRecap.id });
-      // Move to next recap or close
+      // Move to next recap or close the modal if this was the last one
       if (activeRecapIndex < displayedRecaps.length - 1) {
         setActiveRecapIndex((prev) => prev + 1);
+      } else {
+        // This was the last recap - close the modal and mark as dismissed
+        setIsOpen(false);
+        setHasUserDismissed(true);
       }
     }
   }, [currentRecap, markDone, activeRecapIndex, displayedRecaps.length]);
@@ -963,8 +971,8 @@ export function CallRecapModal() {
     }
   }, [currentRecap, getPhoneFromMetadata]);
 
-  // Don't render if nothing to show - AFTER all hooks
-  if (!isEligibleUser || (pendingRecaps.length === 0 && callTasks.length === 0)) {
+  // Don't render if nothing to show or user has dismissed - AFTER all hooks
+  if (!isEligibleUser || (pendingRecaps.length === 0 && callTasks.length === 0) || hasUserDismissed) {
     return null;
   }
 
