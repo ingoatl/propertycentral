@@ -54,6 +54,9 @@ import { ContactInfoModal } from "./ContactInfoModal";
 import { ConversationNotes } from "./ConversationNotes";
 import { AdminInboxSelector } from "./AdminInboxSelector";
 import { EmailActionModal } from "./EmailActionModal";
+import { InboxZeroGuide } from "./InboxZeroGuide";
+import { ConversationQuickActions } from "./ConversationQuickActions";
+import { PriorityBadge } from "./PriorityBadge";
 import LeadDetailModal from "@/components/leads/LeadDetailModal";
 import { OwnerCommunicationDetail } from "./OwnerCommunicationDetail";
 import { useNavigate } from "react-router-dom";
@@ -1599,9 +1602,9 @@ export function InboxView() {
           </div>
         )}
 
-        {/* Filters row - compact horizontal scroll */}
-        <div className="px-4 py-2 border-b overflow-x-auto scrollbar-hide">
-          <div className="flex items-center gap-2 min-w-max">
+        {/* Filters row - compact horizontal scroll with help guide */}
+        <div className="px-3 py-2 border-b overflow-x-auto scrollbar-hide">
+          <div className="flex items-center gap-1.5 min-w-max">
             {/* Admin inbox selector */}
             {activeTab !== "emails" && isAdmin && (
               <AdminInboxSelector selectedUserId={selectedInboxUserId} onUserChange={handleInboxChange} currentUserId={currentUserId} />
@@ -1613,21 +1616,21 @@ export function InboxView() {
                 <Button 
                   onClick={() => setShowAIComposeEmail(true)} 
                   size="sm"
-                  className="gap-1.5"
+                  className="gap-1.5 h-8"
                 >
                   <Plus className="h-4 w-4" />
                   <span className="hidden sm:inline">Compose</span>
                 </Button>
-                <div className="w-px h-6 bg-border mx-1" />
+                <div className="w-px h-5 bg-border mx-1" />
                 <button 
                   onClick={() => setSelectedEmailInbox("ingo")} 
-                  className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${selectedEmailInbox === "ingo" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}
+                  className={`px-2.5 py-1.5 rounded-full text-xs font-medium transition-colors ${selectedEmailInbox === "ingo" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}
                 >
                   Ingo
                 </button>
                 <button 
                   onClick={() => setSelectedEmailInbox("anja")} 
-                  className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${selectedEmailInbox === "anja" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}
+                  className={`px-2.5 py-1.5 rounded-full text-xs font-medium transition-colors ${selectedEmailInbox === "anja" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}
                 >
                   Anja
                 </button>
@@ -1654,7 +1657,7 @@ export function InboxView() {
                     <button 
                       key={filter} 
                       onClick={() => setActiveFilter(filter)} 
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                      className={`flex items-center gap-1 px-2.5 py-1.5 rounded-full text-xs font-medium transition-colors whitespace-nowrap ${
                         activeFilter === filter 
                           ? config.color 
                             ? `${config.color} text-white` 
@@ -1663,10 +1666,14 @@ export function InboxView() {
                       }`}
                     >
                       {Icon && <Icon className="h-3 w-3" />}
-                      {config.label}
+                      <span className="hidden xs:inline sm:inline">{config.label}</span>
+                      {/* Show icon-only on very small screens */}
+                      {!Icon && <span>{config.label}</span>}
                     </button>
                   );
                 })}
+                {/* Inbox Zero Help Guide */}
+                <InboxZeroGuide />
               </>
             )}
           </div>
@@ -1754,8 +1761,16 @@ export function InboxView() {
                             handleSelectMessage(comm);
                           }
                         }}
-                        className={`flex items-start gap-3 px-4 py-3 cursor-pointer transition-colors border-b border-border/30 active:bg-muted/50 ${selectedMessage?.id === comm.id ? "bg-primary/5" : "hover:bg-muted/30"}`}
+                        className={`group flex items-start gap-3 px-3 py-3 cursor-pointer transition-colors border-b border-border/30 active:bg-muted/50 ${selectedMessage?.id === comm.id ? "bg-primary/5" : "hover:bg-muted/30"}`}
                       >
+                        {/* Priority indicator line */}
+                        {comm.priority === "urgent" && (
+                          <div className="absolute left-0 top-0 bottom-0 w-1 bg-red-500 rounded-r" />
+                        )}
+                        {comm.priority === "important" && (
+                          <div className="absolute left-0 top-0 bottom-0 w-1 bg-amber-500 rounded-r" />
+                        )}
+                        
                         {/* Compact avatar */}
                         <div className="relative flex-shrink-0">
                           <div className={`h-10 w-10 rounded-full flex items-center justify-center ${
@@ -1767,59 +1782,59 @@ export function InboxView() {
                           }`}>
                             <span className="text-xs font-semibold text-white">{getInitials(comm.contact_name)}</span>
                           </div>
-                          {comm.is_resolved && (
+                          {comm.conversation_status === "done" && (
                             <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-green-500 border-2 border-background flex items-center justify-center">
                               <CheckCircle className="h-2 w-2 text-white" />
+                            </div>
+                          )}
+                          {comm.conversation_status === "snoozed" && (
+                            <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-amber-500 border-2 border-background flex items-center justify-center">
+                              <Clock className="h-2 w-2 text-white" />
                             </div>
                           )}
                         </div>
                         
                         {/* Content */}
                         <div className="flex-1 min-w-0 py-0.5">
-                          <div className="flex items-baseline justify-between gap-2 mb-0.5">
-                            <div className="flex items-center gap-2 min-w-0">
+                          <div className="flex items-center justify-between gap-2 mb-0.5">
+                            <div className="flex items-center gap-1.5 min-w-0 flex-1">
                               <span className="font-semibold text-sm truncate">{comm.contact_name}</span>
-                              {/* Type indicator badges */}
-                              {comm.type === "sms" && (
-                                <span className="flex items-center gap-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded bg-green-500/10 text-green-600">
-                                  <MessageSquare className="h-2.5 w-2.5" />
-                                </span>
-                              )}
+                              {/* Priority/Status badge */}
+                              <PriorityBadge 
+                                priority={comm.priority} 
+                                status={comm.conversation_status}
+                                compact
+                              />
+                              {/* Type indicator */}
                               {comm.type === "call" && (
-                                <span className="flex items-center gap-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded bg-orange-500/10 text-orange-600">
-                                  <Phone className="h-2.5 w-2.5" />
-                                </span>
-                              )}
-                              {comm.type === "email" && (
-                                <span className="flex items-center gap-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-600">
-                                  <Mail className="h-2.5 w-2.5" />
-                                </span>
+                                <Phone className="h-3 w-3 text-orange-500 flex-shrink-0" />
                               )}
                             </div>
-                            <span className="text-[11px] text-muted-foreground whitespace-nowrap">
-                              {isToday(new Date(comm.created_at)) 
-                                ? format(new Date(comm.created_at), "h:mm a")
-                                : isYesterday(new Date(comm.created_at))
-                                ? "Yesterday"
-                                : format(new Date(comm.created_at), "MMM d")
-                              }
-                            </span>
+                            <div className="flex items-center gap-1.5">
+                              {/* Quick actions - visible on hover (desktop) or always (mobile touch) */}
+                              <div className="opacity-0 group-hover:opacity-100 transition-opacity md:flex hidden">
+                                <ConversationQuickActions
+                                  status={comm.conversation_status}
+                                  onMarkDone={() => handleMarkDone(comm)}
+                                  onSnooze={(hours) => handleSnooze(comm, hours)}
+                                  onReopen={() => handleReopen(comm)}
+                                  isUpdating={updateConversationStatus.isPending}
+                                  compact
+                                />
+                              </div>
+                              <span className="text-[11px] text-muted-foreground whitespace-nowrap">
+                                {isToday(new Date(comm.created_at)) 
+                                  ? format(new Date(comm.created_at), "h:mm a")
+                                  : isYesterday(new Date(comm.created_at))
+                                  ? "Yesterday"
+                                  : format(new Date(comm.created_at), "MMM d")
+                                }
+                              </span>
+                            </div>
                           </div>
                           
-                          {/* Inline badges */}
-                          {(comm.type === "draft" || (comm.direction === "inbound" && !comm.is_resolved)) && (
-                            <div className="flex items-center gap-1.5 mb-1">
-                              {comm.type === "draft" && (
-                                <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600">Draft</span>
-                              )}
-                              {comm.direction === "inbound" && !comm.is_resolved && (
-                                <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-600">New</span>
-                              )}
-                            </div>
-                          )}
-                          
-                          {/* Message preview - 3 lines */}
-                          <p className="text-[13px] text-muted-foreground line-clamp-3 leading-relaxed">
+                          {/* Message preview - 2 lines */}
+                          <p className="text-[13px] text-muted-foreground line-clamp-2 leading-relaxed">
                             {getMessagePreview(comm)}
                           </p>
                         </div>
@@ -1860,8 +1875,16 @@ export function InboxView() {
                           handleSelectMessage(comm);
                         }
                       }}
-                      className={`flex items-start gap-3 px-4 py-3 cursor-pointer transition-colors border-b border-border/30 active:bg-muted/50 ${selectedMessage?.id === comm.id ? "bg-primary/5" : "hover:bg-muted/30"}`}
+                      className={`group relative flex items-start gap-3 px-3 py-3 cursor-pointer transition-colors border-b border-border/30 active:bg-muted/50 ${selectedMessage?.id === comm.id ? "bg-primary/5" : "hover:bg-muted/30"}`}
                     >
+                      {/* Priority indicator line */}
+                      {comm.priority === "urgent" && (
+                        <div className="absolute left-0 top-0 bottom-0 w-1 bg-red-500 rounded-r" />
+                      )}
+                      {comm.priority === "important" && (
+                        <div className="absolute left-0 top-0 bottom-0 w-1 bg-amber-500 rounded-r" />
+                      )}
+                      
                       {/* Compact avatar */}
                       <div className="relative flex-shrink-0">
                         <div className={`h-10 w-10 rounded-full flex items-center justify-center ${
@@ -1871,53 +1894,47 @@ export function InboxView() {
                         }`}>
                           <span className="text-xs font-semibold text-white">{getInitials(comm.contact_name)}</span>
                         </div>
-                        {comm.is_resolved && (
+                        {comm.conversation_status === "done" && (
                           <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-green-500 border-2 border-background flex items-center justify-center">
                             <CheckCircle className="h-2 w-2 text-white" />
                           </div>
                         )}
-                      </div>
-                      
-                      {/* Content - maximize text visibility */}
-                      <div className="flex-1 min-w-0 py-0.5">
-                        <div className="flex items-baseline justify-between gap-2 mb-0.5">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <span className="font-semibold text-sm truncate">{comm.contact_name}</span>
-                            {/* Type indicator badges */}
-                            {comm.type === "sms" && (
-                              <span className="flex items-center gap-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded bg-green-500/10 text-green-600">
-                                <MessageSquare className="h-2.5 w-2.5" />
-                              </span>
-                            )}
-                            {comm.type === "call" && (
-                              <span className="flex items-center gap-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded bg-orange-500/10 text-orange-600">
-                                <Phone className="h-2.5 w-2.5" />
-                              </span>
-                            )}
-                            {comm.type === "email" && (
-                              <span className="flex items-center gap-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-600">
-                                <Mail className="h-2.5 w-2.5" />
-                              </span>
-                            )}
-                          </div>
-                          <span className="text-[11px] text-muted-foreground whitespace-nowrap">
-                            {format(new Date(comm.created_at), "h:mm a")}
-                          </span>
-                        </div>
-                        
-                        {/* Inline badges only for important states */}
-                        {(comm.type === "draft" || (comm.direction === "inbound" && !comm.is_resolved)) && (
-                          <div className="flex items-center gap-1.5 mb-1">
-                            {comm.type === "draft" && (
-                              <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-600">Draft</span>
-                            )}
-                            {comm.direction === "inbound" && !comm.is_resolved && (
-                              <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-600">New</span>
-                            )}
+                        {comm.conversation_status === "snoozed" && (
+                          <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-amber-500 border-2 border-background flex items-center justify-center">
+                            <Clock className="h-2 w-2 text-white" />
                           </div>
                         )}
+                      </div>
+                      
+                      {/* Content */}
+                      <div className="flex-1 min-w-0 py-0.5">
+                        <div className="flex items-center justify-between gap-2 mb-0.5">
+                          <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                            <span className="font-semibold text-sm truncate">{comm.contact_name}</span>
+                            <PriorityBadge 
+                              priority={comm.priority} 
+                              status={comm.conversation_status}
+                              compact
+                            />
+                          </div>
+                          <div className="flex items-center gap-1.5">
+                            <div className="opacity-0 group-hover:opacity-100 transition-opacity hidden md:flex">
+                              <ConversationQuickActions
+                                status={comm.conversation_status}
+                                onMarkDone={() => handleMarkDone(comm)}
+                                onSnooze={(hours) => handleSnooze(comm, hours)}
+                                onReopen={() => handleReopen(comm)}
+                                isUpdating={updateConversationStatus.isPending}
+                                compact
+                              />
+                            </div>
+                            <span className="text-[11px] text-muted-foreground whitespace-nowrap">
+                              {format(new Date(comm.created_at), "h:mm a")}
+                            </span>
+                          </div>
+                        </div>
                         
-                        {/* Message preview - show more content */}
+                        {/* Message preview */}
                         <p className="text-[13px] text-muted-foreground line-clamp-2 leading-relaxed">
                           {getMessagePreview(comm)}
                         </p>
@@ -2056,7 +2073,15 @@ export function InboxView() {
                   {selectedMessage.contact_phone || selectedMessage.contact_email || ""}
                 </span>
               </div>
-              {/* Minimal mobile actions */}
+              {/* Mobile quick actions */}
+              <ConversationQuickActions
+                status={selectedMessage.conversation_status}
+                onMarkDone={() => handleMarkDone(selectedMessage)}
+                onSnooze={(hours) => handleSnooze(selectedMessage, hours)}
+                onReopen={() => handleReopen(selectedMessage)}
+                isUpdating={updateConversationStatus.isPending}
+                compact
+              />
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon" className="h-10 w-10">
@@ -2108,6 +2133,15 @@ export function InboxView() {
                 <p className="text-sm text-muted-foreground truncate">{selectedMessage.sender_email || selectedMessage.contact_email || selectedMessage.contact_phone || "No contact info"}</p>
               </div>
               <div className="flex items-center gap-1">
+                {/* Inbox Zero Quick Actions */}
+                <ConversationQuickActions
+                  status={selectedMessage.conversation_status}
+                  onMarkDone={() => handleMarkDone(selectedMessage)}
+                  onSnooze={(hours) => handleSnooze(selectedMessage, hours)}
+                  onReopen={() => handleReopen(selectedMessage)}
+                  isUpdating={updateConversationStatus.isPending}
+                />
+                <div className="w-px h-6 bg-border mx-1" />
                 {/* Income Report button in detail header */}
                 <IncomeReportButton 
                   variant="ghost" 
@@ -2117,9 +2151,6 @@ export function InboxView() {
                 {selectedMessage.contact_phone && (
                   <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => setShowSmsReply(true)}><PhoneCall className="h-4 w-4" /></Button>
                 )}
-                <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => selectedMessage.type === "personal_sms" && markResolvedMutation.mutate({ id: selectedMessage.id, resolved: !selectedMessage.is_resolved })}>
-                  <CheckCircle className={`h-4 w-4 ${selectedMessage.is_resolved ? "text-green-500" : ""}`} />
-                </Button>
                 <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => setShowNotes(true)}><FileText className="h-4 w-4" /></Button>
                 <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => setShowContactInfo(true)}><Info className="h-4 w-4" /></Button>
                 <DropdownMenu>
