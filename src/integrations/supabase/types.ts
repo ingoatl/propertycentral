@@ -732,6 +732,63 @@ export type Database = {
           },
         ]
       }
+      conversation_status: {
+        Row: {
+          ai_sentiment: string | null
+          ai_summary: string | null
+          contact_email: string | null
+          contact_id: string | null
+          contact_phone: string | null
+          contact_type: string
+          created_at: string
+          id: string
+          last_inbound_at: string | null
+          last_message_at: string | null
+          priority: string
+          snoozed_until: string | null
+          status: string
+          unread_count: number | null
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          ai_sentiment?: string | null
+          ai_summary?: string | null
+          contact_email?: string | null
+          contact_id?: string | null
+          contact_phone?: string | null
+          contact_type?: string
+          created_at?: string
+          id?: string
+          last_inbound_at?: string | null
+          last_message_at?: string | null
+          priority?: string
+          snoozed_until?: string | null
+          status?: string
+          unread_count?: number | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          ai_sentiment?: string | null
+          ai_summary?: string | null
+          contact_email?: string | null
+          contact_id?: string | null
+          contact_phone?: string | null
+          contact_type?: string
+          created_at?: string
+          id?: string
+          last_inbound_at?: string | null
+          last_message_at?: string | null
+          priority?: string
+          snoozed_until?: string | null
+          status?: string
+          unread_count?: number | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       daily_performance_entries: {
         Row: {
           created_at: string

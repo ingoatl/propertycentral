@@ -1,7 +1,7 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { format, isToday, isYesterday, parseISO } from "date-fns";
+import { format, isToday, isYesterday, parseISO, addHours, addDays, isBefore } from "date-fns";
 import {
   MessageSquare,
   Phone,
@@ -28,6 +28,11 @@ import {
   Inbox,
   Play,
   TrendingUp,
+  Clock,
+  AlertCircle,
+  Zap,
+  Archive,
+  CheckCheck,
 } from "lucide-react";
 import { IncomeReportButton } from "@/components/IncomeReportEmbed";
 import { TwilioCallDialog } from "@/components/TwilioCallDialog";
@@ -84,6 +89,19 @@ interface CommunicationItem {
   is_resolved?: boolean;
   owner_id?: string;
   property_name?: string;
+  // New Inbox Zero fields
+  priority?: ConversationPriority;
+  conversation_status?: ConversationStatusType;
+  snoozed_until?: string;
+}
+
+interface ConversationStatusRecord {
+  id: string;
+  contact_phone?: string;
+  contact_email?: string;
+  status: ConversationStatusType;
+  priority: ConversationPriority;
+  snoozed_until?: string;
 }
 
 interface PhoneAssignment {
@@ -94,8 +112,37 @@ interface PhoneAssignment {
 }
 
 type TabType = "all" | "chats" | "calls" | "emails";
-type FilterType = "all" | "open" | "unread" | "unresponded" | "owners";
+type FilterType = "all" | "open" | "unread" | "snoozed" | "done" | "urgent" | "owners";
 type MessageChannel = "sms" | "email";
+type ConversationPriority = "urgent" | "important" | "normal" | "low";
+type ConversationStatusType = "open" | "snoozed" | "done" | "archived";
+
+// Priority detection keywords
+const URGENT_KEYWORDS = ["urgent", "emergency", "asap", "immediately", "broken", "not working", "help", "problem", "issue", "leak", "flood", "fire", "locked out", "no heat", "no ac", "no water"];
+const IMPORTANT_KEYWORDS = ["interested", "inquiry", "booking", "schedule", "call me", "call back", "question", "property", "rent", "lease", "tour", "viewing", "price", "rate", "available"];
+
+// Detect priority from message content
+function detectPriority(body: string, direction: string, contactType: string): ConversationPriority {
+  if (!body) return "normal";
+  const lowerBody = body.toLowerCase();
+  
+  // Urgent: emergency keywords or owner messages that need response
+  if (URGENT_KEYWORDS.some(kw => lowerBody.includes(kw))) {
+    return "urgent";
+  }
+  
+  // Important: scheduling or business inquiry keywords
+  if (IMPORTANT_KEYWORDS.some(kw => lowerBody.includes(kw))) {
+    return "important";
+  }
+  
+  // Owner inbound messages are always at least important
+  if (contactType === "owner" && direction === "inbound") {
+    return "important";
+  }
+  
+  return "normal";
+}
 
 interface GmailEmail {
   id: string;
@@ -266,6 +313,123 @@ export function InboxView() {
       queryClient.invalidateQueries({ queryKey: ["all-communications"] });
     },
   });
+
+  // Fetch conversation statuses for Inbox Zero workflow
+  const { data: conversationStatuses = [] } = useQuery({
+    queryKey: ["conversation-statuses", currentUserId],
+    queryFn: async () => {
+      if (!currentUserId) return [];
+      const { data, error } = await supabase
+        .from("conversation_status")
+        .select("*")
+        .eq("user_id", currentUserId);
+      if (error) throw error;
+      return data as ConversationStatusRecord[];
+    },
+    enabled: !!currentUserId,
+  });
+
+  // Map conversation statuses by contact key for quick lookup
+  const statusLookup = useMemo(() => {
+    const map = new Map<string, ConversationStatusRecord>();
+    for (const status of conversationStatuses) {
+      if (status.contact_phone) {
+        map.set(normalizePhone(status.contact_phone), status);
+      }
+      if (status.contact_email) {
+        map.set(status.contact_email.toLowerCase(), status);
+      }
+    }
+    return map;
+  }, [conversationStatuses]);
+
+  // Update conversation status mutation
+  const updateConversationStatus = useMutation({
+    mutationFn: async ({ 
+      contactPhone, 
+      contactEmail, 
+      status, 
+      snoozedUntil 
+    }: { 
+      contactPhone?: string; 
+      contactEmail?: string; 
+      status: ConversationStatusType; 
+      snoozedUntil?: Date;
+    }) => {
+      if (!currentUserId) throw new Error("Not authenticated");
+      
+      const key = contactPhone ? normalizePhone(contactPhone) : contactEmail?.toLowerCase();
+      const existing = key ? statusLookup.get(key) : null;
+      
+      if (existing) {
+        // Update existing record
+        const { error } = await supabase
+          .from("conversation_status")
+          .update({ 
+            status, 
+            snoozed_until: snoozedUntil?.toISOString() || null,
+            updated_at: new Date().toISOString()
+          })
+          .eq("id", existing.id);
+        if (error) throw error;
+      } else {
+        // Insert new record
+        const { error } = await supabase
+          .from("conversation_status")
+          .insert({
+            contact_phone: contactPhone || null,
+            contact_email: contactEmail || null,
+            status,
+            snoozed_until: snoozedUntil?.toISOString() || null,
+            user_id: currentUserId,
+          });
+        if (error) throw error;
+      }
+    },
+    onSuccess: (_, variables) => {
+      const statusLabels: Record<ConversationStatusType, string> = {
+        open: "Reopened",
+        done: "Marked as done",
+        snoozed: `Snoozed until ${variables.snoozedUntil ? format(variables.snoozedUntil, "MMM d, h:mm a") : "later"}`,
+        archived: "Archived",
+      };
+      toast.success(statusLabels[variables.status]);
+      queryClient.invalidateQueries({ queryKey: ["conversation-statuses"] });
+      queryClient.invalidateQueries({ queryKey: ["all-communications"] });
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to update: ${error.message}`);
+    },
+  });
+
+  // Helper to mark conversation as done
+  const handleMarkDone = useCallback((comm: CommunicationItem) => {
+    updateConversationStatus.mutate({
+      contactPhone: comm.contact_phone,
+      contactEmail: comm.contact_email,
+      status: "done",
+    });
+  }, [updateConversationStatus]);
+
+  // Helper to snooze conversation
+  const handleSnooze = useCallback((comm: CommunicationItem, hours: number) => {
+    const snoozedUntil = hours === 24 ? addDays(new Date(), 1) : addHours(new Date(), hours);
+    updateConversationStatus.mutate({
+      contactPhone: comm.contact_phone,
+      contactEmail: comm.contact_email,
+      status: "snoozed",
+      snoozedUntil,
+    });
+  }, [updateConversationStatus]);
+
+  // Helper to reopen conversation
+  const handleReopen = useCallback((comm: CommunicationItem) => {
+    updateConversationStatus.mutate({
+      contactPhone: comm.contact_phone,
+      contactEmail: comm.contact_email,
+      status: "open",
+    });
+  }, [updateConversationStatus]);
 
   // Send draft mutation
   const sendDraftMutation = useMutation({
@@ -892,9 +1056,12 @@ export function InboxView() {
     }
   }, [communications, lookupPhones]);
 
-  // Enhance communications with looked up names
+  // Enhance communications with looked up names, priority, and status
   const enhancedCommunications = useMemo(() => {
     return communications.map(comm => {
+      let enhanced = { ...comm };
+      
+      // Enhance with looked up name
       if (comm.contact_phone) {
         const lookedUpName = getNameForPhone(comm.contact_phone);
         if (lookedUpName) {
@@ -911,13 +1078,38 @@ export function InboxView() {
             (currentName.split(" ").length === 1 && lookedUpName.split(" ").length > 1);
           
           if (shouldReplace) {
-            return { ...comm, contact_name: lookedUpName };
+            enhanced.contact_name = lookedUpName;
           }
         }
       }
-      return comm;
+      
+      // Add priority detection
+      enhanced.priority = detectPriority(comm.body, comm.direction, comm.contact_type);
+      
+      // Add conversation status from lookup
+      const key = comm.contact_phone 
+        ? normalizePhone(comm.contact_phone) 
+        : comm.contact_email?.toLowerCase();
+      const statusRecord = key ? statusLookup.get(key) : null;
+      
+      if (statusRecord) {
+        enhanced.conversation_status = statusRecord.status;
+        enhanced.snoozed_until = statusRecord.snoozed_until;
+        
+        // Check if snooze has expired
+        if (statusRecord.status === "snoozed" && statusRecord.snoozed_until) {
+          if (isBefore(new Date(statusRecord.snoozed_until), new Date())) {
+            enhanced.conversation_status = "open";
+          }
+        }
+      } else {
+        // Default to open if inbound and not resolved, otherwise done
+        enhanced.conversation_status = (comm.direction === "inbound" && !comm.is_resolved) ? "open" : "done";
+      }
+      
+      return enhanced;
     });
-  }, [communications, lookupCache, getNameForPhone]);
+  }, [communications, lookupCache, getNameForPhone, statusLookup]);
 
   // Selected Gmail email state
   const [selectedGmailEmail, setSelectedGmailEmail] = useState<GmailEmail | null>(null);
@@ -1206,7 +1398,25 @@ export function InboxView() {
     if (activeTab !== "all") return null;
     
     const contactMap = new Map<string, CommunicationItem[]>();
-    const filteredComms = communications.filter(c => activeFilter !== "owners" || c.contact_type === "owner");
+    
+    // Apply filter based on active filter
+    const filteredComms = enhancedCommunications.filter(c => {
+      // Filter by contact type
+      if (activeFilter === "owners" && c.contact_type !== "owner") return false;
+      
+      // Filter by conversation status
+      if (activeFilter === "open" && c.conversation_status !== "open") return false;
+      if (activeFilter === "snoozed" && c.conversation_status !== "snoozed") return false;
+      if (activeFilter === "done" && c.conversation_status !== "done") return false;
+      
+      // Filter by priority
+      if (activeFilter === "urgent" && c.priority !== "urgent" && c.priority !== "important") return false;
+      
+      // Filter by unread (inbound + not resolved)
+      if (activeFilter === "unread" && (c.direction !== "inbound" || c.is_resolved)) return false;
+      
+      return true;
+    });
     
     for (const comm of filteredComms) {
       // Create unique key based on contact phone, email, or id
@@ -1217,15 +1427,21 @@ export function InboxView() {
       contactMap.set(key, existing);
     }
     
-    // Return only the latest message per contact, sorted by date descending
-    return Array.from(contactMap.values())
+    // Return only the latest message per contact, sorted by priority then date
+    const sorted = Array.from(contactMap.values())
       .map(messages => messages.sort((a, b) => 
         new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-      )[0])
-      .sort((a, b) => 
-        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-      );
-  }, [communications, activeFilter, activeTab]);
+      )[0]);
+    
+    // Sort by priority first (urgent > important > normal > low), then by date
+    const priorityOrder: Record<ConversationPriority, number> = { urgent: 0, important: 1, normal: 2, low: 3 };
+    return sorted.sort((a, b) => {
+      const aPriority = priorityOrder[a.priority || "normal"];
+      const bPriority = priorityOrder[b.priority || "normal"];
+      if (aPriority !== bPriority) return aPriority - bPriority;
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    });
+  }, [enhancedCommunications, activeFilter, activeTab]);
 
   // Group "All" tab contacts by date for date separators
   const groupedByContactWithDates = useMemo(() => {
@@ -1418,24 +1634,39 @@ export function InboxView() {
               </>
             )}
             
-            {/* Quick filters for chats/calls */}
+            {/* Quick filters for chats/calls - Inbox Zero workflow */}
             {activeTab !== "emails" && (
               <>
-                {(["all", "owners", "open", "unread"] as FilterType[]).map((filter) => (
-                  <button 
-                    key={filter} 
-                    onClick={() => setActiveFilter(filter)} 
-                    className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                      activeFilter === filter 
-                        ? filter === "owners" 
-                          ? "bg-purple-500 text-white" 
-                          : "bg-primary text-primary-foreground" 
-                        : "bg-muted text-muted-foreground hover:bg-muted/80"
-                    }`}
-                  >
-                    {filter === "owners" ? "Owners" : filter.charAt(0).toUpperCase() + filter.slice(1)}
-                  </button>
-                ))}
+                {(["all", "open", "urgent", "snoozed", "done", "owners"] as FilterType[]).map((filter) => {
+                  const filterConfig: Record<FilterType, { label: string; icon?: any; color?: string }> = {
+                    all: { label: "All" },
+                    open: { label: "Open", icon: Inbox, color: "bg-blue-500" },
+                    urgent: { label: "Urgent", icon: Zap, color: "bg-red-500" },
+                    snoozed: { label: "Snoozed", icon: Clock, color: "bg-amber-500" },
+                    done: { label: "Done", icon: CheckCheck, color: "bg-green-500" },
+                    owners: { label: "Owners", color: "bg-purple-500" },
+                    unread: { label: "Unread" },
+                  };
+                  const config = filterConfig[filter];
+                  const Icon = config.icon;
+                  
+                  return (
+                    <button 
+                      key={filter} 
+                      onClick={() => setActiveFilter(filter)} 
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                        activeFilter === filter 
+                          ? config.color 
+                            ? `${config.color} text-white` 
+                            : "bg-primary text-primary-foreground"
+                          : "bg-muted text-muted-foreground hover:bg-muted/80"
+                      }`}
+                    >
+                      {Icon && <Icon className="h-3 w-3" />}
+                      {config.label}
+                    </button>
+                  );
+                })}
               </>
             )}
           </div>
