@@ -300,15 +300,22 @@ export function SmartSchedulingCard({
       const testTime = selectedTime || "10:00";
       const [hours, minutes] = testTime.split(":").map(Number);
       const scheduledAt = setMinutes(setHours(testDate, hours), minutes);
+      const endTime = new Date(scheduledAt.getTime() + 30 * 60 * 1000);
       
       const displayName = contactName || "Test Contact";
       const formattedDate = format(scheduledAt, "EEEE, MMMM d, yyyy");
       const formattedTime = format(scheduledAt, "h:mm a");
       const userName = await getCurrentUserName();
       
-      const googleMeetLink = meetingType === "video" ? "https://meet.google.com/abc-defg-hij" : null;
+      // Use the fixed Google Meet link
+      const GOOGLE_MEET_LINK = "https://meet.google.com/jww-deey-iaa";
 
-      const { error } = await supabase.functions.invoke("send-test-template-email", {
+      // Get current user ID for calendar operations
+      const { data: { user } } = await supabase.auth.getUser();
+      const currentUserId = user?.id;
+
+      // Send branded email with calendar invite instructions
+      const { error: emailError } = await supabase.functions.invoke("send-test-template-email", {
         body: {
           templateId: null,
           testEmail: "schaer76@gmail.com",
@@ -321,12 +328,12 @@ Your ${meetingType === "video" ? "video" : "phone"} call has been scheduled.
 
 📅 Date: ${formattedDate}
 🕐 Time: ${formattedTime} EST
-${meetingType === "video" ? `📹 Google Meet Link: ${googleMeetLink}` : "📞 We will call you at the number you provided."}
+${meetingType === "video" ? `📹 Google Meet Link: ${GOOGLE_MEET_LINK}` : "📞 We will call you at the number you provided."}
 
 Contact Details:
 • Name: ${displayName}
 • Phone: ${contactPhone || "Not provided"}
-• Email: ${contactEmail || "Not provided"}
+• Email: ${contactEmail || "schaer76@gmail.com"}
 • Contact Type: ${contactType}
 • Lead ID: ${leadId || contactId || "N/A"}
 
@@ -338,8 +345,41 @@ Looking forward to our conversation!
         },
       });
 
-      if (error) throw error;
-      toast.success("Test email sent to schaer76@gmail.com!");
+      if (emailError) {
+        console.error("Email send error:", emailError);
+      }
+
+      // Also create a test Google Calendar event with invite to schaer76@gmail.com
+      if (currentUserId) {
+        try {
+          const { data: calResult, error: calError } = await supabase.functions.invoke("google-calendar-sync", {
+            body: {
+              action: "create-event-direct",
+              userId: currentUserId,
+              summary: `[TEST] ${meetingType === "video" ? "Video" : "Phone"} Call with ${displayName}`,
+              description: `${meetingType === "video" ? "Video" : "Phone"} call with ${displayName}\nPhone: ${contactPhone || "N/A"}\nEmail: schaer76@gmail.com${meetingType === "video" ? `\n\n📹 Google Meet: ${GOOGLE_MEET_LINK}` : ""}\n\n⚠️ Please confirm this calendar event by clicking "Yes" in the invitation.\n\n[TEST EVENT - Scheduled via PeachHaus CRM]`,
+              startTime: scheduledAt.toISOString(),
+              endTime: endTime.toISOString(),
+              attendeeEmail: "schaer76@gmail.com",
+              addConferenceData: false,
+              meetLink: meetingType === "video" ? GOOGLE_MEET_LINK : undefined,
+            },
+          });
+          
+          if (calError) {
+            console.error("Calendar event creation failed:", calError);
+            toast.error("Email sent but calendar invite failed");
+          } else {
+            console.log("Test calendar event created:", calResult);
+            toast.success("Test email AND calendar invite sent to schaer76@gmail.com!");
+          }
+        } catch (calErr) {
+          console.error("Calendar sync error:", calErr);
+          toast.success("Test email sent! (Calendar invite failed)");
+        }
+      } else {
+        toast.success("Test email sent to schaer76@gmail.com!");
+      }
     } catch (error: any) {
       console.error("Error sending test email:", error);
       toast.error(`Failed to send test: ${error.message}`);
