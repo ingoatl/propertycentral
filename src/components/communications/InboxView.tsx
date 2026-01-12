@@ -739,10 +739,20 @@ export function InboxView() {
                 // Use GHL data for name and email - prioritize actual name over phone
                 const ghlName = metadata.ghl_data?.contactName;
                 const ghlEmail = metadata.ghl_data?.contactEmail;
-                contactName = ghlName || metadata.contact_name || "Unknown";
-                contactPhone = phone;
-                contactEmail = ghlEmail || undefined;
-                contactType = "external";
+                
+                // Check if this is a Voice AI transcript and extract caller info
+                if (isVoiceAITranscript(comm.body)) {
+                  const callerPhone = extractCallerPhoneFromTranscript(comm.body);
+                  const agentName = extractAgentNameFromTranscript(comm.body) || "Voice AI";
+                  contactName = agentName + " Call";
+                  contactPhone = callerPhone || phone;
+                  contactType = "external";
+                } else {
+                  contactName = (ghlName && ghlName !== "Contact") ? ghlName : (metadata.contact_name || "Unknown");
+                  contactPhone = phone;
+                  contactEmail = ghlEmail || undefined;
+                  contactType = "external";
+                }
               }
             }
             
@@ -2150,12 +2160,31 @@ export function InboxView() {
             
             {/* Desktop header - unchanged */}
             <div className="hidden md:flex p-4 border-b items-center gap-4">
-              <div className="h-11 w-11 rounded-full bg-emerald-500 flex items-center justify-center flex-shrink-0">
-                <span className="text-sm font-medium text-white">{getInitials(selectedMessage.contact_name)}</span>
+              <div className={`h-11 w-11 rounded-full flex items-center justify-center flex-shrink-0 ${
+                isVoiceAITranscript(selectedMessage.body) ? "bg-violet-500" : "bg-emerald-500"
+              }`}>
+                {isVoiceAITranscript(selectedMessage.body) ? (
+                  <Bot className="h-5 w-5 text-white" />
+                ) : (
+                  <span className="text-sm font-medium text-white">{getInitials(selectedMessage.contact_name)}</span>
+                )}
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className="font-semibold text-base">{selectedMessage.contact_name}</h3>
-                <p className="text-sm text-muted-foreground truncate">{selectedMessage.sender_email || selectedMessage.contact_email || selectedMessage.contact_phone || "No contact info"}</p>
+                <div className="flex items-center gap-2">
+                  <h3 className="font-semibold text-base">{selectedMessage.contact_name}</h3>
+                  {isVoiceAITranscript(selectedMessage.body) && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-violet-500/10 text-violet-600 text-xs font-medium">
+                      <Bot className="h-3 w-3" />
+                      Voice AI
+                    </span>
+                  )}
+                </div>
+                <p className="text-sm text-muted-foreground truncate">
+                  {isVoiceAITranscript(selectedMessage.body) 
+                    ? `Caller: ${extractCallerPhoneFromTranscript(selectedMessage.body) || "Unknown"}`
+                    : (selectedMessage.sender_email || selectedMessage.contact_email || selectedMessage.contact_phone || "No contact info")
+                  }
+                </p>
               </div>
               <div className="flex items-center gap-1">
                 {/* Inbox Zero Quick Actions */}
@@ -2167,13 +2196,25 @@ export function InboxView() {
                   isUpdating={updateConversationStatus.isPending}
                 />
                 <div className="w-px h-6 bg-border mx-1" />
+                {/* Call Back button for Voice AI transcripts */}
+                {isVoiceAITranscript(selectedMessage.body) && extractCallerPhoneFromTranscript(selectedMessage.body) && (
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="h-9 gap-1.5 text-green-600 hover:text-green-700 hover:bg-green-50 border-green-200"
+                    onClick={() => setShowCallDialog(true)}
+                  >
+                    <PhoneOutgoing className="h-4 w-4" />
+                    Call Back
+                  </Button>
+                )}
                 {/* Income Report button in detail header */}
                 <IncomeReportButton 
                   variant="ghost" 
                   size="sm"
                   className="h-9 gap-1.5 text-orange-600 hover:text-orange-700 hover:bg-orange-50"
                 />
-                {selectedMessage.contact_phone && (
+                {selectedMessage.contact_phone && !isVoiceAITranscript(selectedMessage.body) && (
                   <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => setShowSmsReply(true)}><PhoneCall className="h-4 w-4" /></Button>
                 )}
                 <Button variant="ghost" size="icon" className="h-9 w-9" onClick={() => setShowNotes(true)}><FileText className="h-4 w-4" /></Button>
