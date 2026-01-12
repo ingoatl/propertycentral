@@ -158,6 +158,8 @@ export function DiscoveryCallCalendar() {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedCall, setSelectedCall] = useState<DiscoveryCall | null>(null);
   const [selectedGhlEvent, setSelectedGhlEvent] = useState<GhlAppointment | null>(null);
+  // Local state for optimistic deletion
+  const [deletedCallIds, setDeletedCallIds] = useState<Set<string>>(new Set());
 
   // Fetch discovery calls
   const { data: calls = [], isLoading: isLoadingCalls } = useQuery({
@@ -210,8 +212,11 @@ export function DiscoveryCallCalendar() {
   const calendarEnd = endOfWeek(monthEnd, { weekStartsOn: 0 });
   const days = eachDayOfInterval({ start: calendarStart, end: calendarEnd });
 
+  // Filter out optimistically deleted calls
+  const filteredCalls = calls.filter(call => !deletedCallIds.has(call.id));
+
   const getCallsForDay = (date: Date) => {
-    return calls.filter((call) => isSameDay(new Date(call.scheduled_at), date));
+    return filteredCalls.filter((call) => isSameDay(new Date(call.scheduled_at), date));
   };
 
   const getGhlEventsForDay = (date: Date) => {
@@ -224,7 +229,7 @@ export function DiscoveryCallCalendar() {
     return [...dayCalls, ...dayGhl].sort((a, b) => a.time.getTime() - b.time.getTime());
   };
 
-  const upcomingCalls = calls
+  const upcomingCalls = filteredCalls
     .filter((call) => new Date(call.scheduled_at) >= new Date() && call.status === "scheduled")
     .slice(0, 5);
 
@@ -568,6 +573,12 @@ export function DiscoveryCallCalendar() {
       <DiscoveryCallDetailModal
         call={selectedCall}
         onClose={() => setSelectedCall(null)}
+        onOptimisticDelete={(callId) => setDeletedCallIds(prev => new Set(prev).add(callId))}
+        onRevertDelete={(callId) => setDeletedCallIds(prev => {
+          const updated = new Set(prev);
+          updated.delete(callId);
+          return updated;
+        })}
       />
 
       {/* GHL Appointment Detail Modal */}
@@ -704,9 +715,11 @@ function GhlAppointmentDetailModal({ appointment, onClose }: GhlAppointmentDetai
 interface DiscoveryCallDetailModalProps {
   call: DiscoveryCall | null;
   onClose: () => void;
+  onOptimisticDelete: (callId: string) => void;
+  onRevertDelete: (callId: string) => void;
 }
 
-function DiscoveryCallDetailModal({ call, onClose }: DiscoveryCallDetailModalProps) {
+function DiscoveryCallDetailModal({ call, onClose, onOptimisticDelete, onRevertDelete }: DiscoveryCallDetailModalProps) {
   const [showCallConfirm, setShowCallConfirm] = useState(false);
   const [isCallingLead, setIsCallingLead] = useState(false);
   const [showEmailDialog, setShowEmailDialog] = useState(false);
@@ -766,6 +779,10 @@ function DiscoveryCallDetailModal({ call, onClose }: DiscoveryCallDetailModalPro
 
   const handleDeleteCall = async () => {
     setIsDeleting(true);
+    
+    // Optimistic update - immediately remove from UI
+    onOptimisticDelete(call.id);
+    
     try {
       // First, delete the Google Calendar event if it exists
       if (call.google_calendar_event_id) {
@@ -788,8 +805,8 @@ function DiscoveryCallDetailModal({ call, onClose }: DiscoveryCallDetailModalPro
 
       if (error) throw error;
 
-      toast.success("Scheduled call deleted", {
-        description: `Discovery call with ${call.leads?.name || "Unknown"} has been removed from calendar`,
+      toast.success("Call deleted", {
+        description: `Discovery call with ${call.leads?.name || "Unknown"} removed`,
       });
       
       // Invalidate queries to refresh calendar
@@ -797,6 +814,8 @@ function DiscoveryCallDetailModal({ call, onClose }: DiscoveryCallDetailModalPro
       onClose();
     } catch (error: any) {
       console.error("Error deleting call:", error);
+      // Revert optimistic update on error
+      onRevertDelete(call.id);
       toast.error("Failed to delete call", {
         description: error.message,
       });

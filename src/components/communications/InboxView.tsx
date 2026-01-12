@@ -1568,12 +1568,22 @@ export function InboxView() {
         new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       )[0]);
     
-    // Sort by priority first (urgent > important > normal > low), then by date
+    // Sort: open/awaiting at top (unfaded), then snoozed/done at bottom (faded)
+    // Within each group, sort by priority then by date
     const priorityOrder: Record<ConversationPriority, number> = { urgent: 0, important: 1, normal: 2, low: 3 };
+    const statusOrder: Record<string, number> = { open: 0, awaiting: 1, snoozed: 2, done: 3, archived: 4 };
     return sorted.sort((a, b) => {
+      // First sort by status (open/awaiting at top, snoozed/done at bottom)
+      const aStatus = statusOrder[a.conversation_status || "open"] ?? 2;
+      const bStatus = statusOrder[b.conversation_status || "open"] ?? 2;
+      if (aStatus !== bStatus) return aStatus - bStatus;
+      
+      // Then by priority
       const aPriority = priorityOrder[a.priority || "normal"];
       const bPriority = priorityOrder[b.priority || "normal"];
       if (aPriority !== bPriority) return aPriority - bPriority;
+      
+      // Finally by date (newest first)
       return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
     });
   }, [enhancedCommunications, activeFilter, activeTab]);
@@ -1929,6 +1939,8 @@ export function InboxView() {
                     </div>
                     {group.communications.map((comm) => {
                       const isDone = comm.conversation_status === "done";
+                      const isSnoozed = comm.conversation_status === "snoozed";
+                      const shouldFade = isDone || isSnoozed;
                       return (
                       <div 
                         key={`${comm.id}-${comm.conversation_status}`}
@@ -1944,11 +1956,13 @@ export function InboxView() {
                             handleSelectMessage(comm);
                           }
                         }}
-                        className={`group relative flex items-start gap-3 px-3 py-3 cursor-pointer transition-all border-b border-border/30 active:bg-muted/50 ${selectedMessage?.id === comm.id ? "bg-primary/5" : "hover:bg-muted/30"} ${isDone ? "opacity-50" : ""}`}
+                        className={`group relative flex items-start gap-3 px-3 py-3 cursor-pointer transition-all border-b border-border/30 active:bg-muted/50 ${selectedMessage?.id === comm.id ? "bg-primary/5" : "hover:bg-muted/30"} ${shouldFade ? "opacity-50" : ""}`}
                       >
-                        {/* Status/Priority indicator line - done takes precedence */}
+                        {/* Status/Priority indicator line - done/snoozed take precedence */}
                         {isDone ? (
                           <div className="absolute left-0 top-0 bottom-0 w-1 bg-green-500 rounded-r" />
+                        ) : isSnoozed ? (
+                          <div className="absolute left-0 top-0 bottom-0 w-1 bg-amber-500 rounded-r" />
                         ) : comm.conversation_status === "awaiting" ? (
                           <div className="absolute left-0 top-0 bottom-0 w-1 bg-cyan-500 rounded-r" />
                         ) : comm.priority === "urgent" ? (
@@ -2049,6 +2063,8 @@ export function InboxView() {
                   {/* Messages for this date */}
                   {comms.map((comm) => {
                     const isDone = comm.conversation_status === "done";
+                    const isSnoozed = comm.conversation_status === "snoozed";
+                    const shouldFade = isDone || isSnoozed;
                     return (
                     <div 
                       key={`${comm.id}-${comm.conversation_status}`}
@@ -2064,11 +2080,13 @@ export function InboxView() {
                           handleSelectMessage(comm);
                         }
                       }}
-                      className={`group relative flex items-start gap-3 px-3 py-3 cursor-pointer transition-all border-b border-border/30 active:bg-muted/50 ${selectedMessage?.id === comm.id ? "bg-primary/5" : "hover:bg-muted/30"} ${isDone ? "opacity-50" : ""}`}
+                      className={`group relative flex items-start gap-3 px-3 py-3 cursor-pointer transition-all border-b border-border/30 active:bg-muted/50 ${selectedMessage?.id === comm.id ? "bg-primary/5" : "hover:bg-muted/30"} ${shouldFade ? "opacity-50" : ""}`}
                     >
-                      {/* Status/Priority indicator line - done takes precedence */}
+                      {/* Status/Priority indicator line - done/snoozed take precedence */}
                       {isDone ? (
                         <div className="absolute left-0 top-0 bottom-0 w-1 bg-green-500 rounded-r" />
+                      ) : isSnoozed ? (
+                        <div className="absolute left-0 top-0 bottom-0 w-1 bg-amber-500 rounded-r" />
                       ) : comm.conversation_status === "awaiting" ? (
                         <div className="absolute left-0 top-0 bottom-0 w-1 bg-cyan-500 rounded-r" />
                       ) : comm.priority === "urgent" ? (
