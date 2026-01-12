@@ -352,7 +352,10 @@ export function InboxView() {
     return map;
   }, [conversationStatuses]);
 
-  // Update conversation status mutation
+  // Local state for optimistic updates
+  const [localStatusOverrides, setLocalStatusOverrides] = useState<Map<string, ConversationStatusType>>(new Map());
+
+  // Update conversation status mutation with optimistic updates
   const updateConversationStatus = useMutation({
     mutationFn: async ({ 
       contactPhone, 
@@ -394,6 +397,22 @@ export function InboxView() {
           });
         if (error) throw error;
       }
+      
+      return { contactPhone, contactEmail, status };
+    },
+    onMutate: async (variables) => {
+      // Optimistic update - immediately update local state
+      const key = variables.contactPhone 
+        ? normalizePhone(variables.contactPhone) 
+        : variables.contactEmail?.toLowerCase();
+      
+      if (key) {
+        setLocalStatusOverrides(prev => {
+          const updated = new Map(prev);
+          updated.set(key, variables.status);
+          return updated;
+        });
+      }
     },
     onSuccess: (_, variables) => {
       const statusLabels: Record<ConversationStatusType, string> = {
@@ -407,7 +426,19 @@ export function InboxView() {
       queryClient.invalidateQueries({ queryKey: ["conversation-statuses"] });
       queryClient.invalidateQueries({ queryKey: ["all-communications"] });
     },
-    onError: (error: Error) => {
+    onError: (error: Error, variables) => {
+      // Revert optimistic update on error
+      const key = variables.contactPhone 
+        ? normalizePhone(variables.contactPhone) 
+        : variables.contactEmail?.toLowerCase();
+      
+      if (key) {
+        setLocalStatusOverrides(prev => {
+          const updated = new Map(prev);
+          updated.delete(key);
+          return updated;
+        });
+      }
       toast.error(`Failed to update: ${error.message}`);
     },
   });
@@ -1136,13 +1167,19 @@ export function InboxView() {
       // Add priority detection
       enhanced.priority = detectPriority(comm.body, comm.direction, comm.contact_type);
       
-      // Add conversation status from lookup
+      // Add conversation status from lookup OR local optimistic override
       const key = comm.contact_phone 
         ? normalizePhone(comm.contact_phone) 
         : comm.contact_email?.toLowerCase();
+      
+      // Check local optimistic override first (for instant UI updates)
+      const localOverride = key ? localStatusOverrides.get(key) : null;
       const statusRecord = key ? statusLookup.get(key) : null;
       
-      if (statusRecord) {
+      if (localOverride) {
+        // Use optimistic local state
+        enhanced.conversation_status = localOverride;
+      } else if (statusRecord) {
         enhanced.conversation_status = statusRecord.status;
         enhanced.snoozed_until = statusRecord.snoozed_until;
         
@@ -1159,7 +1196,7 @@ export function InboxView() {
       
       return enhanced;
     });
-  }, [communications, lookupCache, statusLookup]);
+  }, [communications, lookupCache, statusLookup, localStatusOverrides]);
 
   // Selected Gmail email state
   const [selectedGmailEmail, setSelectedGmailEmail] = useState<GmailEmail | null>(null);
