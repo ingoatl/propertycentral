@@ -33,6 +33,7 @@ import {
   Zap,
   Archive,
   CheckCheck,
+  Bot,
 } from "lucide-react";
 import { IncomeReportButton } from "@/components/IncomeReportEmbed";
 import { TwilioCallDialog } from "@/components/TwilioCallDialog";
@@ -57,6 +58,7 @@ import { EmailActionModal } from "./EmailActionModal";
 import { InboxZeroGuide } from "./InboxZeroGuide";
 import { ConversationQuickActions } from "./ConversationQuickActions";
 import { PriorityBadge } from "./PriorityBadge";
+import { VoiceAIBadge, isVoiceAITranscript, extractCallerPhoneFromTranscript, extractAgentNameFromTranscript, extractCallSummaryFromTranscript } from "./VoiceAIBadge";
 import LeadDetailModal from "@/components/leads/LeadDetailModal";
 import { OwnerCommunicationDetail } from "./OwnerCommunicationDetail";
 import { useNavigate } from "react-router-dom";
@@ -1160,6 +1162,14 @@ export function InboxView() {
 
   const getInitials = (name: string) => name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2);
   const getMessagePreview = (comm: CommunicationItem) => {
+    // Check for Voice AI transcripts first - show summary instead of full transcript
+    if (isVoiceAITranscript(comm.body)) {
+      const summary = extractCallSummaryFromTranscript(comm.body);
+      if (summary) {
+        return "🤖 " + summary.slice(0, 100) + (summary.length > 100 ? "..." : "");
+      }
+      return "🤖 Voice AI transcript received";
+    }
     // For calls, show transcript or direction with icon prefix
     if (comm.type === "call" || comm.type === "personal_call") {
       if (comm.body && comm.body.length > 10 && comm.body !== "Call" && !comm.body.startsWith("Phone call") && !comm.body.startsWith("Incoming call") && !comm.body.startsWith("Outgoing call")) {
@@ -2342,8 +2352,32 @@ export function InboxView() {
                                     )}
                                     {msg.type === "sms" && (
                                       <div className={`flex items-center gap-1.5 text-[11px] mb-1 ${isOutbound ? "opacity-70" : "text-muted-foreground"}`}>
-                                        <MessageSquare className="h-3 w-3" />
-                                        <span>{isOutbound ? "SMS sent" : "SMS received"}</span>
+                                        {isVoiceAITranscript(msg.body) ? (
+                                          <>
+                                            <Bot className="h-3 w-3 text-violet-500" />
+                                            <span className="text-violet-600 font-medium">Voice AI Transcript</span>
+                                          </>
+                                        ) : (
+                                          <>
+                                            <MessageSquare className="h-3 w-3" />
+                                            <span>{isOutbound ? "SMS sent" : "SMS received"}</span>
+                                          </>
+                                        )}
+                                      </div>
+                                    )}
+                                    {/* Voice AI Call Back Action */}
+                                    {isVoiceAITranscript(msg.body) && !isOutbound && (
+                                      <div className="mb-2">
+                                        <VoiceAIBadge
+                                          callerPhone={extractCallerPhoneFromTranscript(msg.body) || undefined}
+                                          agentName={extractAgentNameFromTranscript(msg.body) || undefined}
+                                          onCallBack={() => {
+                                            const callerPhone = extractCallerPhoneFromTranscript(msg.body);
+                                            if (callerPhone) {
+                                              setShowCallDialog(true);
+                                            }
+                                          }}
+                                        />
                                       </div>
                                     )}
                                     {/* MMS Images - OpenPhone style grid with lightbox */}

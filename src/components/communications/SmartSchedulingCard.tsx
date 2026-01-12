@@ -204,7 +204,7 @@ export function SmartSchedulingCard({
               if (!foundEmail && metadata?.ghl_data?.contactEmail) {
                 foundEmail = metadata.ghl_data.contactEmail;
               }
-              if (!foundName && metadata?.ghl_data?.contactName) {
+              if (!foundName && metadata?.ghl_data?.contactName && metadata.ghl_data.contactName !== "Contact") {
                 foundName = metadata.ghl_data.contactName;
               }
               // Fallback to body extraction
@@ -219,26 +219,22 @@ export function SmartSchedulingCard({
           }
         }
         
-        // Strategy 2: Search by phone number if no lead_id (unmatched GHL conversations)
+        // Strategy 2: Search ALL messages by phone number - find any with email
+        // This is crucial for unmatched GHL conversations where some messages have email, some don't
         if ((!foundEmail || !foundName) && contactPhone) {
           const normalizedPhone = contactPhone.replace(/[^\d]/g, "");
-          const phoneVariants = [
-            contactPhone,
-            `+1${normalizedPhone.slice(-10)}`,
-            `+${normalizedPhone}`,
-            normalizedPhone.slice(-10),
-          ];
+          const last10 = normalizedPhone.slice(-10);
           
-          // Search lead_communications metadata for matching phone
-          const { data: phoneComms } = await supabase
+          // Search ALL lead_communications and check metadata for matching phone
+          const { data: allComms } = await supabase
             .from("lead_communications")
             .select("body, metadata")
             .not("metadata", "is", null)
             .order("created_at", { ascending: false })
-            .limit(100);
+            .limit(200);
           
-          if (phoneComms) {
-            for (const comm of phoneComms) {
+          if (allComms) {
+            for (const comm of allComms) {
               const metadata = comm.metadata as { 
                 ghl_data?: { contactEmail?: string; contactName?: string; contactPhone?: string };
                 unmatched_phone?: string;
@@ -249,24 +245,32 @@ export function SmartSchedulingCard({
               const commPhone = metadata.ghl_data?.contactPhone || metadata.unmatched_phone;
               if (!commPhone) continue;
               
+              // Normalize and compare phone numbers
               const normalizedCommPhone = commPhone.replace(/[^\d]/g, "");
-              const matchesPhone = phoneVariants.some(v => 
-                normalizedCommPhone.includes(v.replace(/[^\d]/g, "").slice(-10))
-              );
+              const commLast10 = normalizedCommPhone.slice(-10);
               
-              if (matchesPhone) {
-                if (!foundEmail && metadata.ghl_data?.contactEmail) {
-                  foundEmail = metadata.ghl_data.contactEmail;
-                  console.log("Found email via phone match:", foundEmail);
+              if (commLast10 === last10) {
+                // Found a message from the same phone number
+                const email = metadata.ghl_data?.contactEmail;
+                const name = metadata.ghl_data?.contactName;
+                
+                // Take email if we don't have one yet and it's not empty
+                if (!foundEmail && email && email.trim().length > 0) {
+                  foundEmail = email;
+                  console.log("Found email from phone match:", foundEmail);
                 }
-                if (!foundName && metadata.ghl_data?.contactName) {
-                  foundName = metadata.ghl_data.contactName;
-                  console.log("Found name via phone match:", foundName);
+                
+                // Take name if we don't have one yet and it's not "Contact" placeholder
+                if (!foundName && name && name !== "Contact" && name.trim().length > 0) {
+                  foundName = name;
+                  console.log("Found name from phone match:", foundName);
                 }
-                // Also check body
+                
+                // Also check body for email
                 if (!foundEmail && comm.body) {
                   foundEmail = extractEmailFromText(comm.body);
                 }
+                
                 if (foundEmail && foundName) break;
               }
             }
