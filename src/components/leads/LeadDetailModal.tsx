@@ -68,6 +68,10 @@ const LeadDetailModal = ({ lead, open, onOpenChange, onRefresh }: LeadDetailModa
   const [showSMSDialog, setShowSMSDialog] = useState(false);
   const [isEditingName, setIsEditingName] = useState(false);
   const [editedName, setEditedName] = useState(lead?.name || "");
+  const [isEditingEmail, setIsEditingEmail] = useState(false);
+  const [editedEmail, setEditedEmail] = useState(lead?.email || "");
+  const [isEditingPhone, setIsEditingPhone] = useState(false);
+  const [editedPhone, setEditedPhone] = useState(lead?.phone || "");
 
   // Fetch timeline
   const { data: timeline } = useQuery({
@@ -176,6 +180,60 @@ const LeadDetailModal = ({ lead, open, onOpenChange, onRefresh }: LeadDetailModa
     },
   });
 
+  // Update email mutation
+  const updateEmail = useMutation({
+    mutationFn: async (newEmail: string) => {
+      if (!lead) return;
+      const { error } = await supabase
+        .from("leads")
+        .update({ email: newEmail.trim() || null })
+        .eq("id", lead.id);
+      if (error) throw error;
+      
+      await supabase.from("lead_timeline").insert({
+        lead_id: lead.id,
+        action: `Email updated to "${newEmail.trim() || 'none'}"`,
+        metadata: { previousEmail: lead.email, newEmail: newEmail.trim() || null },
+      });
+    },
+    onSuccess: () => {
+      toast.success("Email updated");
+      setIsEditingEmail(false);
+      queryClient.invalidateQueries({ queryKey: ["leads"] });
+      onRefresh();
+    },
+    onError: (error) => {
+      toast.error("Failed to update email: " + error.message);
+    },
+  });
+
+  // Update phone mutation
+  const updatePhone = useMutation({
+    mutationFn: async (newPhone: string) => {
+      if (!lead) return;
+      const { error } = await supabase
+        .from("leads")
+        .update({ phone: newPhone.trim() || null })
+        .eq("id", lead.id);
+      if (error) throw error;
+      
+      await supabase.from("lead_timeline").insert({
+        lead_id: lead.id,
+        action: `Phone updated to "${newPhone.trim() || 'none'}"`,
+        metadata: { previousPhone: lead.phone, newPhone: newPhone.trim() || null },
+      });
+    },
+    onSuccess: () => {
+      toast.success("Phone updated");
+      setIsEditingPhone(false);
+      queryClient.invalidateQueries({ queryKey: ["leads"] });
+      onRefresh();
+    },
+    onError: (error) => {
+      toast.error("Failed to update phone: " + error.message);
+    },
+  });
+
   // Update notes mutation
   const updateNotes = useMutation({
     mutationFn: async () => {
@@ -265,13 +323,17 @@ const LeadDetailModal = ({ lead, open, onOpenChange, onRefresh }: LeadDetailModa
     },
   });
 
-  // Reset edited name when lead changes
+  // Reset edited values when lead changes
   useEffect(() => {
     if (lead) {
       setEditedName(lead.name);
       setIsEditingName(false);
+      setEditedEmail(lead.email || "");
+      setIsEditingEmail(false);
+      setEditedPhone(lead.phone || "");
+      setIsEditingPhone(false);
     }
-  }, [lead?.id, lead?.name]);
+  }, [lead?.id, lead?.name, lead?.email, lead?.phone]);
 
   const handleSaveName = useCallback(() => {
     if (editedName.trim() && editedName.trim() !== lead?.name) {
@@ -386,19 +448,134 @@ const LeadDetailModal = ({ lead, open, onOpenChange, onRefresh }: LeadDetailModa
         </div>
 
         {/* Lead Info */}
-        <div className="flex items-center gap-4 pb-4">
-          {lead.opportunity_value > 0 && (
-            <div className="flex items-center gap-2 text-green-600 font-medium">
-              <DollarSign className="h-4 w-4" />
-              ${lead.opportunity_value.toLocaleString()}
-            </div>
-          )}
-          {lead.property_address && (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <MapPin className="h-4 w-4" />
-              {lead.property_address}
-            </div>
-          )}
+        <div className="space-y-3 pb-4">
+          {/* Email */}
+          <div className="flex items-center gap-2 group">
+            <Mail className="h-4 w-4 text-muted-foreground" />
+            {isEditingEmail ? (
+              <div className="flex items-center gap-2 flex-1">
+                <Input
+                  type="email"
+                  value={editedEmail}
+                  onChange={(e) => setEditedEmail(e.target.value)}
+                  className="h-8 max-w-[250px]"
+                  autoFocus
+                  placeholder="email@example.com"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") updateEmail.mutate(editedEmail);
+                    if (e.key === "Escape") {
+                      setIsEditingEmail(false);
+                      setEditedEmail(lead.email || "");
+                    }
+                  }}
+                />
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 text-green-600 hover:text-green-700 hover:bg-green-50"
+                  onClick={() => updateEmail.mutate(editedEmail)}
+                  disabled={updateEmail.isPending}
+                >
+                  <Check className="h-3 w-3" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                  onClick={() => {
+                    setIsEditingEmail(false);
+                    setEditedEmail(lead.email || "");
+                  }}
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              </div>
+            ) : (
+              <>
+                <span className="text-sm">{lead.email || "No email"}</span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                  onClick={() => setIsEditingEmail(true)}
+                >
+                  <Pencil className="h-3 w-3" />
+                </Button>
+              </>
+            )}
+          </div>
+
+          {/* Phone */}
+          <div className="flex items-center gap-2 group">
+            <Phone className="h-4 w-4 text-muted-foreground" />
+            {isEditingPhone ? (
+              <div className="flex items-center gap-2 flex-1">
+                <Input
+                  type="tel"
+                  value={editedPhone}
+                  onChange={(e) => setEditedPhone(e.target.value)}
+                  className="h-8 max-w-[200px]"
+                  autoFocus
+                  placeholder="+1 (555) 000-0000"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") updatePhone.mutate(editedPhone);
+                    if (e.key === "Escape") {
+                      setIsEditingPhone(false);
+                      setEditedPhone(lead.phone || "");
+                    }
+                  }}
+                />
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 text-green-600 hover:text-green-700 hover:bg-green-50"
+                  onClick={() => updatePhone.mutate(editedPhone)}
+                  disabled={updatePhone.isPending}
+                >
+                  <Check className="h-3 w-3" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                  onClick={() => {
+                    setIsEditingPhone(false);
+                    setEditedPhone(lead.phone || "");
+                  }}
+                >
+                  <X className="h-3 w-3" />
+                </Button>
+              </div>
+            ) : (
+              <>
+                <span className="text-sm">{lead.phone || "No phone"}</span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                  onClick={() => setIsEditingPhone(true)}
+                >
+                  <Pencil className="h-3 w-3" />
+                </Button>
+              </>
+            )}
+          </div>
+
+          {/* Other Info Row */}
+          <div className="flex items-center gap-4">
+            {lead.opportunity_value > 0 && (
+              <div className="flex items-center gap-2 text-green-600 font-medium">
+                <DollarSign className="h-4 w-4" />
+                ${lead.opportunity_value.toLocaleString()}
+              </div>
+            )}
+            {lead.property_address && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <MapPin className="h-4 w-4" />
+                {lead.property_address}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Stage and Actions */}

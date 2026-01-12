@@ -466,6 +466,82 @@ serve(async (req) => {
       if (lead) {
         console.log("Document is linked to lead, updating stage to contract_signed");
         
+        // Get the booking document to extract contract type and recipient info
+        const { data: bookingDoc } = await supabase
+          .from("booking_documents")
+          .select("id, contract_type, recipient_name, recipient_email")
+          .eq("id", signingToken.document_id)
+          .single();
+
+        // === CREATE OWNER RECORD NOW THAT AGREEMENT IS FULLY EXECUTED ===
+        console.log("Creating owner record upon full agreement execution");
+        
+        // Extract service type from contract or field values
+        const servicePackage = (fieldValues?.service_package || fieldValues?.package_selection) as string | null;
+        let serviceType = "cohosting"; // default
+        if (servicePackage?.toLowerCase().includes("full")) {
+          serviceType = "full_service";
+        } else if (bookingDoc?.contract_type === "full_service") {
+          serviceType = "full_service";
+        }
+        
+        // Get owner details from field values or signing token
+        const finalOwnerName = ownerName || bookingDoc?.recipient_name || signingToken.signer_name;
+        const finalOwnerEmail = bookingDoc?.recipient_email || signingToken.signer_email;
+        const finalOwnerPhone = (fieldValues?.phone || fieldValues?.owner_phone) as string | null;
+        const finalOwnerAddress = (fieldValues?.owner_mailing_address || fieldValues?.mailing_address) as string | null;
+        
+        // Check if owner already exists with this email
+        const { data: existingOwner } = await supabase
+          .from("property_owners")
+          .select("id")
+          .eq("email", finalOwnerEmail)
+          .maybeSingle();
+        
+        let ownerId: string | null = null;
+        
+        if (existingOwner) {
+          ownerId = existingOwner.id;
+          console.log("Found existing owner:", ownerId);
+        } else {
+          // Create new owner record
+          const { data: newOwner, error: ownerError } = await supabase
+            .from("property_owners")
+            .insert({
+              name: finalOwnerName,
+              email: finalOwnerEmail,
+              phone: finalOwnerPhone || lead.property_address ? null : null, // Use lead phone if available
+              address: finalOwnerAddress,
+              payment_method: "ach",
+              service_type: serviceType,
+            })
+            .select()
+            .single();
+          
+          if (ownerError) {
+            console.error("Error creating owner:", ownerError);
+          } else {
+            ownerId = newOwner.id;
+            console.log("Created new owner:", ownerId);
+          }
+        }
+        
+        // Link owner to lead and booking document
+        if (ownerId) {
+          await supabase
+            .from("leads")
+            .update({ owner_id: ownerId })
+            .eq("id", lead.id);
+          
+          await supabase
+            .from("booking_documents")
+            .update({ owner_id: ownerId })
+            .eq("id", signingToken.document_id);
+          
+          console.log("Linked owner to lead and document");
+        }
+        // === END OWNER CREATION ===
+        
         const { error: leadUpdateError } = await supabase
           .from("leads")
           .update({ 
@@ -492,6 +568,8 @@ serve(async (req) => {
               reason: "Document fully signed by all parties",
               document_id: signingToken.document_id,
               property_address: propertyAddress,
+              owner_created: !!ownerId,
+              owner_id: ownerId,
             },
           });
         }
