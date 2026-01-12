@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 interface PhoneLookupResult {
   phone: string;
   name?: string;
+  email?: string;
   carrier?: string;
   lineType?: string;
   callerName?: string;
@@ -55,7 +56,7 @@ export function usePhoneLookup() {
         }
       });
       
-      // 2. Get names from lead_communications metadata (GHL sync data)
+      // 2. Get names AND emails from lead_communications metadata (GHL sync data)
       const { data: commMetadata } = await supabase
         .from("lead_communications")
         .select("metadata")
@@ -66,13 +67,14 @@ export function usePhoneLookup() {
         const metadata = comm.metadata as { 
           contact_name?: string; 
           unmatched_phone?: string;
-          ghl_data?: { contactName?: string; contactPhone?: string };
+          ghl_data?: { contactName?: string; contactPhone?: string; contactEmail?: string };
         } | null;
         
         if (!metadata) return;
         
         const phone = metadata.unmatched_phone || metadata.ghl_data?.contactPhone;
         const name = metadata.contact_name || metadata.ghl_data?.contactName;
+        const email = metadata.ghl_data?.contactEmail;
         
         if (phone && name) {
           const normalized = normalizePhoneStatic(phone);
@@ -87,6 +89,7 @@ export function usePhoneLookup() {
             cache[normalized] = {
               phone: normalized,
               name: name,
+              email: email || cache[normalized]?.email,
               callerName: name,
               valid: true,
               cached: true,
