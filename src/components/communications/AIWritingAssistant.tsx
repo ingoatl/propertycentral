@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Sparkles, Loader2, RefreshCw, Zap, MessageSquare, FileText } from "lucide-react";
+import { Sparkles, Loader2, RefreshCw, Zap, MessageSquare, FileText, Calendar, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Popover,
@@ -8,6 +8,8 @@ import {
 } from "@/components/ui/popover";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+
+const SCHEDULING_LINK = "https://propertycentral.lovable.app/book-discovery-call";
 
 interface AIWritingAssistantProps {
   currentMessage: string;
@@ -58,6 +60,26 @@ export function AIWritingAssistant({
     }
   };
 
+  // Quick insert actions - these don't use AI, just insert text
+  const handleAddScheduleCall = () => {
+    const scheduleText = currentMessage 
+      ? `${currentMessage}\n\nWant to hop on a quick call? Here's my calendar: ${SCHEDULING_LINK}`
+      : `Want to hop on a quick call? Here's my calendar: ${SCHEDULING_LINK}`;
+    onMessageGenerated(scheduleText);
+    toast.success("Added scheduling link!");
+    setIsOpen(false);
+  };
+
+  const handleAddIncomeAnalysis = () => {
+    const firstName = contactName?.split(" ")[0] || "there";
+    const incomeText = currentMessage 
+      ? `${currentMessage}\n\nBy the way - I can put together a free income analysis showing what your property could earn. Just need your address and email to send it over!`
+      : `Hey ${firstName}! I can put together a free income analysis showing what your property could earn. Just need your address and email to send it over! - Ingo`;
+    onMessageGenerated(incomeText);
+    toast.success("Added income analysis offer!");
+    setIsOpen(false);
+  };
+
   const actions = [
     { type: "generate" as ActionType, label: "Generate Reply", icon: MessageSquare, description: "Create a contextual reply" },
     { type: "improve" as ActionType, label: "Improve", icon: Sparkles, description: "Make it better" },
@@ -96,6 +118,36 @@ export function AIWritingAssistant({
               </div>
             </button>
           ))}
+          
+          {/* Divider */}
+          <div className="border-t border-border my-2" />
+          
+          {/* Quick Insert Section */}
+          <p className="text-xs font-medium text-muted-foreground px-2 py-1">
+            Quick Insert
+          </p>
+          
+          <button
+            onClick={handleAddScheduleCall}
+            className="w-full flex items-center gap-3 px-2 py-2 text-sm rounded-md hover:bg-muted transition-colors text-left"
+          >
+            <Calendar className="h-4 w-4 text-blue-500" />
+            <div>
+              <p className="font-medium">+ Schedule Call</p>
+              <p className="text-xs text-muted-foreground">Add calendar link</p>
+            </div>
+          </button>
+          
+          <button
+            onClick={handleAddIncomeAnalysis}
+            className="w-full flex items-center gap-3 px-2 py-2 text-sm rounded-md hover:bg-muted transition-colors text-left"
+          >
+            <TrendingUp className="h-4 w-4 text-green-500" />
+            <div>
+              <p className="font-medium">+ Income Analysis</p>
+              <p className="text-xs text-muted-foreground">Offer free report</p>
+            </div>
+          </button>
         </div>
       </PopoverContent>
     </Popover>

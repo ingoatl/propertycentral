@@ -1,9 +1,11 @@
 import { useState } from "react";
-import { Sparkles, Loader2, Check, X, Edit3 } from "lucide-react";
+import { Sparkles, Loader2, Check, X, Edit3, Calendar, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+
+const SCHEDULING_LINK = "https://propertycentral.lovable.app/book-discovery-call";
 
 interface AIReplyButtonProps {
   contactName: string;
@@ -101,12 +103,55 @@ export function AIReplyButton({
     setEditedReply(generatedReply || "");
   };
 
+  // Quick action buttons to add scheduling or income analysis offer
+  const handleAddScheduleCall = () => {
+    const scheduleText = `\n\nWant to hop on a quick call? Here's my calendar: ${SCHEDULING_LINK}`;
+    const newReply = (isEditing ? editedReply : generatedReply || "") + scheduleText;
+    setEditedReply(newReply);
+    setIsEditing(true);
+    toast.success("Added scheduling link!");
+  };
+
+  const handleAddIncomeAnalysis = () => {
+    const incomeText = `\n\nBy the way - I can put together a free income analysis showing what your property could earn. Just need your address and email to send it over!`;
+    const newReply = (isEditing ? editedReply : generatedReply || "") + incomeText;
+    setEditedReply(newReply);
+    setIsEditing(true);
+    toast.success("Added income analysis offer!");
+  };
+
   if (generatedReply) {
     return (
       <div className="bg-gradient-to-r from-primary/5 to-primary/10 border border-primary/20 rounded-xl p-4 space-y-3">
-        <div className="flex items-center gap-2 text-sm font-medium text-primary">
-          <Sparkles className="h-4 w-4" />
-          <span>AI Suggested Reply</span>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-sm font-medium text-primary">
+            <Sparkles className="h-4 w-4" />
+            <span>AI Suggested Reply</span>
+          </div>
+          
+          {/* Quick action buttons */}
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleAddScheduleCall}
+              className="h-7 px-2 text-xs gap-1 text-muted-foreground hover:text-primary"
+              title="Add scheduling link"
+            >
+              <Calendar className="h-3 w-3" />
+              + Call
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleAddIncomeAnalysis}
+              className="h-7 px-2 text-xs gap-1 text-muted-foreground hover:text-primary"
+              title="Add income analysis offer"
+            >
+              <TrendingUp className="h-3 w-3" />
+              + Analysis
+            </Button>
+          </div>
         </div>
         
         {isEditing ? (
