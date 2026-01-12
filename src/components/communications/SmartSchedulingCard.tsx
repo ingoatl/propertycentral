@@ -54,6 +54,9 @@ export function SmartSchedulingCard({
   const extractedFirstName = contactName?.split(" ")[0] || "";
   const isPhoneNumber = /^[\d\s\-\(\)\+\.]+$/.test(extractedFirstName);
   const [inviteFirstName, setInviteFirstName] = useState(isPhoneNumber ? "" : extractedFirstName);
+  
+  // Email input for calendar invite - use provided email or allow manual entry
+  const [inviteEmail, setInviteEmail] = useState(contactEmail || "");
 
   // Generate available dates based on intent
   const availableDates = useMemo(() => {
@@ -193,15 +196,18 @@ export function SmartSchedulingCard({
 
       // Create calendar event with Google Meet link and send invite to attendee
       try {
+        // Use inviteEmail (user input) for calendar invite, required for sending invite
+        const attendeeEmailToUse = inviteEmail?.trim() || contactEmail;
+        
         const { data: calResult, error: calError } = await supabase.functions.invoke("google-calendar-sync", {
           body: {
             action: "create-event-direct",
             userId: currentUserId,
             summary: `${meetingType === "video" ? "Video" : "Phone"} Call with ${displayName}`,
-            description: `${meetingType === "video" ? "Video" : "Phone"} call with ${displayName}${contactPhone ? `\nPhone: ${contactPhone}` : ""}${contactEmail ? `\nEmail: ${contactEmail}` : ""}${meetingType === "video" ? `\n\n📹 Google Meet: ${GOOGLE_MEET_LINK}` : ""}\n\n⚠️ Please confirm this calendar event by clicking "Yes" in the invitation email you received.\n\nScheduled via PeachHaus CRM`,
+            description: `${meetingType === "video" ? "Video" : "Phone"} call with ${displayName}${contactPhone ? `\nPhone: ${contactPhone}` : ""}${attendeeEmailToUse ? `\nEmail: ${attendeeEmailToUse}` : ""}${meetingType === "video" ? `\n\n📹 Google Meet: ${GOOGLE_MEET_LINK}` : ""}\n\n⚠️ Please confirm this calendar event by clicking "Yes" in the invitation email you received.\n\nScheduled via PeachHaus CRM`,
             startTime: scheduledAt.toISOString(),
             endTime: endTime.toISOString(),
-            attendeeEmail: contactEmail || undefined,
+            attendeeEmail: attendeeEmailToUse || undefined,
             addConferenceData: false, // Use fixed meet link instead
             meetLink: meetingType === "video" ? GOOGLE_MEET_LINK : undefined,
           },
@@ -268,6 +274,11 @@ export function SmartSchedulingCard({
       toast.error("Please enter a first name for the invite");
       return;
     }
+    
+    if (!inviteEmail?.trim()) {
+      toast.error("Please enter an email address for the calendar invite");
+      return;
+    }
 
     setIsSendingInvite(true);
     try {
@@ -323,11 +334,14 @@ export function SmartSchedulingCard({
         }
       }
 
+      // Use inviteEmail for both email and calendar invite
+      const attendeeEmailToUse = inviteEmail.trim();
+      
       // Send branded email via send-test-template-email
       const { error: emailError } = await supabase.functions.invoke("send-test-template-email", {
         body: {
           templateId: null,
-          testEmail: contactEmail || "schaer76@gmail.com",
+          testEmail: attendeeEmailToUse,
           customEmail: {
             subject: `${meetingType === "video" ? "Video" : "Phone"} Call Scheduled with ${displayName}`,
             body: `
@@ -353,16 +367,16 @@ Looking forward to speaking with you!
         console.error("Email send error:", emailError);
       }
 
-      // Create Google Calendar event with invite
+      // Create Google Calendar event with invite using the email user entered
       const { data: calResult, error: calError } = await supabase.functions.invoke("google-calendar-sync", {
         body: {
           action: "create-event-direct",
           userId: currentUserId,
           summary: `${meetingType === "video" ? "Video" : "Phone"} Call with ${displayName}`,
-          description: `${meetingType === "video" ? "Video" : "Phone"} call with ${displayName}\nPhone: ${contactPhone || "N/A"}\nEmail: ${contactEmail || "N/A"}${meetingType === "video" ? `\n\n📹 Google Meet: ${GOOGLE_MEET_LINK}` : ""}\n\n⚠️ Please confirm this calendar event by clicking "Yes" in the invitation.\n\nScheduled via PeachHaus CRM`,
+          description: `${meetingType === "video" ? "Video" : "Phone"} call with ${displayName}\nPhone: ${contactPhone || "N/A"}\nEmail: ${attendeeEmailToUse}${meetingType === "video" ? `\n\n📹 Google Meet: ${GOOGLE_MEET_LINK}` : ""}\n\n⚠️ Please confirm this calendar event by clicking "Yes" in the invitation.\n\nScheduled via PeachHaus CRM`,
           startTime: scheduledAt.toISOString(),
           endTime: endTime.toISOString(),
-          attendeeEmail: contactEmail || undefined,
+          attendeeEmail: attendeeEmailToUse,
           addConferenceData: false,
           meetLink: meetingType === "video" ? GOOGLE_MEET_LINK : undefined,
         },
@@ -584,6 +598,26 @@ Looking forward to our conversation!
                 placeholder="Enter first name..."
                 className="h-8 text-sm mt-1"
               />
+            </div>
+            
+            {/* Email Input for Calendar Invite */}
+            <div>
+              <Label htmlFor="inviteEmail" className="text-xs text-muted-foreground">
+                Email for calendar invite: <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="inviteEmail"
+                type="email"
+                value={inviteEmail}
+                onChange={(e) => setInviteEmail(e.target.value)}
+                placeholder="Enter email address..."
+                className="h-8 text-sm mt-1"
+              />
+              {!inviteEmail && (
+                <p className="text-[10px] text-amber-600 mt-1">
+                  Email required to send calendar invite
+                </p>
+              )}
             </div>
             
             {/* Meeting Type Selection */}
