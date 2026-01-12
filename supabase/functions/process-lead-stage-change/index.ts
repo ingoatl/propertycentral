@@ -42,7 +42,7 @@ const OWNER_TIMELINE_STEPS = [
   { key: 'onboarded', label: 'Onboarded', icon: '🎉' },
 ];
 
-// Map lead stages to timeline step index
+// Map lead stages to timeline step index (returns the CURRENT step, not the completed step)
 function getTimelineStep(stage: string): number {
   switch(stage) {
     case 'contract_signed': 
@@ -52,9 +52,9 @@ function getTimelineStep(stage: string): number {
     case 'onboarding_form_requested': 
       return 2; // Current step: Submit Insurance
     case 'insurance_requested': 
-      return 3; // Current step: Schedule Inspection
+      return 3; // Current step: Schedule Inspection (this is the CURRENT step, not completed)
     case 'inspection_scheduled': 
-      return 4; // Current step: Onboarded (final step)
+      return 3; // Still on Schedule Inspection (inspection booked but not yet done)
     case 'ops_handoff': 
       return 5; // All done (beyond timeline - all checkmarks)
     default: 
@@ -492,6 +492,7 @@ function buildFullServicePaymentEmailHtml(recipientName: string, stripeUrl: stri
 // Build inspection scheduling email HTML
 function buildInspectionSchedulingEmailHtml(recipientName: string, bookingUrl: string, currentStage: string): string {
   const SMART_LOCK_URL = "https://www.amazon.com/Yale-Security-Connected-Back-Up-YRD410-WF1-BSP/dp/B0B9HWYMV5";
+  const CHECKLIST_URL = "https://propertycentral.lovable.app/documents/MTR_Start_Up_Checklist.pdf";
   
   return buildBrandedEmailHtml(recipientName, "Schedule Your Onboarding Inspection", [
     {
@@ -505,13 +506,13 @@ function buildInspectionSchedulingEmailHtml(recipientName: string, bookingUrl: s
           <tr>
             <td style="padding: 12px 0; border-bottom: 1px solid #e5e7eb; vertical-align: top;">
               <strong style="color: #f59e0b;">🔍 Safety & Onboarding Check</strong>
-              <p style="margin: 4px 0 0 0; color: #6b7280; font-size: 13px;">We'll document all appliance serial numbers, verify safety equipment (fire extinguishers, smoke/CO detectors), and ensure everything meets guest-ready standards.</p>
+              <p style="margin: 4px 0 0 0; color: #6b7280; font-size: 13px;">We'll document all appliance serial numbers, verify safety equipment (fire extinguishers, fire blankets, smoke/CO detectors), and ensure everything meets guest-ready standards.</p>
             </td>
           </tr>
           <tr>
             <td style="padding: 12px 0; border-bottom: 1px solid #e5e7eb; vertical-align: top;">
               <strong style="color: #f59e0b;">📋 Property Inventory Check</strong>
-              <p style="margin: 4px 0 0 0; color: #6b7280; font-size: 13px;">We verify that all essential items are in place - linens, kitchen supplies, toiletries, and everything guests need for a 5-star experience.</p>
+              <p style="margin: 4px 0 0 0; color: #6b7280; font-size: 13px;">We verify that all essential items are in place - linens, kitchen supplies, toiletries, plungers in bathrooms, and everything guests need for a 5-star experience.</p>
             </td>
           </tr>
           <tr>
@@ -530,8 +531,11 @@ function buildInspectionSchedulingEmailHtml(recipientName: string, bookingUrl: s
       `
     },
     {
-      title: "📅 Available Times",
-      content: "Inspections are available <strong>Tuesdays & Thursdays</strong> between <strong>11 AM - 3 PM EST</strong>.",
+      title: "📥 Prepare for Your Inspection",
+      content: `
+        <p style="margin: 0 0 12px 0;">Download our inventory checklist to ensure your property has everything needed:</p>
+        <a href="${CHECKLIST_URL}" style="display: inline-block; padding: 10px 20px; background: #f3f4f6; color: #374151; text-decoration: none; border-radius: 6px; font-size: 13px; font-weight: 600; border: 1px solid #e5e7eb;">📄 Download STR/MTR Setup Checklist</a>
+      `,
       highlight: true
     },
     {
