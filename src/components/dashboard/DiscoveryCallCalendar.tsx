@@ -281,93 +281,104 @@ export function DiscoveryCallCalendar() {
         </div>
       </CardHeader>
       <CardContent className="px-3 sm:px-6">
-        {/* Mobile: Show upcoming events list first, then compact calendar */}
+        {/* Upcoming Events - Horizontal scroll on all screens */}
+        <div className="mb-6">
+          <h3 className="font-semibold mb-3 flex items-center gap-2 text-sm">
+            <Clock className="h-4 w-4" />
+            Upcoming Events ({allUpcomingEvents.length})
+          </h3>
+          {allUpcomingEvents.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-4 text-center">No upcoming events</p>
+          ) : (
+            <div className="flex gap-3 overflow-x-auto pb-2 -mx-3 px-3 snap-x snap-mandatory scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent">
+              {allUpcomingEvents.map((event) => {
+                if (event.type === 'discovery') {
+                  const call = event.data as DiscoveryCall;
+                  const score = calculateRevenueScore(
+                    call.leads?.property_address || "",
+                    call.leads?.property_type || null
+                  );
+                  return (
+                    <button
+                      key={call.id}
+                      onClick={() => setSelectedCall(call)}
+                      className="flex-shrink-0 w-[280px] snap-start text-left p-3 rounded-lg border border-green-200 dark:border-green-800 hover:border-primary active:bg-muted/50 transition-colors bg-green-50/50 dark:bg-green-900/10"
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="font-medium text-sm truncate max-w-[180px]">
+                          {call.leads?.name || "Unknown"}
+                        </span>
+                        <Badge
+                          variant="outline"
+                          className={cn("text-xs flex-shrink-0", getScoreColor(score))}
+                        >
+                          {score}
+                        </Badge>
+                      </div>
+                      <div className="text-xs text-muted-foreground space-y-1">
+                        <div className="flex items-center gap-1">
+                          <Calendar className="h-3 w-3 flex-shrink-0" />
+                          {format(event.time, "MMM d, h:mm a")}
+                        </div>
+                        <div className="flex items-center gap-1">
+                          {call.meeting_type === "video" ? (
+                            <Video className="h-3 w-3 text-green-600 flex-shrink-0" />
+                          ) : (
+                            <Phone className="h-3 w-3 text-blue-600 flex-shrink-0" />
+                          )}
+                          Discovery Call
+                        </div>
+                        {call.leads?.property_address && (
+                          <div className="flex items-center gap-1">
+                            <MapPin className="h-3 w-3 flex-shrink-0" />
+                            <span className="truncate">{call.leads.property_address}</span>
+                          </div>
+                        )}
+                      </div>
+                    </button>
+                  );
+                } else {
+                  const apt = event.data as GhlAppointment;
+                  return (
+                    <button
+                      key={apt.ghl_event_id}
+                      onClick={() => setSelectedGhlEvent(apt)}
+                      className="flex-shrink-0 w-[280px] snap-start text-left p-3 rounded-lg border border-cyan-200 dark:border-cyan-800 hover:border-primary active:bg-muted/50 transition-colors bg-cyan-50/50 dark:bg-cyan-900/10"
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="font-medium text-sm truncate max-w-[180px]">
+                          {apt.contact_name || apt.lead_name || "Unknown"}
+                        </span>
+                        <Badge variant="outline" className="text-xs flex-shrink-0 bg-cyan-100 dark:bg-cyan-900/30 text-cyan-800 dark:text-cyan-200">
+                          GHL
+                        </Badge>
+                      </div>
+                      <div className="text-xs text-muted-foreground space-y-1">
+                        <div className="flex items-center gap-1">
+                          <Calendar className="h-3 w-3 flex-shrink-0" />
+                          {format(event.time, "MMM d, h:mm a")}
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <CalendarCheck className="h-3 w-3 text-cyan-600 flex-shrink-0" />
+                          <span className="truncate">{apt.title || "Appointment"}</span>
+                        </div>
+                        {(apt.lead_property_address || apt.contact_address) && (
+                          <div className="flex items-center gap-1">
+                            <MapPin className="h-3 w-3 flex-shrink-0" />
+                            <span className="truncate">{apt.lead_property_address || apt.contact_address}</span>
+                          </div>
+                        )}
+                      </div>
+                    </button>
+                  );
+                }
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Mobile: Compact calendar only */}
         <div className="lg:hidden space-y-4">
-          {/* Upcoming events - Priority on mobile */}
-          <div>
-            <h3 className="font-semibold mb-3 flex items-center gap-2 text-sm">
-              <Clock className="h-4 w-4" />
-              Upcoming ({allUpcomingEvents.length})
-            </h3>
-            {allUpcomingEvents.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-4 text-center">No upcoming events</p>
-            ) : (
-              <div className="space-y-2">
-                {allUpcomingEvents.map((event) => {
-                  if (event.type === 'discovery') {
-                    const call = event.data as DiscoveryCall;
-                    const score = calculateRevenueScore(
-                      call.leads?.property_address || "",
-                      call.leads?.property_type || null
-                    );
-                    return (
-                      <button
-                        key={call.id}
-                        onClick={() => setSelectedCall(call)}
-                        className="w-full text-left p-3 rounded-lg border border-green-200 dark:border-green-800 hover:border-primary active:bg-muted/50 transition-colors bg-green-50/50 dark:bg-green-900/10"
-                      >
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="font-medium text-sm">
-                            {call.leads?.name || "Unknown"}
-                          </span>
-                          <Badge
-                            variant="outline"
-                            className={cn("text-xs", getScoreColor(score))}
-                          >
-                            {score}
-                          </Badge>
-                        </div>
-                        <div className="text-xs text-muted-foreground space-y-1">
-                          <div className="flex items-center gap-1">
-                            <Calendar className="h-3 w-3" />
-                            {format(event.time, "EEE, MMM d 'at' h:mm a")}
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-1">
-                              {call.meeting_type === "video" ? (
-                                <Video className="h-3 w-3 text-green-600" />
-                              ) : (
-                                <Phone className="h-3 w-3 text-blue-600" />
-                              )}
-                              Discovery Call
-                            </div>
-                          </div>
-                        </div>
-                      </button>
-                    );
-                  } else {
-                    const apt = event.data as GhlAppointment;
-                    return (
-                      <button
-                        key={apt.ghl_event_id}
-                        onClick={() => setSelectedGhlEvent(apt)}
-                        className="w-full text-left p-3 rounded-lg border border-cyan-200 dark:border-cyan-800 hover:border-primary active:bg-muted/50 transition-colors bg-cyan-50/50 dark:bg-cyan-900/10"
-                      >
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="font-medium text-sm">
-                            {apt.contact_name || apt.lead_name || "Unknown"}
-                          </span>
-                          <Badge variant="outline" className="text-xs bg-cyan-100 dark:bg-cyan-900/30 text-cyan-800 dark:text-cyan-200">
-                            GHL
-                          </Badge>
-                        </div>
-                        <div className="text-xs text-muted-foreground space-y-1">
-                          <div className="flex items-center gap-1">
-                            <Calendar className="h-3 w-3" />
-                            {format(event.time, "EEE, MMM d 'at' h:mm a")}
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <CalendarCheck className="h-3 w-3 text-cyan-600" />
-                            {apt.title || "Appointment"}
-                          </div>
-                        </div>
-                      </button>
-                    );
-                  }
-                })}
-              </div>
-            )}
-          </div>
 
           {/* Compact mobile calendar */}
           <div className="border rounded-lg p-2">
@@ -435,10 +446,10 @@ export function DiscoveryCallCalendar() {
           </div>
         </div>
 
-        {/* Desktop: Full calendar with sidebar */}
-        <div className="hidden lg:grid grid-cols-1 lg:grid-cols-4 gap-6">
+        {/* Desktop: Full calendar (no sidebar since events are shown above) */}
+        <div className="hidden lg:block">
           {/* Calendar Grid */}
-          <div className="lg:col-span-3">
+          <div>
             {/* Day headers */}
             <div className="grid grid-cols-7 mb-2">
               {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
@@ -549,119 +560,6 @@ export function DiscoveryCallCalendar() {
                 );
               })}
             </div>
-          </div>
-
-          {/* Upcoming events sidebar */}
-          <div className="lg:col-span-1">
-            <h3 className="font-semibold mb-3 flex items-center gap-2">
-              <Clock className="h-4 w-4" />
-              Upcoming Events
-            </h3>
-            <ScrollArea className="h-[400px]">
-              {allUpcomingEvents.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No upcoming events</p>
-              ) : (
-                <div className="space-y-3">
-                  {allUpcomingEvents.map((event) => {
-                    if (event.type === 'discovery') {
-                      const call = event.data as DiscoveryCall;
-                      const score = calculateRevenueScore(
-                        call.leads?.property_address || "",
-                        call.leads?.property_type || null
-                      );
-                      return (
-                        <button
-                          key={call.id}
-                          onClick={() => setSelectedCall(call)}
-                          className="w-full text-left p-3 rounded-lg border border-green-200 dark:border-green-800 hover:border-primary transition-colors"
-                        >
-                          <div className="flex items-center justify-between mb-1">
-                            <span className="font-medium text-sm">
-                              {call.leads?.name || "Unknown"}
-                            </span>
-                            <Badge
-                              variant="outline"
-                              className={cn("text-xs", getScoreColor(score))}
-                            >
-                              {score}
-                            </Badge>
-                          </div>
-                          <div className="text-xs text-muted-foreground space-y-1">
-                            <div className="flex items-center gap-1">
-                              <Calendar className="h-3 w-3" />
-                              {format(event.time, "MMM d, h:mm a")}
-                            </div>
-                            <div className="flex items-center gap-1">
-                              {call.meeting_type === "video" ? (
-                                <Video className="h-3 w-3 text-green-600" />
-                              ) : (
-                                <Phone className="h-3 w-3 text-blue-600" />
-                              )}
-                              Discovery Call
-                            </div>
-                            {call.leads?.property_address && (
-                              <div className="flex items-center gap-1 truncate">
-                                <MapPin className="h-3 w-3 shrink-0" />
-                                <span className="truncate">
-                                  {call.leads.property_address}
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                        </button>
-                      );
-                    } else {
-                      const apt = event.data as GhlAppointment;
-                      return (
-                        <button
-                          key={apt.ghl_event_id}
-                          onClick={() => setSelectedGhlEvent(apt)}
-                          className="w-full text-left p-3 rounded-lg border border-cyan-200 dark:border-cyan-800 hover:border-primary transition-colors"
-                        >
-                          <div className="flex items-center justify-between mb-1">
-                            <span className="font-medium text-sm">
-                              {apt.contact_name || apt.lead_name || "Unknown"}
-                            </span>
-                            <Badge variant="outline" className="text-xs bg-cyan-100 dark:bg-cyan-900/30 text-cyan-800 dark:text-cyan-200">
-                              GHL
-                            </Badge>
-                          </div>
-                          <div className="text-xs text-muted-foreground space-y-1">
-                            <div className="flex items-center gap-1">
-                              <Calendar className="h-3 w-3" />
-                              {format(event.time, "MMM d, h:mm a")}
-                              {apt.end_time && (
-                                <span>- {format(new Date(apt.end_time), "h:mm a")}</span>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <CalendarCheck className="h-3 w-3 text-cyan-600" />
-                              {apt.title || "Appointment"}
-                            </div>
-                            {(apt.lead_property_address || apt.contact_address) && (
-                              <div className="flex items-center gap-1 truncate">
-                                <MapPin className="h-3 w-3 shrink-0" />
-                                <span className="truncate">
-                                  {apt.lead_property_address || apt.contact_address}
-                                </span>
-                              </div>
-                            )}
-                            {apt.contact_tags && apt.contact_tags.length > 0 && (
-                              <div className="flex items-center gap-1 flex-wrap">
-                                <Tag className="h-3 w-3 shrink-0" />
-                                {apt.contact_tags.slice(0, 2).map((tag, i) => (
-                                  <span key={i} className="text-[10px] bg-muted px-1 rounded">{tag}</span>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        </button>
-                      );
-                    }
-                  })}
-                </div>
-              )}
-            </ScrollArea>
           </div>
         </div>
       </CardContent>
