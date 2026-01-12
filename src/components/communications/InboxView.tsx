@@ -34,6 +34,7 @@ import {
   Archive,
   CheckCheck,
   Bot,
+  RotateCcw,
 } from "lucide-react";
 import { IncomeReportButton } from "@/components/IncomeReportEmbed";
 import { TwilioCallDialog } from "@/components/TwilioCallDialog";
@@ -1171,6 +1172,46 @@ export function InboxView() {
     }
   });
 
+  // Track done/handled emails in localStorage
+  const [doneGmailIds, setDoneGmailIds] = useState<Set<string>>(() => {
+    try {
+      const saved = localStorage.getItem('doneGmailIds');
+      return saved ? new Set(JSON.parse(saved)) : new Set();
+    } catch {
+      return new Set();
+    }
+  });
+
+  // Mark email as done/handled
+  const markEmailAsDone = useCallback((emailId: string) => {
+    setDoneGmailIds(prev => {
+      const updated = new Set(prev);
+      updated.add(emailId);
+      try {
+        localStorage.setItem('doneGmailIds', JSON.stringify([...updated]));
+      } catch {
+        // localStorage full, ignore
+      }
+      return updated;
+    });
+    toast.success("Email marked as done");
+  }, []);
+
+  // Unmark email as done
+  const unmarkEmailAsDone = useCallback((emailId: string) => {
+    setDoneGmailIds(prev => {
+      const updated = new Set(prev);
+      updated.delete(emailId);
+      try {
+        localStorage.setItem('doneGmailIds', JSON.stringify([...updated]));
+      } catch {
+        // localStorage full, ignore
+      }
+      return updated;
+    });
+    toast.success("Email reopened");
+  }, []);
+
   // Mark email as read when selected - persists to localStorage
   const handleSelectGmailEmail = (email: GmailEmail) => {
     // Add to localStorage read set
@@ -1748,37 +1789,85 @@ export function InboxView() {
               </div>
             ) : (
               <div>
-                {filteredGmailEmails.filter(email => !search || search === " " || email.subject.toLowerCase().includes(search.toLowerCase()) || email.fromName.toLowerCase().includes(search.toLowerCase())).map((email) => {
-                  const isUnread = email.labelIds?.includes('UNREAD') && !readGmailIds.has(email.id);
-                  return (
-                    <div 
-                      key={email.id} 
-                      onClick={() => handleSelectGmailEmailMobile(email)} 
-                      className={`flex items-start gap-3 px-4 py-3 cursor-pointer transition-colors border-b border-border/30 active:bg-muted/50 ${selectedGmailEmail?.id === email.id ? "bg-primary/5" : "hover:bg-muted/30"} ${isUnread ? "bg-primary/[0.03]" : ""}`}
-                    >
-                      <div className="h-10 w-10 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center flex-shrink-0">
-                        <span className="text-xs font-semibold text-white">{getInitials(email.fromName)}</span>
-                      </div>
-                      <div className="flex-1 min-w-0 py-0.5">
-                        <div className="flex items-baseline justify-between gap-2 mb-0.5">
-                          <span className={`text-sm truncate ${isUnread ? 'font-semibold' : 'font-medium text-foreground/80'}`}>
-                            {email.fromName}
-                          </span>
-                          <span className="text-[11px] text-muted-foreground whitespace-nowrap">
-                            {format(new Date(email.date), "MMM d")}
-                          </span>
+                {filteredGmailEmails
+                  .filter(email => !search || search === " " || email.subject.toLowerCase().includes(search.toLowerCase()) || email.fromName.toLowerCase().includes(search.toLowerCase()))
+                  .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()) // Newest first
+                  .map((email) => {
+                    const isUnread = email.labelIds?.includes('UNREAD') && !readGmailIds.has(email.id);
+                    const isDone = doneGmailIds.has(email.id);
+                    
+                    return (
+                      <div 
+                        key={email.id} 
+                        onClick={() => handleSelectGmailEmailMobile(email)} 
+                        className={`group relative flex items-start gap-3 px-4 py-3 cursor-pointer transition-colors border-b border-border/30 active:bg-muted/50 
+                          ${selectedGmailEmail?.id === email.id ? "bg-primary/5" : "hover:bg-muted/30"} 
+                          ${isUnread ? "bg-primary/[0.03]" : ""} 
+                          ${isDone ? "opacity-50" : ""}`}
+                      >
+                        {/* Done indicator line */}
+                        {isDone && (
+                          <div className="absolute left-0 top-0 bottom-0 w-1 bg-green-500 rounded-r" />
+                        )}
+                        
+                        <div className="relative h-10 w-10 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center flex-shrink-0">
+                          <span className="text-xs font-semibold text-white">{getInitials(email.fromName)}</span>
+                          {isDone && (
+                            <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-green-500 border-2 border-background flex items-center justify-center">
+                              <CheckCircle className="h-2.5 w-2.5 text-white" />
+                            </div>
+                          )}
                         </div>
-                        <p className={`text-[13px] leading-snug ${isUnread ? 'font-medium' : 'text-foreground/70'}`}>
-                          {email.subject}
-                        </p>
-                        <p className="text-[13px] text-muted-foreground mt-0.5 line-clamp-2 leading-relaxed">
-                          {email.snippet}
-                        </p>
+                        
+                        <div className="flex-1 min-w-0 py-0.5">
+                          <div className="flex items-center justify-between gap-2 mb-0.5">
+                            <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                              <span className={`text-sm truncate ${isUnread ? 'font-semibold' : isDone ? 'font-normal text-muted-foreground' : 'font-medium text-foreground/80'}`}>
+                                {email.fromName}
+                              </span>
+                              {isDone && (
+                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-green-500/10 text-green-600 text-[10px] font-medium">
+                                  ✓ Done
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              {/* Quick action buttons on hover */}
+                              <div className="opacity-0 group-hover:opacity-100 transition-opacity hidden md:flex items-center gap-1">
+                                {isDone ? (
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); unmarkEmailAsDone(email.id); }}
+                                    className="p-1.5 rounded-full hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+                                    title="Reopen"
+                                  >
+                                    <RotateCcw className="h-3.5 w-3.5" />
+                                  </button>
+                                ) : (
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); markEmailAsDone(email.id); }}
+                                    className="p-1.5 rounded-full hover:bg-green-500/10 transition-colors text-muted-foreground hover:text-green-600"
+                                    title="Mark as done"
+                                  >
+                                    <CheckCheck className="h-3.5 w-3.5" />
+                                  </button>
+                                )}
+                              </div>
+                              <span className="text-[11px] text-muted-foreground whitespace-nowrap">
+                                {format(new Date(email.date), "MMM d")}
+                              </span>
+                            </div>
+                          </div>
+                          <p className={`text-[13px] leading-snug ${isUnread ? 'font-medium' : isDone ? 'text-muted-foreground' : 'text-foreground/70'}`}>
+                            {email.subject}
+                          </p>
+                          <p className="text-[13px] text-muted-foreground mt-0.5 line-clamp-2 leading-relaxed">
+                            {email.snippet}
+                          </p>
+                        </div>
+                        {isUnread && !isDone && <div className="w-2 h-2 rounded-full bg-primary flex-shrink-0 mt-3" />}
                       </div>
-                      {isUnread && <div className="w-2 h-2 rounded-full bg-primary flex-shrink-0 mt-3" />}
-                    </div>
-                  );
-                })}
+                    );
+                  })}
               </div>
             )
           ) : isLoading ? (
