@@ -58,7 +58,7 @@ import { EmailActionModal } from "./EmailActionModal";
 import { InboxZeroGuide } from "./InboxZeroGuide";
 import { ConversationQuickActions } from "./ConversationQuickActions";
 import { PriorityBadge } from "./PriorityBadge";
-import { VoiceAIBadge, isVoiceAITranscript, extractCallerPhoneFromTranscript, extractAgentNameFromTranscript, extractCallSummaryFromTranscript } from "./VoiceAIBadge";
+import { VoiceAIBadge, isVoiceAITranscript, extractCallerPhoneFromTranscript, extractAgentNameFromTranscript, extractCallSummaryFromTranscript, extractCallerNameFromTranscript } from "./VoiceAIBadge";
 import LeadDetailModal from "@/components/leads/LeadDetailModal";
 import { OwnerCommunicationDetail } from "./OwnerCommunicationDetail";
 import { useNavigate } from "react-router-dom";
@@ -117,10 +117,10 @@ interface PhoneAssignment {
 }
 
 type TabType = "all" | "chats" | "calls" | "emails";
-type FilterType = "all" | "open" | "unread" | "snoozed" | "done" | "urgent" | "owners";
+type FilterType = "all" | "open" | "unread" | "snoozed" | "done" | "urgent" | "owners" | "awaiting";
 type MessageChannel = "sms" | "email";
 type ConversationPriority = "urgent" | "important" | "normal" | "low";
-type ConversationStatusType = "open" | "snoozed" | "done" | "archived";
+type ConversationStatusType = "open" | "snoozed" | "done" | "archived" | "awaiting";
 
 // Priority detection keywords
 const URGENT_KEYWORDS = ["urgent", "emergency", "asap", "immediately", "broken", "not working", "help", "problem", "issue", "leak", "flood", "fire", "locked out", "no heat", "no ac", "no water"];
@@ -398,6 +398,7 @@ export function InboxView() {
         done: "Marked as done",
         snoozed: `Snoozed until ${variables.snoozedUntil ? format(variables.snoozedUntil, "MMM d, h:mm a") : "later"}`,
         archived: "Archived",
+        awaiting: "Marked as awaiting response",
       };
       toast.success(statusLabels[variables.status]);
       queryClient.invalidateQueries({ queryKey: ["conversation-statuses"] });
@@ -711,8 +712,10 @@ export function InboxView() {
             // Check for Voice AI transcript FIRST - before other matching logic
             if (isVoiceAITranscript(comm.body)) {
               const callerPhone = extractCallerPhoneFromTranscript(comm.body);
-              const agentName = extractAgentNameFromTranscript(comm.body) || "GHL Voice Agent";
-              contactName = agentName;
+              // Extract the caller's actual name from the transcript conversation
+              const callerName = extractCallerNameFromTranscript(comm.body);
+              // Use the caller's name if found, otherwise use "PeachHaus Receptionist" to indicate it was AI-handled
+              contactName = callerName || "PeachHaus Receptionist";
               contactPhone = callerPhone || metadata?.unmatched_phone || metadata?.ghl_data?.contactPhone;
               contactType = "external";
             } else if (comm.lead_id && lead) {
@@ -1004,10 +1007,13 @@ export function InboxView() {
                               body.includes("AI Agent Name:") ||
                               body.includes("Call Transcript:");
             
-            // Default to "PeachHaus Receptionist" for Voice AI calls, otherwise use metadata or "Unknown Caller"
+            // For Voice AI calls, try to extract the caller's actual name from the transcript
             let contactName = metadata?.ghl_data?.contactName || "Unknown Caller";
-            if (isVoiceAI || contactName === "Unknown Caller" || contactName === "Unknown") {
-              contactName = "PeachHaus Receptionist";
+            if (isVoiceAI) {
+              const callerName = extractCallerNameFromTranscript(body);
+              contactName = callerName || "PeachHaus Receptionist";
+            } else if (contactName === "Unknown Caller" || contactName === "Unknown") {
+              contactName = "Unknown Caller";
             }
             
             const contactPhone = metadata?.ghl_data?.contactPhone || undefined;
@@ -1457,6 +1463,7 @@ export function InboxView() {
       if (activeFilter === "open" && c.conversation_status !== "open") return false;
       if (activeFilter === "snoozed" && c.conversation_status !== "snoozed") return false;
       if (activeFilter === "done" && c.conversation_status !== "done") return false;
+      if (activeFilter === "awaiting" && c.conversation_status !== "awaiting") return false;
       
       // Filter by priority
       if (activeFilter === "urgent" && c.priority !== "urgent" && c.priority !== "important") return false;
@@ -1686,11 +1693,12 @@ export function InboxView() {
             {/* Quick filters for chats/calls - Inbox Zero workflow */}
             {activeTab !== "emails" && (
               <>
-                {(["all", "open", "urgent", "snoozed", "done", "owners"] as FilterType[]).map((filter) => {
+                {(["all", "open", "urgent", "awaiting", "snoozed", "done", "owners"] as FilterType[]).map((filter) => {
                   const filterConfig: Record<FilterType, { label: string; icon?: any; color?: string }> = {
                     all: { label: "All" },
                     open: { label: "Open", icon: Inbox, color: "bg-blue-500" },
                     urgent: { label: "Urgent", icon: Zap, color: "bg-red-500" },
+                    awaiting: { label: "Awaiting", icon: Clock, color: "bg-cyan-500" },
                     snoozed: { label: "Snoozed", icon: Clock, color: "bg-amber-500" },
                     done: { label: "Done", icon: CheckCheck, color: "bg-green-500" },
                     owners: { label: "Owners", color: "bg-purple-500" },
@@ -1860,7 +1868,7 @@ export function InboxView() {
                               {/* Quick actions - visible on hover (desktop) or always (mobile touch) */}
                               <div className="opacity-0 group-hover:opacity-100 transition-opacity md:flex hidden">
                                 <ConversationQuickActions
-                                  status={comm.conversation_status}
+                                  status={(comm.conversation_status === "awaiting" ? "open" : comm.conversation_status) as "open" | "snoozed" | "done" | "archived"}
                                   onMarkDone={() => handleMarkDone(comm)}
                                   onSnooze={(hours) => handleSnooze(comm, hours)}
                                   onReopen={() => handleReopen(comm)}
@@ -1869,7 +1877,7 @@ export function InboxView() {
                                 />
                               </div>
                               <span className="text-[11px] text-muted-foreground whitespace-nowrap">
-                                {isToday(new Date(comm.created_at)) 
+                                {isToday(new Date(comm.created_at))
                                   ? format(new Date(comm.created_at), "h:mm a")
                                   : isYesterday(new Date(comm.created_at))
                                   ? "Yesterday"
@@ -1966,7 +1974,7 @@ export function InboxView() {
                           <div className="flex items-center gap-1.5">
                             <div className="opacity-0 group-hover:opacity-100 transition-opacity hidden md:flex">
                               <ConversationQuickActions
-                                status={comm.conversation_status}
+                                status={(comm.conversation_status === "awaiting" ? "open" : comm.conversation_status) as "open" | "snoozed" | "done" | "archived"}
                                 onMarkDone={() => handleMarkDone(comm)}
                                 onSnooze={(hours) => handleSnooze(comm, hours)}
                                 onReopen={() => handleReopen(comm)}

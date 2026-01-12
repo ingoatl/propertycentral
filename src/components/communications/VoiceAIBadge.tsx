@@ -49,6 +49,37 @@ export function extractCallSummaryFromTranscript(body: string): string | null {
   return null;
 }
 
+// Helper to extract caller's actual name from Voice AI transcript
+// Parses the transcript conversation to find how the caller introduced themselves
+export function extractCallerNameFromTranscript(body: string): string | null {
+  if (!body) return null;
+  
+  // Look for common name introduction patterns in the transcript
+  // Pattern 1: "User: My name is [Name]" or "User: I'm [Name]" or "User: This is [Name]"
+  const namePatterns = [
+    /User:\s*(?:My name is|I'm|This is|I am|It's|Hi,? (?:this is|I'm))\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/i,
+    /User:\s*(?:It's|Hi,? it's)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/i,
+    // Pattern 2: Response to "May I have your name" - just the name on its own line
+    /User:\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\s*(?:\n|$)/,
+    // Pattern 3: "User: [Name] Brooks" or similar full name at start of response
+    /User:\s*([A-Z][a-z]+\s+[A-Z][a-z]+)(?:[,.\s]|$)/,
+  ];
+  
+  for (const pattern of namePatterns) {
+    const match = body.match(pattern);
+    if (match && match[1]) {
+      const name = match[1].trim();
+      // Validate it looks like a real name (not a common word)
+      const commonWords = ['yes', 'no', 'okay', 'sure', 'hello', 'hi', 'hey', 'thanks', 'thank', 'good', 'great'];
+      if (name.length >= 2 && !commonWords.includes(name.toLowerCase())) {
+        return name;
+      }
+    }
+  }
+  
+  return null;
+}
+
 export function VoiceAIBadge({ callerPhone, agentName, onCallBack, compact = false }: VoiceAIBadgeProps) {
   if (compact) {
     return (
