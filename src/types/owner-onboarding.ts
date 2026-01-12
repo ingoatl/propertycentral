@@ -4,6 +4,9 @@ export interface OwnerOnboardingFormData {
   owner_email: string;
   owner_phone: string;
   property_address: string;
+  how_did_you_find_us: string;
+  was_referred: boolean;
+  referred_by: string;
 
   // Step 2: Access Details
   wifi_ssid: string;
@@ -121,6 +124,9 @@ export const initialFormData: OwnerOnboardingFormData = {
   owner_email: '',
   owner_phone: '',
   property_address: '',
+  how_did_you_find_us: '',
+  was_referred: false,
+  referred_by: '',
 
   // Step 2
   wifi_ssid: '',
