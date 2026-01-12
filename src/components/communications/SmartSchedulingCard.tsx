@@ -92,57 +92,116 @@ export function SmartSchedulingCard({
   // Track if we've attempted to extract from conversations
   const [hasExtractedFromConversations, setHasExtractedFromConversations] = useState(false);
 
-  // Auto-extract email and name from conversation history
+  // Auto-extract email and name from conversation history + GHL metadata
   useEffect(() => {
     if (hasExtractedFromConversations) return;
     
     const extractFromConversations = async () => {
-      // Determine if we have a lead or owner context
-      const ownerId = contactType === "owner" ? contactId : null;
-      if (!leadId && !ownerId) {
-        setHasExtractedFromConversations(true);
-        return;
-      }
-      
       try {
-        let query = supabase
-          .from("lead_communications")
-          .select("body, subject")
-          .order("created_at", { ascending: false })
-          .limit(30);
+        const ownerId = contactType === "owner" ? contactId : null;
+        let foundEmail: string | null = null;
+        let foundName: string | null = null;
         
-        if (leadId) {
-          query = query.eq("lead_id", leadId);
-        } else if (ownerId) {
-          query = query.eq("owner_id", ownerId);
+        // Strategy 1: Search by lead_id or owner_id if available
+        if (leadId || ownerId) {
+          const query = supabase
+            .from("lead_communications")
+            .select("body, subject, metadata")
+            .order("created_at", { ascending: false })
+            .limit(30);
+          
+          if (leadId) {
+            query.eq("lead_id", leadId);
+          } else if (ownerId) {
+            query.eq("owner_id", ownerId);
+          }
+          
+          const { data: communications } = await query;
+          
+          if (communications && communications.length > 0) {
+            for (const comm of communications) {
+              // Check GHL metadata for email (most reliable source)
+              const metadata = comm.metadata as { ghl_data?: { contactEmail?: string; contactName?: string } } | null;
+              if (!foundEmail && metadata?.ghl_data?.contactEmail) {
+                foundEmail = metadata.ghl_data.contactEmail;
+              }
+              if (!foundName && metadata?.ghl_data?.contactName) {
+                foundName = metadata.ghl_data.contactName;
+              }
+              // Fallback to body extraction
+              if (!foundEmail && comm.body) {
+                foundEmail = extractEmailFromText(comm.body);
+              }
+              if (!foundName && comm.body) {
+                foundName = extractFirstNameFromText(comm.body);
+              }
+              if (foundEmail && foundName) break;
+            }
+          }
         }
         
-        const { data: communications } = await query;
+        // Strategy 2: Search by phone number if no lead_id (unmatched GHL conversations)
+        if ((!foundEmail || !foundName) && contactPhone) {
+          const normalizedPhone = contactPhone.replace(/[^\d]/g, "");
+          const phoneVariants = [
+            contactPhone,
+            `+1${normalizedPhone.slice(-10)}`,
+            `+${normalizedPhone}`,
+            normalizedPhone.slice(-10),
+          ];
+          
+          // Search lead_communications metadata for matching phone
+          const { data: phoneComms } = await supabase
+            .from("lead_communications")
+            .select("body, metadata")
+            .not("metadata", "is", null)
+            .order("created_at", { ascending: false })
+            .limit(100);
+          
+          if (phoneComms) {
+            for (const comm of phoneComms) {
+              const metadata = comm.metadata as { 
+                ghl_data?: { contactEmail?: string; contactName?: string; contactPhone?: string };
+                unmatched_phone?: string;
+              } | null;
+              
+              if (!metadata) continue;
+              
+              const commPhone = metadata.ghl_data?.contactPhone || metadata.unmatched_phone;
+              if (!commPhone) continue;
+              
+              const normalizedCommPhone = commPhone.replace(/[^\d]/g, "");
+              const matchesPhone = phoneVariants.some(v => 
+                normalizedCommPhone.includes(v.replace(/[^\d]/g, "").slice(-10))
+              );
+              
+              if (matchesPhone) {
+                if (!foundEmail && metadata.ghl_data?.contactEmail) {
+                  foundEmail = metadata.ghl_data.contactEmail;
+                  console.log("Found email via phone match:", foundEmail);
+                }
+                if (!foundName && metadata.ghl_data?.contactName) {
+                  foundName = metadata.ghl_data.contactName;
+                  console.log("Found name via phone match:", foundName);
+                }
+                // Also check body
+                if (!foundEmail && comm.body) {
+                  foundEmail = extractEmailFromText(comm.body);
+                }
+                if (foundEmail && foundName) break;
+              }
+            }
+          }
+        }
         
-        if (communications && communications.length > 0) {
-          let foundEmail: string | null = null;
-          let foundName: string | null = null;
-          
-          // Search through messages for email and name
-          for (const comm of communications) {
-            if (!foundEmail && comm.body) {
-              foundEmail = extractEmailFromText(comm.body);
-            }
-            if (!foundName && comm.body) {
-              foundName = extractFirstNameFromText(comm.body);
-            }
-            if (foundEmail && foundName) break;
-          }
-          
-          // Update state if we found info and fields are empty
-          if (foundEmail && !inviteEmail) {
-            console.log("Auto-extracted email from conversation:", foundEmail);
-            setInviteEmail(foundEmail);
-          }
-          if (foundName && !inviteFirstName) {
-            console.log("Auto-extracted name from conversation:", foundName);
-            setInviteFirstName(foundName);
-          }
+        // Update state if we found info and fields are empty
+        if (foundEmail && !inviteEmail) {
+          console.log("Auto-extracted email from conversation:", foundEmail);
+          setInviteEmail(foundEmail);
+        }
+        if (foundName && !inviteFirstName) {
+          console.log("Auto-extracted name from conversation:", foundName);
+          setInviteFirstName(foundName);
         }
       } catch (err) {
         console.error("Failed to extract from conversations:", err);
@@ -152,7 +211,7 @@ export function SmartSchedulingCard({
     };
     
     extractFromConversations();
-  }, [leadId, contactId, contactType, hasExtractedFromConversations, inviteEmail, inviteFirstName]);
+  }, [leadId, contactId, contactType, contactPhone, hasExtractedFromConversations, inviteEmail, inviteFirstName]);
 
   // Generate available dates based on intent
   const availableDates = useMemo(() => {

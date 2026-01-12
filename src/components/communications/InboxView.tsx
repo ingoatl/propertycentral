@@ -696,7 +696,7 @@ export function InboxView() {
               tenant_id?: string; 
               tenant_name?: string; 
               tenant_phone?: string;
-              ghl_data?: { contactPhone?: string; contactName?: string };
+              ghl_data?: { contactPhone?: string; contactName?: string; contactEmail?: string };
             } | null;
             
             let contactName = "Unknown";
@@ -734,8 +734,12 @@ export function InboxView() {
                 contactType = "tenant";
                 contactId = matchedTenant.id;
               } else {
-                contactName = metadata.contact_name || metadata.ghl_data?.contactName || phone || "Unknown";
+                // Use GHL data for name and email - prioritize actual name over phone
+                const ghlName = metadata.ghl_data?.contactName;
+                const ghlEmail = metadata.ghl_data?.contactEmail;
+                contactName = ghlName || metadata.contact_name || "Unknown";
                 contactPhone = phone;
+                contactEmail = ghlEmail || undefined;
                 contactType = "external";
               }
             }
@@ -1059,29 +1063,40 @@ export function InboxView() {
     }
   }, [communications, lookupPhones]);
 
-  // Enhance communications with looked up names, priority, and status
+  // Enhance communications with looked up names, emails, priority, and status
   const enhancedCommunications = useMemo(() => {
     return communications.map(comm => {
       let enhanced = { ...comm };
       
-      // Enhance with looked up name
+      // Enhance with looked up name and email from phone lookup
       if (comm.contact_phone) {
-        const lookedUpName = getNameForPhone(comm.contact_phone);
-        if (lookedUpName) {
-          const currentName = comm.contact_name?.trim() || "";
+        const normalized = normalizePhone(comm.contact_phone);
+        const lookedUpData = lookupCache[normalized];
+        
+        if (lookedUpData) {
+          // Enhance name
+          if (lookedUpData.name || lookedUpData.callerName) {
+            const lookedUpName = lookedUpData.name || lookedUpData.callerName;
+            const currentName = comm.contact_name?.trim() || "";
+            
+            // Replace if current name is unknown, a phone number, or just a first name
+            const shouldReplace = 
+              !currentName ||
+              currentName === "Unknown" || 
+              currentName === "Unknown Caller" ||
+              currentName.match(/^[\d\s\-\(\)\+\.]+$/) ||
+              currentName.startsWith("+") ||
+              // If looked up name is longer/better, use it
+              (currentName.split(" ").length === 1 && lookedUpName && lookedUpName.split(" ").length > 1);
+            
+            if (shouldReplace && lookedUpName) {
+              enhanced.contact_name = lookedUpName;
+            }
+          }
           
-          // Replace if current name is unknown, a phone number, or just a first name
-          const shouldReplace = 
-            !currentName ||
-            currentName === "Unknown" || 
-            currentName === "Unknown Caller" ||
-            currentName.match(/^[\d\s\-\(\)\+\.]+$/) ||
-            currentName.startsWith("+") ||
-            // If looked up name is longer/better, use it
-            (currentName.split(" ").length === 1 && lookedUpName.split(" ").length > 1);
-          
-          if (shouldReplace) {
-            enhanced.contact_name = lookedUpName;
+          // Enhance email if not present
+          if (!enhanced.contact_email && lookedUpData.email) {
+            enhanced.contact_email = lookedUpData.email;
           }
         }
       }
@@ -1112,7 +1127,7 @@ export function InboxView() {
       
       return enhanced;
     });
-  }, [communications, lookupCache, getNameForPhone, statusLookup]);
+  }, [communications, lookupCache, statusLookup]);
 
   // Selected Gmail email state
   const [selectedGmailEmail, setSelectedGmailEmail] = useState<GmailEmail | null>(null);
