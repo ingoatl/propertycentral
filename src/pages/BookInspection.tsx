@@ -743,19 +743,36 @@ export default function BookInspection() {
                 {(formData.hasSmartLock === "will_buy" || formData.hasSmartLock === "need_install") && (
                   <Card className="bg-blue-50 border-blue-200">
                     <CardContent className="pt-4">
-                      <p className="text-sm text-blue-800 mb-2">
-                        <strong>Recommended Smart Lock:</strong> We recommend the Yale Security Connected Smart Lock for reliable guest access.
-                      </p>
-                      <Button variant="outline" size="sm" asChild className="bg-white">
-                        <a href={SMART_LOCK_URL} target="_blank" rel="noopener noreferrer">
-                          <ExternalLink className="h-4 w-4 mr-2" />
-                          View on Amazon
-                        </a>
-                      </Button>
-                      {formData.hasSmartLock === "need_install" && (
-                        <p className="text-xs text-blue-700 mt-2">
-                          ✓ We can install this for you at <strong>no extra charge</strong> during your inspection!
-                        </p>
+                      {formData.hasSmartLock === "need_install" ? (
+                        <>
+                          <p className="text-sm text-blue-800 mb-2">
+                            <strong>✓ We'll buy and install your smart lock!</strong>
+                          </p>
+                          <p className="text-xs text-blue-700 mb-3">
+                            We use the Yale Security Connected Smart Lock because it integrates directly with our property management system to generate unique access codes automatically for each guest. Not all smart locks support this—we'll bring one that works seamlessly with our system.
+                          </p>
+                          <Button variant="outline" size="sm" asChild className="bg-white">
+                            <a href={SMART_LOCK_URL} target="_blank" rel="noopener noreferrer">
+                              <ExternalLink className="h-4 w-4 mr-2" />
+                              View Recommended Lock
+                            </a>
+                          </Button>
+                        </>
+                      ) : (
+                        <>
+                          <p className="text-sm text-blue-800 mb-2">
+                            <strong>Important:</strong> Not all smart locks are compatible with our system.
+                          </p>
+                          <p className="text-xs text-blue-700 mb-3">
+                            We need a lock that connects with our property management system to automatically generate unique access codes for each guest. We recommend the Yale Security Connected Smart Lock for reliable, automated guest access.
+                          </p>
+                          <Button variant="outline" size="sm" asChild className="bg-white">
+                            <a href={SMART_LOCK_URL} target="_blank" rel="noopener noreferrer">
+                              <ExternalLink className="h-4 w-4 mr-2" />
+                              View Recommended Lock on Amazon
+                            </a>
+                          </Button>
+                        </>
                       )}
                     </CardContent>
                   </Card>

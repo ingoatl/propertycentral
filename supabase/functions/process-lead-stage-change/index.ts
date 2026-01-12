@@ -543,7 +543,11 @@ function buildInspectionSchedulingEmailHtml(recipientName: string, bookingUrl: s
     },
     {
       warning: true,
-      content: `<strong>Don't have a smart lock yet?</strong> We recommend the <a href="${SMART_LOCK_URL}" style="color: #1e40af;">Yale Security Smart Lock</a>. Can't install it yourself? We can install it for you at <strong>no extra charge</strong> during your inspection!`
+      content: `<strong>🔐 About the Smart Lock:</strong> If you need us to install a smart lock, we'll purchase and bring one. Not all smart locks are compatible—we use the <a href="${SMART_LOCK_URL}" style="color: #1e40af;">Yale Security Smart Lock</a> because it integrates with our property management system to automatically generate unique access codes for each guest.`
+    },
+    {
+      warning: true,
+      content: `<strong>🗄️ Utility Closet Needed:</strong> Please designate one closet or cabinet for property supplies. We'll store extra blankets, towels, cleaning supplies, and guest refills there, and install a lock during the inspection.`
     },
     {
       content: "Once your inspection is complete, we'll finalize your listing and you'll be ready to welcome guests!"
@@ -932,7 +936,16 @@ serve(async (req) => {
         adminEmailSubject = `🛡️ Insurance Email Sent: ${lead.name}`;
         console.log(`Sending direct insurance email for stage ${newStage}`);
       } else if (newStage === 'inspection_scheduled') {
-        const bookingUrl = "https://propertycentral.lovable.app/book-inspection";
+        // Build personalized booking URL with lead info prefilled
+        const bookingParams = new URLSearchParams();
+        bookingParams.set('name', lead.name || '');
+        bookingParams.set('email', lead.email || '');
+        bookingParams.set('phone', lead.phone || '');
+        bookingParams.set('address', lead.property_address || '');
+        bookingParams.set('leadId', leadId);
+        if (lead.property_id) bookingParams.set('propertyId', lead.property_id);
+        
+        const bookingUrl = `https://propertycentral.lovable.app/book-inspection?${bookingParams.toString()}`;
         directEmailHtml = buildInspectionSchedulingEmailHtml(recipientFirstName, bookingUrl, newStage);
         directEmailSubject = "Schedule Your Onboarding Inspection - PeachHaus";
         // No admin copy - admin gets notified when lead actually books
@@ -1400,8 +1413,16 @@ serve(async (req) => {
             } else if (newStage === 'insurance_requested') {
               finalHtmlBody = buildInsuranceEmailHtml(recipientFirstName, newStage);
             } else if (newStage === 'inspection_scheduled') {
-              // Use our internal booking page
-              const bookingUrl = "https://propertycentral.lovable.app/book-inspection";
+              // Build personalized booking URL with lead info prefilled
+              const bookingParams = new URLSearchParams();
+              bookingParams.set('name', lead.name || '');
+              bookingParams.set('email', lead.email || '');
+              bookingParams.set('phone', lead.phone || '');
+              bookingParams.set('address', lead.property_address || '');
+              bookingParams.set('leadId', leadId);
+              if (lead.property_id) bookingParams.set('propertyId', lead.property_id);
+              
+              const bookingUrl = `https://propertycentral.lovable.app/book-inspection?${bookingParams.toString()}`;
               finalHtmlBody = buildInspectionSchedulingEmailHtml(recipientFirstName, bookingUrl, newStage);
               emailSubject = "Schedule Your Onboarding Inspection - PeachHaus";
             } else if (newStage === 'ach_form_signed') {
