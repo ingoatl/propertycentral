@@ -66,7 +66,6 @@ export function OwnerPortalAdmin() {
   const [searchTerm, setSearchTerm] = useState("");
   const [sendingInvite, setSendingInvite] = useState<string | null>(null);
   const [syncingPayments, setSyncingPayments] = useState(false);
-  const [openingDemo, setOpeningDemo] = useState(false);
   const [reportModal, setReportModal] = useState<{
     open: boolean;
     owner: OwnerWithProperties | null;
@@ -280,45 +279,10 @@ export function OwnerPortalAdmin() {
     }
   };
 
-  const openDemoPortal = async () => {
-    // Find first owner with a property to use as demo
-    const ownerWithProperty = owners.find(o => o.properties.length > 0);
-    if (!ownerWithProperty) {
-      toast.error("No owners with properties available for demo");
-      return;
-    }
-    
-    const property = ownerWithProperty.properties[0];
-    setOpeningDemo(true);
-    
-    try {
-      const token = crypto.randomUUID();
-      const { error } = await supabase
-        .from("owner_portal_sessions")
-        .insert({
-          owner_id: ownerWithProperty.id,
-          email: ownerWithProperty.email,
-          token: token,
-          expires_at: new Date(Date.now() + 100 * 365 * 24 * 60 * 60 * 1000).toISOString(),
-          is_admin_preview: true,
-          property_id: property.id,
-          property_name: property.name,
-        });
-
-      if (error) {
-        console.error("Error creating demo session:", error);
-        toast.error("Failed to create demo session");
-        return;
-      }
-      
-      window.open(`/owner?token=${token}`, "_blank");
-      toast.success(`Opening demo portal for ${property.name}`);
-    } catch (error) {
-      console.error("Error opening demo portal:", error);
-      toast.error("Failed to open demo portal");
-    } finally {
-      setOpeningDemo(false);
-    }
+  const openDemoPortal = () => {
+    // Use the dedicated Sara Thompson demo portal with pre-configured token
+    window.open('/owner?token=demo-portal-token-3069-rita-way', '_blank');
+    toast.success('Opening Sara Thompson demo portal');
   };
 
   const filteredOwners = owners.filter(
@@ -420,19 +384,12 @@ export function OwnerPortalAdmin() {
           </Button>
           <Button 
             variant="outline" 
-            className="gap-2 bg-gradient-to-r from-red-100 to-red-200 border-red-400 hover:border-red-500 text-red-700 font-semibold"
+            className="gap-2 bg-gradient-to-r from-amber-100 to-orange-100 border-amber-400 hover:border-amber-500 text-amber-700 font-semibold"
             onClick={openDemoPortal}
-            disabled={openingDemo || owners.every(o => o.properties.length === 0)}
           >
-            {openingDemo ? (
-              <RefreshCw className="h-4 w-4 animate-spin" />
-            ) : (
-              <>
-                <Sparkles className="h-4 w-4" />
-                <Play className="h-3 w-3" />
-              </>
-            )}
-            DEMO PORTAL
+            <Sparkles className="h-4 w-4" />
+            <Play className="h-3 w-3" />
+            DEMO PORTAL (Sara Thompson)
           </Button>
           <Button variant="outline" onClick={loadOwners}>
             <RefreshCw className="h-4 w-4 mr-2" />
