@@ -99,7 +99,17 @@ const INSPECTION_TYPES = [
 ];
 
 const SMART_LOCK_URL = "https://www.amazon.com/Yale-Security-Connected-Back-Up-YRD410-WF1-BSP/dp/B0B9HWYMV5";
-const CHECKLIST_URL = "/documents/MTR_Start_Up_Checklist.pdf";
+const CHECKLIST_PATH = "/documents/MTR_Start_Up_Checklist.pdf";
+
+// Helper function to download PDF
+const downloadChecklist = () => {
+  const link = document.createElement('a');
+  link.href = CHECKLIST_PATH;
+  link.target = '_blank';
+  link.rel = 'noopener noreferrer';
+  link.download = 'MTR_Start_Up_Checklist.pdf';
+  link.click();
+};
 
 // Email and phone validation
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -290,11 +300,13 @@ export default function BookInspection() {
             </div>
 
             <div className="flex flex-col gap-3">
-              <Button variant="outline" asChild className="w-full">
-                <a href={CHECKLIST_URL} download target="_blank" rel="noopener noreferrer">
-                  <Download className="h-4 w-4 mr-2" />
-                  Download Inventory Checklist
-                </a>
+              <Button 
+                variant="outline" 
+                className="w-full"
+                onClick={downloadChecklist}
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Download Inventory Checklist
               </Button>
               <p className="text-xs text-muted-foreground">
                 A confirmation email has been sent to {formData.email}
@@ -382,11 +394,14 @@ export default function BookInspection() {
                 </div>
 
                 <div className="mt-4 pt-4 border-t border-amber-200 flex flex-wrap gap-3">
-                  <Button variant="outline" size="sm" asChild className="bg-white">
-                    <a href={CHECKLIST_URL} download target="_blank" rel="noopener noreferrer">
-                      <Download className="h-4 w-4 mr-2" />
-                      Download Inventory Checklist
-                    </a>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="bg-white"
+                    onClick={downloadChecklist}
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    Download Inventory Checklist
                   </Button>
                 </div>
               </CardContent>
