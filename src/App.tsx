@@ -44,6 +44,7 @@ const AuditPortal = lazy(() => import("./pages/AuditPortal"));
 const OwnerDashboard = lazy(() => import("./pages/owner/OwnerDashboard"));
 const OwnerPortalManagement = lazy(() => import("./pages/OwnerPortalManagement"));
 const SignDocument = lazy(() => import("./pages/SignDocument"));
+const BookInspection = lazy(() => import("./pages/BookInspection"));
 
 // Optimized QueryClient with caching and stale time
 const queryClient = new QueryClient({
@@ -101,7 +102,7 @@ const App = () => (
             {/* Public job application page */}
             <Route path="/careers/property-inspector" element={<JobApplication />} />
             <Route path="/book-discovery-call" element={<BookDiscoveryCall />} />
-            <Route path="/book-inspection" element={<Suspense fallback={<PageLoader />}>{(() => { const BookInspection = lazy(() => import("./pages/BookInspection")); return <BookInspection />; })()}</Suspense>} />
+            <Route path="/book-inspection" element={<BookInspection />} />
             <Route path="/payment-setup" element={<PaymentSetup />} />
             <Route path="/payment-success" element={<PaymentSetup />} />
             <Route path="/owner-payment-setup" element={<OwnerPaymentSetup />} />
