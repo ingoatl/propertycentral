@@ -205,6 +205,7 @@ export function InboxView() {
     phone?: string | null;
   } | null>(null);
   const [showCallDialog, setShowCallDialog] = useState(false);
+  const [voiceAICallerPhone, setVoiceAICallerPhone] = useState<string | null>(null);
   const [showFollowUpModal, setShowFollowUpModal] = useState(false);
   // Income report now opens directly in new tab via IncomeReportButton
   const [lastSentMessage, setLastSentMessage] = useState<string>("");
@@ -707,7 +708,14 @@ export function InboxView() {
             let contactType: CommunicationItem["contact_type"] = "external";
             let contactId = comm.id;
 
-            if (comm.lead_id && lead) {
+            // Check for Voice AI transcript FIRST - before other matching logic
+            if (isVoiceAITranscript(comm.body)) {
+              const callerPhone = extractCallerPhoneFromTranscript(comm.body);
+              const agentName = extractAgentNameFromTranscript(comm.body) || "GHL Voice Agent";
+              contactName = agentName;
+              contactPhone = callerPhone || metadata?.unmatched_phone || metadata?.ghl_data?.contactPhone;
+              contactType = "external";
+            } else if (comm.lead_id && lead) {
               // Has a linked lead
               contactName = lead.name;
               contactPhone = lead.phone || undefined;
@@ -739,20 +747,10 @@ export function InboxView() {
                 // Use GHL data for name and email - prioritize actual name over phone
                 const ghlName = metadata.ghl_data?.contactName;
                 const ghlEmail = metadata.ghl_data?.contactEmail;
-                
-                // Check if this is a Voice AI transcript and extract caller info
-                if (isVoiceAITranscript(comm.body)) {
-                  const callerPhone = extractCallerPhoneFromTranscript(comm.body);
-                  const agentName = extractAgentNameFromTranscript(comm.body) || "Voice AI";
-                  contactName = agentName + " Call";
-                  contactPhone = callerPhone || phone;
-                  contactType = "external";
-                } else {
-                  contactName = (ghlName && ghlName !== "Contact") ? ghlName : (metadata.contact_name || "Unknown");
-                  contactPhone = phone;
-                  contactEmail = ghlEmail || undefined;
-                  contactType = "external";
-                }
+                contactName = (ghlName && ghlName !== "Contact") ? ghlName : (metadata.contact_name || "Unknown");
+                contactPhone = phone;
+                contactEmail = ghlEmail || undefined;
+                contactType = "external";
               }
             }
             
@@ -2202,7 +2200,13 @@ export function InboxView() {
                     variant="outline" 
                     size="sm" 
                     className="h-9 gap-1.5 text-green-600 hover:text-green-700 hover:bg-green-50 border-green-200"
-                    onClick={() => setShowCallDialog(true)}
+                    onClick={() => {
+                      const callerPhone = extractCallerPhoneFromTranscript(selectedMessage.body);
+                      if (callerPhone) {
+                        setVoiceAICallerPhone(callerPhone);
+                        setShowCallDialog(true);
+                      }
+                    }}
                   >
                     <PhoneOutgoing className="h-4 w-4" />
                     Call Back
@@ -2415,6 +2419,7 @@ export function InboxView() {
                                           onCallBack={() => {
                                             const callerPhone = extractCallerPhoneFromTranscript(msg.body);
                                             if (callerPhone) {
+                                              setVoiceAICallerPhone(callerPhone);
                                               setShowCallDialog(true);
                                             }
                                           }}
@@ -2604,13 +2609,17 @@ export function InboxView() {
       )}
       
       {/* Twilio Call Dialog */}
-      {selectedMessage?.contact_phone && (
+      {/* Twilio Call Dialog - use voiceAICallerPhone for Voice AI transcripts, otherwise contact_phone */}
+      {(selectedMessage?.contact_phone || voiceAICallerPhone) && (
         <TwilioCallDialog
           isOpen={showCallDialog}
-          onOpenChange={setShowCallDialog}
-          phoneNumber={selectedMessage.contact_phone}
-          contactName={selectedMessage.contact_name}
-          metadata={selectedMessage.contact_type === "lead" ? { leadId: selectedMessage.contact_id } : undefined}
+          onOpenChange={(open) => {
+            setShowCallDialog(open);
+            if (!open) setVoiceAICallerPhone(null);
+          }}
+          phoneNumber={voiceAICallerPhone || selectedMessage?.contact_phone || ""}
+          contactName={voiceAICallerPhone ? `Caller ${voiceAICallerPhone}` : selectedMessage?.contact_name || "Unknown"}
+          metadata={selectedMessage?.contact_type === "lead" ? { leadId: selectedMessage.contact_id } : undefined}
         />
       )}
 
