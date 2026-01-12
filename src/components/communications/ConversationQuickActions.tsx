@@ -8,10 +8,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 interface ConversationQuickActionsProps {
-  status?: "open" | "snoozed" | "done" | "archived";
+  status?: "open" | "snoozed" | "done" | "archived" | "awaiting";
   onMarkDone: () => void;
   onSnooze: (hours: number) => void;
   onReopen: () => void;
+  onMarkAwaiting?: () => void;
   isUpdating?: boolean;
   compact?: boolean;
 }

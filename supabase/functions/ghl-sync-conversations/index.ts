@@ -403,6 +403,35 @@ serve(async (req) => {
               console.error("Analysis error:", e);
             }
           }
+          
+          // Save Voice AI transcripts to lead timeline for context
+          const isVoiceAITranscript = messageBody.includes("Your AI Employee has handled another call") ||
+                                       messageBody.includes("AI Agent Name:") ||
+                                       messageBody.includes("Call Transcript:");
+          
+          if (isVoiceAITranscript && matchedLeadId) {
+            try {
+              // Extract call summary from transcript
+              const summaryMatch = messageBody.match(/Call Summary:\s*([\s\S]*?)(?:Call Transcript:|$)/);
+              const callSummary = summaryMatch ? summaryMatch[1].trim().slice(0, 500) : "Voice AI call handled";
+              
+              await supabase.from("lead_timeline").insert({
+                lead_id: matchedLeadId,
+                action: "Voice AI call transcript received",
+                performed_by: null,
+                metadata: {
+                  communication_id: inserted.id,
+                  call_summary: callSummary,
+                  caller_phone: contactPhone,
+                  transcript_preview: messageBody.slice(0, 1000),
+                  source: "ghl_voice_ai"
+                }
+              });
+              console.log(`✓ Saved Voice AI transcript to timeline for lead ${matchedLeadId}`);
+            } catch (timelineError) {
+              console.error("Failed to save to timeline:", timelineError);
+            }
+          }
         }
       }
     }
