@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
-import { Building2, CreditCard, DollarSign, ExternalLink, Plus, Trash2, Wallet, Edit, Phone, Mail, Send, Loader2, MoreVertical, MessageSquare } from "lucide-react";
+import { Building2, CreditCard, DollarSign, ExternalLink, Plus, Trash2, Wallet, Edit, Phone, Mail, Send, Loader2, MoreVertical, MessageSquare, Eye } from "lucide-react";
 import { z } from "zod";
 import { AddPaymentMethod } from "@/components/AddPaymentMethod";
 import { SendOwnerPaymentRequestButton } from "@/components/owners/SendOwnerPaymentRequestButton";
@@ -593,6 +593,16 @@ const PropertyOwners = () => {
                         <Button
                           variant="outline"
                           size="sm"
+                          onClick={() => window.open(`/owner?owner=${owner.id}`, '_blank')}
+                          title="View owner portal"
+                          className="gap-2"
+                        >
+                          <Eye className="w-4 h-4" />
+                          View Portal
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
                           onClick={() => setSelectedOwnerForComms(owner)}
                           title="View all communications"
                           className="gap-2"
@@ -637,6 +647,10 @@ const PropertyOwners = () => {
                             >
                               <Send className="w-4 h-4 mr-2" />
                               Send Portal Invite
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => window.open(`/owner?owner=${owner.id}`, '_blank')}>
+                              <Eye className="w-4 h-4 mr-2" />
+                              View Portal
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => setSelectedOwnerForComms(owner)}>
                               <MessageSquare className="w-4 h-4 mr-2" />
