@@ -1,5 +1,5 @@
-import { useState, useMemo, useEffect } from "react";
-import { Calendar, Clock, Send, X, Loader2, Check, Phone, Video, ChevronDown, ChevronUp, Mail, Trash2 } from "lucide-react";
+import { useState, useMemo, useEffect, useRef } from "react";
+import { Calendar as CalendarIcon, Clock, Send, X, Loader2, Check, Phone, Video, ChevronDown, ChevronUp, Mail, Trash2, MapPin, Home, Building } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -7,9 +7,14 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { format, addDays, setHours, setMinutes, isBefore, isAfter, startOfDay, parseISO } from "date-fns";
+import { format, addDays, setHours, setMinutes, isBefore, isAfter, startOfDay, parseISO, isWeekend, addMonths } from "date-fns";
+import { cn } from "@/lib/utils";
+import { useQuery } from "@tanstack/react-query";
 
 // Helper to extract email addresses from text
 function extractEmailFromText(text: string): string | null {
@@ -60,7 +65,13 @@ interface TimeSlot {
   available: boolean;
 }
 
-type MeetingType = "phone" | "video";
+type MeetingType = "phone" | "video" | "onsite";
+
+interface Property {
+  id: string;
+  name: string;
+  address: string;
+}
 
 export function SmartSchedulingCard({
   detectedIntent,
@@ -80,6 +91,14 @@ export function SmartSchedulingCard({
   const [isSendingInvite, setIsSendingInvite] = useState(false);
   const [isSendingTest, setIsSendingTest] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
+  const [calendarOpen, setCalendarOpen] = useState(false);
+  
+  // On-site meeting state
+  const [selectedPropertyId, setSelectedPropertyId] = useState<string>("");
+  const [customAddress, setCustomAddress] = useState("");
+  const [addressSuggestions, setAddressSuggestions] = useState<google.maps.places.AutocompletePrediction[]>([]);
+  const [showAddressSuggestions, setShowAddressSuggestions] = useState(false);
+  const autocompleteService = useRef<google.maps.places.AutocompleteService | null>(null);
   
   // First name input for calendar invite - extract from contactName if available
   const extractedFirstName = contactName?.split(" ")[0] || "";
@@ -91,6 +110,66 @@ export function SmartSchedulingCard({
   
   // Track if we've attempted to extract from conversations
   const [hasExtractedFromConversations, setHasExtractedFromConversations] = useState(false);
+
+  // Fetch managed properties for on-site meetings
+  const { data: properties = [] } = useQuery({
+    queryKey: ["managed-properties-scheduling"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("properties")
+        .select("id, name, address")
+        .is("offboarded_at", null)
+        .order("name");
+      if (error) throw error;
+      return (data || []) as Property[];
+    },
+    staleTime: 60000,
+  });
+
+  // Initialize Google Places Autocomplete
+  useEffect(() => {
+    if (typeof google !== "undefined" && google.maps?.places) {
+      autocompleteService.current = new google.maps.places.AutocompleteService();
+    }
+  }, []);
+
+  // Handle address input for Google autocomplete
+  const handleAddressChange = async (value: string) => {
+    setCustomAddress(value);
+    if (value.length > 3 && autocompleteService.current) {
+      try {
+        const result = await autocompleteService.current.getPlacePredictions({
+          input: value,
+          componentRestrictions: { country: "us" },
+          types: ["address"],
+        });
+        setAddressSuggestions(result?.predictions || []);
+        setShowAddressSuggestions(true);
+      } catch (error) {
+        console.error("Autocomplete error:", error);
+        setAddressSuggestions([]);
+      }
+    } else {
+      setAddressSuggestions([]);
+      setShowAddressSuggestions(false);
+    }
+  };
+
+  const handleSelectAddress = (prediction: google.maps.places.AutocompletePrediction) => {
+    setCustomAddress(prediction.description);
+    setShowAddressSuggestions(false);
+    setAddressSuggestions([]);
+  };
+
+  // Get meeting location for on-site meetings
+  const getMeetingLocation = (): string => {
+    if (meetingType !== "onsite") return "";
+    if (selectedPropertyId) {
+      const prop = properties.find(p => p.id === selectedPropertyId);
+      return prop?.address || prop?.name || "";
+    }
+    return customAddress;
+  };
 
   // Auto-extract email and name from conversation history + GHL metadata
   useEffect(() => {
@@ -354,17 +433,34 @@ export function SmartSchedulingCard({
         // Use inviteEmail (user input) for calendar invite, required for sending invite
         const attendeeEmailToUse = inviteEmail?.trim() || contactEmail;
         
+        // Build meeting type specific content
+        const meetingLocation = getMeetingLocation();
+        const meetingTypeLabel = meetingType === "video" ? "Video" : meetingType === "phone" ? "Phone" : "On-site";
+        
+        let description = `${meetingTypeLabel} meeting with ${displayName}`;
+        description += contactPhone ? `\nPhone: ${contactPhone}` : "";
+        description += attendeeEmailToUse ? `\nEmail: ${attendeeEmailToUse}` : "";
+        
+        if (meetingType === "video") {
+          description += `\n\n📹 Google Meet: ${GOOGLE_MEET_LINK}`;
+        } else if (meetingType === "onsite" && meetingLocation) {
+          description += `\n\n📍 Location: ${meetingLocation}`;
+        }
+        
+        description += "\n\n⚠️ Please confirm this calendar event by clicking \"Yes\" in the invitation email you received.\n\nScheduled via PeachHaus CRM";
+        
         const { data: calResult, error: calError } = await supabase.functions.invoke("google-calendar-sync", {
           body: {
             action: "create-event-direct",
             userId: currentUserId,
-            summary: `${meetingType === "video" ? "Video" : "Phone"} Call with ${displayName}`,
-            description: `${meetingType === "video" ? "Video" : "Phone"} call with ${displayName}${contactPhone ? `\nPhone: ${contactPhone}` : ""}${attendeeEmailToUse ? `\nEmail: ${attendeeEmailToUse}` : ""}${meetingType === "video" ? `\n\n📹 Google Meet: ${GOOGLE_MEET_LINK}` : ""}\n\n⚠️ Please confirm this calendar event by clicking "Yes" in the invitation email you received.\n\nScheduled via PeachHaus CRM`,
+            summary: `${meetingTypeLabel} ${meetingType === "onsite" ? "Meeting" : "Call"} with ${displayName}`,
+            description,
             startTime: scheduledAt.toISOString(),
             endTime: endTime.toISOString(),
             attendeeEmail: attendeeEmailToUse || undefined,
-            addConferenceData: false, // Use fixed meet link instead
+            addConferenceData: false,
             meetLink: meetingType === "video" ? GOOGLE_MEET_LINK : undefined,
+            location: meetingType === "onsite" ? meetingLocation : undefined,
           },
         });
         
@@ -385,10 +481,15 @@ export function SmartSchedulingCard({
           const formattedDate = format(scheduledAt, "EEEE, MMM d");
           const formattedTime = format(scheduledAt, "h:mm a");
           
-          let message = `Hi ${displayName}! I've scheduled our ${meetingType === "video" ? "video" : "phone"} call for ${formattedDate} at ${formattedTime} EST.`;
+          const meetingLocation = getMeetingLocation();
+          const meetingTypeLabel = meetingType === "video" ? "video" : meetingType === "phone" ? "phone" : "on-site";
+          
+          let message = `Hi ${displayName}! I've scheduled our ${meetingTypeLabel} meeting for ${formattedDate} at ${formattedTime} EST.`;
           
           if (meetingType === "video") {
             message += ` Join here: ${GOOGLE_MEET_LINK}`;
+          } else if (meetingType === "onsite" && meetingLocation) {
+            message += ` We'll meet at: ${meetingLocation}`;
           } else {
             message += " I'll call you at this number.";
           }
@@ -407,7 +508,7 @@ export function SmartSchedulingCard({
         }
       }
 
-      toast.success("Call scheduled successfully! Email confirmation sent.");
+      toast.success("Meeting scheduled successfully! Email confirmation sent.");
       onScheduled?.();
       onDismiss();
     } catch (error: any) {
@@ -491,6 +592,21 @@ export function SmartSchedulingCard({
 
       // Use inviteEmail for both email and calendar invite
       const attendeeEmailToUse = inviteEmail.trim();
+      const meetingLocation = getMeetingLocation();
+      const meetingTypeLabel = meetingType === "video" ? "Video" : meetingType === "phone" ? "Phone" : "On-site";
+      
+      // Build email body with location for on-site
+      let emailBody = `Hi ${displayName}!\n\nYour ${meetingTypeLabel.toLowerCase()} meeting has been scheduled.\n\n📅 Date: ${formattedDate}\n🕐 Time: ${formattedTime} EST\n`;
+      
+      if (meetingType === "video") {
+        emailBody += `📹 Google Meet Link: ${GOOGLE_MEET_LINK}`;
+      } else if (meetingType === "onsite" && meetingLocation) {
+        emailBody += `📍 Location: ${meetingLocation}`;
+      } else {
+        emailBody += "📞 We will call you at the number you provided.";
+      }
+      
+      emailBody += "\n\n⚠️ IMPORTANT: You will receive a separate Google Calendar invitation. Please click \"Yes\" to confirm your attendance.\n\nLooking forward to meeting with you!\n\n- " + userName + " @ PeachHaus Group";
       
       // Send branded email via send-test-template-email
       const { error: emailError } = await supabase.functions.invoke("send-test-template-email", {
@@ -498,22 +614,8 @@ export function SmartSchedulingCard({
           templateId: null,
           testEmail: attendeeEmailToUse,
           customEmail: {
-            subject: `${meetingType === "video" ? "Video" : "Phone"} Call Scheduled with ${displayName}`,
-            body: `
-Hi ${displayName}!
-
-Your ${meetingType === "video" ? "video" : "phone"} call has been scheduled.
-
-📅 Date: ${formattedDate}
-🕐 Time: ${formattedTime} EST
-${meetingType === "video" ? `📹 Google Meet Link: ${GOOGLE_MEET_LINK}` : "📞 We will call you at the number you provided."}
-
-⚠️ IMPORTANT: You will receive a separate Google Calendar invitation. Please click "Yes" to confirm your attendance.
-
-Looking forward to speaking with you!
-
-- ${userName} @ PeachHaus Group
-            `.trim()
+            subject: `${meetingTypeLabel} ${meetingType === "onsite" ? "Meeting" : "Call"} Scheduled with ${displayName}`,
+            body: emailBody
           }
         },
       });
@@ -522,18 +624,30 @@ Looking forward to speaking with you!
         console.error("Email send error:", emailError);
       }
 
+      // Build description for calendar event
+      let calDescription = `${meetingTypeLabel} meeting with ${displayName}\nPhone: ${contactPhone || "N/A"}\nEmail: ${attendeeEmailToUse}`;
+      
+      if (meetingType === "video") {
+        calDescription += `\n\n📹 Google Meet: ${GOOGLE_MEET_LINK}`;
+      } else if (meetingType === "onsite" && meetingLocation) {
+        calDescription += `\n\n📍 Location: ${meetingLocation}`;
+      }
+      
+      calDescription += "\n\n⚠️ Please confirm this calendar event by clicking \"Yes\" in the invitation.\n\nScheduled via PeachHaus CRM";
+
       // Create Google Calendar event with invite using the email user entered
       const { data: calResult, error: calError } = await supabase.functions.invoke("google-calendar-sync", {
         body: {
           action: "create-event-direct",
           userId: currentUserId,
-          summary: `${meetingType === "video" ? "Video" : "Phone"} Call with ${displayName}`,
-          description: `${meetingType === "video" ? "Video" : "Phone"} call with ${displayName}\nPhone: ${contactPhone || "N/A"}\nEmail: ${attendeeEmailToUse}${meetingType === "video" ? `\n\n📹 Google Meet: ${GOOGLE_MEET_LINK}` : ""}\n\n⚠️ Please confirm this calendar event by clicking "Yes" in the invitation.\n\nScheduled via PeachHaus CRM`,
+          summary: `${meetingTypeLabel} ${meetingType === "onsite" ? "Meeting" : "Call"} with ${displayName}`,
+          description: calDescription,
           startTime: scheduledAt.toISOString(),
           endTime: endTime.toISOString(),
           attendeeEmail: attendeeEmailToUse,
           addConferenceData: false,
           meetLink: meetingType === "video" ? GOOGLE_MEET_LINK : undefined,
+          location: meetingType === "onsite" ? meetingLocation : undefined,
         },
       });
       
@@ -548,10 +662,12 @@ Looking forward to speaking with you!
           const smsFormattedDate = format(scheduledAt, "EEEE, MMM d");
           const smsFormattedTime = format(scheduledAt, "h:mm a");
           
-          let message = `Hi ${displayName}! I've scheduled our ${meetingType === "video" ? "video" : "phone"} call for ${smsFormattedDate} at ${smsFormattedTime} EST.`;
+          let message = `Hi ${displayName}! I've scheduled our ${meetingTypeLabel.toLowerCase()} meeting for ${smsFormattedDate} at ${smsFormattedTime} EST.`;
           
           if (meetingType === "video") {
             message += ` Join here: ${GOOGLE_MEET_LINK}`;
+          } else if (meetingType === "onsite" && meetingLocation) {
+            message += ` We'll meet at: ${meetingLocation}`;
           } else {
             message += " I'll call you at this number.";
           }
@@ -703,9 +819,9 @@ Looking forward to our conversation!
           <div className="flex items-center justify-between">
             <CollapsibleTrigger asChild>
               <Button variant="ghost" className="flex items-center gap-2 p-0 h-auto hover:bg-transparent">
-                <Calendar className="h-4 w-4 text-primary" />
+                <CalendarIcon className="h-4 w-4 text-primary" />
                 <CardTitle className="text-sm font-medium">
-                  Schedule a Call
+                  Schedule a Meeting
                 </CardTitle>
                 {isOpen ? (
                   <ChevronUp className="h-4 w-4 text-muted-foreground" />
@@ -780,8 +896,15 @@ Looking forward to our conversation!
               <p className="text-xs text-muted-foreground mb-2">Meeting type:</p>
               <RadioGroup 
                 value={meetingType} 
-                onValueChange={(v) => setMeetingType(v as MeetingType)}
-                className="flex gap-3"
+                onValueChange={(v) => {
+                  setMeetingType(v as MeetingType);
+                  // Reset property selection when switching away from on-site
+                  if (v !== "onsite") {
+                    setSelectedPropertyId("");
+                    setCustomAddress("");
+                  }
+                }}
+                className="flex flex-wrap gap-3"
               >
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="video" id="video" />
@@ -797,14 +920,87 @@ Looking forward to our conversation!
                     Phone Call
                   </Label>
                 </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="onsite" id="onsite" />
+                  <Label htmlFor="onsite" className="flex items-center gap-1.5 text-xs cursor-pointer">
+                    <MapPin className="h-3.5 w-3.5" />
+                    On-site
+                  </Label>
+                </div>
               </RadioGroup>
             </div>
 
-            {/* Date Selection */}
+            {/* On-site Meeting Location */}
+            {meetingType === "onsite" && (
+              <div className="space-y-2">
+                <p className="text-xs text-muted-foreground">Meeting location:</p>
+                
+                {/* Property Selection */}
+                <Select value={selectedPropertyId} onValueChange={(v) => {
+                  setSelectedPropertyId(v);
+                  setCustomAddress("");
+                }}>
+                  <SelectTrigger className="h-8 text-sm">
+                    <SelectValue placeholder="Select a managed property..." />
+                  </SelectTrigger>
+                  <SelectContent className="bg-background border shadow-lg z-50">
+                    <SelectItem value="custom">
+                      <span className="flex items-center gap-2">
+                        <MapPin className="h-3.5 w-3.5" />
+                        Enter custom address
+                      </span>
+                    </SelectItem>
+                    {properties.map((prop) => (
+                      <SelectItem key={prop.id} value={prop.id}>
+                        <span className="flex items-center gap-2">
+                          <Home className="h-3.5 w-3.5" />
+                          {prop.name}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                
+                {/* Show address for selected property */}
+                {selectedPropertyId && selectedPropertyId !== "custom" && (
+                  <p className="text-xs text-muted-foreground pl-2">
+                    📍 {properties.find(p => p.id === selectedPropertyId)?.address}
+                  </p>
+                )}
+                
+                {/* Custom Address with Google Autocomplete */}
+                {selectedPropertyId === "custom" && (
+                  <div className="relative">
+                    <Input
+                      value={customAddress}
+                      onChange={(e) => handleAddressChange(e.target.value)}
+                      placeholder="Enter street address..."
+                      className="h-8 text-sm"
+                    />
+                    {showAddressSuggestions && addressSuggestions.length > 0 && (
+                      <div className="absolute z-50 w-full mt-1 bg-background border rounded-md shadow-lg max-h-48 overflow-y-auto">
+                        {addressSuggestions.map((suggestion) => (
+                          <button
+                            key={suggestion.place_id}
+                            className="w-full text-left px-3 py-2 text-sm hover:bg-muted transition-colors"
+                            onClick={() => handleSelectAddress(suggestion)}
+                          >
+                            {suggestion.description}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Date Selection - Calendar Picker + Quick Buttons */}
             <div>
               <p className="text-xs text-muted-foreground mb-2">Select a date:</p>
-              <div className="flex flex-wrap gap-1.5">
-                {availableDates.map((date) => (
+              <div className="flex flex-wrap gap-1.5 items-center">
+                {/* Quick date buttons */}
+                {availableDates.slice(0, 3).map((date) => (
                   <Button
                     key={date.toISOString()}
                     variant={selectedDate?.toDateString() === date.toDateString() ? "default" : "outline"}
@@ -818,6 +1014,43 @@ Looking forward to our conversation!
                     {format(date, "EEE, MMM d")}
                   </Button>
                 ))}
+                
+                {/* Calendar Picker */}
+                <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant={selectedDate && !availableDates.slice(0, 3).some(d => d.toDateString() === selectedDate.toDateString()) ? "default" : "outline"}
+                      size="sm"
+                      className="text-xs h-7 px-2 gap-1"
+                    >
+                      <CalendarIcon className="h-3 w-3" />
+                      {selectedDate && !availableDates.slice(0, 3).some(d => d.toDateString() === selectedDate.toDateString()) 
+                        ? format(selectedDate, "MMM d")
+                        : "Pick date"
+                      }
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0 bg-background border shadow-lg z-50" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={selectedDate || undefined}
+                      onSelect={(date) => {
+                        if (date) {
+                          setSelectedDate(date);
+                          setSelectedTime(null);
+                          setCalendarOpen(false);
+                        }
+                      }}
+                      disabled={(date) => 
+                        isBefore(date, startOfDay(new Date())) || 
+                        isWeekend(date) ||
+                        isAfter(date, addMonths(new Date(), 2))
+                      }
+                      initialFocus
+                      className={cn("p-3 pointer-events-auto")}
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
             </div>
 
@@ -826,7 +1059,7 @@ Looking forward to our conversation!
               <div>
                 <p className="text-xs text-muted-foreground mb-2">Select a time:</p>
                 <div className="flex flex-wrap gap-1">
-                  {timeSlots.filter(s => s.available).slice(0, 8).map((slot) => (
+                  {timeSlots.filter(s => s.available).slice(0, 10).map((slot) => (
                     <Button
                       key={slot.time}
                       variant={selectedTime === slot.time ? "default" : "outline"}
