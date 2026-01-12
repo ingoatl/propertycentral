@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Calendar, Clock, Plus, Trash2, Ban, ExternalLink, Copy, Check, Link2, CheckCircle2, XCircle, Loader2 } from "lucide-react";
+import { Calendar, Clock, Plus, Trash2, Ban, ExternalLink, Copy, Check, Link2, CheckCircle2, XCircle, Loader2, RefreshCw, Users, Phone, Mail, MapPin, Building } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -23,6 +23,11 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -44,6 +49,36 @@ const TIME_OPTIONS = Array.from({ length: 24 }, (_, i) => ({
   label: format(new Date().setHours(i, 0), "h:mm a"),
 }));
 
+interface GhlAppointment {
+  ghl_event_id: string;
+  ghl_calendar_id: string;
+  calendar_name: string;
+  title: string;
+  status: string;
+  scheduled_at: string;
+  end_time: string;
+  notes: string | null;
+  location: string | null;
+  contact_id: string;
+  contact_name: string | null;
+  contact_email: string | null;
+  contact_phone: string | null;
+  contact_address: string | null;
+  contact_city: string | null;
+  contact_state: string | null;
+  contact_source: string | null;
+  contact_tags: string[];
+  lead_id: string | null;
+  lead_name: string | null;
+  lead_email: string | null;
+  lead_phone: string | null;
+  lead_property_address: string | null;
+  lead_property_type: string | null;
+  lead_stage: string | null;
+  lead_source: string | null;
+  lead_notes: string | null;
+}
+
 export function CalendarAdminPanel() {
   const [newSlotDay, setNewSlotDay] = useState<number>(1);
   const [newSlotStart, setNewSlotStart] = useState("09:00");
@@ -52,6 +87,7 @@ export function CalendarAdminPanel() {
   const [blockReason, setBlockReason] = useState("");
   const [copied, setCopied] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
+  const [expandedAppointment, setExpandedAppointment] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
   // Use the production domain for embed links
@@ -95,6 +131,22 @@ export function CalendarAdminPanel() {
         .limit(10);
       return data || [];
     },
+  });
+
+  // Fetch GHL Calendar Appointments
+  const { data: ghlAppointments = [], isLoading: ghlLoading, refetch: refetchGhlAppointments } = useQuery({
+    queryKey: ["ghl-calendar-appointments"],
+    queryFn: async () => {
+      const response = await supabase.functions.invoke("ghl-sync-calendar", {
+        body: {},
+      });
+      if (response.error) {
+        console.error("GHL Calendar error:", response.error);
+        return [];
+      }
+      return (response.data?.appointments || []) as GhlAppointment[];
+    },
+    refetchInterval: 5 * 60 * 1000, // Refetch every 5 minutes
   });
 
   // Check Google Calendar connection status - verify it actually works
@@ -334,14 +386,163 @@ export function CalendarAdminPanel() {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <Tabs defaultValue="availability">
-          <TabsList className="grid w-full grid-cols-5">
+        <Tabs defaultValue="ghl-appointments">
+          <TabsList className="grid w-full grid-cols-6">
+            <TabsTrigger value="ghl-appointments">GHL Appointments</TabsTrigger>
             <TabsTrigger value="availability">Availability</TabsTrigger>
             <TabsTrigger value="blocked">Blocked Days</TabsTrigger>
             <TabsTrigger value="upcoming">Upcoming</TabsTrigger>
             <TabsTrigger value="google">Google Calendar</TabsTrigger>
             <TabsTrigger value="embed">Embed</TabsTrigger>
           </TabsList>
+
+          {/* GHL Appointments Tab */}
+          <TabsContent value="ghl-appointments" className="mt-4">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="font-semibold">GoHighLevel Calendar Appointments</h3>
+                <p className="text-sm text-muted-foreground">
+                  Synced from your GHL calendars with full lead details
+                </p>
+              </div>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => refetchGhlAppointments()}
+                disabled={ghlLoading}
+              >
+                <RefreshCw className={cn("h-4 w-4 mr-2", ghlLoading && "animate-spin")} />
+                Sync Now
+              </Button>
+            </div>
+            
+            <ScrollArea className="h-[500px]">
+              {ghlLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : ghlAppointments.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-8 text-center">
+                  No appointments found in GHL calendars
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {ghlAppointments.map((apt) => (
+                    <Collapsible 
+                      key={apt.ghl_event_id}
+                      open={expandedAppointment === apt.ghl_event_id}
+                      onOpenChange={(open) => setExpandedAppointment(open ? apt.ghl_event_id : null)}
+                    >
+                      <div className="border rounded-lg overflow-hidden">
+                        <CollapsibleTrigger className="w-full p-4 hover:bg-muted/50 transition-colors">
+                          <div className="flex justify-between items-start gap-4 text-left">
+                            <div className="flex-1">
+                              <p className="font-semibold text-lg">
+                                {apt.contact_name || apt.lead_name || "Unknown Contact"}
+                              </p>
+                              <p className="text-sm text-muted-foreground">
+                                {apt.title} • {apt.calendar_name}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Badge variant={apt.status === "confirmed" ? "default" : "secondary"}>
+                                {apt.status}
+                              </Badge>
+                              {apt.lead_id && (
+                                <Badge className="bg-green-100 text-green-800">
+                                  <Users className="h-3 w-3 mr-1" />
+                                  Matched
+                                </Badge>
+                              )}
+                              <div className="text-right">
+                                <p className="text-sm font-medium">
+                                  {format(new Date(apt.scheduled_at), "MMM d, h:mm a")}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        </CollapsibleTrigger>
+                        
+                        <CollapsibleContent>
+                          <div className="px-4 pb-4 pt-2 border-t bg-muted/30">
+                            <div className="grid md:grid-cols-2 gap-4">
+                              {/* Contact Details */}
+                              <div className="space-y-2">
+                                <h4 className="font-medium text-sm flex items-center gap-1">
+                                  <Users className="h-4 w-4" /> Contact Details
+                                </h4>
+                                {apt.contact_phone && (
+                                  <p className="text-sm flex items-center gap-2">
+                                    <Phone className="h-3 w-3 text-muted-foreground" />
+                                    {apt.contact_phone}
+                                  </p>
+                                )}
+                                {apt.contact_email && (
+                                  <p className="text-sm flex items-center gap-2">
+                                    <Mail className="h-3 w-3 text-muted-foreground" />
+                                    {apt.contact_email}
+                                  </p>
+                                )}
+                                {(apt.contact_address || apt.contact_city) && (
+                                  <p className="text-sm flex items-center gap-2">
+                                    <MapPin className="h-3 w-3 text-muted-foreground" />
+                                    {[apt.contact_address, apt.contact_city, apt.contact_state].filter(Boolean).join(", ")}
+                                  </p>
+                                )}
+                                {apt.contact_source && (
+                                  <p className="text-sm text-muted-foreground">
+                                    Source: {apt.contact_source}
+                                  </p>
+                                )}
+                                {apt.contact_tags?.length > 0 && (
+                                  <div className="flex flex-wrap gap-1">
+                                    {apt.contact_tags.map((tag, i) => (
+                                      <Badge key={i} variant="outline" className="text-xs">{tag}</Badge>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                              
+                              {/* Lead Details (if matched) */}
+                              {apt.lead_id && (
+                                <div className="space-y-2">
+                                  <h4 className="font-medium text-sm flex items-center gap-1">
+                                    <Building className="h-4 w-4" /> Lead Details
+                                  </h4>
+                                  {apt.lead_property_address && (
+                                    <p className="text-sm">
+                                      <span className="text-muted-foreground">Property:</span> {apt.lead_property_address}
+                                    </p>
+                                  )}
+                                  {apt.lead_property_type && (
+                                    <p className="text-sm">
+                                      <span className="text-muted-foreground">Type:</span> {apt.lead_property_type}
+                                    </p>
+                                  )}
+                                  {apt.lead_stage && (
+                                    <Badge variant="secondary">{apt.lead_stage}</Badge>
+                                  )}
+                                  {apt.lead_notes && (
+                                    <p className="text-sm text-muted-foreground line-clamp-2">{apt.lead_notes}</p>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                            
+                            {apt.notes && (
+                              <div className="mt-3 pt-3 border-t">
+                                <p className="text-sm"><span className="font-medium">Notes:</span> {apt.notes}</p>
+                              </div>
+                            )}
+                          </div>
+                        </CollapsibleContent>
+                      </div>
+                    </Collapsible>
+                  ))}
+                </div>
+              )}
+            </ScrollArea>
+          </TabsContent>
 
           {/* Availability Tab */}
           <TabsContent value="availability" className="space-y-4 mt-4">
