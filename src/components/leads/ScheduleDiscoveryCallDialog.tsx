@@ -188,6 +188,22 @@ export function ScheduleDiscoveryCallDialog({
         console.warn("Notification sending failed:", notifError);
       }
 
+      // Auto-schedule Recall.ai bot for video meetings to capture transcript
+      if (meetingType === "video") {
+        try {
+          const { data: botResult, error: botError } = await supabase.functions.invoke("recall-auto-schedule-bot", {
+            body: { discoveryCallId: newCall.id },
+          });
+          if (botError) {
+            console.warn("Recall bot scheduling failed:", botError);
+          } else {
+            console.log("Recall bot scheduled:", botResult);
+          }
+        } catch (recallError) {
+          console.warn("Recall bot scheduling failed:", recallError);
+        }
+      }
+
       return { scheduledAt, meetingType };
     },
     onSuccess: ({ scheduledAt, meetingType }) => {
