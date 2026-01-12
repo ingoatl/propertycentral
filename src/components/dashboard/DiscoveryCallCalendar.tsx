@@ -71,6 +71,7 @@ interface DiscoveryCall {
   start_timeline: string | null;
   meeting_notes: string | null;
   google_meet_link: string | null;
+  google_calendar_event_id: string | null;
   leads: {
     id: string;
     name: string;
@@ -868,6 +869,20 @@ function DiscoveryCallDetailModal({ call, onClose }: DiscoveryCallDetailModalPro
   const handleDeleteCall = async () => {
     setIsDeleting(true);
     try {
+      // First, delete the Google Calendar event if it exists
+      if (call.google_calendar_event_id) {
+        console.log("Deleting Google Calendar event:", call.google_calendar_event_id);
+        const { error: calendarError } = await supabase.functions.invoke("delete-calendar-event", {
+          body: { eventId: call.google_calendar_event_id },
+        });
+        
+        if (calendarError) {
+          console.warn("Failed to delete calendar event:", calendarError);
+          // Continue with DB deletion even if calendar deletion fails
+        }
+      }
+      
+      // Then delete from database
       const { error } = await supabase
         .from("discovery_calls")
         .delete()
@@ -876,7 +891,7 @@ function DiscoveryCallDetailModal({ call, onClose }: DiscoveryCallDetailModalPro
       if (error) throw error;
 
       toast.success("Scheduled call deleted", {
-        description: `Discovery call with ${call.leads?.name || "Unknown"} has been removed`,
+        description: `Discovery call with ${call.leads?.name || "Unknown"} has been removed from calendar`,
       });
       
       // Invalidate queries to refresh calendar
