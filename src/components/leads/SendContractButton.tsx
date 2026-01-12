@@ -86,50 +86,15 @@ export function SendContractButton({ lead, onContractSent }: SendContractButtonP
         throw new Error("Selected template not found");
       }
 
-      // Create or get the property owner
-      let ownerId: string | null = lead.owner_id || null;
+      // NOTE: Owner record will be created ONLY when agreement is fully executed
+      // (in the submit-signature edge function after all parties sign)
 
-      if (!ownerId) {
-        // Check if owner exists with this email
-        const { data: existingOwner } = await supabase
-          .from("property_owners")
-          .select("id")
-          .eq("email", recipientEmail)
-          .maybeSingle();
-
-        if (existingOwner) {
-          ownerId = existingOwner.id;
-        } else {
-          // Create new owner
-          const { data: newOwner, error: ownerError } = await supabase
-            .from("property_owners")
-            .insert({
-              name: recipientName,
-              email: recipientEmail,
-              phone: lead.phone,
-              payment_method: "ach",
-              service_type: template.contract_type === "full_service" ? "full_service" : "cohosting",
-            })
-            .select()
-            .single();
-
-          if (ownerError) throw ownerError;
-          ownerId = newOwner.id;
-
-          // Link owner to lead
-          await supabase
-            .from("leads")
-            .update({ owner_id: ownerId })
-            .eq("id", lead.id);
-        }
-      }
-
-      // Create the booking document record
+      // Create the booking document record (no owner_id yet)
       const { data: bookingDoc, error: docError } = await supabase
         .from("booking_documents")
         .insert({
           template_id: template.id,
-          owner_id: ownerId,
+          owner_id: null, // Owner will be created upon full agreement execution
           recipient_name: recipientName,
           recipient_email: recipientEmail,
           document_name: `${template.name} - ${recipientName}`,
