@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Calendar, Clock, Send, X, Loader2, Check, Phone, Video, ChevronDown, ChevronUp, Mail, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,6 +10,37 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { format, addDays, setHours, setMinutes, isBefore, isAfter, startOfDay, parseISO } from "date-fns";
+
+// Helper to extract email addresses from text
+function extractEmailFromText(text: string): string | null {
+  if (!text) return null;
+  // Look for email= pattern in URLs first (from GHL unsubscribe links)
+  const emailParamMatch = text.match(/email=([^&\s\]]+)/i);
+  if (emailParamMatch) {
+    const decoded = decodeURIComponent(emailParamMatch[1]);
+    if (decoded.includes("@")) return decoded;
+  }
+  // General email pattern
+  const emailMatch = text.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
+  if (emailMatch) {
+    // Filter out our own emails
+    const email = emailMatch[0].toLowerCase();
+    if (!email.includes("peachhausgroup.com") && !email.includes("peachhaus.com") && !email.includes("msgsndr.com")) {
+      return email;
+    }
+  }
+  return null;
+}
+
+// Helper to extract first name from message body (e.g., "Hi Hector!")
+function extractFirstNameFromText(text: string): string | null {
+  if (!text) return null;
+  const greetingMatch = text.match(/(?:Hi|Hello|Hey|Dear)\s+([A-Z][a-z]+)[!,.\s]/i);
+  if (greetingMatch) {
+    return greetingMatch[1];
+  }
+  return null;
+}
 
 interface SmartSchedulingCardProps {
   detectedIntent: "tomorrow" | "this_week" | "call_request" | "schedule" | null;
@@ -57,6 +88,71 @@ export function SmartSchedulingCard({
   
   // Email input for calendar invite - use provided email or allow manual entry
   const [inviteEmail, setInviteEmail] = useState(contactEmail || "");
+  
+  // Track if we've attempted to extract from conversations
+  const [hasExtractedFromConversations, setHasExtractedFromConversations] = useState(false);
+
+  // Auto-extract email and name from conversation history
+  useEffect(() => {
+    if (hasExtractedFromConversations) return;
+    
+    const extractFromConversations = async () => {
+      // Determine if we have a lead or owner context
+      const ownerId = contactType === "owner" ? contactId : null;
+      if (!leadId && !ownerId) {
+        setHasExtractedFromConversations(true);
+        return;
+      }
+      
+      try {
+        let query = supabase
+          .from("lead_communications")
+          .select("body, subject")
+          .order("created_at", { ascending: false })
+          .limit(30);
+        
+        if (leadId) {
+          query = query.eq("lead_id", leadId);
+        } else if (ownerId) {
+          query = query.eq("owner_id", ownerId);
+        }
+        
+        const { data: communications } = await query;
+        
+        if (communications && communications.length > 0) {
+          let foundEmail: string | null = null;
+          let foundName: string | null = null;
+          
+          // Search through messages for email and name
+          for (const comm of communications) {
+            if (!foundEmail && comm.body) {
+              foundEmail = extractEmailFromText(comm.body);
+            }
+            if (!foundName && comm.body) {
+              foundName = extractFirstNameFromText(comm.body);
+            }
+            if (foundEmail && foundName) break;
+          }
+          
+          // Update state if we found info and fields are empty
+          if (foundEmail && !inviteEmail) {
+            console.log("Auto-extracted email from conversation:", foundEmail);
+            setInviteEmail(foundEmail);
+          }
+          if (foundName && !inviteFirstName) {
+            console.log("Auto-extracted name from conversation:", foundName);
+            setInviteFirstName(foundName);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to extract from conversations:", err);
+      }
+      
+      setHasExtractedFromConversations(true);
+    };
+    
+    extractFromConversations();
+  }, [leadId, contactId, contactType, hasExtractedFromConversations, inviteEmail, inviteFirstName]);
 
   // Generate available dates based on intent
   const availableDates = useMemo(() => {
