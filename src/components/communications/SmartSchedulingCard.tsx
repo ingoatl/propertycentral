@@ -123,8 +123,10 @@ export function SmartSchedulingCard({
       // Determine if we have a valid lead ID
       const validLeadId = leadId || (contactType === "lead" ? contactId : null);
 
+      // Fixed Google Meet link
+      const GOOGLE_MEET_LINK = "https://meet.google.com/jww-deey-iaa";
+
       let callId: string | null = null;
-      let googleMeetLink: string | null = null;
 
       // Only create discovery_call if we have a valid lead ID
       if (validLeadId) {
@@ -136,6 +138,7 @@ export function SmartSchedulingCard({
             status: "scheduled",
             meeting_type: meetingType,
             duration_minutes: 30,
+            google_meet_link: meetingType === "video" ? GOOGLE_MEET_LINK : null,
           })
           .select()
           .single();
@@ -148,6 +151,29 @@ export function SmartSchedulingCard({
           }
         } else {
           callId = call.id;
+          
+          // Send branded confirmation email and admin notification via discovery-call-notifications
+          try {
+            // Send confirmation to lead
+            await supabase.functions.invoke("discovery-call-notifications", {
+              body: {
+                discoveryCallId: call.id,
+                notificationType: "confirmation",
+              },
+            });
+            
+            // Send admin notification
+            await supabase.functions.invoke("discovery-call-notifications", {
+              body: {
+                discoveryCallId: call.id,
+                notificationType: "admin_notification",
+              },
+            });
+            
+            console.log("Discovery call notifications sent");
+          } catch (notifErr) {
+            console.error("Failed to send discovery call notifications:", notifErr);
+          }
         }
       }
 
@@ -159,20 +185,19 @@ export function SmartSchedulingCard({
         throw new Error("You must be logged in to schedule calls");
       }
 
-      // Create calendar event with Google Meet if video call
-      const meetLinkToUse = meetingType === "video" ? "https://meet.google.com/new" : null;
-      
+      // Create calendar event with Google Meet link and send invite to attendee
       try {
         const { data: calResult, error: calError } = await supabase.functions.invoke("google-calendar-sync", {
           body: {
             action: "create-event-direct",
             userId: currentUserId,
             summary: `${meetingType === "video" ? "Video" : "Phone"} Call with ${displayName}`,
-            description: `${meetingType === "video" ? "Video" : "Phone"} call with ${displayName}${contactPhone ? `\nPhone: ${contactPhone}` : ""}${contactEmail ? `\nEmail: ${contactEmail}` : ""}\n\nScheduled via PeachHaus CRM`,
+            description: `${meetingType === "video" ? "Video" : "Phone"} call with ${displayName}${contactPhone ? `\nPhone: ${contactPhone}` : ""}${contactEmail ? `\nEmail: ${contactEmail}` : ""}${meetingType === "video" ? `\n\n📹 Google Meet: ${GOOGLE_MEET_LINK}` : ""}\n\n⚠️ Please confirm this calendar event by clicking "Yes" in the invitation email you received.\n\nScheduled via PeachHaus CRM`,
             startTime: scheduledAt.toISOString(),
             endTime: endTime.toISOString(),
             attendeeEmail: contactEmail || undefined,
-            addConferenceData: meetingType === "video",
+            addConferenceData: false, // Use fixed meet link instead
+            meetLink: meetingType === "video" ? GOOGLE_MEET_LINK : undefined,
           },
         });
         
@@ -181,39 +206,27 @@ export function SmartSchedulingCard({
           toast.error("Calendar event could not be created, but call is scheduled");
         } else {
           console.log("Calendar event created:", calResult);
-          // Extract meet link if returned
-          if (calResult?.meetLink) {
-            googleMeetLink = calResult.meetLink;
-          }
         }
       } catch (calErr) {
         console.error("Calendar sync error:", calErr);
       }
 
-      // Update discovery call with meet link if we have one
-      if (callId && googleMeetLink) {
-        await supabase
-          .from("discovery_calls")
-          .update({ google_meet_link: googleMeetLink })
-          .eq("id", callId);
-      }
-
-      // Send SMS invite to the contact
+      // Send SMS invite to the contact with calendar confirmation instruction
       if (contactPhone) {
         try {
           const userName = await getCurrentUserName();
           const formattedDate = format(scheduledAt, "EEEE, MMM d");
           const formattedTime = format(scheduledAt, "h:mm a");
           
-          let message = `Hi ${displayName.split(" ")[0]}! I've scheduled our ${meetingType === "video" ? "video" : "phone"} call for ${formattedDate} at ${formattedTime}.`;
+          let message = `Hi ${displayName.split(" ")[0]}! I've scheduled our ${meetingType === "video" ? "video" : "phone"} call for ${formattedDate} at ${formattedTime} EST.`;
           
-          if (meetingType === "video" && googleMeetLink) {
-            message += ` Here's the link: ${googleMeetLink}`;
-          } else if (meetingType === "phone") {
+          if (meetingType === "video") {
+            message += ` Join here: ${GOOGLE_MEET_LINK}`;
+          } else {
             message += " I'll call you at this number.";
           }
           
-          message += ` Looking forward to chatting! - ${userName} @ PeachHaus Group`;
+          message += ` Check your email & confirm the calendar invite! - ${userName} @ PeachHaus`;
           
           await supabase.functions.invoke("ghl-send-sms", {
             body: {
@@ -227,7 +240,7 @@ export function SmartSchedulingCard({
         }
       }
 
-      toast.success("Call scheduled successfully!");
+      toast.success("Call scheduled successfully! Email confirmation sent.");
       onScheduled?.();
       onDismiss();
     } catch (error: any) {

@@ -236,6 +236,18 @@ const handler = async (req: Request): Promise<Response> => {
                   </div>
                   ` : ''}
 
+                  <!-- Calendar Confirmation Notice -->
+                  <div style="padding: 0 32px 24px 32px;">
+                    <div style="background: #fef3c7; border: 1px solid #fcd34d; border-radius: 4px; padding: 16px;">
+                      <p style="margin: 0; font-size: 13px; color: #92400e; font-weight: 600;">
+                        📅 Important: Confirm Your Calendar Invite
+                      </p>
+                      <p style="margin: 8px 0 0 0; font-size: 12px; color: #a16207;">
+                        You'll receive a separate Google Calendar invitation for this call. Please click <strong>"Yes"</strong> to confirm your attendance. This helps us ensure our meeting is on your calendar and you'll receive reminders.
+                      </p>
+                    </div>
+                  </div>
+
                   <!-- What to Expect -->
                   <div style="padding: 0 32px 24px 32px;">
                     <div style="font-size: 11px; font-weight: 600; color: #111111; padding: 8px 0; border-bottom: 1px solid #111111; text-transform: uppercase; letter-spacing: 0.5px;">
@@ -247,6 +259,9 @@ const handler = async (req: Request): Promise<Response> => {
                       <li>Custom revenue estimate for your property</li>
                       <li>Answers to all your questions</li>
                     </ul>
+                    <p style="margin: 16px 0 0 0; font-size: 12px; color: #666666; font-style: italic;">
+                      Note: This call may be recorded for quality and training purposes.
+                    </p>
                   </div>
 
                   <!-- Signature Section -->
@@ -283,7 +298,7 @@ const handler = async (req: Request): Promise<Response> => {
             await supabase.functions.invoke("send-sms", {
               body: {
                 to: lead.phone,
-                message: `Hi ${lead.name}! Your PeachHaus discovery call is confirmed for ${formattedDate} at ${formattedTime}. ${isVideoCall ? `Join here: ${GOOGLE_MEET_LINK}` : "We'll call you!"} Reply STOP to opt out.`,
+                message: `Hi ${lead.name?.split(' ')[0]}! Your PeachHaus call is confirmed for ${formattedDate} at ${formattedTime}. ${isVideoCall ? `Join: ${GOOGLE_MEET_LINK}` : "We'll call you!"} Check email & confirm the calendar invite! Reply STOP to opt out.`,
               },
             });
           } catch (smsError) {
