@@ -68,6 +68,82 @@ serve(async (req: Request): Promise<Response> => {
       );
     }
 
+    // Check if this is a demo receipt path - return a sample receipt for demo
+    if (receiptPath.startsWith("demo-receipts/")) {
+      console.log("Demo receipt requested, returning sample receipt data");
+      
+      // Return a base64-encoded sample receipt HTML for demo purposes
+      const sampleReceiptHtml = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Sample Receipt</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 40px auto; padding: 20px; }
+    .header { text-align: center; border-bottom: 2px solid #10b981; padding-bottom: 20px; margin-bottom: 20px; }
+    .logo { font-size: 24px; font-weight: bold; color: #10b981; }
+    .receipt-info { background: #f3f4f6; padding: 15px; border-radius: 8px; margin-bottom: 20px; }
+    .line-item { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #e5e7eb; }
+    .total { font-weight: bold; font-size: 18px; margin-top: 15px; }
+    .footer { text-align: center; color: #6b7280; font-size: 12px; margin-top: 30px; }
+    .badge { background: #10b981; color: white; padding: 4px 12px; border-radius: 12px; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="logo">PeachHaus Group</div>
+    <p style="margin: 5px 0; color: #6b7280;">Property Management Services</p>
+    <span class="badge">SAMPLE RECEIPT</span>
+  </div>
+  
+  <div class="receipt-info">
+    <p><strong>Property:</strong> 3069 Rita Way Retreat</p>
+    <p><strong>Owner:</strong> Sarah & Michael Thompson</p>
+    <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
+  </div>
+  
+  <div class="line-items">
+    <div class="line-item">
+      <span>Property Maintenance Supplies</span>
+      <span>$45.99</span>
+    </div>
+    <div class="line-item">
+      <span>Guest Amenities Package</span>
+      <span>$28.50</span>
+    </div>
+    <div class="line-item">
+      <span>Cleaning Products</span>
+      <span>$15.25</span>
+    </div>
+    <div class="line-item total">
+      <span>TOTAL</span>
+      <span>$89.74</span>
+    </div>
+  </div>
+  
+  <div class="footer">
+    <p>This is a sample receipt for demonstration purposes.</p>
+    <p>Actual receipts are stored securely and linked to your expenses.</p>
+    <p style="margin-top: 15px;">PeachHaus Group LLC • info@peachhausgroup.com</p>
+  </div>
+</body>
+</html>`;
+      
+      // Create a data URL for the HTML content
+      const base64Html = btoa(unescape(encodeURIComponent(sampleReceiptHtml)));
+      const dataUrl = `data:text/html;base64,${base64Html}`;
+      
+      return new Response(
+        JSON.stringify({ 
+          signedUrl: dataUrl,
+          path: receiptPath,
+          isDemo: true
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     // Generate signed URL using service role key (bypasses RLS)
     const { data: signedUrlData, error: signedUrlError } = await supabase.storage
       .from("expense-documents")
