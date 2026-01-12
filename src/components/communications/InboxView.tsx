@@ -1891,9 +1891,11 @@ export function InboxView() {
                     <div className="sticky top-0 bg-background/95 backdrop-blur px-4 py-2 border-b z-10">
                       <span className="text-xs font-medium text-muted-foreground">{group.label}</span>
                     </div>
-                    {group.communications.map((comm) => (
+                    {group.communications.map((comm) => {
+                      const isDone = comm.conversation_status === "done";
+                      return (
                       <div 
-                        key={comm.id} 
+                        key={`${comm.id}-${comm.conversation_status}`}
                         onClick={() => {
                           if (comm.contact_type === "owner" && comm.owner_id) {
                             setSelectedOwnerForDetail({
@@ -1906,8 +1908,12 @@ export function InboxView() {
                             handleSelectMessage(comm);
                           }
                         }}
-                        className={`group flex items-start gap-3 px-3 py-3 cursor-pointer transition-colors border-b border-border/30 active:bg-muted/50 ${selectedMessage?.id === comm.id ? "bg-primary/5" : "hover:bg-muted/30"}`}
+                        className={`group relative flex items-start gap-3 px-3 py-3 cursor-pointer transition-all border-b border-border/30 active:bg-muted/50 ${selectedMessage?.id === comm.id ? "bg-primary/5" : "hover:bg-muted/30"} ${isDone ? "opacity-50" : ""}`}
                       >
+                        {/* Done indicator line */}
+                        {isDone && (
+                          <div className="absolute left-0 top-0 bottom-0 w-1 bg-green-500 rounded-r" />
+                        )}
                         {/* Priority indicator line */}
                         {comm.priority === "urgent" && (
                           <div className="absolute left-0 top-0 bottom-0 w-1 bg-red-500 rounded-r" />
@@ -1984,7 +1990,8 @@ export function InboxView() {
                           </p>
                         </div>
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 ))}
               </div>
@@ -2005,9 +2012,11 @@ export function InboxView() {
                     </span>
                   </div>
                   {/* Messages for this date */}
-                  {comms.map((comm) => (
+                  {comms.map((comm) => {
+                    const isDone = comm.conversation_status === "done";
+                    return (
                     <div 
-                      key={comm.id} 
+                      key={`${comm.id}-${comm.conversation_status}`}
                       onClick={() => {
                         if (comm.contact_type === "owner" && comm.owner_id) {
                           setSelectedOwnerForDetail({
@@ -2020,13 +2029,17 @@ export function InboxView() {
                           handleSelectMessage(comm);
                         }
                       }}
-                      className={`group relative flex items-start gap-3 px-3 py-3 cursor-pointer transition-colors border-b border-border/30 active:bg-muted/50 ${selectedMessage?.id === comm.id ? "bg-primary/5" : "hover:bg-muted/30"}`}
+                      className={`group relative flex items-start gap-3 px-3 py-3 cursor-pointer transition-all border-b border-border/30 active:bg-muted/50 ${selectedMessage?.id === comm.id ? "bg-primary/5" : "hover:bg-muted/30"} ${isDone ? "opacity-50" : ""}`}
                     >
+                      {/* Done indicator line */}
+                      {isDone && (
+                        <div className="absolute left-0 top-0 bottom-0 w-1 bg-green-500 rounded-r" />
+                      )}
                       {/* Priority indicator line */}
-                      {comm.priority === "urgent" && (
+                      {!isDone && comm.priority === "urgent" && (
                         <div className="absolute left-0 top-0 bottom-0 w-1 bg-red-500 rounded-r" />
                       )}
-                      {comm.priority === "important" && (
+                      {!isDone && comm.priority === "important" && (
                         <div className="absolute left-0 top-0 bottom-0 w-1 bg-amber-500 rounded-r" />
                       )}
                       
@@ -2085,7 +2098,8 @@ export function InboxView() {
                         </p>
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               ))}
             </div>
