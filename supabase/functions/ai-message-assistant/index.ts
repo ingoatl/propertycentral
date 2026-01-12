@@ -30,26 +30,17 @@ FOR SMS:
 // Scheduling link for discovery calls
 const SCHEDULING_LINK = "https://propertycentral.lovable.app/book-discovery-call";
 
-// Company knowledge base with psychology-informed communication guidance
+// Company knowledge base - clean, no auto-suggestions
 const companyKnowledge = `
 COMPANY: PeachHaus Group
 BUSINESS: Mid-term rental property management in Atlanta, GA
 
-SCHEDULING LINK: ${SCHEDULING_LINK}
-- ALWAYS include this link when suggesting a call or deeper conversation
-- Present it as a convenience, not a sales tactic
-
-FREE INCOME ANALYSIS OFFER (ALWAYS MENTION!):
-- We provide a FREE rental income analysis for any property
-- Shows projected income for ALL 3 rental types:
-  1. Short-term (Airbnb, 1-29 nights)
-  2. Mid-term (30-365 days - our specialty)
-  3. Long-term (12+ month leases)
-- To create the analysis, we need their:
-  1. Property address (required)
-  2. Email address (to send the report, especially if they texted)
-- ALWAYS offer this to new leads or interested owners
-- Say: "Would you like a free income analysis? Just need your address and email to send it over!"
+CRITICAL INSTRUCTION - READ THIS:
+- DO NOT automatically suggest scheduling calls
+- DO NOT automatically offer income analysis
+- The user has BUTTONS for these - they will add them manually
+- Your job is to write clean, human, helpful responses
+- Just answer what they asked, nothing more
 
 KEY SERVICES:
 - Mid-term rental management (30+ day stays)
@@ -69,33 +60,17 @@ CONTACT INFO:
 - Office hours: Monday-Friday 9am-6pm EST
 
 BRAND VOICE & PSYCHOLOGY PRINCIPLES:
-1. RECIPROCITY: Lead with value - offer the FREE income analysis first!
-2. SOCIAL PROOF: Reference "many Atlanta property owners" when relevant
-3. LIKING: Use their name, acknowledge their specific situation
-4. AUTHORITY: Position PeachHaus as trusted experts, not salespeople
-5. COMMITMENT: Reference their interest to reinforce engagement
+1. LIKING: Use their name, acknowledge their specific situation
+2. AUTHENTICITY: Sound like a real person, not a script
+3. SPECIFICITY: Reference exact things they mentioned
+4. CLARITY: They should know exactly what to do next
 
-COMMUNICATION STRATEGY:
-- If they texted: Ask for their email so we can send the income analysis
-- If we don't have address: Ask for it to create the analysis
-- Always offer the free analysis before pushing for a call
-- The income analysis is our primary value-add for new leads
-
-TONE GUIDELINES (based on communication psychology):
-- Sound like a trusted advisor helping them, not selling to them
+TONE GUIDELINES:
+- Sound like a trusted advisor helping them
 - Acknowledge emotions - if they sounded stressed or excited, reflect that
-- Use "we" and "together" to create partnership feeling
 - Be specific - vague messages feel impersonal
-- End with clarity - they should know exactly what to do next
-
-AFTER SOMEONE CALLS IN OR TEXTS:
-- Thank them for reaching out (reciprocity)
-- Acknowledge what they're interested in (active listening)
-- Offer the free income analysis if they haven't received one
-- Ask for address + email if we don't have them
-- If they need to speak with someone, invite them to schedule: ${SCHEDULING_LINK}
-- If it sounded urgent, offer to have someone call back quickly
-- Make them feel their inquiry is valued and will be handled
+- NO sales pitches, NO upselling, NO suggesting calls or income reports unless they asked
+- Just be helpful and human
 
 COMMON TOPICS:
 - Move-in/move-out procedures
@@ -352,37 +327,24 @@ YOUR RESPONSE SHOULD:
 
     switch (action) {
       case "generate_contextual_reply":
-        // Build smart instructions based on what's been discussed
-        let incomeReportInstruction = "";
-        
-        // If they're asking for something specific, don't push income reports
-        if (isAskingForReferrals || isAskingQuestion) {
-          incomeReportInstruction = "They asked a SPECIFIC question - ANSWER IT FIRST. Don't push income reports unless it's directly relevant.";
-        } else if (isExistingOwner) {
-          incomeReportInstruction = "This is an EXISTING PROPERTY OWNER - do NOT offer income analysis.";
-        } else if (alreadyOfferedIncomeReport) {
-          incomeReportInstruction = "We already offered the income analysis. Don't repeat.";
-        } else if (isNewConversation && !isAskingForReferrals && !isAskingQuestion) {
-          incomeReportInstruction = "Offer a FREE income analysis if it fits naturally.";
-        } else {
-          incomeReportInstruction = "Continue the natural conversation flow.";
-        }
-
-        userPrompt = `Generate a warm, professional SMS reply.
+        userPrompt = `Generate a warm, human ${messageType === "sms" ? "SMS" : "email"} reply.
 
 THEIR MESSAGE (RESPOND TO THIS):
 "${currentMessage || "See conversation history"}"
 
 ${specificRequestContext}
 
-RESPONSE RULES:
-1. **ANSWER WHAT THEY ASKED** - If they asked for insurance referrals, say you'll get them. If they asked a question, answer it.
-2. ${hasPhoneCall ? "We talked before - skip pleasantries" : "NO phone call yet - say 'Hi ${firstName}!' or 'Thanks for reaching out!' - NEVER 'great chatting'"}
+CRITICAL RULES:
+1. **JUST ANSWER THEIR QUESTION** - Be helpful and direct
+2. ${hasPhoneCall ? "We talked before - skip pleasantries, be direct" : "Say 'Hi ${firstName}!' or 'Hey!' - NEVER 'great chatting'"}
 3. Be specific - mention the exact thing they asked about
-4. ${incomeReportInstruction}
-5. Keep it SHORT - under 200 characters if possible
-6. Sound human, not like AI
-7. End with: "- Ingo @ PeachHaus Group"
+4. **DO NOT** suggest scheduling a call
+5. **DO NOT** offer income analysis or reports
+6. **DO NOT** pitch any services
+7. Just be helpful, human, and to-the-point
+8. Keep it SHORT - ${messageType === "sms" ? "under 160 characters ideal" : "2-3 sentences"}
+9. Sound like a real person texting, not a business
+10. End with: "- Ingo"
 
 Generate ONLY the reply text, nothing else.`;
         break;
@@ -391,8 +353,7 @@ Generate ONLY the reply text, nothing else.`;
         userPrompt = `Generate a professional ${messageType === "sms" ? "SMS" : "email"} reply.
 ${currentMessage ? `Current draft: "${currentMessage}"` : "Create an appropriate response."}
 
-Include scheduling link when suggesting a call: ${SCHEDULING_LINK}
-Be warm, specific, and action-oriented. Make them feel valued.`;
+Be warm, specific, and action-oriented. DO NOT suggest calls or income analysis - just respond naturally.`;
         break;
 
       case "improve":
