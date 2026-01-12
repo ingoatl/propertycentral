@@ -39,7 +39,9 @@ import {
   Mail,
   CalendarCheck,
   Tag,
+  Trash2,
 } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   format,
   startOfMonth,
@@ -708,21 +710,30 @@ function GhlAppointmentDetailModal({ appointment, onClose }: GhlAppointmentDetai
             {endTime && <span>- {format(endTime, "h:mm a")}</span>}
           </div>
 
-          {/* Google Meet Link - check location and notes for meet links */}
+          {/* Google Meet Link - check location, notes, and extract from any field */}
           {(() => {
             let meetLink: string | null = null;
+            // Check location first
             if (appointment.location?.includes("meet.google.com")) {
-              meetLink = appointment.location;
-            } else if (appointment.notes) {
-              const match = appointment.notes.match(/https:\/\/meet\.google\.com\/[a-z-]+/);
+              const match = appointment.location.match(/https:\/\/meet\.google\.com\/[a-z0-9-]+/i);
+              meetLink = match ? match[0] : appointment.location;
+            }
+            // Check notes
+            if (!meetLink && appointment.notes) {
+              const match = appointment.notes.match(/https:\/\/meet\.google\.com\/[a-z0-9-]+/i);
+              if (match) meetLink = match[0];
+            }
+            // Check title
+            if (!meetLink && appointment.title?.includes("meet.google.com")) {
+              const match = appointment.title.match(/https:\/\/meet\.google\.com\/[a-z0-9-]+/i);
               if (match) meetLink = match[0];
             }
             
             if (meetLink) {
               return (
-                <Button className="w-full h-9 text-sm bg-green-600 hover:bg-green-700" asChild>
+                <Button className="w-full h-10 text-sm bg-green-600 hover:bg-green-700 font-medium" asChild>
                   <a href={meetLink} target="_blank" rel="noopener noreferrer">
-                    <Video className="h-4 w-4 mr-2" /> Join Google Meet
+                    <Video className="h-5 w-5 mr-2" /> Join Google Meet
                   </a>
                 </Button>
               );
@@ -800,6 +811,9 @@ function DiscoveryCallDetailModal({ call, onClose }: DiscoveryCallDetailModalPro
   const [showCallConfirm, setShowCallConfirm] = useState(false);
   const [isCallingLead, setIsCallingLead] = useState(false);
   const [showEmailDialog, setShowEmailDialog] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const queryClient = useQueryClient();
 
   if (!call) return null;
 
@@ -848,6 +862,34 @@ function DiscoveryCallDetailModal({ call, onClose }: DiscoveryCallDetailModalPro
     } finally {
       setIsCallingLead(false);
       setShowCallConfirm(false);
+    }
+  };
+
+  const handleDeleteCall = async () => {
+    setIsDeleting(true);
+    try {
+      const { error } = await supabase
+        .from("discovery_calls")
+        .delete()
+        .eq("id", call.id);
+
+      if (error) throw error;
+
+      toast.success("Scheduled call deleted", {
+        description: `Discovery call with ${call.leads?.name || "Unknown"} has been removed`,
+      });
+      
+      // Invalidate queries to refresh calendar
+      queryClient.invalidateQueries({ queryKey: ["discovery-calls-calendar"] });
+      onClose();
+    } catch (error: any) {
+      console.error("Error deleting call:", error);
+      toast.error("Failed to delete call", {
+        description: error.message,
+      });
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteConfirm(false);
     }
   };
 
@@ -1032,14 +1074,23 @@ function DiscoveryCallDetailModal({ call, onClose }: DiscoveryCallDetailModalPro
                 </div>
               </div>
 
-              {/* Meeting Link for Video Calls */}
+              {/* Meeting Link for Video Calls - Make prominent */}
               {call.meeting_type === "video" && call.google_meet_link && (
-                <Button className="w-full h-8 text-xs bg-green-600 hover:bg-green-700" asChild>
+                <Button className="w-full h-10 text-sm bg-green-600 hover:bg-green-700 font-medium" asChild>
                   <a href={call.google_meet_link} target="_blank" rel="noopener noreferrer">
-                    <Video className="h-3 w-3 mr-1" /> Join Google Meet
+                    <Video className="h-5 w-5 mr-2" /> Join Google Meet
                   </a>
                 </Button>
               )}
+
+              {/* Delete Button */}
+              <Button 
+                variant="outline" 
+                className="w-full h-8 text-xs text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                onClick={() => setShowDeleteConfirm(true)}
+              >
+                <Trash2 className="h-3 w-3 mr-1" /> Delete Scheduled Call
+              </Button>
 
               {/* Combined Notes - Compact */}
               {allNotes && (
@@ -1107,6 +1158,41 @@ function DiscoveryCallDetailModal({ call, onClose }: DiscoveryCallDetailModalPro
           contactId={call.leads.id}
         />
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Trash2 className="h-5 w-5 text-destructive" />
+              Delete Scheduled Call?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete the discovery call scheduled with {call.leads?.name || "Unknown"} on {format(scheduledAt, "MMMM d, yyyy 'at' h:mm a")}.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteCall}
+              disabled={isDeleting}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              {isDeleting ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete
+                </>
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
