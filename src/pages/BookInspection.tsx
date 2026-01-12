@@ -140,11 +140,11 @@ export default function BookInspection() {
   const [isBooked, setIsBooked] = useState(false);
   const [bookedDateTime, setBookedDateTime] = useState<{ date: Date; time: string } | null>(null);
 
-  // Only allow Tuesdays (2) and Thursdays (4)
+  // Only allow Tuesdays (2), Wednesdays (3), and Thursdays (4)
   const isDateDisabled = (date: Date) => {
     const dayOfWeek = getDay(date);
     const isPast = isBefore(date, addDays(new Date(), -1));
-    const isAllowedDay = dayOfWeek === 2 || dayOfWeek === 4; // Tuesday or Thursday
+    const isAllowedDay = dayOfWeek === 2 || dayOfWeek === 3 || dayOfWeek === 4; // Tuesday, Wednesday, Thursday
     const isHoliday = isUSHoliday(date);
     return isPast || !isAllowedDay || isHoliday;
   };
@@ -720,7 +720,7 @@ export default function BookInspection() {
             <div className="text-center mb-8">
               <h1 className="text-2xl font-bold mb-2">Choose Your Inspection Date</h1>
               <p className="text-muted-foreground">
-                Inspections are available Tuesdays & Thursdays, 11 AM - 3 PM EST.
+                Inspections are available Tuesday - Thursday, 11 AM - 3 PM EST.
               </p>
             </div>
 
