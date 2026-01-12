@@ -137,24 +137,24 @@ serve(async (req) => {
           }
         }
 
-        // Create lead_communications record
+        // Create lead_communications record with correct column names
         const { data: commRecord, error: commError } = await supabase
           .from("lead_communications")
           .insert({
-            type: "call",
+            communication_type: "voice_call",
             direction: "outbound",
-            message: transcriptText,
-            transcript: transcriptText,
+            body: transcriptText,
             call_duration: data.duration_seconds,
             owner_id: matchedOwnerId,
             lead_id: matchedLeadId,
-            property_id: propertyId,
-            source_platform: recording.platform,
+            status: "delivered",
             metadata: {
               platform: recording.platform,
               meeting_title: recording.meeting_title,
               participants: data.participants,
               recall_bot_id: data.bot_id,
+              transcript_source: "recall.ai",
+              is_video_meeting: true,
             },
           })
           .select()
