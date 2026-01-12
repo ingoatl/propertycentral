@@ -93,11 +93,23 @@ const LeadKanbanBoard = ({ leads, onSelectLead, onRefresh }: LeadKanbanBoardProp
       if (!over) return;
 
       const leadId = active.id as string;
-      const newStage = over.id as LeadStage;
+      const overId = over.id as string;
 
-      // Check if it's a valid stage
-      const isValidStage = LEAD_STAGES.some((s) => s.stage === newStage);
-      if (!isValidStage) return;
+      // Check if dropped on a stage column directly
+      let newStage: LeadStage | null = null;
+      const isValidStage = LEAD_STAGES.some((s) => s.stage === overId);
+      
+      if (isValidStage) {
+        newStage = overId as LeadStage;
+      } else {
+        // Dropped on a lead card - find that lead's stage
+        const targetLead = leads.find((l) => l.id === overId);
+        if (targetLead) {
+          newStage = targetLead.stage;
+        }
+      }
+
+      if (!newStage) return;
 
       const lead = leads.find((l) => l.id === leadId);
       if (!lead || lead.stage === newStage) return;
