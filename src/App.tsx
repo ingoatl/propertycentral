@@ -101,6 +101,7 @@ const App = () => (
             {/* Public job application page */}
             <Route path="/careers/property-inspector" element={<JobApplication />} />
             <Route path="/book-discovery-call" element={<BookDiscoveryCall />} />
+            <Route path="/book-inspection" element={<Suspense fallback={<PageLoader />}>{(() => { const BookInspection = lazy(() => import("./pages/BookInspection")); return <BookInspection />; })()}</Suspense>} />
             <Route path="/payment-setup" element={<PaymentSetup />} />
             <Route path="/payment-success" element={<PaymentSetup />} />
             <Route path="/owner-payment-setup" element={<OwnerPaymentSetup />} />
