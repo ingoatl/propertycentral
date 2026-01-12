@@ -997,12 +997,24 @@ export function InboxView() {
           for (const comm of unmatchedCallComms) {
             // Extract contact name from metadata if available
             const metadata = comm.metadata as { ghl_data?: { contactName?: string; contactPhone?: string } } | null;
-            const contactName = metadata?.ghl_data?.contactName || "Unknown Caller";
+            const body = comm.body || "";
+            
+            // Check if this is a Voice AI / PeachHaus Receptionist call
+            const isVoiceAI = body.includes("Your AI Employee has handled another call") ||
+                              body.includes("AI Agent Name:") ||
+                              body.includes("Call Transcript:");
+            
+            // Default to "PeachHaus Receptionist" for Voice AI calls, otherwise use metadata or "Unknown Caller"
+            let contactName = metadata?.ghl_data?.contactName || "Unknown Caller";
+            if (isVoiceAI || contactName === "Unknown Caller" || contactName === "Unknown") {
+              contactName = "PeachHaus Receptionist";
+            }
+            
             const contactPhone = metadata?.ghl_data?.contactPhone || undefined;
             
             results.push({
               id: comm.id, type: "call", direction: comm.direction as "inbound" | "outbound",
-              body: comm.body || "Call", created_at: comm.created_at, contact_name: contactName,
+              body: body || "Call", created_at: comm.created_at, contact_name: contactName,
               contact_phone: contactPhone, contact_type: "external", contact_id: comm.id, 
               status: comm.status || undefined,
             });
@@ -1051,7 +1063,8 @@ export function InboxView() {
           name === "Unknown" || 
           name === "Unknown Caller" ||
           name === "Unknown Contact" ||
-          name.toLowerCase() === "unknown";
+          name.toLowerCase() === "unknown" ||
+          name === "PeachHaus Receptionist"; // Don't override receptionist with phone lookup
           
         const isPhoneFormat = name.match(/^[\d\s\-\(\)\+\.]+$/) || 
           name.startsWith("+");
@@ -1095,8 +1108,8 @@ export function InboxView() {
               currentName === "Unknown" || 
               currentName === "Unknown Caller" ||
               currentName.match(/^[\d\s\-\(\)\+\.]+$/) ||
-              currentName.startsWith("+") ||
-              // If looked up name is longer/better, use it
+              currentName.startsWith("+");
+            // Don't replace "PeachHaus Receptionist" with phone lookup
               (currentName.split(" ").length === 1 && lookedUpName && lookedUpName.split(" ").length > 1);
             
             if (shouldReplace && lookedUpName) {
