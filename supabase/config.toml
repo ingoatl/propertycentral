@@ -446,3 +446,6 @@ verify_jwt = false
 
 [functions.ghl-sync-all-calls]
 verify_jwt = false
+
+[functions.recall-auto-schedule-bot]
+verify_jwt = false
