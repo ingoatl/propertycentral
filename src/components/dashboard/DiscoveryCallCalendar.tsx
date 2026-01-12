@@ -708,6 +708,28 @@ function GhlAppointmentDetailModal({ appointment, onClose }: GhlAppointmentDetai
             {endTime && <span>- {format(endTime, "h:mm a")}</span>}
           </div>
 
+          {/* Google Meet Link - check location and notes for meet links */}
+          {(() => {
+            let meetLink: string | null = null;
+            if (appointment.location?.includes("meet.google.com")) {
+              meetLink = appointment.location;
+            } else if (appointment.notes) {
+              const match = appointment.notes.match(/https:\/\/meet\.google\.com\/[a-z-]+/);
+              if (match) meetLink = match[0];
+            }
+            
+            if (meetLink) {
+              return (
+                <Button className="w-full h-9 text-sm bg-green-600 hover:bg-green-700" asChild>
+                  <a href={meetLink} target="_blank" rel="noopener noreferrer">
+                    <Video className="h-4 w-4 mr-2" /> Join Google Meet
+                  </a>
+                </Button>
+              );
+            }
+            return null;
+          })()}
+
           {/* Contact Info */}
           <div className="p-3 rounded-lg border space-y-2">
             <h4 className="font-semibold text-sm flex items-center gap-2">
