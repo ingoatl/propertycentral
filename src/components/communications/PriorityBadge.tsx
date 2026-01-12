@@ -1,7 +1,7 @@
-import { Zap, AlertTriangle, Clock } from "lucide-react";
+import { Zap, AlertTriangle, Clock, Hourglass } from "lucide-react";
 
 type Priority = "urgent" | "important" | "normal" | "low";
-type Status = "open" | "snoozed" | "done" | "archived";
+type Status = "open" | "snoozed" | "done" | "archived" | "awaiting";
 
 interface PriorityBadgeProps {
   priority?: Priority;
@@ -11,6 +11,18 @@ interface PriorityBadgeProps {
 }
 
 export function PriorityBadge({ priority, status, snoozedUntil, compact = false }: PriorityBadgeProps) {
+  // Show awaiting badge if awaiting response
+  if (status === "awaiting") {
+    return (
+      <span className={`inline-flex items-center gap-1 rounded-full bg-cyan-500/10 text-cyan-600 ${
+        compact ? "px-1.5 py-0.5 text-[10px]" : "px-2 py-0.5 text-xs"
+      } font-medium`}>
+        <Hourglass className={compact ? "h-2.5 w-2.5" : "h-3 w-3"} />
+        {!compact && "Awaiting"}
+      </span>
+    );
+  }
+
   // Show snoozed badge if snoozed
   if (status === "snoozed") {
     return (
