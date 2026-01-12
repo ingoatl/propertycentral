@@ -88,7 +88,7 @@ export function SmartSchedulingCard({
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [meetingType, setMeetingType] = useState<MeetingType>("video");
   const [isScheduling, setIsScheduling] = useState(false);
-  const [isSendingInvite, setIsSendingInvite] = useState(false);
+  
   const [isSendingTest, setIsSendingTest] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [calendarOpen, setCalendarOpen] = useState(false);
@@ -358,6 +358,16 @@ export function SmartSchedulingCard({
       return;
     }
 
+    if (!inviteFirstName.trim()) {
+      toast.error("Please enter a first name for the invite");
+      return;
+    }
+    
+    if (!inviteEmail?.trim()) {
+      toast.error("Please enter an email address for the calendar invite");
+      return;
+    }
+
     setIsScheduling(true);
     try {
       const [hours, minutes] = selectedTime.split(":").map(Number);
@@ -365,13 +375,17 @@ export function SmartSchedulingCard({
       const endTime = new Date(scheduledAt.getTime() + 30 * 60 * 1000); // 30 min duration
 
       // Use first name input, falling back to contact name
-      const displayName = inviteFirstName || contactName || "Contact";
+      const displayName = inviteFirstName.trim() || contactName || "Contact";
+      const attendeeEmailToUse = inviteEmail.trim();
       
       // Determine if we have a valid lead ID
       const validLeadId = leadId || (contactType === "lead" ? contactId : null);
 
       // Fixed Google Meet link
       const GOOGLE_MEET_LINK = "https://meet.google.com/jww-deey-iaa";
+      const userName = await getCurrentUserName();
+      const formattedDate = format(scheduledAt, "EEEE, MMMM d, yyyy");
+      const formattedTime = format(scheduledAt, "h:mm a");
 
       let callId: string | null = null;
 
@@ -399,9 +413,8 @@ export function SmartSchedulingCard({
         } else {
           callId = call.id;
           
-          // Send branded confirmation email and admin notification via discovery-call-notifications
+          // Send branded confirmation email via discovery-call-notifications
           try {
-            // Send confirmation to lead
             await supabase.functions.invoke("discovery-call-notifications", {
               body: {
                 discoveryCallId: call.id,
@@ -432,36 +445,61 @@ export function SmartSchedulingCard({
         throw new Error("You must be logged in to schedule calls");
       }
 
-      // Create calendar event with Google Meet link and send invite to attendee
+      // Build meeting type specific content
+      const meetingLocation = getMeetingLocation();
+      const meetingTypeLabel = meetingType === "video" ? "Video" : meetingType === "phone" ? "Phone" : "On-site";
+      
+      // Send branded Peachhaus confirmation email
+      let emailBody = `Hi ${displayName}!\n\nYour ${meetingTypeLabel.toLowerCase()} meeting has been scheduled.\n\n📅 Date: ${formattedDate}\n🕐 Time: ${formattedTime} EST\n`;
+      
+      if (meetingType === "video") {
+        emailBody += `📹 Google Meet Link: ${GOOGLE_MEET_LINK}`;
+      } else if (meetingType === "onsite" && meetingLocation) {
+        emailBody += `📍 Location: ${meetingLocation}`;
+      } else {
+        emailBody += "📞 We will call you at the number you provided.";
+      }
+      
+      emailBody += "\n\n⚠️ IMPORTANT: You will receive a separate Google Calendar invitation. Please click \"Yes\" to confirm your attendance.\n\nLooking forward to meeting with you!\n\n- " + userName + " @ PeachHaus Group";
+      
+      // Send the official Peachhaus confirmation email
       try {
-        // Use inviteEmail (user input) for calendar invite, required for sending invite
-        const attendeeEmailToUse = inviteEmail?.trim() || contactEmail;
-        
-        // Build meeting type specific content
-        const meetingLocation = getMeetingLocation();
-        const meetingTypeLabel = meetingType === "video" ? "Video" : meetingType === "phone" ? "Phone" : "On-site";
-        
-        let description = `${meetingTypeLabel} meeting with ${displayName}`;
-        description += contactPhone ? `\nPhone: ${contactPhone}` : "";
-        description += attendeeEmailToUse ? `\nEmail: ${attendeeEmailToUse}` : "";
-        
-        if (meetingType === "video") {
-          description += `\n\n📹 Google Meet: ${GOOGLE_MEET_LINK}`;
-        } else if (meetingType === "onsite" && meetingLocation) {
-          description += `\n\n📍 Location: ${meetingLocation}`;
-        }
-        
-        description += "\n\n⚠️ Please confirm this calendar event by clicking \"Yes\" in the invitation email you received.\n\nScheduled via PeachHaus CRM";
-        
+        await supabase.functions.invoke("send-test-template-email", {
+          body: {
+            templateId: null,
+            testEmail: attendeeEmailToUse,
+            customEmail: {
+              subject: `${meetingTypeLabel} ${meetingType === "onsite" ? "Meeting" : "Call"} Scheduled - PeachHaus Group`,
+              body: emailBody
+            }
+          },
+        });
+        console.log("Peachhaus confirmation email sent");
+      } catch (emailErr) {
+        console.error("Failed to send Peachhaus email:", emailErr);
+      }
+
+      // Create Google Calendar event with invite
+      let calDescription = `${meetingTypeLabel} meeting with ${displayName}\nPhone: ${contactPhone || "N/A"}\nEmail: ${attendeeEmailToUse}`;
+      
+      if (meetingType === "video") {
+        calDescription += `\n\n📹 Google Meet: ${GOOGLE_MEET_LINK}`;
+      } else if (meetingType === "onsite" && meetingLocation) {
+        calDescription += `\n\n📍 Location: ${meetingLocation}`;
+      }
+      
+      calDescription += "\n\n⚠️ Please confirm this calendar event by clicking \"Yes\" in the invitation.\n\nScheduled via PeachHaus CRM";
+
+      try {
         const { data: calResult, error: calError } = await supabase.functions.invoke("google-calendar-sync", {
           body: {
             action: "create-event-direct",
             userId: currentUserId,
             summary: `${meetingTypeLabel} ${meetingType === "onsite" ? "Meeting" : "Call"} with ${displayName}`,
-            description,
+            description: calDescription,
             startTime: scheduledAt.toISOString(),
             endTime: endTime.toISOString(),
-            attendeeEmail: attendeeEmailToUse || undefined,
+            attendeeEmail: attendeeEmailToUse,
             addConferenceData: false,
             meetLink: meetingType === "video" ? GOOGLE_MEET_LINK : undefined,
             location: meetingType === "onsite" ? meetingLocation : undefined,
@@ -470,25 +508,30 @@ export function SmartSchedulingCard({
         
         if (calError) {
           console.error("Calendar event creation failed:", calError);
-          toast.error("Calendar event could not be created, but call is scheduled");
+          toast.error("Meeting scheduled but Google Calendar invite failed - please send manually");
         } else {
-          console.log("Calendar event created:", calResult);
+          console.log("Calendar event with invite created:", calResult);
+          
+          // Update discovery call with calendar event ID if we have one
+          if (callId && calResult?.eventId) {
+            await supabase
+              .from("discovery_calls")
+              .update({ google_calendar_event_id: calResult.eventId })
+              .eq("id", callId);
+          }
         }
       } catch (calErr) {
-        console.error("Calendar sync error:", calErr);
+        console.error("Calendar creation error:", calErr);
+        toast.error("Meeting scheduled but calendar invite failed");
       }
 
-      // Send SMS invite to the contact with calendar confirmation instruction
+      // Send SMS confirmation if we have phone
       if (contactPhone) {
         try {
-          const userName = await getCurrentUserName();
-          const formattedDate = format(scheduledAt, "EEEE, MMM d");
-          const formattedTime = format(scheduledAt, "h:mm a");
+          const smsFormattedDate = format(scheduledAt, "EEEE, MMM d");
+          const smsFormattedTime = format(scheduledAt, "h:mm a");
           
-          const meetingLocation = getMeetingLocation();
-          const meetingTypeLabel = meetingType === "video" ? "video" : meetingType === "phone" ? "phone" : "on-site";
-          
-          let message = `Hi ${displayName}! I've scheduled our ${meetingTypeLabel} meeting for ${formattedDate} at ${formattedTime} EST.`;
+          let message = `Hi ${displayName}! I've scheduled our ${meetingTypeLabel.toLowerCase()} meeting for ${smsFormattedDate} at ${smsFormattedTime} EST.`;
           
           if (meetingType === "video") {
             message += ` Join here: ${GOOGLE_MEET_LINK}`;
@@ -512,7 +555,7 @@ export function SmartSchedulingCard({
         }
       }
 
-      toast.success("Meeting scheduled successfully! Email confirmation sent.");
+      toast.success("Meeting scheduled! Calendar invite & confirmation email sent.");
       onScheduled?.();
       onDismiss();
     } catch (error: any) {
@@ -523,181 +566,6 @@ export function SmartSchedulingCard({
     }
   };
 
-  // Send Calendar Invite - works like live scheduling (creates calendar event + sends invite)
-  const handleSendCalendarInvite = async () => {
-    if (!selectedDate || !selectedTime) {
-      toast.error("Please select a date and time first");
-      return;
-    }
-    
-    if (!inviteFirstName.trim()) {
-      toast.error("Please enter a first name for the invite");
-      return;
-    }
-    
-    if (!inviteEmail?.trim()) {
-      toast.error("Please enter an email address for the calendar invite");
-      return;
-    }
-
-    setIsSendingInvite(true);
-    try {
-      const [hours, minutes] = selectedTime.split(":").map(Number);
-      const scheduledAt = setMinutes(setHours(selectedDate, hours), minutes);
-      const endTime = new Date(scheduledAt.getTime() + 30 * 60 * 1000);
-      
-      const displayName = inviteFirstName.trim();
-      const formattedDate = format(scheduledAt, "EEEE, MMMM d, yyyy");
-      const formattedTime = format(scheduledAt, "h:mm a");
-      const userName = await getCurrentUserName();
-      
-      const GOOGLE_MEET_LINK = "https://meet.google.com/jww-deey-iaa";
-
-      // Get current user ID for calendar operations
-      const { data: { user } } = await supabase.auth.getUser();
-      const currentUserId = user?.id;
-
-      if (!currentUserId) {
-        throw new Error("You must be logged in to send invites");
-      }
-
-      // Determine if we have a valid lead ID
-      const validLeadId = leadId || (contactType === "lead" ? contactId : null);
-
-      // Create discovery call record if we have a lead
-      if (validLeadId) {
-        const { data: call, error: callError } = await supabase
-          .from("discovery_calls")
-          .insert({
-            lead_id: validLeadId,
-            scheduled_at: scheduledAt.toISOString(),
-            status: "scheduled",
-            meeting_type: meetingType,
-            duration_minutes: 30,
-            google_meet_link: meetingType === "video" ? GOOGLE_MEET_LINK : null,
-          })
-          .select()
-          .single();
-
-        if (!callError && call) {
-          // Send branded confirmation email
-          try {
-            await supabase.functions.invoke("discovery-call-notifications", {
-              body: {
-                discoveryCallId: call.id,
-                notificationType: "confirmation",
-              },
-            });
-          } catch (notifErr) {
-            console.error("Failed to send discovery call notification:", notifErr);
-          }
-        }
-      }
-
-      // Use inviteEmail for both email and calendar invite
-      const attendeeEmailToUse = inviteEmail.trim();
-      const meetingLocation = getMeetingLocation();
-      const meetingTypeLabel = meetingType === "video" ? "Video" : meetingType === "phone" ? "Phone" : "On-site";
-      
-      // Build email body with location for on-site
-      let emailBody = `Hi ${displayName}!\n\nYour ${meetingTypeLabel.toLowerCase()} meeting has been scheduled.\n\n📅 Date: ${formattedDate}\n🕐 Time: ${formattedTime} EST\n`;
-      
-      if (meetingType === "video") {
-        emailBody += `📹 Google Meet Link: ${GOOGLE_MEET_LINK}`;
-      } else if (meetingType === "onsite" && meetingLocation) {
-        emailBody += `📍 Location: ${meetingLocation}`;
-      } else {
-        emailBody += "📞 We will call you at the number you provided.";
-      }
-      
-      emailBody += "\n\n⚠️ IMPORTANT: You will receive a separate Google Calendar invitation. Please click \"Yes\" to confirm your attendance.\n\nLooking forward to meeting with you!\n\n- " + userName + " @ PeachHaus Group";
-      
-      // Send branded email via send-test-template-email
-      const { error: emailError } = await supabase.functions.invoke("send-test-template-email", {
-        body: {
-          templateId: null,
-          testEmail: attendeeEmailToUse,
-          customEmail: {
-            subject: `${meetingTypeLabel} ${meetingType === "onsite" ? "Meeting" : "Call"} Scheduled with ${displayName}`,
-            body: emailBody
-          }
-        },
-      });
-
-      if (emailError) {
-        console.error("Email send error:", emailError);
-      }
-
-      // Build description for calendar event
-      let calDescription = `${meetingTypeLabel} meeting with ${displayName}\nPhone: ${contactPhone || "N/A"}\nEmail: ${attendeeEmailToUse}`;
-      
-      if (meetingType === "video") {
-        calDescription += `\n\n📹 Google Meet: ${GOOGLE_MEET_LINK}`;
-      } else if (meetingType === "onsite" && meetingLocation) {
-        calDescription += `\n\n📍 Location: ${meetingLocation}`;
-      }
-      
-      calDescription += "\n\n⚠️ Please confirm this calendar event by clicking \"Yes\" in the invitation.\n\nScheduled via PeachHaus CRM";
-
-      // Create Google Calendar event with invite using the email user entered
-      const { data: calResult, error: calError } = await supabase.functions.invoke("google-calendar-sync", {
-        body: {
-          action: "create-event-direct",
-          userId: currentUserId,
-          summary: `${meetingTypeLabel} ${meetingType === "onsite" ? "Meeting" : "Call"} with ${displayName}`,
-          description: calDescription,
-          startTime: scheduledAt.toISOString(),
-          endTime: endTime.toISOString(),
-          attendeeEmail: attendeeEmailToUse,
-          addConferenceData: false,
-          meetLink: meetingType === "video" ? GOOGLE_MEET_LINK : undefined,
-          location: meetingType === "onsite" ? meetingLocation : undefined,
-        },
-      });
-      
-      if (calError) {
-        console.error("Calendar event creation failed:", calError);
-        toast.error("Email sent but calendar invite failed");
-      } else {
-        console.log("Calendar event created:", calResult);
-        
-        // Send SMS if we have phone
-        if (contactPhone) {
-          const smsFormattedDate = format(scheduledAt, "EEEE, MMM d");
-          const smsFormattedTime = format(scheduledAt, "h:mm a");
-          
-          let message = `Hi ${displayName}! I've scheduled our ${meetingTypeLabel.toLowerCase()} meeting for ${smsFormattedDate} at ${smsFormattedTime} EST.`;
-          
-          if (meetingType === "video") {
-            message += ` Join here: ${GOOGLE_MEET_LINK}`;
-          } else if (meetingType === "onsite" && meetingLocation) {
-            message += ` We'll meet at: ${meetingLocation}`;
-          } else {
-            message += " I'll call you at this number.";
-          }
-          
-          message += ` Check your email & confirm the calendar invite! - ${userName} @ PeachHaus`;
-          
-          await supabase.functions.invoke("ghl-send-sms", {
-            body: {
-              leadId: validLeadId || undefined,
-              phone: contactPhone,
-              message,
-            },
-          });
-        }
-        
-        toast.success("Calendar invite sent successfully!");
-      }
-      
-      onDismiss();
-    } catch (error: any) {
-      console.error("Error sending calendar invite:", error);
-      toast.error(`Failed to send invite: ${error.message}`);
-    } finally {
-      setIsSendingInvite(false);
-    }
-  };
 
   const getCurrentUserName = async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -1081,37 +949,19 @@ Looking forward to our conversation!
             {/* Actions */}
             <div className="flex flex-wrap gap-2 pt-2">
               {selectedDate && selectedTime ? (
-                <>
-                  <Button
-                    size="sm"
-                    onClick={handleScheduleCall}
-                    disabled={isScheduling}
-                    className="gap-1.5"
-                  >
-                    {isScheduling ? (
-                      <Loader2 className="h-3 w-3 animate-spin" />
-                    ) : (
-                      <Check className="h-3 w-3" />
-                    )}
-                    Schedule for {format(selectedDate, "MMM d")} at {timeSlots.find(s => s.time === selectedTime)?.display}
-                  </Button>
-                  
-                  {/* Send Calendar Invite - works like live mode */}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleSendCalendarInvite}
-                    disabled={isSendingInvite || !inviteFirstName.trim()}
-                    className="gap-1.5"
-                  >
-                    {isSendingInvite ? (
-                      <Loader2 className="h-3 w-3 animate-spin" />
-                    ) : (
-                      <Send className="h-3 w-3" />
-                    )}
-                    Send Calendar Invite
-                  </Button>
-                </>
+                <Button
+                  size="sm"
+                  onClick={handleScheduleCall}
+                  disabled={isScheduling || !inviteFirstName.trim() || !inviteEmail?.trim()}
+                  className="gap-1.5"
+                >
+                  {isScheduling ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <Send className="h-3 w-3" />
+                  )}
+                  Schedule & Send Invite
+                </Button>
               ) : (
                 <p className="text-xs text-muted-foreground italic">
                   Select a date and time above to schedule
