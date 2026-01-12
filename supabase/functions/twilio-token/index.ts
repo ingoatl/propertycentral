@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -85,8 +86,11 @@ serve(async (req) => {
       throw new Error('Twilio credentials not fully configured');
     }
 
-    const { identity } = await req.json();
-    const userIdentity = identity || `user-${Date.now()}`;
+    const { identity, userId } = await req.json();
+    
+    // Use userId as identity for tracking which user is making calls
+    // This allows twilio-voice to look up their assigned phone number
+    const userIdentity = userId || identity || `user-${Date.now()}`;
 
     console.log(`Generating token for identity: ${userIdentity}`);
 
@@ -98,10 +102,30 @@ serve(async (req) => {
       TWILIO_TWIML_APP_SID
     );
 
+    // If userId provided, look up their assigned phone number
+    let assignedPhone = null;
+    if (userId) {
+      const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+      const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+      const supabase = createClient(supabaseUrl, supabaseKey);
+
+      const { data: assignment } = await supabase
+        .from('user_phone_assignments')
+        .select('phone_number, display_name')
+        .eq('user_id', userId)
+        .eq('is_active', true)
+        .single();
+
+      if (assignment) {
+        assignedPhone = assignment.phone_number;
+        console.log(`User ${userId} has assigned phone: ${assignedPhone} (${assignment.display_name})`);
+      }
+    }
+
     console.log('Token generated successfully');
 
     return new Response(
-      JSON.stringify({ token, identity: userIdentity }),
+      JSON.stringify({ token, identity: userIdentity, assignedPhone }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 

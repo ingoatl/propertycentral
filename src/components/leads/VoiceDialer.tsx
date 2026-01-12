@@ -23,6 +23,7 @@ import { Device, Call } from "@twilio/voice-sdk";
 import { useQuery } from "@tanstack/react-query";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/components/ProtectedRoute";
 
 interface VoiceDialerProps {
   defaultMessage?: string;
