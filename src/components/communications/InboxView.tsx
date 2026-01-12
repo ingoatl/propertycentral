@@ -353,7 +353,8 @@ export function InboxView() {
   }, [conversationStatuses]);
 
   // Local state for optimistic updates
-  const [localStatusOverrides, setLocalStatusOverrides] = useState<Map<string, ConversationStatusType>>(new Map());
+  // Using plain object instead of Map for better React reactivity
+  const [localStatusOverrides, setLocalStatusOverrides] = useState<Record<string, ConversationStatusType>>({});
 
   // Update conversation status mutation with optimistic updates
   const updateConversationStatus = useMutation({
@@ -401,17 +402,16 @@ export function InboxView() {
       return { contactPhone, contactEmail, status };
     },
     onMutate: async (variables) => {
-      // Optimistic update - immediately update local state
+      // Optimistic update - immediately update local state with plain object spread
       const key = variables.contactPhone 
         ? normalizePhone(variables.contactPhone) 
         : variables.contactEmail?.toLowerCase();
       
       if (key) {
-        setLocalStatusOverrides(prev => {
-          const updated = new Map(prev);
-          updated.set(key, variables.status);
-          return updated;
-        });
+        setLocalStatusOverrides(prev => ({
+          ...prev,
+          [key]: variables.status
+        }));
       }
     },
     onSuccess: (_, variables) => {
@@ -427,16 +427,15 @@ export function InboxView() {
       queryClient.invalidateQueries({ queryKey: ["all-communications"] });
     },
     onError: (error: Error, variables) => {
-      // Revert optimistic update on error
+      // Revert optimistic update on error - remove key from object
       const key = variables.contactPhone 
         ? normalizePhone(variables.contactPhone) 
         : variables.contactEmail?.toLowerCase();
       
       if (key) {
         setLocalStatusOverrides(prev => {
-          const updated = new Map(prev);
-          updated.delete(key);
-          return updated;
+          const { [key]: _, ...rest } = prev;
+          return rest;
         });
       }
       toast.error(`Failed to update: ${error.message}`);
@@ -1173,7 +1172,7 @@ export function InboxView() {
         : comm.contact_email?.toLowerCase();
       
       // Check local optimistic override first (for instant UI updates)
-      const localOverride = key ? localStatusOverrides.get(key) : null;
+      const localOverride = key ? localStatusOverrides[key] : undefined;
       const statusRecord = key ? statusLookup.get(key) : null;
       
       if (localOverride) {
@@ -1947,17 +1946,16 @@ export function InboxView() {
                         }}
                         className={`group relative flex items-start gap-3 px-3 py-3 cursor-pointer transition-all border-b border-border/30 active:bg-muted/50 ${selectedMessage?.id === comm.id ? "bg-primary/5" : "hover:bg-muted/30"} ${isDone ? "opacity-50" : ""}`}
                       >
-                        {/* Done indicator line */}
-                        {isDone && (
+                        {/* Status/Priority indicator line - done takes precedence */}
+                        {isDone ? (
                           <div className="absolute left-0 top-0 bottom-0 w-1 bg-green-500 rounded-r" />
-                        )}
-                        {/* Priority indicator line */}
-                        {comm.priority === "urgent" && (
+                        ) : comm.conversation_status === "awaiting" ? (
+                          <div className="absolute left-0 top-0 bottom-0 w-1 bg-cyan-500 rounded-r" />
+                        ) : comm.priority === "urgent" ? (
                           <div className="absolute left-0 top-0 bottom-0 w-1 bg-red-500 rounded-r" />
-                        )}
-                        {comm.priority === "important" && (
+                        ) : comm.priority === "important" ? (
                           <div className="absolute left-0 top-0 bottom-0 w-1 bg-amber-500 rounded-r" />
-                        )}
+                        ) : null}
                         
                         {/* Compact avatar */}
                         <div className="relative flex-shrink-0">
@@ -2068,17 +2066,16 @@ export function InboxView() {
                       }}
                       className={`group relative flex items-start gap-3 px-3 py-3 cursor-pointer transition-all border-b border-border/30 active:bg-muted/50 ${selectedMessage?.id === comm.id ? "bg-primary/5" : "hover:bg-muted/30"} ${isDone ? "opacity-50" : ""}`}
                     >
-                      {/* Done indicator line */}
-                      {isDone && (
+                      {/* Status/Priority indicator line - done takes precedence */}
+                      {isDone ? (
                         <div className="absolute left-0 top-0 bottom-0 w-1 bg-green-500 rounded-r" />
-                      )}
-                      {/* Priority indicator line */}
-                      {!isDone && comm.priority === "urgent" && (
+                      ) : comm.conversation_status === "awaiting" ? (
+                        <div className="absolute left-0 top-0 bottom-0 w-1 bg-cyan-500 rounded-r" />
+                      ) : comm.priority === "urgent" ? (
                         <div className="absolute left-0 top-0 bottom-0 w-1 bg-red-500 rounded-r" />
-                      )}
-                      {!isDone && comm.priority === "important" && (
+                      ) : comm.priority === "important" ? (
                         <div className="absolute left-0 top-0 bottom-0 w-1 bg-amber-500 rounded-r" />
-                      )}
+                      ) : null}
                       
                       {/* Compact avatar */}
                       <div className="relative flex-shrink-0">
