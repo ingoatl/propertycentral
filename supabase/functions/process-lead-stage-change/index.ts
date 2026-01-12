@@ -491,20 +491,42 @@ function buildFullServicePaymentEmailHtml(recipientName: string, stripeUrl: stri
 
 // Build inspection scheduling email HTML
 function buildInspectionSchedulingEmailHtml(recipientName: string, bookingUrl: string, currentStage: string): string {
+  const SMART_LOCK_URL = "https://www.amazon.com/Yale-Security-Connected-Back-Up-YRD410-WF1-BSP/dp/B0B9HWYMV5";
+  
   return buildBrandedEmailHtml(recipientName, "Schedule Your Onboarding Inspection", [
     {
       isIntro: true,
       content: "You're almost there! The final step before going live is to schedule your onboarding inspection."
     },
     {
-      title: "🏠 What Happens During the Inspection",
+      title: "🛡️ What We'll Cover During Your Inspection",
       content: `
-        <ul style="margin: 0; padding-left: 20px; color: #374151;">
-          <li style="margin-bottom: 8px;">Walk through the property together (in-person or virtual)</li>
-          <li style="margin-bottom: 8px;">Review amenities, access codes, and special features</li>
-          <li style="margin-bottom: 8px;">Take professional photos if needed</li>
-          <li>Ensure everything is ready for your first guests</li>
-        </ul>
+        <table style="width: 100%;">
+          <tr>
+            <td style="padding: 12px 0; border-bottom: 1px solid #e5e7eb; vertical-align: top;">
+              <strong style="color: #f59e0b;">🔍 Safety & Onboarding Check</strong>
+              <p style="margin: 4px 0 0 0; color: #6b7280; font-size: 13px;">We'll document all appliance serial numbers, verify safety equipment (fire extinguishers, smoke/CO detectors), and ensure everything meets guest-ready standards.</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 12px 0; border-bottom: 1px solid #e5e7eb; vertical-align: top;">
+              <strong style="color: #f59e0b;">📋 Property Inventory Check</strong>
+              <p style="margin: 4px 0 0 0; color: #6b7280; font-size: 13px;">We verify that all essential items are in place - linens, kitchen supplies, toiletries, and everything guests need for a 5-star experience.</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 12px 0; border-bottom: 1px solid #e5e7eb; vertical-align: top;">
+              <strong style="color: #f59e0b;">🔐 Smart Lock Verification</strong>
+              <p style="margin: 4px 0 0 0; color: #6b7280; font-size: 13px;">We'll test and verify your smart lock is properly connected and working for seamless guest check-ins.</p>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 12px 0; vertical-align: top;">
+              <strong style="color: #f59e0b;">✨ Final Go-Live Preparation</strong>
+              <p style="margin: 4px 0 0 0; color: #6b7280; font-size: 13px;">After the inspection, your property will be ready to welcome guests!</p>
+            </td>
+          </tr>
+        </table>
       `
     },
     {
@@ -514,6 +536,10 @@ function buildInspectionSchedulingEmailHtml(recipientName: string, bookingUrl: s
     },
     {
       cta: { text: "Schedule Your Inspection →", url: bookingUrl }
+    },
+    {
+      warning: true,
+      content: `<strong>Don't have a smart lock yet?</strong> We recommend the <a href="${SMART_LOCK_URL}" style="color: #1e40af;">Yale Security Smart Lock</a>. Can't install it yourself? We can install it for you at <strong>no extra charge</strong> during your inspection!`
     },
     {
       content: "Once your inspection is complete, we'll finalize your listing and you'll be ready to welcome guests!"
