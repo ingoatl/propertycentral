@@ -37,6 +37,8 @@ import {
   FileText,
   Loader2,
   Mail,
+  CalendarCheck,
+  Tag,
 } from "lucide-react";
 import {
   format,
@@ -55,6 +57,7 @@ import { cn } from "@/lib/utils";
 import { PropertyPhotos } from "@/components/ui/property-photos";
 import { toast } from "sonner";
 import { SendEmailDialog } from "@/components/communications/SendEmailDialog";
+import { useGhlCalendarSync, GhlAppointment } from "@/hooks/useGhlCalendarSync";
 
 interface DiscoveryCall {
   id: string;
@@ -76,6 +79,26 @@ interface DiscoveryCall {
     opportunity_value: number | null;
     notes: string | null;
   } | null;
+}
+
+// Unified calendar event type
+interface CalendarEvent {
+  id: string;
+  type: "discovery" | "ghl";
+  scheduled_at: string;
+  end_time?: string;
+  title: string;
+  status: string;
+  meeting_type?: string;
+  contact_name: string | null;
+  contact_email: string | null;
+  contact_phone: string | null;
+  property_address: string | null;
+  notes: string | null;
+  // Discovery-specific
+  discoveryCall?: DiscoveryCall;
+  // GHL-specific
+  ghlAppointment?: GhlAppointment;
 }
 
 // Calculate revenue potential score
@@ -131,8 +154,10 @@ function getServiceLabel(service: string | null): string {
 export function DiscoveryCallCalendar() {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedCall, setSelectedCall] = useState<DiscoveryCall | null>(null);
+  const [selectedGhlEvent, setSelectedGhlEvent] = useState<GhlAppointment | null>(null);
 
-  const { data: calls = [], isLoading } = useQuery({
+  // Fetch discovery calls
+  const { data: calls = [], isLoading: isLoadingCalls } = useQuery({
     queryKey: ["discovery-calls-calendar", format(currentMonth, "yyyy-MM")],
     queryFn: async () => {
       const monthStart = startOfMonth(currentMonth);
@@ -155,6 +180,27 @@ export function DiscoveryCallCalendar() {
     },
   });
 
+  // Fetch GHL calendar appointments (auto-synced)
+  const { appointments: ghlAppointments, isLoading: isLoadingGhl } = useGhlCalendarSync(currentMonth);
+
+  // Filter GHL appointments to current month and exclude duplicates
+  const filteredGhlAppointments = ghlAppointments.filter((apt) => {
+    const aptDate = new Date(apt.scheduled_at);
+    const monthStart = startOfMonth(currentMonth);
+    const monthEnd = endOfMonth(currentMonth);
+    if (aptDate < monthStart || aptDate > monthEnd) return false;
+    
+    // Check if already in discovery_calls
+    const aptTime = aptDate.getTime();
+    return !calls.some((call) => {
+      const callTime = new Date(call.scheduled_at).getTime();
+      return Math.abs(aptTime - callTime) < 5 * 60 * 1000 && 
+             call.leads?.name?.toLowerCase() === apt.contact_name?.toLowerCase();
+    });
+  });
+
+  const isLoading = isLoadingCalls || isLoadingGhl;
+
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(currentMonth);
   const calendarStart = startOfWeek(monthStart, { weekStartsOn: 0 });
@@ -165,9 +211,29 @@ export function DiscoveryCallCalendar() {
     return calls.filter((call) => isSameDay(new Date(call.scheduled_at), date));
   };
 
+  const getGhlEventsForDay = (date: Date) => {
+    return filteredGhlAppointments.filter((apt) => isSameDay(new Date(apt.scheduled_at), date));
+  };
+
+  const getAllEventsForDay = (date: Date) => {
+    const dayCalls = getCallsForDay(date).map(call => ({ type: 'discovery' as const, data: call, time: new Date(call.scheduled_at) }));
+    const dayGhl = getGhlEventsForDay(date).map(apt => ({ type: 'ghl' as const, data: apt, time: new Date(apt.scheduled_at) }));
+    return [...dayCalls, ...dayGhl].sort((a, b) => a.time.getTime() - b.time.getTime());
+  };
+
   const upcomingCalls = calls
     .filter((call) => new Date(call.scheduled_at) >= new Date() && call.status === "scheduled")
     .slice(0, 5);
+
+  const upcomingGhlEvents = filteredGhlAppointments
+    .filter((apt) => new Date(apt.scheduled_at) >= new Date() && apt.status !== "cancelled")
+    .slice(0, 5);
+
+  // Combined upcoming events
+  const allUpcomingEvents = [
+    ...upcomingCalls.map(call => ({ type: 'discovery' as const, data: call, time: new Date(call.scheduled_at) })),
+    ...upcomingGhlEvents.map(apt => ({ type: 'ghl' as const, data: apt, time: new Date(apt.scheduled_at) })),
+  ].sort((a, b) => a.time.getTime() - b.time.getTime()).slice(0, 8);
 
   return (
     <Card className="col-span-full">
@@ -175,7 +241,18 @@ export function DiscoveryCallCalendar() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <CardTitle className="flex items-center gap-2">
             <Calendar className="h-5 w-5 text-primary" />
-            Discovery Calls
+            Calendar
+            {isLoading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+            <div className="flex gap-1 ml-2">
+              <Badge variant="outline" className="text-xs bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200">
+                <Video className="h-3 w-3 mr-1" />
+                Discovery
+              </Badge>
+              <Badge variant="outline" className="text-xs bg-cyan-100 dark:bg-cyan-900/30 text-cyan-800 dark:text-cyan-200">
+                <CalendarCheck className="h-3 w-3 mr-1" />
+                GHL
+              </Badge>
+            </div>
           </CardTitle>
           <div className="flex items-center gap-2">
             <Button
@@ -201,66 +278,89 @@ export function DiscoveryCallCalendar() {
         </div>
       </CardHeader>
       <CardContent className="px-3 sm:px-6">
-        {/* Mobile: Show upcoming calls list first, then compact calendar */}
+        {/* Mobile: Show upcoming events list first, then compact calendar */}
         <div className="lg:hidden space-y-4">
-          {/* Upcoming calls - Priority on mobile */}
+          {/* Upcoming events - Priority on mobile */}
           <div>
             <h3 className="font-semibold mb-3 flex items-center gap-2 text-sm">
               <Clock className="h-4 w-4" />
-              Upcoming Calls ({upcomingCalls.length})
+              Upcoming ({allUpcomingEvents.length})
             </h3>
-            {upcomingCalls.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-4 text-center">No upcoming calls</p>
+            {allUpcomingEvents.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-4 text-center">No upcoming events</p>
             ) : (
               <div className="space-y-2">
-                {upcomingCalls.map((call) => {
-                  const score = calculateRevenueScore(
-                    call.leads?.property_address || "",
-                    call.leads?.property_type || null
-                  );
-                  return (
-                    <button
-                      key={call.id}
-                      onClick={() => setSelectedCall(call)}
-                      className="w-full text-left p-3 rounded-lg border hover:border-primary active:bg-muted/50 transition-colors"
-                    >
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="font-medium text-sm">
-                          {call.leads?.name || "Unknown"}
-                        </span>
-                        <Badge
-                          variant="outline"
-                          className={cn("text-xs", getScoreColor(score))}
-                        >
-                          {score}
-                        </Badge>
-                      </div>
-                      <div className="text-xs text-muted-foreground space-y-1">
-                        <div className="flex items-center gap-1">
-                          <Calendar className="h-3 w-3" />
-                          {format(new Date(call.scheduled_at), "EEE, MMM d 'at' h:mm a")}
+                {allUpcomingEvents.map((event) => {
+                  if (event.type === 'discovery') {
+                    const call = event.data as DiscoveryCall;
+                    const score = calculateRevenueScore(
+                      call.leads?.property_address || "",
+                      call.leads?.property_type || null
+                    );
+                    return (
+                      <button
+                        key={call.id}
+                        onClick={() => setSelectedCall(call)}
+                        className="w-full text-left p-3 rounded-lg border border-green-200 dark:border-green-800 hover:border-primary active:bg-muted/50 transition-colors bg-green-50/50 dark:bg-green-900/10"
+                      >
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="font-medium text-sm">
+                            {call.leads?.name || "Unknown"}
+                          </span>
+                          <Badge
+                            variant="outline"
+                            className={cn("text-xs", getScoreColor(score))}
+                          >
+                            {score}
+                          </Badge>
                         </div>
-                        <div className="flex items-center justify-between">
+                        <div className="text-xs text-muted-foreground space-y-1">
                           <div className="flex items-center gap-1">
-                            {call.meeting_type === "video" ? (
-                              <Video className="h-3 w-3 text-green-600" />
-                            ) : (
-                              <Phone className="h-3 w-3 text-blue-600" />
-                            )}
-                            {call.meeting_type === "video" ? "Video Call" : "Phone Call"}
+                            <Calendar className="h-3 w-3" />
+                            {format(event.time, "EEE, MMM d 'at' h:mm a")}
                           </div>
-                          {call.leads?.property_address && (
-                            <div className="flex items-center gap-1 truncate max-w-[50%]">
-                              <MapPin className="h-3 w-3 shrink-0" />
-                              <span className="truncate text-[10px]">
-                                {call.leads.property_address.split(',')[0]}
-                              </span>
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-1">
+                              {call.meeting_type === "video" ? (
+                                <Video className="h-3 w-3 text-green-600" />
+                              ) : (
+                                <Phone className="h-3 w-3 text-blue-600" />
+                              )}
+                              Discovery Call
                             </div>
-                          )}
+                          </div>
                         </div>
-                      </div>
-                    </button>
-                  );
+                      </button>
+                    );
+                  } else {
+                    const apt = event.data as GhlAppointment;
+                    return (
+                      <button
+                        key={apt.ghl_event_id}
+                        onClick={() => setSelectedGhlEvent(apt)}
+                        className="w-full text-left p-3 rounded-lg border border-cyan-200 dark:border-cyan-800 hover:border-primary active:bg-muted/50 transition-colors bg-cyan-50/50 dark:bg-cyan-900/10"
+                      >
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="font-medium text-sm">
+                            {apt.contact_name || apt.lead_name || "Unknown"}
+                          </span>
+                          <Badge variant="outline" className="text-xs bg-cyan-100 dark:bg-cyan-900/30 text-cyan-800 dark:text-cyan-200">
+                            GHL
+                          </Badge>
+                        </div>
+                        <div className="text-xs text-muted-foreground space-y-1">
+                          <div className="flex items-center gap-1">
+                            <Calendar className="h-3 w-3" />
+                            {format(event.time, "EEE, MMM d 'at' h:mm a")}
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <CalendarCheck className="h-3 w-3 text-cyan-600" />
+                            {apt.title || "Appointment"}
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  }
                 })}
               </div>
             )}
@@ -283,34 +383,46 @@ export function DiscoveryCallCalendar() {
             {/* Calendar days - compact */}
             <div className="grid grid-cols-7 gap-0.5">
               {days.map((day) => {
-                const dayCalls = getCallsForDay(day);
+                const dayEvents = getAllEventsForDay(day);
                 const isCurrentMonth = isSameMonth(day, currentMonth);
                 const isCurrentDay = isToday(day);
-                const hasCall = dayCalls.length > 0;
+                const hasEvent = dayEvents.length > 0;
+                const hasDiscovery = dayEvents.some(e => e.type === 'discovery');
+                const hasGhl = dayEvents.some(e => e.type === 'ghl');
 
                 return (
                   <button
                     key={day.toISOString()}
-                    onClick={() => hasCall && setSelectedCall(dayCalls[0])}
-                    disabled={!hasCall}
+                    onClick={() => {
+                      if (hasEvent) {
+                        const first = dayEvents[0];
+                        if (first.type === 'discovery') {
+                          setSelectedCall(first.data as DiscoveryCall);
+                        } else {
+                          setSelectedGhlEvent(first.data as GhlAppointment);
+                        }
+                      }
+                    }}
+                    disabled={!hasEvent}
                     className={cn(
                       "aspect-square p-0.5 text-xs rounded transition-colors relative",
                       !isCurrentMonth && "opacity-30",
                       isCurrentDay && "ring-1 ring-primary",
-                      hasCall && "cursor-pointer hover:bg-primary/10",
-                      !hasCall && "cursor-default"
+                      hasEvent && "cursor-pointer hover:bg-primary/10",
+                      !hasEvent && "cursor-default"
                     )}
                   >
                     <span className={cn(
                       "flex items-center justify-center w-full h-full rounded-full text-xs",
                       isCurrentDay && "bg-primary text-primary-foreground font-bold",
-                      hasCall && !isCurrentDay && "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 font-medium"
+                      hasDiscovery && !isCurrentDay && "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 font-medium",
+                      hasGhl && !hasDiscovery && !isCurrentDay && "bg-cyan-100 dark:bg-cyan-900/30 text-cyan-800 dark:text-cyan-200 font-medium"
                     )}>
                       {format(day, "d")}
                     </span>
-                    {dayCalls.length > 1 && (
+                    {dayEvents.length > 1 && (
                       <span className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 text-[8px] text-muted-foreground">
-                        +{dayCalls.length - 1}
+                        +{dayEvents.length - 1}
                       </span>
                     )}
                   </button>
@@ -339,7 +451,7 @@ export function DiscoveryCallCalendar() {
             {/* Calendar days */}
             <div className="grid grid-cols-7 gap-1">
               {days.map((day) => {
-                const dayCalls = getCallsForDay(day);
+                const dayEvents = getAllEventsForDay(day);
                 const isCurrentMonth = isSameMonth(day, currentMonth);
                 const isCurrentDay = isToday(day);
 
@@ -361,45 +473,72 @@ export function DiscoveryCallCalendar() {
                       {format(day, "d")}
                     </div>
                     <div className="space-y-1">
-                      {dayCalls.slice(0, 3).map((call) => {
-                        const score = calculateRevenueScore(
-                          call.leads?.property_address || "",
-                          call.leads?.property_type || null
-                        );
-                        return (
-                          <button
-                            key={call.id}
-                            onClick={() => setSelectedCall(call)}
-                            className={cn(
-                              "w-full text-left text-xs p-1.5 rounded transition-all hover:scale-[1.02]",
-                              call.meeting_type === "video"
-                                ? "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200"
-                                : "bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200"
-                            )}
-                          >
-                            <div className="flex items-center gap-1">
-                              {call.meeting_type === "video" ? (
-                                <Video className="h-3 w-3 shrink-0" />
-                              ) : (
-                                <Phone className="h-3 w-3 shrink-0" />
+                      {dayEvents.slice(0, 4).map((event) => {
+                        if (event.type === 'discovery') {
+                          const call = event.data as DiscoveryCall;
+                          const score = calculateRevenueScore(
+                            call.leads?.property_address || "",
+                            call.leads?.property_type || null
+                          );
+                          return (
+                            <button
+                              key={call.id}
+                              onClick={() => setSelectedCall(call)}
+                              className={cn(
+                                "w-full text-left text-xs p-1.5 rounded transition-all hover:scale-[1.02]",
+                                call.meeting_type === "video"
+                                  ? "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200"
+                                  : "bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200"
                               )}
-                              <span className="truncate font-medium">
-                                {format(new Date(call.scheduled_at), "h:mm a")}
-                              </span>
-                            </div>
-                            <div className="truncate opacity-80">
-                              {call.leads?.name || "Unknown"}
-                            </div>
-                            <div className="flex items-center gap-1 mt-0.5">
-                              <Star className="h-2.5 w-2.5" />
-                              <span className="text-[10px]">{score}</span>
-                            </div>
-                          </button>
-                        );
+                            >
+                              <div className="flex items-center gap-1">
+                                {call.meeting_type === "video" ? (
+                                  <Video className="h-3 w-3 shrink-0" />
+                                ) : (
+                                  <Phone className="h-3 w-3 shrink-0" />
+                                )}
+                                <span className="truncate font-medium">
+                                  {format(new Date(call.scheduled_at), "h:mm a")}
+                                </span>
+                              </div>
+                              <div className="truncate opacity-80">
+                                {call.leads?.name || "Unknown"}
+                              </div>
+                              <div className="flex items-center gap-1 mt-0.5">
+                                <Star className="h-2.5 w-2.5" />
+                                <span className="text-[10px]">{score}</span>
+                              </div>
+                            </button>
+                          );
+                        } else {
+                          const apt = event.data as GhlAppointment;
+                          return (
+                            <button
+                              key={apt.ghl_event_id}
+                              onClick={() => setSelectedGhlEvent(apt)}
+                              className="w-full text-left text-xs p-1.5 rounded transition-all hover:scale-[1.02] bg-cyan-100 dark:bg-cyan-900/30 text-cyan-800 dark:text-cyan-200"
+                            >
+                              <div className="flex items-center gap-1">
+                                <CalendarCheck className="h-3 w-3 shrink-0" />
+                                <span className="truncate font-medium">
+                                  {format(new Date(apt.scheduled_at), "h:mm a")}
+                                </span>
+                              </div>
+                              <div className="truncate opacity-80">
+                                {apt.contact_name || apt.lead_name || "Appointment"}
+                              </div>
+                              {apt.title && (
+                                <div className="truncate text-[10px] opacity-70">
+                                  {apt.title}
+                                </div>
+                              )}
+                            </button>
+                          );
+                        }
                       })}
-                      {dayCalls.length > 3 && (
+                      {dayEvents.length > 4 && (
                         <div className="text-xs text-muted-foreground text-center">
-                          +{dayCalls.length - 3} more
+                          +{dayEvents.length - 4} more
                         </div>
                       )}
                     </div>
@@ -409,63 +548,113 @@ export function DiscoveryCallCalendar() {
             </div>
           </div>
 
-          {/* Upcoming calls sidebar */}
+          {/* Upcoming events sidebar */}
           <div className="lg:col-span-1">
             <h3 className="font-semibold mb-3 flex items-center gap-2">
               <Clock className="h-4 w-4" />
-              Upcoming Calls
+              Upcoming Events
             </h3>
             <ScrollArea className="h-[400px]">
-              {upcomingCalls.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No upcoming calls</p>
+              {allUpcomingEvents.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No upcoming events</p>
               ) : (
                 <div className="space-y-3">
-                  {upcomingCalls.map((call) => {
-                    const score = calculateRevenueScore(
-                      call.leads?.property_address || "",
-                      call.leads?.property_type || null
-                    );
-                    return (
-                      <button
-                        key={call.id}
-                        onClick={() => setSelectedCall(call)}
-                        className="w-full text-left p-3 rounded-lg border hover:border-primary transition-colors"
-                      >
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="font-medium text-sm">
-                            {call.leads?.name || "Unknown"}
-                          </span>
-                          <Badge
-                            variant="outline"
-                            className={cn("text-xs", getScoreColor(score))}
-                          >
-                            {score}
-                          </Badge>
-                        </div>
-                        <div className="text-xs text-muted-foreground space-y-1">
-                          <div className="flex items-center gap-1">
-                            <Calendar className="h-3 w-3" />
-                            {format(new Date(call.scheduled_at), "MMM d, h:mm a")}
+                  {allUpcomingEvents.map((event) => {
+                    if (event.type === 'discovery') {
+                      const call = event.data as DiscoveryCall;
+                      const score = calculateRevenueScore(
+                        call.leads?.property_address || "",
+                        call.leads?.property_type || null
+                      );
+                      return (
+                        <button
+                          key={call.id}
+                          onClick={() => setSelectedCall(call)}
+                          className="w-full text-left p-3 rounded-lg border border-green-200 dark:border-green-800 hover:border-primary transition-colors"
+                        >
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="font-medium text-sm">
+                              {call.leads?.name || "Unknown"}
+                            </span>
+                            <Badge
+                              variant="outline"
+                              className={cn("text-xs", getScoreColor(score))}
+                            >
+                              {score}
+                            </Badge>
                           </div>
-                          <div className="flex items-center gap-1">
-                            {call.meeting_type === "video" ? (
-                              <Video className="h-3 w-3 text-green-600" />
-                            ) : (
-                              <Phone className="h-3 w-3 text-blue-600" />
-                            )}
-                            {call.meeting_type === "video" ? "Video" : "Phone"}
-                          </div>
-                          {call.leads?.property_address && (
-                            <div className="flex items-center gap-1 truncate">
-                              <MapPin className="h-3 w-3 shrink-0" />
-                              <span className="truncate">
-                                {call.leads.property_address}
-                              </span>
+                          <div className="text-xs text-muted-foreground space-y-1">
+                            <div className="flex items-center gap-1">
+                              <Calendar className="h-3 w-3" />
+                              {format(event.time, "MMM d, h:mm a")}
                             </div>
-                          )}
-                        </div>
-                      </button>
-                    );
+                            <div className="flex items-center gap-1">
+                              {call.meeting_type === "video" ? (
+                                <Video className="h-3 w-3 text-green-600" />
+                              ) : (
+                                <Phone className="h-3 w-3 text-blue-600" />
+                              )}
+                              Discovery Call
+                            </div>
+                            {call.leads?.property_address && (
+                              <div className="flex items-center gap-1 truncate">
+                                <MapPin className="h-3 w-3 shrink-0" />
+                                <span className="truncate">
+                                  {call.leads.property_address}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        </button>
+                      );
+                    } else {
+                      const apt = event.data as GhlAppointment;
+                      return (
+                        <button
+                          key={apt.ghl_event_id}
+                          onClick={() => setSelectedGhlEvent(apt)}
+                          className="w-full text-left p-3 rounded-lg border border-cyan-200 dark:border-cyan-800 hover:border-primary transition-colors"
+                        >
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="font-medium text-sm">
+                              {apt.contact_name || apt.lead_name || "Unknown"}
+                            </span>
+                            <Badge variant="outline" className="text-xs bg-cyan-100 dark:bg-cyan-900/30 text-cyan-800 dark:text-cyan-200">
+                              GHL
+                            </Badge>
+                          </div>
+                          <div className="text-xs text-muted-foreground space-y-1">
+                            <div className="flex items-center gap-1">
+                              <Calendar className="h-3 w-3" />
+                              {format(event.time, "MMM d, h:mm a")}
+                              {apt.end_time && (
+                                <span>- {format(new Date(apt.end_time), "h:mm a")}</span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <CalendarCheck className="h-3 w-3 text-cyan-600" />
+                              {apt.title || "Appointment"}
+                            </div>
+                            {(apt.lead_property_address || apt.contact_address) && (
+                              <div className="flex items-center gap-1 truncate">
+                                <MapPin className="h-3 w-3 shrink-0" />
+                                <span className="truncate">
+                                  {apt.lead_property_address || apt.contact_address}
+                                </span>
+                              </div>
+                            )}
+                            {apt.contact_tags && apt.contact_tags.length > 0 && (
+                              <div className="flex items-center gap-1 flex-wrap">
+                                <Tag className="h-3 w-3 shrink-0" />
+                                {apt.contact_tags.slice(0, 2).map((tag, i) => (
+                                  <span key={i} className="text-[10px] bg-muted px-1 rounded">{tag}</span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </button>
+                      );
+                    }
                   })}
                 </div>
               )}
@@ -474,12 +663,109 @@ export function DiscoveryCallCalendar() {
         </div>
       </CardContent>
 
-      {/* Call Detail Modal */}
+      {/* Discovery Call Detail Modal */}
       <DiscoveryCallDetailModal
         call={selectedCall}
         onClose={() => setSelectedCall(null)}
       />
+
+      {/* GHL Appointment Detail Modal */}
+      <GhlAppointmentDetailModal
+        appointment={selectedGhlEvent}
+        onClose={() => setSelectedGhlEvent(null)}
+      />
     </Card>
+  );
+}
+
+// GHL Appointment Detail Modal
+interface GhlAppointmentDetailModalProps {
+  appointment: GhlAppointment | null;
+  onClose: () => void;
+}
+
+function GhlAppointmentDetailModal({ appointment, onClose }: GhlAppointmentDetailModalProps) {
+  if (!appointment) return null;
+
+  const scheduledAt = new Date(appointment.scheduled_at);
+  const endTime = appointment.end_time ? new Date(appointment.end_time) : null;
+
+  return (
+    <Dialog open={!!appointment} onOpenChange={() => onClose()}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <CalendarCheck className="h-5 w-5 text-cyan-600" />
+            {appointment.title || "GHL Appointment"}
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          {/* Time */}
+          <div className="flex items-center gap-2 text-sm">
+            <Clock className="h-4 w-4 text-muted-foreground" />
+            <span>{format(scheduledAt, "EEEE, MMMM d 'at' h:mm a")}</span>
+            {endTime && <span>- {format(endTime, "h:mm a")}</span>}
+          </div>
+
+          {/* Contact Info */}
+          <div className="p-3 rounded-lg border space-y-2">
+            <h4 className="font-semibold text-sm flex items-center gap-2">
+              <User className="h-4 w-4" />
+              {appointment.contact_name || appointment.lead_name || "Unknown Contact"}
+            </h4>
+            {(appointment.contact_email || appointment.lead_email) && (
+              <div className="flex items-center gap-2 text-sm">
+                <Mail className="h-3 w-3 text-muted-foreground" />
+                {appointment.contact_email || appointment.lead_email}
+              </div>
+            )}
+            {(appointment.contact_phone || appointment.lead_phone) && (
+              <div className="flex items-center gap-2 text-sm">
+                <Phone className="h-3 w-3 text-muted-foreground" />
+                {appointment.contact_phone || appointment.lead_phone}
+              </div>
+            )}
+            {(appointment.lead_property_address || appointment.contact_address) && (
+              <div className="flex items-center gap-2 text-sm">
+                <MapPin className="h-3 w-3 text-muted-foreground" />
+                {appointment.lead_property_address || appointment.contact_address}
+              </div>
+            )}
+          </div>
+
+          {/* Lead Details if matched */}
+          {appointment.lead_id && (
+            <div className="p-3 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 space-y-1">
+              <h4 className="font-semibold text-sm text-green-800 dark:text-green-200">Matched Lead</h4>
+              {appointment.lead_stage && (
+                <Badge variant="outline" className="text-xs">{appointment.lead_stage}</Badge>
+              )}
+              {appointment.lead_notes && (
+                <p className="text-xs text-muted-foreground">{appointment.lead_notes}</p>
+              )}
+            </div>
+          )}
+
+          {/* Tags */}
+          {appointment.contact_tags && appointment.contact_tags.length > 0 && (
+            <div className="flex items-center gap-2 flex-wrap">
+              <Tag className="h-4 w-4 text-muted-foreground" />
+              {appointment.contact_tags.map((tag, i) => (
+                <Badge key={i} variant="secondary" className="text-xs">{tag}</Badge>
+              ))}
+            </div>
+          )}
+
+          {/* Notes */}
+          {appointment.notes && (
+            <div className="p-2 rounded-lg bg-muted">
+              <p className="text-sm">{appointment.notes}</p>
+            </div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 

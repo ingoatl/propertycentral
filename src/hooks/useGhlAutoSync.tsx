@@ -58,6 +58,25 @@ export function useGhlAutoSync() {
           console.log("[GHL Sync] Call transcripts result:", callData);
         }
 
+        // Sync GHL calendar appointments (current month + next month)
+        try {
+          const now = new Date();
+          const startTime = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+          const endTime = new Date(now.getFullYear(), now.getMonth() + 2, 0).getTime();
+          
+          const { data: calendarData, error: calendarError } = await supabase.functions.invoke("ghl-sync-calendar", {
+            body: { startTime, endTime }
+          });
+          
+          if (calendarError) {
+            console.error("[GHL Sync] Calendar sync error:", calendarError);
+          } else {
+            console.log("[GHL Sync] Calendar result:", calendarData?.appointmentCount, "appointments");
+          }
+        } catch (calErr) {
+          console.error("[GHL Sync] Calendar sync exception:", calErr);
+        }
+
         // Note: Recall AI transcripts are synced automatically via webhook when meetings complete
         
         // Update last sync time
@@ -67,6 +86,8 @@ export function useGhlAutoSync() {
         queryClient.invalidateQueries({ queryKey: ["all-communications"] });
         queryClient.invalidateQueries({ queryKey: ["lead-communications"] });
         queryClient.invalidateQueries({ queryKey: ["owners-with-comms"] });
+        queryClient.invalidateQueries({ queryKey: ["ghl-calendar-appointments"] });
+        queryClient.invalidateQueries({ queryKey: ["discovery-calls-calendar"] });
         
         console.log("[GHL Sync] Background sync completed");
       } catch (err) {
