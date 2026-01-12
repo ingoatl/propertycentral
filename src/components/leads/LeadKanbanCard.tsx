@@ -1,6 +1,5 @@
 import { memo } from "react";
-import { useSortable } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
+import { useDraggable } from "@dnd-kit/core";
 import { Lead, STAGE_CONFIG } from "@/types/leads";
 import { Phone, Mail, MapPin, Calendar } from "lucide-react";
 import { format } from "date-fns";
@@ -17,14 +16,12 @@ const LeadKanbanCardComponent = ({ lead, onClick }: LeadKanbanCardProps) => {
     listeners,
     setNodeRef,
     transform,
-    transition,
     isDragging,
-  } = useSortable({ id: lead.id });
+  } = useDraggable({ id: lead.id });
 
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-  };
+  const style = transform ? {
+    transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
+  } : undefined;
 
   const stageConfig = STAGE_CONFIG[lead.stage];
 

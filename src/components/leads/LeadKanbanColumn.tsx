@@ -1,6 +1,5 @@
-import { memo, useCallback } from "react";
+import { memo } from "react";
 import { useDroppable } from "@dnd-kit/core";
-import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { Lead, LeadStage, STAGE_CONFIG, LEAD_STAGES } from "@/types/leads";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useState } from "react";
@@ -69,21 +68,19 @@ const LeadKanbanColumnComponent = ({ stage, leads, onSelectLead }: LeadKanbanCol
             isOver && "bg-primary/10"
           )}
         >
-          <SortableContext items={leads.map((l) => l.id)} strategy={verticalListSortingStrategy}>
-            {leads.length === 0 ? (
-              <div className="flex items-center justify-center h-24 text-xs text-muted-foreground border-2 border-dashed border-muted rounded-lg">
-                Drop leads here
-              </div>
-            ) : (
-              leads.map((lead) => (
-                <LeadKanbanCard
-                  key={lead.id}
-                  lead={lead}
-                  onClick={() => onSelectLead(lead)}
-                />
-              ))
-            )}
-          </SortableContext>
+          {leads.length === 0 ? (
+            <div className="flex items-center justify-center h-24 text-xs text-muted-foreground border-2 border-dashed border-muted rounded-lg">
+              Drop leads here
+            </div>
+          ) : (
+            leads.map((lead) => (
+              <LeadKanbanCard
+                key={lead.id}
+                lead={lead}
+                onClick={() => onSelectLead(lead)}
+              />
+            ))
+          )}
         </div>
       )}
     </div>

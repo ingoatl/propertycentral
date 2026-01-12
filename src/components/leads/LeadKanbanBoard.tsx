@@ -2,7 +2,7 @@ import { useState, useCallback } from "react";
 import {
   DndContext,
   DragOverlay,
-  closestCorners,
+  pointerWithin,
   KeyboardSensor,
   PointerSensor,
   useSensor,
@@ -10,7 +10,6 @@ import {
   DragStartEvent,
   DragEndEvent,
 } from "@dnd-kit/core";
-import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { useMutation } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -34,9 +33,7 @@ const LeadKanbanBoard = ({ leads, onSelectLead, onRefresh }: LeadKanbanBoardProp
         distance: 8,
       },
     }),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    })
+    useSensor(KeyboardSensor)
   );
 
   const updateStageMutation = useMutation({
@@ -129,7 +126,7 @@ const LeadKanbanBoard = ({ leads, onSelectLead, onRefresh }: LeadKanbanBoardProp
   return (
     <DndContext
       sensors={sensors}
-      collisionDetection={closestCorners}
+      collisionDetection={pointerWithin}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
