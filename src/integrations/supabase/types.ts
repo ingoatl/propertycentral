@@ -2735,6 +2735,7 @@ export type Database = {
           has_unread_messages: boolean | null
           id: string
           inspection_calendar_event_id: string | null
+          inspection_checklist_responses: Json | null
           inspection_date: string | null
           last_contacted_at: string | null
           last_response_at: string | null
@@ -2773,6 +2774,7 @@ export type Database = {
           has_unread_messages?: boolean | null
           id?: string
           inspection_calendar_event_id?: string | null
+          inspection_checklist_responses?: Json | null
           inspection_date?: string | null
           last_contacted_at?: string | null
           last_response_at?: string | null
@@ -2811,6 +2813,7 @@ export type Database = {
           has_unread_messages?: boolean | null
           id?: string
           inspection_calendar_event_id?: string | null
+          inspection_checklist_responses?: Json | null
           inspection_date?: string | null
           last_contacted_at?: string | null
           last_response_at?: string | null
@@ -6716,6 +6719,76 @@ export type Database = {
             foreignKeyName: "property_schools_property_id_fkey"
             columns: ["property_id"]
             isOneToOne: true
+            referencedRelation: "properties"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      property_setup_tasks: {
+        Row: {
+          category: string | null
+          completed_at: string | null
+          completed_by: string | null
+          created_at: string
+          description: string | null
+          id: string
+          lead_id: string | null
+          notes: string | null
+          priority: string | null
+          property_id: string | null
+          status: string | null
+          task_type: string
+          title: string
+        }
+        Insert: {
+          category?: string | null
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          lead_id?: string | null
+          notes?: string | null
+          priority?: string | null
+          property_id?: string | null
+          status?: string | null
+          task_type: string
+          title: string
+        }
+        Update: {
+          category?: string | null
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          lead_id?: string | null
+          notes?: string | null
+          priority?: string | null
+          property_id?: string | null
+          status?: string | null
+          task_type?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "property_setup_tasks_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "property_setup_tasks_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
+            referencedRelation: "comprehensive_property_data"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "property_setup_tasks_property_id_fkey"
+            columns: ["property_id"]
+            isOneToOne: false
             referencedRelation: "properties"
             referencedColumns: ["id"]
           },

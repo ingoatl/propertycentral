@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { 
   Calendar, Clock, User, Check, ArrowRight, ArrowLeft, MapPin, 
   ClipboardCheck, Home, Phone, Mail, Download, ExternalLink,
-  Flame, ShowerHead, LockKeyhole, CheckCircle2
+  Flame, ShowerHead, LockKeyhole, CheckCircle2, Wifi
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
@@ -127,6 +128,7 @@ const formatPhone = (value: string): string => {
 
 export default function BookInspection() {
   const queryClient = useQueryClient();
+  const [searchParams] = useSearchParams();
   const [step, setStep] = useState(1);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
@@ -142,8 +144,36 @@ export default function BookInspection() {
     stoveType: "",
     hasPlungers: "",
     hasSmartLock: "",
+    wifiWorking: "",
     additionalNotes: "",
+    leadId: "",
+    propertyId: "",
+    propertyImage: "",
   });
+
+  // Prefill from URL params (from lead/onboarding)
+  useEffect(() => {
+    const name = searchParams.get('name');
+    const email = searchParams.get('email');
+    const phone = searchParams.get('phone');
+    const address = searchParams.get('address');
+    const leadId = searchParams.get('leadId');
+    const propertyId = searchParams.get('propertyId');
+    const propertyImage = searchParams.get('propertyImage');
+
+    if (name || email || address) {
+      setFormData(prev => ({
+        ...prev,
+        name: name || prev.name,
+        email: email || prev.email,
+        phone: phone || prev.phone,
+        propertyAddress: address || prev.propertyAddress,
+        leadId: leadId || prev.leadId,
+        propertyId: propertyId || prev.propertyId,
+        propertyImage: propertyImage || prev.propertyImage,
+      }));
+    }
+  }, [searchParams]);
   
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [touched, setTouched] = useState<Record<string, boolean>>({});
@@ -213,6 +243,9 @@ export default function BookInspection() {
     if (!formData.hasSmartLock) {
       newErrors.hasSmartLock = "Please answer this question";
     }
+    if (!formData.wifiWorking) {
+      newErrors.wifiWorking = "Please answer this question";
+    }
     
     setErrors(prev => ({ ...prev, ...newErrors }));
     return Object.keys(newErrors).length === 0;
@@ -226,12 +259,24 @@ export default function BookInspection() {
       const [hours, minutes] = selectedTime.split(":").map(Number);
       const scheduledAt = setMinutes(setHours(selectedDate, hours), minutes);
 
+      // Structured checklist responses for database storage
+      const checklistResponses = {
+        hasFireExtinguisher: formData.hasFireExtinguisher,
+        hasFireBlanket: formData.hasFireBlanket,
+        stoveType: formData.stoveType,
+        hasPlungers: formData.hasPlungers,
+        hasSmartLock: formData.hasSmartLock,
+        wifiWorking: formData.wifiWorking,
+        additionalNotes: formData.additionalNotes,
+      };
+
       const safetyNotes = [
         `Fire Extinguisher: ${formData.hasFireExtinguisher === 'yes' ? 'Yes' : 'No'}`,
         `Fire Blanket Near Stove: ${formData.hasFireBlanket === 'yes' ? 'Yes' : 'No'}`,
         `Stove Type: ${formData.stoveType === 'gas' ? 'Gas' : 'Electric'}`,
         `Plunger in Every Bathroom: ${formData.hasPlungers === 'yes' ? 'Yes' : 'No'}`,
         `Has Smart Lock: ${formData.hasSmartLock === 'yes' ? 'Yes, already installed' : formData.hasSmartLock === 'need_install' ? 'Need PeachHaus to install' : 'Will purchase and install'}`,
+        `WiFi Working: ${formData.wifiWorking === 'yes' ? 'Yes' : 'No'}`,
         formData.additionalNotes ? `Additional Notes: ${formData.additionalNotes}` : "",
       ].filter(Boolean).join("\n");
 
@@ -246,6 +291,10 @@ export default function BookInspection() {
           inspectionType: formData.inspectionType,
           scheduledAt: scheduledAt.toISOString(),
           safetyNotes,
+          checklistResponses,
+          leadId: formData.leadId || undefined,
+          propertyId: formData.propertyId || undefined,
+          propertyImage: formData.propertyImage || undefined,
         }
       });
 
@@ -710,6 +759,42 @@ export default function BookInspection() {
                       )}
                     </CardContent>
                   </Card>
+                )}
+              </div>
+
+              {/* WiFi */}
+              <div className="space-y-3">
+                <Label className="flex items-center gap-2">
+                  <Wifi className="h-4 w-4 text-green-500" />
+                  Is the WiFi set up and working at the property? *
+                </Label>
+                <RadioGroup
+                  value={formData.wifiWorking}
+                  onValueChange={(value) => setFormData(prev => ({ ...prev, wifiWorking: value }))}
+                  className="flex gap-4"
+                >
+                  <label className={cn(
+                    "flex items-center gap-2 px-4 py-2 rounded-lg border cursor-pointer",
+                    formData.wifiWorking === "yes" ? "border-primary bg-primary/5" : "border-muted"
+                  )}>
+                    <RadioGroupItem value="yes" />
+                    <span>Yes, working</span>
+                  </label>
+                  <label className={cn(
+                    "flex items-center gap-2 px-4 py-2 rounded-lg border cursor-pointer",
+                    formData.wifiWorking === "no" ? "border-primary bg-primary/5" : "border-muted"
+                  )}>
+                    <RadioGroupItem value="no" />
+                    <span>Not yet / Not sure</span>
+                  </label>
+                </RadioGroup>
+                {errors.wifiWorking && (
+                  <p className="text-xs text-destructive">{errors.wifiWorking}</p>
+                )}
+                {formData.wifiWorking === "no" && (
+                  <p className="text-xs text-amber-600 bg-amber-50 p-2 rounded">
+                    ⚠️ Please ensure WiFi is set up before the inspection. Smart lock configuration requires an active internet connection.
+                  </p>
                 )}
               </div>
             </div>
