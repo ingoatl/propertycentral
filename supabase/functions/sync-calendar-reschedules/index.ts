@@ -17,6 +17,28 @@ const CALENDAR_SYNC_USER_ID = Deno.env.get("CALENDAR_SYNC_USER_ID");
 
 const MCP_SERVER_URL = "https://remote.mcp.pipedream.net";
 
+// INSPECTION TIME VALIDATION: Only 11am-2pm EST (16:00-19:00 UTC) on Tue/Wed/Thu
+const isValidInspectionTime = (date: Date): { valid: boolean; reason?: string } => {
+  // Convert to Eastern Time for validation
+  const estOffset = -5; // EST offset (ignoring DST for simplicity)
+  const utcHour = date.getUTCHours();
+  const estHour = (utcHour + estOffset + 24) % 24;
+  const dayOfWeek = date.getUTCDay();
+  
+  // Check day of week: Tuesday (2), Wednesday (3), Thursday (4)
+  if (dayOfWeek !== 2 && dayOfWeek !== 3 && dayOfWeek !== 4) {
+    return { valid: false, reason: `Inspections only on Tue/Wed/Thu (got day ${dayOfWeek})` };
+  }
+  
+  // Check time: 11am-2pm EST = 11:00-14:00 EST
+  // In UTC: 16:00-19:00 (EST = UTC-5)
+  if (estHour < 11 || estHour >= 15) { // 11am to before 3pm (last slot is 2:30)
+    return { valid: false, reason: `Inspections only 11am-2pm EST (got ${estHour}:${date.getUTCMinutes().toString().padStart(2, '0')} EST)` };
+  }
+  
+  return { valid: true };
+};
+
 async function getPipedreamAccessToken(): Promise<string> {
   const response = await fetch("https://api.pipedream.com/v1/oauth/token", {
     method: "POST",
@@ -135,7 +157,7 @@ serve(async (req) => {
     // Get all discovery calls with google_calendar_event_id that are scheduled
     const { data: discoveryCallsWithEvents, error: callsError } = await supabase
       .from("discovery_calls")
-      .select("id, scheduled_at, google_calendar_event_id, status, leads(id, name, email)")
+      .select("id, scheduled_at, google_calendar_event_id, status, meeting_type, meeting_notes, leads(id, name, email)")
       .not("google_calendar_event_id", "is", null)
       .in("status", ["scheduled", "confirmed"])
       .gte("scheduled_at", new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()) // Last 7 days + future
@@ -272,6 +294,7 @@ serve(async (req) => {
     // Check each discovery call against Google Calendar
     const updates: any[] = [];
     const cancelled: any[] = [];
+    const rejected: any[] = []; // Inspection reschedules blocked due to invalid times
 
     for (const call of discoveryCallsWithEvents) {
       const eventId = call.google_calendar_event_id;
@@ -331,6 +354,37 @@ serve(async (req) => {
         console.log(`  - Original: ${callDate.toISOString()}`);
         console.log(`  - New: ${googleDate.toISOString()}`);
         console.log(`  - Lead: ${call.leads?.name}`);
+        console.log(`  - Meeting type: ${call.meeting_type}`);
+
+        // VALIDATE INSPECTION TIMES: Block invalid reschedules for inspections
+        const isInspection = call.meeting_type === 'inspection' || call.meeting_type === 'virtual_inspection';
+        
+        if (isInspection) {
+          const validation = isValidInspectionTime(googleDate);
+          if (!validation.valid) {
+            console.error(`[Calendar Reschedule Sync] BLOCKED invalid inspection reschedule for ${call.leads?.name}:`);
+            console.error(`  - Reason: ${validation.reason}`);
+            console.error(`  - Attempted new time: ${googleDate.toISOString()}`);
+            
+            // Don't update, add to rejected list
+            rejected.push({
+              callId: call.id,
+              leadName: call.leads?.name,
+              attemptedTime: googleDate.toISOString(),
+              reason: validation.reason || "Invalid inspection time"
+            });
+            
+            // Add note to the call about the rejected reschedule
+            await supabase
+              .from("discovery_calls")
+              .update({
+                meeting_notes: `${call.meeting_notes || ""}\n\n⚠️ [Auto-blocked] Attempted reschedule to ${googleDate.toLocaleString()} was REJECTED: ${validation.reason}. In-person inspections can only be scheduled Tue-Thu, 11am-2pm EST.`
+              })
+              .eq("id", call.id);
+            
+            continue;
+          }
+        }
 
         // Update the discovery call with new time
         const { error: updateError } = await supabase
@@ -351,14 +405,27 @@ serve(async (req) => {
             newTime: googleDate.toISOString()
           });
 
+          // Update lead's inspection_date if this is an inspection
+          if (isInspection && call.leads?.id) {
+            await supabase
+              .from("leads")
+              .update({ inspection_date: googleDate.toISOString() })
+              .eq("id", call.leads.id);
+          }
+
           // Add to lead timeline
           if (call.leads?.id) {
+            const eventType = isInspection ? "inspection_rescheduled" : "call_rescheduled";
+            const description = isInspection 
+              ? `Inspection rescheduled from ${callDate.toLocaleString()} to ${googleDate.toLocaleString()} (updated via Google Calendar sync)`
+              : `Discovery call rescheduled from ${callDate.toLocaleString()} to ${googleDate.toLocaleString()} (updated via Google Calendar sync)`;
+            
             await supabase
               .from("lead_timeline")
               .insert({
                 lead_id: call.leads.id,
-                event_type: "call_rescheduled",
-                description: `Discovery call rescheduled from ${callDate.toLocaleString()} to ${googleDate.toLocaleString()} (updated via Google Calendar sync)`,
+                event_type: eventType,
+                description: description,
                 metadata: {
                   original_time: callDate.toISOString(),
                   new_time: googleDate.toISOString(),
@@ -370,14 +437,16 @@ serve(async (req) => {
       }
     }
 
-    console.log(`[Calendar Reschedule Sync] Completed. Updated: ${updates.length}, Cancelled: ${cancelled.length}`);
+    console.log(`[Calendar Reschedule Sync] Completed. Updated: ${updates.length}, Cancelled: ${cancelled.length}, Rejected: ${rejected.length}`);
 
     return new Response(JSON.stringify({ 
       success: true, 
       updated: updates.length,
       cancelled: cancelled.length,
+      rejected: rejected.length,
       updates,
-      cancelledCalls: cancelled
+      cancelledCalls: cancelled,
+      rejectedReschedules: rejected
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
