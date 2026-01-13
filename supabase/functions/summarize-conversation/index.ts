@@ -124,29 +124,44 @@ serve(async (req) => {
       if (leadId && comm.lead_id === leadId) return true;
       if (ownerId && comm.owner_id === ownerId) return true;
 
-      // Match by phone number in metadata
+      const meta = comm.metadata || {};
+      const ghlData = meta.ghl_data || {};
+
+      // Match by phone number in metadata - check multiple possible locations
       if (searchPhoneNormalized) {
-        const fromNum = normalizePhone(comm.metadata?.from_number || "");
-        const toNum = normalizePhone(comm.metadata?.to_number || "");
-        const metaPhone = normalizePhone(comm.metadata?.phone || "");
+        const phonesToCheck = [
+          meta.from_number,
+          meta.to_number,
+          meta.phone,
+          meta.contactPhone,
+          ghlData.contactPhone,
+          ghlData.from,
+          ghlData.to,
+        ];
         
-        if (fromNum === searchPhoneNormalized || 
-            toNum === searchPhoneNormalized ||
-            metaPhone === searchPhoneNormalized) {
-          return true;
+        for (const phone of phonesToCheck) {
+          if (phone && normalizePhone(phone) === searchPhoneNormalized) {
+            return true;
+          }
         }
       }
 
-      // Match by email in metadata
+      // Match by email in metadata - check multiple possible locations
       if (searchEmailLower) {
-        const fromEmail = (comm.metadata?.from_email || "").toLowerCase();
-        const toEmail = (comm.metadata?.to_email || "").toLowerCase();
-        const metaEmail = (comm.metadata?.email || "").toLowerCase();
+        const emailsToCheck = [
+          meta.from_email,
+          meta.to_email,
+          meta.email,
+          meta.contactEmail,
+          ghlData.contactEmail,
+          ghlData.from,
+          ghlData.to,
+        ];
         
-        if (fromEmail === searchEmailLower || 
-            toEmail === searchEmailLower ||
-            metaEmail === searchEmailLower) {
-          return true;
+        for (const email of emailsToCheck) {
+          if (email && email.toLowerCase() === searchEmailLower) {
+            return true;
+          }
         }
       }
 
