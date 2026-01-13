@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
-import { ChevronLeft, ChevronRight, Maximize2, Minimize2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Maximize2, Minimize2, Home } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { Link } from "react-router-dom";
 
 // Import slides
 import { TitleSlide } from "@/components/presentation/slides/TitleSlide";
@@ -14,26 +15,30 @@ import { RevenueComparisonSlide } from "@/components/presentation/slides/Revenue
 import { CorporateNetworkSlide } from "@/components/presentation/slides/CorporateNetworkSlide";
 import { CaseStudySlide } from "@/components/presentation/slides/CaseStudySlide";
 import { WhatSetsUsApartSlide } from "@/components/presentation/slides/WhatSetsUsApartSlide";
+import { WhatWeDoMoreSlide } from "@/components/presentation/slides/WhatWeDoMoreSlide";
+import { OnboardingTimelineSlide } from "@/components/presentation/slides/OnboardingTimelineSlide";
 import { HowItWorksSlide } from "@/components/presentation/slides/HowItWorksSlide";
 import { PricingSlide } from "@/components/presentation/slides/PricingSlide";
 import { ClosingSlide } from "@/components/presentation/slides/ClosingSlide";
 
 const SLIDES = [
-  { id: "title", component: TitleSlide },
-  { id: "founders", component: MeetTheFoundersSlide },
-  { id: "mission", component: MissionSlide },
-  { id: "numbers", component: ByTheNumbersSlide },
-  { id: "problem", component: ProblemSolutionSlide },
-  { id: "strategies", component: ThreeStrategiesSlide },
-  { id: "revenue", component: RevenueComparisonSlide },
-  { id: "corporate", component: CorporateNetworkSlide },
-  { id: "case-woodland", component: () => <CaseStudySlide propertyName="Woodland Lane" /> },
-  { id: "case-berkley", component: () => <CaseStudySlide propertyName="The Berkley" /> },
-  { id: "case-lavish", component: () => <CaseStudySlide propertyName="Lavish Living" /> },
-  { id: "apart", component: WhatSetsUsApartSlide },
-  { id: "how", component: HowItWorksSlide },
-  { id: "pricing", component: PricingSlide },
-  { id: "closing", component: ClosingSlide },
+  { id: "title", component: TitleSlide, label: "Welcome" },
+  { id: "founders", component: MeetTheFoundersSlide, label: "Team" },
+  { id: "mission", component: MissionSlide, label: "Mission" },
+  { id: "numbers", component: ByTheNumbersSlide, label: "Stats" },
+  { id: "problem", component: ProblemSolutionSlide, label: "Solutions" },
+  { id: "strategies", component: ThreeStrategiesSlide, label: "Strategies" },
+  { id: "revenue", component: RevenueComparisonSlide, label: "Revenue" },
+  { id: "corporate", component: CorporateNetworkSlide, label: "Network" },
+  { id: "case-woodland", component: () => <CaseStudySlide propertyName="Woodland Lane" />, label: "Case 1" },
+  { id: "case-berkley", component: () => <CaseStudySlide propertyName="The Berkley" />, label: "Case 2" },
+  { id: "case-lavish", component: () => <CaseStudySlide propertyName="Lavish Living" />, label: "Case 3" },
+  { id: "what-more", component: WhatWeDoMoreSlide, label: "Difference" },
+  { id: "apart", component: WhatSetsUsApartSlide, label: "Why Us" },
+  { id: "timeline", component: OnboardingTimelineSlide, label: "Timeline" },
+  { id: "how", component: HowItWorksSlide, label: "Process" },
+  { id: "pricing", component: PricingSlide, label: "Pricing" },
+  { id: "closing", component: ClosingSlide, label: "Contact" },
 ];
 
 export default function OnboardingPresentation() {
@@ -168,7 +173,19 @@ export default function OnboardingPresentation() {
         </Button>
       </div>
 
-      {/* Top Right Controls */}
+      {/* Top Controls */}
+      <div className="fixed top-6 left-6 z-50">
+        <Link to="/">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-9 w-9 rounded-full bg-white/10 hover:bg-white/20 text-white border border-white/20 backdrop-blur-sm"
+          >
+            <Home className="h-4 w-4" />
+          </Button>
+        </Link>
+      </div>
+
       <div className="fixed top-6 right-6 flex items-center gap-3 z-50">
         <span className="text-white/60 text-sm font-medium">
           {currentSlide + 1} / {SLIDES.length}

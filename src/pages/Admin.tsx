@@ -8,7 +8,8 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { CheckCircle, XCircle, Clock, Shield, UserPlus, Key, Users, MessageCircleQuestion, UserCog, Bug, Mail, Database, Briefcase, Sparkles, Star, Calendar, Phone, FileText, FileArchive, Home } from "lucide-react";
+import { CheckCircle, XCircle, Clock, Shield, UserPlus, Key, Users, MessageCircleQuestion, UserCog, Bug, Mail, Database, Briefcase, Sparkles, Star, Calendar, Phone, FileText, FileArchive, Home, Presentation } from "lucide-react";
+import { Link } from "react-router-dom";
 import { RescheduleLogsTab } from "@/components/admin/RescheduleLogsTab";
 import { z } from "zod";
 import { TeamMatrixTab } from "@/components/admin/TeamMatrixTab";
@@ -389,13 +390,21 @@ const Admin = () => {
 
   return (
     <div className="space-y-8 pb-20">
-      <div className="mb-8">
-        <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-primary via-primary-light to-accent bg-clip-text text-transparent">
-          Admin Panel
-        </h1>
-        <p className="text-muted-foreground">
-          Manage user accounts, permissions, team roles, and access to the system
-        </p>
+      <div className="mb-8 flex items-start justify-between">
+        <div>
+          <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-primary via-primary-light to-accent bg-clip-text text-transparent">
+            Admin Panel
+          </h1>
+          <p className="text-muted-foreground">
+            Manage user accounts, permissions, team roles, and access to the system
+          </p>
+        </div>
+        <Link to="/onboarding-presentation">
+          <Button className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white">
+            <Presentation className="h-4 w-4 mr-2" />
+            Owner Presentation
+          </Button>
+        </Link>
       </div>
 
       <Tabs defaultValue="users" className="w-full">
