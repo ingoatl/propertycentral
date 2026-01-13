@@ -26,16 +26,18 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Fetch conversation history - support all contact types
-    let query = supabase
-      .from("lead_communications")
-      .select("id, direction, body, subject, communication_type, created_at, transcript")
-      .order("created_at", { ascending: true });
-
+    let communications: any[] = [];
     let contactName = "Contact";
     let contactType = "external";
 
     if (leadId) {
-      query = query.eq("lead_id", leadId);
+      const { data } = await supabase
+        .from("lead_communications")
+        .select("id, direction, body, subject, communication_type, created_at, transcript")
+        .eq("lead_id", leadId)
+        .order("created_at", { ascending: true });
+      communications = data || [];
+      
       const { data: lead } = await supabase
         .from("leads")
         .select("name, phone, email")
@@ -46,7 +48,13 @@ serve(async (req) => {
         contactType = "lead";
       }
     } else if (ownerId) {
-      query = query.eq("owner_id", ownerId);
+      const { data } = await supabase
+        .from("lead_communications")
+        .select("id, direction, body, subject, communication_type, created_at, transcript")
+        .eq("owner_id", ownerId)
+        .order("created_at", { ascending: true });
+      communications = data || [];
+      
       const { data: owner } = await supabase
         .from("property_owners")
         .select("name, phone, email")
@@ -57,8 +65,30 @@ serve(async (req) => {
         contactType = "owner";
       }
     } else if (contactPhone) {
-      // External conversation by phone
-      query = query.or(`metadata->from_number.eq.${contactPhone},metadata->to_number.eq.${contactPhone}`);
+      // External conversation by phone - query using JSONB containment
+      const normalizedPhone = contactPhone.replace(/\D/g, "");
+      const phoneVariants = [
+        contactPhone,
+        `+${normalizedPhone}`,
+        `+1${normalizedPhone}`,
+        normalizedPhone,
+      ];
+      
+      // Query all communications that have this phone in metadata
+      const { data } = await supabase
+        .from("lead_communications")
+        .select("id, direction, body, subject, communication_type, created_at, transcript, metadata")
+        .is("lead_id", null)
+        .is("owner_id", null)
+        .order("created_at", { ascending: true });
+      
+      // Filter by phone in metadata
+      communications = (data || []).filter(comm => {
+        const fromNum = comm.metadata?.from_number || "";
+        const toNum = comm.metadata?.to_number || "";
+        return phoneVariants.some(pv => fromNum.includes(pv) || toNum.includes(pv) || pv.includes(fromNum) || pv.includes(toNum));
+      });
+      
       contactName = `Phone ${contactPhone}`;
       contactType = "external_phone";
       
@@ -73,7 +103,21 @@ serve(async (req) => {
       }
     } else if (contactEmail) {
       // External conversation by email
-      query = query.or(`metadata->from_email.eq.${contactEmail},metadata->to_email.eq.${contactEmail}`);
+      const { data } = await supabase
+        .from("lead_communications")
+        .select("id, direction, body, subject, communication_type, created_at, transcript, metadata")
+        .is("lead_id", null)
+        .is("owner_id", null)
+        .order("created_at", { ascending: true });
+      
+      // Filter by email in metadata or subject
+      communications = (data || []).filter(comm => {
+        const fromEmail = comm.metadata?.from_email || "";
+        const toEmail = comm.metadata?.to_email || "";
+        return fromEmail.includes(contactEmail) || toEmail.includes(contactEmail) || 
+               (comm.subject && comm.subject.includes(contactEmail));
+      });
+      
       contactName = contactEmail;
       contactType = "external_email";
       
@@ -87,10 +131,15 @@ serve(async (req) => {
         contactName = matchingLead.name;
       }
     } else {
-      throw new Error("At least one identifier (leadId, ownerId, contactPhone, or contactEmail) is required");
+      // No identifier provided - return helpful error
+      return new Response(
+        JSON.stringify({ 
+          error: "No contact identifier provided. Need leadId, ownerId, contactPhone, or contactEmail.",
+          success: false
+        }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
-
-    const { data: communications } = await query;
 
     if (!communications || communications.length < 3) {
       return new Response(
