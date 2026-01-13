@@ -7306,6 +7306,56 @@ export type Database = {
         }
         Relationships: []
       }
+      team_routing: {
+        Row: {
+          created_at: string | null
+          display_name: string
+          dtmf_digit: string | null
+          forward_to_browser: boolean | null
+          forward_to_number: string | null
+          ghl_number: string
+          id: string
+          is_active: boolean | null
+          updated_at: string | null
+          user_id: string | null
+          voicemail_enabled: boolean | null
+        }
+        Insert: {
+          created_at?: string | null
+          display_name: string
+          dtmf_digit?: string | null
+          forward_to_browser?: boolean | null
+          forward_to_number?: string | null
+          ghl_number: string
+          id?: string
+          is_active?: boolean | null
+          updated_at?: string | null
+          user_id?: string | null
+          voicemail_enabled?: boolean | null
+        }
+        Update: {
+          created_at?: string | null
+          display_name?: string
+          dtmf_digit?: string | null
+          forward_to_browser?: boolean | null
+          forward_to_number?: string | null
+          ghl_number?: string
+          id?: string
+          is_active?: boolean | null
+          updated_at?: string | null
+          user_id?: string | null
+          voicemail_enabled?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_routing_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tenant_applications: {
         Row: {
           applicant_email: string | null

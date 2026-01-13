@@ -274,7 +274,7 @@ export default function BookInspection() {
         `Fire Extinguisher: ${formData.hasFireExtinguisher === 'yes' ? 'Yes' : 'No'}`,
         `Fire Blanket Near Stove: ${formData.hasFireBlanket === 'yes' ? 'Yes' : 'No'}`,
         `Stove Type: ${formData.stoveType === 'gas' ? 'Gas' : 'Electric'}`,
-        `Plunger in Every Bathroom: ${formData.hasPlungers === 'yes' ? 'Yes' : 'No'}`,
+        `Plunger on Property: ${formData.hasPlungers === 'yes' ? 'Yes' : 'No'}`,
         `Has Smart Lock: ${formData.hasSmartLock === 'yes' ? 'Yes, already installed' : formData.hasSmartLock === 'need_install' ? 'Need PeachHaus to install' : 'Will purchase and install'}`,
         `WiFi Working: ${formData.wifiWorking === 'yes' ? 'Yes' : 'No'}`,
         formData.additionalNotes ? `Additional Notes: ${formData.additionalNotes}` : "",
@@ -672,11 +672,11 @@ export default function BookInspection() {
                 )}
               </div>
 
-              {/* Plungers */}
+              {/* Plunger */}
               <div className="space-y-3">
                 <Label className="flex items-center gap-2">
                   <ShowerHead className="h-4 w-4 text-blue-500" />
-                  Is there a plunger in every bathroom? *
+                  Is there a plunger on the property? *
                 </Label>
                 <RadioGroup
                   value={formData.hasPlungers}

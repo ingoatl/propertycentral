@@ -106,11 +106,10 @@ export const INSPECTION_SECTIONS: InspectionSection[] = [
     ]
   },
   {
-    id: "bathrooms",
-    title: "Bathrooms",
+    id: "essentials-misc",
+    title: "Essentials & Supplies",
     fields: [
-      { key: "bathroom1_plunger_present", label: "Bathroom 1: Plunger present", responsibleParty: "pm" },
-      { key: "bathroom2_plunger_present", label: "Bathroom 2: Plunger present", responsibleParty: "pm" }
+      { key: "plunger_on_property", label: "Plunger present on property", responsibleParty: "pm" }
     ]
   }
 ];

@@ -47,7 +47,9 @@ const VoiceDialer = ({ defaultMessage }: VoiceDialerProps) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [isSendingSMS, setIsSendingSMS] = useState(false);
   const [selectedContact, setSelectedContact] = useState<ContactRecord | null>(null);
+  const [selectedCallerId, setSelectedCallerId] = useState<string>("");
   const isMobile = useIsMobile();
+  const { user } = useAuth();
   
   const deviceRef = useRef<Device | null>(null);
   const callRef = useRef<Call | null>(null);
@@ -59,6 +61,26 @@ const VoiceDialer = ({ defaultMessage }: VoiceDialerProps) => {
     ["7", "8", "9"],
     ["*", "0", "#"],
   ];
+
+  // Fetch user's caller ID options (GHL numbers assigned to them)
+  const { data: callerIdOptions = [] } = useQuery({
+    queryKey: ['caller-id-options', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      
+      // Get team routing numbers for this user, or all if admin
+      const { data: teamRouting } = await supabase
+        .from('team_routing')
+        .select('ghl_number, display_name')
+        .eq('is_active', true);
+      
+      return teamRouting?.map(t => ({
+        value: t.ghl_number,
+        label: `${t.display_name} (${t.ghl_number})`
+      })) || [];
+    },
+    enabled: open && !!user?.id,
+  });
 
   // Fetch owners and leads for search
   const { data: contacts = [] } = useQuery({

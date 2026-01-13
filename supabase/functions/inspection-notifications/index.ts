@@ -444,14 +444,14 @@ serve(async (req) => {
           });
         }
 
-        // No plungers
+        // No plunger on property
         if (checklistResponses.hasPlungers === 'no') {
           tasksToCreate.push({
             property_id: foundPropertyId,
             lead_id: foundLeadId,
-            task_type: 'plungers',
-            title: 'Provide Plungers for Bathrooms',
-            description: 'Ensure there is a plunger in every bathroom.',
+            task_type: 'plunger',
+            title: 'Provide Plunger',
+            description: 'Property needs a plunger.',
             priority: 'medium',
             category: 'setup'
           });
