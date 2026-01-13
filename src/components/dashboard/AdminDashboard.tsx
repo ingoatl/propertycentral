@@ -11,10 +11,11 @@ import { SendTestTeamDigestButton } from "./SendTestTeamDigestButton";
 import { DiscoveryCallCalendar } from "./DiscoveryCallCalendar";
 import { OnboardingPropertiesTimeline } from "./OnboardingPropertiesTimeline";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Presentation } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Download, RefreshCw, Building2, DollarSign, TrendingUp, AlertCircle, MessageCircleQuestion, Bug } from "lucide-react";
+import { Link } from "react-router-dom";
 import { toast } from "sonner";
 import { OverdueTasksCard } from "./OverdueTasksCard";
 import { AllTasksCard } from "./AllTasksCard";
@@ -354,6 +355,12 @@ export const AdminDashboard = ({ summaries, onExport, onSync, syncing, onSendOve
             </div>
             {/* Hide admin action buttons on mobile */}
             <div className="hidden md:flex items-center gap-3">
+              <Link to="/onboarding-presentation">
+                <Button variant="default" size="sm" className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white">
+                  <Presentation className="h-4 w-4 mr-1" />
+                  <span>Owner Presentation</span>
+                </Button>
+              </Link>
               <SendTestTeamDigestButton />
               <Button onClick={onSendOverdueEmails} variant="outline" size="sm">
                 <AlertCircle className="h-4 w-4" />
