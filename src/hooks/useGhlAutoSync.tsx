@@ -77,6 +77,23 @@ export function useGhlAutoSync() {
           console.error("[GHL Sync] Calendar sync exception:", calErr);
         }
 
+        // Sync calendar reschedules from Google Calendar
+        try {
+          const { data: rescheduleData, error: rescheduleError } = await supabase.functions.invoke("sync-calendar-reschedules", {
+            body: {}
+          });
+          
+          if (rescheduleError) {
+            console.error("[GHL Sync] Calendar reschedule sync error:", rescheduleError);
+          } else if (rescheduleData?.updated > 0 || rescheduleData?.cancelled > 0) {
+            console.log("[GHL Sync] Calendar reschedule sync:", 
+              rescheduleData?.updated, "updated,", 
+              rescheduleData?.cancelled, "cancelled");
+          }
+        } catch (rescheduleErr) {
+          console.error("[GHL Sync] Calendar reschedule sync exception:", rescheduleErr);
+        }
+
         // Note: Recall AI transcripts are synced automatically via webhook when meetings complete
         
         // Update last sync time
