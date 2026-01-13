@@ -10,6 +10,61 @@ const LOGO_URL = "https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/pub
 const SMART_LOCK_URL = "https://www.amazon.com/Yale-Security-Connected-Back-Up-YRD410-WF1-BSP/dp/B0B9HWYMV5";
 const CHECKLIST_URL = "https://propertycentral.lovable.app/documents/MTR_Start_Up_Checklist.pdf";
 
+// Generate iCalendar (.ics) content for calendar invite
+function generateICSContent(
+  summary: string,
+  description: string,
+  location: string,
+  startDate: Date,
+  durationMinutes: number,
+  organizerEmail: string,
+  attendeeEmail: string,
+  attendeeName: string
+): string {
+  const formatDateToICS = (date: Date): string => {
+    return date.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+  };
+
+  const endDate = new Date(startDate.getTime() + durationMinutes * 60000);
+  const uid = `inspection-${Date.now()}@peachhausgroup.com`;
+  const now = new Date();
+  
+  // Escape special characters in text
+  const escapeICS = (text: string): string => {
+    return text.replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n');
+  };
+
+  return `BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//PeachHaus Group//Inspection Booking//EN
+CALSCALE:GREGORIAN
+METHOD:REQUEST
+BEGIN:VEVENT
+UID:${uid}
+DTSTAMP:${formatDateToICS(now)}
+DTSTART:${formatDateToICS(startDate)}
+DTEND:${formatDateToICS(endDate)}
+SUMMARY:${escapeICS(summary)}
+DESCRIPTION:${escapeICS(description)}
+LOCATION:${escapeICS(location)}
+ORGANIZER;CN=PeachHaus Group:mailto:${organizerEmail}
+ATTENDEE;CUTYPE=INDIVIDUAL;ROLE=REQ-PARTICIPANT;PARTSTAT=ACCEPTED;CN=${escapeICS(attendeeName)}:mailto:${attendeeEmail}
+STATUS:CONFIRMED
+SEQUENCE:0
+BEGIN:VALARM
+ACTION:DISPLAY
+DESCRIPTION:Reminder: ${escapeICS(summary)}
+TRIGGER:-P1D
+END:VALARM
+BEGIN:VALARM
+ACTION:DISPLAY
+DESCRIPTION:Reminder: ${escapeICS(summary)}
+TRIGGER:-PT1H
+END:VALARM
+END:VEVENT
+END:VCALENDAR`;
+}
+
 // Build professional inspection confirmation email for lead with property image
 function buildInspectionConfirmationEmail(
   recipientName: string,
@@ -520,7 +575,27 @@ serve(async (req) => {
         // Don't fail the whole request if calendar sync fails
       }
 
-      // Send confirmation email to lead with property image
+      // Generate calendar invite (.ics) for the booker
+      const isVirtual = inspectionType === 'virtual';
+      const eventLocation = isVirtual ? 'Virtual - Google Meet link will be sent' : propertyAddress;
+      const eventSummary = `PeachHaus Onboarding Inspection - ${propertyAddress}`;
+      const eventDescription = `Your property inspection with PeachHaus Group.\n\n${isVirtual ? 'This is a virtual inspection. A Google Meet link will be sent before your appointment.' : `Location: ${propertyAddress}`}\n\nWhat we'll cover:\n- Safety equipment verification\n- Appliance documentation\n- Smart lock setup\n- Property readiness check\n\nQuestions? Call (404) 800-5932 or email ingo@peachhausgroup.com`;
+      
+      const icsContent = generateICSContent(
+        eventSummary,
+        eventDescription,
+        eventLocation,
+        scheduledDate,
+        60, // 60 minutes duration
+        'ingo@peachhausgroup.com',
+        email,
+        name
+      );
+      
+      // Convert ICS content to base64 for email attachment
+      const icsBase64 = btoa(icsContent);
+
+      // Send confirmation email to lead with property image AND calendar invite
       const emailHtml = buildInspectionConfirmationEmail(
         recipientName,
         scheduledDate,
@@ -541,11 +616,18 @@ serve(async (req) => {
           to: [email],
           subject: "Your Onboarding Inspection is Confirmed! 🏠",
           html: emailHtml,
+          attachments: [
+            {
+              filename: "peachhaus-inspection.ics",
+              content: icsBase64,
+              type: "text/calendar"
+            }
+          ]
         }),
       });
 
       const emailResult = await emailResponse.json();
-      console.log("Lead confirmation email result:", emailResult);
+      console.log("Lead confirmation email with calendar invite result:", emailResult);
 
       // Send admin notification email
       const adminEmailHtml = buildAdminNotificationEmail(
