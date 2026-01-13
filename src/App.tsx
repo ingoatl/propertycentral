@@ -46,6 +46,7 @@ const OwnerPortalManagement = lazy(() => import("./pages/OwnerPortalManagement")
 const SignDocument = lazy(() => import("./pages/SignDocument"));
 const BookInspection = lazy(() => import("./pages/BookInspection"));
 const OnboardingPresentation = lazy(() => import("./pages/OnboardingPresentation"));
+const RescheduleCall = lazy(() => import("./pages/RescheduleCall"));
 
 // Optimized QueryClient with caching and stale time
 const queryClient = new QueryClient({
@@ -112,6 +113,7 @@ const App = () => (
             <Route path="/owner" element={<OwnerDashboard />} />
             <Route path="/sign/:token" element={<Suspense fallback={<SigningLoader />}><SignDocument /></Suspense>} />
             <Route path="/onboarding-presentation" element={<OnboardingPresentation />} />
+            <Route path="/reschedule/:callId" element={<RescheduleCall />} />
             <Route path="*" element={
               <Layout>
                 <Suspense fallback={<PageLoader />}>
