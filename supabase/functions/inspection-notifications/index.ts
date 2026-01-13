@@ -471,6 +471,55 @@ serve(async (req) => {
         }
       }
 
+      // Create calendar event for inspection (sync to Ingo's calendar via google-calendar-sync)
+      try {
+        // Get users who receive inspections
+        const { data: calendarUsers } = await supabase
+          .from("user_calendar_settings")
+          .select("user_id, pipedream_external_id")
+          .eq("receives_inspections", true);
+
+        if (calendarUsers && calendarUsers.length > 0) {
+          // Create discovery_call entry to trigger calendar sync
+          const { data: inspectionCall, error: callError } = await supabase
+            .from("discovery_calls")
+            .insert({
+              lead_id: foundLeadId,
+              scheduled_at: scheduledDate.toISOString(),
+              duration_minutes: 60,
+              meeting_type: inspectionType === 'virtual' ? 'virtual_inspection' : 'inspection',
+              service_interest: 'onboarding_inspection',
+              meeting_notes: `Property: ${propertyAddress}\n${safetyNotes || ''}`,
+              status: 'scheduled'
+            })
+            .select()
+            .single();
+
+          if (!callError && inspectionCall) {
+            // Update lead with calendar event reference
+            await supabase
+              .from("leads")
+              .update({ 
+                inspection_calendar_event_id: inspectionCall.id 
+              })
+              .eq("id", foundLeadId);
+
+            // Add to calendar sync queue for each user who receives inspections
+            for (const user of calendarUsers) {
+              await supabase.from("calendar_sync_queue").insert({
+                discovery_call_id: inspectionCall.id,
+                status: "pending"
+              });
+            }
+
+            console.log(`Added inspection to calendar sync queue for ${calendarUsers.length} users`);
+          }
+        }
+      } catch (calendarError) {
+        console.error("Calendar sync scheduling error:", calendarError);
+        // Don't fail the whole request if calendar sync fails
+      }
+
       // Send confirmation email to lead with property image
       const emailHtml = buildInspectionConfirmationEmail(
         recipientName,

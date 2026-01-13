@@ -2734,6 +2734,7 @@ export type Database = {
           ghl_contact_id: string | null
           has_unread_messages: boolean | null
           id: string
+          inspection_assigned_to: string | null
           inspection_calendar_event_id: string | null
           inspection_checklist_responses: Json | null
           inspection_date: string | null
@@ -2773,6 +2774,7 @@ export type Database = {
           ghl_contact_id?: string | null
           has_unread_messages?: boolean | null
           id?: string
+          inspection_assigned_to?: string | null
           inspection_calendar_event_id?: string | null
           inspection_checklist_responses?: Json | null
           inspection_date?: string | null
@@ -2812,6 +2814,7 @@ export type Database = {
           ghl_contact_id?: string | null
           has_unread_messages?: boolean | null
           id?: string
+          inspection_assigned_to?: string | null
           inspection_calendar_event_id?: string | null
           inspection_checklist_responses?: Json | null
           inspection_date?: string | null
@@ -2843,6 +2846,13 @@ export type Database = {
             columns: ["active_sequence_id"]
             isOneToOne: false
             referencedRelation: "lead_follow_up_sequences"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leads_inspection_assigned_to_fkey"
+            columns: ["inspection_assigned_to"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {
@@ -7579,6 +7589,48 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      user_calendar_settings: {
+        Row: {
+          calendar_email: string | null
+          created_at: string | null
+          default_calendar_id: string | null
+          google_calendar_connected: boolean | null
+          id: string
+          pipedream_external_id: string | null
+          receives_discovery_calls: boolean | null
+          receives_inspections: boolean | null
+          receives_team_meetings: boolean | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          calendar_email?: string | null
+          created_at?: string | null
+          default_calendar_id?: string | null
+          google_calendar_connected?: boolean | null
+          id?: string
+          pipedream_external_id?: string | null
+          receives_discovery_calls?: boolean | null
+          receives_inspections?: boolean | null
+          receives_team_meetings?: boolean | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          calendar_email?: string | null
+          created_at?: string | null
+          default_calendar_id?: string | null
+          google_calendar_connected?: boolean | null
+          id?: string
+          pipedream_external_id?: string | null
+          receives_discovery_calls?: boolean | null
+          receives_inspections?: boolean | null
+          receives_team_meetings?: boolean | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
       }
       user_phone_assignments: {
         Row: {
