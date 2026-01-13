@@ -16,10 +16,12 @@ const FRONTEND_URL = "https://preview--peachhaus-property-central.lovable.app";
 const BOOKING_URL = "https://propertycentral.lovable.app/book-discovery-call";
 const LOGO_URL = "https://ijsxcaaqphaciaenlegl.supabase.co/storage/v1/object/public/property-images/peachhaus-logo.png";
 const FROM_EMAIL = "PeachHaus <info@peachhausgroup.com>";
+const RESCHEDULE_BASE_URL = "https://propertycentral.lovable.app/reschedule";
 
 interface DiscoveryCallNotificationRequest {
   discoveryCallId: string;
-  notificationType: "confirmation" | "admin_notification" | "reminder_24h" | "reminder_1h";
+  notificationType: "confirmation" | "admin_notification" | "reminder_24h" | "reminder_1h" | "reminder_48h" | "reschedule_confirmation";
+  oldScheduledAt?: string; // For reschedule confirmation
 }
 
 // Calculate revenue potential score based on property location and type
@@ -85,7 +87,8 @@ const handler = async (req: Request): Promise<Response> => {
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const { discoveryCallId, notificationType }: DiscoveryCallNotificationRequest = await req.json();
+    const { discoveryCallId, notificationType, oldScheduledAt }: DiscoveryCallNotificationRequest = await req.json();
+    const rescheduleUrl = `${RESCHEDULE_BASE_URL}/${discoveryCallId}`;
 
     // Fetch discovery call with lead info
     const { data: call, error: callError } = await supabase
@@ -262,6 +265,16 @@ const handler = async (req: Request): Promise<Response> => {
                     <p style="margin: 16px 0 0 0; font-size: 12px; color: #666666; font-style: italic;">
                       Note: This call may be recorded for quality and training purposes.
                     </p>
+                  </div>
+
+                  <!-- Reschedule Option -->
+                  <div style="padding: 0 32px 24px 32px;">
+                    <div style="text-align: center; padding: 16px; background: #f5f5f5; border: 1px solid #e5e5e5; border-radius: 4px;">
+                      <p style="font-size: 12px; color: #666666; margin: 0 0 8px 0;">Need to reschedule?</p>
+                      <a href="${rescheduleUrl}" style="display: inline-block; background: #6b7280; color: white; padding: 8px 20px; text-decoration: none; font-size: 12px; font-weight: 500; border-radius: 4px;">
+                        Reschedule Call
+                      </a>
+                    </div>
                   </div>
 
                   <!-- Signature Section -->
@@ -451,6 +464,64 @@ const handler = async (req: Request): Promise<Response> => {
         `,
       });
       console.log("Admin email result:", JSON.stringify(adminEmailResult));
+    }
+
+    // Handle reschedule confirmation
+    if (notificationType === "reschedule_confirmation") {
+      const oldDate = oldScheduledAt ? new Date(oldScheduledAt) : null;
+      const oldFormattedDate = oldDate?.toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+      const oldFormattedTime = oldDate?.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", timeZoneName: "short" });
+
+      if (lead?.email) {
+        await resend.emails.send({
+          from: FROM_EMAIL,
+          to: [lead.email],
+          subject: `✅ Call Rescheduled - New Time: ${formattedDate} at ${formattedTime}`,
+          html: `
+            <div style="font-family: -apple-system, BlinkMacSystemFont, sans-serif; max-width: 600px; margin: 0 auto; background: #fff;">
+              <div style="padding: 24px 32px; border-bottom: 2px solid #111;">
+                <img src="${LOGO_URL}" alt="PeachHaus" style="height: 40px;" />
+              </div>
+              <div style="padding: 32px;">
+                <h2 style="color: #16a34a; margin: 0 0 16px 0;">✅ Your Call Has Been Rescheduled</h2>
+                <p style="color: #444; line-height: 1.6;">Hi ${lead.name?.split(' ')[0]},</p>
+                <p style="color: #444; line-height: 1.6;">Your discovery call has been successfully rescheduled.</p>
+                
+                ${oldDate ? `<div style="background: #fef2f2; padding: 12px 16px; border-radius: 6px; margin: 16px 0;">
+                  <p style="margin: 0; color: #991b1b; font-size: 13px;"><strong>Previous:</strong> ${oldFormattedDate} at ${oldFormattedTime}</p>
+                </div>` : ''}
+                
+                <div style="background: #f0fdf4; padding: 16px; border-radius: 6px; border-left: 4px solid #16a34a; margin: 16px 0;">
+                  <p style="margin: 0 0 8px 0; color: #166534; font-weight: 600;">NEW DATE & TIME:</p>
+                  <p style="margin: 0; color: #166534; font-size: 18px;"><strong>${formattedDate}</strong></p>
+                  <p style="margin: 4px 0 0 0; color: #166534;">${formattedTime}</p>
+                </div>
+                
+                ${isVideoCall ? `<div style="text-align: center; margin: 24px 0;">
+                  <a href="${GOOGLE_MEET_LINK}" style="display: inline-block; background: #16a34a; color: white; padding: 12px 32px; text-decoration: none; font-weight: 600; border-radius: 6px;">Join Video Call</a>
+                </div>` : `<p style="text-align: center; color: #666;">📞 We will call you at ${lead.phone}</p>`}
+                
+                <p style="color: #666; font-size: 13px; text-align: center; margin-top: 24px;">
+                  Need to reschedule again? <a href="${rescheduleUrl}" style="color: #2563eb;">Click here</a>
+                </p>
+              </div>
+            </div>
+          `,
+        });
+      }
+
+      if (lead?.phone) {
+        try {
+          await supabase.functions.invoke("send-sms", {
+            body: {
+              to: lead.phone,
+              message: `✅ Your PeachHaus call has been rescheduled to ${formattedDate} at ${formattedTime}. ${isVideoCall ? `Join: ${GOOGLE_MEET_LINK}` : "We'll call you!"} Questions? Reply here.`,
+            },
+          });
+        } catch (smsError) {
+          console.error("SMS reschedule confirmation failed:", smsError);
+        }
+      }
     }
 
     if (notificationType === "reminder_24h" || notificationType === "reminder_1h") {

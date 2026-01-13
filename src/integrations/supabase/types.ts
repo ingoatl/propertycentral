@@ -970,13 +970,18 @@ export type Database = {
           google_calendar_event_id: string | null
           google_meet_link: string | null
           id: string
+          last_reminder_scheduled_at: string | null
           lead_id: string | null
           meeting_notes: string | null
           meeting_type: string | null
           reminder_1h_sent: boolean | null
           reminder_24h_sent: boolean | null
+          reminder_48h_sent: boolean | null
           reminder_sent: boolean | null
           rental_strategy: string | null
+          reschedule_count: number | null
+          rescheduled_at: string | null
+          rescheduled_from: string | null
           scheduled_at: string
           scheduled_by: string | null
           service_interest: string | null
@@ -994,13 +999,18 @@ export type Database = {
           google_calendar_event_id?: string | null
           google_meet_link?: string | null
           id?: string
+          last_reminder_scheduled_at?: string | null
           lead_id?: string | null
           meeting_notes?: string | null
           meeting_type?: string | null
           reminder_1h_sent?: boolean | null
           reminder_24h_sent?: boolean | null
+          reminder_48h_sent?: boolean | null
           reminder_sent?: boolean | null
           rental_strategy?: string | null
+          reschedule_count?: number | null
+          rescheduled_at?: string | null
+          rescheduled_from?: string | null
           scheduled_at: string
           scheduled_by?: string | null
           service_interest?: string | null
@@ -1018,13 +1028,18 @@ export type Database = {
           google_calendar_event_id?: string | null
           google_meet_link?: string | null
           id?: string
+          last_reminder_scheduled_at?: string | null
           lead_id?: string | null
           meeting_notes?: string | null
           meeting_type?: string | null
           reminder_1h_sent?: boolean | null
           reminder_24h_sent?: boolean | null
+          reminder_48h_sent?: boolean | null
           reminder_sent?: boolean | null
           rental_strategy?: string | null
+          reschedule_count?: number | null
+          rescheduled_at?: string | null
+          rescheduled_from?: string | null
           scheduled_at?: string
           scheduled_by?: string | null
           service_interest?: string | null

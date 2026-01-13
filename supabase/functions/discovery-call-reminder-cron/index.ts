@@ -18,16 +18,40 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     const now = new Date();
+    const in48Hours = new Date(now.getTime() + 48 * 60 * 60 * 1000);
+    const in49Hours = new Date(now.getTime() + 49 * 60 * 60 * 1000);
     const in24Hours = new Date(now.getTime() + 24 * 60 * 60 * 1000);
     const in25Hours = new Date(now.getTime() + 25 * 60 * 60 * 1000);
     const in1Hour = new Date(now.getTime() + 60 * 60 * 1000);
     const in75Min = new Date(now.getTime() + 75 * 60 * 1000);
 
     const results = {
+      reminder48h: 0,
       reminder24h: 0,
       reminder1h: 0,
       errors: [] as string[],
     };
+
+    // Find calls needing 48h reminder (email only)
+    const { data: calls48h } = await supabase
+      .from("discovery_calls")
+      .select("id")
+      .eq("status", "scheduled")
+      .eq("reminder_48h_sent", false)
+      .gte("scheduled_at", in48Hours.toISOString())
+      .lt("scheduled_at", in49Hours.toISOString());
+
+    for (const call of calls48h || []) {
+      try {
+        await supabase.functions.invoke("discovery-call-notifications", {
+          body: { discoveryCallId: call.id, notificationType: "reminder_48h" },
+        });
+        await supabase.from("discovery_calls").update({ reminder_48h_sent: true }).eq("id", call.id);
+        results.reminder48h++;
+      } catch (e: any) {
+        results.errors.push(`48h reminder for ${call.id}: ${e.message}`);
+      }
+    }
 
     // Find calls needing 24h reminder (scheduled between 24-25 hours from now)
     const { data: calls24h } = await supabase
