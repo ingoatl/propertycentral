@@ -3,6 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const ELEVENLABS_API_KEY = Deno.env.get('ELEVENLABS_API_KEY');
 const ELEVENLABS_AGENT_ID = Deno.env.get('ELEVENLABS_AGENT_ID');
+const MEM0_API_KEY = Deno.env.get('MEM0_API_KEY');
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
@@ -108,6 +109,8 @@ async function fetchCallerContext(callerPhone: string): Promise<{
   hasScheduledCall: boolean;
   notes: string | null;
   communicationHistory: { calls: number; emails: number; sms: number };
+  memories: string[];
+  contactIdentifier: string | null;
 }> {
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
   
@@ -135,6 +138,10 @@ async function fetchCallerContext(callerPhone: string): Promise<{
       .maybeSingle();
 
     if (owner) {
+      // Fetch Mem0 memories for owner
+      const contactIdentifier = `owner_${owner.id}`;
+      const memories = await fetchMem0Memories(contactIdentifier);
+      
       return {
         name: owner.name,
         propertyAddress: owner.properties?.[0]?.address || null,
@@ -144,6 +151,8 @@ async function fetchCallerContext(callerPhone: string): Promise<{
         hasScheduledCall: false,
         notes: null,
         communicationHistory: { calls: 0, emails: 0, sms: 0 },
+        memories,
+        contactIdentifier,
       };
     }
 
@@ -156,8 +165,14 @@ async function fetchCallerContext(callerPhone: string): Promise<{
       hasScheduledCall: false,
       notes: null,
       communicationHistory: { calls: 0, emails: 0, sms: 0 },
+      memories: [],
+      contactIdentifier: null,
     };
   }
+
+  // Fetch Mem0 memories for lead
+  const contactIdentifier = `lead_${lead.id}`;
+  const memories = await fetchMem0Memories(contactIdentifier);
 
   // Get communication history
   const { data: communications } = await supabase
@@ -192,7 +207,45 @@ async function fetchCallerContext(callerPhone: string): Promise<{
     hasScheduledCall: !!scheduledCall,
     notes: lead.notes,
     communicationHistory: { calls, emails, sms },
+    memories,
+    contactIdentifier,
   };
+}
+
+// Fetch memories from Mem0
+async function fetchMem0Memories(contactIdentifier: string): Promise<string[]> {
+  if (!MEM0_API_KEY || !contactIdentifier) {
+    return [];
+  }
+
+  try {
+    const response = await fetch(
+      `https://api.mem0.ai/v1/memories/?user_id=${encodeURIComponent(contactIdentifier)}&limit=15`,
+      {
+        method: 'GET',
+        headers: {
+          'Authorization': `Token ${MEM0_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    if (!response.ok) {
+      console.error("Mem0 fetch error:", await response.text());
+      return [];
+    }
+
+    const data = await response.json();
+    const memories = data.results || data || [];
+    
+    return memories
+      .map((m: any) => m.memory || m.text || m.content)
+      .filter((m: string) => m && m.length > 0)
+      .slice(0, 10);
+  } catch (e) {
+    console.error("Error fetching Mem0 memories:", e);
+    return [];
+  }
 }
 
 // Generate dynamic greeting based on caller context
@@ -224,7 +277,7 @@ function generateDynamicGreeting(context: Awaited<ReturnType<typeof fetchCallerC
   return `${timeGreeting}! Thank you for calling Peachhaus Property Management. My name is Ava, and I'd be happy to help you. May I ask who I'm speaking with?`;
 }
 
-// Generate system prompt with caller context
+// Generate system prompt with caller context and memories
 function generateSystemPromptOverride(context: Awaited<ReturnType<typeof fetchCallerContext>>): string {
   const basePrompt = `You are Ava, a friendly and professional AI assistant for Peachhaus Property Management, Atlanta's premier property management company specializing in mid-term rentals.`;
 
@@ -257,6 +310,14 @@ function generateSystemPromptOverride(context: Awaited<ReturnType<typeof fetchCa
   
   if (context.notes) {
     contextPrompt += `\n- Notes: ${context.notes.substring(0, 200)}`;
+  }
+
+  // Add memories from Mem0 for personalization
+  if (context.memories && context.memories.length > 0) {
+    contextPrompt += `\n\nTHINGS TO REMEMBER ABOUT THIS CALLER (use naturally, don't explicitly say "I remember"):`;
+    for (const memory of context.memories) {
+      contextPrompt += `\n- ${memory}`;
+    }
   }
 
   contextPrompt += `\n\nUse this context to personalize the conversation. Reference their property if relevant. Be warm, professional, and helpful.`;
