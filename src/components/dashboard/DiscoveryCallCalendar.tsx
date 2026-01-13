@@ -87,7 +87,7 @@ interface DiscoveryCall {
 // Unified calendar event type
 interface CalendarEvent {
   id: string;
-  type: "discovery" | "ghl";
+  type: "discovery" | "ghl" | "inspection";
   scheduled_at: string;
   end_time?: string;
   title: string;
@@ -97,6 +97,7 @@ interface CalendarEvent {
   contact_email: string | null;
   contact_phone: string | null;
   property_address: string | null;
+  property_image?: string | null;
   notes: string | null;
   // Discovery-specific
   discoveryCall?: DiscoveryCall;
@@ -215,8 +216,25 @@ export function DiscoveryCallCalendar() {
   // Filter out optimistically deleted calls
   const filteredCalls = calls.filter(call => !deletedCallIds.has(call.id));
 
+  // Separate inspections from regular discovery calls
+  const inspections = filteredCalls.filter(call => 
+    call.meeting_type === 'inspection' || 
+    call.meeting_type === 'virtual_inspection' ||
+    call.service_interest === 'onboarding_inspection'
+  );
+  
+  const regularCalls = filteredCalls.filter(call => 
+    call.meeting_type !== 'inspection' && 
+    call.meeting_type !== 'virtual_inspection' &&
+    call.service_interest !== 'onboarding_inspection'
+  );
+
   const getCallsForDay = (date: Date) => {
-    return filteredCalls.filter((call) => isSameDay(new Date(call.scheduled_at), date));
+    return regularCalls.filter((call) => isSameDay(new Date(call.scheduled_at), date));
+  };
+
+  const getInspectionsForDay = (date: Date) => {
+    return inspections.filter((call) => isSameDay(new Date(call.scheduled_at), date));
   };
 
   const getGhlEventsForDay = (date: Date) => {
@@ -225,11 +243,16 @@ export function DiscoveryCallCalendar() {
 
   const getAllEventsForDay = (date: Date) => {
     const dayCalls = getCallsForDay(date).map(call => ({ type: 'discovery' as const, data: call, time: new Date(call.scheduled_at) }));
+    const dayInspections = getInspectionsForDay(date).map(call => ({ type: 'inspection' as const, data: call, time: new Date(call.scheduled_at) }));
     const dayGhl = getGhlEventsForDay(date).map(apt => ({ type: 'ghl' as const, data: apt, time: new Date(apt.scheduled_at) }));
-    return [...dayCalls, ...dayGhl].sort((a, b) => a.time.getTime() - b.time.getTime());
+    return [...dayCalls, ...dayInspections, ...dayGhl].sort((a, b) => a.time.getTime() - b.time.getTime());
   };
 
-  const upcomingCalls = filteredCalls
+  const upcomingCalls = regularCalls
+    .filter((call) => new Date(call.scheduled_at) >= new Date() && call.status === "scheduled")
+    .slice(0, 5);
+
+  const upcomingInspections = inspections
     .filter((call) => new Date(call.scheduled_at) >= new Date() && call.status === "scheduled")
     .slice(0, 5);
 
@@ -240,6 +263,7 @@ export function DiscoveryCallCalendar() {
   // Combined upcoming events
   const allUpcomingEvents = [
     ...upcomingCalls.map(call => ({ type: 'discovery' as const, data: call, time: new Date(call.scheduled_at) })),
+    ...upcomingInspections.map(call => ({ type: 'inspection' as const, data: call, time: new Date(call.scheduled_at) })),
     ...upcomingGhlEvents.map(apt => ({ type: 'ghl' as const, data: apt, time: new Date(apt.scheduled_at) })),
   ].sort((a, b) => a.time.getTime() - b.time.getTime()).slice(0, 8);
 
@@ -251,10 +275,14 @@ export function DiscoveryCallCalendar() {
             <Calendar className="h-5 w-5 text-primary" />
             Calendar
             {isLoading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
-            <div className="flex gap-1 ml-2">
+            <div className="flex gap-1 ml-2 flex-wrap">
               <Badge variant="outline" className="text-xs bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200">
                 <Video className="h-3 w-3 mr-1" />
                 Discovery
+              </Badge>
+              <Badge variant="outline" className="text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200">
+                <Home className="h-3 w-3 mr-1" />
+                Inspection
               </Badge>
               <Badge variant="outline" className="text-xs bg-cyan-100 dark:bg-cyan-900/30 text-cyan-800 dark:text-cyan-200">
                 <CalendarCheck className="h-3 w-3 mr-1" />
@@ -342,6 +370,45 @@ export function DiscoveryCallCalendar() {
                       </div>
                     </button>
                   );
+                } else if (event.type === 'inspection') {
+                  const call = event.data as DiscoveryCall;
+                  const isVirtual = call.meeting_type === 'virtual_inspection';
+                  return (
+                    <button
+                      key={call.id}
+                      onClick={() => setSelectedCall(call)}
+                      className="flex-shrink-0 w-[280px] snap-start text-left p-3 rounded-lg border border-amber-200 dark:border-amber-800 hover:border-primary active:bg-muted/50 transition-colors bg-amber-50/50 dark:bg-amber-900/10"
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="font-medium text-sm truncate max-w-[180px]">
+                          {call.leads?.name || "Unknown"}
+                        </span>
+                        <Badge variant="outline" className="text-xs flex-shrink-0 bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200">
+                          🏠 Inspection
+                        </Badge>
+                      </div>
+                      <div className="text-xs text-muted-foreground space-y-1">
+                        <div className="flex items-center gap-1">
+                          <Calendar className="h-3 w-3 flex-shrink-0" />
+                          {format(event.time, "MMM d, h:mm a")}
+                        </div>
+                        <div className="flex items-center gap-1">
+                          {isVirtual ? (
+                            <Video className="h-3 w-3 text-amber-600 flex-shrink-0" />
+                          ) : (
+                            <Home className="h-3 w-3 text-amber-600 flex-shrink-0" />
+                          )}
+                          {isVirtual ? "Virtual Inspection" : "In-Person Inspection"}
+                        </div>
+                        {call.leads?.property_address && (
+                          <div className="flex items-center gap-1">
+                            <MapPin className="h-3 w-3 flex-shrink-0" />
+                            <span className="truncate">{call.leads.property_address}</span>
+                          </div>
+                        )}
+                      </div>
+                    </button>
+                  );
                 } else {
                   const apt = event.data as GhlAppointment;
                   return (
@@ -407,6 +474,7 @@ export function DiscoveryCallCalendar() {
                 const isCurrentDay = isToday(day);
                 const hasEvent = dayEvents.length > 0;
                 const hasDiscovery = dayEvents.some(e => e.type === 'discovery');
+                const hasInspection = dayEvents.some(e => e.type === 'inspection');
                 const hasGhl = dayEvents.some(e => e.type === 'ghl');
 
                 return (
@@ -415,7 +483,7 @@ export function DiscoveryCallCalendar() {
                     onClick={() => {
                       if (hasEvent) {
                         const first = dayEvents[0];
-                        if (first.type === 'discovery') {
+                        if (first.type === 'discovery' || first.type === 'inspection') {
                           setSelectedCall(first.data as DiscoveryCall);
                         } else {
                           setSelectedGhlEvent(first.data as GhlAppointment);
@@ -434,8 +502,9 @@ export function DiscoveryCallCalendar() {
                     <span className={cn(
                       "flex items-center justify-center w-full h-full rounded-full text-xs",
                       isCurrentDay && "bg-primary text-primary-foreground font-bold",
-                      hasDiscovery && !isCurrentDay && "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 font-medium",
-                      hasGhl && !hasDiscovery && !isCurrentDay && "bg-cyan-100 dark:bg-cyan-900/30 text-cyan-800 dark:text-cyan-200 font-medium"
+                      hasInspection && !isCurrentDay && "bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 font-medium",
+                      hasDiscovery && !hasInspection && !isCurrentDay && "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 font-medium",
+                      hasGhl && !hasDiscovery && !hasInspection && !isCurrentDay && "bg-cyan-100 dark:bg-cyan-900/30 text-cyan-800 dark:text-cyan-200 font-medium"
                     )}>
                       {format(day, "d")}
                     </span>
@@ -526,6 +595,34 @@ export function DiscoveryCallCalendar() {
                               <div className="flex items-center gap-1 mt-0.5">
                                 <Star className="h-2.5 w-2.5" />
                                 <span className="text-[10px]">{score}</span>
+                              </div>
+                            </button>
+                          );
+                        } else if (event.type === 'inspection') {
+                          const call = event.data as DiscoveryCall;
+                          const isVirtual = call.meeting_type === 'virtual_inspection';
+                          return (
+                            <button
+                              key={call.id}
+                              onClick={() => setSelectedCall(call)}
+                              className="w-full text-left text-xs p-1.5 rounded transition-all hover:scale-[1.02] bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200"
+                            >
+                              <div className="flex items-center gap-1">
+                                {isVirtual ? (
+                                  <Video className="h-3 w-3 shrink-0" />
+                                ) : (
+                                  <Home className="h-3 w-3 shrink-0" />
+                                )}
+                                <span className="truncate font-medium">
+                                  {format(new Date(call.scheduled_at), "h:mm a")}
+                                </span>
+                              </div>
+                              <div className="truncate opacity-80">
+                                {call.leads?.name || "Unknown"}
+                              </div>
+                              <div className="flex items-center gap-1 mt-0.5">
+                                <Home className="h-2.5 w-2.5" />
+                                <span className="text-[10px]">Inspection</span>
                               </div>
                             </button>
                           );
@@ -729,6 +826,11 @@ function DiscoveryCallDetailModal({ call, onClose, onOptimisticDelete, onRevertD
 
   if (!call) return null;
 
+  // Determine if this is an inspection
+  const isInspection = call.meeting_type === 'inspection' || 
+    call.meeting_type === 'virtual_inspection' || 
+    call.service_interest === 'onboarding_inspection';
+
   const score = calculateRevenueScore(
     call.leads?.property_address || "",
     call.leads?.property_type || null
@@ -837,10 +939,24 @@ function DiscoveryCallDetailModal({ call, onClose, onOptimisticDelete, onRevertD
                 className="h-10 w-auto"
               />
               <div>
-                <span>Discovery Call with {call.leads?.name || "Unknown"}</span>
+                <span className="flex items-center gap-2">
+                  {isInspection ? (
+                    <>
+                      <Home className="h-5 w-5 text-amber-600" />
+                      Inspection with {call.leads?.name || "Unknown"}
+                    </>
+                  ) : (
+                    <>Discovery Call with {call.leads?.name || "Unknown"}</>
+                  )}
+                </span>
                 <p className="text-sm font-normal text-muted-foreground">
                   {format(scheduledAt, "EEEE, MMMM d, yyyy 'at' h:mm a")}
                 </p>
+                {isInspection && (
+                  <Badge className="mt-1 bg-amber-500 text-white">
+                    {call.meeting_type === 'virtual_inspection' ? '📹 Virtual Inspection' : '🏠 In-Person Inspection'}
+                  </Badge>
+                )}
               </div>
             </DialogTitle>
           </DialogHeader>

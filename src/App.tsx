@@ -45,7 +45,6 @@ const OwnerDashboard = lazy(() => import("./pages/owner/OwnerDashboard"));
 const OwnerPortalManagement = lazy(() => import("./pages/OwnerPortalManagement"));
 const SignDocument = lazy(() => import("./pages/SignDocument"));
 const BookInspection = lazy(() => import("./pages/BookInspection"));
-const UserCalendar = lazy(() => import("./pages/UserCalendar"));
 
 // Optimized QueryClient with caching and stale time
 const queryClient = new QueryClient({
@@ -132,7 +131,6 @@ const App = () => (
                     <Route path="/maintenance" element={<Maintenance />} />
                     <Route path="/leads" element={<Leads />} />
                     <Route path="/communications" element={<Communications />} />
-                    <Route path="/calendar" element={<UserCalendar />} />
                     {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                     <Route path="*" element={<NotFound />} />
                   </Routes>
