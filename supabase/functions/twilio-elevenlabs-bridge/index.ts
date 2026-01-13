@@ -1,7 +1,10 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const ELEVENLABS_API_KEY = Deno.env.get('ELEVENLABS_API_KEY');
 const ELEVENLABS_AGENT_ID = Deno.env.get('ELEVENLABS_AGENT_ID');
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
 // Mulaw to PCM conversion table
 const MULAW_TO_PCM = new Int16Array(256);
@@ -95,6 +98,178 @@ function bytesToInt16(bytes: Uint8Array): Int16Array {
   return new Int16Array(buffer);
 }
 
+// Fetch caller context from database
+async function fetchCallerContext(callerPhone: string): Promise<{
+  name: string | null;
+  propertyAddress: string | null;
+  stage: string | null;
+  lastContact: string | null;
+  isNewCaller: boolean;
+  hasScheduledCall: boolean;
+  notes: string | null;
+  communicationHistory: { calls: number; emails: number; sms: number };
+}> {
+  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+  
+  // Normalize phone number for lookup
+  let normalizedPhone = callerPhone;
+  if (normalizedPhone.startsWith('+1')) {
+    normalizedPhone = normalizedPhone.substring(2);
+  } else if (normalizedPhone.startsWith('+')) {
+    normalizedPhone = normalizedPhone.substring(1);
+  }
+
+  // Look up lead by phone
+  const { data: lead } = await supabase
+    .from('leads')
+    .select('id, name, property_address, stage, notes, last_contacted_at')
+    .or(`phone.eq.${callerPhone},phone.eq.${normalizedPhone},phone.eq.+1${normalizedPhone},phone.ilike.%${normalizedPhone}%`)
+    .maybeSingle();
+
+  if (!lead) {
+    // Check property owners
+    const { data: owner } = await supabase
+      .from('property_owners')
+      .select('id, name, phone, properties(address)')
+      .or(`phone.eq.${callerPhone},phone.eq.${normalizedPhone},phone.eq.+1${normalizedPhone},phone.ilike.%${normalizedPhone}%`)
+      .maybeSingle();
+
+    if (owner) {
+      return {
+        name: owner.name,
+        propertyAddress: owner.properties?.[0]?.address || null,
+        stage: 'owner',
+        lastContact: null,
+        isNewCaller: false,
+        hasScheduledCall: false,
+        notes: null,
+        communicationHistory: { calls: 0, emails: 0, sms: 0 },
+      };
+    }
+
+    return {
+      name: null,
+      propertyAddress: null,
+      stage: null,
+      lastContact: null,
+      isNewCaller: true,
+      hasScheduledCall: false,
+      notes: null,
+      communicationHistory: { calls: 0, emails: 0, sms: 0 },
+    };
+  }
+
+  // Get communication history
+  const { data: communications } = await supabase
+    .from('lead_communications')
+    .select('communication_type')
+    .eq('lead_id', lead.id);
+
+  const calls = communications?.filter(c => c.communication_type === 'call').length || 0;
+  const emails = communications?.filter(c => c.communication_type === 'email').length || 0;
+  const sms = communications?.filter(c => c.communication_type === 'sms').length || 0;
+
+  // Check for scheduled discovery call
+  const now = new Date();
+  const thirtyMinutesFromNow = new Date(now.getTime() + 30 * 60 * 1000);
+  const thirtyMinutesAgo = new Date(now.getTime() - 30 * 60 * 1000);
+
+  const { data: scheduledCall } = await supabase
+    .from('discovery_calls')
+    .select('id')
+    .eq('lead_id', lead.id)
+    .eq('status', 'scheduled')
+    .gte('scheduled_at', thirtyMinutesAgo.toISOString())
+    .lte('scheduled_at', thirtyMinutesFromNow.toISOString())
+    .maybeSingle();
+
+  return {
+    name: lead.name,
+    propertyAddress: lead.property_address,
+    stage: lead.stage,
+    lastContact: lead.last_contacted_at,
+    isNewCaller: false,
+    hasScheduledCall: !!scheduledCall,
+    notes: lead.notes,
+    communicationHistory: { calls, emails, sms },
+  };
+}
+
+// Generate dynamic greeting based on caller context
+function generateDynamicGreeting(context: Awaited<ReturnType<typeof fetchCallerContext>>): string {
+  const hour = new Date().getHours();
+  const timeGreeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+
+  if (context.hasScheduledCall && context.name) {
+    return `${timeGreeting} ${context.name}! Thank you for joining our scheduled call. I'm excited to speak with you about your property. How are you doing today?`;
+  }
+
+  if (context.name) {
+    if (context.stage === 'owner') {
+      return `${timeGreeting} ${context.name}! Great to hear from you. How can I help you with your property today?`;
+    }
+    
+    if (context.communicationHistory.calls > 0) {
+      return `${timeGreeting} ${context.name}! It's great to hear from you again. How can I help you today?`;
+    }
+    
+    if (context.propertyAddress) {
+      return `${timeGreeting} ${context.name}! Thank you for calling about ${context.propertyAddress}. I'm here to help - what questions can I answer for you?`;
+    }
+    
+    return `${timeGreeting} ${context.name}! Thank you for calling Peachhaus Property Management. How can I assist you today?`;
+  }
+
+  // New or unknown caller
+  return `${timeGreeting}! Thank you for calling Peachhaus Property Management. My name is Ava, and I'd be happy to help you. May I ask who I'm speaking with?`;
+}
+
+// Generate system prompt with caller context
+function generateSystemPromptOverride(context: Awaited<ReturnType<typeof fetchCallerContext>>): string {
+  const basePrompt = `You are Ava, a friendly and professional AI assistant for Peachhaus Property Management, Atlanta's premier property management company specializing in mid-term rentals.`;
+
+  if (!context.name) {
+    return basePrompt + `\n\nThis appears to be a new caller. Be warm and welcoming. Collect their name and understand their needs.`;
+  }
+
+  let contextPrompt = basePrompt + `\n\nCALLER CONTEXT:`;
+  contextPrompt += `\n- Name: ${context.name}`;
+  
+  if (context.propertyAddress) {
+    contextPrompt += `\n- Property: ${context.propertyAddress}`;
+  }
+  
+  if (context.stage && context.stage !== 'owner') {
+    contextPrompt += `\n- Lead Stage: ${context.stage.replace(/_/g, ' ')}`;
+  }
+  
+  if (context.stage === 'owner') {
+    contextPrompt += `\n- This is a property OWNER, not a lead. Provide white-glove service.`;
+  }
+  
+  if (context.hasScheduledCall) {
+    contextPrompt += `\n- This is a SCHEDULED DISCOVERY CALL - be prepared to discuss property management services in detail.`;
+  }
+  
+  if (context.communicationHistory.calls > 0) {
+    contextPrompt += `\n- Previous calls: ${context.communicationHistory.calls}`;
+  }
+  
+  if (context.notes) {
+    contextPrompt += `\n- Notes: ${context.notes.substring(0, 200)}`;
+  }
+
+  contextPrompt += `\n\nUse this context to personalize the conversation. Reference their property if relevant. Be warm, professional, and helpful.`;
+  
+  // Add transfer rules
+  contextPrompt += `\n\nTRANSFER RULES:`;
+  contextPrompt += `\n- If caller asks for a human or seems frustrated, offer to transfer to a team member`;
+  contextPrompt += `\n- If discussing complex legal, financial, or contract matters, offer to transfer`;
+  contextPrompt += `\n- If caller explicitly requests to schedule a call with a human, help schedule and confirm`;
+
+  return contextPrompt;
+}
+
 serve(async (req) => {
   const { headers } = req;
   const upgradeHeader = headers.get("upgrade") || "";
@@ -110,11 +285,21 @@ serve(async (req) => {
   let elevenLabsSocket: WebSocket | null = null;
   let streamSid: string | null = null;
   let callSid: string | null = null;
+  let callerNumber: string | null = null;
+  let leadName: string | null = null;
   let audioChunksSent = 0;
   let audioChunksReceived = 0;
+  let callerContext: Awaited<ReturnType<typeof fetchCallerContext>> | null = null;
 
   const connectToElevenLabs = async () => {
     try {
+      // Fetch caller context if we have a phone number
+      if (callerNumber) {
+        console.log("Fetching caller context for:", callerNumber);
+        callerContext = await fetchCallerContext(callerNumber);
+        console.log("Caller context:", JSON.stringify(callerContext, null, 2));
+      }
+
       console.log("Getting ElevenLabs signed URL...");
       const signedUrlResponse = await fetch(
         `https://api.elevenlabs.io/v1/convai/conversation/get-signed-url?agent_id=${ELEVENLABS_AGENT_ID}`,
@@ -137,9 +322,39 @@ serve(async (req) => {
       elevenLabsSocket = new WebSocket(signed_url);
 
       elevenLabsSocket.onopen = () => {
-        console.log("ElevenLabs WebSocket connected, ready to receive audio");
-        // Note: Don't send first_message override - let the agent use its configured greeting
-        // The agent should be configured in the ElevenLabs dashboard with the appropriate first message
+        console.log("ElevenLabs WebSocket connected");
+        
+        // Send conversation config with dynamic first message and context
+        if (callerContext && elevenLabsSocket) {
+          const dynamicGreeting = generateDynamicGreeting(callerContext);
+          const systemPromptOverride = generateSystemPromptOverride(callerContext);
+          
+          console.log("Sending dynamic greeting:", dynamicGreeting);
+          
+          // Send conversation initialization with overrides
+          const initMessage = {
+            type: "conversation_initiation_client_data",
+            conversation_initiation_client_data: {
+              conversation_config_override: {
+                agent: {
+                  prompt: {
+                    prompt: systemPromptOverride
+                  },
+                  first_message: dynamicGreeting,
+                }
+              },
+              custom_llm_extra_body: {
+                caller_name: callerContext.name || "Unknown",
+                caller_phone: callerNumber,
+                caller_property: callerContext.propertyAddress || "Not specified",
+                caller_stage: callerContext.stage || "new",
+                has_scheduled_call: callerContext.hasScheduledCall,
+              }
+            }
+          };
+          
+          elevenLabsSocket.send(JSON.stringify(initMessage));
+        }
       };
 
       elevenLabsSocket.onmessage = (event) => {
@@ -206,9 +421,25 @@ serve(async (req) => {
             console.log("Agent speaking:", data.agent_response_event?.agent_response?.substring(0, 100));
           }
 
+          // Handle user transcript for logging
+          if (data.type === 'user_transcript') {
+            console.log("User said:", data.user_transcript_event?.user_transcript?.substring(0, 100));
+          }
+
           // Handle interruption
           if (data.type === 'interruption') {
             console.log("User interrupted agent");
+          }
+
+          // Handle client tool calls (like transfer to human)
+          if (data.type === 'client_tool_call') {
+            const toolCall = data.client_tool_call;
+            console.log("Client tool call received:", toolCall?.tool_name);
+            
+            if (toolCall?.tool_name === 'transfer_to_human') {
+              console.log("Transfer to human requested");
+              // TODO: Implement call transfer logic
+            }
           }
 
         } catch (e) {
@@ -222,12 +453,52 @@ serve(async (req) => {
 
       elevenLabsSocket.onclose = (event) => {
         console.log("ElevenLabs WebSocket closed, code:", event.code, "reason:", event.reason);
+        
+        // Trigger post-call processing
+        if (callSid && callerNumber) {
+          triggerPostCallProcessing(callSid, callerNumber, callerContext);
+        }
       };
 
     } catch (error) {
       console.error("Error setting up ElevenLabs connection:", error);
     }
   };
+
+  // Trigger post-call processing to create action items
+  async function triggerPostCallProcessing(
+    callSid: string, 
+    callerPhone: string,
+    context: Awaited<ReturnType<typeof fetchCallerContext>> | null
+  ) {
+    try {
+      console.log("Triggering post-call processing for call:", callSid);
+      
+      const response = await fetch(`${SUPABASE_URL}/functions/v1/voice-ai-post-call`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        },
+        body: JSON.stringify({
+          callSid,
+          callerPhone,
+          callerName: context?.name || null,
+          callerStage: context?.stage || null,
+          propertyAddress: context?.propertyAddress || null,
+        }),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log("Post-call processing triggered:", result);
+      } else {
+        console.error("Post-call processing failed:", await response.text());
+      }
+    } catch (error) {
+      console.error("Error triggering post-call processing:", error);
+    }
+  }
 
   twilioSocket.onopen = () => {
     console.log("Twilio WebSocket connected");
@@ -240,9 +511,15 @@ serve(async (req) => {
       if (data.event === 'start') {
         streamSid = data.start.streamSid;
         callSid = data.start.callSid;
-        console.log("Twilio stream started:", { streamSid, callSid });
         
-        // Now connect to ElevenLabs after we have the streamSid
+        // Extract custom parameters from Twilio stream
+        const customParams = data.start.customParameters || {};
+        callerNumber = customParams.caller_number || null;
+        leadName = customParams.lead_name || null;
+        
+        console.log("Twilio stream started:", { streamSid, callSid, callerNumber, leadName });
+        
+        // Now connect to ElevenLabs after we have the caller info
         await connectToElevenLabs();
       } 
       else if (data.event === 'media') {
