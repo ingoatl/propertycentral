@@ -70,7 +70,7 @@ interface SmsLog {
   created_at: string;
 }
 
-const GOOGLE_REVIEWS_PHONE = "+14049247251";
+const GOOGLE_REVIEWS_PHONE = "+17709885286";
 
 const GoogleReviewsTab = () => {
   const [reviews, setReviews] = useState<OwnerrezReview[]>([]);

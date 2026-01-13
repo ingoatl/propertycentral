@@ -1198,7 +1198,7 @@ serve(async (req) => {
             const telnyxApiKey = Deno.env.get("TELNYX_API_KEY");
             if (telnyxApiKey) {
               try {
-                const fromPhone = formatPhoneE164(Deno.env.get("TELNYX_PHONE_NUMBER") || "+14049247251");
+                const fromPhone = formatPhoneE164(Deno.env.get("TWILIO_PHONE_NUMBER") || "+17709885286");
                 console.log(`Fallback to Telnyx from phone: ${fromPhone}`);
                 
                 const telnyxResponse = await fetch("https://api.telnyx.com/v2/messages", {
