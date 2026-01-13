@@ -38,6 +38,8 @@ serve(async (req) => {
     console.log("Generate draft reply request:", { communicationId, leadId, ownerId, messageType });
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    const MEM0_API_KEY = Deno.env.get("MEM0_API_KEY");
+    
     if (!LOVABLE_API_KEY) {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
@@ -69,6 +71,58 @@ serve(async (req) => {
     let contactName = "there";
     let fullContext = "";
     let commHistory = "";
+    let contactMemories = "";
+
+    // Build contact identifier and fetch memories from Mem0
+    let contactIdentifier = "";
+    if (leadId) {
+      contactIdentifier = `lead_${leadId}`;
+    } else if (ownerId) {
+      contactIdentifier = `owner_${ownerId}`;
+    }
+
+    // Fetch memories from Mem0 if available
+    if (MEM0_API_KEY && contactIdentifier) {
+      try {
+        const mem0Response = await fetch(`https://api.mem0.ai/v1/memories/?user_id=${encodeURIComponent(contactIdentifier)}&limit=15`, {
+          method: "GET",
+          headers: {
+            "Authorization": `Token ${MEM0_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+        });
+
+        if (mem0Response.ok) {
+          const mem0Data = await mem0Response.json();
+          const memories = mem0Data.results || mem0Data || [];
+          
+          if (memories.length > 0) {
+            contactMemories = "\n\nREMEMBERED ABOUT THIS CONTACT:\n";
+            const grouped: Record<string, string[]> = {};
+            
+            for (const m of memories) {
+              const category = m.metadata?.category || "general";
+              const memory = m.memory || m.text || m.content;
+              if (memory) {
+                if (!grouped[category]) grouped[category] = [];
+                grouped[category].push(memory);
+              }
+            }
+            
+            for (const [category, items] of Object.entries(grouped)) {
+              for (const item of items) {
+                contactMemories += `- ${item}\n`;
+              }
+            }
+            
+            contactMemories += "\nUse this to personalize the response naturally.\n";
+            console.log(`Loaded ${memories.length} memories for draft generation`);
+          }
+        }
+      } catch (e) {
+        console.error("Error fetching memories:", e);
+      }
+    }
 
     if (communicationId) {
       const { data: comm } = await supabase
@@ -129,6 +183,7 @@ CONTACT INFO:
 Name: ${contactName}
 ${fullContext}
 ${commHistory}
+${contactMemories}
 
 CRITICAL RULES:
 1. Reply DIRECTLY to what they said - be helpful and specific
