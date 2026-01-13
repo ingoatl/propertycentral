@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -19,11 +19,11 @@ import {
 import { Phone, Delete, Loader2, PhoneOff, PhoneCall, MessageSquare, User, Home } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Device, Call } from "@twilio/voice-sdk";
 import { useQuery } from "@tanstack/react-query";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/components/ProtectedRoute";
+import { useTwilioDevice } from "@/hooks/useTwilioDevice";
 
 interface VoiceDialerProps {
   defaultMessage?: string;
@@ -39,21 +39,15 @@ interface ContactRecord {
 
 const VoiceDialer = ({ defaultMessage }: VoiceDialerProps) => {
   const [phoneNumber, setPhoneNumber] = useState("");
-  const [isConnecting, setIsConnecting] = useState(false);
-  const [isOnCall, setIsOnCall] = useState(false);
-  const [callDuration, setCallDuration] = useState(0);
   const [open, setOpen] = useState(false);
   const [view, setView] = useState<'search' | 'dialer'>('search');
   const [searchQuery, setSearchQuery] = useState("");
   const [isSendingSMS, setIsSendingSMS] = useState(false);
   const [selectedContact, setSelectedContact] = useState<ContactRecord | null>(null);
-  const [selectedCallerId, setSelectedCallerId] = useState<string>("");
   const isMobile = useIsMobile();
   const { user } = useAuth();
   
-  const deviceRef = useRef<Device | null>(null);
-  const callRef = useRef<Call | null>(null);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const { isConnecting, isOnCall, callDuration, makeCall, endCall, sendDigits, formatDuration } = useTwilioDevice();
 
   const dialPad = [
     ["1", "2", "3"],
@@ -61,26 +55,6 @@ const VoiceDialer = ({ defaultMessage }: VoiceDialerProps) => {
     ["7", "8", "9"],
     ["*", "0", "#"],
   ];
-
-  // Fetch user's caller ID options (GHL numbers assigned to them)
-  const { data: callerIdOptions = [] } = useQuery({
-    queryKey: ['caller-id-options', user?.id],
-    queryFn: async () => {
-      if (!user?.id) return [];
-      
-      // Get team routing numbers for this user, or all if admin
-      const { data: teamRouting } = await supabase
-        .from('team_routing')
-        .select('ghl_number, display_name')
-        .eq('is_active', true);
-      
-      return teamRouting?.map(t => ({
-        value: t.ghl_number,
-        label: `${t.display_name} (${t.ghl_number})`
-      })) || [];
-    },
-    enabled: open && !!user?.id,
-  });
 
   // Fetch owners and leads for search
   const { data: contacts = [] } = useQuery({
@@ -129,73 +103,9 @@ const VoiceDialer = ({ defaultMessage }: VoiceDialerProps) => {
     );
   });
 
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-      }
-      if (deviceRef.current) {
-        deviceRef.current.destroy();
-      }
-    };
-  }, []);
-
-  const initializeDevice = async () => {
-    try {
-      console.log('Getting Twilio token...');
-      const { data, error } = await supabase.functions.invoke('twilio-token', {
-        body: { identity: `peachhaus-${Date.now()}` }
-      });
-
-      if (error) throw error;
-      if (!data?.token) throw new Error('No token received');
-
-      console.log('Token received, initializing device...');
-      
-      const device = new Device(data.token, {
-        logLevel: 1,
-        codecPreferences: [Call.Codec.Opus, Call.Codec.PCMU]
-      });
-
-      device.on('registered', () => {
-        console.log('Device registered successfully');
-      });
-
-      device.on('error', (err) => {
-        console.error('Device error:', err);
-        toast.error('Call device error: ' + err.message);
-      });
-
-      await device.register();
-      deviceRef.current = device;
-      
-      return device;
-    } catch (error) {
-      console.error('Failed to initialize device:', error);
-      throw error;
-    }
-  };
-
-  const handleEndCall = useCallback(() => {
-    if (callRef.current) {
-      callRef.current.disconnect();
-      callRef.current = null;
-    }
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-      timerRef.current = null;
-    }
-    setIsOnCall(false);
-    setIsConnecting(false);
-    setCallDuration(0);
-  }, []);
-
   const handleDigitPress = (digit: string) => {
     setPhoneNumber((prev) => prev + digit);
-    if (callRef.current && isOnCall) {
-      callRef.current.sendDigits(digit);
-    }
+    sendDigits(digit);
   };
 
   const handleBackspace = () => {
@@ -224,75 +134,8 @@ const VoiceDialer = ({ defaultMessage }: VoiceDialerProps) => {
     return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6, 10)}`;
   };
 
-  const formatDuration = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  };
-
   const handleCall = async () => {
-    if (!phoneNumber || phoneNumber.replace(/\D/g, "").length < 10) {
-      toast.error("Please enter a valid phone number");
-      return;
-    }
-
-    setIsConnecting(true);
-
-    try {
-      let device = deviceRef.current;
-      
-      if (!device) {
-        device = await initializeDevice();
-      }
-
-      let formattedPhone = phoneNumber.replace(/\D/g, "");
-      if (!formattedPhone.startsWith('1') && formattedPhone.length === 10) {
-        formattedPhone = '1' + formattedPhone;
-      }
-      formattedPhone = '+' + formattedPhone;
-
-      console.log('Making call to:', formattedPhone);
-
-      const call = await device.connect({
-        params: {
-          To: formattedPhone
-        }
-      });
-
-      callRef.current = call;
-
-      call.on('accept', () => {
-        console.log('Call accepted');
-        setIsOnCall(true);
-        setIsConnecting(false);
-        setCallDuration(0);
-        timerRef.current = setInterval(() => {
-          setCallDuration(prev => prev + 1);
-        }, 1000);
-        toast.success('Call connected');
-      });
-
-      call.on('disconnect', () => {
-        console.log('Call disconnected');
-        handleEndCall();
-      });
-
-      call.on('cancel', () => {
-        console.log('Call cancelled');
-        handleEndCall();
-      });
-
-      call.on('error', (err) => {
-        console.error('Call error:', err);
-        toast.error('Call error: ' + err.message);
-        handleEndCall();
-      });
-
-    } catch (error) {
-      console.error('Failed to make call:', error);
-      toast.error('Failed to initiate call: ' + (error instanceof Error ? error.message : 'Unknown error'));
-      setIsConnecting(false);
-    }
+    await makeCall(phoneNumber);
   };
 
   const handleSendSMS = async () => {
@@ -329,8 +172,23 @@ const VoiceDialer = ({ defaultMessage }: VoiceDialerProps) => {
     }
   };
 
+  const handleOpenChange = useCallback((newOpen: boolean) => {
+    if (!newOpen && isOnCall) {
+      // Don't close if on a call
+      return;
+    }
+    if (!newOpen) {
+      endCall();
+      setPhoneNumber("");
+      setSelectedContact(null);
+      setView('search');
+      setSearchQuery("");
+    }
+    setOpen(newOpen);
+  }, [isOnCall, endCall]);
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
         <Button 
           variant="outline" 
@@ -547,7 +405,7 @@ const VoiceDialer = ({ defaultMessage }: VoiceDialerProps) => {
                       "flex-1 font-semibold",
                       isMobile ? "h-14 text-lg" : "h-12"
                     )}
-                    onClick={handleEndCall}
+                    onClick={endCall}
                   >
                     <PhoneOff className="h-5 w-5 mr-2" />
                     End Call
