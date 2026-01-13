@@ -2542,9 +2542,9 @@ export function InboxView() {
                       />
                     )}
                     
-                    {/* AI Reply + Smart Extract buttons */}
+                    {/* AI Reply + Smart Extract buttons - compact horizontal row on mobile */}
                     {!selectedMessage.is_draft && conversationThread.length > 0 && (
-                      <div className="flex flex-wrap items-center gap-2 pb-2">
+                      <div className="flex items-center gap-2 pb-2 overflow-x-auto">
                         {selectedMessage.contact_phone && (
                           <AIReplyButton
                             contactName={selectedMessage.contact_name}
@@ -2613,10 +2613,10 @@ export function InboxView() {
                                   </span>
                                 </div>
                               )}
-                              <div className={`flex ${isOutbound ? "justify-end" : "justify-start"} gap-2`}>
-                                {/* Show sender initials for outbound messages */}
+                              <div className={`flex ${isOutbound ? "justify-end" : "justify-start"} gap-1 sm:gap-2 w-full`}>
+                                {/* Show sender initials for outbound messages - hidden on very small screens */}
                                 {isOutbound && currentUserProfile?.first_name && (
-                                  <div className="flex-shrink-0 self-end mb-5">
+                                  <div className="hidden sm:flex flex-shrink-0 self-end mb-5">
                                     <div className="h-7 w-7 rounded-full bg-primary/20 flex items-center justify-center">
                                       <span className="text-[10px] font-semibold text-primary">
                                         {currentUserProfile.first_name.charAt(0).toUpperCase()}
@@ -2624,8 +2624,8 @@ export function InboxView() {
                                     </div>
                                   </div>
                                 )}
-                              <div className="max-w-[85%] sm:max-w-[80%]">
-                                  <div className={`rounded-2xl px-3 py-2 sm:px-3.5 ${
+                              <div className="max-w-[88%] sm:max-w-[80%] min-w-0">
+                                  <div className={`rounded-2xl px-3 py-2 sm:px-3.5 overflow-hidden ${
                                     isOutbound 
                                       ? "bg-primary text-primary-foreground" 
                                       : "bg-muted"

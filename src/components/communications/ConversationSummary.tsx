@@ -150,28 +150,28 @@ export function ConversationSummary({
   return (
     <Card className={cn("border-border/50 bg-muted/20", className)}>
       <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-        <div className="flex items-center justify-between p-3">
-          <CollapsibleTrigger className="flex items-center gap-2 hover:opacity-80 transition-opacity flex-1">
-            <div className="p-1.5 rounded-lg bg-primary/10">
-              <FileText className="h-4 w-4 text-primary" />
+        <div className="flex items-center justify-between p-2 sm:p-3">
+          <CollapsibleTrigger className="flex items-center gap-1.5 sm:gap-2 hover:opacity-80 transition-opacity flex-1 min-w-0">
+            <div className="p-1 sm:p-1.5 rounded-lg bg-primary/10 flex-shrink-0">
+              <FileText className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary" />
             </div>
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium">Thread Summary</span>
+            <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 overflow-hidden">
+              <span className="text-xs sm:text-sm font-medium whitespace-nowrap">Summary</span>
               {summary && (
-                <Badge variant="secondary" className="text-xs">
-                  <Clock className="h-3 w-3 mr-1" />
+                <Badge variant="secondary" className="text-[10px] sm:text-xs h-5 px-1.5 hidden sm:flex">
+                  <Clock className="h-2.5 w-2.5 sm:h-3 sm:w-3 mr-0.5 sm:mr-1" />
                   {format(new Date(summary.created_at), "MMM d")}
                 </Badge>
               )}
-              <Badge variant="outline" className="text-xs">
-                <MessageSquare className="h-3 w-3 mr-1" />
-                {messageCount} messages
+              <Badge variant="outline" className="text-[10px] sm:text-xs h-5 px-1.5 flex-shrink-0">
+                <MessageSquare className="h-2.5 w-2.5 sm:h-3 sm:w-3 mr-0.5 sm:mr-1" />
+                {messageCount}
               </Badge>
             </div>
             {isOpen ? (
-              <ChevronUp className="h-4 w-4 text-muted-foreground ml-auto" />
+              <ChevronUp className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground ml-auto flex-shrink-0" />
             ) : (
-              <ChevronDown className="h-4 w-4 text-muted-foreground ml-auto" />
+              <ChevronDown className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground ml-auto flex-shrink-0" />
             )}
           </CollapsibleTrigger>
           
@@ -183,14 +183,14 @@ export function ConversationSummary({
               handleGenerateSummary();
             }}
             disabled={isGenerating}
-            className="h-8 ml-2"
+            className="h-7 sm:h-8 px-2 sm:px-3 ml-1 sm:ml-2 flex-shrink-0"
           >
             {isGenerating ? (
-              <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+              <RefreshCw className="h-3 w-3 sm:h-3.5 sm:w-3.5 animate-spin" />
             ) : (
-              <Sparkles className="h-3.5 w-3.5" />
+              <Sparkles className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
             )}
-            <span className="ml-1 text-xs">
+            <span className="ml-1 text-[10px] sm:text-xs">
               {summary ? "Refresh" : "Summarize"}
             </span>
           </Button>

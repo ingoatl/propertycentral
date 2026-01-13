@@ -701,28 +701,28 @@ Looking forward to our conversation!
   };
 
   return (
-    <Card className="border-primary/30 bg-gradient-to-br from-primary/5 to-primary/10 mb-4">
+    <Card className="border-primary/30 bg-gradient-to-br from-primary/5 to-primary/10 mb-3 sm:mb-4 overflow-hidden">
       <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-        <CardHeader className="pb-2">
-          <div className="flex items-center justify-between">
+        <CardHeader className="pb-2 px-3 sm:px-4 pt-3 sm:pt-4">
+          <div className="flex items-center justify-between gap-2">
             <CollapsibleTrigger asChild>
-              <Button variant="ghost" className="flex items-center gap-2 p-0 h-auto hover:bg-transparent">
-                <CalendarIcon className="h-4 w-4 text-primary" />
-                <CardTitle className="text-sm font-medium">
+              <Button variant="ghost" className="flex items-center gap-1.5 sm:gap-2 p-0 h-auto hover:bg-transparent min-w-0">
+                <CalendarIcon className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary flex-shrink-0" />
+                <CardTitle className="text-xs sm:text-sm font-medium truncate">
                   Schedule a Meeting
                 </CardTitle>
                 {isOpen ? (
-                  <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                  <ChevronUp className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground flex-shrink-0" />
                 ) : (
-                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                  <ChevronDown className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground flex-shrink-0" />
                 )}
               </Button>
             </CollapsibleTrigger>
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1 flex-shrink-0">
               <Button 
                 variant="outline" 
                 size="sm" 
-                className="h-6 text-xs gap-1" 
+                className="h-6 text-[10px] sm:text-xs gap-1 px-2 hidden sm:flex" 
                 onClick={handleSendTestEmail}
                 disabled={isSendingTest}
               >
@@ -738,7 +738,7 @@ Looking forward to our conversation!
               </Button>
             </div>
           </div>
-          <Badge variant="secondary" className="w-fit text-xs">
+          <Badge variant="secondary" className="w-fit text-[10px] sm:text-xs mt-1.5">
             {intentMessages[detectedIntent]}
           </Badge>
         </CardHeader>
