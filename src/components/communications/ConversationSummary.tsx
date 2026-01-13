@@ -51,7 +51,8 @@ export function ConversationSummary({
   // Fetch existing summary
   useEffect(() => {
     const fetchExistingSummary = async () => {
-      if (!leadId && !ownerId) return;
+      // Allow fetching for any contact type
+      if (!leadId && !ownerId && !contactPhone && !contactEmail) return;
       
       setIsLoading(true);
       try {
@@ -67,6 +68,10 @@ export function ConversationSummary({
           query = query.eq("lead_id", leadId);
         } else if (ownerId) {
           query = query.eq("owner_id", ownerId);
+        } else if (contactPhone) {
+          query = query.eq("contact_phone", contactPhone);
+        } else if (contactEmail) {
+          query = query.eq("contact_email", contactEmail);
         }
 
         const { data } = await query.maybeSingle();
@@ -81,7 +86,7 @@ export function ConversationSummary({
     };
 
     fetchExistingSummary();
-  }, [leadId, ownerId]);
+  }, [leadId, ownerId, contactPhone, contactEmail]);
 
   // Auto-trigger for 10+ unread messages
   useEffect(() => {
@@ -92,8 +97,9 @@ export function ConversationSummary({
   }, [unreadCount, summary, autoTriggered, messageCount]);
 
   const handleGenerateSummary = async () => {
-    if (!leadId && !ownerId) {
-      toast.error("Cannot summarize external conversations");
+    // Allow summarization for any conversation with sufficient context
+    if (!leadId && !ownerId && !contactPhone && !contactEmail) {
+      toast.error("No contact information available to summarize");
       return;
     }
 

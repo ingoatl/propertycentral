@@ -32,12 +32,13 @@ serve(async (req) => {
       errors: [] as string[],
     };
 
-    // Find calls needing 48h reminder (email only)
+    // Find calls needing 48h reminder (email only) - ONLY for booking page calls (no ghl_calendar_id)
     const { data: calls48h } = await supabase
       .from("discovery_calls")
-      .select("id")
+      .select("id, google_calendar_event_id")
       .eq("status", "scheduled")
       .eq("reminder_48h_sent", false)
+      .is("google_calendar_event_id", null) // Only non-Google calendar (booking page) calls - GHL calls are excluded
       .gte("scheduled_at", in48Hours.toISOString())
       .lt("scheduled_at", in49Hours.toISOString());
 
@@ -53,16 +54,21 @@ serve(async (req) => {
       }
     }
 
-    // Find calls needing 24h reminder (scheduled between 24-25 hours from now)
+    // Find calls needing 24h reminder - ONLY for booking page calls (exclude GHL-synced calls)
     const { data: calls24h } = await supabase
       .from("discovery_calls")
-      .select("id")
+      .select("id, meeting_notes")
       .eq("status", "scheduled")
       .eq("reminder_24h_sent", false)
       .gte("scheduled_at", in24Hours.toISOString())
       .lt("scheduled_at", in25Hours.toISOString());
 
-    for (const call of calls24h || []) {
+    // Filter out GHL-synced calls (they have "Synced from GHL" in meeting_notes)
+    const filteredCalls24h = (calls24h || []).filter(call => 
+      !call.meeting_notes?.includes("Synced from GHL")
+    );
+
+    for (const call of filteredCalls24h) {
       try {
         await supabase.functions.invoke("discovery-call-notifications", {
           body: { discoveryCallId: call.id, notificationType: "reminder_24h" },
@@ -73,16 +79,21 @@ serve(async (req) => {
       }
     }
 
-    // Find calls needing 1h reminder (scheduled between 60-75 minutes from now)
+    // Find calls needing 1h reminder - ONLY for booking page calls (exclude GHL-synced calls)
     const { data: calls1h } = await supabase
       .from("discovery_calls")
-      .select("id")
+      .select("id, meeting_notes")
       .eq("status", "scheduled")
       .eq("reminder_1h_sent", false)
       .gte("scheduled_at", in1Hour.toISOString())
       .lt("scheduled_at", in75Min.toISOString());
 
-    for (const call of calls1h || []) {
+    // Filter out GHL-synced calls
+    const filteredCalls1h = (calls1h || []).filter(call => 
+      !call.meeting_notes?.includes("Synced from GHL")
+    );
+
+    for (const call of filteredCalls1h) {
       try {
         await supabase.functions.invoke("discovery-call-notifications", {
           body: { discoveryCallId: call.id, notificationType: "reminder_1h" },
