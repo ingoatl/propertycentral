@@ -25,6 +25,7 @@ interface ScheduleInspectionDialogProps {
   leadName: string;
   leadEmail?: string;
   propertyAddress?: string;
+  propertyImage?: string;
   onScheduled?: () => void;
 }
 
@@ -56,6 +57,7 @@ export function ScheduleInspectionDialog({
   leadName,
   leadEmail,
   propertyAddress,
+  propertyImage,
   onScheduled,
 }: ScheduleInspectionDialogProps) {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
@@ -217,9 +219,17 @@ export function ScheduleInspectionDialog({
         <div className="space-y-5">
           {/* Lead & Property info */}
           <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
-            <div className="p-2 rounded-full bg-primary/10">
-              <Home className="h-4 w-4 text-primary" />
-            </div>
+            {propertyImage ? (
+              <img 
+                src={propertyImage} 
+                alt={propertyAddress || "Property"} 
+                className="h-16 w-20 rounded-lg object-cover"
+              />
+            ) : (
+              <div className="p-2 rounded-full bg-primary/10">
+                <Home className="h-4 w-4 text-primary" />
+              </div>
+            )}
             <div className="flex-1">
               <p className="font-medium">{leadName}</p>
               {propertyAddress && (
