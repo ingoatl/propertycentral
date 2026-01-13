@@ -100,7 +100,7 @@ serve(async (req) => {
     // This captures all messages for this contact regardless of how they were linked
     const { data: allComms, error: commsError } = await supabase
       .from("lead_communications")
-      .select("id, direction, body, subject, communication_type, created_at, transcript, metadata, lead_id, owner_id, call_recording_url")
+      .select("id, direction, body, subject, communication_type, created_at, metadata, lead_id, owner_id, call_recording_url")
       .order("created_at", { ascending: true });
 
     if (commsError) {
@@ -178,10 +178,8 @@ serve(async (req) => {
       // Gather all available content
       let content = "";
       
-      // Prioritize transcript for calls
-      if (comm.transcript && comm.transcript.trim()) {
-        content = comm.transcript.trim();
-      } else if (comm.body && comm.body.trim()) {
+      // Use body as main content
+      if (comm.body && comm.body.trim()) {
         content = comm.body.trim();
       } else if (comm.subject && comm.subject.trim()) {
         content = comm.subject.trim();
