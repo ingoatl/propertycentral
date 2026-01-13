@@ -119,11 +119,14 @@ const VoiceDialer = ({ defaultMessage }: VoiceDialerProps) => {
     setSearchQuery("");
   };
 
-  const handleSelectContact = (contact: ContactRecord) => {
+  const handleSelectContact = async (contact: ContactRecord) => {
     if (contact.phone) {
-      setPhoneNumber(contact.phone.replace(/\D/g, ''));
+      const cleanedPhone = contact.phone.replace(/\D/g, '');
+      setPhoneNumber(cleanedPhone);
       setSelectedContact(contact);
       setView('dialer');
+      // Automatically initiate the call
+      await makeCall(cleanedPhone);
     }
   };
 
