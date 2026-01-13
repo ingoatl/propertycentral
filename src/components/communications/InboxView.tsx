@@ -67,6 +67,7 @@ import { VoiceAIBadge, isVoiceAITranscript, extractCallerPhoneFromTranscript, ex
 import { CallRecordingPlayer } from "./CallRecordingPlayer";
 import LeadDetailModal from "@/components/leads/LeadDetailModal";
 import { OwnerCommunicationDetail } from "./OwnerCommunicationDetail";
+import { ConversationSummary } from "./ConversationSummary";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useAdminCheck } from "@/hooks/useAdminCheck";
@@ -2467,8 +2468,8 @@ export function InboxView() {
               </div>
             </div>
 
-            <ScrollArea className="flex-1">
-              <div className="px-3 py-2 md:px-4 md:py-4 max-w-3xl mx-auto">
+            <ScrollArea className="flex-1 overflow-x-hidden">
+              <div className="px-2 py-2 sm:px-3 md:px-4 md:py-4 max-w-3xl mx-auto w-full overflow-hidden">
                 {selectedMessage.is_draft && isEditingDraft && editedDraft ? (
                   <div className="space-y-3 p-4 bg-muted/30 rounded-lg">
                     <div><label className="text-sm font-medium">To Email</label><Input value={editedDraft.to_email} onChange={(e) => setEditedDraft({ ...editedDraft, to_email: e.target.value })} className="mt-1" /></div>
@@ -2528,6 +2529,18 @@ export function InboxView() {
                         />
                       );
                     })()}
+                    
+                    {/* Conversation Summary - shows for threads with 5+ messages */}
+                    {!selectedMessage.is_draft && conversationThread.length >= 5 && (
+                      <ConversationSummary
+                        leadId={selectedMessage.contact_type === "lead" ? selectedMessage.contact_id : undefined}
+                        ownerId={selectedMessage.contact_type === "owner" ? selectedMessage.contact_id : undefined}
+                        contactPhone={selectedMessage.contact_phone}
+                        contactEmail={selectedMessage.contact_email}
+                        messageCount={conversationThread.length}
+                        className="mb-3"
+                      />
+                    )}
                     
                     {/* AI Reply + Smart Extract buttons */}
                     {!selectedMessage.is_draft && conversationThread.length > 0 && (
@@ -2611,8 +2624,8 @@ export function InboxView() {
                                     </div>
                                   </div>
                                 )}
-                                <div className={`max-w-[80%]`}>
-                                  <div className={`rounded-2xl px-3.5 py-2 ${
+                              <div className="max-w-[85%] sm:max-w-[80%]">
+                                  <div className={`rounded-2xl px-3 py-2 sm:px-3.5 ${
                                     isOutbound 
                                       ? "bg-primary text-primary-foreground" 
                                       : "bg-muted"
@@ -2701,7 +2714,7 @@ export function InboxView() {
                                         ))}
                                       </div>
                                     )}
-                                    <p className="text-sm whitespace-pre-wrap leading-relaxed">{msg.body}</p>
+                                    <p className="text-sm whitespace-pre-wrap leading-relaxed break-words overflow-hidden">{msg.body}</p>
                                   </div>
                                   <div className={`flex items-center gap-1.5 text-[10px] text-muted-foreground mt-0.5 px-1 ${isOutbound ? "justify-end" : ""}`}>
                                     {isOutbound && currentUserProfile?.first_name && (
@@ -2723,7 +2736,7 @@ export function InboxView() {
                         <div className="max-w-[85%]">
                           <div className={`rounded-2xl px-3.5 py-2 ${selectedMessage.direction === "outbound" ? "bg-primary text-primary-foreground" : "bg-muted"}`}>
                             {selectedMessage.subject && <p className={`text-sm font-medium mb-1 ${selectedMessage.direction === "outbound" ? "opacity-90" : ""}`}>{selectedMessage.subject}</p>}
-                            <p className="text-sm whitespace-pre-wrap leading-relaxed">{selectedMessage.body}</p>
+                            <p className="text-sm whitespace-pre-wrap leading-relaxed break-words overflow-hidden">{selectedMessage.body}</p>
                           </div>
                           <div className={`text-[10px] text-muted-foreground mt-0.5 px-1 ${selectedMessage.direction === "outbound" ? "text-right" : ""}`}>
                             {format(new Date(selectedMessage.created_at), "h:mm a")}
