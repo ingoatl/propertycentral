@@ -144,6 +144,8 @@ export default function BookInspection() {
     stoveType: "",
     hasPlungers: "",
     hasSmartLock: "",
+    smartLockBrand: "",
+    smartLockModel: "",
     wifiWorking: "",
     additionalNotes: "",
     leadId: "",
@@ -284,16 +286,24 @@ export default function BookInspection() {
         stoveType: formData.stoveType,
         hasPlungers: formData.hasPlungers,
         hasSmartLock: formData.hasSmartLock,
+        smartLockBrand: formData.smartLockBrand,
+        smartLockModel: formData.smartLockModel,
         wifiWorking: formData.wifiWorking,
         additionalNotes: formData.additionalNotes,
       };
+
+      const smartLockInfo = formData.hasSmartLock === 'yes' 
+        ? `Yes - ${formData.smartLockBrand || 'Unknown brand'} ${formData.smartLockModel || ''}`.trim()
+        : formData.hasSmartLock === 'need_install' 
+        ? 'Need PeachHaus to install' 
+        : 'Will purchase and install';
 
       const safetyNotes = [
         `Fire Extinguisher: ${formData.hasFireExtinguisher === 'yes' ? 'Yes' : 'No'}`,
         `Fire Blanket Near Stove: ${formData.hasFireBlanket === 'yes' ? 'Yes' : 'No'}`,
         `Stove Type: ${formData.stoveType === 'gas' ? 'Gas' : 'Electric'}`,
         `Plunger on Property: ${formData.hasPlungers === 'yes' ? 'Yes' : 'No'}`,
-        `Has Smart Lock: ${formData.hasSmartLock === 'yes' ? 'Yes, already installed' : formData.hasSmartLock === 'need_install' ? 'Need PeachHaus to install' : 'Will purchase and install'}`,
+        `Smart Lock: ${smartLockInfo}`,
         `WiFi Working: ${formData.wifiWorking === 'yes' ? 'Yes' : 'No'}`,
         formData.additionalNotes ? `Additional Notes: ${formData.additionalNotes}` : "",
       ].filter(Boolean).join("\n");
@@ -729,7 +739,12 @@ export default function BookInspection() {
                 </Label>
                 <RadioGroup
                   value={formData.hasSmartLock}
-                  onValueChange={(value) => setFormData(prev => ({ ...prev, hasSmartLock: value }))}
+                  onValueChange={(value) => setFormData(prev => ({ 
+                    ...prev, 
+                    hasSmartLock: value,
+                    smartLockBrand: value === 'yes' ? prev.smartLockBrand : '',
+                    smartLockModel: value === 'yes' ? prev.smartLockModel : '',
+                  }))}
                   className="grid sm:grid-cols-3 gap-3"
                 >
                   <label className={cn(
@@ -756,6 +771,93 @@ export default function BookInspection() {
                 </RadioGroup>
                 {errors.hasSmartLock && (
                   <p className="text-xs text-destructive">{errors.hasSmartLock}</p>
+                )}
+                
+                {/* Show compatible locks and model/brand input when they have a smart lock */}
+                {formData.hasSmartLock === "yes" && (
+                  <Card className="bg-gradient-to-br from-emerald-50 to-teal-50 border-emerald-200">
+                    <CardContent className="pt-4 space-y-4">
+                      <div>
+                        <p className="text-sm text-emerald-800 font-semibold mb-2">
+                          ✓ Great! Please tell us your smart lock details
+                        </p>
+                        <p className="text-xs text-emerald-700 mb-3">
+                          Our system (Jervis Access) works with specific smart locks for automated guest code generation. 
+                          If your lock isn't compatible, we may need to replace it for seamless guest check-in.
+                        </p>
+                      </div>
+                      
+                      {/* Compatible locks list */}
+                      <div className="bg-white/60 rounded-lg p-3 border border-emerald-200">
+                        <p className="text-xs font-semibold text-emerald-900 mb-2">✅ Compatible Smart Locks (Jervis Access):</p>
+                        <ul className="text-xs text-emerald-800 space-y-1.5">
+                          <li className="flex items-center gap-2">
+                            <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></span>
+                            <strong>Yale</strong> - Assure Lock, Assure Lock 2, Conexis, Linus
+                          </li>
+                          <li className="flex items-center gap-2">
+                            <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></span>
+                            <strong>Schlage</strong> - Encode, Encode Plus, Sense
+                          </li>
+                          <li className="flex items-center gap-2">
+                            <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></span>
+                            <strong>August</strong> - WiFi Smart Lock, Smart Lock Pro
+                          </li>
+                          <li className="flex items-center gap-2">
+                            <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></span>
+                            <strong>Kwikset</strong> - Halo, Aura, SmartCode
+                          </li>
+                          <li className="flex items-center gap-2">
+                            <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></span>
+                            <strong>igloohome</strong> - All models
+                          </li>
+                          <li className="flex items-center gap-2">
+                            <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></span>
+                            <strong>Nuki</strong> - Smart Lock 3.0, Smart Lock Pro
+                          </li>
+                          <li className="flex items-center gap-2">
+                            <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></span>
+                            <strong>TTLock</strong> - Various models
+                          </li>
+                        </ul>
+                      </div>
+                      
+                      {/* Brand & Model inputs */}
+                      <div className="grid sm:grid-cols-2 gap-3">
+                        <div className="space-y-1.5">
+                          <Label htmlFor="smartLockBrand" className="text-xs text-emerald-800">
+                            Smart Lock Brand *
+                          </Label>
+                          <Input
+                            id="smartLockBrand"
+                            placeholder="e.g., Yale, Schlage, August..."
+                            value={formData.smartLockBrand}
+                            onChange={(e) => setFormData(prev => ({ ...prev, smartLockBrand: e.target.value }))}
+                            className="bg-white"
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label htmlFor="smartLockModel" className="text-xs text-emerald-800">
+                            Model (if known)
+                          </Label>
+                          <Input
+                            id="smartLockModel"
+                            placeholder="e.g., Assure Lock 2, Encode Plus..."
+                            value={formData.smartLockModel}
+                            onChange={(e) => setFormData(prev => ({ ...prev, smartLockModel: e.target.value }))}
+                            className="bg-white"
+                          />
+                        </div>
+                      </div>
+                      
+                      <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                        <p className="text-xs text-amber-800">
+                          ⚠️ <strong>Not on the list?</strong> If your lock isn't compatible with our PMS, we'll need to swap it out 
+                          during the inspection. Smart lock integration is vital for guest safety and automated access codes.
+                        </p>
+                      </div>
+                    </CardContent>
+                  </Card>
                 )}
                 
                 {(formData.hasSmartLock === "will_buy" || formData.hasSmartLock === "need_install") && (
