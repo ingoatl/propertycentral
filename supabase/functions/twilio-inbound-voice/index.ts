@@ -18,8 +18,9 @@ serve(async (req) => {
     const fromNumber = formData.get('From') as string;
     const toNumber = formData.get('To') as string;
     const callStatus = formData.get('CallStatus') as string;
+    const forwardedFrom = formData.get('ForwardedFrom') as string; // GHL number if forwarded
 
-    console.log('Inbound call received:', { callSid, fromNumber, toNumber, callStatus });
+    console.log('Inbound call received:', { callSid, fromNumber, toNumber, callStatus, forwardedFrom });
 
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
 
@@ -28,6 +29,29 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
+
+    // Check if this call is forwarded from a GHL team member number
+    // If so, route to IVR operator instead of AI agent
+    if (forwardedFrom) {
+      const { data: teamRouting } = await supabase
+        .from('team_routing')
+        .select('*')
+        .eq('ghl_number', forwardedFrom)
+        .eq('is_active', true)
+        .maybeSingle();
+
+      if (teamRouting) {
+        console.log('Call forwarded from GHL number:', forwardedFrom, '- routing to IVR');
+        
+        // Route to IVR operator
+        const ivrUrl = `${SUPABASE_URL}/functions/v1/twilio-ivr-operator`;
+        const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Redirect method="POST">${ivrUrl}</Redirect>
+</Response>`;
+        return new Response(twiml, { headers: { 'Content-Type': 'text/xml' } });
+      }
+    }
 
     // Normalize phone number for lookup (remove +1 prefix if present)
     let normalizedPhone = fromNumber;
