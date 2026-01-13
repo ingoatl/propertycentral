@@ -9,7 +9,6 @@ import { FloatingChatButton } from "@/components/ai-assistant/FloatingChatButton
 import { MainNavigation } from "@/components/navigation/MainNavigation";
 import { MobileNavigation } from "@/components/navigation/MobileNavigation";
 import { QuickCommunicationButton } from "@/components/communications/QuickCommunicationButton";
-import VoiceDialer from "@/components/leads/VoiceDialer";
 import { useLeadRealtimeMessages } from "@/hooks/useLeadRealtimeMessages";
 import { TaskConfirmationModal } from "@/components/TaskConfirmationModal";
 import { CallRecapModal } from "@/components/CallRecapModal";
@@ -116,12 +115,7 @@ const Layout = ({ children }: LayoutProps) => {
 
             {/* Right side: Quick Actions + User info + Logout */}
             <div className="flex items-center gap-1 sm:gap-2">
-              {canAccessNav && (
-                <>
-                  <QuickCommunicationButton />
-                  <VoiceDialer />
-                </>
-              )}
+              {canAccessNav && <QuickCommunicationButton />}
               {user && (
                 <>
                   <span className="text-sm text-muted-foreground hidden lg:inline truncate max-w-[150px]">
