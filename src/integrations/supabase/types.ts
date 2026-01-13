@@ -96,6 +96,79 @@ export type Database = {
           },
         ]
       }
+      ai_draft_replies: {
+        Row: {
+          communication_id: string | null
+          confidence_score: number | null
+          contact_email: string | null
+          contact_phone: string | null
+          created_at: string
+          dismissed_at: string | null
+          draft_content: string
+          id: string
+          lead_id: string | null
+          message_type: string
+          owner_id: string | null
+          sent_at: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          communication_id?: string | null
+          confidence_score?: number | null
+          contact_email?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          dismissed_at?: string | null
+          draft_content: string
+          id?: string
+          lead_id?: string | null
+          message_type?: string
+          owner_id?: string | null
+          sent_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          communication_id?: string | null
+          confidence_score?: number | null
+          contact_email?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          dismissed_at?: string | null
+          draft_content?: string
+          id?: string
+          lead_id?: string | null
+          message_type?: string
+          owner_id?: string | null
+          sent_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_draft_replies_communication_id_fkey"
+            columns: ["communication_id"]
+            isOneToOne: false
+            referencedRelation: "lead_communications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_draft_replies_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_draft_replies_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "property_owners"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       appliance_warranties: {
         Row: {
           appliance_type: string

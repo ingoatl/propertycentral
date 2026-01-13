@@ -452,3 +452,6 @@ verify_jwt = false
 
 [functions.ghl-sync-calendar]
 verify_jwt = true
+
+[functions.generate-draft-reply]
+verify_jwt = true

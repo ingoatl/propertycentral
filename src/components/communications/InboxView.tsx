@@ -36,6 +36,7 @@ import {
   Bot,
   RotateCcw,
   Volume2,
+  Sparkles,
 } from "lucide-react";
 import { IncomeReportButton } from "@/components/IncomeReportEmbed";
 import { TwilioCallDialog } from "@/components/TwilioCallDialog";
@@ -49,6 +50,7 @@ import { ComposeEmailDialog } from "./ComposeEmailDialog";
 import { AIComposeEmailDialog } from "./AIComposeEmailDialog";
 import { AIWritingAssistant } from "./AIWritingAssistant";
 import { AIReplyButton } from "./AIReplyButton";
+import { AIDraftReplyCard } from "./AIDraftReplyCard";
 import { SmartSchedulingCard, detectSchedulingIntent } from "./SmartSchedulingCard";
 import { SmartTaskExtractButton } from "./SmartTaskExtractButton";
 import { EmojiPicker } from "./EmojiPicker";
@@ -70,6 +72,7 @@ import { useAdminCheck } from "@/hooks/useAdminCheck";
 import { useGhlAutoSync } from "@/hooks/useGhlAutoSync";
 import { useLeadRealtimeMessages } from "@/hooks/useLeadRealtimeMessages";
 import { usePhoneLookup } from "@/hooks/usePhoneLookup";
+import { useAIDraftReplies, usePendingDrafts } from "@/hooks/useAIDraftReplies";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -2464,6 +2467,30 @@ export function InboxView() {
                         );
                       }
                       return null;
+                    })()}
+                    
+                    {/* AI Draft Reply Card - shows pre-generated draft if available */}
+                    {!selectedMessage.is_draft && selectedMessage.contact_phone && (() => {
+                      // Check for pending AI draft for this contact
+                      const leadId = selectedMessage.contact_type === "lead" ? selectedMessage.contact_id : undefined;
+                      const ownerId = selectedMessage.contact_type === "owner" ? selectedMessage.contact_id : undefined;
+                      
+                      return (
+                        <AIDraftReplySection 
+                          contactPhone={selectedMessage.contact_phone}
+                          leadId={leadId}
+                          ownerId={ownerId}
+                          onSend={(message) => {
+                            sendSmsMutation.mutate({
+                              to: selectedMessage.contact_phone!,
+                              message,
+                              contactType: selectedMessage.contact_type,
+                              contactId: selectedMessage.contact_id,
+                            });
+                          }}
+                          isSending={sendSmsMutation.isPending}
+                        />
+                      );
                     })()}
                     
                     {/* AI Reply + Smart Extract buttons */}
