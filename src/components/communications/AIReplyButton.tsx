@@ -208,17 +208,19 @@ export function AIReplyButton({
       size="sm"
       onClick={handleGenerateReply}
       disabled={isGenerating}
-      className="gap-2 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70"
+      className="gap-1.5 h-8 px-3 text-xs sm:text-sm sm:gap-2 sm:px-4 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 whitespace-nowrap flex-shrink-0"
     >
       {isGenerating ? (
         <>
-          <Loader2 className="h-4 w-4 animate-spin" />
-          Generating...
+          <Loader2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 animate-spin" />
+          <span className="hidden sm:inline">Generating...</span>
+          <span className="sm:hidden">AI...</span>
         </>
       ) : (
         <>
-          <Sparkles className="h-4 w-4" />
-          Reply with AI
+          <Sparkles className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+          <span className="hidden sm:inline">Reply with AI</span>
+          <span className="sm:hidden">AI Reply</span>
         </>
       )}
     </Button>
