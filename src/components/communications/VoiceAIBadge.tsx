@@ -51,27 +51,74 @@ export function extractCallSummaryFromTranscript(body: string): string | null {
 
 // Helper to extract caller's actual name from Voice AI transcript
 // Parses the transcript conversation to find how the caller introduced themselves
+// Supports both old format (User:) and new GHL format (human:)
 export function extractCallerNameFromTranscript(body: string): string | null {
   if (!body) return null;
   
-  // Look for common name introduction patterns in the transcript
-  // Pattern 1: "User: My name is [Name]" or "User: I'm [Name]" or "User: This is [Name]"
-  const namePatterns = [
-    /User:\s*(?:My name is|I'm|This is|I am|It's|Hi,? (?:this is|I'm))\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/i,
-    /User:\s*(?:It's|Hi,? it's)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/i,
-    // Pattern 2: Response to "May I have your name" - just the name on its own line
-    /User:\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\s*(?:\n|$)/,
-    // Pattern 3: "User: [Name] Brooks" or similar full name at start of response
-    /User:\s*([A-Z][a-z]+\s+[A-Z][a-z]+)(?:[,.\s]|$)/,
+  // Common words that are NOT names
+  const commonWords = [
+    'yes', 'no', 'okay', 'sure', 'hello', 'hi', 'hey', 'thanks', 'thank', 'good', 'great',
+    'just', 'please', 'connect', 'okay', 'ok', 'alright', 'right', 'yeah', 'yep', 'nope',
+    'bot', 'human', 'user', 'the', 'a', 'an', 'is', 'are', 'was', 'were', 'one', 'moment',
+    'hold', 'wait', 'transfer', 'call', 'back', 'calling', 'speaking', 'speak', 'talk', 'i',
+    'um', 'uh', 'hmm', 'got', 'it', 'and', 'or', 'but', 'so', 'very', 'much', 'how'
   ];
   
-  for (const pattern of namePatterns) {
-    const match = body.match(pattern);
-    if (match && match[1]) {
-      const name = match[1].trim();
-      // Validate it looks like a real name (not a common word)
-      const commonWords = ['yes', 'no', 'okay', 'sure', 'hello', 'hi', 'hey', 'thanks', 'thank', 'good', 'great'];
-      if (name.length >= 2 && !commonWords.includes(name.toLowerCase())) {
+  // Helper to validate name
+  const isValidName = (name: string): boolean => {
+    if (!name || name.length < 2) return false;
+    const lowerName = name.toLowerCase();
+    // Not a common word
+    if (commonWords.includes(lowerName)) return false;
+    // Not a phone number format
+    if (/^[\d\s\-\(\)\+\.]+$/.test(name)) return false;
+    // Not starting with +
+    if (name.startsWith('+')) return false;
+    // Should have at least one letter
+    if (!/[a-zA-Z]/.test(name)) return false;
+    // Should start with a capital letter for proper names
+    if (!/^[A-Z]/.test(name)) return false;
+    return true;
+  };
+  
+  // GHL format patterns (human:Message)
+  const ghlNamePatterns = [
+    // "human:My name is [Name]" or "human:I'm [Name]" or "human:This is [Name]"
+    /human:\s*(?:My name is|I'm|This is|I am|It's|Hi,?\s*(?:this is|I'm|it's))\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/gi,
+    // "human:[Name]." at start - short response with name only (like "human:Tanya.")
+    /human:\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\s*[.,!?\n]/g,
+    // "human:Hi. My name is [Name]" 
+    /human:\s*(?:Hi\.?|Hello\.?)\s*My name is\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/gi,
+    // Full name pattern like "human:Samuel Penn,"
+    /human:\s*([A-Z][a-z]+\s+[A-Z][a-z]+)[,.\s]/g,
+    // "It's [Name]" pattern like "human:It's Addie Brook."
+    /human:\s*It's\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/gi,
+  ];
+  
+  for (const pattern of ghlNamePatterns) {
+    // Reset lastIndex for global patterns
+    pattern.lastIndex = 0;
+    let match;
+    while ((match = pattern.exec(body)) !== null) {
+      const name = match[1]?.trim();
+      if (isValidName(name)) {
+        return name;
+      }
+    }
+  }
+  
+  // Also try old format patterns (User:Message)
+  const oldFormatPatterns = [
+    /User:\s*(?:My name is|I'm|This is|I am|It's|Hi,?\s*(?:this is|I'm))\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/gi,
+    /User:\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\s*[.,!?\n]/g,
+  ];
+  
+  for (const pattern of oldFormatPatterns) {
+    pattern.lastIndex = 0;
+    let match;
+    while ((match = pattern.exec(body)) !== null) {
+      const name = match[1]?.trim();
+      if (isValidName(name)) {
         return name;
       }
     }

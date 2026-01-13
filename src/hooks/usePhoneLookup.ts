@@ -59,7 +59,7 @@ export function usePhoneLookup() {
       // 2. Get names AND emails from lead_communications metadata (GHL sync data)
       const { data: commMetadata } = await supabase
         .from("lead_communications")
-        .select("metadata")
+        .select("metadata, body")
         .not("metadata", "is", null)
         .limit(500);
       
@@ -67,14 +67,37 @@ export function usePhoneLookup() {
         const metadata = comm.metadata as { 
           contact_name?: string; 
           unmatched_phone?: string;
-          ghl_data?: { contactName?: string; contactPhone?: string; contactEmail?: string };
+          ghl_data?: { 
+            contactName?: string; 
+            contactPhone?: string; 
+            contactEmail?: string;
+            matchedName?: string;
+            fromNumber?: string;
+          };
         } | null;
         
         if (!metadata) return;
         
-        const phone = metadata.unmatched_phone || metadata.ghl_data?.contactPhone;
-        const name = metadata.contact_name || metadata.ghl_data?.contactName;
+        const phone = metadata.unmatched_phone || metadata.ghl_data?.contactPhone || metadata.ghl_data?.fromNumber;
+        // Priority: matchedName > contact_name > contactName
+        let name = metadata.ghl_data?.matchedName || metadata.contact_name || metadata.ghl_data?.contactName;
         const email = metadata.ghl_data?.contactEmail;
+        
+        // If name is invalid, try extracting from transcript body
+        if (phone && (!name || name === "Unknown" || name === "Contact" || 
+            name?.match(/^[\d\s\-\(\)\+\.]+$/) || 
+            name?.toLowerCase() === "just connect" || 
+            name?.toLowerCase() === "sure")) {
+          // Try extracting from transcript using human: pattern
+          const body = comm.body || "";
+          if (body.includes("human:")) {
+            // Simple extraction - look for name introductions
+            const nameMatch = body.match(/human:\s*(?:My name is|I'm|This is|I am|It's)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/i);
+            if (nameMatch && nameMatch[1]) {
+              name = nameMatch[1].trim();
+            }
+          }
+        }
         
         if (phone && name) {
           const normalized = normalizePhoneStatic(phone);
@@ -83,7 +106,9 @@ export function usePhoneLookup() {
             name !== "Unknown" && 
             name !== "Contact" &&
             !name.match(/^[\d\s\-\(\)\+\.]+$/) && 
-            !name.startsWith("+");
+            !name.startsWith("+") &&
+            name.toLowerCase() !== "just connect" &&
+            name.toLowerCase() !== "sure";
           
           if (isValidName && (!cache[normalized] || cache[normalized].source !== "twilio")) {
             cache[normalized] = {

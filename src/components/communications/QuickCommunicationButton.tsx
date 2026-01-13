@@ -107,8 +107,8 @@ export function QuickCommunicationButton() {
       toast.error("Please enter a valid phone number");
       return;
     }
-    // For now, just show a message - will integrate with Telnyx
-    toast.info("Call functionality - Telnyx integration coming soon");
+    // Use the Voice Dialer for calls
+    toast.info("Use the Voice Dialer button for outbound calls");
     setOpen(false);
   };
 
@@ -130,7 +130,7 @@ export function QuickCommunicationButton() {
 
   const handleCall = (contact: Contact) => {
     setSelectedContact(contact);
-    toast.info("Call functionality - Telnyx integration coming soon");
+    toast.info("Use the Voice Dialer button for outbound calls");
     setOpen(false);
   };
 

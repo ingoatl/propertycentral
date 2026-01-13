@@ -1035,25 +1035,57 @@ export function InboxView() {
 
         if (unmatchedCallComms) {
           for (const comm of unmatchedCallComms) {
-            // Extract contact name from metadata if available
-            const metadata = comm.metadata as { ghl_data?: { contactName?: string; contactPhone?: string } } | null;
+            // Extract contact name from metadata if available - check matchedName first (from GHL sync)
+            const metadata = comm.metadata as { 
+              ghl_data?: { 
+                contactName?: string; 
+                contactPhone?: string;
+                matchedName?: string;
+                fromNumber?: string;
+              } 
+            } | null;
             const body = comm.body || "";
             
-            // Check if this is a Voice AI / PeachHaus Receptionist call
-            const isVoiceAI = body.includes("Your AI Employee has handled another call") ||
-                              body.includes("AI Agent Name:") ||
-                              body.includes("Call Transcript:");
+            // Check if this is a Voice AI / PeachHaus Receptionist call (uses bot:/human: format)
+            const isVoiceAI = body.includes("bot:") && body.includes("human:");
             
-            // For Voice AI calls, try to extract the caller's actual name from the transcript
-            let contactName = metadata?.ghl_data?.contactName || "Unknown Caller";
-            if (isVoiceAI) {
-              const callerName = extractCallerNameFromTranscript(body);
-              contactName = callerName || "PeachHaus Receptionist";
-            } else if (contactName === "Unknown Caller" || contactName === "Unknown") {
-              contactName = "Unknown Caller";
+            // Priority for name extraction:
+            // 1. matchedName from GHL metadata (most reliable - GHL's own matching)
+            // 2. Extract from transcript (human:Name pattern)
+            // 3. contactName from GHL metadata
+            // 4. Fallback based on whether it's Voice AI or not
+            let contactName = "";
+            
+            // Check matchedName from GHL first (most reliable source)
+            const matchedName = metadata?.ghl_data?.matchedName;
+            if (matchedName && matchedName !== "Unknown" && matchedName !== "Contact" && 
+                !matchedName.match(/^[\d\s\-\(\)\+\.]+$/) && 
+                matchedName.toLowerCase() !== "just connect" &&
+                matchedName.toLowerCase() !== "sure") {
+              contactName = matchedName;
             }
             
-            const contactPhone = metadata?.ghl_data?.contactPhone || undefined;
+            // If no matchedName, try extracting from transcript
+            if (!contactName && isVoiceAI) {
+              const extractedName = extractCallerNameFromTranscript(body);
+              if (extractedName) {
+                contactName = extractedName;
+              }
+            }
+            
+            // If still no name, try contactName from metadata
+            if (!contactName && metadata?.ghl_data?.contactName && 
+                metadata.ghl_data.contactName !== "Unknown" && 
+                metadata.ghl_data.contactName !== "Contact") {
+              contactName = metadata.ghl_data.contactName;
+            }
+            
+            // Final fallback
+            if (!contactName) {
+              contactName = isVoiceAI ? "AI Call" : "Caller";
+            }
+            
+            const contactPhone = metadata?.ghl_data?.contactPhone || metadata?.ghl_data?.fromNumber || undefined;
             
             results.push({
               id: comm.id, type: "call", direction: comm.direction as "inbound" | "outbound",
@@ -1098,7 +1130,7 @@ export function InboxView() {
         const name = comm.contact_name?.trim() || "";
         
         // Check if we should look up this contact:
-        // 1. Name is "Unknown" or similar
+        // 1. Name is "Unknown" or similar generic fallback
         // 2. Name looks like a phone number
         // 3. Name is very short (likely first name only like "Hector")
         // 4. Name starts with a "+" (phone number format)
@@ -1106,8 +1138,9 @@ export function InboxView() {
           name === "Unknown" || 
           name === "Unknown Caller" ||
           name === "Unknown Contact" ||
-          name.toLowerCase() === "unknown" ||
-          name === "PeachHaus Receptionist"; // Don't override receptionist with phone lookup
+          name === "AI Call" ||
+          name === "Caller" ||
+          name.toLowerCase() === "unknown";
           
         const isPhoneFormat = name.match(/^[\d\s\-\(\)\+\.]+$/) || 
           name.startsWith("+");
@@ -1145,14 +1178,16 @@ export function InboxView() {
             const lookedUpName = lookedUpData.name || lookedUpData.callerName;
             const currentName = comm.contact_name?.trim() || "";
             
-            // Replace if current name is unknown, a phone number, or just a first name
+            // Replace if current name is unknown, a phone number, or a generic fallback
             const shouldReplace = 
               !currentName ||
               currentName === "Unknown" || 
               currentName === "Unknown Caller" ||
+              currentName === "AI Call" ||
+              currentName === "Caller" ||
               currentName.match(/^[\d\s\-\(\)\+\.]+$/) ||
-              currentName.startsWith("+");
-            // Don't replace "PeachHaus Receptionist" with phone lookup
+              currentName.startsWith("+") ||
+              // Also replace single word names with full names from lookup
               (currentName.split(" ").length === 1 && lookedUpName && lookedUpName.split(" ").length > 1);
             
             if (shouldReplace && lookedUpName) {
