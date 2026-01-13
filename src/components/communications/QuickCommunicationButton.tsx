@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { SendSMSDialog } from "./SendSMSDialog";
+import { CallDialog } from "./CallDialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -36,6 +37,7 @@ export function QuickCommunicationButton() {
   const [phoneNumber, setPhoneNumber] = useState("");
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
   const [showSMS, setShowSMS] = useState(false);
+  const [showCall, setShowCall] = useState(false);
   const [activeTab, setActiveTab] = useState<"search" | "dialpad">("search");
 
   // Fetch leads and owners for contact search
@@ -107,8 +109,15 @@ export function QuickCommunicationButton() {
       toast.error("Please enter a valid phone number");
       return;
     }
-    // Use the Voice Dialer for calls
-    toast.info("Use the Voice Dialer button for outbound calls");
+    // Create a manual contact and open the call dialog
+    setSelectedContact({
+      id: "manual",
+      name: formatPhoneDisplay(phoneNumber),
+      phone: phoneNumber,
+      email: null,
+      type: "lead",
+    });
+    setShowCall(true);
     setOpen(false);
   };
 
@@ -129,8 +138,12 @@ export function QuickCommunicationButton() {
   };
 
   const handleCall = (contact: Contact) => {
+    if (!contact.phone) {
+      toast.error("No phone number available");
+      return;
+    }
     setSelectedContact(contact);
-    toast.info("Use the Voice Dialer button for outbound calls");
+    setShowCall(true);
     setOpen(false);
   };
 
@@ -308,6 +321,17 @@ export function QuickCommunicationButton() {
           </Tabs>
         </PopoverContent>
       </Popover>
+
+      {/* Call Dialog */}
+      {selectedContact && (
+        <CallDialog
+          open={showCall}
+          onOpenChange={setShowCall}
+          contactName={selectedContact.name}
+          contactPhone={selectedContact.phone || ""}
+          contactType={selectedContact.type}
+        />
+      )}
 
       {/* SMS Dialog */}
       {selectedContact && (
