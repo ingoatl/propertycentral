@@ -6,7 +6,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Google Reviews dedicated phone number
+// Google Reviews dedicated phone number (Twilio)
 const GOOGLE_REVIEWS_PHONE = "+14049247251";
 
 // Helper to check if current time is within send window (11am-3pm EST)
@@ -25,11 +25,12 @@ serve(async (req) => {
   }
 
   try {
-    const { reviewId, action, requestId, forceTime } = await req.json();
+    const { reviewId, action, requestId, forceTime, to, body } = await req.json();
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const telnyxApiKey = Deno.env.get("TELNYX_API_KEY")!;
+    const twilioAccountSid = Deno.env.get("TWILIO_ACCOUNT_SID")!;
+    const twilioAuthToken = Deno.env.get("TWILIO_AUTH_TOKEN")!;
     const googleReviewUrl = Deno.env.get("GOOGLE_REVIEW_URL") || "https://g.page/r/YOUR_REVIEW_LINK";
 
     const supabase = createClient(supabaseUrl, supabaseKey);
@@ -37,7 +38,7 @@ serve(async (req) => {
     console.log(`Processing SMS action: ${action} for review: ${reviewId || requestId}`);
 
     // Check time window for non-test messages
-    if (action !== "test" && !forceTime && !isWithinSendWindow()) {
+    if (action !== "test" && action !== "direct" && !forceTime && !isWithinSendWindow()) {
       console.log("Outside send window (11am-3pm EST), SMS queued");
       return new Response(
         JSON.stringify({ 
@@ -49,69 +50,84 @@ serve(async (req) => {
       );
     }
 
-    // Helper function to send SMS via Telnyx
-    const sendSms = async (to: string, body: string, contactId?: string): Promise<{ success: boolean; messageId?: string; error?: string; optedOut?: boolean }> => {
+    // Helper function to send SMS via Twilio
+    const sendSms = async (toNumber: string, messageBody: string, contactId?: string): Promise<{ success: boolean; messageId?: string; error?: string; optedOut?: boolean }> => {
       try {
-        // Format phone number for Telnyx (needs + prefix)
-        const formattedTo = to.startsWith('+') ? to : `+1${to.replace(/\D/g, '')}`;
+        // Format phone number for Twilio (needs + prefix)
+        let formattedTo = toNumber.replace(/\D/g, '');
+        if (!formattedTo.startsWith('1') && formattedTo.length === 10) {
+          formattedTo = '1' + formattedTo;
+        }
+        formattedTo = '+' + formattedTo;
         
-        console.log(`Sending SMS via Telnyx from ${GOOGLE_REVIEWS_PHONE} to ${formattedTo}`);
+        console.log(`Sending SMS via Twilio from ${GOOGLE_REVIEWS_PHONE} to ${formattedTo}`);
         
-        const response = await fetch("https://api.telnyx.com/v2/messages", {
+        const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${twilioAccountSid}/Messages.json`;
+        const authHeader = btoa(`${twilioAccountSid}:${twilioAuthToken}`);
+        
+        const formData = new URLSearchParams();
+        formData.append('From', GOOGLE_REVIEWS_PHONE);
+        formData.append('To', formattedTo);
+        formData.append('Body', messageBody);
+        
+        const response = await fetch(twilioUrl, {
           method: "POST",
           headers: {
-            "Authorization": `Bearer ${telnyxApiKey}`,
-            "Content-Type": "application/json",
+            "Authorization": `Basic ${authHeader}`,
+            "Content-Type": "application/x-www-form-urlencoded",
           },
-          body: JSON.stringify({
-            from: GOOGLE_REVIEWS_PHONE,
-            to: formattedTo,
-            text: body,
-          }),
+          body: formData.toString(),
         });
 
         if (!response.ok) {
-          const errorText = await response.text();
-          console.error("Telnyx error:", errorText);
+          const errorData = await response.json();
+          console.error("Twilio error:", errorData);
           
-          try {
-            const errorData = JSON.parse(errorText);
-            // Check for opt-out/blocked errors
-            if (errorData.errors?.[0]?.code === "40300" || 
-                errorData.errors?.[0]?.detail?.includes("opted out") ||
-                errorData.errors?.[0]?.detail?.includes("blocked")) {
-              console.log(`Contact ${to} has unsubscribed`);
-              
-              const cleanPhone = to.replace(/[\s\-\(\)\+]/g, "");
-              const phoneDigits = cleanPhone.slice(-10);
-              
-              await supabase
-                .from("google_review_requests")
-                .update({
-                  opted_out: true,
-                  opted_out_at: new Date().toISOString(),
-                  workflow_status: "ignored",
-                  updated_at: new Date().toISOString(),
-                })
-                .ilike("guest_phone", `%${phoneDigits}`);
-              
-              return { success: false, error: "Contact has unsubscribed", optedOut: true };
-            }
-          } catch (parseError) {
-            // Continue with generic error
+          // Check for opt-out/blocked errors
+          if (errorData.code === 21610 || errorData.message?.includes("unsubscribed")) {
+            console.log(`Contact ${toNumber} has unsubscribed`);
+            
+            const cleanPhone = toNumber.replace(/[\s\-\(\)\+]/g, "");
+            const phoneDigits = cleanPhone.slice(-10);
+            
+            await supabase
+              .from("google_review_requests")
+              .update({
+                opted_out: true,
+                opted_out_at: new Date().toISOString(),
+                workflow_status: "ignored",
+                updated_at: new Date().toISOString(),
+              })
+              .ilike("guest_phone", `%${phoneDigits}`);
+            
+            return { success: false, error: "Contact has unsubscribed", optedOut: true };
           }
           
-          return { success: false, error: errorText };
+          return { success: false, error: errorData.message || JSON.stringify(errorData) };
         }
 
         const data = await response.json();
-        console.log(`SMS sent successfully via Telnyx, ID: ${data.data?.id}`);
-        return { success: true, messageId: data.data?.id };
+        console.log(`SMS sent successfully via Twilio, SID: ${data.sid}`);
+        return { success: true, messageId: data.sid };
       } catch (error) {
-        console.error("Telnyx exception:", error);
+        console.error("Twilio exception:", error);
         return { success: false, error: String(error) };
       }
     };
+
+    // Handle direct SMS (from VoiceDialer or other components)
+    if (action === "direct" && to && body) {
+      const result = await sendSms(to, body);
+      
+      if (!result.success) {
+        throw new Error(result.error || "Failed to send SMS");
+      }
+      
+      return new Response(
+        JSON.stringify({ success: true, messageId: result.messageId }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     // Handle different actions
     if (action === "permission_ask") {
@@ -189,7 +205,7 @@ serve(async (req) => {
         phone_number: review.guest_phone,
         message_type: "permission_ask",
         message_body: message,
-        telnyx_message_id: result.messageId,
+        twilio_message_id: result.messageId,
         status: "sent",
       });
 
@@ -261,7 +277,7 @@ serve(async (req) => {
         phone_number: request.guest_phone,
         message_type: "link_delivery",
         message_body: linkMessage,
-        telnyx_message_id: linkResult.messageId,
+        twilio_message_id: linkResult.messageId,
         status: "sent",
       });
 
@@ -274,7 +290,7 @@ serve(async (req) => {
           phone_number: request.guest_phone,
           message_type: "review_text",
           message_body: reviewMessage,
-          telnyx_message_id: reviewResult.messageId,
+          twilio_message_id: reviewResult.messageId,
           status: reviewResult.success ? "sent" : "failed",
           error_message: reviewResult.error,
         });
@@ -347,7 +363,7 @@ serve(async (req) => {
         phone_number: request.guest_phone,
         message_type: request.nudge_count === 0 ? "nudge" : "final_reminder",
         message_body: nudgeMessage,
-        telnyx_message_id: nudgeResult.messageId,
+        twilio_message_id: nudgeResult.messageId,
         status: "sent",
       });
 
@@ -371,7 +387,7 @@ serve(async (req) => {
     if (action === "test") {
       // Send test to Ingo's phone
       const adminPhone = "+17709065022";
-      const testMessage = `🧪 Test SMS from PeachHaus Google Review system (via Telnyx from ${GOOGLE_REVIEWS_PHONE}). If you received this, the SMS integration is working! Reply to test inbound handling.`;
+      const testMessage = `🧪 Test SMS from PeachHaus Google Review system (via Twilio from ${GOOGLE_REVIEWS_PHONE}). If you received this, the SMS integration is working! Reply to test inbound handling.`;
       
       console.log(`Sending test SMS to ${adminPhone} from ${GOOGLE_REVIEWS_PHONE}`);
       
@@ -381,7 +397,7 @@ serve(async (req) => {
         phone_number: adminPhone,
         message_type: "test",
         message_body: testMessage,
-        telnyx_message_id: testResult.messageId,
+        twilio_message_id: testResult.messageId,
         status: testResult.success ? "sent" : "failed",
         error_message: testResult.error,
       });
@@ -391,7 +407,7 @@ serve(async (req) => {
         throw new Error(testResult.error || "Failed to send test SMS");
       }
 
-      console.log(`Test SMS sent successfully via Telnyx, message ID: ${testResult.messageId}`);
+      console.log(`Test SMS sent successfully via Twilio, message SID: ${testResult.messageId}`);
 
       return new Response(
         JSON.stringify({ success: true, action: "test", messageId: testResult.messageId }),
