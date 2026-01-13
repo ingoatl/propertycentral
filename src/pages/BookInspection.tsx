@@ -180,13 +180,31 @@ export default function BookInspection() {
   const [isBooked, setIsBooked] = useState(false);
   const [bookedDateTime, setBookedDateTime] = useState<{ date: Date; time: string } | null>(null);
 
-  // Only allow Tuesdays (2), Wednesdays (3), and Thursdays (4)
+  // Calculate minimum date with 3 business day lead time
+  const getMinimumBookingDate = (): Date => {
+    let businessDaysAdded = 0;
+    let currentDate = new Date();
+    
+    while (businessDaysAdded < 3) {
+      currentDate = addDays(currentDate, 1);
+      const dayOfWeek = getDay(currentDate);
+      // Skip weekends (0 = Sunday, 6 = Saturday)
+      if (dayOfWeek !== 0 && dayOfWeek !== 6 && !isUSHoliday(currentDate)) {
+        businessDaysAdded++;
+      }
+    }
+    return currentDate;
+  };
+
+  const minimumBookingDate = getMinimumBookingDate();
+
+  // Only allow Tuesdays (2), Wednesdays (3), and Thursdays (4) with 3 business day lead time
   const isDateDisabled = (date: Date) => {
     const dayOfWeek = getDay(date);
-    const isPast = isBefore(date, addDays(new Date(), -1));
+    const isBeforeMinimum = isBefore(date, minimumBookingDate);
     const isAllowedDay = dayOfWeek === 2 || dayOfWeek === 3 || dayOfWeek === 4; // Tuesday, Wednesday, Thursday
     const isHoliday = isUSHoliday(date);
-    return isPast || !isAllowedDay || isHoliday;
+    return isBeforeMinimum || !isAllowedDay || isHoliday;
   };
 
   const isTimeSlotPast = (date: Date, time: string) => {
