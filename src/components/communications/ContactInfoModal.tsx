@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { Phone, Mail, MapPin, Building, User, ExternalLink, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { ContactMemoriesPanel } from "./ContactMemoriesPanel";
 
 interface ContactInfoModalProps {
   open: boolean;
@@ -243,6 +244,18 @@ export function ContactInfoModal({
             {contactType === "external" && (
               <div className="text-sm text-muted-foreground pt-2 border-t">
                 This is an external contact not linked to a lead or owner in the system.
+              </div>
+            )}
+
+            {/* AI Memory Panel */}
+            {(contactType === "lead" || contactType === "owner") && (
+              <div className="pt-2 border-t">
+                <ContactMemoriesPanel
+                  leadId={contactType === "lead" ? contactId : undefined}
+                  ownerId={contactType === "owner" ? contactId : undefined}
+                  contactPhone={contactPhone}
+                  contactName={contactName}
+                />
               </div>
             )}
 
