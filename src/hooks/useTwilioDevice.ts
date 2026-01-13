@@ -2,6 +2,7 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { Device, Call } from "@twilio/voice-sdk";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { formatPhoneForTwilio, cleanPhoneNumber } from "@/lib/phoneUtils";
 
 interface UseTwilioDeviceOptions {
   onCallStart?: () => void;
@@ -33,12 +34,26 @@ export function useTwilioDevice(options: UseTwilioDeviceOptions = {}) {
   const initializeDevice = async () => {
     try {
       console.log('Getting Twilio token...');
+      
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      const userId = user?.id;
+      
       const { data, error } = await supabase.functions.invoke('twilio-token', {
-        body: { identity: `peachhaus-${Date.now()}` }
+        body: { 
+          identity: `peachhaus-${Date.now()}`,
+          userId 
+        }
       });
 
-      if (error) throw error;
-      if (!data?.token) throw new Error('No token received');
+      if (error) {
+        console.error('Twilio token error:', error);
+        throw new Error(error.message || 'Failed to get call token');
+      }
+      if (!data?.token) {
+        console.error('No token in response:', data);
+        throw new Error('No token received from server');
+      }
 
       console.log('Token received, initializing device...');
       
@@ -89,7 +104,7 @@ export function useTwilioDevice(options: UseTwilioDeviceOptions = {}) {
   }, [isOnCall]);
 
   const makeCall = useCallback(async (phoneNumber: string): Promise<boolean> => {
-    const cleaned = phoneNumber.replace(/\D/g, "");
+    const cleaned = cleanPhoneNumber(phoneNumber);
     if (cleaned.length < 10) {
       toast.error("Please enter a valid phone number");
       return false;
@@ -104,11 +119,7 @@ export function useTwilioDevice(options: UseTwilioDeviceOptions = {}) {
         device = await initializeDevice();
       }
 
-      let formattedPhone = cleaned;
-      if (!formattedPhone.startsWith('1') && formattedPhone.length === 10) {
-        formattedPhone = '1' + formattedPhone;
-      }
-      formattedPhone = '+' + formattedPhone;
+      const formattedPhone = formatPhoneForTwilio(cleaned);
 
       console.log('Making call to:', formattedPhone);
 

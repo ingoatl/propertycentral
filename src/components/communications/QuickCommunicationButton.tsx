@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Phone, MessageSquare, Search, X, Delete, Users, Grid3X3 } from "lucide-react";
+import { Phone, MessageSquare, X, Delete, Users, Grid3X3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Popover,
@@ -15,6 +15,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
+import { formatPhoneForDisplay } from "@/lib/phoneUtils";
 
 interface Contact {
   id: string;
@@ -97,12 +98,7 @@ export function QuickCommunicationButton() {
     setPhoneNumber((prev) => prev.slice(0, -1));
   };
 
-  const formatPhoneDisplay = (phone: string) => {
-    const cleaned = phone.replace(/\D/g, "");
-    if (cleaned.length <= 3) return cleaned;
-    if (cleaned.length <= 6) return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3)}`;
-    return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6, 10)}`;
-  };
+  // Using formatPhoneForDisplay from phoneUtils
 
   const handleDialpadCall = () => {
     if (phoneNumber.length < 10) {
@@ -112,7 +108,7 @@ export function QuickCommunicationButton() {
     // Create a manual contact and open the call dialog
     setSelectedContact({
       id: "manual",
-      name: formatPhoneDisplay(phoneNumber),
+      name: formatPhoneForDisplay(phoneNumber),
       phone: phoneNumber,
       email: null,
       type: "lead",
@@ -128,7 +124,7 @@ export function QuickCommunicationButton() {
     }
     setSelectedContact({
       id: "manual",
-      name: formatPhoneDisplay(phoneNumber),
+      name: formatPhoneForDisplay(phoneNumber),
       phone: phoneNumber,
       email: null,
       type: "lead",
@@ -183,25 +179,11 @@ export function QuickCommunicationButton() {
 
             <TabsContent value="search" className="m-0">
               <div className="p-3 border-b">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search leads or owners..."
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    className="pl-9"
-                  />
-                  {search && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="absolute right-1 top-1/2 -translate-y-1/2 h-6 w-6"
-                      onClick={() => setSearch("")}
-                    >
-                      <X className="h-3 w-3" />
-                    </Button>
-                  )}
-                </div>
+                <Input
+                  placeholder="Search leads or owners..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
               </div>
 
               <ScrollArea className="max-h-[300px]">
@@ -229,7 +211,7 @@ export function QuickCommunicationButton() {
                           </div>
                           {contact.phone && (
                             <div className="text-xs text-muted-foreground truncate">
-                              {contact.phone}
+                              {formatPhoneForDisplay(contact.phone)}
                             </div>
                           )}
                         </div>
@@ -266,7 +248,7 @@ export function QuickCommunicationButton() {
               {/* Phone number display */}
               <div className="relative">
                 <Input
-                  value={formatPhoneDisplay(phoneNumber)}
+                  value={formatPhoneForDisplay(phoneNumber)}
                   onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, ""))}
                   placeholder="Enter phone number"
                   className="text-center text-xl font-medium h-12 pr-10"

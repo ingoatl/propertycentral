@@ -11,6 +11,7 @@ import { Delete, Loader2, PhoneOff, PhoneCall, User, Home } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { useTwilioDevice } from "@/hooks/useTwilioDevice";
+import { formatPhoneForDisplay, cleanPhoneNumber } from "@/lib/phoneUtils";
 
 interface CallDialogProps {
   open: boolean;
@@ -44,7 +45,7 @@ export function CallDialog({
   // Set phone number when dialog opens
   useEffect(() => {
     if (open && contactPhone) {
-      setPhoneNumber(contactPhone.replace(/\D/g, ''));
+      setPhoneNumber(cleanPhoneNumber(contactPhone));
     }
   }, [open, contactPhone]);
 
@@ -57,12 +58,7 @@ export function CallDialog({
     setPhoneNumber((prev) => prev.slice(0, -1));
   };
 
-  const formatPhoneDisplay = (phone: string) => {
-    const cleaned = phone.replace(/\D/g, "");
-    if (cleaned.length <= 3) return cleaned;
-    if (cleaned.length <= 6) return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3)}`;
-    return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6, 10)}`;
-  };
+  // Using formatPhoneForDisplay from phoneUtils
 
   const handleCall = async () => {
     await makeCall(phoneNumber);
@@ -121,7 +117,7 @@ export function CallDialog({
           {/* Phone input */}
           <div className="relative">
             <Input
-              value={formatPhoneDisplay(phoneNumber)}
+              value={formatPhoneForDisplay(phoneNumber)}
               onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, ""))}
               placeholder="Enter phone number"
               className={cn(

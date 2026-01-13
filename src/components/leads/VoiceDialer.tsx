@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -24,6 +24,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/components/ProtectedRoute";
 import { useTwilioDevice } from "@/hooks/useTwilioDevice";
+import { formatPhoneForDisplay, cleanPhoneNumber } from "@/lib/phoneUtils";
 
 interface VoiceDialerProps {
   defaultMessage?: string;
@@ -121,7 +122,7 @@ const VoiceDialer = ({ defaultMessage }: VoiceDialerProps) => {
 
   const handleSelectContact = async (contact: ContactRecord) => {
     if (contact.phone) {
-      const cleanedPhone = contact.phone.replace(/\D/g, '');
+      const cleanedPhone = cleanPhoneNumber(contact.phone);
       setPhoneNumber(cleanedPhone);
       setSelectedContact(contact);
       setView('dialer');
@@ -130,12 +131,7 @@ const VoiceDialer = ({ defaultMessage }: VoiceDialerProps) => {
     }
   };
 
-  const formatPhoneDisplay = (phone: string) => {
-    const cleaned = phone.replace(/\D/g, "");
-    if (cleaned.length <= 3) return cleaned;
-    if (cleaned.length <= 6) return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3)}`;
-    return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6, 10)}`;
-  };
+  // Using formatPhoneForDisplay from phoneUtils
 
   const handleCall = async () => {
     await makeCall(phoneNumber);
@@ -268,7 +264,7 @@ const VoiceDialer = ({ defaultMessage }: VoiceDialerProps) => {
                           <span className={cn(
                             "text-muted-foreground shrink-0",
                             isMobile ? "text-sm" : "text-xs"
-                          )}>{contact.phone}</span>
+                          )}>{formatPhoneForDisplay(contact.phone)}</span>
                         </div>
                       </CommandItem>
                     ))}
@@ -324,7 +320,7 @@ const VoiceDialer = ({ defaultMessage }: VoiceDialerProps) => {
               
               <div className="relative">
                 <Input
-                  value={formatPhoneDisplay(phoneNumber)}
+                  value={formatPhoneForDisplay(phoneNumber)}
                   onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, ""))}
                   placeholder="Enter phone number"
                   className={cn(
