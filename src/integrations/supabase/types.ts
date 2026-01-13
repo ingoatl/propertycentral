@@ -761,8 +761,12 @@ export type Database = {
           contact_phone: string | null
           created_at: string
           id: string
+          is_ai_generated: boolean | null
+          lead_id: string | null
           note: string
+          owner_id: string | null
           property_id: string | null
+          summary_type: string | null
           updated_at: string
           user_id: string | null
         }
@@ -772,8 +776,12 @@ export type Database = {
           contact_phone?: string | null
           created_at?: string
           id?: string
+          is_ai_generated?: boolean | null
+          lead_id?: string | null
           note: string
+          owner_id?: string | null
           property_id?: string | null
+          summary_type?: string | null
           updated_at?: string
           user_id?: string | null
         }
@@ -783,12 +791,30 @@ export type Database = {
           contact_phone?: string | null
           created_at?: string
           id?: string
+          is_ai_generated?: boolean | null
+          lead_id?: string | null
           note?: string
+          owner_id?: string | null
           property_id?: string | null
+          summary_type?: string | null
           updated_at?: string
           user_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "conversation_notes_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_notes_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "property_owners"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "conversation_notes_property_id_fkey"
             columns: ["property_id"]
