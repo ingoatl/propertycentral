@@ -4099,6 +4099,44 @@ export type Database = {
           },
         ]
       }
+      owner_context_cache: {
+        Row: {
+          context_data: Json
+          created_at: string
+          expires_at: string
+          generated_at: string
+          id: string
+          owner_id: string
+          updated_at: string
+        }
+        Insert: {
+          context_data: Json
+          created_at?: string
+          expires_at?: string
+          generated_at?: string
+          id?: string
+          owner_id: string
+          updated_at?: string
+        }
+        Update: {
+          context_data?: Json
+          created_at?: string
+          expires_at?: string
+          generated_at?: string
+          id?: string
+          owner_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "owner_context_cache_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: true
+            referencedRelation: "property_owners"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       owner_conversation_actions: {
         Row: {
           action_type: string

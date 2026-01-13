@@ -25,6 +25,7 @@ import {
   ResponsiveModalHeader,
   ResponsiveModalTitle,
 } from "@/components/ui/responsive-modal";
+import { Owner360Panel } from "./Owner360Panel";
 
 interface OwnerCommunicationDetailProps {
   ownerId: string;
@@ -253,6 +254,14 @@ export function OwnerCommunicationDetail({
               ))}
             </div>
           )}
+
+          {/* AI Insights Panel */}
+          <Owner360Panel 
+            ownerId={ownerId} 
+            ownerName={ownerName}
+            className="mt-4"
+            defaultExpanded={false}
+          />
         </ResponsiveModalHeader>
 
         {/* Communication List */}
