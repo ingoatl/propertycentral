@@ -26,6 +26,7 @@ import {
   ResponsiveModalTitle,
 } from "@/components/ui/responsive-modal";
 import { Owner360Panel } from "./Owner360Panel";
+import { ConversationSummary } from "./ConversationSummary";
 
 interface OwnerCommunicationDetailProps {
   ownerId: string;
@@ -262,6 +263,17 @@ export function OwnerCommunicationDetail({
             className="mt-4"
             defaultExpanded={false}
           />
+
+          {/* Conversation Summary */}
+          {communications.length >= 5 && (
+            <ConversationSummary
+              ownerId={ownerId}
+              contactPhone={ownerPhone || undefined}
+              contactEmail={ownerEmail || undefined}
+              messageCount={communications.length}
+              className="mt-3"
+            />
+          )}
         </ResponsiveModalHeader>
 
         {/* Communication List */}
