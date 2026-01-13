@@ -14,7 +14,7 @@ serve(async (req) => {
   try {
     const { leadId, ownerId, contactPhone, contactEmail } = await req.json();
 
-    console.log("Summarize conversation request:", { leadId, ownerId, contactPhone });
+    console.log("Summarize conversation request:", { leadId, ownerId, contactPhone, contactEmail });
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
@@ -25,19 +25,14 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Fetch conversation history - support all contact types
     let communications: any[] = [];
     let contactName = "Contact";
-    let contactType = "external";
+    let contactType = "unknown";
+    let searchPhone: string | null = null;
+    let searchEmail: string | null = null;
 
+    // First, determine the contact info we're working with
     if (leadId) {
-      const { data } = await supabase
-        .from("lead_communications")
-        .select("id, direction, body, subject, communication_type, created_at, transcript")
-        .eq("lead_id", leadId)
-        .order("created_at", { ascending: true });
-      communications = data || [];
-      
       const { data: lead } = await supabase
         .from("leads")
         .select("name, phone, email")
@@ -46,15 +41,10 @@ serve(async (req) => {
       if (lead) {
         contactName = lead.name || "Lead";
         contactType = "lead";
+        searchPhone = lead.phone;
+        searchEmail = lead.email;
       }
     } else if (ownerId) {
-      const { data } = await supabase
-        .from("lead_communications")
-        .select("id, direction, body, subject, communication_type, created_at, transcript")
-        .eq("owner_id", ownerId)
-        .order("created_at", { ascending: true });
-      communications = data || [];
-      
       const { data: owner } = await supabase
         .from("property_owners")
         .select("name, phone, email")
@@ -63,36 +53,15 @@ serve(async (req) => {
       if (owner) {
         contactName = owner.name || "Owner";
         contactType = "owner";
+        searchPhone = owner.phone;
+        searchEmail = owner.email;
       }
     } else if (contactPhone) {
-      // External conversation by phone - query using JSONB containment
-      const normalizedPhone = contactPhone.replace(/\D/g, "");
-      const phoneVariants = [
-        contactPhone,
-        `+${normalizedPhone}`,
-        `+1${normalizedPhone}`,
-        normalizedPhone,
-      ];
-      
-      // Query all communications that have this phone in metadata
-      const { data } = await supabase
-        .from("lead_communications")
-        .select("id, direction, body, subject, communication_type, created_at, transcript, metadata")
-        .is("lead_id", null)
-        .is("owner_id", null)
-        .order("created_at", { ascending: true });
-      
-      // Filter by phone in metadata
-      communications = (data || []).filter(comm => {
-        const fromNum = comm.metadata?.from_number || "";
-        const toNum = comm.metadata?.to_number || "";
-        return phoneVariants.some(pv => fromNum.includes(pv) || toNum.includes(pv) || pv.includes(fromNum) || pv.includes(toNum));
-      });
-      
+      searchPhone = contactPhone;
       contactName = `Phone ${contactPhone}`;
       contactType = "external_phone";
       
-      // Try to find name from any matching lead
+      // Try to find name from matching lead
       const { data: matchingLead } = await supabase
         .from("leads")
         .select("name")
@@ -102,26 +71,11 @@ serve(async (req) => {
         contactName = matchingLead.name;
       }
     } else if (contactEmail) {
-      // External conversation by email
-      const { data } = await supabase
-        .from("lead_communications")
-        .select("id, direction, body, subject, communication_type, created_at, transcript, metadata")
-        .is("lead_id", null)
-        .is("owner_id", null)
-        .order("created_at", { ascending: true });
-      
-      // Filter by email in metadata or subject
-      communications = (data || []).filter(comm => {
-        const fromEmail = comm.metadata?.from_email || "";
-        const toEmail = comm.metadata?.to_email || "";
-        return fromEmail.includes(contactEmail) || toEmail.includes(contactEmail) || 
-               (comm.subject && comm.subject.includes(contactEmail));
-      });
-      
+      searchEmail = contactEmail;
       contactName = contactEmail;
       contactType = "external_email";
       
-      // Try to find name from any matching lead
+      // Try to find name from matching lead
       const { data: matchingLead } = await supabase
         .from("leads")
         .select("name")
@@ -131,7 +85,6 @@ serve(async (req) => {
         contactName = matchingLead.name;
       }
     } else {
-      // No identifier provided - return helpful error
       return new Response(
         JSON.stringify({ 
           error: "No contact identifier provided. Need leadId, ownerId, contactPhone, or contactEmail.",
@@ -141,26 +94,126 @@ serve(async (req) => {
       );
     }
 
-    if (!communications || communications.length < 3) {
+    console.log("Searching for communications with:", { searchPhone, searchEmail, leadId, ownerId });
+
+    // Now fetch ALL communications - don't filter by lead_id/owner_id restrictions
+    // This captures all messages for this contact regardless of how they were linked
+    const { data: allComms, error: commsError } = await supabase
+      .from("lead_communications")
+      .select("id, direction, body, subject, communication_type, created_at, transcript, metadata, lead_id, owner_id, call_recording_url")
+      .order("created_at", { ascending: true });
+
+    if (commsError) {
+      console.error("Error fetching communications:", commsError);
+      throw new Error("Failed to fetch communications");
+    }
+
+    console.log("Total communications in database:", allComms?.length || 0);
+
+    // Filter to find all messages related to this contact
+    const normalizePhone = (phone: string | null) => {
+      if (!phone) return "";
+      return phone.replace(/\D/g, "").slice(-10); // Last 10 digits
+    };
+
+    const searchPhoneNormalized = normalizePhone(searchPhone);
+    const searchEmailLower = searchEmail?.toLowerCase();
+
+    communications = (allComms || []).filter(comm => {
+      // Direct match by lead_id or owner_id
+      if (leadId && comm.lead_id === leadId) return true;
+      if (ownerId && comm.owner_id === ownerId) return true;
+
+      // Match by phone number in metadata
+      if (searchPhoneNormalized) {
+        const fromNum = normalizePhone(comm.metadata?.from_number || "");
+        const toNum = normalizePhone(comm.metadata?.to_number || "");
+        const metaPhone = normalizePhone(comm.metadata?.phone || "");
+        
+        if (fromNum === searchPhoneNormalized || 
+            toNum === searchPhoneNormalized ||
+            metaPhone === searchPhoneNormalized) {
+          return true;
+        }
+      }
+
+      // Match by email in metadata
+      if (searchEmailLower) {
+        const fromEmail = (comm.metadata?.from_email || "").toLowerCase();
+        const toEmail = (comm.metadata?.to_email || "").toLowerCase();
+        const metaEmail = (comm.metadata?.email || "").toLowerCase();
+        
+        if (fromEmail === searchEmailLower || 
+            toEmail === searchEmailLower ||
+            metaEmail === searchEmailLower) {
+          return true;
+        }
+      }
+
+      return false;
+    });
+
+    console.log("Matched communications:", communications.length);
+
+    if (!communications || communications.length < 1) {
       return new Response(
         JSON.stringify({ 
           success: false, 
-          error: "Not enough messages to summarize (minimum 3 required)",
-          messageCount: communications?.length || 0
+          error: "No messages found to summarize",
+          messageCount: 0,
+          debug: { searchPhone, searchEmail, leadId, ownerId }
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Build conversation thread for summarization
+    // Build conversation thread for summarization - include ALL content types
     let thread = "";
+    let contentCount = 0;
+    
     for (const comm of communications) {
       const sender = comm.direction === "inbound" ? contactName : "PeachHaus";
-      const content = comm.transcript || comm.body || comm.subject || "";
-      if (content.trim()) {
-        const type = comm.communication_type?.toUpperCase() || "MSG";
-        thread += `[${sender} - ${type}]: ${content.trim()}\n\n`;
+      const commType = comm.communication_type?.toUpperCase() || "MSG";
+      
+      // Gather all available content
+      let content = "";
+      
+      // Prioritize transcript for calls
+      if (comm.transcript && comm.transcript.trim()) {
+        content = comm.transcript.trim();
+      } else if (comm.body && comm.body.trim()) {
+        content = comm.body.trim();
+      } else if (comm.subject && comm.subject.trim()) {
+        content = comm.subject.trim();
       }
+      
+      // Add note about recording if available but no transcript
+      if (!content && comm.call_recording_url) {
+        content = "[Call recording available - no transcript]";
+      }
+      
+      if (content) {
+        // Truncate very long messages to prevent token overflow
+        if (content.length > 1000) {
+          content = content.substring(0, 1000) + "...";
+        }
+        thread += `[${sender} - ${commType}]: ${content}\n\n`;
+        contentCount++;
+      }
+    }
+
+    console.log("Content items for summary:", contentCount);
+
+    if (contentCount < 1) {
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: "No message content found to summarize",
+          messageCount: communications.length,
+          contentCount: 0
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     // Generate summary using AI
@@ -170,7 +223,7 @@ serve(async (req) => {
 2. What we've told them  
 3. What action is pending (if any)
 
-CONVERSATION:
+CONVERSATION (${contentCount} messages):
 ${thread}
 
 RULES:
@@ -179,6 +232,7 @@ RULES:
 - If no action pending, say "No pending action"
 - Each bullet should be 1-2 sentences max
 - Write in present tense
+- Include details from calls, SMS, and emails
 
 Return ONLY the 3 bullet points, nothing else.`;
 
@@ -194,7 +248,7 @@ Return ONLY the 3 bullet points, nothing else.`;
           { role: "system", content: "You are a concise business conversation summarizer. Return only the requested format." },
           { role: "user", content: summaryPrompt },
         ],
-        max_tokens: 300,
+        max_tokens: 500,
         temperature: 0.3,
       }),
     });
@@ -228,8 +282,8 @@ Return ONLY the 3 bullet points, nothing else.`;
       .insert({
         lead_id: leadId || null,
         owner_id: ownerId || null,
-        contact_phone: contactPhone || null,
-        contact_email: contactEmail || null,
+        contact_phone: contactPhone || searchPhone || null,
+        contact_email: contactEmail || searchEmail || null,
         contact_name: contactName,
         note: summary,
         is_ai_generated: true,
@@ -240,16 +294,16 @@ Return ONLY the 3 bullet points, nothing else.`;
 
     if (insertError) {
       console.error("Error storing summary:", insertError);
-      // Still return the summary even if storage fails
     }
 
-    console.log("Summary generated for:", contactName);
+    console.log("Summary generated for:", contactName, "with", communications.length, "messages");
 
     return new Response(
       JSON.stringify({
         success: true,
         summary,
         messageCount: communications.length,
+        contentCount,
         contactName,
         contactType,
         noteId: savedNote?.id,
