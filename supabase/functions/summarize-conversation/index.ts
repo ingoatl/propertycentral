@@ -25,7 +25,7 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Fetch conversation history
+    // Fetch conversation history - support all contact types
     let query = supabase
       .from("lead_communications")
       .select("id, direction, body, subject, communication_type, created_at, transcript")
@@ -56,8 +56,38 @@ serve(async (req) => {
         contactName = owner.name || "Owner";
         contactType = "owner";
       }
+    } else if (contactPhone) {
+      // External conversation by phone
+      query = query.or(`metadata->from_number.eq.${contactPhone},metadata->to_number.eq.${contactPhone}`);
+      contactName = `Phone ${contactPhone}`;
+      contactType = "external_phone";
+      
+      // Try to find name from any matching lead
+      const { data: matchingLead } = await supabase
+        .from("leads")
+        .select("name")
+        .eq("phone", contactPhone)
+        .maybeSingle();
+      if (matchingLead?.name) {
+        contactName = matchingLead.name;
+      }
+    } else if (contactEmail) {
+      // External conversation by email
+      query = query.or(`metadata->from_email.eq.${contactEmail},metadata->to_email.eq.${contactEmail}`);
+      contactName = contactEmail;
+      contactType = "external_email";
+      
+      // Try to find name from any matching lead
+      const { data: matchingLead } = await supabase
+        .from("leads")
+        .select("name")
+        .eq("email", contactEmail)
+        .maybeSingle();
+      if (matchingLead?.name) {
+        contactName = matchingLead.name;
+      }
     } else {
-      throw new Error("Either leadId or ownerId is required");
+      throw new Error("At least one identifier (leadId, ownerId, contactPhone, or contactEmail) is required");
     }
 
     const { data: communications } = await query;
