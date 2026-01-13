@@ -48,6 +48,7 @@ import { SendSMSDialog } from "./SendSMSDialog";
 import { SendEmailDialog } from "./SendEmailDialog";
 import { ComposeEmailDialog } from "./ComposeEmailDialog";
 import { AIComposeEmailDialog } from "./AIComposeEmailDialog";
+import { AIDraftReplySection } from "./AIDraftReplySection";
 import { AIWritingAssistant } from "./AIWritingAssistant";
 import { AIReplyButton } from "./AIReplyButton";
 import { AIDraftReplyCard } from "./AIDraftReplyCard";
