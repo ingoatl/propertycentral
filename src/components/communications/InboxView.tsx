@@ -37,6 +37,7 @@ import {
   RotateCcw,
   Volume2,
   Sparkles,
+  Keyboard,
 } from "lucide-react";
 import { IncomeReportButton } from "@/components/IncomeReportEmbed";
 import { formatPhoneForDisplay } from "@/lib/phoneUtils";
@@ -71,6 +72,10 @@ import { OwnerCommunicationDetail } from "./OwnerCommunicationDetail";
 import { ConversationSummary } from "./ConversationSummary";
 import { TeamAssignmentDropdown } from "./TeamAssignmentDropdown";
 import { TeamNotificationBell } from "./TeamNotificationBell";
+import { EmailCategoryBadge } from "./EmailCategoryBadge";
+import { EmailCategoryFilter } from "./EmailCategoryFilter";
+import { KeyboardShortcutsHelp } from "./KeyboardShortcutsHelp";
+import { useInboxKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useAdminCheck } from "@/hooks/useAdminCheck";
@@ -222,6 +227,13 @@ export function InboxView() {
   // Income report now opens directly in new tab via IncomeReportButton
   const [lastSentMessage, setLastSentMessage] = useState<string>("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  
+  // New Phase 2-3 enhancements: category filter, keyboard navigation
+  const [selectedEmailCategory, setSelectedEmailCategory] = useState<string | null>(null);
+  const [selectedGmailIndex, setSelectedGmailIndex] = useState<number>(0);
+  const [selectedCommIndex, setSelectedCommIndex] = useState<number>(0);
+  const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -719,15 +731,59 @@ export function InboxView() {
     refetchInterval: 30000, // Refresh every 30 seconds
   });
 
-  // Filter emails based on selected inbox
-  const filteredGmailEmails = gmailEmails.filter(email => {
-    const targetInbox = email.targetInbox?.toLowerCase() || '';
-    if (selectedEmailInbox === "ingo") {
-      return targetInbox.includes("ingo") || !email.targetInbox;
-    } else {
-      return targetInbox.includes("anja");
-    }
+  // Fetch email insights for AI categorization badges
+  const { data: emailInsights = [] } = useQuery({
+    queryKey: ["email-insights-for-inbox"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("email_insights")
+        .select("gmail_message_id, category, sentiment, priority, action_required")
+        .not("gmail_message_id", "is", null)
+        .order("created_at", { ascending: false })
+        .limit(200);
+      
+      if (error) {
+        console.error("Failed to fetch email insights:", error);
+        return [];
+      }
+      return data || [];
+    },
+    enabled: activeTab === "emails",
+    staleTime: 60000,
   });
+
+  // Create a lookup map for email insights by gmail_message_id
+  const emailInsightsMap = useMemo(() => {
+    const map = new Map<string, typeof emailInsights[0]>();
+    emailInsights.forEach(insight => {
+      if (insight.gmail_message_id) {
+        map.set(insight.gmail_message_id, insight);
+      }
+    });
+    return map;
+  }, [emailInsights]);
+
+  // Filter emails based on selected inbox AND category filter
+  const filteredGmailEmails = useMemo(() => {
+    let filtered = gmailEmails.filter(email => {
+      const targetInbox = email.targetInbox?.toLowerCase() || '';
+      if (selectedEmailInbox === "ingo") {
+        return targetInbox.includes("ingo") || !email.targetInbox;
+      } else {
+        return targetInbox.includes("anja");
+      }
+    });
+
+    // Apply category filter if selected
+    if (selectedEmailCategory) {
+      filtered = filtered.filter(email => {
+        const insight = emailInsightsMap.get(email.id);
+        return insight?.category === selectedEmailCategory;
+      });
+    }
+
+    return filtered;
+  }, [gmailEmails, selectedEmailInbox, selectedEmailCategory, emailInsightsMap]);
 
   const { data: communications = [], isLoading, isError, error, refetch } = useQuery({
     queryKey: ["all-communications", search, activeTab, activeFilter, selectedInboxUserId, viewAllInboxes],
@@ -1340,6 +1396,126 @@ export function InboxView() {
     setSelectedGmailEmail(email);
   };
 
+  // Keyboard navigation helpers
+  const sortedEmails = useMemo(() => {
+    return [...filteredGmailEmails]
+      .filter(email => !search || search === " " || email.subject.toLowerCase().includes(search.toLowerCase()) || email.fromName.toLowerCase().includes(search.toLowerCase()))
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [filteredGmailEmails, search]);
+
+  const handleKeyNavigateUp = useCallback(() => {
+    if (activeTab === "emails") {
+      setSelectedGmailIndex(prev => Math.max(0, prev - 1));
+      const email = sortedEmails[Math.max(0, selectedGmailIndex - 1)];
+      if (email) setSelectedGmailEmail(email);
+    } else {
+      setSelectedCommIndex(prev => Math.max(0, prev - 1));
+    }
+  }, [activeTab, sortedEmails, selectedGmailIndex]);
+
+  const handleKeyNavigateDown = useCallback(() => {
+    if (activeTab === "emails") {
+      const maxIdx = sortedEmails.length - 1;
+      setSelectedGmailIndex(prev => Math.min(maxIdx, prev + 1));
+      const email = sortedEmails[Math.min(maxIdx, selectedGmailIndex + 1)];
+      if (email) setSelectedGmailEmail(email);
+    } else {
+      setSelectedCommIndex(prev => Math.min(99, prev + 1)); // Max 100 items
+    }
+  }, [activeTab, sortedEmails, selectedGmailIndex]);
+
+  const handleKeyOpen = useCallback(() => {
+    if (activeTab === "emails" && selectedGmailEmail) {
+      // Already selected, just ensure it's visible
+      setShowMobileDetail(true);
+    } else if (selectedMessage) {
+      setShowMobileDetail(true);
+    }
+  }, [activeTab, selectedGmailEmail, selectedMessage]);
+
+  const handleKeyReply = useCallback(() => {
+    if (activeTab === "emails" && selectedGmailEmail) {
+      setShowEmailActionModal(true);
+    } else if (selectedMessage?.contact_phone) {
+      setShowSmsReply(true);
+    }
+  }, [activeTab, selectedGmailEmail, selectedMessage]);
+
+  const handleKeyMarkDone = useCallback(() => {
+    if (activeTab === "emails" && selectedGmailEmail) {
+      if (doneGmailIds.has(selectedGmailEmail.id)) {
+        unmarkEmailAsDone(selectedGmailEmail.id);
+      } else {
+        markEmailAsDone(selectedGmailEmail.id);
+      }
+    } else if (selectedMessage) {
+      handleMarkDone(selectedMessage);
+    }
+  }, [activeTab, selectedGmailEmail, selectedMessage, doneGmailIds, markEmailAsDone, unmarkEmailAsDone, handleMarkDone]);
+
+  const handleKeySnooze = useCallback(() => {
+    if (selectedMessage) {
+      handleSnooze(selectedMessage, 1); // Snooze 1 hour by default
+    }
+  }, [selectedMessage, handleSnooze]);
+
+  const handleKeyNotes = useCallback(() => {
+    if (selectedMessage) {
+      setShowNotes(true);
+    }
+  }, [selectedMessage]);
+
+  const handleKeyAssign = useCallback(() => {
+    // Assignment is handled via dropdown, just focus the message
+    if (selectedMessage) {
+      setShowMobileDetail(true);
+    }
+  }, [selectedMessage]);
+
+  const handleKeyClose = useCallback(() => {
+    setSelectedMessage(null);
+    setSelectedGmailEmail(null);
+    setShowMobileDetail(false);
+  }, []);
+
+  const handleKeySearch = useCallback(() => {
+    setSearch(" "); // Trigger search bar to open
+    setTimeout(() => searchInputRef.current?.focus(), 50);
+  }, []);
+
+  // Register keyboard shortcuts
+  const keyboardShortcuts = useInboxKeyboardShortcuts({
+    onNavigateUp: handleKeyNavigateUp,
+    onNavigateDown: handleKeyNavigateDown,
+    onOpen: handleKeyOpen,
+    onReply: handleKeyReply,
+    onMarkDone: handleKeyMarkDone,
+    onSnooze: handleKeySnooze,
+    onNotes: handleKeyNotes,
+    onAssign: handleKeyAssign,
+    onClose: handleKeyClose,
+    onSearch: handleKeySearch,
+    selectedIndex: activeTab === "emails" ? selectedGmailIndex : selectedCommIndex,
+    itemCount: activeTab === "emails" ? sortedEmails.length : 100,
+    hasSelection: activeTab === "emails" ? !!selectedGmailEmail : !!selectedMessage,
+    enabled: !showSmsReply && !showEmailReply && !showNotes && !showContactInfo && !isEditingDraft,
+  });
+
+  // Listen for ? key to show keyboard help
+  useEffect(() => {
+    const handleQuestionMark = (e: KeyboardEvent) => {
+      if (e.key === "?" && !e.ctrlKey && !e.altKey && !e.metaKey) {
+        const target = e.target as HTMLElement;
+        if (target.tagName !== "INPUT" && target.tagName !== "TEXTAREA" && !target.isContentEditable) {
+          e.preventDefault();
+          setShowKeyboardHelp(prev => !prev);
+        }
+      }
+    };
+    document.addEventListener("keydown", handleQuestionMark);
+    return () => document.removeEventListener("keydown", handleQuestionMark);
+  }, []);
+
   const getInitials = (name: string) => name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2);
   const getMessagePreview = (comm: CommunicationItem) => {
     // Check for Voice AI transcripts first - show summary instead of full transcript
@@ -1828,7 +2004,7 @@ export function InboxView() {
               <AdminInboxSelector selectedUserId={selectedInboxUserId} onUserChange={handleInboxChange} currentUserId={currentUserId} />
             )}
             
-            {/* Email inbox selector */}
+            {/* Email inbox selector with category filter and keyboard help */}
             {activeTab === "emails" && (
               <>
                 <Button 
@@ -1852,6 +2028,18 @@ export function InboxView() {
                 >
                   Anja
                 </button>
+                <div className="w-px h-5 bg-border mx-1" />
+                {/* AI Category Filter */}
+                <EmailCategoryFilter 
+                  selectedCategory={selectedEmailCategory}
+                  onCategoryChange={setSelectedEmailCategory}
+                />
+                {/* Keyboard shortcuts help */}
+                <KeyboardShortcutsHelp 
+                  shortcuts={keyboardShortcuts}
+                  open={showKeyboardHelp}
+                  onOpenChange={setShowKeyboardHelp}
+                />
               </>
             )}
             
@@ -1919,6 +2107,7 @@ export function InboxView() {
                   .map((email) => {
                     const isUnread = email.labelIds?.includes('UNREAD') && !readGmailIds.has(email.id);
                     const isDone = doneGmailIds.has(email.id);
+                    const insight = emailInsightsMap.get(email.id);
                     
                     return (
                       <div 
@@ -1953,6 +2142,15 @@ export function InboxView() {
                                 <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-green-500/10 text-green-600 text-[10px] font-medium">
                                   ✓ Done
                                 </span>
+                              )}
+                              {/* AI Category Badge */}
+                              {insight && (
+                                <EmailCategoryBadge 
+                                  category={insight.category}
+                                  sentiment={insight.sentiment || undefined}
+                                  priority={insight.priority || undefined}
+                                  compact
+                                />
                               )}
                             </div>
                             <div className="flex items-center gap-1.5">
