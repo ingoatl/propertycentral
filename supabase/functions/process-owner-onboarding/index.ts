@@ -113,6 +113,11 @@ const TASK_MAPPINGS: Record<string, { phase: number; title: string; phaseTitle?:
   recent_renovations: { phase: 10, title: 'Recent Renovations', phaseTitle: 'Property Details' },
   existing_photos_link: { phase: 5, title: 'Existing Photos Link', phaseTitle: 'Photos & Media' },
   
+  // Schools
+  elementary_school: { phase: 10, title: 'Elementary School', phaseTitle: 'Property Details' },
+  middle_school: { phase: 10, title: 'Middle School', phaseTitle: 'Property Details' },
+  high_school: { phase: 10, title: 'High School', phaseTitle: 'Property Details' },
+  
   // Phase 11 - Pricing
   average_daily_rate: { phase: 11, title: 'Nightly Rate', phaseTitle: 'Pricing & Revenue' },
   current_nightly_rate: { phase: 11, title: 'Current Nightly Rate', phaseTitle: 'Pricing & Revenue' },

@@ -14,6 +14,11 @@ export interface NewSTROnboardingFormData {
   fencedYard: boolean;
   adaCompliant: boolean;
   poolType: string;
+  
+  // Nearby Schools
+  elementarySchool: string;
+  middleSchool: string;
+  highSchool: string;
 
   // Step 2: Rental Strategy
   rentalStrategy: string;
@@ -171,6 +176,11 @@ export const initialNewSTRFormData: NewSTROnboardingFormData = {
   fencedYard: false,
   adaCompliant: false,
   poolType: '',
+  
+  // Nearby Schools
+  elementarySchool: '',
+  middleSchool: '',
+  highSchool: '',
 
   // Step 2
   rentalStrategy: '',

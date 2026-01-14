@@ -20,6 +20,12 @@ export interface OwnerOnboardingFormData {
   fenced_yard: boolean;
   ada_compliant: boolean;
   pool_type: string;
+  
+  // Nearby Schools (Step 1)
+  elementary_school: string;
+  middle_school: string;
+  high_school: string;
+  
   // Step 2: Access Details
   wifi_ssid: string;
   wifi_password: string;
@@ -156,6 +162,11 @@ export const initialFormData: OwnerOnboardingFormData = {
   fenced_yard: false,
   ada_compliant: false,
   pool_type: '',
+  
+  // Nearby Schools
+  elementary_school: '',
+  middle_school: '',
+  high_school: '',
 
   // Step 2
   wifi_ssid: '',
