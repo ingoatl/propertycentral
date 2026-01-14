@@ -698,6 +698,44 @@ export type Database = {
           },
         ]
       }
+      communication_recipients: {
+        Row: {
+          communication_id: string
+          created_at: string | null
+          id: string
+          is_read: boolean | null
+          read_at: string | null
+          recipient_type: string
+          user_id: string
+        }
+        Insert: {
+          communication_id: string
+          created_at?: string | null
+          id?: string
+          is_read?: boolean | null
+          read_at?: string | null
+          recipient_type: string
+          user_id: string
+        }
+        Update: {
+          communication_id?: string
+          created_at?: string | null
+          id?: string
+          is_read?: boolean | null
+          read_at?: string | null
+          recipient_type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "communication_recipients_communication_id_fkey"
+            columns: ["communication_id"]
+            isOneToOne: false
+            referencedRelation: "lead_communications"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       compliance_training_log: {
         Row: {
           certificate_path: string | null
@@ -2424,6 +2462,7 @@ export type Database = {
           body: string
           call_duration: number | null
           call_recording_url: string | null
+          cc_user_ids: string[] | null
           clicked_at: string | null
           communication_type: string
           created_at: string
@@ -2438,17 +2477,22 @@ export type Database = {
           ghl_message_id: string | null
           id: string
           is_read: boolean | null
+          labels: string[] | null
+          last_activity_at: string | null
           lead_id: string | null
           media_urls: string[] | null
           metadata: Json | null
           opened_at: string | null
           owner_id: string | null
+          recipient_user_id: string | null
           replied_at: string | null
           sent_at: string | null
           sequence_id: string | null
           status: string | null
           step_number: number | null
           subject: string | null
+          visibility_users: string[] | null
+          work_status: string | null
         }
         Insert: {
           assigned_at?: string | null
@@ -2457,6 +2501,7 @@ export type Database = {
           body: string
           call_duration?: number | null
           call_recording_url?: string | null
+          cc_user_ids?: string[] | null
           clicked_at?: string | null
           communication_type: string
           created_at?: string
@@ -2471,17 +2516,22 @@ export type Database = {
           ghl_message_id?: string | null
           id?: string
           is_read?: boolean | null
+          labels?: string[] | null
+          last_activity_at?: string | null
           lead_id?: string | null
           media_urls?: string[] | null
           metadata?: Json | null
           opened_at?: string | null
           owner_id?: string | null
+          recipient_user_id?: string | null
           replied_at?: string | null
           sent_at?: string | null
           sequence_id?: string | null
           status?: string | null
           step_number?: number | null
           subject?: string | null
+          visibility_users?: string[] | null
+          work_status?: string | null
         }
         Update: {
           assigned_at?: string | null
@@ -2490,6 +2540,7 @@ export type Database = {
           body?: string
           call_duration?: number | null
           call_recording_url?: string | null
+          cc_user_ids?: string[] | null
           clicked_at?: string | null
           communication_type?: string
           created_at?: string
@@ -2504,17 +2555,22 @@ export type Database = {
           ghl_message_id?: string | null
           id?: string
           is_read?: boolean | null
+          labels?: string[] | null
+          last_activity_at?: string | null
           lead_id?: string | null
           media_urls?: string[] | null
           metadata?: Json | null
           opened_at?: string | null
           owner_id?: string | null
+          recipient_user_id?: string | null
           replied_at?: string | null
           sent_at?: string | null
           sequence_id?: string | null
           status?: string | null
           step_number?: number | null
           subject?: string | null
+          visibility_users?: string[] | null
+          work_status?: string | null
         }
         Relationships: [
           {
@@ -7835,6 +7891,39 @@ export type Database = {
           receives_discovery_calls?: boolean | null
           receives_inspections?: boolean | null
           receives_team_meetings?: boolean | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_gmail_labels: {
+        Row: {
+          created_at: string | null
+          email_address: string | null
+          gmail_label_id: string | null
+          id: string
+          is_active: boolean | null
+          label_name: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          email_address?: string | null
+          gmail_label_id?: string | null
+          id?: string
+          is_active?: boolean | null
+          label_name: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          email_address?: string | null
+          gmail_label_id?: string | null
+          id?: string
+          is_active?: boolean | null
+          label_name?: string
           updated_at?: string | null
           user_id?: string
         }
