@@ -8,6 +8,12 @@ export interface NewSTROnboardingFormData {
   bedrooms: number | null;
   bathrooms: number | null;
   squareFootage: number | null;
+  yearBuilt: number | null;
+  numStories: string;
+  hasBasement: boolean;
+  fencedYard: boolean;
+  adaCompliant: boolean;
+  poolType: string;
 
   // Step 2: Rental Strategy
   rentalStrategy: string;
@@ -159,6 +165,12 @@ export const initialNewSTRFormData: NewSTROnboardingFormData = {
   bedrooms: null,
   bathrooms: null,
   squareFootage: null,
+  yearBuilt: null,
+  numStories: '',
+  hasBasement: false,
+  fencedYard: false,
+  adaCompliant: false,
+  poolType: '',
 
   // Step 2
   rentalStrategy: '',

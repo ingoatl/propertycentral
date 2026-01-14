@@ -95,9 +95,15 @@ const TASK_MAPPINGS: Record<string, { phase: number; title: string }> = {
 
   // Phase 10: Property Specs
   property_type: { phase: 10, title: 'Property Type' },
-  bedrooms: { phase: 10, title: 'Number of Bedrooms' },
-  bathrooms: { phase: 10, title: 'Number of Bathrooms' },
+  bedrooms: { phase: 10, title: 'Bedrooms' },
+  bathrooms: { phase: 10, title: 'Bathrooms' },
   square_footage: { phase: 10, title: 'Square Footage' },
+  year_built: { phase: 10, title: 'Year Built' },
+  num_stories: { phase: 10, title: 'Number of Stories' },
+  has_basement: { phase: 10, title: 'Basement' },
+  fenced_yard: { phase: 10, title: 'Fenced Yard' },
+  ada_compliant: { phase: 10, title: 'ADA Compliant' },
+  pool_type: { phase: 10, title: 'Pool' },
   property_features: { phase: 10, title: 'Property Features & Amenities' },
   neighbor_notes: { phase: 10, title: 'Neighbor Notes' },
 

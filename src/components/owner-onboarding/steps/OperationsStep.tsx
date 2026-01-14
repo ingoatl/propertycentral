@@ -174,7 +174,7 @@ export function OperationsStep({ formData, updateFormData }: StepProps) {
           />
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <Label htmlFor="airbnb_link" className="text-sm font-medium">Airbnb Link</Label>
             <Input
@@ -198,12 +198,63 @@ export function OperationsStep({ formData, updateFormData }: StepProps) {
           </div>
 
           <div>
+            <Label htmlFor="furnished_finder_link" className="text-sm font-medium">Furnished Finder Link</Label>
+            <Input
+              id="furnished_finder_link"
+              value={formData.furnished_finder_link}
+              onChange={(e) => updateFormData({ furnished_finder_link: e.target.value })}
+              placeholder="https://furnishedfinder.com/..."
+              className="h-14 mt-1"
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="booking_com_link" className="text-sm font-medium">Booking.com Link</Label>
+            <Input
+              id="booking_com_link"
+              value={formData.booking_com_link}
+              onChange={(e) => updateFormData({ booking_com_link: e.target.value })}
+              placeholder="https://booking.com/..."
+              className="h-14 mt-1"
+            />
+          </div>
+
+          <div>
             <Label htmlFor="other_listing_links" className="text-sm font-medium">Other Listing Links</Label>
             <Input
               id="other_listing_links"
               value={formData.other_listing_links}
               onChange={(e) => updateFormData({ other_listing_links: e.target.value })}
               placeholder="Other platform links"
+              className="h-14 mt-1"
+            />
+          </div>
+        </div>
+
+        {/* Current Pricing */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t">
+          <div>
+            <Label htmlFor="current_nightly_rate" className="text-sm font-medium">Current Nightly Rate ($)</Label>
+            <Input
+              id="current_nightly_rate"
+              type="number"
+              min="0"
+              value={formData.current_nightly_rate ?? ''}
+              onChange={(e) => updateFormData({ current_nightly_rate: e.target.value ? parseFloat(e.target.value) : null })}
+              placeholder="150"
+              className="h-14 mt-1"
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="current_cleaning_fee" className="text-sm font-medium">Current Cleaning Fee ($)</Label>
+            <Input
+              id="current_cleaning_fee"
+              type="number"
+              min="0"
+              value={formData.current_cleaning_fee ?? ''}
+              onChange={(e) => updateFormData({ current_cleaning_fee: e.target.value ? parseFloat(e.target.value) : null })}
+              placeholder="100"
               className="h-14 mt-1"
             />
           </div>

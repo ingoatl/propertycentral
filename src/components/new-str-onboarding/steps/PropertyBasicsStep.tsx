@@ -3,12 +3,22 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { Home, User, Mail, Phone, MapPin } from "lucide-react";
 
 interface PropertyBasicsStepProps {
   formData: NewSTROnboardingFormData;
   updateFormData: (updates: Partial<NewSTROnboardingFormData>) => void;
 }
+
+const STORIES_OPTIONS = ['1', '2', '3', 'Multi-level'];
+
+const POOL_TYPE_OPTIONS = [
+  { value: '', label: 'None' },
+  { value: 'pool_only', label: 'Pool Only' },
+  { value: 'hot_tub_only', label: 'Hot Tub Only' },
+  { value: 'pool_and_hot_tub', label: 'Pool & Hot Tub' },
+];
 
 export const PropertyBasicsStep = ({ formData, updateFormData }: PropertyBasicsStepProps) => {
   return (
@@ -111,26 +121,26 @@ export const PropertyBasicsStep = ({ formData, updateFormData }: PropertyBasicsS
             </Select>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="bedrooms">Bedrooms</Label>
+              <Label htmlFor="bedrooms">Bedrooms *</Label>
               <Input
                 id="bedrooms"
                 type="number"
                 min="0"
-                value={formData.bedrooms || ''}
+                value={formData.bedrooms ?? ''}
                 onChange={(e) => updateFormData({ bedrooms: e.target.value ? parseInt(e.target.value) : null })}
                 placeholder="3"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="bathrooms">Bathrooms</Label>
+              <Label htmlFor="bathrooms">Bathrooms *</Label>
               <Input
                 id="bathrooms"
                 type="number"
                 min="0"
                 step="0.5"
-                value={formData.bathrooms || ''}
+                value={formData.bathrooms ?? ''}
                 onChange={(e) => updateFormData({ bathrooms: e.target.value ? parseFloat(e.target.value) : null })}
                 placeholder="2"
               />
@@ -141,9 +151,94 @@ export const PropertyBasicsStep = ({ formData, updateFormData }: PropertyBasicsS
                 id="squareFootage"
                 type="number"
                 min="0"
-                value={formData.squareFootage || ''}
+                value={formData.squareFootage ?? ''}
                 onChange={(e) => updateFormData({ squareFootage: e.target.value ? parseInt(e.target.value) : null })}
                 placeholder="1500"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="yearBuilt">Year Built</Label>
+              <Input
+                id="yearBuilt"
+                type="number"
+                min="1800"
+                max={new Date().getFullYear()}
+                value={formData.yearBuilt ?? ''}
+                onChange={(e) => updateFormData({ yearBuilt: e.target.value ? parseInt(e.target.value) : null })}
+                placeholder="2010"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="numStories">Number of Stories</Label>
+              <Select
+                value={formData.numStories}
+                onValueChange={(value) => updateFormData({ numStories: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select" />
+                </SelectTrigger>
+                <SelectContent>
+                  {STORIES_OPTIONS.map((option) => (
+                    <SelectItem key={option} value={option}>
+                      {option}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="poolType">Pool / Hot Tub</Label>
+              <Select
+                value={formData.poolType}
+                onValueChange={(value) => updateFormData({ poolType: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select" />
+                </SelectTrigger>
+                <SelectContent>
+                  {POOL_TYPE_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Toggle options */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4">
+            <div className="flex items-center justify-between py-3 px-4 bg-muted/50 rounded-lg">
+              <Label htmlFor="hasBasement" className="text-sm font-medium">
+                Has Basement
+              </Label>
+              <Switch
+                id="hasBasement"
+                checked={formData.hasBasement}
+                onCheckedChange={(checked) => updateFormData({ hasBasement: checked })}
+              />
+            </div>
+            <div className="flex items-center justify-between py-3 px-4 bg-muted/50 rounded-lg">
+              <Label htmlFor="fencedYard" className="text-sm font-medium">
+                Fenced Yard
+              </Label>
+              <Switch
+                id="fencedYard"
+                checked={formData.fencedYard}
+                onCheckedChange={(checked) => updateFormData({ fencedYard: checked })}
+              />
+            </div>
+            <div className="flex items-center justify-between py-3 px-4 bg-muted/50 rounded-lg">
+              <Label htmlFor="adaCompliant" className="text-sm font-medium">
+                ADA Compliant
+              </Label>
+              <Switch
+                id="adaCompliant"
+                checked={formData.adaCompliant}
+                onCheckedChange={(checked) => updateFormData({ adaCompliant: checked })}
               />
             </div>
           </div>
