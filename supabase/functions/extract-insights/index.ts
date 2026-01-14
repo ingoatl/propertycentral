@@ -234,6 +234,45 @@ serve(async (req) => {
       );
     }
 
+    // PHASE 1.5: PROMOTIONAL/NEWSLETTER DETECTION - Classify but don't skip
+    const promotionalKeywords = [
+      'unsubscribe', 'newsletter', 'promotional', 'marketing',
+      'special offer', 'discount', 'limited time', 'sale ends',
+      'click here to unsubscribe', 'email preferences', 'opt out',
+      'weekly update', 'monthly digest', 'bulletin', 'digest',
+      'deals', 'exclusive offer', 'free shipping', 'promo code',
+      'don\'t miss out', 'act now', 'save now', 'shop now',
+    ];
+    
+    const automatedKeywords = [
+      'no-reply', 'noreply', 'do-not-reply', 'donotreply',
+      'automated message', 'auto-generated', 'system notification',
+      'this is an automated', 'please do not reply to this email',
+    ];
+    
+    const emailContentLower = `${subject} ${body}`.toLowerCase();
+    const senderLower = senderEmail.toLowerCase();
+    
+    const isPromotional = promotionalKeywords.some(kw => emailContentLower.includes(kw));
+    const isAutomated = automatedKeywords.some(kw => emailContentLower.includes(kw) || senderLower.includes(kw));
+    const isNewsletter = emailContentLower.includes('newsletter') || 
+                         emailContentLower.includes('weekly update') ||
+                         emailContentLower.includes('monthly digest');
+
+    // Pre-detect promotional status to inform AI
+    let preDetectedCategory = null;
+    let preDetectedPriority = null;
+    
+    if (isPromotional || isNewsletter) {
+      preDetectedCategory = isNewsletter ? 'newsletter' : 'promotional';
+      preDetectedPriority = 'low';
+      console.log(`Pre-detected ${preDetectedCategory} email:`, subject);
+    } else if (isAutomated) {
+      preDetectedCategory = 'automated';
+      preDetectedPriority = 'low';
+      console.log('Pre-detected automated email:', subject);
+    }
+
     const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
 
     // Create context for AI
