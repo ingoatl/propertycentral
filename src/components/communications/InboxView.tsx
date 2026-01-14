@@ -79,6 +79,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
@@ -476,6 +477,36 @@ export function InboxView() {
     });
   }, [updateConversationStatus]);
 
+  // Delete message mutation
+  const deleteMessageMutation = useMutation({
+    mutationFn: async ({ id, table }: { id: string; table: 'lead_communications' | 'user_phone_messages' }) => {
+      const { error } = await supabase.from(table).delete().eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Message deleted");
+      queryClient.invalidateQueries({ queryKey: ["all-communications"] });
+      setSelectedMessage(null);
+    },
+    onError: (err: Error) => toast.error(`Failed to delete: ${err.message}`),
+  });
+
+  // Mark as read/unread mutation
+  const markReadMutation = useMutation({
+    mutationFn: async ({ id, isRead }: { id: string; isRead: boolean }) => {
+      const { error } = await supabase.from('lead_communications').update({ is_read: isRead }).eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["all-communications"] }),
+  });
+
+  // Auto-mark inbound messages as read when selected
+  useEffect(() => {
+    if (selectedMessage && selectedMessage.direction === 'inbound' && selectedMessage.type !== 'draft') {
+      markReadMutation.mutate({ id: selectedMessage.id, isRead: true });
+    }
+  }, [selectedMessage?.id]);
+
   // Send draft mutation
   const sendDraftMutation = useMutation({
     mutationFn: async (draftId: string) => {
@@ -695,7 +726,7 @@ export function InboxView() {
     }
   });
 
-  const { data: communications = [], isLoading } = useQuery({
+  const { data: communications = [], isLoading, isError, error, refetch } = useQuery({
     queryKey: ["all-communications", search, activeTab, activeFilter, selectedInboxUserId, viewAllInboxes],
     refetchInterval: 10000,
     staleTime: 5000,
@@ -1962,6 +1993,15 @@ export function InboxView() {
             <div className="flex items-center justify-center h-32">
               <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
             </div>
+          ) : isError ? (
+            <div className="flex flex-col items-center justify-center h-48 text-destructive">
+              <AlertCircle className="h-12 w-12 mb-3 opacity-70" />
+              <p className="text-sm font-medium">Failed to load messages</p>
+              <p className="text-xs text-muted-foreground mb-3">{(error as Error)?.message || "Unknown error"}</p>
+              <Button variant="outline" size="sm" onClick={() => refetch()}>
+                <RotateCcw className="h-4 w-4 mr-2" />Retry
+              </Button>
+            </div>
           ) : activeTab === "all" && groupedByContactWithDates ? (
             // "All" tab - grouped by contact with date separators
             groupedByContactWithDates.length === 0 ? (
@@ -2051,8 +2091,8 @@ export function InboxView() {
                               )}
                             </div>
                             <div className="flex items-center gap-1.5">
-                              {/* Quick actions - visible on hover (desktop) or always (mobile touch) */}
-                              <div className="opacity-0 group-hover:opacity-100 transition-opacity md:flex hidden">
+                              {/* Quick actions - visible on hover (desktop) or touch-active (mobile) */}
+                              <div className="opacity-100 md:opacity-0 group-hover:opacity-100 group-active:opacity-100 transition-opacity flex">
                                 <ConversationQuickActions
                                   status={(comm.conversation_status === "awaiting" ? "open" : comm.conversation_status) as "open" | "snoozed" | "done" | "archived"}
                                   onMarkDone={() => handleMarkDone(comm)}
@@ -2168,7 +2208,7 @@ export function InboxView() {
                             />
                           </div>
                           <div className="flex items-center gap-1.5">
-                            <div className="opacity-0 group-hover:opacity-100 transition-opacity hidden md:flex">
+                            <div className="opacity-100 md:opacity-0 group-hover:opacity-100 group-active:opacity-100 transition-opacity flex">
                               <ConversationQuickActions
                                 status={(comm.conversation_status === "awaiting" ? "open" : comm.conversation_status) as "open" | "snoozed" | "done" | "archived"}
                                 onMarkDone={() => handleMarkDone(comm)}
@@ -2370,6 +2410,22 @@ export function InboxView() {
                       <UserPlus className="h-4 w-4 mr-2" />{createLeadMutation.isPending ? "Creating..." : "Create Lead"}
                     </DropdownMenuItem>
                   )}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem 
+                    onClick={() => {
+                      const table = selectedMessage.type === "personal_sms" || selectedMessage.type === "personal_call" 
+                        ? 'user_phone_messages' as const 
+                        : 'lead_communications' as const;
+                      if (window.confirm("Are you sure you want to delete this message?")) {
+                        deleteMessageMutation.mutate({ id: selectedMessage.id, table });
+                      }
+                    }}
+                    disabled={deleteMessageMutation.isPending}
+                    className="text-destructive focus:text-destructive"
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    {deleteMessageMutation.isPending ? "Deleting..." : "Delete"}
+                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
