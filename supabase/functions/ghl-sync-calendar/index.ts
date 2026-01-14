@@ -207,47 +207,109 @@ serve(async (req) => {
         }
       }
 
-      // Extract meeting link from various GHL fields
+      // Extract meeting link from various GHL fields - extensive search
       let meetingLink: string | null = null;
-      const meetLinkSources = [
+      
+      // Build array of all potential sources for meeting links
+      const customFields = contactDetails.customFields as Record<string, unknown> || {};
+      const rawApt = apt as Record<string, unknown>;
+      
+      const meetLinkSources: (string | undefined | null | unknown)[] = [
+        // Primary GHL video conference fields
         apt.meetUrl,
         apt.conferenceUrl,
         apt.hangoutLink,
+        apt.videoUrl,
+        apt.videoLink,
+        apt.meetingUrl,
+        apt.meetingLink,
+        apt.calendarLink,
+        rawApt.video_conference_url,
+        rawApt.video_url,
+        rawApt.meet_link,
+        rawApt.zoom_link,
+        rawApt.teams_link,
+        rawApt.conferenceData,
+        // Location fields that might contain URLs
         apt.locationUrl,
         apt.address as string,
         apt.location as string,
+        // Text fields that might contain embedded links
         apt.notes as string,
         apt.title as string,
-        (contactDetails.customFields as Record<string, unknown>)?.meeting_link,
-        (contactDetails.customFields as Record<string, unknown>)?.zoom_link,
-        (contactDetails.customFields as Record<string, unknown>)?.google_meet,
+        apt.description as string,
+        rawApt.appointment_notes,
+        rawApt.internal_notes,
+        // Custom contact fields
+        customFields.meeting_link,
+        customFields.zoom_link,
+        customFields.google_meet,
+        customFields.meet_url,
+        customFields.video_link,
+        customFields.conference_url,
+        customFields.teams_link,
+        // Calendar-specific fields
+        rawApt.calendarLinks,
       ];
       
+      // Also check if calendarLinks is an object with nested URLs
+      if (rawApt.calendarLinks && typeof rawApt.calendarLinks === 'object') {
+        const calLinks = rawApt.calendarLinks as Record<string, unknown>;
+        meetLinkSources.push(calLinks.hangoutLink, calLinks.meetUrl, calLinks.videoUrl);
+      }
+      
+      // Conference data might be an object
+      if (rawApt.conferenceData && typeof rawApt.conferenceData === 'object') {
+        const confData = rawApt.conferenceData as Record<string, unknown>;
+        meetLinkSources.push(confData.entryPoint, confData.uri, confData.url);
+        // Entry points might be an array
+        if (Array.isArray(confData.entryPoints)) {
+          for (const entry of confData.entryPoints) {
+            if (entry && typeof entry === 'object') {
+              meetLinkSources.push((entry as Record<string, unknown>).uri);
+            }
+          }
+        }
+      }
+      
+      // Search through all sources for video conference URLs
       for (const source of meetLinkSources) {
         if (source && typeof source === 'string') {
           // Google Meet
           const meetMatch = source.match(/https:\/\/meet\.google\.com\/[a-z0-9-]+/i);
           if (meetMatch) {
             meetingLink = meetMatch[0];
+            console.log(`[GHL Calendar Sync] Found Google Meet link in source`);
             break;
           }
-          // Zoom
-          const zoomMatch = source.match(/https:\/\/[\w.-]*zoom\.us\/[a-z0-9/?=&-]+/i);
+          // Zoom (various formats)
+          const zoomMatch = source.match(/https:\/\/[\w.-]*zoom\.us\/(?:j|my|w)\/[a-z0-9/?=&-]+/i);
           if (zoomMatch) {
             meetingLink = zoomMatch[0];
+            console.log(`[GHL Calendar Sync] Found Zoom link in source`);
             break;
           }
           // Teams
-          const teamsMatch = source.match(/https:\/\/teams\.microsoft\.com\/[a-z0-9/?=&-]+/i);
+          const teamsMatch = source.match(/https:\/\/teams\.(?:microsoft|live)\.com\/[a-z0-9/?=&-]+/i);
           if (teamsMatch) {
             meetingLink = teamsMatch[0];
+            console.log(`[GHL Calendar Sync] Found Teams link in source`);
+            break;
+          }
+          // Webex
+          const webexMatch = source.match(/https:\/\/[\w.-]*webex\.com\/[a-z0-9/?=&-]+/i);
+          if (webexMatch) {
+            meetingLink = webexMatch[0];
+            console.log(`[GHL Calendar Sync] Found Webex link in source`);
             break;
           }
         }
       }
 
       if (meetingLink) {
-        console.log(`[GHL Calendar Sync] Found meeting link: ${meetingLink}`);
+        console.log(`[GHL Calendar Sync] Final meeting link: ${meetingLink}`);
+      } else {
+        console.log(`[GHL Calendar Sync] No meeting link found for event: ${apt.title || apt.id}`);
       }
 
       // Build enriched appointment

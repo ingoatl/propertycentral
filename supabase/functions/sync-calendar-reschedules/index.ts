@@ -17,25 +17,95 @@ const CALENDAR_SYNC_USER_ID = Deno.env.get("CALENDAR_SYNC_USER_ID");
 
 const MCP_SERVER_URL = "https://remote.mcp.pipedream.net";
 
-// INSPECTION TIME VALIDATION: Only 11am-2pm EST (16:00-19:00 UTC) on Tue/Wed/Thu
+// Helper to determine if a date is in Eastern Daylight Time (EDT) vs Eastern Standard Time (EST)
+// EDT: Second Sunday of March to First Sunday of November
+function isEDT(date: Date): boolean {
+  const year = date.getUTCFullYear();
+  
+  // Find second Sunday of March
+  const marchFirst = new Date(Date.UTC(year, 2, 1)); // March 1
+  const marchFirstDay = marchFirst.getUTCDay();
+  const secondSundayMarch = new Date(Date.UTC(year, 2, 8 + (7 - marchFirstDay) % 7));
+  // DST starts at 2:00 AM local time = 7:00 AM UTC
+  secondSundayMarch.setUTCHours(7, 0, 0, 0);
+  
+  // Find first Sunday of November
+  const novFirst = new Date(Date.UTC(year, 10, 1)); // November 1
+  const novFirstDay = novFirst.getUTCDay();
+  const firstSundayNov = new Date(Date.UTC(year, 10, 1 + (7 - novFirstDay) % 7));
+  // DST ends at 2:00 AM local time = 6:00 AM UTC
+  firstSundayNov.setUTCHours(6, 0, 0, 0);
+  
+  return date >= secondSundayMarch && date < firstSundayNov;
+}
+
+// Get Eastern Time hour from a UTC date
+function getEasternHour(date: Date): { hour: number; minute: number; isEDT: boolean } {
+  const isDaylightTime = isEDT(date);
+  const offset = isDaylightTime ? -4 : -5; // EDT = UTC-4, EST = UTC-5
+  
+  // Calculate Eastern time
+  const utcHours = date.getUTCHours();
+  const utcMinutes = date.getUTCMinutes();
+  
+  let easternHour = utcHours + offset;
+  if (easternHour < 0) easternHour += 24;
+  if (easternHour >= 24) easternHour -= 24;
+  
+  return { hour: easternHour, minute: utcMinutes, isEDT: isDaylightTime };
+}
+
+// Get Eastern day of week (accounting for timezone crossing midnight)
+function getEasternDayOfWeek(date: Date): number {
+  const isDaylightTime = isEDT(date);
+  const offset = isDaylightTime ? -4 : -5;
+  
+  // Create a date object adjusted to Eastern time
+  const easternTime = new Date(date.getTime() + offset * 60 * 60 * 1000);
+  return easternTime.getUTCDay();
+}
+
+// Format date in Eastern Time for display
+function formatEasternTime(date: Date): string {
+  const { hour, minute, isEDT: isDaylightTime } = getEasternHour(date);
+  const dayOfWeek = getEasternDayOfWeek(date);
+  const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const ampm = hour >= 12 ? 'PM' : 'AM';
+  const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
+  const tz = isDaylightTime ? 'EDT' : 'EST';
+  
+  return `${days[dayOfWeek]} ${displayHour}:${minute.toString().padStart(2, '0')} ${ampm} ${tz}`;
+}
+
+// INSPECTION TIME VALIDATION: Only 11am-3pm Eastern Time on Tue/Wed/Thu
 const isValidInspectionTime = (date: Date): { valid: boolean; reason?: string } => {
-  // Convert to Eastern Time for validation
-  const estOffset = -5; // EST offset (ignoring DST for simplicity)
-  const utcHour = date.getUTCHours();
-  const estHour = (utcHour + estOffset + 24) % 24;
-  const dayOfWeek = date.getUTCDay();
+  const { hour: easternHour, minute: easternMinute, isEDT: isDaylightTime } = getEasternHour(date);
+  const easternDayOfWeek = getEasternDayOfWeek(date);
+  const tz = isDaylightTime ? 'EDT' : 'EST';
   
-  // Check day of week: Tuesday (2), Wednesday (3), Thursday (4)
-  if (dayOfWeek !== 2 && dayOfWeek !== 3 && dayOfWeek !== 4) {
-    return { valid: false, reason: `Inspections only on Tue/Wed/Thu (got day ${dayOfWeek})` };
+  console.log(`[Validation] Checking inspection time: ${date.toISOString()}`);
+  console.log(`[Validation] Eastern time: ${easternHour}:${easternMinute.toString().padStart(2, '0')} ${tz}, Day: ${easternDayOfWeek}`);
+  
+  // Check day of week in Eastern time: Tuesday (2), Wednesday (3), Thursday (4)
+  if (easternDayOfWeek !== 2 && easternDayOfWeek !== 3 && easternDayOfWeek !== 4) {
+    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    return { 
+      valid: false, 
+      reason: `Inspections only on Tue/Wed/Thu (got ${dayNames[easternDayOfWeek]}). Time in ${tz}: ${formatEasternTime(date)}` 
+    };
   }
   
-  // Check time: 11am-2pm EST = 11:00-14:00 EST
-  // In UTC: 16:00-19:00 (EST = UTC-5)
-  if (estHour < 11 || estHour >= 15) { // 11am to before 3pm (last slot is 2:30)
-    return { valid: false, reason: `Inspections only 11am-2pm EST (got ${estHour}:${date.getUTCMinutes().toString().padStart(2, '0')} EST)` };
+  // Check time: 11am-3pm Eastern Time (11:00-14:59)
+  // Valid start times are 11:00, 11:30, 12:00, 12:30, 1:00, 1:30, 2:00, 2:30
+  // Last appointment at 2:30 PM ends at 3:00 PM
+  if (easternHour < 11 || easternHour >= 15) {
+    return { 
+      valid: false, 
+      reason: `Inspections only 11am-3pm ${tz} (got ${easternHour}:${easternMinute.toString().padStart(2, '0')} ${tz}). Valid slots: 11:00 AM - 2:30 PM ${tz}.` 
+    };
   }
   
+  console.log(`[Validation] ✓ Valid inspection time: ${formatEasternTime(date)}`);
   return { valid: true };
 };
 
@@ -375,10 +445,11 @@ serve(async (req) => {
             });
             
             // Add note to the call about the rejected reschedule
+            const attemptedTimeStr = formatEasternTime(googleDate);
             await supabase
               .from("discovery_calls")
               .update({
-                meeting_notes: `${call.meeting_notes || ""}\n\n⚠️ [Auto-blocked] Attempted reschedule to ${googleDate.toLocaleString()} was REJECTED: ${validation.reason}. In-person inspections can only be scheduled Tue-Thu, 11am-2pm EST.`
+                meeting_notes: `${call.meeting_notes || ""}\n\n⚠️ [Auto-blocked] Attempted reschedule to ${attemptedTimeStr} was REJECTED: ${validation.reason}. In-person inspections can only be scheduled Tue-Thu, 11am-3pm Eastern Time.`
               })
               .eq("id", call.id);
             
@@ -386,12 +457,15 @@ serve(async (req) => {
           }
         }
 
-        // Update the discovery call with new time
+        // Update the discovery call with new time - use ISO strings for consistency
+        const originalTimeStr = formatEasternTime(callDate);
+        const newTimeStr = formatEasternTime(googleDate);
+        
         const { error: updateError } = await supabase
           .from("discovery_calls")
           .update({ 
             scheduled_at: googleDate.toISOString(),
-            meeting_notes: `${call.meeting_notes || ""}\n\n[Auto-updated] Rescheduled via Google Calendar from ${callDate.toLocaleString()} to ${googleDate.toLocaleString()} on ${new Date().toLocaleDateString()}`
+            meeting_notes: `${call.meeting_notes || ""}\n\n[Auto-updated] Rescheduled via Google Calendar from ${originalTimeStr} to ${newTimeStr} on ${new Date().toISOString().split('T')[0]}`
           })
           .eq("id", call.id);
 
