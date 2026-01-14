@@ -39,6 +39,134 @@ async function syncOwnerRezInBackground(): Promise<void> {
   }
 }
 
+// Demo portal data for Sara Thompson demo (no database dependencies)
+function getDemoPortalData() {
+  const today = new Date();
+  const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+  const twoMonthsAgo = new Date(today.getFullYear(), today.getMonth() - 2, 1);
+  const threeMonthsAgo = new Date(today.getFullYear(), today.getMonth() - 3, 1);
+  
+  const formatMonth = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
+  const formatDate = (d: Date) => d.toISOString().split('T')[0];
+
+  return {
+    owner: {
+      id: "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+      name: "Sara Thompson",
+      email: "sara.thompson@demo.com",
+      phone: "(404) 555-0123",
+      secondOwnerName: "Michael Thompson",
+      secondOwnerEmail: "michael.thompson@demo.com",
+    },
+    property: {
+      id: "b2c3d4e5-f6a7-8901-bcde-f12345678901",
+      name: "3069 Rita Way Retreat",
+      address: "3069 Rita Way, Smyrna, GA 30080",
+      rental_type: "hybrid",
+      image_path: null, // Will use bundled demo image
+      management_fee_percentage: 20,
+      bedrooms: 4,
+      bathrooms: 3,
+      square_feet: 2400,
+      max_guests: 8,
+      amenities: ["WiFi", "Pool", "Hot Tub", "Smart TV", "Full Kitchen", "Washer/Dryer"],
+      onboarding_stage: null,
+    },
+    statements: [
+      {
+        id: "stmt-demo-1",
+        reconciliation_month: formatMonth(lastMonth),
+        total_revenue: 4850,
+        total_expenses: 320,
+        net_to_owner: 3624,
+        actual_net_earnings: 3624,
+        status: "sent",
+        short_term_revenue: 2350,
+        mid_term_revenue: 2500,
+      },
+      {
+        id: "stmt-demo-2",
+        reconciliation_month: formatMonth(twoMonthsAgo),
+        total_revenue: 5200,
+        total_expenses: 450,
+        net_to_owner: 3800,
+        actual_net_earnings: 3800,
+        status: "completed",
+        short_term_revenue: 2700,
+        mid_term_revenue: 2500,
+      },
+      {
+        id: "stmt-demo-3",
+        reconciliation_month: formatMonth(threeMonthsAgo),
+        total_revenue: 4600,
+        total_expenses: 280,
+        net_to_owner: 3456,
+        actual_net_earnings: 3456,
+        status: "completed",
+        short_term_revenue: 2100,
+        mid_term_revenue: 2500,
+      },
+    ],
+    expenses: [
+      { id: "exp-1", date: formatDate(new Date(today.getTime() - 5 * 24 * 60 * 60 * 1000)), amount: 89.99, purpose: "Pool maintenance supplies", vendor: "Leslie's Pool Supplies", category: "Maintenance", file_path: null },
+      { id: "exp-2", date: formatDate(new Date(today.getTime() - 12 * 24 * 60 * 60 * 1000)), amount: 156.50, purpose: "Deep cleaning between guests", vendor: "CleanCo Pro", category: "Cleaning", file_path: null },
+      { id: "exp-3", date: formatDate(new Date(today.getTime() - 20 * 24 * 60 * 60 * 1000)), amount: 45.00, purpose: "Welcome basket supplies", vendor: "Costco", category: "Guest Amenities", file_path: null },
+    ],
+    credentials: [
+      { id: "cred-1", service_name: "WiFi Network", username: "RitaWay_Guest", password: "Welcome2024!", url: null, notes: "5GHz network for best streaming" },
+      { id: "cred-2", service_name: "Smart Lock", username: null, password: "Last 4 of guest phone", url: null, notes: "Auto-generated for each booking" },
+      { id: "cred-3", service_name: "Nest Thermostat", username: "ritaway@peachhausgroup.com", password: "Contact PeachHaus", url: "https://home.nest.com", notes: "Set to 72°F for guest comfort" },
+    ],
+    bookings: {
+      str: [
+        { id: "str-1", booking_id: "ORZ-12345", guest_name: "Jennifer Martinez", check_in: formatDate(new Date(today.getTime() + 3 * 24 * 60 * 60 * 1000)), check_out: formatDate(new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000)), total_amount: 875, management_fee: 175, booking_status: "confirmed" },
+        { id: "str-2", booking_id: "ORZ-12344", guest_name: "David Chen", check_in: formatDate(new Date(today.getTime() - 10 * 24 * 60 * 60 * 1000)), check_out: formatDate(new Date(today.getTime() - 6 * 24 * 60 * 60 * 1000)), total_amount: 720, management_fee: 144, booking_status: "completed" },
+        { id: "str-3", booking_id: "ORZ-12343", guest_name: "Sarah Williams", check_in: formatDate(new Date(today.getTime() - 25 * 24 * 60 * 60 * 1000)), check_out: formatDate(new Date(today.getTime() - 20 * 24 * 60 * 60 * 1000)), total_amount: 950, management_fee: 190, booking_status: "completed" },
+      ],
+      mtr: [
+        { id: "mtr-1", tenant_name: "Robert Anderson", tenant_email: "r.anderson@delta.com", start_date: formatDate(new Date(today.getTime() - 45 * 24 * 60 * 60 * 1000)), end_date: formatDate(new Date(today.getTime() + 15 * 24 * 60 * 60 * 1000)), monthly_rent: 2500, deposit_amount: 2500, status: "active", notes: "Delta relocation - excellent tenant" },
+      ],
+    },
+    reviews: [
+      { id: "rev-1", guestName: "Jennifer M.", rating: 5, text: "Absolutely stunning property! The pool was pristine and the host communication was exceptional. Will definitely return!", date: formatDate(new Date(today.getTime() - 8 * 24 * 60 * 60 * 1000)), source: "Airbnb" },
+      { id: "rev-2", guestName: "David C.", rating: 5, text: "Perfect for our family vacation. Clean, spacious, and every amenity we needed. The smart home features were a nice touch.", date: formatDate(new Date(today.getTime() - 15 * 24 * 60 * 60 * 1000)), source: "VRBO" },
+      { id: "rev-3", guestName: "Sarah W.", rating: 4, text: "Great location and beautiful home. Minor issue with AC was resolved within an hour. Very responsive management.", date: formatDate(new Date(today.getTime() - 22 * 24 * 60 * 60 * 1000)), source: "Airbnb" },
+    ],
+    performance: {
+      totalRevenue: 14650,
+      strRevenue: 7150,
+      mtrRevenue: 7500,
+      totalBookings: 12,
+      strBookings: 9,
+      mtrBookings: 3,
+      occupancyRate: 87,
+      averageRating: 4.8,
+      reviewCount: 3,
+    },
+    monthlyRevenue: [
+      { month: formatMonth(threeMonthsAgo).substring(0, 7), str: 2100, mtr: 2500, total: 4600 },
+      { month: formatMonth(twoMonthsAgo).substring(0, 7), str: 2700, mtr: 2500, total: 5200 },
+      { month: formatMonth(lastMonth).substring(0, 7), str: 2350, mtr: 2500, total: 4850 },
+    ],
+    ownerHighlights: [
+      { type: "review", message: "New 5-star review from Jennifer M.!", date: formatDate(new Date(today.getTime() - 8 * 24 * 60 * 60 * 1000)) },
+      { type: "booking", message: "Upcoming STR booking confirmed: Jennifer Martinez (4 nights)", date: formatDate(today) },
+      { type: "revenue", message: "MTR tenant Robert Anderson extended stay by 1 month!", date: formatDate(new Date(today.getTime() - 3 * 24 * 60 * 60 * 1000)) },
+    ],
+    revenueBreakdown: {
+      mtr: [],
+      str: [],
+      summary: {
+        mtrFromStatements: 7500,
+        mtrFromFutureBookings: 0,
+        strFromReconciliation: 7150,
+        strFromBookings: 7150,
+      }
+    },
+    dataWarnings: [],
+  };
+}
+
 serve(async (req: Request): Promise<Response> => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -82,6 +210,18 @@ serve(async (req: Request): Promise<Response> => {
       return new Response(
         JSON.stringify({ error: "Owner ID is required" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Demo mode - return mock data for demo owner ID
+    const DEMO_OWNER_ID = "a1b2c3d4-e5f6-7890-abcd-ef1234567890";
+    const DEMO_PROPERTY_ID = "b2c3d4e5-f6a7-8901-bcde-f12345678901";
+    
+    if (validatedOwnerId === DEMO_OWNER_ID) {
+      console.log("Demo mode activated - returning mock data");
+      return new Response(
+        JSON.stringify(getDemoPortalData()),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
