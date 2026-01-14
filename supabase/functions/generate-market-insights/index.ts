@@ -18,7 +18,7 @@ serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const openaiKey = Deno.env.get("OPENAI_API_KEY")!;
+    const openaiKey = Deno.env.get("OPENAI_API_KEY");
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     const { propertyId }: PropertyInsightsRequest = await req.json();
@@ -28,6 +28,247 @@ serve(async (req) => {
     }
 
     console.log(`Generating market insights for property: ${propertyId}`);
+
+    // Demo mode - return optimistic data for demo property
+    const DEMO_PROPERTY_ID = "b2c3d4e5-f6a7-8901-bcde-f12345678901";
+    
+    if (propertyId === DEMO_PROPERTY_ID) {
+      console.log("Demo mode - returning optimistic market insights");
+      
+      const currentDate = new Date();
+      const currentYear = currentDate.getFullYear();
+      
+      const demoInsights = {
+        property: {
+          id: DEMO_PROPERTY_ID,
+          name: "3069 Rita Way Retreat",
+          address: "3069 Rita Way, Smyrna, GA 30080",
+          rental_type: "hybrid",
+          nightly_rate: 375,
+        },
+        performance: {
+          totalRevenue: 74350,
+          strRevenue: 35350,
+          mtrRevenue: 39000,
+          totalBookings: 24,
+          strBookings: 18,
+          mtrBookings: 6,
+          occupancyRate: 92,
+          averageRating: 4.9,
+          reviewCount: 47,
+        },
+        reviews: [
+          { id: "rev-1", guestName: "Jennifer M.", rating: 5, text: "Absolutely stunning property! The pool was pristine and the host communication was exceptional. The game room was a hit with our kids.", date: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], source: "Airbnb" },
+          { id: "rev-2", guestName: "David C.", rating: 5, text: "Perfect for our family reunion. Clean, spacious, and every amenity we needed. PeachHaus really knows how to manage properties!", date: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], source: "VRBO" },
+          { id: "rev-3", guestName: "Sarah W.", rating: 5, text: "Best Airbnb experience we've ever had! Great location near the Battery Atlanta.", date: new Date(Date.now() - 22 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], source: "Airbnb" },
+        ],
+        monthlyRevenue: [
+          { month: `${currentYear}-01`, str: 5800, mtr: 6500, total: 12300 },
+          { month: `${currentYear}-02`, str: 6200, mtr: 6500, total: 12700 },
+          { month: `${currentYear}-03`, str: 7100, mtr: 6500, total: 13600 },
+          { month: `${currentYear}-04`, str: 5400, mtr: 6500, total: 11900 },
+          { month: `${currentYear}-05`, str: 6800, mtr: 6500, total: 13300 },
+          { month: `${currentYear}-06`, str: 4050, mtr: 6500, total: 10550 },
+        ],
+        aiInsights: {
+          comparableProperties: [
+            {
+              name: "Buckhead Executive Retreat",
+              area: "Buckhead, Atlanta",
+              distance: "< 8 miles",
+              bedrooms: 5,
+              bathrooms: 4,
+              nightlyRate: 425,
+              occupancy: 85,
+              avgMonthly: 10850,
+              platform: "Airbnb"
+            },
+            {
+              name: "Vinings Luxury Villa",
+              area: "Vinings, GA",
+              distance: "< 3 miles",
+              bedrooms: 5,
+              bathrooms: 3,
+              nightlyRate: 395,
+              occupancy: 88,
+              avgMonthly: 10200,
+              platform: "VRBO"
+            },
+            {
+              name: "Sandy Springs Family Home",
+              area: "Sandy Springs, GA",
+              distance: "< 6 miles",
+              bedrooms: 4,
+              bathrooms: 3,
+              nightlyRate: 350,
+              occupancy: 82,
+              avgMonthly: 8650,
+              platform: "Airbnb"
+            },
+            {
+              name: "Marietta Modern Estate",
+              area: "East Cobb, GA",
+              distance: "< 4 miles",
+              bedrooms: 5,
+              bathrooms: 4,
+              nightlyRate: 380,
+              occupancy: 79,
+              avgMonthly: 9100,
+              platform: "Booking.com"
+            },
+            {
+              name: "Smyrna Market District Home",
+              area: "Smyrna, GA",
+              distance: "< 2 miles",
+              bedrooms: 4,
+              bathrooms: 3,
+              nightlyRate: 325,
+              occupancy: 86,
+              avgMonthly: 8400,
+              platform: "Airbnb"
+            }
+          ],
+          marketMetrics: {
+            areaOccupancy: 84,
+            avgNightlyRate: 365,
+            yoyGrowth: 18,
+            marketTrend: "rising" as const
+          },
+          futureOpportunities: [
+            {
+              title: "FIFA World Cup 2026 - Atlanta Host City",
+              timeframe: "June-July 2026",
+              description: "Atlanta's Mercedes-Benz Stadium will host multiple World Cup matches. Properties within 15 miles are projecting 300-500% rate increases during match weeks.",
+              potentialImpact: "Potential for $15,000-25,000 in a single month"
+            },
+            {
+              title: "Corporate Housing Expansion",
+              timeframe: "Q1-Q2 2026",
+              description: "Your hybrid strategy is perfectly positioned. Consider increasing MTR rate by 8-10% given the low vacancy in corporate housing.",
+              potentialImpact: "+$650/month additional MTR revenue"
+            },
+            {
+              title: "Premium Event Pricing",
+              timeframe: "Ongoing",
+              description: "With your 4.9 rating and proximity to venues, you can command 40-60% premiums during SEC Championship, Dragon Con, and major concerts.",
+              potentialImpact: "+$2,000-4,000 per major event weekend"
+            },
+            {
+              title: "Extended Stay Corporate Partnerships",
+              timeframe: "2026",
+              description: "Your property's amenities (home gym, EV charger, workspace) are ideal for Delta, Home Depot, and UPS executive relocations.",
+              potentialImpact: "Consistent $6,500+/month occupancy"
+            }
+          ],
+          demandDrivers: [
+            {
+              event: "FIFA World Cup 2026 - Group Stage Matches",
+              date: "2026-06-15",
+              impact: "Unprecedented demand - 400%+ rate increase expected",
+              category: "World Cup",
+              venue: "Mercedes-Benz Stadium",
+              distance: "12 miles"
+            },
+            {
+              event: "SEC Championship Game 2025",
+              date: "2025-12-06",
+              impact: "75,000+ fans, hotels sold out, 250% rate increase",
+              category: "Sports",
+              venue: "Mercedes-Benz Stadium",
+              distance: "12 miles"
+            },
+            {
+              event: "Chick-fil-A Peach Bowl",
+              date: "2025-12-30",
+              impact: "Major bowl game with 70,000+ attendees",
+              category: "Sports",
+              venue: "Mercedes-Benz Stadium",
+              distance: "12 miles"
+            },
+            {
+              event: "Dragon Con 2025",
+              date: "2025-08-29",
+              impact: "85,000+ attendees, downtown hotels 100% booked",
+              category: "Festival",
+              venue: "Downtown Atlanta",
+              distance: "14 miles"
+            },
+            {
+              event: "Music Midtown 2025",
+              date: "2025-09-20",
+              impact: "50,000+ daily attendees seeking nearby accommodation",
+              category: "Music",
+              venue: "Piedmont Park",
+              distance: "13 miles"
+            },
+            {
+              event: "Atlanta Braves Postseason",
+              date: "2025-10-01",
+              impact: "Premium pricing for Truist Park events, 3 miles away",
+              category: "Sports",
+              venue: "Truist Park",
+              distance: "3 miles"
+            },
+            {
+              event: "Delta Air Lines Corporate Relocations",
+              date: "2026-01-15",
+              impact: "Ongoing demand for 30-90 day executive housing",
+              category: "Corporate",
+              venue: "Delta HQ Atlanta",
+              distance: "15 miles"
+            },
+            {
+              event: "Home Depot Executive Training Programs",
+              date: "2026-02-01",
+              impact: "Regular demand for extended stay housing near HQ",
+              category: "Corporate",
+              venue: "Home Depot HQ - Vinings",
+              distance: "4 miles"
+            }
+          ],
+          strengthsForArea: [
+            "Prime Smyrna location - 3 miles from Truist Park (Atlanta Braves) drives consistent sports tourism demand",
+            "12 miles to Mercedes-Benz Stadium - optimal distance for major event demand without city traffic",
+            "Close proximity to Fortune 500 HQs: Home Depot (4mi), Coca-Cola (12mi), Delta (15mi) for corporate housing",
+            "Smyrna Market Village walkable dining/shopping adds premium value for guests seeking local experience",
+            "Strong school district (Cobb County) attracts family relocations and extended stays",
+            "Easy I-285 access enables quick trips to any Atlanta destination while maintaining suburban tranquility"
+          ],
+          mtrDemandSources: [
+            {
+              source: "Delta Air Lines",
+              description: "Regular executive relocations and training programs",
+              typicalStay: "30-90 days",
+              demandLevel: "High"
+            },
+            {
+              source: "Home Depot Corporate",
+              description: "Management training and consulting assignments",
+              typicalStay: "60-120 days",
+              demandLevel: "High"
+            },
+            {
+              source: "Emory Healthcare",
+              description: "Travel nurses and medical professionals",
+              typicalStay: "90 days",
+              demandLevel: "Medium"
+            },
+            {
+              source: "Insurance Placements",
+              description: "Families displaced by home damage",
+              typicalStay: "30-180 days",
+              demandLevel: "Medium"
+            }
+          ]
+        },
+        generatedAt: new Date().toISOString()
+      };
+      
+      return new Response(
+        JSON.stringify(demoInsights),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     // Fetch property data
     const { data: property, error: propError } = await supabase
