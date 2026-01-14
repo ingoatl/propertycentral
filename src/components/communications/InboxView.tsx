@@ -1994,35 +1994,35 @@ export function InboxView() {
       {/* Left Panel - Message List (Hidden on mobile when viewing detail) */}
       <div className={`w-full md:w-96 lg:w-[420px] md:border-r flex flex-col ${showMobileDetail ? 'hidden md:flex' : 'flex'}`}>
         {/* Compact tab bar - Gmail style */}
-        <div className="flex items-center gap-2 px-4 py-3 border-b bg-background">
+        <div className="flex items-center gap-1 sm:gap-2 px-2 sm:px-4 py-2.5 sm:py-3 border-b bg-background">
           {/* Tabs */}
-          <div className="flex items-center gap-1 flex-1">
+          <div className="flex items-center gap-0.5 sm:gap-1 flex-1 min-w-0">
             <button 
               onClick={() => { setActiveTab("all"); setSelectedGmailEmail(null); setShowMobileDetail(false); }} 
-              className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-colors ${activeTab === "all" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"}`}
+              className={`flex items-center justify-center gap-1 sm:gap-1.5 px-2.5 sm:px-4 py-2 rounded-full text-sm font-medium transition-colors shrink-0 ${activeTab === "all" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"}`}
             >
-              <MessageSquare className="h-4 w-4" />
+              <MessageSquare className="h-4 w-4 shrink-0" />
               <span className="hidden sm:inline">All</span>
             </button>
             <button 
               onClick={() => { setActiveTab("chats"); setSelectedGmailEmail(null); setShowMobileDetail(false); }} 
-              className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-colors ${activeTab === "chats" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"}`}
+              className={`flex items-center justify-center gap-1 sm:gap-1.5 px-2.5 sm:px-4 py-2 rounded-full text-sm font-medium transition-colors shrink-0 ${activeTab === "chats" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"}`}
             >
-              <MessageSquare className="h-4 w-4" />
+              <MessageSquare className="h-4 w-4 shrink-0" />
               <span className="hidden sm:inline">SMS</span>
             </button>
             <button 
               onClick={() => { setActiveTab("calls"); setSelectedGmailEmail(null); setShowMobileDetail(false); }} 
-              className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-colors ${activeTab === "calls" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"}`}
+              className={`flex items-center justify-center gap-1 sm:gap-1.5 px-2.5 sm:px-4 py-2 rounded-full text-sm font-medium transition-colors shrink-0 ${activeTab === "calls" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"}`}
             >
-              <Phone className="h-4 w-4" />
+              <Phone className="h-4 w-4 shrink-0" />
               <span className="hidden sm:inline">Calls</span>
             </button>
             <button 
               onClick={() => { setActiveTab("emails"); setSelectedMessage(null); setShowMobileDetail(false); }} 
-              className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium transition-colors ${activeTab === "emails" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"}`}
+              className={`flex items-center justify-center gap-1 sm:gap-1.5 px-2.5 sm:px-4 py-2 rounded-full text-sm font-medium transition-colors shrink-0 ${activeTab === "emails" ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted"}`}
             >
-              <Mail className="h-4 w-4" />
+              <Mail className="h-4 w-4 shrink-0" />
               <span className="hidden sm:inline">Emails</span>
             </button>
           </div>
@@ -2030,7 +2030,7 @@ export function InboxView() {
           {/* Search toggle */}
           <button 
             onClick={() => setSearch(search ? "" : " ")}
-            className="p-2 rounded-full text-muted-foreground hover:bg-muted"
+            className="p-2 rounded-full text-muted-foreground hover:bg-muted shrink-0"
           >
             <Search className="h-5 w-5" />
           </button>
@@ -2059,7 +2059,8 @@ export function InboxView() {
         )}
 
         {/* Filters row - compact horizontal scroll with help guide */}
-        <div className="px-3 py-2 border-b overflow-x-auto scrollbar-hide">
+        <div className="relative">
+          <div className="px-2 sm:px-3 py-2 border-b overflow-x-auto scrollbar-hide">
           <div className="flex items-center gap-1.5 min-w-max">
             {/* Notification bell */}
             <TeamNotificationBell />
@@ -2142,6 +2143,9 @@ export function InboxView() {
               </>
             )}
           </div>
+          </div>
+          {/* Right fade indicator for overflow */}
+          <div className="absolute right-0 top-0 bottom-0 w-6 bg-gradient-to-l from-background to-transparent pointer-events-none border-b" />
         </div>
 
         {/* Message List - Clean, content-first cards */}
