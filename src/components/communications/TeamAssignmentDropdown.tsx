@@ -25,6 +25,9 @@ interface TeamAssignmentDropdownProps {
   communicationId: string;
   currentAssignedTo?: string | null;
   contactName?: string;
+  messageSubject?: string;
+  messageSummary?: string;
+  messageType?: string;
   onAssigned?: (userId: string, userName: string) => void;
   variant?: "icon" | "button";
 }
@@ -33,9 +36,34 @@ export function TeamAssignmentDropdown({
   communicationId,
   currentAssignedTo,
   contactName,
+  messageSubject,
+  messageSummary,
+  messageType,
   onAssigned,
   variant = "icon",
 }: TeamAssignmentDropdownProps) {
+  const [currentUserName, setCurrentUserName] = useState("A team member");
+
+  // Fetch current user's name on mount
+  useEffect(() => {
+    const fetchCurrentUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("first_name, email")
+          .eq("id", user.id)
+          .maybeSingle();
+        
+        if (profile?.first_name) {
+          setCurrentUserName(profile.first_name);
+        } else if (profile?.email) {
+          setCurrentUserName(profile.email.split("@")[0]);
+        }
+      }
+    };
+    fetchCurrentUser();
+  }, []);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
@@ -140,9 +168,12 @@ export function TeamAssignmentDropdown({
             body: {
               recipientEmail: member.email,
               recipientName: member.display_name,
-              assignerName: "Team Member", // Could fetch current user's name
+              assignerName: currentUserName,
               contactName: contactName || "Unknown",
               communicationId,
+              messageSubject,
+              messageSummary,
+              messageType,
             },
           });
         } catch (emailError) {

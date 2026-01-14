@@ -2468,6 +2468,9 @@ export function InboxView() {
                 <TeamAssignmentDropdown
                   communicationId={selectedMessage.id}
                   contactName={selectedMessage.contact_name}
+                  messageSubject={selectedMessage.subject}
+                  messageSummary={selectedMessage.body?.substring(0, 300)}
+                  messageType={selectedMessage.type}
                 />
                 {/* Inbox Zero Quick Actions */}
                 <ConversationQuickActions
