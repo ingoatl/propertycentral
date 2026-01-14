@@ -687,125 +687,387 @@ export function DiscoveryCallCalendar() {
   );
 }
 
-// GHL Appointment Detail Modal
+// Helper to extract Google Meet link from various sources
+function extractMeetLink(appointment: GhlAppointment): string | null {
+  // First check the dedicated meeting_link field from the sync
+  if (appointment.meeting_link) {
+    return appointment.meeting_link;
+  }
+  
+  // Fallback: search in other fields
+  const sources = [
+    appointment.location,
+    appointment.notes,
+    appointment.title,
+    appointment.lead_notes,
+  ];
+  
+  for (const source of sources) {
+    if (source) {
+      // Match Google Meet links
+      const meetMatch = source.match(/https:\/\/meet\.google\.com\/[a-z0-9-]+/i);
+      if (meetMatch) return meetMatch[0];
+      
+      // Match Zoom links
+      const zoomMatch = source.match(/https:\/\/[\w.-]*zoom\.us\/[a-z0-9/?=&-]+/i);
+      if (zoomMatch) return zoomMatch[0];
+      
+      // Match Teams links
+      const teamsMatch = source.match(/https:\/\/teams\.microsoft\.com\/[a-z0-9/?=&-]+/i);
+      if (teamsMatch) return teamsMatch[0];
+    }
+  }
+  
+  return null;
+}
+
+// GHL Appointment Detail Modal - Enhanced to match DiscoveryCallDetailModal
 interface GhlAppointmentDetailModalProps {
   appointment: GhlAppointment | null;
   onClose: () => void;
 }
 
 function GhlAppointmentDetailModal({ appointment, onClose }: GhlAppointmentDetailModalProps) {
+  const [showEmailDialog, setShowEmailDialog] = useState(false);
+  const [showCallConfirm, setShowCallConfirm] = useState(false);
+  const [isCallingLead, setIsCallingLead] = useState(false);
+
   if (!appointment) return null;
 
   const scheduledAt = new Date(appointment.scheduled_at);
   const endTime = appointment.end_time ? new Date(appointment.end_time) : null;
+  const propertyAddress = appointment.lead_property_address || appointment.contact_address;
+  const contactName = appointment.contact_name || appointment.lead_name || "Unknown Contact";
+  const contactEmail = appointment.contact_email || appointment.lead_email;
+  const contactPhone = appointment.contact_phone || appointment.lead_phone;
+  
+  // Calculate revenue score if property address is available
+  const score = propertyAddress ? calculateRevenueScore(propertyAddress, appointment.lead_property_type || null) : null;
+  
+  // Extract meeting link
+  const meetLink = extractMeetLink(appointment);
+  
+  // Google Maps embed URL
+  const googleMapsEmbedUrl = propertyAddress
+    ? `https://www.google.com/maps/embed/v1/place?key=AIzaSyBFw0Qbyq9zTFTd-tUY6dZWTgaQzuU17R8&q=${encodeURIComponent(propertyAddress)}&zoom=12&maptype=roadmap`
+    : null;
+    
+  const googleMapsLink = propertyAddress
+    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(propertyAddress)}`
+    : null;
+
+  const handleCallContact = async () => {
+    if (!contactPhone || !appointment.lead_id) return;
+    
+    setIsCallingLead(true);
+    try {
+      const { error } = await supabase.functions.invoke("elevenlabs-voice-call", {
+        body: {
+          leadId: appointment.lead_id,
+          message: `Hello ${contactName}, this is PeachHaus calling about your upcoming appointment. We're looking forward to speaking with you!`,
+        },
+      });
+
+      if (error) throw error;
+      toast.success(`Call initiated to ${contactName}`, {
+        description: `Calling ${contactPhone}`,
+      });
+    } catch (error: any) {
+      console.error("Error initiating call:", error);
+      toast.error("Failed to initiate call", { description: error.message });
+    } finally {
+      setIsCallingLead(false);
+      setShowCallConfirm(false);
+    }
+  };
 
   return (
-    <Dialog open={!!appointment} onOpenChange={() => onClose()}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <CalendarCheck className="h-5 w-5 text-cyan-600" />
-            {appointment.title || "GHL Appointment"}
-          </DialogTitle>
-        </DialogHeader>
+    <>
+      <Dialog open={!!appointment} onOpenChange={() => onClose()}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-3">
+              <img 
+                src="/images/peachhaus-logo.png" 
+                alt="PeachHaus" 
+                className="h-10 w-auto"
+              />
+              <div>
+                <span className="flex items-center gap-2">
+                  <CalendarCheck className="h-5 w-5 text-cyan-600" />
+                  {appointment.title || "GHL Appointment"}
+                </span>
+                <p className="text-sm font-normal text-muted-foreground">
+                  {format(scheduledAt, "EEEE, MMMM d, yyyy 'at' h:mm a")}
+                  {endTime && ` - ${format(endTime, "h:mm a")}`}
+                </p>
+                <Badge className="mt-1 bg-cyan-500 text-white">
+                  <CalendarCheck className="h-3 w-3 mr-1" />
+                  {appointment.calendar_name || "GHL Calendar"}
+                </Badge>
+              </div>
+            </DialogTitle>
+          </DialogHeader>
 
-        <div className="space-y-4">
-          {/* Time */}
-          <div className="flex items-center gap-2 text-sm">
-            <Clock className="h-4 w-4 text-muted-foreground" />
-            <span>{format(scheduledAt, "EEEE, MMMM d 'at' h:mm a")}</span>
-            {endTime && <span>- {format(endTime, "h:mm a")}</span>}
-          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-3 mt-2">
+            {/* Left Column - Map & Photos */}
+            <div className="lg:col-span-3 space-y-2">
+              {/* Property Address - Compact */}
+              {propertyAddress && (
+                <div className="p-2 rounded-lg bg-primary/5 border border-primary/20 flex items-center gap-2">
+                  <MapPin className="h-4 w-4 text-primary shrink-0" />
+                  <p className="font-semibold text-sm flex-1 truncate">{propertyAddress}</p>
+                  <div className="flex gap-1">
+                    {googleMapsLink && (
+                      <Button variant="ghost" size="sm" className="h-7 px-2" asChild>
+                        <a href={googleMapsLink} target="_blank" rel="noopener noreferrer">
+                          <ExternalLink className="h-3 w-3" />
+                        </a>
+                      </Button>
+                    )}
+                    <Button variant="ghost" size="sm" className="h-7 px-2" asChild>
+                      <a 
+                        href={`https://www.zillow.com/homes/${encodeURIComponent(propertyAddress)}_rb/`} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                      >
+                        <Home className="h-3 w-3" />
+                      </a>
+                    </Button>
+                  </div>
+                </div>
+              )}
+              
+              {/* Map - Google Maps Embed */}
+              {googleMapsEmbedUrl ? (
+                <div className="rounded-lg overflow-hidden border h-[260px]">
+                  <iframe
+                    width="100%"
+                    height="100%"
+                    style={{ border: 0 }}
+                    loading="lazy"
+                    allowFullScreen
+                    referrerPolicy="no-referrer-when-downgrade"
+                    src={googleMapsEmbedUrl}
+                    title="Property Location"
+                  />
+                </div>
+              ) : (
+                <div className="h-[200px] bg-muted rounded-lg flex items-center justify-center">
+                  <p className="text-muted-foreground text-sm">No address provided</p>
+                </div>
+              )}
 
-          {/* Google Meet Link - check location, notes, and extract from any field */}
-          {(() => {
-            let meetLink: string | null = null;
-            // Check location first
-            if (appointment.location?.includes("meet.google.com")) {
-              const match = appointment.location.match(/https:\/\/meet\.google\.com\/[a-z0-9-]+/i);
-              meetLink = match ? match[0] : appointment.location;
-            }
-            // Check notes
-            if (!meetLink && appointment.notes) {
-              const match = appointment.notes.match(/https:\/\/meet\.google\.com\/[a-z0-9-]+/i);
-              if (match) meetLink = match[0];
-            }
-            // Check title
-            if (!meetLink && appointment.title?.includes("meet.google.com")) {
-              const match = appointment.title.match(/https:\/\/meet\.google\.com\/[a-z0-9-]+/i);
-              if (match) meetLink = match[0];
-            }
-            
-            if (meetLink) {
-              return (
+              {/* Property Photos */}
+              {propertyAddress && (
+                <PropertyPhotos 
+                  address={propertyAddress} 
+                  height="180px"
+                  className="rounded-lg overflow-hidden border"
+                />
+              )}
+
+              {/* GHL Notification Warning */}
+              <div className="p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
+                <div className="flex items-start gap-2">
+                  <CalendarCheck className="h-4 w-4 text-amber-600 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                      GHL Calendar Event
+                    </p>
+                    <p className="text-xs text-amber-700 dark:text-amber-300 mt-1">
+                      This appointment was synced from GoHighLevel. GHL may send its own automated reminders separately. 
+                      To avoid duplicate notifications, check your GHL workflow settings.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Right Column - Contact & Details */}
+            <div className="lg:col-span-2 space-y-2">
+              {/* Score Card - Only if property address exists */}
+              {score && (
+                <div className={cn("p-3 rounded-lg border", getScoreColor(score))}>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-medium opacity-80">Revenue Score</p>
+                      <p className="text-2xl font-bold">{score}/100</p>
+                    </div>
+                    <Star className="h-8 w-8 opacity-40" />
+                  </div>
+                  <div className="mt-1 h-1.5 bg-black/10 rounded-full overflow-hidden">
+                    <div className="h-full bg-current" style={{ width: `${score}%` }} />
+                  </div>
+                </div>
+              )}
+
+              {/* Contact Info */}
+              <div className="p-3 rounded-lg border space-y-2">
+                <h4 className="font-semibold text-sm flex items-center gap-2">
+                  <User className="h-3 w-3" />
+                  {contactName}
+                </h4>
+                
+                {/* Email */}
+                {contactEmail && (
+                  <div className="flex items-center gap-2">
+                    <Mail className="h-3 w-3 text-muted-foreground" />
+                    <span className="text-sm flex-1 truncate">{contactEmail}</span>
+                    <Button variant="ghost" size="sm" className="h-6 px-2" onClick={() => setShowEmailDialog(true)}>
+                      <Mail className="h-3 w-3" />
+                    </Button>
+                  </div>
+                )}
+
+                {/* Phone */}
+                {contactPhone && (
+                  <div className="flex items-center gap-2">
+                    <Phone className="h-3 w-3 text-muted-foreground" />
+                    <span className="text-sm flex-1">{contactPhone}</span>
+                    <Button variant="ghost" size="sm" className="h-6 px-2" onClick={() => setShowCallConfirm(true)}>
+                      <Phone className="h-3 w-3" />
+                    </Button>
+                  </div>
+                )}
+
+                {/* Action Buttons */}
+                <div className="flex gap-2 pt-1">
+                  {contactEmail && (
+                    <Button variant="outline" size="sm" className="flex-1 h-7 text-xs" onClick={() => setShowEmailDialog(true)}>
+                      <Mail className="h-3 w-3 mr-1" /> Email
+                    </Button>
+                  )}
+                  {contactPhone && (
+                    <Button variant="outline" size="sm" className="flex-1 h-7 text-xs" onClick={() => setShowCallConfirm(true)}>
+                      <Phone className="h-3 w-3 mr-1" /> Call
+                    </Button>
+                  )}
+                </div>
+              </div>
+
+              {/* Lead Details if matched */}
+              {appointment.lead_id && (
+                <div className="p-3 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 space-y-2">
+                  <h4 className="font-semibold text-sm text-green-800 dark:text-green-200 flex items-center gap-2">
+                    <User className="h-3 w-3" />
+                    Matched Lead
+                  </h4>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    {appointment.lead_stage && (
+                      <div>
+                        <p className="text-muted-foreground">Stage</p>
+                        <Badge variant="secondary" className="text-xs px-1.5 py-0">{appointment.lead_stage}</Badge>
+                      </div>
+                    )}
+                    {appointment.lead_source && (
+                      <div>
+                        <p className="text-muted-foreground">Source</p>
+                        <Badge variant="secondary" className="text-xs px-1.5 py-0">{appointment.lead_source}</Badge>
+                      </div>
+                    )}
+                    {appointment.lead_property_type && (
+                      <div>
+                        <p className="text-muted-foreground">Type</p>
+                        <p className="font-medium capitalize">{appointment.lead_property_type.replace("_", " ")}</p>
+                      </div>
+                    )}
+                  </div>
+                  {appointment.lead_notes && (
+                    <p className="text-xs text-muted-foreground mt-2">{appointment.lead_notes}</p>
+                  )}
+                </div>
+              )}
+
+              {/* Tags */}
+              {appointment.contact_tags && appointment.contact_tags.length > 0 && (
+                <div className="p-2 rounded-lg border">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Tag className="h-3 w-3 text-muted-foreground" />
+                    {appointment.contact_tags.map((tag, i) => (
+                      <Badge key={i} variant="secondary" className="text-xs">{tag}</Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Meeting Link - Prominent */}
+              {meetLink && (
                 <Button className="w-full h-10 text-sm bg-green-600 hover:bg-green-700 font-medium" asChild>
                   <a href={meetLink} target="_blank" rel="noopener noreferrer">
-                    <Video className="h-5 w-5 mr-2" /> Join Google Meet
+                    <Video className="h-5 w-5 mr-2" /> 
+                    {meetLink.includes("zoom") ? "Join Zoom" : meetLink.includes("teams") ? "Join Teams" : "Join Google Meet"}
                   </a>
                 </Button>
-              );
-            }
-            return null;
-          })()}
+              )}
 
-          {/* Contact Info */}
-          <div className="p-3 rounded-lg border space-y-2">
-            <h4 className="font-semibold text-sm flex items-center gap-2">
-              <User className="h-4 w-4" />
-              {appointment.contact_name || appointment.lead_name || "Unknown Contact"}
-            </h4>
-            {(appointment.contact_email || appointment.lead_email) && (
-              <div className="flex items-center gap-2 text-sm">
-                <Mail className="h-3 w-3 text-muted-foreground" />
-                {appointment.contact_email || appointment.lead_email}
-              </div>
-            )}
-            {(appointment.contact_phone || appointment.lead_phone) && (
-              <div className="flex items-center gap-2 text-sm">
-                <Phone className="h-3 w-3 text-muted-foreground" />
-                {appointment.contact_phone || appointment.lead_phone}
-              </div>
-            )}
-            {(appointment.lead_property_address || appointment.contact_address) && (
-              <div className="flex items-center gap-2 text-sm">
-                <MapPin className="h-3 w-3 text-muted-foreground" />
-                {appointment.lead_property_address || appointment.contact_address}
-              </div>
-            )}
+              {/* Notes */}
+              {appointment.notes && (
+                <div className="p-2 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
+                  <h4 className="font-semibold text-xs flex items-center gap-1 text-amber-800 dark:text-amber-200 mb-1">
+                    <FileText className="h-3 w-3" /> Notes
+                  </h4>
+                  <div className="text-xs text-amber-900 dark:text-amber-100 whitespace-pre-wrap max-h-[100px] overflow-y-auto">
+                    {appointment.notes}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
+        </DialogContent>
+      </Dialog>
 
-          {/* Lead Details if matched */}
-          {appointment.lead_id && (
-            <div className="p-3 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 space-y-1">
-              <h4 className="font-semibold text-sm text-green-800 dark:text-green-200">Matched Lead</h4>
-              {appointment.lead_stage && (
-                <Badge variant="outline" className="text-xs">{appointment.lead_stage}</Badge>
+      {/* Call Confirmation Dialog */}
+      <AlertDialog open={showCallConfirm} onOpenChange={setShowCallConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Phone className="h-5 w-5 text-primary" />
+              Call {contactName}?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <p>You're about to initiate a call to:</p>
+              <div className="p-3 rounded-lg bg-muted mt-2">
+                <p className="font-semibold">{contactName}</p>
+                <p className="text-primary font-medium">{contactPhone}</p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isCallingLead}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleCallContact}
+              disabled={isCallingLead || !appointment.lead_id}
+              className="bg-green-600 hover:bg-green-700"
+            >
+              {isCallingLead ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Calling...
+                </>
+              ) : (
+                <>
+                  <Phone className="h-4 w-4 mr-2" />
+                  Yes, Call Now
+                </>
               )}
-              {appointment.lead_notes && (
-                <p className="text-xs text-muted-foreground">{appointment.lead_notes}</p>
-              )}
-            </div>
-          )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
-          {/* Tags */}
-          {appointment.contact_tags && appointment.contact_tags.length > 0 && (
-            <div className="flex items-center gap-2 flex-wrap">
-              <Tag className="h-4 w-4 text-muted-foreground" />
-              {appointment.contact_tags.map((tag, i) => (
-                <Badge key={i} variant="secondary" className="text-xs">{tag}</Badge>
-              ))}
-            </div>
-          )}
-
-          {/* Notes */}
-          {appointment.notes && (
-            <div className="p-2 rounded-lg bg-muted">
-              <p className="text-sm">{appointment.notes}</p>
-            </div>
-          )}
-        </div>
-      </DialogContent>
-    </Dialog>
+      {/* Email Dialog */}
+      {contactEmail && appointment.lead_id && (
+        <SendEmailDialog
+          open={showEmailDialog}
+          onOpenChange={setShowEmailDialog}
+          contactName={contactName}
+          contactEmail={contactEmail}
+          contactType="lead"
+          contactId={appointment.lead_id}
+        />
+      )}
+    </>
   );
 }
 
