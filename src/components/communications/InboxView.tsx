@@ -1452,45 +1452,100 @@ export function InboxView() {
     }
   });
 
-  // Track done/handled emails in localStorage
-  const [doneGmailIds, setDoneGmailIds] = useState<Set<string>>(() => {
-    try {
-      const saved = localStorage.getItem('doneGmailIds');
-      return saved ? new Set(JSON.parse(saved)) : new Set();
-    } catch {
-      return new Set();
-    }
+  // Fetch email statuses from database
+  const { data: gmailEmailStatuses = [] } = useQuery({
+    queryKey: ["gmail-email-statuses", currentUserId],
+    queryFn: async () => {
+      if (!currentUserId) return [];
+      const { data, error } = await supabase
+        .from("gmail_email_status")
+        .select("*")
+        .eq("user_id", currentUserId);
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!currentUserId,
+  });
+
+  // Create lookup maps for email statuses
+  const doneGmailIds = useMemo(() => {
+    const set = new Set<string>();
+    gmailEmailStatuses.forEach(status => {
+      if (status.status === "done") set.add(status.gmail_message_id);
+    });
+    return set;
+  }, [gmailEmailStatuses]);
+
+  const snoozedGmailEmails = useMemo(() => {
+    const map = new Map<string, string>();
+    gmailEmailStatuses.forEach(status => {
+      if (status.status === "snoozed" && status.snoozed_until) {
+        // Only count as snoozed if snooze time hasn't passed
+        if (new Date(status.snoozed_until) > new Date()) {
+          map.set(status.gmail_message_id, status.snoozed_until);
+        }
+      }
+    });
+    return map;
+  }, [gmailEmailStatuses]);
+
+  // Mutation for updating email status in database
+  const updateGmailStatusMutation = useMutation({
+    mutationFn: async ({ 
+      emailId, 
+      status, 
+      snoozedUntil 
+    }: { 
+      emailId: string; 
+      status: "open" | "done" | "snoozed"; 
+      snoozedUntil?: Date;
+    }) => {
+      if (!currentUserId) throw new Error("Not authenticated");
+      
+      const { error } = await supabase
+        .from("gmail_email_status")
+        .upsert({
+          gmail_message_id: emailId,
+          user_id: currentUserId,
+          status,
+          snoozed_until: snoozedUntil?.toISOString() || null,
+          updated_at: new Date().toISOString(),
+        }, {
+          onConflict: 'gmail_message_id'
+        });
+      
+      if (error) throw error;
+      return { emailId, status };
+    },
+    onSuccess: (_, variables) => {
+      const labels: Record<string, string> = {
+        done: "Email marked as done",
+        open: "Email reopened",
+        snoozed: `Email snoozed until ${variables.snoozedUntil ? format(variables.snoozedUntil, "MMM d, h:mm a") : "later"}`,
+      };
+      toast.success(labels[variables.status]);
+      queryClient.invalidateQueries({ queryKey: ["gmail-email-statuses"] });
+    },
+    onError: (error: Error) => {
+      toast.error(`Failed to update email: ${error.message}`);
+    },
   });
 
   // Mark email as done/handled
   const markEmailAsDone = useCallback((emailId: string) => {
-    setDoneGmailIds(prev => {
-      const updated = new Set(prev);
-      updated.add(emailId);
-      try {
-        localStorage.setItem('doneGmailIds', JSON.stringify([...updated]));
-      } catch {
-        // localStorage full, ignore
-      }
-      return updated;
-    });
-    toast.success("Email marked as done");
-  }, []);
+    updateGmailStatusMutation.mutate({ emailId, status: "done" });
+  }, [updateGmailStatusMutation]);
 
-  // Unmark email as done
+  // Unmark email as done (reopen)
   const unmarkEmailAsDone = useCallback((emailId: string) => {
-    setDoneGmailIds(prev => {
-      const updated = new Set(prev);
-      updated.delete(emailId);
-      try {
-        localStorage.setItem('doneGmailIds', JSON.stringify([...updated]));
-      } catch {
-        // localStorage full, ignore
-      }
-      return updated;
-    });
-    toast.success("Email reopened");
-  }, []);
+    updateGmailStatusMutation.mutate({ emailId, status: "open" });
+  }, [updateGmailStatusMutation]);
+
+  // Snooze email
+  const handleGmailSnooze = useCallback((emailId: string, hours: number) => {
+    const snoozedUntil = hours === 24 ? addDays(new Date(), 1) : addHours(new Date(), hours);
+    updateGmailStatusMutation.mutate({ emailId, status: "snoozed", snoozedUntil });
+  }, [updateGmailStatusMutation]);
 
   // Mark email as read when selected - persists to localStorage
   const handleSelectGmailEmail = (email: GmailEmail) => {
@@ -1566,10 +1621,12 @@ export function InboxView() {
   }, [activeTab, selectedGmailEmail, selectedMessage, doneGmailIds, markEmailAsDone, unmarkEmailAsDone, handleMarkDone]);
 
   const handleKeySnooze = useCallback(() => {
-    if (selectedMessage) {
+    if (activeTab === "emails" && selectedGmailEmail) {
+      handleGmailSnooze(selectedGmailEmail.id, 1); // Snooze 1 hour by default
+    } else if (selectedMessage) {
       handleSnooze(selectedMessage, 1); // Snooze 1 hour by default
     }
-  }, [selectedMessage, handleSnooze]);
+  }, [activeTab, selectedGmailEmail, selectedMessage, handleGmailSnooze, handleSnooze]);
 
   const handleKeyNotes = useCallback(() => {
     if (selectedMessage) {
@@ -2327,21 +2384,28 @@ export function InboxView() {
                   .map((email) => {
                     const isUnread = email.labelIds?.includes('UNREAD') && !readGmailIds.has(email.id);
                     const isDone = doneGmailIds.has(email.id);
+                    const isSnoozed = snoozedGmailEmails.has(email.id);
                     const insight = emailInsightsMap.get(email.id);
+                    const isLowPriority = insight?.priority === 'low';
+                    const shouldFade = isDone || isSnoozed || isLowPriority;
                     
                     return (
                       <div 
-                        key={`${email.id}-${doneGmailIds.has(email.id) ? 'done' : 'open'}`}
+                        key={`${email.id}-${isDone ? 'done' : isSnoozed ? 'snoozed' : 'open'}`}
                         onClick={() => handleSelectGmailEmailMobile(email)} 
                         className={`group relative flex items-start gap-3 px-4 py-3 cursor-pointer transition-colors border-b border-border/30 active:bg-muted/50 
                           ${selectedGmailEmail?.id === email.id ? "bg-primary/5" : "hover:bg-muted/30"} 
                           ${isUnread ? "bg-primary/[0.03]" : ""} 
-                          ${isDone ? "opacity-50" : ""}`}
+                          ${shouldFade ? "opacity-50" : ""}`}
                       >
-                        {/* Done indicator line */}
-                        {isDone && (
+                        {/* Status indicator line - done/snoozed/priority */}
+                        {isDone ? (
                           <div className="absolute left-0 top-0 bottom-0 w-1 bg-green-500 rounded-r" />
-                        )}
+                        ) : isSnoozed ? (
+                          <div className="absolute left-0 top-0 bottom-0 w-1 bg-amber-500 rounded-r" />
+                        ) : insight?.priority === 'urgent' ? (
+                          <div className="absolute left-0 top-0 bottom-0 w-1 bg-red-500 rounded-r" />
+                        ) : null}
                         
                         <div className="relative h-10 w-10 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center flex-shrink-0">
                           <span className="text-xs font-semibold text-white">{getInitials(email.fromName)}</span>
@@ -2350,17 +2414,27 @@ export function InboxView() {
                               <CheckCircle className="h-2.5 w-2.5 text-white" />
                             </div>
                           )}
+                          {isSnoozed && !isDone && (
+                            <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-amber-500 border-2 border-background flex items-center justify-center">
+                              <Clock className="h-2.5 w-2.5 text-white" />
+                            </div>
+                          )}
                         </div>
                         
                         <div className="flex-1 min-w-0 py-0.5">
                           <div className="flex items-center justify-between gap-2 mb-0.5">
                             <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                              <span className={`text-sm truncate ${isUnread ? 'font-semibold' : isDone ? 'font-normal text-muted-foreground' : 'font-medium text-foreground/80'}`}>
+                              <span className={`text-sm truncate ${isUnread ? 'font-semibold' : shouldFade ? 'font-normal text-muted-foreground' : 'font-medium text-foreground/80'}`}>
                                 {email.fromName}
                               </span>
                               {isDone && (
                                 <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-green-500/10 text-green-600 text-[10px] font-medium">
                                   ✓ Done
+                                </span>
+                              )}
+                              {isSnoozed && !isDone && (
+                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-600 text-[10px] font-medium">
+                                  ⏰ Snoozed
                                 </span>
                               )}
                               {/* AI Category Badge */}
@@ -2376,37 +2450,28 @@ export function InboxView() {
                             <div className="flex items-center gap-1.5">
                               {/* Quick action buttons on hover */}
                               <div className="opacity-0 group-hover:opacity-100 transition-opacity hidden md:flex items-center gap-1">
-                                {isDone ? (
-                                  <button
-                                    onClick={(e) => { e.stopPropagation(); unmarkEmailAsDone(email.id); }}
-                                    className="p-1.5 rounded-full hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
-                                    title="Reopen"
-                                  >
-                                    <RotateCcw className="h-3.5 w-3.5" />
-                                  </button>
-                                ) : (
-                                  <button
-                                    onClick={(e) => { e.stopPropagation(); markEmailAsDone(email.id); }}
-                                    className="p-1.5 rounded-full hover:bg-green-500/10 transition-colors text-muted-foreground hover:text-green-600"
-                                    title="Mark as done"
-                                  >
-                                    <CheckCheck className="h-3.5 w-3.5" />
-                                  </button>
-                                )}
+                                <ConversationQuickActions
+                                  status={isDone ? "done" : isSnoozed ? "snoozed" : "open"}
+                                  onMarkDone={() => markEmailAsDone(email.id)}
+                                  onSnooze={(hours) => handleGmailSnooze(email.id, hours)}
+                                  onReopen={() => unmarkEmailAsDone(email.id)}
+                                  isUpdating={updateGmailStatusMutation.isPending}
+                                  compact
+                                />
                               </div>
                               <span className="text-[11px] text-muted-foreground whitespace-nowrap">
                                 {format(new Date(email.date), "MMM d")}
                               </span>
                             </div>
                           </div>
-                          <p className={`text-[13px] leading-snug ${isUnread ? 'font-medium' : isDone ? 'text-muted-foreground' : 'text-foreground/70'}`}>
+                          <p className={`text-[13px] leading-snug ${isUnread ? 'font-medium' : shouldFade ? 'text-muted-foreground' : 'text-foreground/70'}`}>
                             {email.subject}
                           </p>
                           <p className="text-[13px] text-muted-foreground mt-0.5 line-clamp-2 leading-relaxed">
                             {email.snippet}
                           </p>
                         </div>
-                        {isUnread && !isDone && <div className="w-2 h-2 rounded-full bg-primary flex-shrink-0 mt-3" />}
+                        {isUnread && !isDone && !isSnoozed && <div className="w-2 h-2 rounded-full bg-primary flex-shrink-0 mt-3" />}
                       </div>
                     );
                   })}
@@ -2704,6 +2769,15 @@ export function InboxView() {
                 <span className="font-medium text-sm truncate block">{selectedGmailEmail.fromName}</span>
                 <span className="text-xs text-muted-foreground truncate block">{selectedGmailEmail.from}</span>
               </div>
+              {/* Mobile email quick actions */}
+              <ConversationQuickActions
+                status={doneGmailIds.has(selectedGmailEmail.id) ? "done" : snoozedGmailEmails.has(selectedGmailEmail.id) ? "snoozed" : "open"}
+                onMarkDone={() => markEmailAsDone(selectedGmailEmail.id)}
+                onSnooze={(hours) => handleGmailSnooze(selectedGmailEmail.id, hours)}
+                onReopen={() => unmarkEmailAsDone(selectedGmailEmail.id)}
+                isUpdating={updateGmailStatusMutation.isPending}
+                compact
+              />
             </div>
             
             {/* Desktop email header */}
@@ -2715,6 +2789,14 @@ export function InboxView() {
                 <h3 className="font-semibold text-base">{selectedGmailEmail.fromName}</h3>
                 <p className="text-sm text-muted-foreground truncate">{selectedGmailEmail.from}</p>
               </div>
+              {/* Desktop email quick actions */}
+              <ConversationQuickActions
+                status={doneGmailIds.has(selectedGmailEmail.id) ? "done" : snoozedGmailEmails.has(selectedGmailEmail.id) ? "snoozed" : "open"}
+                onMarkDone={() => markEmailAsDone(selectedGmailEmail.id)}
+                onSnooze={(hours) => handleGmailSnooze(selectedGmailEmail.id, hours)}
+                onReopen={() => unmarkEmailAsDone(selectedGmailEmail.id)}
+                isUpdating={updateGmailStatusMutation.isPending}
+              />
               <Badge variant="secondary" className="text-xs">
                 {format(new Date(selectedGmailEmail.date), "MMM d, h:mm a")}
               </Badge>
