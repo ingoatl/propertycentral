@@ -2108,41 +2108,49 @@ export function InboxView() {
           <div className="flex items-center gap-1.5 min-w-max">
             {/* Notification bell */}
             <TeamNotificationBell />
-            {/* Admin inbox selector */}
-            {activeTab !== "emails" && isAdmin && (
+            {/* Admin inbox selector - for SMS/Calls */}
+            {activeTab !== "emails" && activeTab !== "all" && isAdmin && (
               <AdminInboxSelector selectedUserId={selectedInboxUserId} onUserChange={handleInboxChange} currentUserId={currentUserId} />
             )}
             
-            {/* Email inbox selector with category filter and keyboard help */}
-            {activeTab === "emails" && (
+            {/* Email inbox selector - show for both All tab and Emails tab */}
+            {(activeTab === "emails" || activeTab === "all") && (
               <>
-                <Button 
-                  onClick={() => setShowAIComposeEmail(true)} 
-                  size="sm"
-                  className="gap-1.5 h-8"
-                >
-                  <Plus className="h-4 w-4" />
-                  <span className="hidden sm:inline">Compose</span>
-                </Button>
-                <div className="w-px h-5 bg-border mx-1" />
-                {/* Enhanced Inbox Selector - replaces hardcoded Ingo/Anja buttons */}
+                {activeTab === "emails" && (
+                  <>
+                    <Button 
+                      onClick={() => setShowAIComposeEmail(true)} 
+                      size="sm"
+                      className="gap-1.5 h-8"
+                    >
+                      <Plus className="h-4 w-4" />
+                      <span className="hidden sm:inline">Compose</span>
+                    </Button>
+                    <div className="w-px h-5 bg-border mx-1" />
+                  </>
+                )}
+                {/* Enhanced Inbox Selector - filter emails by team member */}
                 <EnhancedInboxSelector
                   selectedView={selectedEmailInboxView}
                   onViewChange={setSelectedEmailInboxView}
                   currentUserId={currentUserId}
                 />
-                <div className="w-px h-5 bg-border mx-1" />
-                {/* AI Category Filter */}
-                <EmailCategoryFilter 
-                  selectedCategory={selectedEmailCategory}
-                  onCategoryChange={setSelectedEmailCategory}
-                />
-                {/* Keyboard shortcuts help */}
-                <KeyboardShortcutsHelp 
-                  shortcuts={keyboardShortcuts}
-                  open={showKeyboardHelp}
-                  onOpenChange={setShowKeyboardHelp}
-                />
+                {activeTab === "emails" && (
+                  <>
+                    <div className="w-px h-5 bg-border mx-1" />
+                    {/* AI Category Filter */}
+                    <EmailCategoryFilter 
+                      selectedCategory={selectedEmailCategory}
+                      onCategoryChange={setSelectedEmailCategory}
+                    />
+                    {/* Keyboard shortcuts help */}
+                    <KeyboardShortcutsHelp 
+                      shortcuts={keyboardShortcuts}
+                      open={showKeyboardHelp}
+                      onOpenChange={setShowKeyboardHelp}
+                    />
+                  </>
+                )}
               </>
             )}
             
