@@ -293,6 +293,14 @@ export function DiscoveryCallCalendar() {
           <div className="flex items-center gap-2">
             <Button
               variant="outline"
+              size="sm"
+              className="h-9 px-3 text-xs font-medium"
+              onClick={() => setCurrentMonth(new Date())}
+            >
+              Today
+            </Button>
+            <Button
+              variant="outline"
               size="icon"
               className="h-9 w-9"
               onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
@@ -991,14 +999,24 @@ function GhlAppointmentDetailModal({ appointment, onClose }: GhlAppointmentDetai
                 </div>
               )}
 
-              {/* Meeting Link - Prominent */}
-              {meetLink && (
-                <Button className="w-full h-10 text-sm bg-green-600 hover:bg-green-700 font-medium" asChild>
+              {/* Meeting Link - Always Prominent at Top */}
+              {meetLink ? (
+                <Button className="w-full h-12 text-base bg-green-600 hover:bg-green-700 font-semibold shadow-lg" asChild>
                   <a href={meetLink} target="_blank" rel="noopener noreferrer">
-                    <Video className="h-5 w-5 mr-2" /> 
-                    {meetLink.includes("zoom") ? "Join Zoom" : meetLink.includes("teams") ? "Join Teams" : "Join Google Meet"}
+                    <Video className="h-6 w-6 mr-2" /> 
+                    {meetLink.includes("zoom") ? "Join Zoom Meeting" : meetLink.includes("teams") ? "Join Teams Meeting" : "Join Google Meet"}
                   </a>
                 </Button>
+              ) : (
+                <div className="w-full p-3 rounded-lg bg-muted/50 border border-dashed text-center">
+                  <p className="text-sm text-muted-foreground flex items-center justify-center gap-2">
+                    <Video className="h-4 w-4" />
+                    No meeting link detected
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Check GHL calendar for video conference details
+                  </p>
+                </div>
               )}
 
               {/* Notes */}
