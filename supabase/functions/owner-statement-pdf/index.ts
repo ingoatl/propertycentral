@@ -27,6 +27,101 @@ serve(async (req: Request): Promise<Response> => {
       );
     }
 
+    // Handle demo statements - generate a demo PDF inline
+    if (reconciliationId.startsWith("stmt-demo-")) {
+      console.log("Demo statement requested, generating sample PDF");
+      
+      // Generate a demo statement PDF using the generate-statement-pdf endpoint logic
+      // For demo, we'll create a simple base64 PDF response
+      const demoMonth = reconciliationId === "stmt-demo-1" 
+        ? new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().substring(0, 7)
+        : reconciliationId === "stmt-demo-2"
+        ? new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString().substring(0, 7)
+        : new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().substring(0, 7);
+      
+      const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+      const [year, monthNum] = demoMonth.split("-");
+      const monthName = monthNames[parseInt(monthNum) - 1];
+      
+      // Create a minimal valid PDF (this is a simple demo PDF)
+      const demoPdfContent = `%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>
+endobj
+4 0 obj
+<< /Length 580 >>
+stream
+BT
+/F1 28 Tf
+50 720 Td
+(PeachHaus Group) Tj
+0 -40 Td
+/F1 18 Tf
+(Owner Statement) Tj
+0 -30 Td
+/F1 14 Tf
+(${monthName} ${year}) Tj
+0 -50 Td
+/F1 12 Tf
+(Property: 3069 Rita Way Retreat) Tj
+0 -20 Td
+(Owner: Sara & Michael Thompson) Tj
+0 -40 Td
+/F1 14 Tf
+(Revenue Summary) Tj
+0 -25 Td
+/F1 11 Tf
+(Short-Term Revenue: $2,350.00) Tj
+0 -18 Td
+(Mid-Term Revenue: $2,500.00) Tj
+0 -18 Td
+(Total Revenue: $4,850.00) Tj
+0 -35 Td
+/F1 14 Tf
+(Net Owner Earnings: $3,624.00) Tj
+0 -50 Td
+/F1 10 Tf
+(This is a demo statement for demonstration purposes.) Tj
+ET
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000266 00000 n 
+0000000898 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+977
+%%EOF`;
+
+      const pdfBase64 = btoa(demoPdfContent);
+      
+      return new Response(
+        JSON.stringify({ 
+          pdfBase64: pdfBase64,
+          fileName: `Statement-${monthName}-${year}-Demo.pdf`,
+          month: `${demoMonth}-01`,
+          generated: true,
+          isDemo: true
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     // Validate session if token provided
     let validatedPropertyId: string | null = null;
     if (token) {
