@@ -108,9 +108,9 @@ function getDemoPortalData() {
       },
     ],
     expenses: [
-      { id: "exp-1", date: formatDate(new Date(today.getTime() - 5 * 24 * 60 * 60 * 1000)), amount: 89.99, purpose: "Pool maintenance supplies", vendor: "Leslie's Pool Supplies", category: "Maintenance", file_path: null },
-      { id: "exp-2", date: formatDate(new Date(today.getTime() - 12 * 24 * 60 * 60 * 1000)), amount: 156.50, purpose: "Deep cleaning between guests", vendor: "CleanCo Pro", category: "Cleaning", file_path: null },
-      { id: "exp-3", date: formatDate(new Date(today.getTime() - 20 * 24 * 60 * 60 * 1000)), amount: 45.00, purpose: "Welcome basket supplies", vendor: "Costco", category: "Guest Amenities", file_path: null },
+      { id: "exp-1", date: formatDate(new Date(today.getTime() - 5 * 24 * 60 * 60 * 1000)), amount: 89.99, purpose: "Pool maintenance supplies", vendor: "Leslie's Pool Supplies", category: "Maintenance", file_path: null, original_receipt_path: null, email_screenshot_path: "demo/receipt-pool-supplies.jpg" },
+      { id: "exp-2", date: formatDate(new Date(today.getTime() - 12 * 24 * 60 * 60 * 1000)), amount: 156.50, purpose: "Deep cleaning between guests", vendor: "CleanCo Pro", category: "Cleaning", file_path: null, original_receipt_path: null, email_screenshot_path: "demo/receipt-cleaning.jpg" },
+      { id: "exp-3", date: formatDate(new Date(today.getTime() - 20 * 24 * 60 * 60 * 1000)), amount: 45.00, purpose: "Welcome basket supplies", vendor: "Costco", category: "Guest Amenities", file_path: null, original_receipt_path: null, email_screenshot_path: "demo/receipt-costco.jpg" },
     ],
     credentials: [
       { id: "cred-1", service_name: "WiFi Network", username: "RitaWay_Guest", password: "Welcome2024!", url: null, notes: "5GHz network for best streaming" },

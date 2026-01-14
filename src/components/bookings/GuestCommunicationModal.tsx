@@ -163,14 +163,22 @@ export const GuestCommunicationModal = ({
   };
 
   const handleSendMessage = async () => {
-    if (!guest || !generatedMessage) return;
+    if (!guest) return;
+    
+    // Use generated message if available, otherwise use context input directly
+    const messageToSend = generatedMessage || contextInput;
+    
+    if (!messageToSend.trim()) {
+      toast.error('Please enter a message');
+      return;
+    }
 
     setIsSending(true);
     try {
       const { data, error } = await supabase.functions.invoke('ghl-send-sms', {
         body: {
           phone: guest.phone,
-          message: generatedMessage,
+          message: messageToSend,
           fromNumber: smsPhone, // Always use GHL 404-800 number for SMS
         },
       });
@@ -340,7 +348,7 @@ export const GuestCommunicationModal = ({
             </Button>
             <Button
               onClick={handleSendMessage}
-              disabled={!generatedMessage || isSending}
+              disabled={(!generatedMessage && !contextInput.trim()) || isSending}
               className="gap-2 bg-green-600 hover:bg-green-700"
             >
               {isSending ? (
