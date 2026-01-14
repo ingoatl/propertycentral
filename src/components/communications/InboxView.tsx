@@ -715,8 +715,8 @@ export function InboxView() {
     },
   });
 
-  // Enhanced inbox selector state - "all" shows all emails, or specific user inbox
-  const [selectedEmailInboxView, setSelectedEmailInboxView] = useState<InboxViewType>("all");
+  // Enhanced inbox selector state - default to user's own inbox, not all
+  const [selectedEmailInboxView, setSelectedEmailInboxView] = useState<InboxViewType>("my-inbox");
 
   // Fetch Gmail inbox emails for ALL team members - always fetch for All and Emails tabs
   const { data: gmailEmails = [], isLoading: isLoadingGmail } = useQuery({
@@ -2129,11 +2129,12 @@ export function InboxView() {
                     <div className="w-px h-5 bg-border mx-1" />
                   </>
                 )}
-                {/* Enhanced Inbox Selector - filter emails by team member */}
+                {/* Enhanced Inbox Selector - filter emails by team member, "All" only for admins */}
                 <EnhancedInboxSelector
                   selectedView={selectedEmailInboxView}
                   onViewChange={setSelectedEmailInboxView}
                   currentUserId={currentUserId}
+                  isAdmin={isAdmin}
                 />
                 {activeTab === "emails" && (
                   <>
@@ -2580,8 +2581,8 @@ export function InboxView() {
 
       {/* Right Panel - Detail View (Full screen on mobile when showing detail) */}
       <div className={`flex-1 flex flex-col min-w-0 overflow-hidden ${showMobileDetail ? 'flex' : 'hidden md:flex'}`}>
-        {activeTab === "emails" && selectedGmailEmail ? (
-          // Gmail Email Detail View - Mobile optimized
+        {(activeTab === "emails" || activeTab === "all") && selectedGmailEmail ? (
+          // Gmail Email Detail View - Mobile optimized (works for both Emails tab and All tab)
           <>
             {/* Mobile back header - minimal */}
             <div className="md:hidden flex items-center gap-2 px-2 py-2 border-b">
