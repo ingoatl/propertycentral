@@ -76,6 +76,11 @@ import { EmailCategoryBadge } from "./EmailCategoryBadge";
 import { EmailCategoryFilter } from "./EmailCategoryFilter";
 import { KeyboardShortcutsHelp } from "./KeyboardShortcutsHelp";
 import { useInboxKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
+import { EnhancedInboxSelector, type InboxView as InboxViewType } from "./EnhancedInboxSelector";
+import { WorkStatusBadge, WorkStatusDot, type WorkStatus } from "./WorkStatusBadge";
+import { LabelBadges } from "./MessageLabels";
+import { BatchActions } from "./BatchActions";
+import { QuickAssignButton } from "./QuickAssignButton";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { useAdminCheck } from "@/hooks/useAdminCheck";
@@ -708,10 +713,10 @@ export function InboxView() {
     },
   });
 
-  // Determine which inbox to show based on selected user
-  const [selectedEmailInbox, setSelectedEmailInbox] = useState<"ingo" | "anja">("ingo");
+  // Enhanced inbox selector state - "all" shows all emails, or specific user inbox
+  const [selectedEmailInboxView, setSelectedEmailInboxView] = useState<InboxViewType>("all");
 
-  // Fetch Gmail inbox emails for both Ingo and Anja
+  // Fetch Gmail inbox emails for ALL team members
   const { data: gmailEmails = [], isLoading: isLoadingGmail } = useQuery({
     queryKey: ["gmail-inbox"],
     queryFn: async () => {
@@ -730,6 +735,38 @@ export function InboxView() {
     staleTime: 30000,
     refetchInterval: 30000, // Refresh every 30 seconds
   });
+
+  // Fetch user gmail labels for mapping
+  const { data: userGmailLabels = [] } = useQuery({
+    queryKey: ["user-gmail-labels"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("user_gmail_labels")
+        .select("user_id, label_name, email_address")
+        .eq("is_active", true);
+      
+      if (error) {
+        console.error("Failed to fetch user gmail labels:", error);
+        return [];
+      }
+      return data || [];
+    },
+    enabled: activeTab === "emails",
+  });
+
+  // Create lookup map for user labels
+  const userLabelMap = useMemo(() => {
+    const map = new Map<string, { user_id: string; label_name: string; email_address: string | null }>();
+    userGmailLabels.forEach(label => {
+      if (label.label_name) {
+        map.set(label.label_name.toLowerCase(), label);
+      }
+      if (label.email_address) {
+        map.set(label.email_address.toLowerCase(), label);
+      }
+    });
+    return map;
+  }, [userGmailLabels]);
 
   // Fetch email insights for AI categorization badges
   const { data: emailInsights = [] } = useQuery({
@@ -763,16 +800,43 @@ export function InboxView() {
     return map;
   }, [emailInsights]);
 
-  // Filter emails based on selected inbox AND category filter
+  // Filter emails based on selected inbox view AND category filter
   const filteredGmailEmails = useMemo(() => {
-    let filtered = gmailEmails.filter(email => {
-      const targetInbox = email.targetInbox?.toLowerCase() || '';
-      if (selectedEmailInbox === "ingo") {
-        return targetInbox.includes("ingo") || !email.targetInbox;
-      } else {
-        return targetInbox.includes("anja");
+    let filtered = gmailEmails;
+    
+    // Filter by inbox view
+    if (selectedEmailInboxView === "all") {
+      // Show all emails - no filtering
+      filtered = gmailEmails;
+    } else if (selectedEmailInboxView === "my-inbox" && currentUserId) {
+      // Show only emails for current user
+      const currentUserLabel = userGmailLabels.find(l => l.user_id === currentUserId);
+      if (currentUserLabel) {
+        filtered = gmailEmails.filter(email => {
+          const targetInbox = email.targetInbox?.toLowerCase() || '';
+          return targetInbox.includes(currentUserLabel.label_name.toLowerCase());
+        });
       }
-    });
+    } else if (selectedEmailInboxView === "unassigned") {
+      // Show emails that don't match any user's label
+      filtered = gmailEmails.filter(email => {
+        const targetInbox = email.targetInbox?.toLowerCase() || '';
+        // Check if this email matches any user's label
+        const matchesAnyUser = userGmailLabels.some(label => 
+          targetInbox.includes(label.label_name.toLowerCase())
+        );
+        return !matchesAnyUser || !email.targetInbox;
+      });
+    } else {
+      // Specific user selected - find their label and filter
+      const selectedUserLabel = userGmailLabels.find(l => l.user_id === selectedEmailInboxView);
+      if (selectedUserLabel) {
+        filtered = gmailEmails.filter(email => {
+          const targetInbox = email.targetInbox?.toLowerCase() || '';
+          return targetInbox.includes(selectedUserLabel.label_name.toLowerCase());
+        });
+      }
+    }
 
     // Apply category filter if selected
     if (selectedEmailCategory) {
@@ -783,7 +847,7 @@ export function InboxView() {
     }
 
     return filtered;
-  }, [gmailEmails, selectedEmailInbox, selectedEmailCategory, emailInsightsMap]);
+  }, [gmailEmails, selectedEmailInboxView, currentUserId, userGmailLabels, selectedEmailCategory, emailInsightsMap]);
 
   const { data: communications = [], isLoading, isError, error, refetch } = useQuery({
     queryKey: ["all-communications", search, activeTab, activeFilter, selectedInboxUserId, viewAllInboxes],
@@ -2016,18 +2080,12 @@ export function InboxView() {
                   <span className="hidden sm:inline">Compose</span>
                 </Button>
                 <div className="w-px h-5 bg-border mx-1" />
-                <button 
-                  onClick={() => setSelectedEmailInbox("ingo")} 
-                  className={`px-2.5 py-1.5 rounded-full text-xs font-medium transition-colors ${selectedEmailInbox === "ingo" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}
-                >
-                  Ingo
-                </button>
-                <button 
-                  onClick={() => setSelectedEmailInbox("anja")} 
-                  className={`px-2.5 py-1.5 rounded-full text-xs font-medium transition-colors ${selectedEmailInbox === "anja" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"}`}
-                >
-                  Anja
-                </button>
+                {/* Enhanced Inbox Selector - replaces hardcoded Ingo/Anja buttons */}
+                <EnhancedInboxSelector
+                  selectedView={selectedEmailInboxView}
+                  onViewChange={setSelectedEmailInboxView}
+                  currentUserId={currentUserId}
+                />
                 <div className="w-px h-5 bg-border mx-1" />
                 {/* AI Category Filter */}
                 <EmailCategoryFilter 

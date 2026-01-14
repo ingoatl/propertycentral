@@ -27,18 +27,46 @@ serve(async (req) => {
   try {
     const { daysBack = 3 } = await req.json().catch(() => ({}));
     
-    // Fetch emails for both Ingo and Anja - include all known email variants
-    const targetEmails = [
-      'ingo@peachhausgroup.com', 
-      'anja@peachhausgroup.com',
-      'ingo@peachhg.com',
-      'anja@peachhg.com'
-    ];
-    
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
+
+    // Fetch target emails from user_gmail_labels table for dynamic team member support
+    const { data: gmailLabels, error: labelsError } = await supabase
+      .from('user_gmail_labels')
+      .select('label_name, email_address')
+      .eq('is_active', true);
+
+    // Build target emails list from database, with fallback to hardcoded values
+    let targetEmails: string[] = [];
+    
+    if (gmailLabels && gmailLabels.length > 0) {
+      // Use emails from the database
+      targetEmails = gmailLabels
+        .filter(l => l.email_address)
+        .map(l => l.email_address!);
+      
+      // Also add common email domain variations
+      const labels = gmailLabels.map(l => l.label_name.toLowerCase());
+      for (const label of labels) {
+        targetEmails.push(`${label}@peachhausgroup.com`);
+        targetEmails.push(`${label}@peachhg.com`);
+      }
+    } else {
+      // Fallback to hardcoded emails if no database entries
+      targetEmails = [
+        'ingo@peachhausgroup.com', 
+        'anja@peachhausgroup.com',
+        'alex@peachhausgroup.com',
+        'ingo@peachhg.com',
+        'anja@peachhg.com',
+        'alex@peachhg.com'
+      ];
+    }
+    
+    // Remove duplicates
+    targetEmails = [...new Set(targetEmails.filter(Boolean))];
 
     console.log(`Fetching Gmail inbox for ${targetEmails.join(', ')}, last ${daysBack} days...`);
 
@@ -75,7 +103,7 @@ serve(async (req) => {
     daysAgo.setDate(daysAgo.getDate() - daysBack);
     const afterDate = Math.floor(daysAgo.getTime() / 1000);
 
-    // Build search query - fetch emails TO either Ingo or Anja
+    // Build search query - fetch emails TO any team member
     const toQuery = targetEmails.map(e => `to:${e}`).join(' OR ');
     const query = `(${toQuery}) after:${afterDate}`;
 
@@ -164,11 +192,32 @@ serve(async (req) => {
         bodyText = extracted.text;
         bodyHtml = extracted.html;
 
-        // Determine which inbox this email is for (check all email variants)
+        // Determine which inbox this email is for - check against all team member labels
         const toLower = to.toLowerCase();
-        const targetInbox = (toLower.includes('anja@peachhausgroup.com') || toLower.includes('anja@peachhg.com')) 
-          ? 'anja' 
-          : 'ingo';
+        let targetInbox = 'unknown';
+        
+        // Check against all known labels from database
+        if (gmailLabels && gmailLabels.length > 0) {
+          for (const label of gmailLabels) {
+            const labelLower = label.label_name.toLowerCase();
+            if (toLower.includes(`${labelLower}@`) || 
+                (label.email_address && toLower.includes(label.email_address.toLowerCase()))) {
+              targetInbox = labelLower;
+              break;
+            }
+          }
+        }
+        
+        // Fallback to pattern matching if no database match
+        if (targetInbox === 'unknown') {
+          if (toLower.includes('anja@')) {
+            targetInbox = 'anja';
+          } else if (toLower.includes('alex@')) {
+            targetInbox = 'alex';
+          } else if (toLower.includes('ingo@')) {
+            targetInbox = 'ingo';
+          }
+        }
 
         emails.push({
           id: msg.id,
